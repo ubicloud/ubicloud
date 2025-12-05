@@ -306,7 +306,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   label def setup_environment
-    command = <<~COMMAND
+    command = [NetSsh.command(<<~COMMAND, setup_info: setup_info.to_json, runtime_token: vm.runtime_token, base_url: Config.base_url)]
       # To make sure the script errors out if any command fails
       set -ueo pipefail
       echo "image version: $ImageVersion"
@@ -318,30 +318,30 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # The `imagedata.json` file contains information about the generated image.
       # I enrich it with details about the Ubicloud environment and placed it in the runner's home directory.
       # GitHub-hosted runners also use this file as setup_info to show on the GitHub UI.
-      jq '. += [#{setup_info.to_json}]' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+      jq '. += [':setup_info']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
 
       # We use a JWT token to authenticate the virtual machines with our runtime API. This token is valid as long as the vm is running.
       # ubicloud/cache package which forked from the official actions/cache package, sends requests to UBICLOUD_CACHE_URL using this token.
-      echo "UBICLOUD_RUNTIME_TOKEN=#{vm.runtime_token}
-      UBICLOUD_CACHE_URL=#{Config.base_url}/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+      echo "UBICLOUD_RUNTIME_TOKEN=":runtime_token"
+      UBICLOUD_CACHE_URL=":base_url"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
     COMMAND
 
     if installation.cache_enabled
-      command += <<~COMMAND
-        echo "CUSTOM_ACTIONS_CACHE_URL=http://#{vm.private_ipv4}:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
+      command << NetSsh.command(<<~COMMAND, private_ipv4: vm.private_ipv4)
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://:private_ipv4:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
     end
 
     if github_runner.label.include?("gpu")
       message = "The GPU runners will be deprecated on December 31, 2025. All jobs using these runners should be migrated to other runner types."
-      command += <<~COMMAND
-        echo "::warning::#{message}" | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
+      command << NetSsh.command(<<~COMMAND, message:)
+        echo "::warning::":message | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
     end
 
     begin
       # Remove comments and empty lines before sending them to the machine
-      vm.sshable.cmd(command.gsub(/^(\s*# .*)?\n/, ""))
+      vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""))
     rescue Net::SSH::AuthenticationFailed
       Clog.emit("ssh authentication failed") { {failed_runner_authentication: github_runner} }
       nap 1
@@ -442,7 +442,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
       if vm.vm_host
         serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
-        vm.vm_host.sshable.cmd("sudo ln #{serial_log_path} /var/log/ubicloud/serials/#{github_runner.ubid}_serial.log")
+        vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid)
       end
       # We grep only the lines related to 'run-withenv' and 'systemd'. Other
       # logs include outputs from subprocesses like php, sudo, etc., which
