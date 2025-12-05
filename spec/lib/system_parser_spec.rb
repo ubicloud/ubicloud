@@ -64,16 +64,6 @@ RSpec.describe SystemParser do
     end
   end
 
-  describe ".df_command" do
-    it "returns the correct df command" do
-      expect(described_class.df_command("/var/storage")).to eq("df -B1 --output=source,target,size,avail /var/storage")
-    end
-
-    it "returns the correct df command with default path" do
-      expect(described_class.df_command).to eq("df -B1 --output=source,target,size,avail ")
-    end
-  end
-
   describe ".extract_disk_info_from_df" do
     context "when df output is correct" do
       it "parses the df output and returns disk information" do

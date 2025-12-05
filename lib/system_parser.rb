@@ -51,8 +51,6 @@ class SystemParser
     section_match[1].scan(/(\w+?)(?:p\d+)?\[\d+\]/).flatten.uniq
   end
 
-  def self.df_command(path = "") = "df -B1 --output=source,target,size,avail #{path}"
-
   # By providing the output of df, you will get an array containing filename, mountpoint and size and available space
   #
   # Sample output of df command
