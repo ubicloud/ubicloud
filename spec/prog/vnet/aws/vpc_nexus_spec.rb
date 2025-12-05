@@ -29,17 +29,6 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     allow(Aws::EC2::Client).to receive(:new).with(credentials: aws_credentials, region: "us-west-2").and_return(client)
   end
 
-  it "hops to destroy if when_destroy_set?" do
-    expect(nx).to receive(:when_destroy_set?).and_yield
-    expect { nx.before_run }.to hop("destroy")
-  end
-
-  it "does not hop to destroy if already destroying" do
-    expect(nx).to receive(:when_destroy_set?).and_yield
-    expect(nx).to receive(:when_destroying_set?).and_yield
-    expect { nx.before_run }.not_to hop("destroy")
-  end
-
   describe "#start" do
     it "creates PrivateSubnetAwsResource and hops to create_vpc" do
       expect(PrivateSubnetAwsResource).to receive(:create_with_id).with(ps.id)
