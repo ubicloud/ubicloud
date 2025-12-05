@@ -110,7 +110,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do
-        project
+        project.set_ff_private_locations(true)
         private_location = create_private_location(project: project)
         Location.where(id: [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]).destroy
 

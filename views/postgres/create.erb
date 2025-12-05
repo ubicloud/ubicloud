@@ -26,8 +26,17 @@
 ) %>
 
 <%
-  byoc_description_html = "<p class='mt-1 text-sm leading-6 text-gray-600'>To run Ubicloud Postgres in your own AWS account using <a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='text-orange-600 hover:text-orange-700'>BYOC (AWS)</a>, email us at <a href='mailto:support@ubicloud.com' class='text-orange-600 hover:text-orange-700'>support@ubicloud.com</a></p>"
-  additional_element_html = "<label class=\"form_flavor form_flavor_standard cursor-not-allowed\"><input type='radio' name='byoc' value='byoc' class='peer sr-only' disabled><span class=\"radio-small-card justify-center p-3 text-sm font-semibold pointer-events-none bg-gray-100 text-gray-500\">Your Own AWS Account</span></label>"
+  byoc_description_html, additional_element_html = if @project.get_ff_private_locations
+    [
+      "<p class='mt-1 text-sm leading-6 text-gray-600'><a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='text-orange-600 hover:text-orange-700'>Learn more</a> about running Ubicloud Postgres on AWS, including in your own account with Bring-Your-Own-Cloud.</p>",
+      "<label class=\"form_flavor form_flavor_standard cursor-pointer\"><a href=\"#{@project.path}/private-location/create\" class=\"radio-small-card justify-center p-3 text-sm font-semibold\">+ Create a new region (BYOC)</a></label>"
+    ]
+  else
+    [
+      "<p class='mt-1 text-sm leading-6 text-gray-600'>To run Ubicloud Postgres in your own AWS account using <a href='https://www.ubicloud.com/postgresql-on-aws-high-iops' class='text-orange-600 hover:text-orange-700'>BYOC (AWS)</a>, email us at <a href='mailto:support@ubicloud.com' class='text-orange-600 hover:text-orange-700'>support@ubicloud.com</a></p>",
+      "<label class=\"form_flavor form_flavor_standard cursor-not-allowed\"><input type='radio' name='byoc' value='byoc' class='peer sr-only' disabled><span class=\"radio-small-card justify-center p-3 text-sm font-semibold pointer-events-none bg-gray-100 text-gray-500\">Your Own AWS Account</span></label>"
+    ]
+  end
 
   form_elements = [
     {name: "flavor", type: "hidden", value: @flavor},
