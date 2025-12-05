@@ -460,5 +460,12 @@ RSpec.describe Prog::Base do
         st.unsynchronized_run
       }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
     end
+
+    it "fails if destroying semaphore not set on destroy label" do
+      st.update(label: "destroy")
+      expect {
+        st.unsynchronized_run
+      }.to raise_error(RuntimeError, "BUG: destroying semaphore not set on destroy label")
+    end
   end
 end
