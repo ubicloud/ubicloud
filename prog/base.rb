@@ -76,10 +76,8 @@ end
   end
 
   def before_run
-    if defined?(hop_destroy) && defined?(when_destroy_set?)
-      when_destroy_set? do
-        hop_destroy if @strand.label != "destroy"
-      end
+    if defined?(hop_destroy)
+      hop_destroy if destroy_set? && !destroying_set?
     end
   end
 
