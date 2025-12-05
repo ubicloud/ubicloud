@@ -37,4 +37,9 @@ RSpec.describe Location do
     expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, [])).to be false
     expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, ["latitude-ai"])).to be true
   end
+
+  it "returns [] for azs if not aws location" do
+    p1_loc.update(provider: "hetzner")
+    expect(p1_loc.azs).to eq([])
+  end
 end
