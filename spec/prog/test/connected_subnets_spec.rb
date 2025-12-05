@@ -285,10 +285,10 @@ ExecStart=nc -l 8080 -6
     it "tests the connection" do
       to_connect_ip = "1.1.1.1"
       connecting = instance_double(Vm, sshable: sshable, inhost_name: "connecting")
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!")
       expect { connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true) }.not_to raise_error
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("error")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true)
 
@@ -299,7 +299,7 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: false)
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_return("success!")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!")
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should not be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: true)
 
@@ -307,7 +307,7 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:fail_test).with("connecting should not be able to connect to 1.1.1.1 on port 8080")
       connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: false)
 
-      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 ").and_raise("error")
+      expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_raise("error")
       expect(connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: true, ipv4: true)).to eq(0)
 
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080 -6").and_raise("error")
