@@ -5,12 +5,6 @@ require "aws-sdk-ec2"
 class Prog::Vnet::Aws::NicNexus < Prog::Base
   subject_is :nic
 
-  def before_run
-    when_destroy_set? do
-      hop_destroy unless ["destroy", "release_eip", "delete_subnet", "destroy_entities"].include?(strand.label)
-    end
-  end
-
   label def start
     register_deadline("wait", 3 * 60)
     NicAwsResource.create_with_id(nic.id)
