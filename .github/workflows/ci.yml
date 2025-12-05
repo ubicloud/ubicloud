@@ -56,6 +56,9 @@ jobs:
     - name: Run linter:xss_check
       run: bundle exec rake linter:xss_check
 
+    - name: Run linter:cmd_exec
+      run: bundle exec rake linter:cmd_exec
+
     - name: Run annotate
       run: bundle exec rake annotate
 
