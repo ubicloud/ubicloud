@@ -74,6 +74,8 @@ RSpec.describe Prog::Test::HaPostgresResource do
   describe "#trigger_failover" do
     it "triggers a failover and hops to wait_failover" do
       expect(pgr_test).to receive(:postgres_resource).at_least(:once).and_return(instance_double(PostgresResource, servers: servers, version: "16"))
+      expect(vm.sshable).to receive(:_cmd).with("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/16/main/conf.d/001-service.conf")
+      expect(vm.sshable).to receive(:_cmd).with("ps aux | grep -v grep | grep '/usr/lib/postgresql/16/bin/postgres' | awk '{print $2}' | xargs sudo kill -9")
       expect(pgr_test).to receive(:update_stack).with({"primary_ubid" => "1234"})
       expect { pgr_test.trigger_failover }.to hop("wait_failover")
     end
