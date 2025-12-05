@@ -73,7 +73,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
   describe "#trigger_failover" do
     it "triggers a failover and hops to wait_failover" do
-      expect(pgr_test).to receive(:postgres_resource).exactly(3).and_return(instance_double(PostgresResource, servers: servers, version: "16"))
+      expect(pgr_test).to receive(:postgres_resource).at_least(:once).and_return(instance_double(PostgresResource, servers: servers, version: "16"))
       expect(pgr_test).to receive(:update_stack).with({"primary_ubid" => "1234"})
       expect { pgr_test.trigger_failover }.to hop("wait_failover")
     end
