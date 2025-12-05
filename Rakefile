@@ -558,7 +558,23 @@ namespace :linter do
       exit 1
     end
   end
+
+  desc "Check for potentially unsafe overrides of cmd/exec!"
+  task :cmd_exec do
+    failure = false
+    Dir.glob("spec/**/*.rb").each do |file|
+      number = 0
+      File.foreach(file) do |line|
+        number += 1
+        if /\(:(cmd|exec!|kubectl|rootish_ssh)/.match?(line)
+          failure = true
+          warn "Potentially insecure :cmd/:exec! override: #{file}:#{number}: #{line}"
+        end
+      end
+    end
+    exit(failure ? 1 : 0)
+  end
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go", "xss_check"].map { "linter:#{it}" }
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go", "xss_check", "cmd_exec"].map { "linter:#{it}" }
