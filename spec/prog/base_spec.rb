@@ -450,11 +450,11 @@ RSpec.describe Prog::Base do
         .not_to change(st, :label)
     end
 
-    it "does not hop to destroy if strand is destroy" do
-      st.update(label: "destroy")
+    it "does not hop to destroy if destroy semaphore incremented" do
       Semaphore.incr(st.id, :destroy)
+      Semaphore.incr(st.id, :destroying)
       expect { st.unsynchronized_run }
-        .to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+        .not_to change(st, :label)
     end
   end
 end
