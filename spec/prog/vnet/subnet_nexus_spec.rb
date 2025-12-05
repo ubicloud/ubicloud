@@ -119,25 +119,6 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy if when_destroy_set?" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "hops to destroy if when_destroy_set? from wait_fw_rules" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_fw_rules").at_least(:once)
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "creates a vpc if location is aws and starts to wait for it" do
       loc = Location.create(name: "aws-us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
