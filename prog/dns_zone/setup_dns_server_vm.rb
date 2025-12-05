@@ -85,9 +85,9 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   end
 
   label def prepare
-    sshable.cmd <<~SH
+    sshable.cmd(<<~SH, inhost_name: vm.inhost_name)
 sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
-sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 #{vm.inhost_name}\\n\\n#/' /etc/hosts
+sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 ':inhost_name'\\n\\n#/' /etc/hosts
 sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo apt-get update
 sudo apt-get -y install apt-transport-https ca-certificates wget
@@ -153,7 +153,7 @@ zone:
 #{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
 #{dz.name}.          3600    NS      #{ds.name}.
       CONF
-      sshable.cmd("sudo -u knot tee /var/lib/knot/#{dz.name}.zone > /dev/null", stdin: zone_config)
+      sshable.cmd("sudo -u knot tee /var/lib/knot/:name.zone > /dev/null", name: dz.name, stdin: zone_config)
     end
 
     sshable.cmd "sudo systemctl restart knot"
