@@ -74,11 +74,11 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     access_token = Config.inference_router_access_token
     asset_name = "inference-router-#{release_tag}-x86_64-unknown-linux-gnu"
     vm.sshable.cmd("id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router")
-    vm.sshable.cmd("sudo chown -R inference-router:inference-router #{workdir}")
-    vm.sshable.cmd("sudo wget -O #{workdir}/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64")
-    vm.sshable.cmd("sudo chmod +x #{workdir}/fetch_linux_amd64")
-    vm.sshable.cmd("sudo #{workdir}/fetch_linux_amd64 --github-oauth-token=\"#{access_token}\" --repo=\"https://github.com/ubicloud/inference-router\" --tag=\"#{release_tag}\" --release-asset=\"inference-router-*\" #{workdir}/")
-    vm.sshable.cmd("sudo tar -xzf #{workdir}/#{asset_name}.tar.gz -C #{workdir}")
+    vm.sshable.cmd("sudo chown -R inference-router:inference-router :workdir", workdir:)
+    vm.sshable.cmd("sudo wget -O :workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64", workdir:)
+    vm.sshable.cmd("sudo chmod +x :workdir/fetch_linux_amd64", workdir:)
+    vm.sshable.cmd("sudo :workdir/fetch_linux_amd64 --github-oauth-token=:access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=:release_tag --release-asset=\"inference-router-*\" :workdir/", workdir:, access_token:, release_tag:)
+    vm.sshable.cmd("sudo tar -xzf :workdir/:asset_name.tar.gz -C :workdir", workdir:, asset_name:)
     write_inference_router_service(asset_name, workdir)
     vm.sshable.cmd("sudo systemctl daemon-reload")
     vm.sshable.cmd("sudo systemctl enable --now inference-router")
@@ -87,7 +87,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   end
 
   def write_inference_router_service(asset_name, workdir)
-    service_definition = <<~SERVICE
+    vm.sshable.cmd("sudo tee /etc/systemd/system/inference-router.service > /dev/null", stdin: <<~SERVICE)
       [Unit]
       Description=Inference Router
       After=network.target
@@ -154,12 +154,6 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       [Install]
       WantedBy=multi-user.target
     SERVICE
-
-    vm.sshable.cmd <<~CMD
-      sudo tee /etc/systemd/system/inference-router.service > /dev/null << 'EOF'
-      #{service_definition}
-      EOF
-    CMD
   end
 
   label def wait_router_up
@@ -298,10 +292,10 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     new_config_json = JSON.generate(new_config)
     new_md5 = Digest::MD5.hexdigest(new_config_json)
     config_path = "/ir/workdir/config.json"
-    current_md5 = vm.sshable.cmd("md5sum #{config_path} | awk '{ print $1 }'").strip
+    current_md5 = vm.sshable.cmd("md5sum :config_path | awk '{ print $1 }'", config_path:).strip
     if current_md5 != new_md5
       # print("new_md5: #{new_md5}, current_md5: #{current_md5}\n") # Uncomment for obtaining md5 for testing.
-      vm.sshable.cmd("sudo mkdir -p /ir/workdir && sudo tee #{config_path} > /dev/null", stdin: new_config_json)
+      vm.sshable.cmd("sudo mkdir -p /ir/workdir && sudo tee :config_path > /dev/null", config_path:, stdin: new_config_json)
       vm.sshable.cmd("sudo pkill -f -HUP inference-router")
       Clog.emit("Configuration updated successfully.")
     end

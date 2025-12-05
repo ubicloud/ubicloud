@@ -147,7 +147,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       )
       expect(sshable).to receive(:_cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
       expect(sshable).to receive(:_cmd).with(
-        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=\"dummy_access_token\" --repo=\"https://github.com/ubicloud/inference-router\" --tag=\"v0.1.0\" --release-asset=\"inference-router-*\" /ir/workdir/"
+        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=dummy_access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=v0.1.0 --release-asset=\"inference-router-*\" /ir/workdir/"
       )
       expect(sshable).to receive(:_cmd).with(
         "sudo tar -xzf /ir/workdir/inference-router-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /ir/workdir"
@@ -156,7 +156,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "sudo chown -R inference-router:inference-router /ir/workdir"
       )
       expect(sshable).to receive(:_cmd)
-        .with(/sudo tee \/etc\/systemd\/system\/inference-router\.service > \/dev\/null << 'EOF'/)
+        .with("sudo tee /etc/systemd/system/inference-router.service > /dev/null", stdin: /\A\[Unit\].*WantedBy=multi-user.target\n\z/m)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now inference-router")
       expect { nx.setup }.to hop("wait_router_up")
