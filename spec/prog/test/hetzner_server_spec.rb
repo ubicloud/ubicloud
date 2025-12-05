@@ -64,12 +64,16 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#wait_reimage" do
     it "hops to setup_host if the server is up" do
-      expect(Util).to receive(:rootish_ssh)
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo 1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
       expect { hs_test.wait_reimage }.to hop("setup_host")
     end
 
     it "naps if the server is not up yet" do
-      expect(Util).to receive(:rootish_ssh).and_raise RuntimeError, "ssh failed"
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).and_raise(RuntimeError, "ssh failed")
       expect { hs_test.wait_reimage }.to nap(15)
     end
   end
