@@ -52,6 +52,26 @@ class Location < Sequel::Model
   def pg_ami(pg_version, arch)
     PgAwsAmi.find(aws_location_name: name, pg_version:, arch:).aws_ami_id
   end
+
+  # only valid for aws locations
+  def azs
+    unless aws?
+      Clog.emit("azs is only valid for aws locations") { {location_id: id} }
+      return []
+    end
+
+    return super if super.any?
+
+    set_azs
+  end
+
+  private
+
+  def set_azs
+    fetched_azs = location_credential.client.describe_availability_zones.availability_zones.map { it.zone_name.delete_prefix(name) }
+    update(azs: fetched_azs)
+    fetched_azs
+  end
 end
 
 # Table: location
@@ -65,6 +85,7 @@ end
 #  project_id   | uuid    |
 #  dns_suffix   | text    |
 #  byoc         | boolean | NOT NULL DEFAULT false
+#  azs          | jsonb   | NOT NULL DEFAULT '[]'::jsonb
 # Indexes:
 #  location_pkey                         | PRIMARY KEY btree (id)
 #  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
