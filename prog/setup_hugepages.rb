@@ -10,7 +10,7 @@ class Prog::SetupHugepages < Prog::Base
     # upto about 1G of the 5G as not all SPDK allocations are from hugepages.
     hugepage_cnt = vm_host.total_mem_gib - 5
 
-    sshable.cmd("sudo sed -i '/^GRUB_CMDLINE_LINUX=\"/ s/\"$/ hugetlb_free_vmemmap=on default_hugepagesz=#{hugepage_size} hugepagesz=#{hugepage_size} hugepages=#{hugepage_cnt}&/' /etc/default/grub")
+    sshable.cmd("sudo sed -i '/^GRUB_CMDLINE_LINUX=\"/ s/\"$/ hugetlb_free_vmemmap=on default_hugepagesz=':hugepage_size' hugepagesz=':hugepage_size' hugepages=':hugepage_cnt'&/' /etc/default/grub", hugepage_size:, hugepage_cnt:)
     sshable.cmd("sudo update-grub")
 
     pop "hugepages installed"
