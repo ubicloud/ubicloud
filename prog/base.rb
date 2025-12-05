@@ -42,6 +42,10 @@ end
         @snap.decr(name)
       end
 
+      define_method :"#{name}_set?" do
+        @snap.set?(name)
+      end
+
       class_eval %{
 def when_#{name}_set?
   if @snap.set?(#{name.inspect})
