@@ -35,12 +35,14 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   end
 
   label def prep
-    case host.sshable.cmd("common/bin/daemonizer --check prep_#{vm_host_slice.name}")
+    name = vm_host_slice.name
+    case host.sshable.cmd("common/bin/daemonizer --check prep_:name", name:)
     when "Succeeded"
-      host.sshable.cmd("common/bin/daemonizer --clean prep_#{vm_host_slice.name}")
+      host.sshable.cmd("common/bin/daemonizer --clean prep_:name", name:)
       hop_wait
     when "NotStarted", "Failed"
-      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/setup-slice prep #{vm_host_slice.inhost_name} \"#{vm_host_slice.allowed_cpus_cgroup}\"' prep_#{vm_host_slice.name}")
+      d_command = NetSsh.command("sudo host/bin/setup-slice prep :inhost_name :allowed_cpus_cgroup", inhost_name:, allowed_cpus_cgroup: vm_host_slice.allowed_cpus_cgroup)
+      host.sshable.cmd("common/bin/daemonizer :d_command prep_:name", name:, d_command:)
     end
 
     nap 1
@@ -92,7 +94,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    host.sshable.cmd("sudo host/bin/setup-slice delete #{vm_host_slice.inhost_name}")
+    host.sshable.cmd("sudo host/bin/setup-slice delete :inhost_name", inhost_name:)
 
     VmHost.dataset.where(id: host.id).update(
       used_cores: Sequel[:used_cores] - vm_host_slice.cores,
@@ -105,7 +107,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   end
 
   label def start_after_host_reboot
-    host.sshable.cmd("sudo host/bin/setup-slice recreate-unpersisted #{vm_host_slice.inhost_name}")
+    host.sshable.cmd("sudo host/bin/setup-slice recreate-unpersisted :inhost_name", inhost_name:)
     decr_start_after_host_reboot
 
     hop_wait
@@ -118,5 +120,9 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     end
 
     available
+  end
+
+  def inhost_name
+    @inhost_name ||= vm_host_slice.inhost_name
   end
 end
