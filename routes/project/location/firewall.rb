@@ -22,6 +22,30 @@ class Clover
       @firewall = firewall = @project.firewalls_dataset.first(filter)
       check_found_object(firewall)
 
+      r.api_patch_web_post do
+        authorize("Firewall:edit", firewall)
+        handle_validation_failure("networking/firewall/show") { @page = "settings" }
+        description = typecast_body_params.nonempty_str!("description")
+
+        if description == firewall.description
+          notice = "Description unchanged"
+          no_audit_log
+        else
+          notice = "Description updated"
+          DB.transaction do
+            firewall.update(description:)
+            audit_log(firewall, "update")
+          end
+        end
+
+        if api?
+          Serializers::Firewall.serialize(firewall)
+        else
+          flash["notice"] = notice
+          r.redirect firewall, "/settings"
+        end
+      end
+
       r.is do
         r.delete do
           authorize("Firewall:delete", firewall)

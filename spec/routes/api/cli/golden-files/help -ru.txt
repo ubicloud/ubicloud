@@ -18,6 +18,7 @@ ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
 ubi fw (location/fw-name | fw-id) modify-rule options rule-id
 ubi fw (location/fw-name | fw-id) rename new-name
 ubi fw (location/fw-name | fw-id) show [options]
+ubi fw (location/fw-name | fw-id) update-description new-description
 ubi gh command [...]
 ubi gh (installation-name/repository-name) post-command [...]
 ubi gh installation command [...]
