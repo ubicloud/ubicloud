@@ -16,14 +16,18 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
+      # For read replicas, we upgrade by replacing servers instead of in-place
+      # upgrade.
+      server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
+
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size }.arch
       boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(postgres_resource.version, arch)
+        postgres_resource.location.pg_ami(server_version, arch)
       else
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD then ""
         when PostgresResource::Flavor::PARADEDB then "-paradedb"
-        when PostgresResource::Flavor::LANTERN then "#{postgres_resource.version}-lantern"
+        when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
         else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
         end
 
@@ -60,7 +64,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         representative_at: representative_at,
         synchronization_status: synchronization_status,
         vm_id: vm_st.id,
-        version: postgres_resource.version
+        version: server_version
       )
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
