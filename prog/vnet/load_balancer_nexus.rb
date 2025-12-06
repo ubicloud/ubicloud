@@ -55,7 +55,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      hop_destroy unless %w[destroy wait_destroy].include?(strand.label)
+      hop_destroy unless %w[destroy wait_destroy_children wait_all_vms_removed].include?(strand.label)
     end
   end
 
@@ -143,11 +143,17 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
   label def destroy
     decr_destroy
-    strand.children.map { it.destroy }
-    load_balancer.vms.each do |vm|
-      bud Prog::Vnet::LoadBalancerRemoveVm, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :destroy_vm_ports_and_update_node
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_destroy_children
+  end
+
+  label def wait_destroy_children
+    reap(nap: 5) do
+      load_balancer.vms.each do |vm|
+        bud Prog::Vnet::LoadBalancerRemoveVm, {"subject_id" => vm.id, "load_balancer_id" => load_balancer.id}, :destroy_vm_ports_and_update_node
+      end
+      hop_wait_all_vms_removed
     end
-    hop_wait_all_vms_removed
   end
 
   label def wait_all_vms_removed
