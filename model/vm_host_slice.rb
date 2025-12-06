@@ -55,9 +55,9 @@ class VmHostSlice < Sequel::Model
 
   def up?(session)
     # We let callers handle exceptions, as each calling method may have opt to handle them differently
-    session.exec!("systemctl is-active #{inhost_name}").split("\n").all?("active") &&
-      (session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.effective").chomp == allowed_cpus_cgroup) &&
-      ["root", "member"].include?(session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.partition").chomp)
+    session.exec!("systemctl is-active :inhost_name", inhost_name:).split("\n").all?("active") &&
+      (session.exec!("cat /sys/fs/cgroup/:inhost_name/cpuset.cpus.effective", inhost_name:).chomp == allowed_cpus_cgroup) &&
+      ["root", "member"].include?(session.exec!("cat /sys/fs/cgroup/:inhost_name/cpuset.cpus.partition", inhost_name:).chomp)
   end
 
   def check_pulse(session:, previous_pulse:)

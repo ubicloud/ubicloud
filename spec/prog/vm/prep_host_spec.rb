@@ -9,9 +9,9 @@ RSpec.describe Prog::Vm::PrepHost do
 
   describe "#start" do
     it "prepare host" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       vm_host = instance_double(VmHost, ubid: "vmhostubid")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/prep_host.rb #{vm_host.ubid} test")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/prep_host.rb #{vm_host.ubid} test")
       expect(ph).to receive(:sshable).and_return(sshable)
       expect(ph).to receive(:vm_host).and_return(vm_host)
 

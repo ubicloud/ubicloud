@@ -47,7 +47,7 @@ RSpec.describe MonitorableResource do
     end
 
     it "swallows exception and logs it if event loop fails" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
       r_w_event_loop.instance_variable_set(:@session, session)
       expect(session[:ssh_session]).to receive(:shutdown!)
       expect(session[:ssh_session]).to receive(:close)
@@ -58,7 +58,7 @@ RSpec.describe MonitorableResource do
     end
 
     it "swallows exception and logs it if check_pulse fails" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
       r_without_event_loop.instance_variable_set(:@session, session)
       expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
       expect(Clog).to receive(:emit).and_call_original
@@ -67,7 +67,7 @@ RSpec.describe MonitorableResource do
   end
 
   describe "#check_pulse with session and event loop" do
-    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+    let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
 
     before do
       r_w_event_loop.instance_variable_set(:@session, session)
@@ -117,7 +117,7 @@ RSpec.describe MonitorableResource do
 
   [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
     describe "#check_pulse", "stale connection retry behavior with #{ex.class}" do
-      let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+      let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
 
       before do
         r_w_event_loop.instance_variable_set(:@session, session)
@@ -126,7 +126,7 @@ RSpec.describe MonitorableResource do
 
       it "retries if the last pulse is not set" do
         expect(postgres_server).to receive(:check_pulse).and_raise(ex)
-        second_session = instance_double(Net::SSH::Connection::Session)
+        second_session = Net::SSH::Connection::Session.allocate
         expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
         expect(session[:ssh_session]).to receive(:shutdown!)
         expect(session).to receive(:merge!).with(second_session)
@@ -144,7 +144,7 @@ RSpec.describe MonitorableResource do
       it "is up on a retry on a stale connection that works the second time" do
         session[:last_pulse] = Time.now - 10
         expect(postgres_server).to receive(:check_pulse).and_raise(ex)
-        second_session = instance_double(Net::SSH::Connection::Session)
+        second_session = Net::SSH::Connection::Session.allocate
         expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
         expect(session[:ssh_session]).to receive(:shutdown!)
         expect(session).to receive(:merge!).with(second_session)
@@ -155,7 +155,7 @@ RSpec.describe MonitorableResource do
       it "is down if consecutive errors are raised even on a stale connection" do
         session[:last_pulse] = Time.now - 10
         expect(postgres_server).to receive(:check_pulse).and_raise(ex)
-        second_session = instance_double(Net::SSH::Connection::Session)
+        second_session = Net::SSH::Connection::Session.allocate
         expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
         expect(session[:ssh_session]).to receive(:shutdown!)
         expect(session).to receive(:merge!).with(second_session)

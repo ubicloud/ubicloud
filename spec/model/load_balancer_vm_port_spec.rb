@@ -27,7 +27,7 @@ RSpec.describe LoadBalancerVmPort do
 
   describe "#health_probe" do
     let(:vmh) {
-      session = instance_double(Sshable, start_fresh_session: "session")
+      session = create_mock_sshable(start_fresh_session: "session")
       instance_double(VmHost, sshable: session)
     }
 
@@ -46,22 +46,47 @@ RSpec.describe LoadBalancerVmPort do
       it "returns the correct command" do
         lb = lb_vm_port.load_balancer_port.load_balancer
         lb.update(health_check_protocol: "http")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:192.168.1.1 --max-time 15 --silent --output /dev/null --write-out '%{http_code}' http://#{lb.hostname}:8080/up")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2] --max-time 15 --silent --output /dev/null --write-out '%{http_code}' http://#{lb.hostname}:8080/up")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:192.168.1.1",
+           dst_port: 8080,
+           health_check_url: "http://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2]",
+           dst_port: 8080,
+           health_check_url: "http://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
 
         lb.update(health_check_protocol: "tcp")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 192.168.1.1 8080 >/dev/null 2>&1 && echo 200 || echo 400")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} nc -z -w 15 2a01:4f8:10a:128b:814c::2 8080 >/dev/null 2>&1 && echo 200 || echo 400")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name nc -z -w :timeout :address :dst_port >/dev/null 2>&1 && echo 200 || echo 400",
+          {address: "192.168.1.1", dst_port: 8080, timeout: 15, vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name nc -z -w :timeout :address :dst_port >/dev/null 2>&1 && echo 200 || echo 400",
+          {address: "2a01:4f8:10a:128b:814c::2",
+           dst_port: 8080,
+           timeout: 15,
+           vm_name: vm.inhost_name}])
 
         lb.update(health_check_protocol: "https")
-        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:192.168.1.1 --max-time 15 --silent --output /dev/null --write-out '%{http_code}' https://#{lb.hostname}:8080/up")
-        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq("sudo ip netns exec #{vm.inhost_name} curl --insecure --resolve #{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2] --max-time 15 --silent --output /dev/null --write-out '%{http_code}' https://#{lb.hostname}:8080/up")
+        expect(lb_vm_port.health_check_cmd(:ipv4)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:192.168.1.1",
+           dst_port: 8080,
+           health_check_url: "https://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
+        expect(lb_vm_port.health_check_cmd(:ipv6)).to eq(["sudo ip netns exec :vm_name curl --insecure --resolve :address --max-time :timeout --silent --output /dev/null --write-out '%{http_code}' :health_check_url",
+          {address: "#{lb.hostname}:8080:[2a01:4f8:10a:128b:814c::2]",
+           dst_port: 8080,
+           health_check_url: "https://#{lb.hostname}:8080/up",
+           timeout: 15,
+           vm_name: vm.inhost_name}])
       end
     end
 
     describe "#check_probe" do
       let(:session) {
-        {ssh_session: instance_double(Net::SSH::Connection::Session)}
+        {ssh_session: Net::SSH::Connection::Session.allocate}
       }
 
       it "raises an exception if health check type is not valid" do
@@ -81,15 +106,15 @@ RSpec.describe LoadBalancerVmPort do
       [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
         it "reraises the exception for exception class: #{ex.class}" do
           expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-          expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise(ex)
+          expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_raise(ex)
           expect { lb_vm_port.check_probe(session, :ipv4) }.to raise_error(ex)
         end
       end
 
       ["ipv4", "ipv6"].each do |stack|
         it "runs the health check command and returns the result for #{stack}" do
-          expect(lb_vm_port).to receive(:health_check_cmd).with(stack.to_sym).and_return("healthcheck command #{stack}").at_least(:once)
-          expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command #{stack}").and_return("200").at_least(:once)
+          expect(lb_vm_port).to receive(:health_check_cmd).with(stack.to_sym).and_return("healthcheck command #{stack}".freeze).at_least(:once)
+          expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command #{stack}").and_return("200").at_least(:once)
 
           expect(lb_vm_port.check_probe(session, stack.to_sym)).to eq("up")
         end
@@ -97,20 +122,20 @@ RSpec.describe LoadBalancerVmPort do
 
       it "returns down if the health check command raises an exception" do
         expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-        expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_raise("error").at_least(:once)
+        expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_raise("error").at_least(:once)
         expect(lb_vm_port.check_probe(session, :ipv4)).to eq("down")
       end
 
       it "returns down if the health check command doesn't return 200" do
         expect(lb_vm_port).to receive(:health_check_cmd).and_return("healthcheck command").at_least(:once)
-        expect(session[:ssh_session]).to receive(:exec!).with("healthcheck command").and_return("400").at_least(:once)
+        expect(session[:ssh_session]).to receive(:_exec!).with("healthcheck command").and_return("400").at_least(:once)
         expect(lb_vm_port.check_probe(session, :ipv4)).to eq("down")
       end
     end
 
     describe "#check_pulse" do
       let(:session) {
-        {ssh_session: instance_double(Sshable)}
+        {ssh_session: Sshable.new}
       }
 
       it "doesn't perform update if the state is up and the pulse is also up" do

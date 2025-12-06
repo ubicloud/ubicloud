@@ -122,7 +122,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   end
 
   describe "#drain" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:unit_name) { "drain_node_#{kd.name}" }
 
     before do
@@ -167,7 +167,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
   describe "#remove_node_from_cluster" do
     let(:client) { instance_double(Kubernetes::Client) }
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
 
     before do
       expect(kd.kubernetes_cluster).to receive(:client).and_return(client)
@@ -177,14 +177,14 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "runs kubeadm reset and remove nodepool node from services_lb and deletes the node from cluster" do
       kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
       kd.update(kubernetes_nodepool_id: kn.id)
-      expect(kd.sshable).to receive(:cmd).with("sudo kubeadm reset --force")
+      expect(kd.sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(kd.kubernetes_cluster.services_lb).to receive(:detach_vm).with(kd.vm)
       expect(client).to receive(:delete_node).with(kd.name)
       expect { nx.remove_node_from_cluster }.to hop("destroy")
     end
 
     it "runs kubeadm reset and remove cluster node from api_server_lb and deletes the node from cluster" do
-      expect(kd.sshable).to receive(:cmd).with("sudo kubeadm reset --force")
+      expect(kd.sshable).to receive(:_cmd).with("sudo kubeadm reset --force")
       expect(nx).to receive(:nodepool).and_return(nil)
       expect(kd.kubernetes_cluster.api_server_lb).to receive(:detach_vm).with(kd.vm)
       expect(client).to receive(:delete_node).with(kd.name)

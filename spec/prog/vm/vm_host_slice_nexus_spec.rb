@@ -87,30 +87,30 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
   describe "#prep" do
     it "starts prep on NotStarted" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo host/bin/setup-slice prep standard.slice \"2-3\"' prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.prep }.to nap(1)
     end
 
     it "starts prep on Failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("Failed")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo host/bin/setup-slice prep standard.slice \"2-3\"' prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-slice\\ prep\\ standard.slice\\ 2-3 prep_standard")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.prep }.to nap(1)
     end
 
     it "hops to wait" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean prep_standard")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean prep_standard")
 
       expect { nx.prep }.to hop("wait")
     end
 
     it "do nothing on random result" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check prep_standard").and_return("foobar")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_standard").and_return("foobar")
 
       expect { nx.prep }.to nap(1)
     end
@@ -145,7 +145,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   describe "#destroy" do
     it "deletes resources and exits" do
       expect(vm_host_slice).to receive(:destroy)
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-slice delete standard.slice")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-slice delete standard.slice")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.destroy }.to exit({"msg" => "vm_host_slice destroyed"})
@@ -154,7 +154,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
   describe "#start_after_host_reboot" do
     it "starts slice on the host and hops to wait" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-slice recreate-unpersisted standard.slice")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-slice recreate-unpersisted standard.slice")
       expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice")
 
       expect { nx.start_after_host_reboot }.to hop("wait")
@@ -181,26 +181,26 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   end
 
   describe "#available?" do
-    let(:session) { instance_double(Net::SSH::Connection::Session) }
+    let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(sshable).to receive(:start_fresh_session).and_yield(session)
-      expect(session).to receive(:exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
+      expect(session).to receive(:_exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
     end
 
     it "succeeds if the partition status is root" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
       expect(nx.available?).to be true
     end
 
     it "succeeds if the partition status is member" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("member\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("member\n").once
       expect(nx.available?).to be true
     end
 
     it "fails on the incorrect partition status" do
-      expect(session).to receive(:exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
       expect(nx.available?).to be false
     end
   end

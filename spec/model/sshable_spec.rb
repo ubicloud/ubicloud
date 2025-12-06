@@ -48,7 +48,7 @@ LOCK
       it "interlocks" do
         portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
         portable_pkill.call
-        q_lock_script = lock_script.shellescape
+        q_lock_script = NetSsh.command(":lock_script", lock_script:)
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
         expect(portable_pkill.call).to be true
@@ -65,12 +65,12 @@ LOCK
       end
 
       it "runs the session lock script if SSH_SESSION_LOCK_NAME is set" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false)
+        expect(sa).to receive(:_cmd).with(lock_script, log: false)
         sa.connect
       end
 
       it "reports a failure to obtain a file descriptor with an obscure exit code" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("could not create session lock file for testlockname")
         end
@@ -79,7 +79,7 @@ LOCK
 
       it "reports lock conflicts when an obscure exit code is raised" do
         sa.id = "624ec0d1-95d9-8f31-bbaa-bcccb76fe98b"
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call).to eq(contended_session_lock: {
             exit_code: 124,
@@ -92,7 +92,7 @@ LOCK
       end
 
       it "has a generic message for unrecognized errors" do
-        expect(sa).to receive(:cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
         expect(Clog).to receive(:emit).with("session lock failure").and_wrap_original do |m, a, &b|
           expect(b.call.dig(:contended_session_lock, :session_fail_msg)).to eq("unknown SshError")
         end
@@ -154,7 +154,7 @@ LOCK
     end
 
     it "can reset caches even if session fails while closing" do
-      sess = instance_double(Net::SSH::Connection::Session)
+      sess = Net::SSH::Connection::Session.allocate
       expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
@@ -165,7 +165,7 @@ LOCK
   end
 
   describe "#cmd" do
-    let(:session) { instance_double(Net::SSH::Connection::Session) }
+    let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(sa).to receive(:connect).and_return(session).at_least(:once)
@@ -223,35 +223,35 @@ LOCK
             end
           end
           simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-          expect(sa.cmd("echo hello", log: log_value, timeout: nil)).to eq("hello")
+          expect(sa.cmd("echo hello", log: log_value, timeout: nil, _skip_command_checking: true)).to eq("hello")
         end
       end
     end
 
     it "raises an SshError with a non-zero exit status" do
       simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
     end
 
     it "raises an SshError with a nil exit status" do
       simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1", timeout: nil) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
     end
 
     it "supports custom timeout" do
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false, timeout: 2)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, timeout: 2, _skip_command_checking: true)).to eq("hello")
     end
 
     it "suports default timeout" do
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
     end
 
     it "supports default timeout based on thread apoptosis_at variable if no explicit timeout is given if variable is available" do
       Thread.current[:apoptosis_at] = Time.now + 60
       simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-      expect(sa.cmd("echo hello", log: false)).to eq("hello")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
     ensure
       Thread.current[:apoptosis_at] = nil
     end
@@ -260,7 +260,7 @@ LOCK
       err = IOError.new("the party is over")
       expect(session).to receive(:open_channel).and_raise err
       expect(sa).to receive(:invalidate_cache_entry)
-      expect { sa.cmd("irrelevant") }.to raise_error err
+      expect { sa.cmd("irrelevant", _skip_command_checking: true) }.to raise_error err
     end
   end
 
@@ -270,27 +270,27 @@ LOCK
     let(:stdin_data) { "secret_data" }
 
     it "calls cmd with the correct check command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 check test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 check test_unit")
       sa.d_check(unit_name)
     end
 
     it "calls cmd with the correct clean command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 clean test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 clean test_unit")
       sa.d_clean(unit_name)
     end
 
     it "calls cmd with the correct restart command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 restart test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 restart test_unit")
       sa.d_restart(unit_name)
     end
 
     it "calls cmd with the correct run command and no stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
       sa.d_run(unit_name, run_command)
     end
 
     it "calls cmd with the correct run command and passes stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
       sa.d_run(unit_name, run_command, stdin: stdin_data)
     end
   end

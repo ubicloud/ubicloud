@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "shellwords"
 require_relative "../model"
 require_relative "../lib/hosting/apis"
 require_relative "../lib/system_parser"
@@ -289,10 +288,11 @@ class VmHost < Sequel::Model
 
   def check_storage_smartctl(ssh_session, devices)
     devices.map do |device_name|
-      command = "sudo smartctl -j -H /dev/#{device_name}"
-      command << " -d scsi" if device_name.start_with?("sd")
-      command << " | jq .smart_status.passed"
-      passed = ssh_session.exec!(command).strip == "true"
+      command = ["sudo smartctl -j -H /dev/:device_name"]
+      command << "-d scsi" if device_name.start_with?("sd")
+      command << "| jq .smart_status.passed"
+      command = NetSsh.combine(*command)
+      passed = ssh_session.exec!(command, device_name:).strip == "true"
       Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}") unless passed
       passed
     end.all?(true)
@@ -300,7 +300,7 @@ class VmHost < Sequel::Model
 
   def check_storage_nvme(ssh_session, devices)
     devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
-      passed = ssh_session.exec!("sudo nvme smart-log /dev/#{device_name} | grep \"critical_warning\" | awk '{print $3}'").strip == "0"
+      passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
       Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}") unless passed
       passed
     end.all?(true)
@@ -318,13 +318,14 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = Shellwords.escape(File.join(mount_point, "test-file-#{test_file_suffix}"))
+      file_name = File.join(mount_point, "test-file-#{test_file_suffix}")
 
-      write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
+      command = NetSsh.command("head -c 1M </dev/zero > :file_name", file_name:)
+      write_result = ssh_session.exec!("sudo bash -c :command", command:)
       write_status = write_result.exitstatus == 0
-      hash_result = ssh_session.exec!("sha256sum #{file_name}")
+      hash_result = ssh_session.exec!("sha256sum :file_name", file_name:)
       hash_status = hash_result.strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
-      delete_result = ssh_session.exec!("sudo rm #{file_name}")
+      delete_result = ssh_session.exec!("sudo rm :file_name", file_name:)
       delete_status = delete_result.exitstatus == 0
 
       unless write_status && hash_status && delete_status
@@ -379,7 +380,7 @@ class VmHost < Sequel::Model
   end
 
   def disk_device_names(ssh_session)
-    disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/#{id}").delete_prefix("/dev/").strip }
+    disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/:id", id:).delete_prefix("/dev/").strip }
   end
 
   def perform_health_checks(ssh_session, test_file_suffix: "monitor")

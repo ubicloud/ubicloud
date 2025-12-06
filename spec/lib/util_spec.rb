@@ -8,8 +8,8 @@ RSpec.describe Util do
     it "can execute a command" do
       expected_options = Sshable::COMMON_SSH_ARGS.merge(key_data: ["key1", "key2"])
       expect(Net::SSH).to receive(:start).with("hostname", "user", expected_options) do |&blk|
-        sess = instance_double(Net::SSH::Connection::Session)
-        expect(sess).to receive(:exec!).with("test command").and_return(
+        sess = Net::SSH::Connection::Session.allocate
+        expect(sess).to receive(:_exec!).with("test command").and_return(
           Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0)
         )
         blk.call sess
@@ -20,8 +20,8 @@ RSpec.describe Util do
 
     it "fails if a command fails" do
       expect(Net::SSH).to receive(:start) do |&blk|
-        sess = instance_double(Net::SSH::Connection::Session)
-        expect(sess).to receive(:exec!).with("failing command").and_return(
+        sess = Net::SSH::Connection::Session.allocate
+        expect(sess).to receive(:_exec!).with("failing command").and_return(
           Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1)
         )
         blk.call sess

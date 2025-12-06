@@ -37,7 +37,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def wait_vm_stop
     vm_state = begin
-      vm.vm_host.sshable.cmd("systemctl is-active #{vm.inhost_name}")
+      vm.vm_host.sshable.cmd("systemctl is-active :inhost_name", inhost_name:)
     rescue Sshable::SshError => ex
       # systemctl returns exit code 3 when a unit is inactive but writes
       # the result to the stdout. based on the way sshable.cmd work,
@@ -55,18 +55,18 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def generate_vhost_backend_conf
-    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file #{root_dir_path}data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file #{vhost_conf_path} --vm-name #{vm.inhost_name} --device #{vm.vm_storage_volumes.first.storage_device.name}", stdin: vm.storage_secrets.to_json)
-    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{vhost_conf_path}")
+    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: vm.vm_storage_volumes.first.storage_device.name, stdin: vm.storage_secrets.to_json)
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :vhost_conf_path", inhost_name:, vhost_conf_path:)
     hop_ready_migration
   end
 
   label def ready_migration
-    vm.vm_host.sshable.cmd("sudo mv #{root_dir_path}disk.raw #{root_dir_path}disk.raw.bk")
+    vm.vm_host.sshable.cmd("sudo mv :root_dir_path/disk.raw :root_dir_path/disk.raw.bk", root_dir_path:)
 
-    vm.vm_host.sshable.cmd("sudo rm #{root_dir_path}vhost.sock")
+    vm.vm_host.sshable.cmd("sudo rm :root_dir_path/vhost.sock", root_dir_path:)
 
-    vm.vm_host.sshable.cmd("sudo mkfifo #{kek_file_path}")
-    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{kek_file_path}")
+    vm.vm_host.sshable.cmd("sudo mkfifo :kek_file_path", kek_file_path:)
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :kek_file_path", inhost_name:, kek_file_path:)
 
     hop_download_migration_binaries
   end
@@ -76,10 +76,10 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       url = "https://github.com/ubicloud/ubiblk-migrate/releases/download/v0.2.0/migrate"
       expected_sha256 = "6a73c44ef6ab03ede17186a814f80a174cbe5ed9cc9f7ae6f5f639a7ec97c4ac"
       path = "/tmp/migrate"
-      vm.vm_host.sshable.cmd("curl -L -f -o #{path} #{url}")
-      actual_sha256 = vm.vm_host.sshable.cmd("sha256sum #{path} | cut -d' ' -f1").strip
+      vm.vm_host.sshable.cmd("curl -L -f -o :path :url", path:, url:)
+      actual_sha256 = vm.vm_host.sshable.cmd("sha256sum :path | cut -d' ' -f1", path:).strip
       raise "SHA256 mismatch for #{path}: expected #{expected_sha256}, got #{actual_sha256}" unless actual_sha256 == expected_sha256
-      vm.vm_host.sshable.cmd("chmod +x #{path}")
+      vm.vm_host.sshable.cmd("chmod +x :path", path:)
     rescue => e
       Clog.emit("encountered an issue while downloading migration binaries") { {exception: {message: e.message}} }
       nap 10
@@ -95,7 +95,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       vm.vm_host.sshable.d_clean(unit_name)
       hop_create_ubiblk_systemd_unit
     when "NotStarted"
-      vm.vm_host.sshable.d_run(unit_name, "/tmp/migrate", "-base-image=#{base_image_path}", "-overlay-image=#{root_dir_path}disk.raw.bk", "-output-image=#{root_dir_path}disk.raw", "-kek-file=#{kek_file_path}", "-vhost-backend-conf-file=#{vhost_conf_path}")
+      vm.vm_host.sshable.d_run(unit_name, "/tmp/migrate", "-base-image=#{base_image_path}", "-overlay-image=#{root_dir_path}/disk.raw.bk", "-output-image=#{root_dir_path}/disk.raw", "-kek-file=#{kek_file_path}", "-vhost-backend-conf-file=#{vhost_conf_path}")
       write_kek_pipe
       nap 5
     when "InProgress"
@@ -107,7 +107,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def create_ubiblk_systemd_unit
-    vm.vm_host.sshable.cmd("sudo chown #{vm.inhost_name}:#{vm.inhost_name} #{root_dir_path}disk.raw")
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :root_dir_path/disk.raw", inhost_name:, root_dir_path:)
     vm.vm_host.sshable.cmd("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: migration_script_params)
     hop_start_ubiblk_systemd_unit
   end
@@ -115,7 +115,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   label def start_ubiblk_systemd_unit
     disk_index = 0
     unit_name = "#{vm.inhost_name}-#{disk_index}-storage.service"
-    vm.vm_host.sshable.cmd("sudo systemctl start #{unit_name}")
+    vm.vm_host.sshable.cmd("sudo systemctl start :unit_name", unit_name:)
     # Disk encryption happens using DEKs (Data Encryption Keys). DEKs needs to be presented
     # to the hypervisor to run the Vm. Now in the case of a breach to a VmHost, we don't want
     # to give away the keys easily so we encrypt the DEK with another set of keys: KEKs (key encryption key)
@@ -137,16 +137,16 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def update_prep_json_file
-    prep_json = JSON.parse(vm.vm_host.sshable.cmd("sudo cat /vm/#{vm.inhost_name}/prep.json"))
+    prep_json = JSON.parse(vm.vm_host.sshable.cmd("sudo cat /vm/:inhost_name/prep.json", inhost_name:))
     prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
     prep_json["storage_volumes"][0]["spdk_version"] = nil
-    vm.vm_host.sshable.cmd("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate(prep_json))
+    vm.vm_host.sshable.cmd("sudo tee /vm/:inhost_name/prep.json >/dev/null", inhost_name:, stdin: JSON.pretty_generate(prep_json))
 
     hop_start_vm
   end
 
   label def start_vm
-    vm.vm_host.sshable.cmd("sudo systemctl start #{vm.inhost_name}")
+    vm.vm_host.sshable.cmd("sudo systemctl start :inhost_name", inhost_name:)
     vm.strand.update(label: "wait")
 
     pop "Vm successfully migrated to ubiblk"
@@ -168,15 +168,15 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   def root_dir_path
-    "/var/storage/#{vm.inhost_name}/0/"
+    "/var/storage/#{vm.inhost_name}/0"
   end
 
   def kek_file_path
-    "#{root_dir_path}kek.pipe"
+    "#{root_dir_path}/kek.pipe"
   end
 
   def vhost_conf_path
-    "#{root_dir_path}vhost-backend.conf"
+    "#{root_dir_path}/vhost-backend.conf"
   end
 
   def write_kek_pipe
@@ -187,7 +187,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "method" => "aes256-gcm",
       "auth_data" => Base64.strict_encode64(kek.auth_data)
     }
-    vm.vm_host.sshable.cmd("sudo tee #{kek_file_path} > /dev/null", stdin: kek_data.to_yaml, log: false)
+    vm.vm_host.sshable.cmd("sudo tee :kek_file_path > /dev/null", kek_file_path:, stdin: kek_data.to_yaml, log: false)
   end
 
   def base_image_path
@@ -196,5 +196,9 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   def vm_host_vhost_block_backend
     vm.vm_host.vhost_block_backends.find { |b| b.version == Config.vhost_block_backend_version }
+  end
+
+  def inhost_name
+    @inhost_name ||= vm.inhost_name
   end
 end

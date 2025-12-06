@@ -5,7 +5,7 @@ RSpec.describe Hosting::HetznerApis do
     instance_double(
       VmHost,
       provider_name: HostProvider::HETZNER_PROVIDER_NAME,
-      sshable: instance_double(Sshable, host: "1.1.1.1")
+      sshable: create_mock_sshable(host: "1.1.1.1")
     )
   }
   let(:hetzner_host) { instance_double(HostProvider, provider_name: HostProvider::HETZNER_PROVIDER_NAME, connection_string: "https://robot-ws.your-server.de", server_identifier: "123", user: "user1", password: "pass", vm_host: vm_host) }

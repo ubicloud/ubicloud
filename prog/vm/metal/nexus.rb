@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "json"
-require "shellwords"
 
 class Prog::Vm::Metal::Nexus < Prog::Base
   DEFAULT_SIZE = "standard-2"
@@ -10,10 +9,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def vm_name
     @vm_name ||= vm.inhost_name
-  end
-
-  def q_vm
-    vm_name.shellescape
   end
 
   def vm_home
@@ -129,21 +124,21 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     command = <<~COMMAND
       set -ueo pipefail
       # Make this script idempotent
-      sudo userdel --remove --force #{q_vm} || true
-      sudo groupdel -f #{q_vm} || true
+      sudo userdel --remove --force :vm_name || true
+      sudo groupdel -f :vm_name || true
       # Create vm's user and home directory
-      sudo adduser --disabled-password --gecos '' --home #{vm_home.shellescape} --uid #{uid} #{q_vm}
+      sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
       # Enable KVM access for VM user
-      sudo usermod -a -G kvm #{q_vm}
+      sudo usermod -a -G kvm :vm_name
     COMMAND
 
-    host.sshable.cmd(command)
+    host.sshable.cmd(command, vm_name:, vm_home:, uid:)
 
     hop_prep
   end
 
   label def prep
-    case host.sshable.cmd("common/bin/daemonizer --check prep_#{q_vm}")
+    case host.sshable.cmd("common/bin/daemonizer --check prep_:vm_name", vm_name:)
     when "Succeeded"
       vm.nics.each(&:incr_setup_nic)
       strand.stack[-1]["prep_done"] = true
@@ -156,19 +151,20 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       write_params_json
 
-      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/setup-vm prep #{q_vm}' prep_#{q_vm}", stdin: secrets_json)
+      d_command = NetSsh.command("sudo host/bin/setup-vm prep :vm_name", vm_name:)
+      host.sshable.cmd("common/bin/daemonizer :d_command prep_:vm_name", d_command:, vm_name:, stdin: secrets_json)
     end
 
     nap 1
   end
 
   label def clean_prep
-    host.sshable.cmd("common/bin/daemonizer --clean prep_#{q_vm}")
+    host.sshable.cmd("common/bin/daemonizer --clean prep_:vm_name", vm_name:)
     hop_wait_sshable
   end
 
   def write_params_json
-    host.sshable.cmd("sudo -u #{q_vm} tee #{params_path.shellescape} > /dev/null",
+    host.sshable.cmd("sudo -u :vm_name tee :params_path > /dev/null", vm_name:, params_path:,
       stdin: vm.params_json(**frame.slice("swap_size_bytes", "hugepages", "hypervisor", "ch_version", "firmware_version").transform_keys!(&:to_sym)))
   end
 
@@ -295,19 +291,19 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   label def update_spdk_dependency
     decr_update_spdk_dependency
     write_params_json
-    host.sshable.cmd("sudo host/bin/setup-vm reinstall-systemd-units #{q_vm}")
+    host.sshable.cmd("sudo host/bin/setup-vm reinstall-systemd-units :vm_name", vm_name:)
     hop_wait
   end
 
   label def restart
     decr_restart
-    host.sshable.cmd("sudo host/bin/setup-vm restart #{q_vm}")
+    host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
     hop_wait
   end
 
   label def stopped
     when_stop_set? do
-      host.sshable.cmd("sudo systemctl stop #{q_vm}")
+      host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
     end
     decr_stop
 
@@ -356,13 +352,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     unless host.nil?
       begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}", timeout: 10)
+        host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:, timeout: 10)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
 
       begin
-        host.sshable.cmd("sudo systemctl stop #{q_vm}-dnsmasq")
+        host.sshable.cmd("sudo systemctl stop :vm_name-dnsmasq", vm_name:)
       rescue Sshable::SshError => ex
         raise unless /Failed to stop .* Unit .* not loaded\./.match?(ex.stderr)
       end
@@ -370,7 +366,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # If there is a load balancer setup, we want to keep the network setup in
       # tact for a while
       action = vm.load_balancer ? "delete_keep_net" : "delete"
-      host.sshable.cmd("sudo host/bin/setup-vm #{action} #{q_vm}")
+      host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:)
     end
 
     vm.vm_storage_volumes.each do |vol|
@@ -409,7 +405,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def wait_vm_removal_from_load_balancer
     reap(nap: 10) do
-      host&.sshable&.cmd("sudo host/bin/setup-vm delete_net #{q_vm}")
+      host&.sshable&.cmd("sudo host/bin/setup-vm delete_net :vm_name", vm_name:)
       hop_destroy_slice
     end
   end
@@ -457,7 +453,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       storage: vm.storage_secrets
     })
 
-    host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted #{q_vm}", stdin: secrets_json)
+    host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted :vm_name", vm_name:, stdin: secrets_json)
     vm.nics.each(&:incr_repopulate)
 
     vm.update(display_state: "running")
@@ -469,6 +465,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def available?
-    host.sshable.cmd("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").split("\n").all?("active")
+    host.sshable.cmd("systemctl is-active :vm_name :vm_name-dnsmasq", vm_name:).split("\n").all?("active")
   end
 end

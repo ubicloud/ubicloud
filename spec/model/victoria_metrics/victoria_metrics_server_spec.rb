@@ -42,8 +42,8 @@ RSpec.describe VictoriaMetricsServer do
       socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_fdfa:b5aa:14a3:4a3d::2")
       unix_server = instance_double(UNIXServer)
       forward = instance_double(Net::SSH::Service::Forward)
-      session = instance_double(Net::SSH::Connection::Session)
-      sshable = instance_double(Sshable)
+      session = Net::SSH::Connection::Session.allocate
+      sshable = Sshable.new
       client = instance_double(VictoriaMetrics::Client)
 
       expect(FileUtils).to receive(:rm_rf).with(socket_path)

@@ -9,13 +9,13 @@ RSpec.describe Prog::SetupNftables do
 
   describe "#start" do
     it "Sets it up and pops" do
-      sshable = instance_double(Sshable, host: "1.1.1.1")
+      sshable = create_mock_sshable(host: "1.1.1.1")
       vm_host = instance_double(VmHost, ubid: "vmhostubid", assigned_subnets: [
         instance_double(Address, cidr: instance_double(NetAddr::IPv4Net, version: 4, network: "1.1.1.1", to_s: "1.1.1.1")),
         instance_double(Address, cidr: instance_double(NetAddr::IPv4Net, version: 6, network: "::", to_s: "::")),
         instance_double(Address, cidr: instance_double(NetAddr::IPv4Net, version: 4, network: "123.123.123.0/24", to_s: "123.123.123.0/24"))
       ], sshable: sshable)
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\]")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-nftables.rb \\[\\\"123.123.123.0/24\\\"\\]")
       expect(sn).to receive(:sshable).and_return(sshable)
       expect(sn).to receive(:vm_host).and_return(vm_host).at_least(:once)
 

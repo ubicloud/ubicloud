@@ -1,6 +1,7 @@
 #  frozen_string_literal: true
 
 require_relative "../../model"
+require_relative "../../lib/net_ssh"
 
 class KubernetesCluster < Sequel::Model
   one_to_one :strand, key: :id

@@ -9,7 +9,7 @@ RSpec.describe Prog::Test::Vm do
   }
 
   let(:sshable) {
-    instance_double(Sshable)
+    Sshable.new
   }
 
   before {
@@ -61,16 +61,16 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#verify_dd" do
     it "verifies dd" do
-      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
-      expect(sshable).to receive(:cmd).with("sync ~/1.txt")
-      expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "500004 /home/xyz/1.txt"
+      expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
+      expect(sshable).to receive(:_cmd).with("sync ~/1.txt")
+      expect(sshable).to receive(:_cmd).with("ls -s ~/1.txt").and_return "500004 /home/xyz/1.txt"
       expect { vm_test.verify_dd }.to hop("install_packages")
     end
 
     it "fails to verify if size is not in expected range" do
-      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
-      expect(sshable).to receive(:cmd).with("sync ~/1.txt")
-      expect(sshable).to receive(:cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
+      expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
+      expect(sshable).to receive(:_cmd).with("sync ~/1.txt")
+      expect(sshable).to receive(:_cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
       expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected size after dd"})
       expect { vm_test.verify_dd }.to hop("failed")
     end
@@ -79,22 +79,22 @@ RSpec.describe Prog::Test::Vm do
   describe "#install_packages" do
     it "installs packages for ubuntu images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "ubuntu-jammy")).at_least(:once)
-      expect(sshable).to receive(:cmd).with("sudo apt update")
-      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential fio")
+      expect(sshable).to receive(:_cmd).with("sudo apt update")
+      expect(sshable).to receive(:_cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for debian images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "debian-12")).at_least(:once)
-      expect(sshable).to receive(:cmd).with("sudo apt update")
-      expect(sshable).to receive(:cmd).with("sudo apt install -y build-essential fio")
+      expect(sshable).to receive(:_cmd).with("sudo apt update")
+      expect(sshable).to receive(:_cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for almalinux images and hops to next step" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "almalinux-9")).at_least(:once)
-      expect(sshable).to receive(:cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
-      expect(sshable).to receive(:cmd).with("sudo dnf install -y gcc gcc-c++ make fio")
+      expect(sshable).to receive(:_cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
+      expect(sshable).to receive(:_cmd).with("sudo dnf install -y gcc gcc-c++ make fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
@@ -108,19 +108,19 @@ RSpec.describe Prog::Test::Vm do
   describe "#umount_if_mounted" do
     it "unmounts if mounted" do
       mount_path = "/home/ubi/mnt0"
-      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}")
+      expect(sshable).to receive(:_cmd).with("sudo umount #{mount_path}")
       expect { vm_test.umount_if_mounted(mount_path) }.not_to raise_error
     end
 
     it "does not raise error if not mounted" do
       mount_path = "/home/ubi/mnt0"
-      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("sudo umount #{mount_path}", "", "umount: #{mount_path}: not mounted.\n", nil, nil))
+      expect(sshable).to receive(:_cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("sudo umount #{mount_path}", "", "umount: #{mount_path}: not mounted.\n", nil, nil))
       expect { vm_test.umount_if_mounted(mount_path) }.not_to raise_error
     end
 
     it "raises error for unexpected ssh error" do
       mount_path = "/home/ubi/mnt0"
-      expect(sshable).to receive(:cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("unexpected error", "", "", nil, nil))
+      expect(sshable).to receive(:_cmd).with("sudo umount #{mount_path}").and_raise(Sshable::SshError.new("unexpected error", "", "", nil, nil))
       expect { vm_test.umount_if_mounted(mount_path) }.to raise_error Sshable::SshError, /unexpected error/
     end
   end
@@ -130,19 +130,19 @@ RSpec.describe Prog::Test::Vm do
       disk_path = "/dev/disk/by-id/disk_1"
       mount_path = "/home/ubi/mnt0"
       expect(vm_test).to receive(:umount_if_mounted).with(mount_path)
-      expect(sshable).to receive(:cmd).with("mkdir -p #{mount_path}")
-      expect(sshable).to receive(:cmd).with("sudo mkfs.ext4 #{disk_path}")
-      expect(sshable).to receive(:cmd).with("sudo mount #{disk_path} #{mount_path}")
-      expect(sshable).to receive(:cmd).with("sudo chown ubi #{mount_path}")
-      expect(sshable).to receive(:cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
-      expect(sshable).to receive(:cmd).with("sync #{mount_path}/1.txt")
+      expect(sshable).to receive(:_cmd).with("mkdir -p #{mount_path}")
+      expect(sshable).to receive(:_cmd).with("sudo mkfs.ext4 #{disk_path}")
+      expect(sshable).to receive(:_cmd).with("sudo mount #{disk_path} #{mount_path}")
+      expect(sshable).to receive(:_cmd).with("sudo chown ubi #{mount_path}")
+      expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
+      expect(sshable).to receive(:_cmd).with("sync #{mount_path}/1.txt")
       expect { vm_test.verify_extra_disks }.to hop("ping_google")
     end
   end
 
   describe "#ping_google" do
     it "pings google and hops to next step" do
-      expect(sshable).to receive(:cmd).with("ping -c 2 google.com")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 google.com")
       expect { vm_test.ping_google }.to hop("verify_io_rates")
     end
   end
@@ -156,7 +156,7 @@ RSpec.describe Prog::Test::Vm do
           }
         ]
       }
-      expect(sshable).to receive(:cmd).with(/sudo fio.*/).and_return output.to_json
+      expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_read_bw_bytes).to eq 1048576
     end
   end
@@ -170,7 +170,7 @@ RSpec.describe Prog::Test::Vm do
           }
         ]
       }
-      expect(sshable).to receive(:cmd).with(/sudo fio.*/).and_return output.to_json
+      expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_write_bw_bytes).to eq 1048576
     end
   end
@@ -211,35 +211,35 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#ping_vms_in_subnet" do
     it "pings vm in same subnet and hops to next step" do
-      expect(sshable).to receive(:cmd).with("ping -c 2 1.1.1.2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a2::2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a2::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a2::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a2::2")
       expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
     end
   end
 
   describe "#ping_vms_not_in_subnet" do
     it "fails to ping private interfaces of vms not in the same subnect and hops to next step" do
-      expect(sshable).to receive(:cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
-      expect(sshable).to receive(:cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:cmd).with("ping -c 2 192.168.0.3")
-      expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip4 of a vm in different subnet"
     end
 
     it "raises error if pinging private ipv9 of vms in other subnets succeed" do
-      expect(sshable).to receive(:cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:cmd).with("ping -c 2 fd01:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2")
       expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip6 of a vm in different subnet"
     end
   end

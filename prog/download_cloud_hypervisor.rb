@@ -24,14 +24,15 @@ class Prog::DownloadCloudHypervisor < Prog::Base
   end
 
   label def download
-    q_daemon_name = "download_ch_#{version}".shellescape
-    case sshable.cmd("common/bin/daemonizer --check #{q_daemon_name}")
+    daemon_name = "download_ch_#{version}"
+    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
-      sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       pop({"msg" => "cloud hypervisor downloaded", "version" => version,
         "sha256_ch_bin" => sha256_ch_bin, "sha256_ch_remote" => sha256_ch_remote})
     when "NotStarted"
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-cloud-hypervisor #{version} #{sha256_ch_bin} #{sha256_ch_remote}' #{q_daemon_name}")
+      d_command = NetSsh.command("host/bin/download-cloud-hypervisor :version :sha256_ch_bin :sha256_ch_remote", version:, sha256_ch_bin:, sha256_ch_remote:)
+      sshable.cmd("common/bin/daemonizer :d_command :daemon_name", daemon_name:, d_command:)
     when "Failed"
       fail "Failed to download cloud hypervisor version #{version} on #{vm_host}"
     end

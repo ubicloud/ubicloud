@@ -31,7 +31,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     Prog::Vm::Nexus.assemble("pub key", lb.project_id, name: "vm2", private_subnet_id: lb.private_subnet.id, nic_id: nic.id).subject
   }
   let(:vmh) {
-    vmh = instance_double(VmHost, sshable: instance_double(Sshable))
+    vmh = instance_double(VmHost, sshable: Sshable.new)
     allow(vm).to receive(:vm_host).and_return(vmh)
     vmh
   }
@@ -40,7 +40,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
     lb.add_vm(vm)
     allow(nx).to receive_messages(vm: vm, load_balancer: lb)
     allow(vm).to receive_messages(ip4: NetAddr::IPv4.parse("100.100.100.100"), ip6: NetAddr::IPv6.parse("2a02:a464:deb2:a000::2"))
-    allow(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: instance_double(Sshable)))
+    allow(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: Sshable.new))
   end
 
   describe ".before_run" do
@@ -78,7 +78,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
       end
 
       it "does not hop to remove load balancer and creates basic load balancing with nat" do
-        expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vmh.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -125,7 +125,7 @@ LOAD_BALANCER
 
       it "does not hop to remove load balancer and creates basic load balancing with nat specifically for ipv4" do
         lb.update(stack: "ipv4")
-        expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vmh.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -172,7 +172,7 @@ LOAD_BALANCER
         lb.reload
         port = LoadBalancerPort.where(load_balancer_id: lb.id, src_port: 443).first
         LoadBalancerVmPort.where(load_balancer_port_id: port.id).update(state: "up")
-        expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vmh.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -229,7 +229,7 @@ LOAD_BALANCER
 
       it "creates basic load balancing with hashing" do
         lb.update(algorithm: "hash_based")
-        expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vmh.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -282,7 +282,7 @@ LOAD_BALANCER
       end
 
       it "creates load balancing with multiple vms if all active" do
-        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -331,7 +331,7 @@ LOAD_BALANCER
       it "creates load balancing with multiple vms if all active ipv6 only" do
         lb.update(stack: "ipv6")
         LoadBalancerVmPort.where(stack: "ipv4").destroy
-        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -377,7 +377,7 @@ LOAD_BALANCER
       it "creates load balancing with multiple vms if all active ipv4 only" do
         lb.update(stack: "ipv4")
         LoadBalancerVmPort.where(stack: "ipv6").destroy
-        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -422,7 +422,7 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if the vm we work on is down" do
         LoadBalancerVmPort.where(load_balancer_vm_id: vm.load_balancer_vm.id).update(state: "down")
-        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -470,7 +470,7 @@ LOAD_BALANCER
 
       it "creates load balancing with multiple vms if the vm we work on is up but the neighbor is down" do
         LoadBalancerVmPort.where(load_balancer_vm_id: neighbor_vm.load_balancer_vm.id).update(state: "down")
-        expect(vm.vm_host.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;
@@ -525,7 +525,7 @@ LOAD_BALANCER
 
   describe "#remove_load_balancer" do
     it "creates basic nat rules" do
-      expect(vmh.sshable).to receive(:cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<REMOVE_LOAD_BALANCER)
+      expect(vmh.sshable).to receive(:_cmd).with("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<REMOVE_LOAD_BALANCER)
 table ip nat;
 delete table ip nat;
 table inet nat;

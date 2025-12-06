@@ -196,8 +196,12 @@ ExecStart=nc -l 8080 -6
   end
 
   def test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true)
-    test_version_arg = ipv4 ? "" : "-6"
-    connecting.sshable.cmd("nc -zvw 1 #{to_connect_ip} 8080 #{test_version_arg}")
+    cmd_string = if ipv4
+      "nc -zvw 1 :to_connect_ip 8080"
+    else
+      "nc -zvw 1 :to_connect_ip 8080 -6"
+    end
+    connecting.sshable.cmd(cmd_string, to_connect_ip:)
     fail_test "#{connecting.inhost_name} should not be able to connect to #{to_connect_ip} on port 8080" if should_fail
   rescue
     return 0 if should_fail
@@ -206,7 +210,7 @@ ExecStart=nc -l 8080 -6
   end
 
   def start_listening(ipv4: true)
-    vm_to_be_connected.sshable.cmd("sudo systemctl stop listening_ipv#{ipv4 ? "6" : "4"}.service")
-    vm_to_be_connected.sshable.cmd("sudo systemctl start listening_ipv#{ipv4 ? "4" : "6"}.service")
+    vm_to_be_connected.sshable.cmd("sudo systemctl stop listening_ipv:rev_version.service", rev_version: ipv4 ? "6" : "4")
+    vm_to_be_connected.sshable.cmd("sudo systemctl start listening_ipv:version.service", version: ipv4 ? "4" : "6")
   end
 end

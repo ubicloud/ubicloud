@@ -44,15 +44,15 @@ RSpec.describe Prog::Storage::SetupSpdk do
 
   describe "#install_spdk" do
     it "installs and hops to start_service" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk install #{spdk_version} 4 ubuntu-24.04")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk install #{spdk_version} 4 ubuntu-24.04")
       expect { setup_spdk.install_spdk }.to hop("start_service")
     end
   end
 
   describe "#start_service" do
     it "installs service and hops to update_database" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk start #{spdk_version}")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify #{spdk_version}")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk start #{spdk_version}")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify #{spdk_version}")
       expect { setup_spdk.start_service }.to hop("update_database")
     end
 

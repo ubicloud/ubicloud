@@ -50,7 +50,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { Sshable.new }
 
   before do
     allow(nx).to receive(:postgres_server).and_return(postgres_server)
@@ -262,7 +262,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "formats data disk correctly when there are multiple storage volumes" do
       expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
-      expect(sshable).to receive(:cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
+      expect(sshable).to receive(:_cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
       expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
 
       expect(sshable).to receive(:d_check).with("format_disk").and_return("NotStarted")
@@ -271,20 +271,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
       expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
-      expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
-      expect(sshable).to receive(:cmd).with("sudo mount /dev/vdb /dat")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
+      expect(sshable).to receive(:_cmd).with("sudo mount /dev/vdb /dat")
       expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 
     it "mounts data disk correctly when there are multiple storage volumes" do
       expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
       expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
-      expect(sshable).to receive(:cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
-      expect(sshable).to receive(:cmd).with("sudo update-initramfs -u")
-      expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
-      expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
-      expect(sshable).to receive(:cmd).with("sudo mount /dev/md0 /dat")
+      expect(sshable).to receive(:_cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
+      expect(sshable).to receive(:_cmd).with("sudo update-initramfs -u")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
+      expect(sshable).to receive(:_cmd).with("sudo mount /dev/md0 /dat")
       expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 
@@ -378,12 +378,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
       expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
 
       expect(postgres_server).to receive(:refresh_walg_credentials)
 
@@ -393,14 +393,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait at times other than the initial provisioning" do
       expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
-      expect(sshable).to receive(:cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
-      expect(sshable).to receive(:cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload pgbouncer@*.service")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:_cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload pgbouncer@*.service")
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
     end
@@ -411,40 +411,40 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "configures prometheus and metrics during initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
 
       # Configure metrics expectations
       expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
-      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
-      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
 
       expect { nx.configure_metrics }.to hop("setup_hugepages")
     end
 
     it "configures prometheus and metrics during initial provisioning and hops to setup_cloudwatch if timeline is AWS" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now node_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
 
       # Configure metrics expectations
       expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
-      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
-      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
 
       expect(postgres_server.timeline).to receive(:aws?).and_return(true)
       expect { nx.configure_metrics }.to hop("setup_cloudwatch")
@@ -452,19 +452,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "configures prometheus and metrics and hops to wait at times other than initial provisioning" do
       # Prometheus expectations
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
       # Configure metrics expectations
       expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
-      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
-      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
 
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
       expect { nx.configure_metrics }.to hop("wait")
@@ -474,19 +474,19 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       config_without_interval = {endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"}
 
       # Prometheus expectations
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
-      expect(sshable).to receive(:cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
       # Configure metrics expectations with default interval
       expect(postgres_server).to receive(:metrics_config).and_return(config_without_interval)
-      expect(sshable).to receive(:cmd).with("mkdir -p /home/ubi/postgres/metrics")
-      expect(sshable).to receive(:cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: config_without_interval.to_json)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: config_without_interval.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
 
       expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
       expect { nx.configure_metrics }.to hop("wait")
@@ -495,9 +495,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#setup_cloudwatch" do
     it "hops to setup_hugepages after setting up cloudwatch" do
-      expect(sshable).to receive(:cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
-      expect(sshable).to receive(:cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything)
-      expect(sshable).to receive(:cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d")
+      expect(sshable).to receive(:_cmd).with("sudo tee /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.d/001-ubicloud-config.json -s")
       expect { nx.setup_cloudwatch }.to hop("setup_hugepages")
     end
   end
@@ -635,7 +635,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#run_post_installation_script" do
     it "runs post installation script and hops wait" do
-      expect(sshable).to receive(:cmd).with(/post-installation-script/)
+      expect(sshable).to receive(:_cmd).with(/post-installation-script/)
       expect { nx.run_post_installation_script }.to hop("wait")
     end
   end
@@ -882,8 +882,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "runs checkpoints and perform lockout" do
       expect(nx).to receive(:decr_fence)
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/lockout 16")
-      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
+      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 16")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
       expect { nx.fence }.to hop("wait_in_fence")
     end
   end
@@ -908,7 +908,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
       expect(nx).to receive(:decr_unplanned_take_over)
       expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
-      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
       expect(representative_server).to receive(:incr_destroy)
 
       expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
@@ -919,7 +919,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
       expect(nx).to receive(:decr_unplanned_take_over)
       expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
-      expect(sshable).to receive(:cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
       expect(representative_server).to receive(:incr_destroy)
 
       expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
@@ -1036,8 +1036,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#restart" do
     it "sets deadline, restarts and exits" do
-      expect(sshable).to receive(:cmd).with("sudo postgres/bin/restart 16")
-      expect(sshable).to receive(:cmd).with("sudo systemctl restart pgbouncer@*.service")
+      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
     end
@@ -1061,13 +1061,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "returns true if the database is in crash recovery" do
       expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
+      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
     it "returns false otherwise" do
       expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
+      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
       expect(nx.available?).to be(false)
     end
   end

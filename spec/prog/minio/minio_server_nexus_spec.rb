@@ -168,20 +168,20 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#create_minio_user" do
     it "creates minio user and hops to setup" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user")
       expect { nx.create_minio_user }.to hop("setup")
     end
 
     it "does not raise an exception if the user already exists" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "useradd: user 'minio-user' already exists")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "useradd: user 'minio-user' already exists")
       expect { nx.create_minio_user }.to hop("setup")
     end
 
     it "raises an exception if the useradd command fails with a different error" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "Error!")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "Error!")
 
       expect { nx.create_minio_user }.to raise_error(RuntimeError, "Error!")
     end
@@ -209,25 +209,25 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#minio_restart" do
     it "hops to wait if succeeded" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --clean restart_minio")
       expect { nx.minio_restart }.to exit({"msg" => "minio server is restarted"})
     end
 
     it "naps if minio is not started" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("NotStarted")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("NotStarted")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
       expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if minio is failed" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Failed")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Failed")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
       expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if the status is unknown" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Unknown")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Unknown")
       expect { nx.minio_restart }.to nap(1)
     end
   end

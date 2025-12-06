@@ -11,7 +11,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
 
   let(:spdk_version) { "v23.09-ubi-0.2" }
   let(:sshable) {
-    instance_double(Sshable)
+    Sshable.new
   }
   let(:vm_host) {
     vmh = instance_double(VmHost)
@@ -66,7 +66,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
 
   describe "#remove_spdk" do
     it "hops to update_database" do
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk remove v23.09-ubi-0.2")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk remove v23.09-ubi-0.2")
       expect { remove_spdk.remove_spdk }.to hop("update_database")
     end
   end

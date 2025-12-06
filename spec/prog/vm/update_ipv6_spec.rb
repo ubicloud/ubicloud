@@ -22,7 +22,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   }
 
   let(:vm_host) {
-    instance_double(VmHost, sshable: instance_double(Sshable, host: "1.1.1.1"), ip6_random_vm_network: NetAddr::IPv6Net.parse("2001:0::"))
+    instance_double(VmHost, sshable: create_mock_sshable(host: "1.1.1.1"), ip6_random_vm_network: NetAddr::IPv6Net.parse("2001:0::"))
   }
 
   before do
@@ -37,10 +37,10 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "stops services and cleans up namespace" do
     expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, cert_enabled: true))
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-metadata-endpoint.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-dnsmasq.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip netns del test")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test-dnsmasq.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip netns del test")
     expect(pr).to receive(:hop_rewrite_persisted)
     pr.start
   end
@@ -48,10 +48,10 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "does not stop metadata endpoint service if not load balancer" do
     expect(vm).to receive(:load_balancer).and_return(nil)
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test.service")
-    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl stop test-metadata-endpoint.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-dnsmasq.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip netns del test")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test.service")
+    expect(vm_host.sshable).not_to receive(:_cmd).with("sudo systemctl stop test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test-dnsmasq.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip netns del test")
     expect(pr).to receive(:hop_rewrite_persisted)
     pr.start
   end
@@ -59,10 +59,10 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "does not stop metadata endpoint service if load balancer is not cert enabled" do
     expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, cert_enabled: false))
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test.service")
-    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl stop test-metadata-endpoint.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl stop test-dnsmasq.service")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip netns del test")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test.service")
+    expect(vm_host.sshable).not_to receive(:_cmd).with("sudo systemctl stop test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl stop test-dnsmasq.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip netns del test")
     expect(pr).to receive(:hop_rewrite_persisted)
     pr.start
   end
@@ -71,7 +71,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm).to receive(:update).with(ephemeral_net6: "2001::/64")
     expect(pr).to receive(:write_params_json)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo host/bin/setup-vm reassign-ip6 test", stdin: JSON.generate({storage: "storage_secrets"}))
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-vm reassign-ip6 test", stdin: JSON.generate({storage: "storage_secrets"}))
     expect(pr).to receive(:hop_start_vm)
     pr.rewrite_persisted
   end
@@ -79,8 +79,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "starts vm" do
     expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, cert_enabled: true))
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo systemctl start test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo systemctl start test-metadata-endpoint.service")
     expect(vm).to receive(:incr_update_firewall_rules)
     expect(vm).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, incr_refresh_keys: nil)])
     expect(pr).to receive(:pop).with("VM test updated")
@@ -90,8 +90,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "does not start metadata endpoint service if not load balancer" do
     expect(vm).to receive(:load_balancer).and_return(nil)
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
-    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl start test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
+    expect(vm_host.sshable).not_to receive(:_cmd).with("sudo systemctl start test-metadata-endpoint.service")
     expect(vm).to receive(:incr_update_firewall_rules)
     expect(vm).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, incr_refresh_keys: nil)])
     expect(pr).to receive(:pop).with("VM test updated")
@@ -101,8 +101,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   it "does not start metadata endpoint service if load balancer is not cert enabled" do
     expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer, cert_enabled: false))
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
-    expect(vm_host.sshable).to receive(:cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
-    expect(vm_host.sshable).not_to receive(:cmd).with("sudo systemctl start test-metadata-endpoint.service")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo ip -n test addr replace 1.0.0.1/8 dev ubid_to_tap_name")
+    expect(vm_host.sshable).not_to receive(:_cmd).with("sudo systemctl start test-metadata-endpoint.service")
     expect(vm).to receive(:incr_update_firewall_rules)
     expect(vm).to receive(:private_subnets).and_return([instance_double(PrivateSubnet, incr_refresh_keys: nil)])
     expect(pr).to receive(:pop).with("VM test updated")
@@ -113,8 +113,8 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     expect(pr).to receive(:vm_host).and_return(vm_host).at_least(:once)
     expect(vm).to receive(:params_json).and_return("params_json")
     expect(vm).to receive(:strand).and_return(instance_double(Strand, stack: [{"gpu_count" => 0, "hugepages" => true, "ch_version" => nil, "gpu_device" => nil, "hypervisor" => nil, "force_host_id" => nil, "swap_size_bytes" => nil, "exclude_host_ids" => [], "firmware_version" => nil, "alternative_families" => [], "last_label_changed_at" => "2025-11-24 11:30:57 +0000", "distinct_storage_devices" => true}]))
-    expect(vm_host.sshable).to receive(:cmd).with("sudo rm /vm/test/prep.json")
-    expect(vm_host.sshable).to receive(:cmd).with("sudo -u test tee /vm/test/prep.json", stdin: "params_json")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo rm /vm/test/prep.json")
+    expect(vm_host.sshable).to receive(:_cmd).with("sudo -u test tee /vm/test/prep.json", stdin: "params_json")
     pr.write_params_json
   end
 end

@@ -133,8 +133,8 @@ RSpec.describe Prog::DownloadBootImage do
         "certs" => nil,
         "use_htcat" => false
       }.to_json
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
@@ -150,8 +150,8 @@ RSpec.describe Prog::DownloadBootImage do
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version}).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
       expect(dbi).to receive(:sha256sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end
@@ -172,37 +172,37 @@ RSpec.describe Prog::DownloadBootImage do
         "use_htcat" => true
       }.to_json
       expect(dbi).to receive(:frame).and_return({"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "download_r2" => true}).at_least(:once)
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
       expect(dbi).to receive(:sha256sum).and_return("sha256_sum")
       expect { dbi.download }.to nap(15)
     end
 
     it "waits manual intervation if it's failed in production" do
       expect(Config).to receive(:production?).and_return(true)
-      expect(sshable).to receive(:cmd).with("cat var/log/download_my-image_20230303.stderr || true")
-      expect(sshable).to receive(:cmd).with("cat var/log/download_my-image_20230303.stdout || true")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
       expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[\"#{vm_host.ubid}\"]"
     end
 
     it "retries downloading image if it is failed somewhere other than production" do
       expect(Config).to receive(:production?).and_return(false)
-      expect(sshable).to receive(:cmd).with("cat var/log/download_my-image_20230303.stderr || true")
-      expect(sshable).to receive(:cmd).with("cat var/log/download_my-image_20230303.stdout || true")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
       expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[\"#{vm_host.ubid}\"]"
     end
 
     it "waits for the download to complete" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("InProgess")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("InProgess")
       expect { dbi.download }.to nap(15)
     end
 
     it "hops if it's succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Succeeded")
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
       expect { dbi.download }.to hop("update_available_storage_space")
     end
   end
@@ -217,7 +217,7 @@ RSpec.describe Prog::DownloadBootImage do
         available_storage_gib: 35,
         enabled: true
       )
-      expect(sshable).to receive(:cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("2361393152")
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
       expect(bi.reload.size_gib).to eq(3)
@@ -234,7 +234,7 @@ RSpec.describe Prog::DownloadBootImage do
         available_storage_gib: 35,
         enabled: true
       )
-      expect(sshable).to receive(:cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
     end

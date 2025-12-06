@@ -50,15 +50,15 @@ JSON
 
   describe "#get_arch" do
     it "returns the architecture" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("common/bin/arch").and_return("x64")
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("common/bin/arch").and_return("x64")
       allow(lc).to receive(:sshable).and_return(sshable)
       expect(lc.get_arch).to eq("x64")
     end
 
     it "fails when there's an unexpected architecture" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("common/bin/arch").and_return("s390x")
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("common/bin/arch").and_return("s390x")
       allow(lc).to receive(:sshable).and_return(sshable)
       expect { lc.get_arch }.to raise_error RuntimeError, "BUG: unexpected CPU architecture"
     end
@@ -66,8 +66,8 @@ JSON
 
   describe "#get_topology" do
     it "returns the CPU topology" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("/usr/bin/lscpu -Jye").and_return(
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("/usr/bin/lscpu -Jye").and_return(
         eight_thread_four_core_four_numa_two_socket
       )
       allow(lc).to receive(:sshable).and_return(sshable)
@@ -77,14 +77,14 @@ JSON
 
   describe "#count_dies" do
     it "returns the number of dies" do
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with("cat /sys/devices/system/cpu/cpu*/topology/die_id").and_return("0\n1\n0\n1\n")
+      sshable = Sshable.new
+      expect(sshable).to receive(:_cmd).with("cat /sys/devices/system/cpu/cpu*/topology/die_id").and_return("0\n1\n0\n1\n")
       allow(lc).to receive(:sshable).and_return(sshable)
       expect(lc.count_dies(arch: "x64", total_sockets: 2)).to eq(2)
     end
 
     it "returns the number of sockets when on arm64" do
-      sshable = instance_double(Sshable)
+      sshable = Sshable.new
       allow(lc).to receive(:sshable).and_return(sshable)
       expect(lc.count_dies(arch: "arm64", total_sockets: 2)).to eq(2)
     end

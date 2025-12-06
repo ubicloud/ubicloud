@@ -8,7 +8,8 @@ class Prog::Minio::SetupMinio < Prog::Base
     when "Succeeded"
       pop "minio is installed"
     when "Failed", "NotStarted"
-      minio_server.vm.sshable.cmd("common/bin/daemonizer 'minio/bin/install_minio #{Config.minio_version}' install_minio")
+      d_command = NetSsh.command("minio/bin/install_minio :version", version: Config.minio_version)
+      minio_server.vm.sshable.cmd("common/bin/daemonizer :d_command install_minio", d_command:)
     end
     nap 5
   end
@@ -57,20 +58,21 @@ ECHO
     when "Succeeded"
       minio_server.vm.sshable.cmd("sudo mkdir -p /minio")
       minio_server.vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).all.each_with_index do |volume, i|
-        minio_server.vm.sshable.cmd("sudo mkdir -p /minio/dat#{i + 1}")
-        device_path = volume.device_path.shellescape
-        minio_server.vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /minio/dat#{i + 1} xfs defaults 0 0")
-        minio_server.vm.sshable.cmd("sudo mount #{device_path} /minio/dat#{i + 1}")
+        i1 = i + 1
+        minio_server.vm.sshable.cmd("sudo mkdir -p /minio/dat:i1", i1:)
+        device_path = volume.device_path
+        minio_server.vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /minio/dat:i1 xfs defaults 0 0", device_path:, i1:)
+        minio_server.vm.sshable.cmd("sudo mount :device_path /minio/dat:i1", device_path:, i1:)
       end
       minio_server.vm.sshable.cmd("sudo chown -R minio-user:minio-user /minio")
 
       pop "data disks are mounted"
     when "Failed", "NotStarted"
       cmd = minio_server.vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).all.map do |volume|
-        device_path = volume.device_path.shellescape
-        "sudo mkfs --type xfs #{device_path}"
+        device_path = volume.device_path
+        NetSsh.command("sudo mkfs --type xfs :device_path", device_path:)
       end.join(" && ")
-      minio_server.vm.sshable.cmd("common/bin/daemonizer '#{cmd}' format_disks")
+      minio_server.vm.sshable.cmd("common/bin/daemonizer :cmd format_disks", cmd:)
     end
 
     nap 5

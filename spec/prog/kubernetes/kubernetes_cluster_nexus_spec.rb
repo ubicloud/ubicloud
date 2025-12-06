@@ -9,6 +9,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   let(:customer_project) { Project.create(name: "default") }
   let(:subnet) { kubernetes_cluster.private_subnet }
+  let(:session) { Net::SSH::Connection::Session.allocate }
 
   let(:kubernetes_cluster) {
     kc = described_class.assemble(
@@ -429,7 +430,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
-      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
+      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
       expect(first_node).to receive(:sshable).and_return(sshable0).at_least(:once)
       allow(second_node).to receive(:sshable).and_return(sshable1)
       allow(sshable0).to receive(:connect)
@@ -497,7 +498,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
   end
 
   describe "#install_metrics_server" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
@@ -544,13 +545,13 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "creates full mesh connectivity on cluster worker nodes" do
-      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: first_ssh_key.private_key)
       first_vm_authorized_keys = [first_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
+      expect(kubernetes_cluster.worker_functional_nodes.first.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: first_vm_authorized_keys)
 
-      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: second_ssh_key.private_key)
       second_vm_authorized_keys = [second_vm.sshable.keys.first.public_key, first_ssh_key.public_key, second_ssh_key.public_key].join("\n") + "\n"
-      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
+      expect(kubernetes_cluster.worker_functional_nodes.last.vm.sshable).to receive(:_cmd).with("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: second_vm_authorized_keys)
 
       expect { nx.sync_worker_mesh }.to hop("wait")
     end
@@ -558,16 +559,17 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
   describe "#install_csi" do
     it "installs the ubicsi on the cluster" do
-      client = instance_double(Kubernetes::Client)
+      client = Kubernetes::Client.new(kubernetes_cluster, session)
       expect(kubernetes_cluster).to receive(:client).and_return(client)
-      expect(client).to receive(:kubectl).with("apply -f kubernetes/manifests/ubicsi")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f kubernetes/manifests/ubicsi").and_return(response)
       expect { nx.install_csi }.to hop("wait")
     end
   end
 
   describe "#sync_internal_dns_config" do
-    let(:client) { instance_double(Kubernetes::Client) }
-    let(:sshable) { instance_double(Sshable) }
+    let(:client) { Kubernetes::Client.new(kubernetes_cluster, session) }
+    let(:sshable) { Sshable.new }
     let(:node) { KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kubernetes_cluster.id) }
 
     before do
@@ -583,7 +585,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       name: coredns
       namespace: kube-system
       YAML
-      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(get_cm)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(get_cm, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
@@ -673,8 +676,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       namespace: kube-system
       YAML
 
-      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(get_cm)
-      expect(sshable).to receive(:cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(get_cm, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
+      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: replace_cm)
       expect { nx.sync_internal_dns_config }.to hop("wait")
     end
 
@@ -712,7 +716,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       namespace: kube-system
       YAML
 
-      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(invalid_corefile)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(invalid_corefile, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to raise_error(RuntimeError, "Kubernetes block not found.")
     end
 
@@ -734,7 +739,8 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       namespace: kube-system
       YAML
 
-      expect(client).to receive(:kubectl).with("-n kube-system get cm coredns -oyaml").and_return(broken_corefile)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(broken_corefile, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system get cm coredns -oyaml").and_return(response)
       expect { nx.sync_internal_dns_config }.to raise_error(RuntimeError, "Closing brace not found.")
     end
   end

@@ -42,7 +42,7 @@ meta mark 0x00B1C100D ip6 saddr . tcp dport @allowed_ipv6_lb_dest_set ct state e
       ""
     end
 
-    vm.vm_host.sshable.cmd("sudo ip netns exec #{vm.inhost_name} nft --file -", stdin: <<TEMPLATE)
+    vm.vm_host.sshable.cmd("sudo ip netns exec :inhost_name nft --file -", inhost_name: vm.inhost_name, stdin: <<TEMPLATE)
 # An nftables idiom for idempotent re-create of a named entity: merge
 # in an empty table (a no-op if the table already exists) and then
 # delete, before creating with a new definition.

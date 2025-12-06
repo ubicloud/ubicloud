@@ -284,10 +284,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     return pod["id"] if pod
 
-    ssh_keys = vm.sshable.cmd(<<-CMD) + Config.operator_ssh_public_keys
+    ssh_keys = vm.sshable.cmd(<<-CMD, ubid: inference_endpoint_replica.ubid) + Config.operator_ssh_public_keys
 if ! sudo test -f /ie/workdir/.ssh/runpod; then
   sudo -u ie mkdir -p /ie/workdir/.ssh
-  sudo -u ie ssh-keygen -t ed25519 -C #{inference_endpoint_replica.ubid}@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
+  sudo -u ie ssh-keygen -t ed25519 -C :ubid@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
 fi
 sudo cat /ie/workdir/.ssh/runpod.pub
     CMD
