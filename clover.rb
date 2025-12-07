@@ -328,7 +328,12 @@ class Clover < Roda
     # is when the provided personal access token is invalid.  Generate the JSON
     # error body up front and serve it, so it doesn't need to be generated per-request.
     json_response_body do |_|
-      invalid_auth_error_body
+      if request.env["PATH_INFO"] == "/cli"
+        response.content_type = :text
+        "! Invalid personal access token provided\n"
+      else
+        invalid_auth_error_body
+      end
     end
 
     require_bcrypt? false
