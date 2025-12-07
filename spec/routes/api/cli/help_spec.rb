@@ -3,6 +3,11 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "cli help" do
+  it "fails if the account is suspended" do
+    @account.suspend
+    expect(cli(%w[help help], status: 401)).to eq "! Invalid personal access token provided\n"
+  end
+
   it "shows help for specific command if given" do
     expect(cli(%w[help help])).to eq <<~OUTPUT
       Get command help
