@@ -128,7 +128,6 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
     private_subnet.remove_all_firewalls
-    Semaphore.incr(strand.children_dataset.where(prog: "Aws::Vpc").select(:id), "destroy")
 
     ignore_invalid_id do
       client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
