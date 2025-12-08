@@ -256,8 +256,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     end
 
     it "hops to wait if all is done" do
+      nx.update_stack_locked_nics([nic.id])
       nic.strand.update(label: "wait")
-      nic.incr_lock
       ps.update(last_rekey_at: Time.now - 100)
       expect { nx.wait_old_state_drop }.to hop("wait")
       ps.refresh
