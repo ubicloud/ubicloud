@@ -56,7 +56,7 @@ class Clover
             "location" => pg.location,
             "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
             "size" => size,
-            "storage_size" => target_storage_size_gib.to_s,
+            "storage_size" => target_storage_size_gib,
             "ha_type" => ha_type,
             "version" => pg.version
           }
