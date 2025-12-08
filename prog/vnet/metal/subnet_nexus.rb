@@ -19,6 +19,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait
     when_refresh_keys_set? do
       private_subnet.update(state: "refreshing_keys")
+      decr_refresh_keys
       hop_refresh_keys
     end
 
@@ -70,8 +71,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
-    decr_refresh_keys
-    nics = active_nics
+    nics = nics_to_rekey
     nap 10 if nics.any?(&:lock_set?)
     locked_nics = []
     nics.each do |nic|
@@ -79,6 +79,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       nic.incr_start_rekey
       nic.incr_lock
       locked_nics << nic.id
+      private_subnet.create_tunnels(nics, nic)
     end
 
     update_stack_locked_nics(locked_nics)
@@ -109,7 +110,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait" }
       private_subnet.update(state: "waiting", last_rekey_at: Time.now)
-      all_connected_nics.exclude(rekey_payload: nil).update(encryption_key: nil, rekey_payload: nil)
+      get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil)
       Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
       update_stack_locked_nics(nil)
       hop_wait
@@ -159,7 +160,11 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   def get_locked_nics
-    Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand).all
+    get_locked_nics_dataset.all
+  end
+
+  def get_locked_nics_dataset
+    Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand)
   end
 
   private
