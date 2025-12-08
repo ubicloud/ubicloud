@@ -92,7 +92,7 @@ RSpec.describe Clover, "postgres" do
       it "success" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "none"
         }.to_json
 
@@ -101,7 +101,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-async", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "async"
         }.to_json
 
@@ -110,7 +110,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-sync", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "sync"
         }.to_json
 
@@ -119,7 +119,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-config", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "none",
           pg_config: {"wal_level" => "logical"}
         }.to_json
@@ -143,7 +143,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           flavor: "paradedb"
         }.to_json
 
@@ -154,7 +154,7 @@ RSpec.describe Clover, "postgres" do
         project.set_ff_postgres_lantern(false)
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-invalid", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           flavor: "invalid"
         }.to_json
         expect(last_response.status).to eq(400)
@@ -164,7 +164,7 @@ RSpec.describe Clover, "postgres" do
         project.set_ff_postgres_lantern(false)
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           flavor: "lantern"
         }.to_json
         expect(last_response.status).to eq(400)
@@ -173,7 +173,7 @@ RSpec.describe Clover, "postgres" do
       it "invalid location" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "sync"
         }.to_json
 
@@ -183,7 +183,7 @@ RSpec.describe Clover, "postgres" do
       it "location not exist" do
         post "/project/#{project.ubid}/location/not-exist-location/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "sync"
         }.to_json
 
@@ -193,7 +193,7 @@ RSpec.describe Clover, "postgres" do
       it "invalid size" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "invalid-size",
-          storage_size: "64"
+          storage_size: 64
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
@@ -202,7 +202,7 @@ RSpec.describe Clover, "postgres" do
       it "invalid config values" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           pg_config: {"wal_level" => "invalid"}
         }.to_json
 
@@ -212,7 +212,7 @@ RSpec.describe Clover, "postgres" do
       it "valid config values" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           pg_config: {"wal_level" => "logical"}
         }.to_json
 
@@ -222,7 +222,7 @@ RSpec.describe Clover, "postgres" do
       it "can set and update tags" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "sync",
           tags: [{key: "env", value: "test"}, {key: "team", value: "devops"}]
         }.to_json
@@ -502,7 +502,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
           size: "standard-2",
-          storage_size: "64",
+          storage_size: 64,
           ha_type: "sync"
         }.to_json
 

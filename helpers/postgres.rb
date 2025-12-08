@@ -20,7 +20,7 @@ class Clover
       "location" => @location,
       "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
-      "storage_size" => storage_size.to_s,
+      "storage_size" => storage_size,
       "ha_type" => ha_type,
       "version" => version
     }
@@ -146,7 +146,7 @@ class Clover
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "burstable"
-        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size.to_i)
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
       end
     end
 

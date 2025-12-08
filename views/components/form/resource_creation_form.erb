@@ -48,7 +48,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
       checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
       selected_options[name] = opt_val if checked
 
-      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.tr(".", "-")}" }
+      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.to_s.tr(".", "-")}" }
       opt_classes << "hidden" unless parents_selected
       opt_classes = opt_classes.join(" ")
 
