@@ -23,11 +23,6 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       hop_refresh_keys
     end
 
-    when_add_new_nic_set? do
-      private_subnet.update(state: "adding_new_nic")
-      hop_add_new_nic
-    end
-
     when_update_firewall_rules_set? do
       private_subnet.vms.each(&:incr_update_firewall_rules)
       decr_update_firewall_rules
@@ -50,24 +45,6 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   def gen_reqid
     SecureRandom.random_number(1...100000)
-  end
-
-  label def add_new_nic
-    register_deadline("wait", 5 * 60)
-    nics_snap = nics_to_rekey
-    nap 10 if nics_snap.any?(&:lock_set?)
-    locked_nics = []
-    nics_snap.each do |nic|
-      nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
-      nic.incr_start_rekey
-      nic.incr_lock
-      locked_nics << nic.id
-      private_subnet.create_tunnels(nics_snap, nic)
-    end
-
-    update_stack_locked_nics(locked_nics)
-    decr_add_new_nic
-    hop_wait_inbound_setup
   end
 
   label def refresh_keys
@@ -145,10 +122,6 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       private_subnet.load_balancers.map { |lb| lb.incr_destroy }
       nap rand(5..10)
     end
-  end
-
-  def active_nics
-    nics_with_state("active")
   end
 
   def nics_to_rekey

@@ -86,12 +86,6 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect { nx.wait }.to hop("refresh_keys")
     end
 
-    it "hops to add_new_nic if when_add_new_nic_set?" do
-      expect(nx).to receive(:when_add_new_nic_set?).and_yield
-      expect(ps).to receive(:update).with(state: "adding_new_nic").and_return(true)
-      expect { nx.wait }.to hop("add_new_nic")
-    end
-
     it "increments refresh_keys if it passed more than a day" do
       expect(ps).to receive(:last_rekey_at).and_return(Time.now - 60 * 60 * 24 - 1)
       expect(ps).to receive(:incr_refresh_keys).and_return(true)
@@ -108,51 +102,6 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(10 * 60)
-    end
-  end
-
-  describe "#add_new_nic" do
-    it "adds new nics and creates tunnels" do
-      st = instance_double(Strand, label: "wait_setup")
-      nic_to_add = instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
-      st = instance_double(Strand, label: "wait")
-      added_nic = instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st, lock_set?: false)
-      nics_to_rekey = [added_nic, nic_to_add]
-      expect(nx).to receive(:decr_add_new_nic)
-      expect(nic_to_add).to receive(:incr_lock)
-      expect(added_nic).to receive(:incr_lock)
-      expect(nic_to_add).to receive(:incr_start_rekey)
-      expect(added_nic).to receive(:incr_start_rekey)
-      expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
-      expect(nx).to receive(:gen_spi).and_return("0xe3af3a04").at_least(:once)
-      expect(nx).to receive(:gen_reqid).and_return(86879).at_least(:once)
-      expect(nx).to receive(:gen_encryption_key).and_return("0x0a0b0c0d0e0f10111213141516171819").at_least(:once)
-      expect(nx.private_subnet).to receive(:create_tunnels).and_return(true).at_least(:once)
-      expect(added_nic).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
-        {
-          spi4: "0xe3af3a04",
-          spi6: "0xe3af3a04",
-          reqid: 86879
-        }).and_return(true)
-      expect(nic_to_add).to receive(:update).with(encryption_key: "0x0a0b0c0d0e0f10111213141516171819", rekey_payload:
-        {
-          spi4: "0xe3af3a04",
-          spi6: "0xe3af3a04",
-          reqid: 86879
-        }).and_return(true)
-      expect(nx).to receive(:update_stack_locked_nics).with([added_nic.id, nic_to_add.id]).and_return(true)
-      expect { nx.add_new_nic }.to hop("wait_inbound_setup")
-    end
-
-    it "naps if the nics are locked" do
-      st = instance_double(Strand, label: "wait_setup")
-      nic_to_add = instance_double(Nic, id: "57afa8a7-2357-4012-9632-07fbe13a3133", rekey_payload: {}, strand: st, lock_set?: false)
-      st = instance_double(Strand, label: "wait")
-      added_nic = instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", rekey_payload: {}, strand: st, lock_set?: false)
-      nics_to_rekey = [added_nic, nic_to_add]
-      expect(added_nic).to receive(:lock_set?).and_return(true)
-      expect(nx).to receive(:nics_to_rekey).and_return(nics_to_rekey)
-      expect { nx.add_new_nic }.to nap(10)
     end
   end
 
