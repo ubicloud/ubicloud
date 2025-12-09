@@ -133,7 +133,7 @@ jobs:
         SMTP_TLS: false
         STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        VHOST_BLOCK_BACKEND_VERSION: v0.2.1
+        VHOST_BLOCK_BACKEND_VERSION: v0.3.0
       run: |
         set -o pipefail
         timeout 68m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
