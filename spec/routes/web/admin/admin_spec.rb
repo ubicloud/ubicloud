@@ -460,6 +460,21 @@ RSpec.describe CloverAdmin do
     expect(st.reload.schedule).to be_within(5).of(Time.now)
   end
 
+  it "supports adding 5 minutes to strand schedule" do
+    schedule = Time.now + 10
+    st = Strand.create(prog: "Test", label: "hop_entry", schedule:)
+    fill_in "UBID or UUID", with: st.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+
+    click_link "Extend Schedule"
+    fill_in "minutes", with: "5"
+    click_button "Extend Schedule"
+    expect(page).to have_flash_notice("Extended schedule")
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+    expect(st.reload.schedule).to be_within(5).of(schedule + 300)
+  end
+
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
     fill_in "UBID or UUID", with: vm.ubid
