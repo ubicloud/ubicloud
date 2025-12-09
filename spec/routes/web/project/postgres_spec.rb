@@ -424,6 +424,22 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_content "Danger Zone"
       end
 
+      it "allows updating initialization script when feature flag is enabled" do
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content "Initialization Script"
+        fill_in "init_script", with: "sudo whoami"
+
+        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        form = find_by_id "creation-form"
+        _csrf = form.find("input[name='_csrf']", visible: false).value
+        init_script = form.find(:field, "init_script").value
+        page.driver.submit :patch, form["action"], {init_script:, _csrf:}
+
+        pg.reload
+        expect(pg.init_script).to eq("sudo whoami")
+      end
+
       it "raises forbidden when does not have permissions" do
         visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/overview"
 
