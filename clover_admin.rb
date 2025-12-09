@@ -179,6 +179,9 @@ class CloverAdmin < Roda
     "Strand" => {
       "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately") do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+      end,
+      "extend" => object_action("Extend Schedule", "Extended schedule", {minutes: :pos_int!}) do |obj, minutes|
+        obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
       end
     },
     "Vm" => {
