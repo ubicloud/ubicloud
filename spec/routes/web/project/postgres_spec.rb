@@ -135,6 +135,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can specify an init script when creating new PostgreSQL database" do
+        project.set_ff_postgres_init_script(true)
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
@@ -425,6 +426,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "allows updating initialization script when feature flag is enabled" do
+        project.set_ff_postgres_init_script(true)
         visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_content "Initialization Script"
         fill_in "init_script", with: "sudo whoami"

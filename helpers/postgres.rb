@@ -158,7 +158,9 @@ class Clover
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
 
-    options.add_option(name: "init_script")
+    if @project.get_ff_postgres_init_script
+      options.add_option(name: "init_script")
+    end
 
     options.serialize
   end

@@ -47,8 +47,11 @@
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
-    {name: "init_script", type: "textarea", label: "Initialization Script", required: "", placeholder: "Enter script to run on database creation"}
   ]
+
+  if @project.get_ff_postgres_init_script
+    form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", required: "", placeholder: "Enter script to run on database creation"}
+  end
 
   if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor)
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
