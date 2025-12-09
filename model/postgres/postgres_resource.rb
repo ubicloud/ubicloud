@@ -14,8 +14,9 @@ class PostgresResource < Sequel::Model
   many_to_one :private_subnet, read_only: true
   many_to_one :location
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
+  one_to_one :init_script, class: :PostgresInitScript, key: :id, read_only: true
 
-  plugin :association_dependencies, metric_destinations: :destroy
+  plugin :association_dependencies, metric_destinations: :destroy, init_script: :destroy
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
@@ -191,6 +192,7 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
+    validates_max_length(2000, :init_script, allow_nil: true)
   end
 
   def read_replica?

@@ -264,7 +264,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
       expect(sshable).to receive(:_cmd).with("sudo mount /dev/vdb /dat")
-      expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
+      expect { nx.mount_data_disk }.to hop("run_init_script")
     end
 
     it "mounts data disk correctly when there are multiple storage volumes" do
@@ -277,12 +277,40 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
       expect(sshable).to receive(:_cmd).with("sudo mount /dev/md0 /dat")
-      expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
+      expect { nx.mount_data_disk }.to hop("run_init_script")
     end
 
     it "naps if script return unknown status" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
+    end
+  end
+
+  describe "#run_init_script" do
+    it "skips running the init script if not provided" do
+      expect(sshable).not_to receive(:_cmd).with("sudo tee /tmp/init_script.sql > /dev/null", anything)
+      expect { nx.run_init_script }.to hop("configure_walg_credentials")
+    end
+
+    it "runs the init script if provided and is not running already" do
+      PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
+      expect(sshable).to receive(:d_check).with("run_init_script").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: "sudo whoami")
+      expect(sshable).to receive(:_cmd).with("sudo chmod +x postgres/bin/init_script.sh")
+      expect(sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", stdin: postgres_resource.name)
+      expect { nx.run_init_script }.to nap(5)
+    end
+
+    it "naps if init script is still running" do
+      PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
+      expect(sshable).to receive(:d_check).with("run_init_script").and_return("InProgress")
+      expect { nx.run_init_script }.to nap(5)
+    end
+
+    it "hops to configure_walg_credentials if init script is succeeded" do
+      PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
+      expect(sshable).to receive(:d_check).with("run_init_script").and_return("Succeeded")
+      expect { nx.run_init_script }.to hop("configure_walg_credentials")
     end
   end
 

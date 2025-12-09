@@ -33,6 +33,46 @@
       </div>
     </div>
   </div>
+  <% if @project.get_ff_postgres_init_script %>
+    <div class="p-6">
+      <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+        <div class="min-w-0 flex-1">
+          <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+            Initialization Script
+          </h3>
+        </div>
+      </div>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <% form_elements = [
+              {name: "init_script", type: "textarea", required: "", placeholder: "Enter script to run on database creation"}
+          ]
+
+@option_tree, @option_parents = generate_postgres_options(flavor: @pg.flavor, location: @location)
+
+pre_selected_values = {
+  "flavor" => @pg.flavor,
+  "location" => @location.ubid,
+  "family" => Option::POSTGRES_SIZE_OPTIONS[@pg.target_vm_size].family,
+  "size" => @pg.target_vm_size,
+  "storage_size" => @pg.target_storage_size_gib,
+  "ha_type" => @pg.ha_type,
+  "init_script" => @pg.init_script&.init_script
+} %>
+
+        <%== render(
+  "components/form/resource_creation_form",
+  locals: {
+    action: "#{path(@pg)}/patch",
+    form_elements:,
+    pre_selected_values:,
+    option_tree: @option_tree,
+    option_parents: @option_parents,
+    mode: "update"
+  }
+) %>
+      </div>
+    </div>
+  <% end %>
 <% end %>
 <!-- Danger Zone -->
 <% if @edit_perm || delete_perm %>
