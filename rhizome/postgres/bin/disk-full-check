@@ -1,0 +1,41 @@
+#!/bin/bash
+set -eu
+
+DAT=${DAT:-/dat}
+
+read name btotal bused bavailable usedp mount_path <<< "$(df -P -B1 "$DAT" | tail -n +2)"
+export PGDATA="$DAT/$1/data"
+
+if test "$btotal" -le 68719476736; then # Smaller thresholds for disks <= 64GB (hobby)
+  recover_threshold=2147483648    # 2GB
+  readonly_threshold=1073741824   # 1GB
+  restart_threshold=536870912     # 512MB
+  human_buffer_size=500M
+else
+  recover_threshold=7516192768    # 7GB
+  readonly_threshold=5368709120   # 5GB
+  restart_threshold=3221225472    # 3GB
+  human_buffer_size=1G
+fi
+
+if test "$bavailable" -gt "$recover_threshold"; then
+  if grep -q "default_transaction_read_only = 'on'" "$PGDATA/postgresql.auto.conf"; then
+    sed -i "/default_transaction_read_only = 'on'/d" "$PGDATA/postgresql.auto.conf"
+    test -f "$DAT/disk-full-read-only-pending-restart-$1" && rm -f "$DAT/disk-full-read-only-pending-restart-$1"
+    pg_ctl reload
+  elif ! test -f "$DAT/disk-full-human-buffer"; then
+    fallocate -l "$human_buffer_size" "$DAT/disk-full-human-buffer"
+  fi
+elif test "$bavailable" -lt "$readonly_threshold"; then
+  if ! grep -q "default_transaction_read_only = 'on'" "$PGDATA/postgresql.auto.conf"; then
+    if test -n "$(tail -c 1 "$PGDATA/postgresql.auto.conf")"; then
+      echo >> "$PGDATA/postgresql.auto.conf"
+    fi
+    echo "default_transaction_read_only = 'on'" >> "$PGDATA/postgresql.auto.conf"
+    touch "$DAT/disk-full-read-only-pending-restart-$1"
+    pg_ctl reload
+  elif test "$bavailable" -lt "$restart_threshold" && test -f "$DAT/disk-full-read-only-pending-restart-$1"; then
+    pg_ctl restart
+    rm -f "$DAT/disk-full-read-only-pending-restart-$1"
+  fi
+fi
