@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S ruby --enable-frozen-string-literal
 # frozen_string_literal: true
 
 REPL = true
