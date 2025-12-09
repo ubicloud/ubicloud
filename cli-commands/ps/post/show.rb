@@ -29,12 +29,12 @@ UbiCli.on("ps").run_on("show") do
 
     body = []
 
-    keys.each do |key|
+    each_with_dashed(keys) do |key, display_key|
       case key
       when :firewalls
         data[key].each_with_index do |firewall, i|
           body << "firewall " << (i + 1).to_s << ":\n"
-          firewall_keys.each do |fw_key|
+          each_with_dashed(firewall_keys) do |fw_key, display_fw_key|
             if fw_key == :firewall_rules
               body << "  rules:\n"
               firewall[fw_key].each_with_index do |rule, i|
@@ -45,19 +45,19 @@ UbiCli.on("ps").run_on("show") do
                 body << "\n"
               end
             else
-              body << "  " << fw_key.to_s << ": " << firewall[fw_key].to_s << "\n"
+              body << "  " << display_fw_key << ": " << firewall[fw_key].to_s << "\n"
             end
           end
         end
       when :nics
         data[key].each_with_index do |nic, i|
           body << "nic " << (i + 1).to_s << ":\n"
-          nic_keys.each do |nic_key|
-            body << "  " << nic_key.to_s << ": " << nic[nic_key].to_s << "\n"
+          each_with_dashed(nic_keys) do |nic_key, display_nic_key|
+            body << "  " << display_nic_key << ": " << nic[nic_key].to_s << "\n"
           end
         end
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

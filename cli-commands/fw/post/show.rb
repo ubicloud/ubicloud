@@ -29,7 +29,7 @@ UbiCli.on("fw").run_on("show") do
 
     body = []
 
-    keys.each do |key|
+    each_with_dashed(keys) do |key, display_key|
       case key
       when :firewall_rules
         body << "rules:\n"
@@ -43,21 +43,21 @@ UbiCli.on("fw").run_on("show") do
       when :private_subnets
         data[key].each_with_index do |ps, i|
           body << "private subnet " << (i + 1).to_s << ":\n"
-          private_subnet_keys.each do |ps_key|
+          each_with_dashed(private_subnet_keys) do |ps_key, display_ps_key|
             if ps_key == :nics
               ps[ps_key].each_with_index do |nic, i|
                 body << "  nic " << (i + 1).to_s << ":\n"
-                nic_keys.each do |nic_key|
-                  body << "    " << nic_key.to_s << ": " << nic[nic_key].to_s << "\n"
+                each_with_dashed(nic_keys) do |nic_key, display_nic_key|
+                  body << "    " << display_nic_key << ": " << nic[nic_key].to_s << "\n"
                 end
               end
             else
-              body << "  " << ps_key.to_s << ": " << ps[ps_key].to_s << "\n"
+              body << "  " << display_ps_key << ": " << ps[ps_key].to_s << "\n"
             end
           end
         end
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

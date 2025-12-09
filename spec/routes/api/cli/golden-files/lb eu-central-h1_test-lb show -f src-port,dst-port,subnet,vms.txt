@@ -1,5 +1,5 @@
-src_port: 12345
-dst_port: 54321
+src-port: 12345
+dst-port: 54321
 subnet: default-eu-central-h1
 vms:
   vmdzyppz6j166jh5e9t2dwrfas

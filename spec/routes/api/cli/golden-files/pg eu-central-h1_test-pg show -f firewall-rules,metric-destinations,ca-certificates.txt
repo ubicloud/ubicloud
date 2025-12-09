@@ -1,9 +1,9 @@
-firewall rules:
+firewall-rules:
   1: frpqgkgjd09y4pnjaq2pkeacam  0.0.0.0/0  5432  pg-fw-desc
   2: frwhnrpxm8wa4jwnpj8hjd6ehc  0.0.0.0/0  6432  
   3: frw2040y4rsy2qxt70bp95j8yg  ::/0  5432  
   4: frtrp88sbzke2mn45n1vj6mmrh  ::/0  6432  
-metric destinations:
+metric-destinations:
   1: md8ntmx8e1764nwc7p970vf3xw  foo  https://baz.example.com
-CA certificates:
+ca-certificates:
 

@@ -27,12 +27,12 @@ UbiCli.on("vm").run_on("show") do
 
     firewall_keys = underscore_keys(firewall_keys)
     firewall_rule_keys = underscore_keys(firewall_rule_keys)
-    underscore_keys(keys).each do |key|
+    each_with_dashed(underscore_keys(keys)) do |key, display_key|
       case key
       when :firewalls
         data[key].each_with_index do |firewall, i|
           body << "firewall " << (i + 1).to_s << ":\n"
-          firewall_keys.each do |fw_key|
+          each_with_dashed(firewall_keys) do |fw_key, display_fw_key|
             if fw_key == :firewall_rules
               body << "  rules:\n"
               firewall[fw_key].each_with_index do |rule, i|
@@ -43,14 +43,14 @@ UbiCli.on("vm").run_on("show") do
                 body << "\n"
               end
             else
-              body << "  " << fw_key.to_s << ": " << firewall[fw_key].to_s << "\n"
+              body << "  " << display_fw_key << ": " << firewall[fw_key].to_s << "\n"
             end
           end
         end
       when :subnet
-        body << key.to_s << ": " << data[key].name << "\n"
+        body << display_key << ": " << data[key].name << "\n"
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

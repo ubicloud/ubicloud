@@ -25,33 +25,33 @@ UbiCli.on("kc").run_on("show") do
 
     body = []
 
-    keys.each do |key|
+    each_with_dashed(keys) do |key, display_key|
       case key
       when :nodepools
         data[key].each_with_index do |nodepool, i|
           body << "nodepool " << (i + 1).to_s << ":\n"
-          nodepool_keys.each do |np_key|
+          each_with_dashed(nodepool_keys) do |np_key, display_np_key|
             if np_key == :vms
               nodepool[np_key].each_with_index do |vm, i|
                 body << "  vm " << (i + 1).to_s << ":\n"
-                vm_keys.each do |vm_key|
-                  body << "    " << vm_key.to_s << ": " << vm[vm_key].to_s << "\n"
+                each_with_dashed(vm_keys) do |vm_key, display_vm_key|
+                  body << "    " << display_vm_key << ": " << vm[vm_key].to_s << "\n"
                 end
               end
             else
-              body << "  " << np_key.to_s << ": " << nodepool[np_key].to_s << "\n"
+              body << "  " << display_np_key << ": " << nodepool[np_key].to_s << "\n"
             end
           end
         end
       when :cp_vms
         data[key].each_with_index do |vm, i|
-          body << "cp vm " << (i + 1).to_s << ":\n"
-          vm_keys.each do |vm_key|
-            body << "  " << vm_key.to_s << ": " << vm[vm_key].to_s << "\n"
+          body << "cp-vms " << (i + 1).to_s << ":\n"
+          each_with_dashed(vm_keys) do |vm_key, display_vm_key|
+            body << "  " << display_vm_key << ": " << vm[vm_key].to_s << "\n"
           end
         end
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

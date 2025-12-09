@@ -29,30 +29,30 @@ RSpec.describe Clover, "cli pg show" do
       name: test-pg
       state: creating
       location: eu-central-h1
-      vm_size: standard-2
-      target_vm_size: standard-2
-      storage_size_gib: 64
-      target_storage_size_gib: 64
+      vm-size: standard-2
+      target-vm-size: standard-2
+      storage-size-gib: 64
+      target-storage-size-gib: 64
       version: 17
-      target_version: 17
-      ha_type: none
+      target-version: 17
+      ha-type: none
       flavor: standard
-      connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require
+      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require
       primary: true
-      earliest_restore_time: 
-      maintenance_window_start_at: 
-      read_replica: false
+      earliest-restore-time: 
+      maintenance-window-start-at: 
+      read-replica: false
       parent: 
       tags:
-      firewall rules:
+      firewall-rules:
         1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
         2: #{rules[1].ubid}  0.0.0.0/0  6432  
         3: #{rules[2].ubid}  ::/0  5432  
         4: #{rules[3].ubid}  ::/0  6432  
-      metric destinations:
+      metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
-      read replicas:
-      CA certificates:
+      read-replicas:
+      ca-certificates:
       a
       b
     END
@@ -63,31 +63,31 @@ RSpec.describe Clover, "cli pg show" do
       name: test-pg
       state: creating
       location: eu-central-h1
-      vm_size: standard-2
-      target_vm_size: standard-2
-      storage_size_gib: 64
-      target_storage_size_gib: 64
+      vm-size: standard-2
+      target-vm-size: standard-2
+      storage-size-gib: 64
+      target-storage-size-gib: 64
       version: 17
-      target_version: 17
-      ha_type: none
+      target-version: 17
+      ha-type: none
       flavor: standard
-      connection_string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require
+      connection-string: postgres://postgres:#{@pg.superuser_password}@test-pg.#{@pg.ubid}.pg.example.com:5432/postgres?channel_binding=require
       primary: true
-      earliest_restore_time: 
-      maintenance_window_start_at: 
-      read_replica: true
+      earliest-restore-time: 
+      maintenance-window-start-at: 
+      read-replica: true
       parent: eu-central-h1/test-pg
       tags:
-      firewall rules:
+      firewall-rules:
         1: #{rules[0].ubid}  0.0.0.0/0  5432  my fwr desc
         2: #{rules[1].ubid}  0.0.0.0/0  6432  
         3: #{rules[2].ubid}  ::/0  5432  
         4: #{rules[3].ubid}  ::/0  6432  
-      metric destinations:
+      metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
-      read replicas:
+      read-replicas:
         eu-central-h1/test-pg
-      CA certificates:
+      ca-certificates:
       a
       b
     END
