@@ -84,16 +84,19 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     return false unless load_balancer.dns_zone
 
     load_balancer.vms_to_dns.each do |vm|
-      if load_balancer.ipv4_enabled? && vm.ip4_string
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "A" && it.data == vm.ip4_string }
-      end
-
-      if load_balancer.ipv6_enabled?
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "AAAA" && it.data == vm.ip6_string }
+      vm_dns_records(vm).each do |type, data|
+        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == type && it.data == data }
       end
     end
 
     false
+  end
+
+  def vm_dns_records(vm)
+    [].tap do
+      it << ["A", vm.ip4_string] if load_balancer.ipv4_enabled? && vm.ip4_string
+      it << ["AAAA", vm.ip6_string] if load_balancer.ipv6_enabled? && vm.ip6_string
+    end
   end
 
   label def create_new_cert
@@ -170,23 +173,12 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     load_balancer.dns_zone&.delete_record(record_name: load_balancer.hostname)
 
     load_balancer.vms_to_dns.each do |vm|
-      # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
-      if load_balancer.ipv4_enabled? && vm.ip4_string
+      vm_dns_records(vm).each do |type, data|
         load_balancer.dns_zone&.insert_record(
           record_name: load_balancer.hostname,
-          type: "A",
+          type: type,
           ttl: 10,
-          data: vm.ip4_string
-        )
-      end
-
-      # Insert IPv6 record if stack is ipv6 or dual, and vm has IPv6
-      if load_balancer.ipv6_enabled? && vm.ip6_string
-        load_balancer.dns_zone&.insert_record(
-          record_name: load_balancer.hostname,
-          type: "AAAA",
-          ttl: 10,
-          data: vm.ip6_string
+          data: data
         )
       end
     end
