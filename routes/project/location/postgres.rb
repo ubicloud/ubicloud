@@ -239,6 +239,7 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
+        tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
 
@@ -260,6 +261,7 @@ class Clover
             target_version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,
+            tags:,
             restore_target: nil
           ).subject
           audit_log(pg, "create_replica", replica)

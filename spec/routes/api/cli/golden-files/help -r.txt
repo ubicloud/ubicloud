@@ -577,7 +577,10 @@ Usage:
 Create a read replica for a PostgreSQL database
 
 Usage:
-    ubi pg (location/pg-name | pg-id) create-read-replica name
+    ubi pg (location/pg-name | pg-id) create-read-replica name [options]
+
+Options:
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
 
 
 Create a PostgreSQL database
