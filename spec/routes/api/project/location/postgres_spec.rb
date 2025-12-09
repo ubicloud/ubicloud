@@ -316,6 +316,22 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "read-replica with tags" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        tags = [{"key" => "env", "value" => "test"}, {"key" => "team", "value" => "backend"}]
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-tags",
+          tags:
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        created_replica = PostgresResource.first(name: "my-read-replica-with-tags")
+        expect(created_replica.tags).to eq(tags)
+      end
+
       it "fails read-replica creation if the parent is not ready" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)

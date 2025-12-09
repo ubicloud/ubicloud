@@ -108,8 +108,8 @@ module Ubicloud
     end
 
     # Create a read replica of this database, with the given name.
-    def create_read_replica(name)
-      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:))
+    def create_read_replica(name, tags: [])
+      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:, tags:))
     end
 
     # Promote this database from a read replica to a primary.

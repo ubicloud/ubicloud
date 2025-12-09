@@ -1359,7 +1359,13 @@ paths:
               type: object
               properties:
                 name:
+                  description: Name for the read replica
                   type: string
+                tags:
+                  description: Tags for the read replica
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PostgresTag'
               additionalProperties: false
               required:
                 - name
