@@ -93,10 +93,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   def vm_dns_records(vm)
-    [].tap do
-      it << ["A", vm.ip4_string] if load_balancer.ipv4_enabled? && vm.ip4_string
-      it << ["AAAA", vm.ip6_string] if load_balancer.ipv6_enabled? && vm.ip6_string
-    end
+    ips = []
+    ips << ["A", vm.ip4_string] if load_balancer.ipv4_enabled? && vm.ip4_string
+    ips << ["AAAA", vm.ip6_string] if load_balancer.ipv6_enabled? && vm.ip6_string
+    ips
   end
 
   label def create_new_cert
