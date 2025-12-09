@@ -15,6 +15,7 @@ class Clover
     tags = typecast_params.array(:Hash, "tags", [])
     with_firewall_rules = !typecast_params.bool("restrict_by_default")
     private_subnet_name = typecast_params.nonempty_str("private_subnet_name") if api?
+    init_script = typecast_params.nonempty_str("init_script")
 
     postgres_params = {
       "flavor" => flavor,
@@ -50,7 +51,8 @@ class Clover
         private_subnet_name:,
         user_config:,
         pgbouncer_user_config:,
-        tags:
+        tags:,
+        init_script:
       ).subject
       audit_log(pg, "create")
     end
@@ -147,6 +149,10 @@ class Clover
     end
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    if @project.get_ff_postgres_init_script
+      options.add_option(name: "init_script")
+    end
 
     options.serialize
   end

@@ -54,6 +54,10 @@
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
   end
 
+  if @project.get_ff_postgres_init_script
+    form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", required: "", placeholder: "Enter script to run on database creation"}
+  end
+
   action = "#{@project.path}/postgres"
 %>
 

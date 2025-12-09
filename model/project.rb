@@ -219,6 +219,7 @@ class Project < Sequel::Model
     :gpu_vm,
     :ipv6_disabled,
     :postgres_hostname_override,
+    :postgres_init_script,
     :postgres_lantern,
     :private_locations,
     :skip_runner_pool,

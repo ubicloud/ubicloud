@@ -60,6 +60,7 @@ class Clover
         target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
         ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
+        init_script = typecast_params.nonempty_str("init_script", pg.init_script)
 
         postgres_params = {
           "flavor" => pg.flavor,
@@ -97,6 +98,13 @@ class Clover
         DB.transaction do
           pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
           pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
+          if init_script
+            if (pg_init_script = pg.init_script)
+              pg_init_script.update(init_script:)
+            else
+              PostgresInitScript.create_with_id(pg, init_script:)
+            end
+          end
           audit_log(pg, "update")
         end
 
