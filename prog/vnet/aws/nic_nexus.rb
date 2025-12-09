@@ -182,7 +182,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   def az_to_provision_subnet
-    frame["availability_zone"] || (["a", "b", "c"] - (frame["exclude_availability_zones"] || [])).sample || "a"
+    frame["availability_zone"] || (private_subnet.location.aws_azs.map(&:az) - (frame["exclude_availability_zones"] || [])).sample || "a"
   end
 
   def get_network_interface
