@@ -106,7 +106,7 @@ RSpec.describe Clover, "account" do
       end
 
       it "allows setting up#{", authenticating," if clear_last_password_entry} and removing Webauthn authentication when password entry is #{"not " unless clear_last_password_entry}required" do
-        webauthn_client = WebAuthn::FakeClient.new("http://www.example.com")
+        webauthn_client = WebAuthn::FakeClient.new("http://localhost:9292")
         2.times do |i|
           visit "/clear-last-password-entry" if clear_last_password_entry
           visit "/account/multifactor-manage"
@@ -195,7 +195,7 @@ RSpec.describe Clover, "account" do
 
       visit "/account/multifactor-manage"
       click_link "Add"
-      webauthn_client = WebAuthn::FakeClient.new("http://www.example.com")
+      webauthn_client = WebAuthn::FakeClient.new("http://localhost:9292")
       challenge = JSON.parse(page.find_by_id("webauthn-setup-form")["data-credential-options"])["challenge"]
       fill_in "Key Name", with: "My Key"
       fill_in "webauthn-setup", with: webauthn_client.create(challenge: challenge).to_json, visible: false
