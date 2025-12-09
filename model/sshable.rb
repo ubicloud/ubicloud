@@ -193,7 +193,7 @@ class Sshable < Sequel::Model
       lock_contents = <<LOCK
 exec 999>/dev/shm/session-lock-:lock_name || exit 92
 flock -xn 999 || { echo "Another session active: " :lock_name; exit 124; }
-exec -a session-lock-:lock_name sleep infinity </dev/null >/dev/null 2>&1 &
+sleep infinity </dev/null >/dev/null 2>&1 &
 disown
 LOCK
 
