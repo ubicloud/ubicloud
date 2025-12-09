@@ -45,7 +45,11 @@ class PostgresTimeline < Sequel::Model
 
     def aws_create_bucket
       location_constraint = (location.name == "us-east-1") ? nil : {location_constraint: location.name}
-      blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
+      begin
+        blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
+      rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
+        # Ignore if bucket already exists
+      end
     end
 
     def aws_set_lifecycle_policy
