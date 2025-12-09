@@ -41,8 +41,8 @@ class Account < Sequel::Model(:accounts)
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
     api_keys_dataset.update(is_valid: false)
-
     PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
+    ProjectInvitation.where(inviter_id: id).destroy
   end
 end
 
