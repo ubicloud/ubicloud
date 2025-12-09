@@ -38,6 +38,7 @@ class PostgresUpgrade
   end
 
   def disable_previous_version
+    r "sudo systemctl disable --now disk-full-check@#{@version}.timer"
     r "sudo systemctl disable --now postgresql@#{@prev_version}-main"
   end
 
@@ -63,6 +64,7 @@ class PostgresUpgrade
 
   def enable_new_version
     r "sudo systemctl enable --now postgresql@#{@version}-main"
+    r "sudo systemctl enable --now disk-full-check@#{@version}.timer"
   end
 
   def wait_for_postgres_to_start
