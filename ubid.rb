@@ -104,6 +104,7 @@ class UBID
   TYPE_VICTORIA_METRICS_SERVER = "vn"
   TYPE_SSH_PUBLIC_KEY = "sk"
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
+  TYPE_DETACHABLE_VOLUME = "dv"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
@@ -146,6 +147,7 @@ class UBID
     ActionTag: ta
     ObjectTag: t0
     KubernetesCluster: kc
+    DetachableVolume: dv
     Location: 10
   TYPES
   def self.generate_vanity_action_type(action)

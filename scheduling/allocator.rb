@@ -611,6 +611,7 @@ module Scheduling::Allocator
     def update(vm, vm_host)
       @storage_device_allocations.each { it.update }
       create_storage_volumes(vm, vm_host)
+      update_detachable_volumes(vm, vm_host)
     end
 
     def utilization
@@ -668,6 +669,15 @@ module Scheduling::Allocator
         dev.allocate(vol["size_gib"])
       end
       true
+    end
+
+    def update_detachable_volumes(vm, vm_host)
+      vm.detachable_volumes.each do |vol|
+        vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(vm_host.vhost_block_backends)
+        fail "no vhost block backend available" unless vhost_block_backend_id
+
+        vol.update(target_vhost_block_backend_id: vhost_block_backend_id)
+      end
     end
 
     def create_storage_volumes(vm, vm_host)

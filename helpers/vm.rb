@@ -33,7 +33,7 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script", "detachable_volume_id"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
@@ -80,6 +80,15 @@ class Clover
       else
         fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{ps_id}\" is not found in the location \"#{@location.display_name}\""})
       end
+    end
+
+    if (dv_ubid = assemble_params.delete(:detachable_volume_id))
+      dv = dataset_authorize(@project.detachable_volumes_dataset.where(vm_id: nil), "DetachableVolume:edit")
+        .first(id: UBID.to_uuid(dv_ubid))
+      unless dv
+        fail Validation::ValidationFailed.new({detachable_volume_id: "Detachable volume with the given id \"#{dv_ubid}\" is not available"})
+      end
+      assemble_params[:detachable_volume_ids] = [dv.id]
     end
 
     requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
@@ -203,6 +212,11 @@ class Clover
           device_availability >= gpu_count
       end
     end
+
+    detachable_volumes = dataset_authorize(@project.detachable_volumes_dataset.where(vm_id: nil), "DetachableVolume:view").map do |dv|
+      {value: dv.ubid, display_name: dv.name}
+    end
+    options.add_option(name: "detachable_volume_id", values: detachable_volumes)
 
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
