@@ -423,6 +423,11 @@ module AdminModelSpecHelper
       PostgresMetricDestination.create_with_id(pg, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
     end
 
+    def create_postgres_init_script
+      pg = create_postgres_resource
+      PostgresInitScript.create_with_id(pg, init_script: "#!/bin/bash\necho 'Hello, World!'")
+    end
+
     def create_postgres_resource
       project = Project.create(name: "test-project")
       PostgresResource.create(

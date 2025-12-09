@@ -192,7 +192,6 @@ class PostgresResource < Sequel::Model
   def validate
     super
     validates_includes(0..23, :maintenance_window_start_at, allow_nil: true, message: "must be between 0 and 23")
-    validates_max_length(2000, :init_script, allow_nil: true)
   end
 
   def read_replica?
