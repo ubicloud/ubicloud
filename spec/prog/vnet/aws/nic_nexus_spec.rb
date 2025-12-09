@@ -304,6 +304,12 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   end
 
   describe "#az_to_provision_subnet" do
+    before do
+      nic.private_subnet.location.add_location_aws_az(az: "a", zone_id: "123")
+      nic.private_subnet.location.add_location_aws_az(az: "b", zone_id: "456")
+      nic.private_subnet.location.add_location_aws_az(az: "c", zone_id: "789")
+    end
+
     it "returns the az if set" do
       expect(nx).to receive(:frame).and_return({"availability_zone" => "a"})
       expect(nx.az_to_provision_subnet).to eq("a")
@@ -317,6 +323,13 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     it "returns a if nothing is available" do
       expect(nx).to receive(:frame).and_return({"exclude_availability_zones" => ["a", "b", "c"]}).at_least(:once)
       expect(nx.az_to_provision_subnet).to eq("a")
+    end
+
+    it "fetches azs if not present" do
+      nic.private_subnet.location.reload.location_aws_azs.map(&:destroy)
+      client.stub_responses(:describe_availability_zones, availability_zones: [{zone_name: "us-west-2a", zone_id: "123"}, {zone_name: "us-west-2b", zone_id: "456"}, {zone_name: "us-west-2c", zone_id: "789"}])
+      expect(["a", "b", "c"]).to include(nx.az_to_provision_subnet) # rubocop:disable RSpec/ExpectActual
+      expect(LocationAwsAz.count).to eq(3)
     end
   end
 end
