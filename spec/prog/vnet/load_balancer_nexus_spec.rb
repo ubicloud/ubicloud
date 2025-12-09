@@ -279,6 +279,16 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
+    it "does not create dns record if ephemeral_net6 doesn't exist" do
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: nil)]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: anything, ttl: 10)
+      expect { nx.rewrite_dns_records }.to hop("wait")
+    end
+
     it "does not create ipv4 dns record if stack is ipv6" do
       nx.load_balancer.update(stack: "ipv6")
       vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]

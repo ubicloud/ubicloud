@@ -180,8 +180,8 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         )
       end
 
-      # Insert IPv6 record if stack is ipv6 or dual
-      if load_balancer.ipv6_enabled?
+      # Insert IPv6 record if stack is ipv6 or dual, and vm has IPv6
+      if load_balancer.ipv6_enabled? && vm.ip6_string
         load_balancer.dns_zone&.insert_record(
           record_name: load_balancer.hostname,
           type: "AAAA",
