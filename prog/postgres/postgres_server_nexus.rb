@@ -124,7 +124,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path:)
       vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
 
-      hop_configure_walg_credentials
+      hop_run_init_script
     when "Failed", "NotStarted"
       storage_device_paths = postgres_server.storage_device_paths
       if storage_device_paths.count == 1
@@ -135,6 +135,21 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           shelljoin_storage_device_paths: storage_device_paths)
         vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
       end
+    end
+
+    nap 5
+  end
+
+  label def run_init_script
+    hop_configure_walg_credentials unless postgres_server.resource.init_script
+
+    case vm.sshable.d_check("run_init_script")
+    when "Succeeded"
+      hop_configure_walg_credentials
+    when "Failed", "NotStarted"
+      vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: postgres_server.resource.init_script)
+      vm.sshable.cmd("sudo chmod +x postgres/bin/init_script.sh")
+      vm.sshable.d_run("run_init_script", "./postgres/bin/init_script.sh")
     end
 
     nap 5
