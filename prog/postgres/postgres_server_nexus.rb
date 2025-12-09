@@ -147,7 +147,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: postgres_server.resource.init_script)
+      vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: postgres_server.resource.init_script.gsub("\r\n", "\n"))
       vm.sshable.cmd("sudo chmod +x postgres/bin/init_script.sh")
       vm.sshable.d_run("run_init_script", "./postgres/bin/init_script.sh")
     end
