@@ -346,7 +346,7 @@ class UbiCli
     results = []
 
     sizes = Hash.new(0)
-    keys.each do |key|
+    keys.each_with_index do |key, idx|
       sizes[key] = headers ? key.size : 0
     end
     rows = rows.map do |row|
@@ -364,13 +364,13 @@ class UbiCli
 
     if headers
       sep = false
-      keys.each do |key|
+      each_with_dashed(keys) do |key, display_key|
         if sep
           results << col_sep
         else
           sep = true
         end
-        results << (sizes[key] % key)
+        results << (sizes[key] % display_key)
       end
       results << "\n"
     end
@@ -400,6 +400,12 @@ class UbiCli
       keys.transform_keys { it.to_s.tr("-", "_").to_sym }
     else # when Array
       keys.map { it.tr("-", "_").to_sym }
+    end
+  end
+
+  def each_with_dashed(keys)
+    keys.each do
+      yield it, it.to_s.tr("_", "-")
     end
   end
 

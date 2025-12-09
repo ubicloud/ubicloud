@@ -1,4 +1,4 @@
-maintenance_window_start_at: 
-read_replica: false
+maintenance-window-start-at: 
+read-replica: false
 parent: 
-read replicas:
+read-replicas:

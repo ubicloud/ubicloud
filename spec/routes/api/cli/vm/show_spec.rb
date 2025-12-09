@@ -20,13 +20,13 @@ RSpec.describe Clover, "cli vm show" do
       state: running
       location: eu-central-h1
       size: standard-2
-      unix_user: ubi
-      storage_size_gib: 0
+      unix-user: ubi
+      storage-size-gib: 0
       ip6: 128:1234::2
-      ip4_enabled: false
+      ip4-enabled: false
       ip4: 128.0.0.1
-      private_ipv4: #{@vm.private_ipv4}
-      private_ipv6: #{@vm.private_ipv6}
+      private-ipv4: #{@vm.private_ipv4}
+      private-ipv6: #{@vm.private_ipv6}
       subnet: default-eu-central-h1
       firewall 1:
         id: #{@fw.ubid}

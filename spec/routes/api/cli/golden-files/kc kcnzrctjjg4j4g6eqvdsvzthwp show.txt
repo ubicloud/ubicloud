@@ -1,34 +1,34 @@
 id: kcnzrctjjg4j4g6eqvdsvzthwp
 name: test-kc
 location: eu-central-h1
-display_state: creating
-cp_node_count: 1
-node_size: standard-2
+display-state: creating
+cp-node-count: 1
+node-size: standard-2
 version: v1.34
 nodepool 1:
   id: kn4gs7gjswkt4j06xy8w80s1ys
   name: test-kc-np
-  node_count: 1
-  node_size: standard-2
+  node-count: 1
+  node-size: standard-2
   vm 1:
     id: vmnwfmjk5k462kkzsfa4n1h4xm
     name: kc-np-vm
     state: creating
     location: eu-central-h1
     size: standard-2
-    unix_user: ubi
-    storage_size_gib: 0
+    unix-user: ubi
+    storage-size-gib: 0
     ip6: bbab:de77:9a94:fa69::2
-    ip4_enabled: true
+    ip4-enabled: true
     ip4: 130.0.0.3
-cp vm 1:
+cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm
   state: creating
   location: eu-central-h1
   size: standard-2
-  unix_user: ubi
-  storage_size_gib: 0
+  unix-user: ubi
+  storage-size-gib: 0
   ip6: ccab:de77:9a94:fa69::2
-  ip4_enabled: true
+  ip4-enabled: true
   ip4: 129.0.0.2

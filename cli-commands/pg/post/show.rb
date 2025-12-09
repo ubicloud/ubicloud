@@ -17,7 +17,7 @@ UbiCli.on("pg").run_on("show") do
 
     body = []
 
-    underscore_keys(keys).each do |key|
+    each_with_dashed(underscore_keys(keys)) do |key, display_key|
       case key
       when :parent
         body << "parent: "
@@ -31,24 +31,24 @@ UbiCli.on("pg").run_on("show") do
           body << "  " << k << ": " << v << "\n"
         end
       when :firewall_rules
-        body << "firewall rules:\n"
+        body << "firewall-rules:\n"
         data[key].each_with_index do |rule, i|
           body << "  " << (i + 1).to_s << ": " << rule[:id] << "  " << rule[:cidr].to_s << "  " << rule[:port].to_s << "  " << rule[:description].to_s << "\n"
         end
       when :metric_destinations
-        body << "metric destinations:\n"
+        body << "metric-destinations:\n"
         data[key].each_with_index do |md, i|
           body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
         end
       when :read_replicas
-        body << "read replicas:\n"
+        body << "read-replicas:\n"
         sdk_object.read_replicas.each do |rr|
           body << "  " << rr[:location] << "/" << rr[:name] << "\n"
         end
       when :ca_certificates
-        body << "CA certificates:\n" << data[key].to_s << "\n"
+        body << "ca-certificates:\n" << data[key].to_s << "\n"
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

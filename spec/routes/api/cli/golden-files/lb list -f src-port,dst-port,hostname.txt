@@ -1,2 +1,2 @@
-src_port  dst_port  hostname      
+src-port  dst-port  hostname      
 12345     54321     test-lb.dpqe2.
