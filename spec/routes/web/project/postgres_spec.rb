@@ -134,6 +134,26 @@ RSpec.describe Clover, "postgres" do
         expect(pg.target_storage_size_gib).to eq(118)
       end
 
+      it "can specify an init script when creating new PostgreSQL database" do
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        fill_in "Initialization Script", with: "sudo whoami"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        expect(PostgresResource.first.project_id).to eq(project.id)
+        expect(PostgresResource.first.init_script).to eq("sudo whoami")
+      end
+
       it "handles errors when creating new PostgreSQL database" do
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 

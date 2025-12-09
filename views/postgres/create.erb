@@ -47,6 +47,7 @@
     {name: "storage_size", type: "radio_small_cards", label: "Storage size", required: "required", content_generator: ContentGenerator::Postgres.method(:storage_size)},
     {name: "version", type: "radio_small_cards", label: "Version", required: "required", content_generator: ContentGenerator::Postgres.method(:version)},
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
+    {name: "init_script", type: "textarea", label: "Initialization Script", required: "", placeholder: "Enter script to run on database creation"}
   ]
 
   if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor)

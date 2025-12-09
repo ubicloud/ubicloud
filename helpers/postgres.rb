@@ -14,6 +14,7 @@ class Clover
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
     with_firewall_rules = !typecast_params.bool("restrict_by_default")
+    init_script = typecast_params.nonempty_str("init_script")
 
     postgres_params = {
       "flavor" => flavor,
@@ -57,7 +58,8 @@ class Clover
         with_firewall_rules:,
         flavor:,
         user_config:,
-        pgbouncer_user_config:
+        pgbouncer_user_config:,
+        init_script:
       ).subject
       pg.update(tags:)
       audit_log(pg, "create")
@@ -155,6 +157,8 @@ class Clover
     end
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    options.add_option(name: "init_script")
 
     options.serialize
   end
