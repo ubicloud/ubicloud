@@ -13,19 +13,19 @@ module CastingConfigHelpers
     ENV.delete(env_name) if clear
   end
 
-  def mandatory(name, method = nil, clear: false)
+  def mandatory(name, method, clear: false)
     assign_cast_clear name, method, clear do |env_name|
       ENV.fetch(env_name)
     end
   end
 
-  def optional(name, method = nil, clear: false)
+  def optional(name, method, clear: false)
     assign_cast_clear name, method, clear do |env_name|
       ENV[env_name]
     end
   end
 
-  def override(name, default, method = nil)
+  def override(name, default, method)
     value = cast(ENV.fetch(name.to_s.upcase, default), method)
     create(name, value)
   end
