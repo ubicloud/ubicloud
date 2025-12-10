@@ -63,7 +63,10 @@ class Clover
                 ubids[uuid] ||= nil
               end
             end
-            UBID.resolve_map(ubids)
+            UBID.resolve_map(ubids) do |ds|
+              # All UBIDs matching UbiCli::OBJECT_INFO_REGEXP need location to construct the path
+              ds.eager(:location)
+            end
             h(body).gsub(UbiCli::OBJECT_INFO_REGEXP) do
               if (obj = ubids[UBID.to_uuid(it)]) && obj.respond_to?(:path)
                 "<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">#{it}</a>"
