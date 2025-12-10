@@ -278,6 +278,22 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 
+  def export_metrics(session:, tsdb_client:)
+    session[:export_count] ||= 0
+    session[:export_count] += 1
+
+    # Check archival backlog every 12 exports (similar to pulse check frequency)
+    # We do this in metrics export rather than pulse check because the metrics
+    # export session does not use an event loop. Calling exec! on an SSH session
+    # with an active event loop is not thread-safe and leads to stuck sessions.
+    if session[:export_count] % 12 == 1
+      observe_archival_backlog(session)
+    end
+
+    # Call parent implementation to export actual metrics
+    super
+  end
+
   def metrics_config
     ignored_timeseries_patterns = [
       "pg_stat_user_tables_.*",
@@ -322,6 +338,35 @@ class PostgresServer < Sequel::Model
     walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     refresh_walg_blob_storage_credentials
+  end
+
+  def observe_archival_backlog(session)
+    result = session[:ssh_session].exec!(
+      "sudo find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
+      version:
+    )
+    archival_backlog = Integer(result.strip, 10)
+
+    if archival_backlog > archival_backlog_threshold
+      Prog::PageNexus.assemble("#{ubid} archival backlog high",
+        ["PGArchivalBacklogHigh", id], ubid,
+        severity: "warning", extra_data: {archival_backlog:})
+    else
+      Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe archival backlog") do
+      {postgres_server_id: id, exception: Util.exception_to_hash(ex)}
+    end
+  end
+
+  def archival_backlog_threshold
+    # To make the threshold adaptive to storage size, we set it as percent of
+    # the storage size as WAL file count based on the allocated storage size,
+    # capped to 1000 to avoid high thresholds on large storage sizes.
+    archival_backlog_threshold_percent = 5
+    archival_backlog_threshold_count = 1000
+    [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
