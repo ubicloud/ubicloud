@@ -95,7 +95,7 @@ module Config
   override :hetzner_connection_string, "https://robot-ws.your-server.de", string
   override :managed_service, false, bool
   override :sanctioned_countries, "CU,IR,KP,SY", array(string)
-  override :hetzner_ssh_public_key, string
+  override :hetzner_ssh_public_key, nil, string
   override :minimum_invoice_charge_threshold, 0.5, float
   optional :cloudflare_turnstile_site_key, string
   optional :cloudflare_turnstile_secret_key, string
@@ -129,19 +129,19 @@ module Config
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
   optional :minio_service_project_id, string
-  override :minio_version, "minio_20250723155402.0.0_amd64"
+  override :minio_version, "minio_20250723155402.0.0_amd64", string
 
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, string
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
-  override :victoria_metrics_version, "v1.113.0"
+  override :victoria_metrics_version, "v1.113.0", string
   optional :victoria_metrics_endpoint_override, string
 
   # Spdk
-  override :spdk_version, "v23.09-ubi-0.3"
+  override :spdk_version, "v23.09-ubi-0.3", string
 
   # Vhost Block Backend
-  override :vhost_block_backend_version, "v0.2.1"
+  override :vhost_block_backend_version, "v0.2.1", string
 
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
@@ -206,7 +206,7 @@ module Config
   override :allocator_max_random_score, 0.1, float
 
   # e2e
-  override :e2e_hetzner_server_id, string
+  override :e2e_hetzner_server_id, nil, string
   optional :e2e_github_installation_id, string
   override :is_e2e, false, bool
   optional :e2e_aws_access_key, string, clear: true
