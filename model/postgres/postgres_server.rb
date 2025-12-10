@@ -77,7 +77,11 @@ class PostgresServer < Sequel::Model
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
-      configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      configs[:archive_command] = if resource.use_old_walg_command_set?
+        "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      else
+        "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
+      end
 
       if primary?
         if resource.ha_type == PostgresResource::HaType::SYNC
@@ -328,7 +332,7 @@ class PostgresServer < Sequel::Model
   def refresh_walg_credentials
     return if timeline.blob_storage.nil?
 
-    walg_config = timeline.generate_walg_config
+    walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs) unless timeline.aws?
   end
