@@ -22,7 +22,7 @@ class Clover
       @firewall = firewall = @project.firewalls_dataset.first(filter)
       check_found_object(firewall)
 
-      r.api_patch_web_post do
+      r.patch true do
         authorize("Firewall:edit", firewall)
         handle_validation_failure("networking/firewall/show") { @page = "settings" }
         description = typecast_body_params.nonempty_str!("description")
@@ -162,7 +162,7 @@ class Clover
           firewall_rule = firewall.firewall_rules_dataset[id:]
           check_found_object(firewall_rule)
 
-          r.api_patch_web_post do
+          r.patch true do
             authorize("Firewall:edit", firewall)
             handle_validation_failure("networking/firewall/show") do
               @fwr_id = firewall_rule.id
