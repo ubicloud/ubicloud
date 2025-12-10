@@ -31,7 +31,7 @@ class Clover < Roda
   Unreloader.record_split_class(__FILE__, "helpers")
 
   # :nocov:
-  default_fixed_locals = if Config.production? || ENV["CLOVER_FREEZE"] == "1"
+  default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
   # :nocov:
   else
@@ -1058,7 +1058,7 @@ class Clover < Roda
   end
 
   # :nocov:
-  if Config.test? && ENV["CLOVER_FREEZE"] != "1"
+  if Config.unfrozen_test?
     # :nocov:
 
     # This section is included when running non-frozen specs, and ensures that all routes

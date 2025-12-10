@@ -10,7 +10,7 @@ require "openssl"
 class CloverAdmin < Roda
   # :nocov:
   plugin :exception_page if Config.development?
-  default_fixed_locals = if Config.production? || ENV["CLOVER_FREEZE"] == "1"
+  default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
   # :nocov:
   else

@@ -25,7 +25,7 @@ RSpec.describe Clover do
     expect(page.title).to end_with("Dashboard")
   end
 
-  if ENV["CLOVER_FREEZE"] != "1"
+  if Config.unfrozen_test?
     it "raises error if no_authorization_needed called when not needed or already authorized" do
       create_account.create_project_with_default_policy("project-1")
       login

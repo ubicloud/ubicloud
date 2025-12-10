@@ -229,7 +229,7 @@ task "coverage" => [:coverage_spec]
 
   desc "Run specs#{desc_suffix} with frozen core, Database, and models (similar to production)"
   task "frozen_#{task_suffix}" do
-    block.call("CLOVER_FREEZE" => "1")
+    block.call("CLOVER_FREEZE" => "true")
   end
 end
 

@@ -3,7 +3,7 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin do
-  unless ENV["CLOVER_FREEZE"] == "1"
+  if Config.unfrozen_test?
     it "does not allow calling create_admin_account inside Pry" do
       expect(Config).to receive(:production?).and_return(true)
       stub_const("CloverAdmin::Pry", true)

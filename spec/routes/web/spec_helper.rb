@@ -9,7 +9,7 @@ File.write(css_file, "") unless File.file?(css_file)
 require "capybara"
 require "capybara/rspec"
 
-if ENV["CLOVER_FREEZE"] == "1"
+if Config.frozen_test?
   require "capybara/validate_html5"
 
   Capybara.custom_html_validation do |doc, &block|

@@ -240,7 +240,7 @@ RSpec.configure do |config|
     end
   end
 
-  if ENV["CLOVER_FREEZE"] == "1"
+  if Config.frozen_test?
     require_relative "thawed_mock"
 
     require "diff/lcs"

@@ -520,7 +520,7 @@ RSpec.describe PostgresServer do
     end
   end
 
-  if ENV["CLOVER_FREEZE"] != "1"
+  if Config.unfrozen_test?
     describe "#attach_s3_policy_if_needed" do
       before do
         allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
