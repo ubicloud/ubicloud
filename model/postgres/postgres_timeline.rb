@@ -18,7 +18,7 @@ class PostgresTimeline < Sequel::Model
     ubid
   end
 
-  def generate_walg_config
+  def generate_walg_config(version)
     walg_credentials = if access_key
       <<-WALG_CONF
 AWS_ACCESS_KEY_ID=#{access_key}
@@ -32,6 +32,7 @@ AWS_ENDPOINT=#{blob_storage_endpoint}
 AWS_REGION=#{aws? ? location.name : "us-east-1"}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
+PGDATA=/dat/#{version}/data
     WALG_CONF
   end
 
