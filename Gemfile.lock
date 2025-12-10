@@ -73,9 +73,6 @@ GEM
       aws-sdk-core (~> 3, >= 3.234.0)
       aws-sdk-kms (~> 1)
       aws-sigv4 (~> 1.5)
-    aws-sdk-sts (1.12.0)
-      aws-sdk-core (~> 3, >= 3.110.0)
-      aws-sigv4 (~> 1.1)
     aws-sigv4 (1.12.1)
       aws-eventstream (~> 1, >= 1.0.2)
     base64 (0.3.0)
@@ -454,7 +451,6 @@ DEPENDENCIES
   aws-sdk-iam
   aws-sdk-kms
   aws-sdk-s3
-  aws-sdk-sts (~> 1.12)
   bcrypt_pbkdf
   brakeman
   by (>= 1.1.0)
