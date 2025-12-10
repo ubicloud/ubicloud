@@ -116,14 +116,14 @@ RSpec.describe CloverAdmin do
   end
 
   it "allows searching by class when using Autoforme" do
-    project = Project.create(name: "Default")
+    project = Project.create(name: "Test")
     firewall = Firewall.create(name: "fw", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
     click_link "Firewall"
     click_link "Search"
     expect(page.title).to eq "Ubicloud Admin - Firewall - Search"
 
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Test", "hetzner-fsn1", "Default firewall"]
 
     click_link "Search"
     fill_in "Name", with: "fw2"
@@ -133,7 +133,7 @@ RSpec.describe CloverAdmin do
     click_link "Search"
     fill_in "Name", with: "fw"
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Default", "hetzner-fsn1", "Default firewall"]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["fw", "Test", "hetzner-fsn1", "Default firewall"]
 
     path = page.current_url
     click_link firewall.name
@@ -214,30 +214,42 @@ RSpec.describe CloverAdmin do
     fill_in "Prog", with: "Vm::Metal::Nexus"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [vm.ubid, "Vm::Metal::Nexus", "start", vm.strand.schedule.to_s, "0"]
+
+    click_link "Ubicloud Admin"
+    click_link "Project"
+    click_link "Search"
+
+    select "new", from: "Reputation"
+    fill_in "Name", with: "Def"
+    fill_in "Created at", with: project.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["Default", "new", "", "0.0", project.created_at.to_s]
   end
 
   it "handles basic pagination when browsing by class" do
-    projects = Array.new(101) { |i| Project.create(name: "project-#{i}") }
+    project_id = Project.create(name: "test").id
+    keys = Array.new(101) { |i| SshPublicKey.create(name: "key-#{i}", public_key: "k v", project_id:) }
     page.refresh
-    click_link "Project"
-    found_projects = page.all("#object-list a").map(&:text)
+    click_link "SshPublicKey"
+    found_keys = page.all("#object-list a").map(&:text)
 
     click_link "More"
-    found_projects.concat(page.all("#object-list a").map(&:text))
+    found_keys.concat(page.all("#object-list a").map(&:text))
 
-    expect(projects.map(&:name) - found_projects).to eq []
-    project = Project.last
-    click_link project.name
-    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+    expect(keys.map(&:name) - found_keys).to eq []
+    key = SshPublicKey.last
+    click_link key.name
+    expect(page.title).to eq "Ubicloud Admin - SshPublicKey #{key.ubid}"
   end
 
   it "ignores bogus ubids when paginating" do
-    project = Project.create(name: "test")
+    project_id = Project.create(name: "test").id
+    key = SshPublicKey.create(name: "key", public_key: "k v", project_id:)
     page.refresh
-    click_link "Project"
+    click_link "SshPublicKey"
     page.visit "#{page.current_path}?after=foo"
-    click_link project.name
-    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+    click_link key.name
+    expect(page.title).to eq "Ubicloud Admin - SshPublicKey #{key.ubid}"
   end
 
   it "shows semaphores set on the object, if any" do

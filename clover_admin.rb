@@ -282,6 +282,20 @@ class CloverAdmin < Roda
       end
     end
 
+    model Project do
+      order Sequel.desc(:created_at)
+      columns [:name, :reputation, :billing_info_id, :credit, :created_at]
+      column_options reputation: {type: "select", options: %w[new verified limited], add_blank: true},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :created_at
+          column_grep.call(ds, column, value)
+        end
+      end
+    end
+
     model Strand do
       order Sequel.desc(:try)
       columns do |type_symbol, request|
