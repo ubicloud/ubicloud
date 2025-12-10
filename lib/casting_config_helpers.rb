@@ -75,7 +75,7 @@ module CastingConfigHelpers
   def create(name, value)
     instance_variable_set(:"@#{name}", value)
     instance_eval "def #{name}; @#{name} end", __FILE__, __LINE__
-    if value.is_a?(TrueClass) || value.is_a?(FalseClass) || value.is_a?(NilClass)
+    if value.is_a?(TrueClass) || value.is_a?(FalseClass)
       instance_eval "def #{name}?; !!@#{name} end", __FILE__, __LINE__
     end
   end
