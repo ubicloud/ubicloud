@@ -282,6 +282,28 @@ class CloverAdmin < Roda
       end
     end
 
+    model GithubRunner do
+      order Sequel.desc(:created_at)
+      eager_graph [:strand]
+      columns do |type_symbol, request|
+        cs = [:repository_name, :label, :strand_label, :created_at]
+        cs.prepend(:name) unless type_symbol == :search_form
+        cs
+      end
+
+      column_options strand_label: {type: "text"},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :strand_label
+          column_grep.call(ds, Sequel[:strand][:label], value)
+        when :created_at
+          column_grep.call(ds, column, value)
+        end
+      end
+    end
+
     model Project do
       order Sequel.desc(:created_at)
       columns [:name, :reputation, :billing_info_id, :credit, :created_at]
