@@ -100,7 +100,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def assign_ipv6_address
-    client.assign_ipv_6_addresses({network_interface_id: nic.nic_aws_resource.network_interface_id, ipv_6_address_count: 1}) if get_network_interface.ipv_6_addresses.empty?
+    nap 1 unless (network_interface = get_network_interface)
+    if network_interface.ipv_6_addresses.empty?
+      client.assign_ipv_6_addresses({network_interface_id: nic.nic_aws_resource.network_interface_id, ipv_6_address_count: 1})
+    end
     hop_wait_network_interface_created
   end
 
