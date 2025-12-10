@@ -411,6 +411,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "configures prometheus and metrics during initial provisioning" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
@@ -431,11 +432,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "configures prometheus and metrics during initial provisioning and hops to setup_cloudwatch if timeline is AWS" do
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      expect(resource).to receive(:use_old_walg_command_set?).and_return(false)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now wal-g")
 
       # Configure metrics expectations
       expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
