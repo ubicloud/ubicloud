@@ -47,4 +47,8 @@ class StoragePath
   def vhost_backend_metadata
     @vhost_backend_metadata ||= File.join(storage_dir, "metadata")
   end
+
+  def rpc_socket_path
+    @rpc_socket_path ||= File.join(storage_dir, "rpc.sock")
+  end
 end

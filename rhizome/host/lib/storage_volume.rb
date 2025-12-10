@@ -251,7 +251,8 @@ class StorageVolume
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
       "skip_sync" => @skip_sync,
-      "write_through" => write_through_device?
+      "write_through" => write_through_device?,
+      "rpc_socket_path" => sp.rpc_socket_path
     }
 
     if @image_path
