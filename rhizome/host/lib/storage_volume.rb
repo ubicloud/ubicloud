@@ -148,6 +148,7 @@ class StorageVolume
         [Service]
         Slice=#{@slice}
         Environment=RUST_LOG=info
+        Environment=RUST_BACKTRACE=1
         ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
         Restart=always
         User=#{@vm_name}
