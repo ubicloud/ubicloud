@@ -472,7 +472,7 @@ class UbiCli
   end
 
   # :nocov:
-  if Config.test? && ENV["CLOVER_FREEZE"] == "1"
+  if Config.frozen_test?
     singleton_class.prepend(Module.new do
       def process(argv, env)
         DB.block_queries do

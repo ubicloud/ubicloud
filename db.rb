@@ -16,7 +16,7 @@ db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "db_ca_bundle.cr
 Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs)
 max_connections = (Util.monitor_process? ? Config.db_pool_monitor : Config.db_pool) - 1
 max_connections = 1 if ENV["SHARED_CONNECTION"] == "1"
-pg_auto_parameterize_min_array_size = 1 if Config.test? && ENV["CLOVER_FREEZE"] == "1"
+pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
 DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: Config.database_timeout, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:)
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
@@ -32,7 +32,7 @@ end
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_auto_parameterize_in_array, :pg_timestamptz, :pg_range, :pg_enum
 Sequel.extension :pg_range_ops, :pg_json_ops
 
-if Config.development? || (Config.test? && ENV["CLOVER_FREEZE"] != "1")
+if Config.development? || Config.unfrozen_test?
   DB.extension :pg_auto_parameterize_duplicate_query_detection
 else
   def DB.ignore_duplicate_queries
@@ -61,4 +61,4 @@ DB.load_schema_cache?("cache/schema.cache")
 DB.load_index_cache?("cache/index.cache")
 
 DB.extension :temporarily_release_connection if ENV["SHARED_CONNECTION"] == "1"
-DB.extension :query_blocker if Config.test? && ENV["CLOVER_FREEZE"] == "1"
+DB.extension :query_blocker if Config.frozen_test?

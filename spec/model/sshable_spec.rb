@@ -28,7 +28,7 @@ RSpec.describe Sshable do
       expect(sa.maybe_ssh_session_lock_name).to be_nil
     end
 
-    unless ENV["CLOVER_FREEZE"]
+    if Config.unfrozen_test?
       it "yields if SSH_SESSION_LOCK_NAME is defined" do
         stub_const("SSH_SESSION_LOCK_NAME", "testlockname")
         expect(sa.maybe_ssh_session_lock_name).to eq("testlockname")

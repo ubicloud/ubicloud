@@ -55,7 +55,7 @@ RSpec.configure do |config|
     error_response_matcher(expected_state, expected_message, expected_details, false)
   end
 
-  RACK_TEST_APP = if ENV["CLOVER_FREEZE"] == "1"
+  RACK_TEST_APP = if Config.frozen_test?
     Clover.app
   else
     backtrace_filter = %r{\A#{Regexp.escape(Dir.pwd)}/(?!spec/)}

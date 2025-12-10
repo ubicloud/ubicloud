@@ -76,7 +76,7 @@ RSpec.describe ResourceMethods do
     sa2 = Sshable.create(host: "test2.localhost", raw_private_key_1: SshKey.generate.keypair)
 
     l = proc { Sshable.where(id: [sa1.id, sa2.id]).destroy }
-    if ENV["CLOVER_FREEZE"] == "1"
+    if Config.frozen_test?
       expect(l.call).to eq 2
     else
       expect(DB.detect_duplicate_queries(&l)).to eq 2

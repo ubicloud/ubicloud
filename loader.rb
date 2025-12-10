@@ -170,7 +170,7 @@ when :test
 end
 
 def clover_freeze
-  return unless Config.production? || ENV["CLOVER_FREEZE"] == "1"
+  return unless Config.production? || Config.frozen_test?
 
   require "refrigerator"
 

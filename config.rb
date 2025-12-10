@@ -38,6 +38,14 @@ module Config
     Config.rack_env == "test"
   end
 
+  def self.frozen_test?
+    test? && clover_freeze?
+  end
+
+  def self.unfrozen_test?
+    test? && !clover_freeze?
+  end
+
   mandatory :clover_database_url, string, clear: true
   mandatory :clover_column_encryption_key, base64, clear: true
   mandatory :clover_session_secret, base64, clear: true
@@ -57,6 +65,7 @@ module Config
   optional :hetzner_ssh_private_key_passphrase, string, clear: true
   optional :operator_ssh_public_keys, string
   override :staging, false, bool
+  override :clover_freeze, false, bool
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
