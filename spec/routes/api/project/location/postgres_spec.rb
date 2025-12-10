@@ -86,6 +86,44 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["items"].length).to eq(2)
       end
+
+      it "shows empty read_replicas when replicas do not exist" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres"
+
+        expect(last_response.status).to eq(200)
+
+        items = JSON.parse(last_response.body)["items"]
+
+        expect(items.length).to eq(1)
+        expect(items.first["read_replicas"]).to eq([])
+      end
+
+      it "shows correct read_replicas when replicas exist" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "test-replica"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres"
+
+        expect(last_response.status).to eq(200)
+
+        items = JSON.parse(last_response.body)["items"]
+
+        parent_pg = items.find { |item| item["read_replica"] == false }
+
+        expect(parent_pg).not_to be_nil
+        expect(parent_pg["read_replicas"]).to eq([PostgresResource[name: "test-replica"].ubid])
+
+        replica_pg = items.find { |item| item["read_replica"] == true }
+
+        expect(replica_pg).not_to be_nil
+        expect(replica_pg["read_replicas"]).to eq([])
+      end
     end
 
     describe "create" do

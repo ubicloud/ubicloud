@@ -2728,6 +2728,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PostgresTag'
+        read_replicas:
+          description: Lists ids of read replicas for this database
+          type: array
+          items:
+            type: string
       additionalProperties: false
       required:
         - flavor
@@ -2743,6 +2748,7 @@ components:
         - maintenance_window_start_at
         - read_replica
         - tags
+        - read_replicas
     PostgresDatabaseMetrics:
       type: object
       properties:

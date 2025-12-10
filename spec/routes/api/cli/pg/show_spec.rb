@@ -51,7 +51,7 @@ RSpec.describe Clover, "cli pg show" do
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
-      read-replicas:
+      read-replicas: []
       ca-certificates:
       a
       b
@@ -85,8 +85,7 @@ RSpec.describe Clover, "cli pg show" do
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
-      read-replicas:
-        eu-central-h1/test-pg
+      read-replicas: ["#{@pg.ubid}"]
       ca-certificates:
       a
       b

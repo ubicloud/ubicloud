@@ -19,7 +19,8 @@ class Serializers::Postgres < Serializers::Base
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
-      tags: pg.tags || []
+      tags: pg.tags || [],
+      read_replicas: pg.read_replicas.map(&:ubid)
     }
 
     if options[:detailed]
@@ -30,8 +31,7 @@ class Serializers::Postgres < Serializers::Base
         hostname: pg.hostname,
         primary: pg.representative_server&.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
-        metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
-        read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
+        metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} }
       )
 
       if pg.timeline && pg.representative_server&.primary?
