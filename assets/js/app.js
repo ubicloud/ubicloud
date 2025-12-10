@@ -3,7 +3,6 @@ $(function () {
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
-  setupFormsWithPatchMethod();
   setupMetricsCharts();
   setupPgConfigCard();
 });
@@ -674,35 +673,6 @@ function setupPlayground() {
   $('#inference_submit').on("click", generate);
   $('#inference_config-show_advanced-0').on("change", function() {
     $('#inference_config_advanced_settings').toggleClass("hidden", !$(this).is(":checked"));
-  });
-}
-
-function setupFormsWithPatchMethod() {
-  $("#creation-form.PATCH").on("submit", function (event) {
-    event.preventDefault();
-
-    var form = $(this);
-    var jsonData = {};
-    form.serializeArray().forEach(function (item) {
-      jsonData[item.name] = item.value;
-    });
-
-    $.ajax({
-      url: form.attr('action'),
-      type: 'PATCH',
-      dataType: "html",
-      data: jsonData,
-      success: function (response, status, xhr) {
-        var redirectUrl = xhr.getResponseHeader('Location');
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        }
-      },
-      error: function (xhr, ajaxOptions, thrownError) {
-        let message = thrownError;
-        alert(`Error: ${message}`);
-      }
-    });
   });
 }
 

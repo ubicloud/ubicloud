@@ -13,11 +13,11 @@ class Clover < Roda
 
     # Accept PATCH for API, but POST for web, so web requests to the
     # path are not forced to use javascript.
-    def api_patch_web_post(...)
+    def patch(*a, &)
       if api?
-        patch(true, ...)
+        super
       else
-        post("patch", ...)
+        post(*a, "patch", &)
       end
     end
 
