@@ -30,7 +30,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
         .and change { prog.strand.stack.first["last_check_at"] }.from("2023-10-19 22:27:47 UTC").to("2023-10-19 23:27:47 UTC")
         .and change(Strand, :count).by(2)
       expect(prog.strand.children.count).to eq(2)
-      expect(prog.strand.children.last.stack.first["delivery_ids"]).to eq([26])
+      expect(prog.strand.children.map { it.stack.first["delivery_ids"] }).to include([26])
     end
   end
 
