@@ -253,7 +253,7 @@ desc "Run specs in parallel with coverage"
 task "coverage_pspec" do
   output_file = "coverage/output.txt"
   coverage_setup.call
-  command = "bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}"
+  command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
   command_output = File.binread(output_file)
   unless command_output.include?("Line Coverage: 100.0%") && command_output.include?("Branch Coverage: 100.0%")
