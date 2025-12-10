@@ -426,41 +426,29 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
-        choose option: 256
+        choose option: 64
+        click_button "Update"
+        expect(page).to have_flash_error("Validation failed for following fields: storage_size")
 
-        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        form = find_by_id "creation-form"
-        _csrf = form.find("input[name='_csrf']", visible: false).value
-        size = form.find(:radio_button, "size", checked: true).value
-        storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
+        choose option: 256
+        click_button "Update"
 
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
         expect(pg.target_storage_size_gib).to eq(256)
       end
 
-      it "handles errors during scale up/down" do
-        visit "#{project.path}#{pg.path}/resize"
+      it "can update PostgreSQL high availability" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        choose option: "standard-8"
-        choose option: 64
+        visit "#{project.path}#{pg.path}"
+        click_link "High Availability"
 
-        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        form = find_by_id "creation-form"
-        _csrf = form.find("input[name='_csrf']", visible: false).value
-        size = form.find(:radio_button, "size", checked: true).value
-        storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
-
-        # Error messages are displayed to the user via javascript, using the error.message entry
-        expect(JSON.parse(page.driver.browser.last_response.body).dig("error", "message")).to eq "Validation failed for following fields: storage_size"
+        choose option: "sync"
+        click_button "Update"
 
         pg.reload
-        expect(pg.target_vm_size).to eq("standard-2")
-        expect(pg.target_storage_size_gib).to eq(128)
+        expect(pg.ha_type).to eq("sync")
       end
 
       it "can restore PostgreSQL database" do
