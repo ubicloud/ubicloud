@@ -170,6 +170,8 @@ RSpec.describe CloverAdmin do
     GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
     ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
     ins3 = GithubInstallation.create(name: "ins3", installation_id: 3, type: "User", allocator_preferences: {"family_filter" => ["standard"]})
+    runner = Prog::Github::GithubRunnerNexus.assemble(ins2, repository_name: "ubicloud/test", label: "ubicloud").subject
+    GithubRunner.create(installation_id: ins2.id, repository_name: "ubicloud/test", label: "ubicloud")
     click_link "Ubicloud Admin"
     click_link "GithubInstallation"
     click_link "Search"
@@ -185,6 +187,16 @@ RSpec.describe CloverAdmin do
     select "User", from: "Type"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["ins3", "3", "User", "true", "false", ins3.created_at.to_s, "{\"family_filter\" => [\"standard\"]}"]
+
+    click_link "Ubicloud Admin"
+    click_link "GithubRunner"
+    click_link "Search"
+
+    fill_in "Repository name", with: "ubicloud"
+    fill_in "Strand label", with: "start"
+    fill_in "Created at", with: ins2.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [runner.ubid, "ubicloud/test", "ubicloud", "start", runner.created_at.to_s]
 
     account = create_account
     AccountIdentity.create(account_id: account.id, provider: "github", uid: "789")
