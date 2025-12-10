@@ -27,15 +27,15 @@ module Config
   extend CastingConfigHelpers
 
   def self.production?
-    Config.rack_env == "production"
+    rack_env == "production"
   end
 
   def self.development?
-    Config.rack_env == "development"
+    rack_env == "development"
   end
 
   def self.test?
-    Config.rack_env == "test"
+    rack_env == "test"
   end
 
   def self.frozen_test?
