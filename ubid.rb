@@ -200,7 +200,8 @@ class UBID
     end.each do |model, model_uuids|
       next unless model
 
-      model.where(id: model_uuids).each do
+      ds = model.where(id: model_uuids)
+      (block_given? ? yield(ds).all : ds).each do
         uuids[it.id] = it
       end
     end
