@@ -13,7 +13,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {})
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil, with_firewall_rules: true,
+    user_config: {}, pgbouncer_user_config: {}, init_script: nil)
 
     unless Project[project_id]
       fail "No existing project"
@@ -49,9 +50,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       postgres_resource = PostgresResource.create(
-        project_id:, location_id: location.id, name:,
-        target_vm_size:, target_storage_size_gib:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
+        project_id:, location_id: location.id, name:, target_vm_size:, target_storage_size_gib:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, restore_target:,
+        hostname_version: "v2", user_config:, pgbouncer_user_config:, init_script:
       )
 
       # Customer firewall, will be attached to created customer subnet

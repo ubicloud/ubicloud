@@ -134,6 +134,27 @@ RSpec.describe Clover, "postgres" do
         expect(pg.target_storage_size_gib).to eq(118)
       end
 
+      it "can specify an init script when creating new PostgreSQL database" do
+        project.set_ff_postgres_init_script(true)
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
+
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        fill_in "Initialization Script", with: "sudo whoami"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        expect(PostgresResource.first.project_id).to eq(project.id)
+        expect(PostgresResource.first.init_script).to eq("sudo whoami")
+      end
+
       it "handles errors when creating new PostgreSQL database" do
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
@@ -402,6 +423,23 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.path}/settings"
         expect(page).to have_no_content "Danger Zone"
+      end
+
+      it "allows updating initialization script when feature flag is enabled" do
+        project.set_ff_postgres_init_script(true)
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content "Initialization Script"
+        fill_in "init_script", with: "sudo whoami"
+
+        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
+        # UI tests run without a JavaScript engine.
+        form = find_by_id "creation-form"
+        _csrf = form.find("input[name='_csrf']", visible: false).value
+        init_script = form.find(:field, "init_script").value
+        page.driver.submit :patch, form["action"], {init_script:, _csrf:}
+
+        pg.reload
+        expect(pg.init_script).to eq("sudo whoami")
       end
 
       it "raises forbidden when does not have permissions" do
