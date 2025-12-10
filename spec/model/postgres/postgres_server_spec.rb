@@ -87,6 +87,13 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
     end
 
+    it "sets archive_command for walg client according to resource.use_old_walg_command_set?" do
+      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
+      expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
+      expect(resource).to receive(:use_old_walg_command_set?).and_return(false).at_least(:once)
+      expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
+    end
+
     it "sets synchronous_standby_names for sync replication mode" do
       postgres_server
       resource.update(ha_type: PostgresResource::HaType::SYNC)
