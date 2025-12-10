@@ -146,6 +146,12 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect(client).not_to receive(:assign_ipv_6_addresses)
       expect { nx.assign_ipv6_address }.to hop("wait_network_interface_created")
     end
+
+    it "naps while waiting for the network interface" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [])
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect { nx.assign_ipv6_address }.to nap(1)
+    end
   end
 
   describe "#wait_network_interface_created" do
