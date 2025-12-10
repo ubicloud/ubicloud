@@ -195,11 +195,8 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
 
-    before do
-      expect(nx).to receive(:get_locked_nics).and_return([nic])
-    end
-
     it "donates if policy update is ongoing" do
+      expect(nx).to receive(:get_locked_nics).and_return([nic])
       nic
       expect { nx.wait_old_state_drop }.to nap(5)
     end
