@@ -30,6 +30,7 @@ Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto
 Sequel::Model.plugin :pg_auto_validate_enums, message: proc { |valid_values| "is not one of the supported values (#{valid_values.sort.join(", ")})" }
 Sequel::Model.plugin :pg_eager_any_typed_array
 Sequel::Model.plugin :association_lazy_eager_option
+Sequel::Model.plugin :forbid_lazy_load if Config.test? && ENV["CLOVER_FREEZE"] != "1"
 
 if (level = Config.database_logger_level) || Config.test?
   require "logger"
