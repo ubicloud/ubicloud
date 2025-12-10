@@ -24,11 +24,9 @@ RSpec.describe LocationCredential do
   end
 
   it "gets account id from sts" do
-    if Config.unfrozen_test?
-      sts_client = Aws::STS::Client.new(stub_responses: true)
-      expect(Aws::STS::Client).to receive(:new).and_return(sts_client).at_least(:once)
-      sts_client.stub_responses(:get_caller_identity, {account: "account-id"})
-      expect(location_credential.aws_iam_account_id).to eq("account-id")
-    end
+    sts_client = Aws::STS::Client.new(stub_responses: true)
+    expect(Aws::STS::Client).to receive(:new).and_return(sts_client).at_least(:once)
+    sts_client.stub_responses(:get_caller_identity, {account: "account-id"})
+    expect(location_credential.aws_iam_account_id).to eq("account-id")
   end
 end

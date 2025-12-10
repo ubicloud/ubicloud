@@ -3,9 +3,6 @@
 require_relative "../model"
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
-# :nocov:
-require "aws-sdk-sts" if Config.test? ? !Config.clover_freeze? : Config.aws_postgres_iam_access
-# :nocov:
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:access_key, :secret_key]
