@@ -254,8 +254,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}] }
 
     project = vm.project
-    strand.stack[-1]["create_billing_record_done"] = true
-    strand.modified!(:stack)
     hop_wait unless project.billable
 
     BillingRecord.create(

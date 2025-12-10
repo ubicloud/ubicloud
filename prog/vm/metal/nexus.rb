@@ -141,8 +141,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     case host.sshable.cmd("common/bin/daemonizer --check prep_:vm_name", vm_name:)
     when "Succeeded"
       vm.nics.each(&:incr_setup_nic)
-      strand.stack[-1]["prep_done"] = true
-      strand.modified!(:stack)
       hop_clean_prep
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
@@ -188,19 +186,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "running", provisioned_at: Time.now)
     Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, vm_host_ubid: host.ubid, duration: (Time.now - vm.allocated_at).round(3)}}] }
 
-    # If the machine has already not gone through create billing record,
-    # create the billing record.
-    # This should only happen if the VM went through prep before the
-    # change to create billing records before prep.
-    hop_create_billing_record unless strand.stack[-1]["create_billing_record_done"]
-
     hop_wait
   end
 
   label def create_billing_record
     project = vm.project
 
-    if project.billable && !strand.stack[-1]["create_billing_record_done"]
+    if project.billable
       BillingRecord.create(
         project_id: project.id,
         resource_id: vm.id,
@@ -242,14 +234,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         )
       end
     end
-
-    strand.stack[-1]["create_billing_record_done"] = true
-    strand.modified!(:stack)
-
-    # If the machine has already gone through prep, hop to wait.
-    # This should only happen if the VM went through prep before the
-    # change to create billing records before prep.
-    hop_wait if strand.stack[-1]["prep_done"]
 
     hop_prep
   end
