@@ -113,15 +113,15 @@ module Option
     [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
   ].to_h { |args| [args[0], PostgresFlavorOption.new(*args)] }.freeze
 
-  PostgresFamilyOption = Data.define(:name, :description)
+  PostgresFamilyOption = Data.define(:name, :description, :category)
   POSTGRES_FAMILY_OPTIONS = [
-    ["standard", "Dedicated CPU"],
-    ["burstable", "Shared CPU"],
-    ["m8gd", "General Purpose, Graviton3"],
-    ["i8g", "Storage Optimized, Graviton4"],
-    ["c6gd", "Compute Optimized, Graviton2"],
-    ["m6id", "General Purpose, Intel Xeon"],
-    ["m6gd", "General Purpose, Graviton2"]
+    ["standard", "Dedicated CPU", "dedicated"],
+    ["burstable", "Shared CPU", "shared"],
+    ["m8gd", "General Purpose, Graviton3", "general-purpose"],
+    ["i8g", "Storage Optimized, Graviton4", "storage-optimized"],
+    ["c6gd", "Compute Optimized, Graviton2", "compute-optimized"],
+    ["m6id", "General Purpose, Intel Xeon", "general-purpose"],
+    ["m6gd", "General Purpose, Graviton2", "general-purpose"]
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
