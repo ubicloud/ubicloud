@@ -28,7 +28,7 @@ class Clover
         end
 
         flash["notice"] = "Usage alert #{usage_alert.name} is deleted."
-        204
+        r.redirect @project, "/billing"
       end
     end
   end

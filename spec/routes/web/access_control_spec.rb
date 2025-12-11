@@ -389,7 +389,7 @@ RSpec.describe Clover, "access control" do
         if type == "subject"
           expect(tds).to eq [
             "Admin", "Manage",
-            "Member", "Manage Remove"
+            "Member", "Manage\nRemove"
           ]
         else
           expect(tds).to eq []
@@ -402,11 +402,11 @@ RSpec.describe Clover, "access control" do
         if type == "subject"
           expect(tds).to eq [
             "Admin", "Manage",
-            "Member", "Manage Remove",
-            "test-subject", "Manage Remove"
+            "Member", "Manage\nRemove",
+            "test-subject", "Manage\nRemove"
           ]
         else
-          expect(tds).to eq ["test-#{type}", "Manage Remove"]
+          expect(tds).to eq ["test-#{type}", "Manage\nRemove"]
         end
       end
 
@@ -446,7 +446,7 @@ RSpec.describe Clover, "access control" do
         page.refresh
         expect(page).to have_content("Create #{cap_type} Tag")
         expect(page.all("table#tag-list td").map(&:text)).to eq [
-          "test-#{type}1", "Manage Remove"
+          "test-#{type}1", "Manage\nRemove"
         ]
         expect(page.all("table#tag-list td a").map(&:text)).to eq [
           "Manage"
@@ -545,12 +545,9 @@ RSpec.describe Clover, "access control" do
         model.create(project_id: project.id, name:)
         visit "#{project.path}/user/access-control/tag/#{type}"
 
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(model[project_id: project.id, name:]).to be_nil
-
-        visit "#{project.path}/user/access-control/tag/#{type}"
+        click_button "Remove"
         expect(page).to have_flash_notice "#{cap_type} tag deleted successfully"
+        expect(model[project_id: project.id, name:]).to be_nil
       end
 
       it "requires #{perm_type} permissions to delete #{type} tag" do
@@ -564,8 +561,7 @@ RSpec.describe Clover, "access control" do
         visit "#{project.path}/user/access-control/tag/#{type}"
 
         ace.destroy
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        click_button "Remove"
         expect(page.status_code).to eq 403
         expect(tag.exists?).to be true
       end
@@ -787,8 +783,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control/tag/subject"
 
       admin.update(name: "Admin")
-      btn = find ".delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      click_button "Remove"
       expect(page.status_code).to eq 400
       expect(SubjectTag[project_id: project.id, name: "Admin"]).not_to be_nil
     end

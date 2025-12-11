@@ -21,6 +21,16 @@ class Clover < Roda
       end
     end
 
+    # Accept DELETE for API, but POST for web, so web requests to the
+    # path are not forced to use javascript.
+    def delete(*a, &)
+      if api?
+        super
+      else
+        post(*a, "delete", &)
+      end
+    end
+
     def rename(object, perm:, serializer:, template_prefix:)
       post "rename" do
         scope.instance_exec do

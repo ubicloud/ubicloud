@@ -30,38 +30,42 @@ class Clover
         private_subnet_connection_action("disconnect", id)
       end
 
-      r.is do
-        r.get do
-          authorize("PrivateSubnet:view", ps)
-          if api?
-            Serializers::PrivateSubnet.serialize(ps)
-          else
-            r.redirect ps, "/overview"
-          end
+      r.get true do
+        authorize("PrivateSubnet:view", ps)
+        if api?
+          Serializers::PrivateSubnet.serialize(ps)
+        else
+          r.redirect ps, "/overview"
+        end
+      end
+
+      r.delete true do
+        authorize("PrivateSubnet:delete", ps)
+        handle_validation_failure("networking/private_subnet/settings")
+
+        vms_dataset = ps.vms_dataset
+          .association_join(:strand)
+          .exclude(label: "destroy")
+          .exclude(Sequel[:vm][:id] => Semaphore
+            .where(
+              strand_id: ps.nics_dataset.select(:vm_id),
+              name: "destroy"
+            )
+            .select(:strand_id))
+
+        unless vms_dataset.empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        r.delete do
-          authorize("PrivateSubnet:delete", ps)
+        DB.transaction do
+          ps.incr_destroy
+          audit_log(ps, "destroy")
+        end
 
-          vms_dataset = ps.vms_dataset
-            .association_join(:strand)
-            .exclude(label: "destroy")
-            .exclude(Sequel[:vm][:id] => Semaphore
-              .where(
-                strand_id: ps.nics_dataset.select(:vm_id),
-                name: "destroy"
-              )
-              .select(:strand_id))
-
-          unless vms_dataset.empty?
-            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
-          end
-
-          DB.transaction do
-            ps.incr_destroy
-            audit_log(ps, "destroy")
-          end
-
+        if web?
+          flash["notice"] = "Private subnet scheduled for deletion."
+          r.redirect @project, "/private-subnet"
+        else
           204
         end
       end

@@ -23,22 +23,26 @@ class Clover
 
       check_found_object(kc)
 
-      r.is do
-        r.get do
-          authorize("KubernetesCluster:view", kc)
-          if api?
-            Serializers::KubernetesCluster.serialize(kc, {detailed: true})
-          else
-            r.redirect kc, "/overview"
-          end
+      r.get true do
+        authorize("KubernetesCluster:view", kc)
+        if api?
+          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+        else
+          r.redirect kc, "/overview"
+        end
+      end
+
+      r.delete true do
+        authorize("KubernetesCluster:delete", kc)
+        DB.transaction do
+          kc.incr_destroy
+          audit_log(kc, "destroy")
         end
 
-        r.delete do
-          authorize("KubernetesCluster:delete", kc)
-          DB.transaction do
-            kc.incr_destroy
-            audit_log(kc, "destroy")
-          end
+        if web?
+          flash["notice"] = "Kubernetes cluster scheduled for deletion."
+          r.redirect @project, "/kubernetes-cluster"
+        else
           204
         end
       end

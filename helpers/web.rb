@@ -199,6 +199,15 @@ class Clover < Roda
     end
   end
 
+  def check_tag_modification!(perm)
+    authorize(perm, @project)
+
+    if @tag_type == "subject" && @tag.name == "Admin"
+      handle_validation_failure("project/tag-list")
+      raise_web_error("Cannot modify Admin subject tag")
+    end
+  end
+
   def config_hash_from_kvs(keys, values)
     hash = keys.map(&:strip).zip(values.map(&:strip)).to_h.compact
     hash.delete_if { |key, value| key.empty? && value.empty? }
