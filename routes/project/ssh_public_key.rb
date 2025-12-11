@@ -24,7 +24,7 @@ class Clover
       view "ssh-public-key/register"
     end
 
-    r.is SSH_PUBLIC_KEY_NAME_OR_UBID do |name, id|
+    r.on SSH_PUBLIC_KEY_NAME_OR_UBID do |name, id|
       @ssh_public_key = if name
         @project.ssh_public_keys_dataset.first(name:)
       else
@@ -32,7 +32,7 @@ class Clover
       end
       check_found_object(@ssh_public_key)
 
-      r.get do
+      r.get true do
         if api?
           Serializers::SshPublicKey.serialize(@ssh_public_key, detailed: true)
         else
@@ -40,11 +40,11 @@ class Clover
         end
       end
 
-      r.post do
+      r.post true do
         ssh_public_key_save
       end
 
-      r.delete do
+      r.delete true do
         DB.transaction do
           @ssh_public_key.destroy
           audit_log(@ssh_public_key, "destroy")
