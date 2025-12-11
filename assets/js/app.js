@@ -68,12 +68,8 @@ $("#new-ace-btn").on("click", function (event) {
 });
 
 $(".delete-btn").on("click", function (event) {
-  let url = $(this).data("url");
-  let csrf = $(this).data("csrf");
   let confirmation = $(this).data("confirmation");
   let confirmationMessage = $(this).data("confirmation-message") || "Are you sure to delete?";
-  let redirect = $(this).data("redirect");
-  let method = $(this).data("method");
 
   if (confirmation) {
     if (prompt(`${confirmationMessage}\nPlease type "${confirmation}" to confirm deletion`, "") != confirmation) {
@@ -86,36 +82,7 @@ $(".delete-btn").on("click", function (event) {
     return;
   }
 
-  if (method === "POST") {
-    // Use normal form submission for POST requests
-    return true;
-  }
-
-  event.preventDefault();
-
-  $.ajax({
-    url: url,
-    type: method || "DELETE",
-    data: { "_csrf": csrf },
-    dataType: "json",
-    headers: { "Accept": "application/json" },
-    success: function (result) {
-      window.location.href = redirect;
-    },
-    error: function (xhr, ajaxOptions, thrownError) {
-      if (xhr.status == 404) {
-        window.location.href = redirect;
-        return;
-      }
-
-      let message = thrownError;
-      try {
-        response = JSON.parse(xhr.responseText);
-        message = response.error?.message
-      } catch { };
-      alert(`Error: ${message}`);
-    }
-  });
+  return true;
 });
 
 $(".restart-btn").on("click", function (event) {

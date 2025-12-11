@@ -52,11 +52,11 @@ class Clover
       view "private-location/create"
     end
 
-    r.is String do |name|
+    r.on String do |name|
       @location = @project.locations.find { |loc| loc.ui_name == name }
       check_found_object(@location)
 
-      r.get do
+      r.get true do
         authorize("Location:view", @project)
 
         if api?
@@ -66,8 +66,9 @@ class Clover
         end
       end
 
-      r.delete do
+      r.delete true do
         authorize("Location:delete", @project)
+        handle_validation_failure("private-location/show")
 
         if @location.has_resources?
           fail DependencyError.new("Private location '#{@location.ui_name}' has some resources, first, delete them.")
@@ -79,10 +80,15 @@ class Clover
           audit_log(@location, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Private location deleted"
+          r.redirect @project, "/private-location"
+        else
+          204
+        end
       end
 
-      r.post do
+      r.post true do
         authorize("Location:edit", @project)
         name = typecast_params.nonempty_str("name")
         Validation.validate_name(name)

@@ -145,8 +145,8 @@ RSpec.describe Clover, "private subnet" do
           expect(ps.project_id).to eq(project.id)
 
           visit "#{project.path}#{ps.path}/settings"
-          btn = find ".delete-btn"
-          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+          click_button "Delete"
+          expect(page).to have_flash_notice("Private subnet scheduled for deletion.")
 
           expect(SemSnap.new(ps.id).set?("destroy")).to be true
           ps.destroy
@@ -425,10 +425,8 @@ RSpec.describe Clover, "private subnet" do
         visit "#{project.path}#{private_subnet.path}"
         within("#private-subnet-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        click_button "Delete"
+        expect(page).to have_flash_notice("Private subnet scheduled for deletion.")
 
         expect(SemSnap.new(private_subnet.id).set?("destroy")).to be true
       end
@@ -451,10 +449,8 @@ RSpec.describe Clover, "private subnet" do
         Prog::Vm::Nexus.assemble("key a", project.id, name: "dummy-vm", nic_id: n_id)
 
         visit "#{project.path}#{private_subnet.path}/settings"
-        btn = find ".delete-btn"
-        Capybara.current_session.driver.header "Accept", "application/json"
-        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(response).to have_api_error(409, "Private subnet '#{private_subnet.name}' has VMs attached, first, delete them.")
+        click_button "Delete"
+        expect(page).to have_flash_error("Private subnet '#{private_subnet.name}' has VMs attached, first, delete them.")
       end
     end
   end

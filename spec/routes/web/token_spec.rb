@@ -50,8 +50,8 @@ RSpec.describe Clover, "personal access token management" do
     page.refresh
     expect(page.title).to eq "Ubicloud - Default - Personal Access Tokens"
 
-    btn = find(".delete-btn")
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    click_button "Remove"
+    expect(page).to have_flash_notice("Personal access token deleted successfully")
     expect(ApiKey.count).to eq 0
 
     click_button "Create Token"
@@ -65,8 +65,7 @@ RSpec.describe Clover, "personal access token management" do
     ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:token"])
     visit "#{project.path}/token"
     ace.destroy
-    btn = find(".delete-btn")
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+    click_button "Remove"
     expect(ApiKey.count).to eq 1
   end
 
@@ -92,22 +91,13 @@ RSpec.describe Clover, "personal access token management" do
   it "user page allows removing personal access tokens" do
     AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
 
-    path = page.current_path
-    btn = find(".delete-btn")
-    data_url = btn["data-url"]
-    _csrf = btn["data-csrf"]
-    page.driver.delete data_url, {_csrf:}
-    expect(page.status_code).to eq(204)
+    click_button "Remove"
+    expect(page).to have_flash_notice("Personal access token deleted successfully")
     expect(ApiKey.all).to be_empty
     expect(DB[:applied_subject_tag].where(tag_id: project.subject_tags_dataset.first(name: "Admin").id, subject_id: @api_key.id).all).to be_empty
     expect(AccessControlEntry.where(project_id: project.id, subject_id: @api_key.id).all).to be_empty
 
-    visit path
-    expect(page).to have_flash_notice("Personal access token deleted successfully")
-
-    page.driver.delete data_url, {_csrf:}
-    expect(page.status_code).to eq(204)
-    visit "#{project.path}/token"
+    page.refresh
     expect(page.html).not_to include("Personal access token deleted successfully")
   end
 

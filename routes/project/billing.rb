@@ -163,7 +163,8 @@ class Clover
             audit_log(payment_method, "destroy")
           end
 
-          204
+          flash["notice"] = "Payment method deleted"
+          r.redirect @project, "/billing"
         end
       end
 

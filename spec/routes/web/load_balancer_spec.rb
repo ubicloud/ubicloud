@@ -463,10 +463,8 @@ RSpec.describe Clover, "load balancer" do
         visit "#{project.path}#{lb.path}"
         within("#load-balancer-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        click_button "Delete"
+        expect(page).to have_flash_notice("Load balancer scheduled for deletion.")
 
         expect(lb.destroy_set?).to be true
       end
@@ -492,12 +490,8 @@ RSpec.describe Clover, "load balancer" do
         visit "#{project.path}#{lb.path}/settings"
 
         lb.update(name: "new-name")
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.status_code).to eq(204)
+        click_button "Delete"
+        expect(page.status_code).to eq(404)
       end
     end
   end

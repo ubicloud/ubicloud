@@ -57,7 +57,13 @@ class Clover
           firewall.destroy
           audit_log(firewall, "destroy")
         end
-        204
+
+        if web?
+          flash["notice"] = "Firewall deleted"
+          r.redirect @project, "/firewall"
+        else
+          204
+        end
       end
 
       r.get true do
@@ -209,7 +215,8 @@ class Clover
             if api?
               204
             else
-              {message: "Firewall rule deleted"}
+              flash["notice"] = "Firewall rule deleted"
+              r.redirect firewall, "/networking"
             end
           end
 

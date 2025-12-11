@@ -655,9 +655,8 @@ RSpec.describe Clover, "postgres" do
         )
         visit "#{project.path}#{pg.path}/charts"
 
-        btn = find "#md-delete-#{md.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        find("#md-delete-#{md.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL metric destination deleted.")
         expect(pg.reload.metric_destinations.count).to eq(0)
       end
 
@@ -672,9 +671,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/charts"
         md.this.update(id: PostgresMetricDestination.generate_uuid)
 
-        btn = find "#md-delete-#{md.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        find("#md-delete-#{md.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL metric destination deleted.")
         expect(pg.reload.metric_destinations.count).to eq(1)
       end
     end
@@ -731,10 +729,10 @@ RSpec.describe Clover, "postgres" do
       it "can delete PostgreSQL database" do
         visit "#{project.path}#{pg.path}/settings"
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#postgres-delete-#{pg.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("PostgreSQL database scheduled for deletion.")
 
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end

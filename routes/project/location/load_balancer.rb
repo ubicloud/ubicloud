@@ -72,7 +72,13 @@ class Clover
           lb.incr_destroy
           audit_log(lb, "destroy")
         end
-        204
+
+        if web?
+          flash["notice"] = "Load balancer scheduled for deletion."
+          r.redirect @project, "/load-balancer"
+        else
+          204
+        end
       end
 
       r.patch api? do

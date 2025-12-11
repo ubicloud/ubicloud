@@ -239,22 +239,17 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content runner.ubid
 
-      btn = find "#runner-#{runner.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
-
-      visit "#{project.path}/github/#{installation.ubid}/runner"
+      find("#runner-#{runner.ubid} .delete-btn").click
       expect(page).to have_flash_notice("Runner '#{runner.ubid}' forcibly terminated")
     end
 
     it "raises not found when runner not exists" do
       runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
       visit "#{project.path}/github/#{installation.ubid}/runner"
+      runner_ubid = runner.ubid
       runner.destroy
 
-      btn = find "#runner-#{runner.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+      find("#runner-#{runner_ubid} .delete-btn").click
       expect(page.status_code).to eq(404)
     end
 
@@ -318,11 +313,7 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content entry.key
 
-      btn = find "#entry-#{entry.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
-
-      visit "#{project.path}/github/#{installation.ubid}/cache"
+      find("#entry-#{entry.ubid} .delete-btn").click
       expect(page).to have_flash_notice("Cache '#{entry.key}' deleted.")
     end
 
@@ -333,11 +324,11 @@ RSpec.describe Clover, "github" do
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
+      entry_ubid = entry.ubid
       entry.destroy
 
-      btn = find "#entry-#{entry.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
+      find("#entry-#{entry_ubid} .delete-btn").click
+      expect(page.status_code).to eq 404
     end
 
     it "can delete all cache entries for a repository" do
@@ -347,22 +338,15 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content "1 cache entries"
 
-      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
+      find("#delete-all-#{repository.ubid}").click
+      expect(page).to have_flash_notice("Scheduled deletion of existing cache entries")
 
       st = Strand.first(prog: "Github::DeleteCacheEntries")
       expect(st.label).to eq "delete_entries"
       st.destroy
 
-      visit "#{project.path}/github/#{installation.ubid}/cache"
-      expect(page).to have_flash_notice("Scheduled deletion of existing cache entries")
-
       entry.this.delete(force: true)
-      btn = find ".cache-group-row[data-repository='#{repository.ubid}'] .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
-      visit "#{project.path}/github/#{installation.ubid}/cache"
+      find("#delete-all-#{repository.ubid}").click
       expect(page).to have_flash_notice("No existing cache entries to delete")
 
       st = Strand.first(prog: "Github::DeleteCacheEntries")

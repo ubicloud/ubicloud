@@ -1,25 +1,25 @@
-<%# locals: (url: request.path, csrf_url: url, text: "Delete", confirmation: nil, confirmation_message: nil, redirect: request.path, method: "DELETE") %>
+<%# locals: (url: request.path, exact_url: false, text: "Delete", confirmation: nil, confirmation_message: nil, form_id: nil, icon: "hero-trash", hidden_inputs: {}, attributes: {}) %>
 
-<% button_html = part(
+<% attributes["data-confirmation"] = confirmation if confirmation
+attributes["data-confirmation-message"] = confirmation_message if confirmation_message
+attributes["form"] = form_id if form_id
+
+url += "/delete" unless exact_url
+
+button_html = part(
   "components/button",
   text:,
-  icon: "hero-trash",
+  icon:,
   extra_class: "delete-btn",
   type: "danger",
-  attributes: {
-    "data-url" => url,
-    "data-csrf" => csrf_token(csrf_url, method),
-    "data-confirmation" => confirmation,
-    "data-confirmation-message" => confirmation_message,
-    "data-redirect" => redirect,
-    "data-method" => method
-  }
+  attributes:
 ) %>
 
-<% if method == "POST" %>
+<% if form_id %>
+  <%== button_html %>
+<% else %>
   <% form(action: url, method: :post) do %>
+    <%== hidden_inputs(hidden_inputs) %>
     <%== button_html %>
   <% end %>
-<% else %>
-  <%== button_html %>
 <% end %>

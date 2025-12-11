@@ -306,7 +306,7 @@ class Clover
               @tag.destroy
               audit_log(@tag, "destroy")
               flash["notice"] = "#{@display_tag_type} tag deleted successfully"
-              204
+              r.redirect @project, "/user/access-control/tag/#{@tag_type}"
             end
 
             r.post "associate" do
@@ -367,16 +367,17 @@ class Clover
 
       r.delete "invitation", String do |email|
         authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
         @project.invitations_dataset.where(email:).destroy
         audit_log(@project, "destroy_invitation")
-        # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
-        204
+        r.redirect @project, "/user"
       end
 
       r.delete :ubid_uuid do |id|
         authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
         next unless (user = @project.accounts_dataset[id:])
 
@@ -388,9 +389,8 @@ class Clover
         user.remove_project(@project)
         audit_log(@project, "remove_account", user)
 
-        # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"
-        204
+        r.redirect @project, "/user"
       end
     end
   end
