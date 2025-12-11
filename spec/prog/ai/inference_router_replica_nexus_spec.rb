@@ -294,6 +294,8 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       )
       expect(inference_router).to receive(:ubid).and_return("irubid")
 
+      expect(inference_router_model.name).to eq("test-model")
+
       expected_projects = projects.map do |p|
         {
           "ubid" => p.ubid,
