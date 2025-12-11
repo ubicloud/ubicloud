@@ -174,8 +174,8 @@ end
                 "delete_button",
                 {
                   component: {
-                    url: "#{path(pm)}?project_id=#{@project.ubid}",
-                    csrf_url: path(pm),
+                    url: path(pm),
+                    hidden_inputs: { project_id: @project.ubid },
                     confirmation: pm.stripe_data["last4"]
                   },
                   extra_class: "flex justify-end"

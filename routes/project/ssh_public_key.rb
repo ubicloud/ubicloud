@@ -50,7 +50,12 @@ class Clover
           audit_log(@ssh_public_key, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "SSH public key deleted."
+          r.redirect @project, "/ssh-public-key"
+        else
+          204
+        end
       end
     end
   end

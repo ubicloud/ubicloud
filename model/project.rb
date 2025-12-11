@@ -12,7 +12,7 @@ class Project < Sequel::Model
   one_to_many :github_installations, read_only: true
   many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id, read_only: true
 
-  many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id, remover: nil
+  many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
   many_to_many :nics, join_table: :private_subnet, right_key: :id, right_primary_key: :private_subnet_id, read_only: true
   one_to_many :vms, read_only: true
   one_to_many :minio_clusters, read_only: true

@@ -310,10 +310,9 @@ RSpec.describe Clover, "billing" do
 
       visit "#{project.path}/billing"
 
-      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript engine.
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
 
       expect(page.status_code).to eq(400)
       expect(page.body).to eq({error: {message: "You can't delete the last payment method of a project."}}.to_json)
@@ -322,20 +321,17 @@ RSpec.describe Clover, "billing" do
 
     it "can delete payment method" do
       payment_method_2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"}))
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}}).at_least(:once)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).at_least(:once)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"})).at_least(:once)
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
 
       visit "#{project.path}/billing"
 
-      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript enginer.
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-      expect(page.status_code).to eq(204)
-      expect(page.body).to be_empty
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
+      expect(page).to have_flash_notice("Payment method deleted")
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
@@ -345,8 +341,9 @@ RSpec.describe Clover, "billing" do
       visit "#{project.path}/billing"
       payment_method.this.delete(force: true)
 
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
       expect(page.status_code).to eq(404)
     end
 
@@ -770,7 +767,7 @@ RSpec.describe Clover, "billing" do
 
     describe "usage alerts" do
       before do
-        UsageAlert.create(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
+        @alert1 = UsageAlert.create(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
         UsageAlert.create(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
       end
 
@@ -804,26 +801,23 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing"
         expect(page).to have_content "alert-1"
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        visit "#{project.path}/billing"
+        within("#alert-#{project.usage_alerts.first.ubid}") do
+          click_button "Remove"
+        end
         expect(page).to have_flash_notice "Usage alert alert-1 is deleted."
-
-        visit "#{project.path}/billing"
-        expect(page).to have_no_content "alert-1"
+        expect(@alert1.exists?).to be false
       end
 
       it "returns 404 if usage alert not found" do
         visit project.path + "/billing"
         expect(page).to have_content "alert-1"
 
-        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
-
+        alert_ubid = project.usage_alerts.first.ubid
         project.usage_alerts.first.destroy
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        within("#alert-#{alert_ubid}") do
+          click_button "Remove"
+        end
 
         expect(page.status_code).to eq(404)
       end

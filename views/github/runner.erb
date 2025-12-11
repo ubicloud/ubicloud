@@ -31,7 +31,6 @@
     headers: ["Repository", "Runner", "Workflow Job", "", ""],
     rows:
       @runners.map do |runner|
-        destroy_url = "#{@project.path}/github/#{@installation.ubid}/runner/#{runner.ubid}"
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
         family = runner.vm&.family || runner.label_data["family"]
         [
@@ -89,20 +88,15 @@
               ""
             end,
             [
-              "button",
+              "delete_button",
               {
                 component: {
+                  url: "#{@project.path}/github/#{@installation.ubid}/runner/#{runner.ubid}",
                   text: nil,
                   icon: "hero-x-circle",
-                  extra_class: "delete-btn",
-                  type: "danger",
+                  confirmation_message: "Are you sure to terminate this runner?\nThis will cancel its current job and permanently delete all its data.",
                   attributes: {
                     "title" => "Terminate",
-                    "data-url" => destroy_url,
-                    "data-csrf" => csrf_token(destroy_url, "DELETE"),
-                    "data-confirmation-message" => "Are you sure to terminate this runner?\nThis will cancel its current job and permanently delete all its data.",
-                    "data-redirect" => request.path,
-                    "data-method" => "DELETE"
                   }
                 },
                 extra_class: "text-right"

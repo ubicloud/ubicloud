@@ -53,7 +53,7 @@
               </div>
             </div>
             <div id="region-delete-<%=@location.ubid%>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", confirmation: @location.ui_name, redirect: "#{@project.path}/private-location") %>
+              <%== part("components/delete_button", confirmation: @location.ui_name) %>
             </div>
           </div>
         </div>

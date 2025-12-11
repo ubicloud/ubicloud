@@ -176,12 +176,8 @@ RSpec.describe Clover, "location-credential" do
     describe "delete" do
       it "can delete aws location credential" do
         visit "#{project.path}#{private_location.path}"
-
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        click_button "Delete"
+        expect(page).to have_flash_notice("Private location deleted")
         expect(LocationCredential[private_location.id]).to be_nil
       end
 
@@ -207,10 +203,9 @@ RSpec.describe Clover, "location-credential" do
         )
 
         visit "#{project.path}#{private_location.path}"
-        btn = find ".delete-btn"
-        Capybara.current_session.driver.header "Accept", "application/json"
-        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(response).to have_api_error(409, "Private location '#{private_location.ui_name}' has some resources, first, delete them.")
+        click_button "Delete"
+        expect(page).to have_flash_error("Private location 'aws-us-west-2' has some resources, first, delete them.")
+        expect(LocationCredential[private_location.id]).not_to be_nil
       end
     end
 

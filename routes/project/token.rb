@@ -38,7 +38,7 @@ class Clover
             audit_log(token, "destroy")
           end
           flash["notice"] = "Personal access token deleted successfully"
-          204
+          r.redirect @project, "/token"
         end
 
         r.post %w[unrestrict-access restrict-access] do |action|

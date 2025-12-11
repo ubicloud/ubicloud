@@ -26,6 +26,7 @@
                   "components/delete_button",
                   url: "#{path(@installation)}/repository/#{repository_id}/cache",
                   text: "Delete All",
+                  attributes: {id: "delete-all-#{repository_id}"},
                   confirmation: "delete all",
                   confirmation_message: "Are you sure you want to delete all cache entries for this repository?"
                 ) %>
