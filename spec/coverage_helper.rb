@@ -2,6 +2,19 @@
 
 if (suite = ENV.delete("COVERAGE"))
   require "simplecov"
+  require "simplecov-console"
+
+  # Configure console formatter to show uncovered files with line/branch details
+  SimpleCov::Formatter::Console.max_rows = -1  # Show all uncovered files
+  SimpleCov::Formatter::Console.show_covered = false  # Only show files with gaps
+  SimpleCov::Formatter::Console.output_style = "table"
+  SimpleCov::Formatter::Console.output_to_file = true  # Save to file for AI/headless review
+  SimpleCov::Formatter::Console.output_filename = "console_report.txt"  # Relative to coverage dir
+
+  SimpleCov.formatter = SimpleCov::Formatter::MultiFormatter.new([
+    SimpleCov::Formatter::HTMLFormatter,
+    SimpleCov::Formatter::Console
+  ])
 
   SimpleCov.start do
     enable_coverage :branch
@@ -22,7 +35,7 @@ if (suite = ENV.delete("COVERAGE"))
     else
       add_filter do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
-        path.match?(/\A\/(rhizome|kubernetes|migrate|spec|var|vendor|(db|model|loader|\.env)\.rb)/)
+        path.match?(/\A\/(coverage|rhizome|kubernetes|migrate|spec|var|vendor|(db|model|loader|\.env)\.rb)/)
       end
     end
 

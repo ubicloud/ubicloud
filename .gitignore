@@ -43,3 +43,6 @@
 
 # mise "local" dependency specification that shouldn't be committed
 mise.local.toml
+
+# Beads issue tracking (agent memory, not committed)
+/.beads/

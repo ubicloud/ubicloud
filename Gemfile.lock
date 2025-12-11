@@ -35,6 +35,7 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     afm (1.0.0)
     android_key_attestation (0.3.0)
+    ansi (1.5.0)
     argon2 (2.3.2)
       ffi (~> 1.15)
       ffi-compiler (~> 1.0)
@@ -375,6 +376,10 @@ GEM
       docile (~> 1.1)
       simplecov-html (~> 0.11)
       simplecov_json_formatter (~> 0.1)
+    simplecov-console (0.9.4)
+      ansi
+      simplecov
+      terminal-table
     simplecov-html (0.13.2)
     simplecov_json_formatter (0.1.4)
     snaky_hash (2.0.3)
@@ -393,6 +398,8 @@ GEM
       lint_roller (~> 1.1)
       rubocop-performance (~> 1.25.0)
     stripe (12.6.0)
+    terminal-table (4.0.0)
+      unicode-display_width (>= 1.1.1, < 4)
     thor (1.4.0)
     tilt (2.6.1)
     timeout (0.4.4)
@@ -508,6 +515,7 @@ DEPENDENCIES
   sequel_pg (>= 1.8)
   shellwords
   simplecov
+  simplecov-console
   standard (>= 1.24.3)
   stripe
   tilt (>= 2.6.1)

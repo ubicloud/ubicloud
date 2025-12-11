@@ -92,6 +92,7 @@ group :test do
   gem "pdf-reader"
   gem "rspec"
   gem "simplecov"
+  gem "simplecov-console"
   gem "turbo_tests"
   gem "webmock"
 end
