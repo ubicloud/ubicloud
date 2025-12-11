@@ -57,67 +57,65 @@ class Clover
         end
       end
 
-      r.is do
-        r.get do
-          authorize("LoadBalancer:view", lb)
-          if api?
-            Serializers::LoadBalancer.serialize(lb, {detailed: true})
-          else
-            r.redirect lb, "/overview"
-          end
+      r.get true do
+        authorize("LoadBalancer:view", lb)
+        if api?
+          Serializers::LoadBalancer.serialize(lb, {detailed: true})
+        else
+          r.redirect lb, "/overview"
         end
+      end
 
-        r.delete do
-          authorize("LoadBalancer:delete", lb)
-          DB.transaction do
-            lb.incr_destroy
-            audit_log(lb, "destroy")
-          end
-          204
+      r.delete true do
+        authorize("LoadBalancer:delete", lb)
+        DB.transaction do
+          lb.incr_destroy
+          audit_log(lb, "destroy")
         end
+        204
+      end
 
-        r.patch api? do
-          authorize("LoadBalancer:edit", lb)
-          algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
-          src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
-          vm_ids = typecast_params.array(:ubid_uuid, "vms")
-          cert_enabled = typecast_params.bool!("cert_enabled")
-          cert_enablement_changed = lb.cert_enabled != cert_enabled
+      r.patch api? do
+        authorize("LoadBalancer:edit", lb)
+        algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
+        src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+        vm_ids = typecast_params.array(:ubid_uuid, "vms")
+        cert_enabled = typecast_params.bool!("cert_enabled")
+        cert_enablement_changed = lb.cert_enabled != cert_enabled
 
-          DB.transaction do
-            lb.update(algorithm:, health_check_endpoint:)
-            lb.ports_dataset.update(src_port: Validation.validate_port(:src_port, src_port), dst_port: Validation.validate_port(:dst_port, dst_port))
+        DB.transaction do
+          lb.update(algorithm:, health_check_endpoint:)
+          lb.ports_dataset.update(src_port: Validation.validate_port(:src_port, src_port), dst_port: Validation.validate_port(:dst_port, dst_port))
 
-            new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
+          new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
 
-            unless vm_ids.length == new_vms.length
-              fail Validation::ValidationFailed.new("vms" => "VM not found")
-            end
-
-            new_vms.each do |vm|
-              if (lb_id = vm.load_balancer&.id)
-                next if lb_id == lb.id
-
-                fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
-              end
-              lb.add_vm(vm)
-            end
-
-            lb.vms.each do |vm|
-              next if new_vms.any? { it.id == vm.id }
-
-              lb.evacuate_vm(vm)
-              lb.remove_vm(vm)
-            end
-
-            lb.incr_update_load_balancer
-            if cert_enablement_changed
-              cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
-            end
-            audit_log(lb, "update")
+          unless vm_ids.length == new_vms.length
+            fail Validation::ValidationFailed.new("vms" => "VM not found")
           end
-          Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
+
+          new_vms.each do |vm|
+            if (lb_id = vm.load_balancer&.id)
+              next if lb_id == lb.id
+
+              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+            end
+            lb.add_vm(vm)
+          end
+
+          lb.vms.each do |vm|
+            next if new_vms.any? { it.id == vm.id }
+
+            lb.evacuate_vm(vm)
+            lb.remove_vm(vm)
+          end
+
+          lb.incr_update_load_balancer
+          if cert_enablement_changed
+            cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+          end
+          audit_log(lb, "update")
         end
+        Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
       end
 
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
