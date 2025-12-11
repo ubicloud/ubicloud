@@ -8,6 +8,8 @@ class InferenceRouterModel < Sequel::Model
 
   plugin ResourceMethods
 
+  alias_method :name, :model_name
+
   def load_balancer
     inference_router.load_balancer
   end
