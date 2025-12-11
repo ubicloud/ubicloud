@@ -60,7 +60,16 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       update_stack({"fail_message" => "Failed to run test queries"})
     end
 
-    hop_destroy_postgres
+    hop_test_ssh_key_rotation
+  end
+
+  label def test_ssh_key_rotation
+    bud Prog::Test::SshKeyRotation, {subject_id: representative_server.vm.sshable.id}
+    hop_wait_ssh_key_rotation
+  end
+
+  label def wait_ssh_key_rotation
+    reap(:destroy_postgres)
   end
 
   label def destroy_postgres

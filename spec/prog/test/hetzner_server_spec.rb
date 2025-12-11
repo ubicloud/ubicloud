@@ -143,7 +143,7 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#run_integration_specs" do
-    it "hops to wait" do
+    it "hops to test_ssh_key_rotation" do
       tmp_dir = "/var/storage/tests"
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
@@ -151,7 +151,25 @@ RSpec.describe Prog::Test::HetznerServer do
         "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
       )
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("wait")
+      expect { hs_test.run_integration_specs }.to hop("test_ssh_key_rotation")
+    end
+  end
+
+  describe "#test_ssh_key_rotation" do
+    it "buds SshKeyRotation test and hops to wait_ssh_key_rotation" do
+      expect(hs_test).to receive(:bud).with(Prog::Test::SshKeyRotation, {subject_id: vm_host.sshable.id})
+      expect { hs_test.test_ssh_key_rotation }.to hop("wait_ssh_key_rotation")
+    end
+  end
+
+  describe "#wait_ssh_key_rotation" do
+    it "hops to wait when no children" do
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    end
+
+    it "naps if children exist" do
+      Strand.create(parent_id: hs_test.strand.id, prog: "Test::SshKeyRotation", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { hs_test.wait_ssh_key_rotation }.to nap(120)
     end
   end
 

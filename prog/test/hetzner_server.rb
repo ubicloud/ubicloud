@@ -112,7 +112,16 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     vm_host.sshable.cmd("sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e")
     vm_host.sshable.cmd("sudo rm -rf :tmp_dir", tmp_dir:)
 
-    hop_wait
+    hop_test_ssh_key_rotation
+  end
+
+  label def test_ssh_key_rotation
+    bud Prog::Test::SshKeyRotation, {subject_id: vm_host.sshable.id}
+    hop_wait_ssh_key_rotation
+  end
+
+  label def wait_ssh_key_rotation
+    reap(:wait)
   end
 
   label def wait

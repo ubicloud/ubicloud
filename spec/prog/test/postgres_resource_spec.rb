@@ -53,12 +53,33 @@ RSpec.describe Prog::Test::PostgresResource do
   describe "#test_postgres" do
     it "fails if the basic connectivity test fails" do
       expect(pgr_test).to receive(:representative_server).and_return(faulty_representative_server)
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("test_ssh_key_rotation")
     end
 
-    it "hops to test_table_create if the basic connectivity test passes" do
+    it "hops to test_ssh_key_rotation if the basic connectivity test passes" do
       expect(pgr_test).to receive(:representative_server).and_return(working_representative_server)
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("test_ssh_key_rotation")
+    end
+  end
+
+  describe "#test_ssh_key_rotation" do
+    it "buds SshKeyRotation test and hops to wait_ssh_key_rotation" do
+      vm = instance_double(Vm, sshable: instance_double(Sshable, id: "sshable-id"))
+      server = instance_double(PostgresServer, vm: vm)
+      expect(pgr_test).to receive(:representative_server).and_return(server)
+      expect(pgr_test).to receive(:bud).with(Prog::Test::SshKeyRotation, {subject_id: "sshable-id"})
+      expect { pgr_test.test_ssh_key_rotation }.to hop("wait_ssh_key_rotation")
+    end
+  end
+
+  describe "#wait_ssh_key_rotation" do
+    it "hops to destroy_postgres when no children" do
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+    end
+
+    it "naps if children exist" do
+      Strand.create(parent_id: pgr_test.strand.id, prog: "Test::SshKeyRotation", label: "start", stack: [{}], lease: Time.now + 10)
+      expect { pgr_test.wait_ssh_key_rotation }.to nap(120)
     end
   end
 
