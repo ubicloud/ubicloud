@@ -103,10 +103,10 @@ class Minio::Client
     response.status == 200
   end
 
-  def list_objects(bucket_name, folder_path, max_keys: 1000)
+  def list_objects(bucket_name, folder_path, max_keys: 1000, delimiter: "")
     objects = []
     query = URI.encode_www_form({
-      "delimiter" => "",
+      "delimiter" => delimiter,
       "encoding-type" => "url",
       "list-type" => 2,
       "prefix" => folder_path,
@@ -125,7 +125,7 @@ class Minio::Client
     while is_truncated
       query = URI.encode_www_form({
         "continuation-token" => continuation_token,
-        "delimiter" => "",
+        "delimiter" => delimiter,
         "encoding-type" => "url",
         "list-type" => 2,
         "prefix" => folder_path,
