@@ -250,6 +250,10 @@ class PostgresServer < Sequel::Model
       end
     end
 
+    if pulse[:reading_rpt] % 12 == 1
+      observe_archival_backlog(session:)
+    end
+
     pulse
   end
 
@@ -335,7 +339,28 @@ class PostgresServer < Sequel::Model
     end
   end
 
+  def observe_archival_backlog(session:)
+    result = session[:ssh_session].exec!(
+      "find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
+      version:
+    )
+    archival_backlog = result.strip.to_i
+
+    if archival_backlog > ARCHIVAL_BACKLOG_THRESHOLD
+      Prog::PageNexus.assemble("#{ubid} archival backlog high",
+        ["PGArchivalBacklogHigh", id], ubid,
+        severity: "warning", extra_data: {archival_backlog: archival_backlog})
+    else
+      Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe archival backlog") do
+      {postgres_server_id: id, exception: Util.exception_to_hash(ex)}
+    end
+  end
+
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
+  ARCHIVAL_BACKLOG_THRESHOLD = 10
 end
 
 # Table: postgres_server
