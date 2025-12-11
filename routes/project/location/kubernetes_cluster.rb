@@ -23,24 +23,22 @@ class Clover
 
       check_found_object(kc)
 
-      r.is do
-        r.get do
-          authorize("KubernetesCluster:view", kc)
-          if api?
-            Serializers::KubernetesCluster.serialize(kc, {detailed: true})
-          else
-            r.redirect kc, "/overview"
-          end
+      r.get true do
+        authorize("KubernetesCluster:view", kc)
+        if api?
+          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+        else
+          r.redirect kc, "/overview"
         end
+      end
 
-        r.delete do
-          authorize("KubernetesCluster:delete", kc)
-          DB.transaction do
-            kc.incr_destroy
-            audit_log(kc, "destroy")
-          end
-          204
+      r.delete true do
+        authorize("KubernetesCluster:delete", kc)
+        DB.transaction do
+          kc.incr_destroy
+          audit_log(kc, "destroy")
         end
+        204
       end
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"

@@ -30,30 +30,28 @@ class Clover
         private_subnet_connection_action("disconnect", id)
       end
 
-      r.is do
-        r.get do
-          authorize("PrivateSubnet:view", ps)
-          if api?
-            Serializers::PrivateSubnet.serialize(ps)
-          else
-            r.redirect ps, "/overview"
-          end
+      r.get true do
+        authorize("PrivateSubnet:view", ps)
+        if api?
+          Serializers::PrivateSubnet.serialize(ps)
+        else
+          r.redirect ps, "/overview"
+        end
+      end
+
+      r.delete true do
+        authorize("PrivateSubnet:delete", ps)
+
+        unless ps.attached_vms.empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        r.delete do
-          authorize("PrivateSubnet:delete", ps)
-
-          unless ps.attached_vms.empty?
-            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
-          end
-
-          DB.transaction do
-            ps.incr_destroy
-            audit_log(ps, "destroy")
-          end
-
-          204
+        DB.transaction do
+          ps.incr_destroy
+          audit_log(ps, "destroy")
         end
+
+        204
       end
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet, template_prefix: "networking/private_subnet"
