@@ -3,8 +3,57 @@
 require "spec_helper"
 
 RSpec.describe MetricsTargetResource do
-  let(:postgres_server) { PostgresServer.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
-  let(:resource) { described_class.new(postgres_server) }
+  subject(:resource) {
+    described_class.new(postgres_server)
+  }
+
+  let(:postgres_server) {
+    PostgresServer.create(
+      timeline:, resource: postgres_resource, vm_id: vm.id, representative_at: Time.now,
+      synchronization_status: "ready", timeline_access: "push", version: "16"
+    )
+  }
+
+  let(:project) { Project.create(name: "postgres-server") }
+  let(:project_service) { Project.create(name: "postgres-service") }
+
+  let(:timeline) { PostgresTimeline.create(location:) }
+
+  let(:postgres_resource) {
+    PostgresResource.create(
+      name: "postgres-resource",
+      project:,
+      location:,
+      ha_type: PostgresResource::HaType::NONE,
+      user_config: {},
+      pgbouncer_user_config: {},
+      target_version: "16",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64,
+      superuser_password: "super"
+    )
+  }
+
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "postgres-subnet", project:, location:,
+      net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+    )
+  }
+
+  let(:vm) { create_hosted_vm(project, private_subnet, "dummy-vm") }
+
+  let(:location) {
+    Location.create(
+      name: "us-west-2",
+      project:,
+      display_name: "us-west-2",
+      ui_name: "us-west-2",
+      provider: "ubicloud",
+      visible: true
+    )
+  }
 
   describe "#initialize" do
     before do
