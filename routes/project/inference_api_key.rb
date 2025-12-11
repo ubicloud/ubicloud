@@ -33,7 +33,7 @@ class Clover
       end
     end
 
-    r.is :ubid_uuid do |id|
+    r.on :ubid_uuid do |id|
       iak = inference_api_key_ds.with_pk(id)
 
       r.get api? do
@@ -42,7 +42,7 @@ class Clover
         end
       end
 
-      r.delete do
+      r.delete true do
         if iak
           authorize("InferenceApiKey:delete", iak)
           DB.transaction do

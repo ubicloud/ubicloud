@@ -143,7 +143,7 @@ class Clover
               204
             end
 
-            r.is :ubid_uuid do |id|
+            r.on :ubid_uuid do |id|
               entry = repository.cache_entries_dataset.with_pk(id)
               check_found_object(entry)
 
@@ -151,7 +151,7 @@ class Clover
                 Serializers::GithubCacheEntry.serialize(entry, installation:, repository:)
               end
 
-              r.delete do
+              r.delete true do
                 DB.transaction do
                   entry.destroy
                   audit_log(entry, "destroy")

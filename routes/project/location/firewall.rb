@@ -46,29 +46,27 @@ class Clover
         end
       end
 
-      r.is do
-        r.delete do
-          authorize("Firewall:delete", firewall)
-          ds = firewall.private_subnets_dataset
-          unless ds.exclude(id: dataset_authorize(ds, "PrivateSubnet:edit").select(:id)).empty?
-            fail Authorization::Unauthorized
-          end
-
-          DB.transaction do
-            firewall.destroy
-            audit_log(firewall, "destroy")
-          end
-          204
+      r.delete true do
+        authorize("Firewall:delete", firewall)
+        ds = firewall.private_subnets_dataset
+        unless ds.exclude(id: dataset_authorize(ds, "PrivateSubnet:edit").select(:id)).empty?
+          fail Authorization::Unauthorized
         end
 
-        r.get do
-          authorize("Firewall:view", firewall)
+        DB.transaction do
+          firewall.destroy
+          audit_log(firewall, "destroy")
+        end
+        204
+      end
 
-          if api?
-            Serializers::Firewall.serialize(firewall, {detailed: true})
-          else
-            r.redirect firewall, "/overview"
-          end
+      r.get true do
+        authorize("Firewall:view", firewall)
+
+        if api?
+          Serializers::Firewall.serialize(firewall, {detailed: true})
+        else
+          r.redirect firewall, "/overview"
         end
       end
 
