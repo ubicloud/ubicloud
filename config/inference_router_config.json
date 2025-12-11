@@ -20,7 +20,8 @@
       "name": "admin-server",
       "addr": "127.0.0.1:8080,::1:8080",
       "locations": [
-        "usage"
+        "usage",
+        "stats"
       ],
       "threads": 1
     }
@@ -40,6 +41,11 @@
       "name": "usage",
       "path": "^/usage$",
       "app": "usage"
+    },
+    {
+      "name": "stats",
+      "path": "^/stats$",
+      "app": "stats"
     }
   ]
 }
