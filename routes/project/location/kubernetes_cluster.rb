@@ -38,7 +38,13 @@ class Clover
           kc.incr_destroy
           audit_log(kc, "destroy")
         end
-        204
+
+        if web?
+          flash["notice"] = "Kubernetes cluster scheduled for deletion."
+          r.redirect @project, "/kubernetes-cluster"
+        else
+          204
+        end
       end
 
       r.rename kc, perm: "KubernetesCluster:edit", serializer: Serializers::KubernetesCluster, template_prefix: "kubernetes-cluster"

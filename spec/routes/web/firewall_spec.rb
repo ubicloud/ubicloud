@@ -412,14 +412,12 @@ RSpec.describe Clover, "firewall" do
       end
 
       it "can delete rule" do
-        firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
+        rule = firewall.insert_firewall_rule("1.0.0.0/8", Sequel.pg_range(80..80))
 
         visit "#{project.path}#{firewall.path}/networking"
 
-        btn = find "#fwr-delete-#{firewall.firewall_rules.first.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.body).to eq({message: "Firewall rule deleted"}.to_json)
+        find("#fwr-delete-#{rule.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("Firewall rule deleted")
         expect(firewall.firewall_rules_dataset.count).to eq(0)
 
         visit "#{project.path}#{firewall.path}"
@@ -431,10 +429,11 @@ RSpec.describe Clover, "firewall" do
 
         visit "#{project.path}#{firewall.path}/networking"
 
+        rule_ubid = firewall.firewall_rules.first.ubid
         firewall.remove_firewall_rule(firewall.firewall_rules.first)
-        btn = find "#fwr-delete-#{firewall.firewall_rules.first.ubid} .delete-btn"
-        expect { page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]} }.not_to raise_error
 
+        find("#fwr-delete-#{rule_ubid} .delete-btn").click
+        expect(page.status_code).to eq 404
         expect(firewall.firewall_rules_dataset.count).to eq(0)
       end
 
@@ -522,13 +521,8 @@ RSpec.describe Clover, "firewall" do
         visit "#{project.path}#{firewall.path}"
         within("#firewall-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.status_code).to eq(204)
-        expect(page.body).to be_empty
+        click_button "Delete"
+        expect(page).to have_flash_notice("Firewall deleted")
         expect(Firewall.count).to eq(0)
       end
 

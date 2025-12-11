@@ -40,7 +40,12 @@ class Clover
           audit_log(vm, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Virtual machine scheduled for deletion."
+          r.redirect @project, "/vm"
+        else
+          204
+        end
       end
 
       r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"

@@ -49,7 +49,7 @@ delete_perm = has_permission?("LoadBalancer:delete", @lb) %>
               </div>
             </div>
             <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", url: path(@lb), confirmation: @lb.name, redirect: "#{@project.path}/load-balancer") %>
+              <%== part("components/delete_button", url: path(@lb), confirmation: @lb.name) %>
             </div>
           </div>
         </div>
