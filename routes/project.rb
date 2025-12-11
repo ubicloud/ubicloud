@@ -60,6 +60,7 @@ class Clover
 
       r.delete true do
         authorize("Project:delete", @project)
+        handle_validation_failure("project/show")
 
         if @project.has_resources?
           fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
@@ -70,7 +71,12 @@ class Clover
           audit_log(@project, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Project deleted"
+          r.redirect "/project"
+        else
+          204
+        end
       end
 
       r.post web? do

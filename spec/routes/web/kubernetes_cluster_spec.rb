@@ -415,10 +415,10 @@ RSpec.describe Clover, "Kubernetes" do
         visit "#{project.path}#{kc.path}"
         within("#kubernetes-cluster-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#kc-delete-#{kc.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#kc-delete-#{kc.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("Kubernetes cluster scheduled for deletion.")
 
         expect(SemSnap.new(kc.id).set?("destroy")).to be true
       end

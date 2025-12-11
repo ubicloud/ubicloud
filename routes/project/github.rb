@@ -88,7 +88,7 @@ class Clover
             audit_log(runner, "destroy")
           end
           flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"
-          204
+          r.redirect @project, "/github/#{@installation.ubid}/runner"
         end
       end
 
@@ -139,8 +139,12 @@ class Clover
                 notice = "Scheduled deletion of existing cache entries"
               end
 
-              flash["notice"] = notice if web?
-              204
+              if web?
+                flash["notice"] = notice
+                r.redirect @project, "/github/#{@installation.ubid}/cache"
+              else
+                204
+              end
             end
 
             r.on :ubid_uuid do |id|
@@ -156,8 +160,13 @@ class Clover
                   entry.destroy
                   audit_log(entry, "destroy")
                 end
-                flash["notice"] = "Cache '#{entry.key}' deleted." if web?
-                204
+
+                if web?
+                  flash["notice"] = "Cache '#{entry.key}' deleted."
+                  r.redirect @project, "/github/#{@installation.ubid}/cache"
+                else
+                  204
+                end
               end
             end
           end

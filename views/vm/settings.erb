@@ -47,7 +47,7 @@
             </div>
           </div>
           <div id="vm-delete-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-            <%== part("components/delete_button", confirmation: @vm.name, url: path(@vm), redirect: "#{@project.path}/vm") %>
+            <%== part("components/delete_button", confirmation: @vm.name, url: path(@vm)) %>
           </div>
         </div>
       </div>

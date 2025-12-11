@@ -94,9 +94,8 @@ RSpec.describe Clover do
     expect(page.all("td a").map(&:text)).to eq ["b"]
 
     click_link "b"
-    btn = find ".delete-btn"
-    page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+    click_button "Delete"
+    expect(page).to have_flash_notice("SSH public key deleted.")
     expect(project.ssh_public_keys_dataset.all).to eq []
   end
 end

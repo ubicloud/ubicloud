@@ -35,23 +35,25 @@ class Clover
 
     r.on :ubid_uuid do |id|
       iak = inference_api_key_ds.with_pk(id)
+      check_found_object(iak)
 
       r.get api? do
-        if iak
-          {id: iak.ubid, key: iak.key}
-        end
+        {id: iak.ubid, key: iak.key}
       end
 
       r.delete true do
-        if iak
-          authorize("InferenceApiKey:delete", iak)
-          DB.transaction do
-            iak.destroy
-            audit_log(iak, "destroy")
-          end
-          flash["notice"] = "Inference API Key deleted successfully" if web?
+        authorize("InferenceApiKey:delete", iak)
+        DB.transaction do
+          iak.destroy
+          audit_log(iak, "destroy")
         end
-        204
+
+        if web?
+          flash["notice"] = "Inference API Key deleted successfully"
+          r.redirect @project, "/inference-api-key"
+        else
+          204
+        end
       end
     end
   end

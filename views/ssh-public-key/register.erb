@@ -4,7 +4,7 @@
 else
   action_type = "Update"
   if @ssh_public_key.errors.empty?
-    right_items = [part("components/delete_button", confirmation: @ssh_public_key.name, url: path(@ssh_public_key), redirect: "#{@project.path}/ssh-public-key")]
+    right_items = [part("components/delete_button", confirmation: @ssh_public_key.name, url: path(@ssh_public_key))]
   end
 end
 @page_title = "#{action_type} SSH Public Key"

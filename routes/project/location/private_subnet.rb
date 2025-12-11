@@ -41,6 +41,7 @@ class Clover
 
       r.delete true do
         authorize("PrivateSubnet:delete", ps)
+        handle_validation_failure("networking/private_subnet/settings")
 
         vms_dataset = ps.vms_dataset
           .association_join(:strand)
@@ -61,7 +62,12 @@ class Clover
           audit_log(ps, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Private subnet scheduled for deletion."
+          r.redirect @project, "/private-subnet"
+        else
+          204
+        end
       end
 
       r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet, template_prefix: "networking/private_subnet"

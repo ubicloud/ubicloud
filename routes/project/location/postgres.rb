@@ -39,7 +39,13 @@ class Clover
           pg.incr_destroy
           audit_log(pg, "destroy")
         end
-        204
+
+        if web?
+          flash["notice"] = "PostgreSQL database scheduled for deletion."
+          r.redirect @project, "/postgres"
+        else
+          204
+        end
       end
 
       r.patch true do
@@ -226,9 +232,16 @@ class Clover
               pg.servers.each(&:incr_configure_metrics)
               audit_log(md, "destroy")
             end
+          else
+            no_audit_log
           end
 
-          204
+          if web?
+            flash["notice"] = "PostgreSQL metric destination deleted."
+            r.redirect pg, "/charts"
+          else
+            204
+          end
         end
       end
 
