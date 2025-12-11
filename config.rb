@@ -231,7 +231,7 @@ module Config
   optional :huggingface_token, string, clear: true
   override :inference_dns_zone, "ai.ubicloud.com", string
   optional :inference_router_access_token, string, clear: true
-  override :inference_router_release_tag, "v0.1.0", string
+  override :inference_router_release_tag, "v0.1.8", string
 
   # DNS
   optional :dns_service_project_id, uuid

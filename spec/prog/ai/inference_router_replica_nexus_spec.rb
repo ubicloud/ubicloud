@@ -329,13 +329,14 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         }, {
           name: "admin-server",
           addr: "127.0.0.1:8080,::1:8080",
-          locations: ["usage"],
+          locations: ["usage", "stats"],
           threads: 1
         }])
         expect(json_sent["locations"].map { |h| h.transform_keys(&:to_sym) }).to eq([
           {name: "up", path: "^/up$", app: "up"},
           {name: "inference", path: "^/v1/(chat/completions|completions|embeddings)$", app: "inference"},
-          {name: "usage", path: "^/usage$", app: "usage"}
+          {name: "usage", path: "^/usage$", app: "usage"},
+          {name: "stats", path: "^/stats$", app: "stats"}
         ])
         expect(json_sent["routes"].map { |h| h.transform_keys(&:to_sym).except(:endpoints) }).to eq([{
           model_name: "test-model",
@@ -368,19 +369,28 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       end
       expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
 
-      usage = [{
-        "ubid" => replica.ubid,
-        "request_count" => 1,
-        "prompt_token_count" => 10,
-        "completion_token_count" => 20
-      }, {
-        "ubid" => "anotherubid",
-        "request_count" => 0,
-        "prompt_token_count" => 0,
-        "completion_token_count" => 0
-      }]
-      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
+      stats = {
+        "usage" => [
+          {
+            "ubid" => replica.ubid,
+            "request_count" => 1,
+            "prompt_token_count" => 10,
+            "completion_token_count" => 20
+          }, {
+            "ubid" => "anotherubid",
+            "request_count" => 0,
+            "prompt_token_count" => 0,
+            "completion_token_count" => 0
+          }
+        ],
+        "health" => [
+          {"id" => "model1", "healthy" => true},
+          {"id" => "model2", "healthy" => true}
+        ]
+      }
+      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/stats").and_return(stats.to_json)
 
+      usage = stats["usage"]
       expect(nx).to receive(:update_billing_records).with(
         usage, "prompt_billing_resource", "prompt_token_count"
       )
@@ -427,23 +437,60 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
 
       expect(sshable).to receive(:_cmd)
-        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
-        .and_return("[]")
+        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
+        .and_return("{\"usage\": [], \"health\": []}")
 
       nx.ping_inference_router
+    end
+
+    it "creates a page for unhealthy endpoints and resolves it when all become healthy" do
+      # First call: unhealthy endpoints, should create a page
+      expect(sshable).to receive(:_cmd).with(
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+      ).and_return("dummy_md5sum").twice
+
+      expect(sshable).to receive(:_cmd).with(
+        "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
+        hash_including(stdin: a_string_matching(/"projects":/))
+      ).twice
+
+      expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router").twice
+
+      expect(sshable).to receive(:_cmd)
+        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
+        .and_return("{\"usage\": [], \"health\": [{\"id\": \"endpoint1\", \"healthy\": false}, {\"id\": \"endpoint2\", \"healthy\": true}]}")
+
+      nx.ping_inference_router
+
+      # Verify page was created
+      page = Page.from_tag_parts(["InferenceRouterReplicaUnhealthyEndpoints", replica.ubid])
+      expect(page).not_to be_nil
+      expect(page.details["unhealthy_endpoints"]).to eq(["endpoint1"])
+
+      # Second call: all endpoints healthy, should resolve the page
+      expect(sshable).to receive(:_cmd)
+        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
+        .and_return("{\"usage\": [], \"health\": [{\"id\": \"endpoint1\", \"healthy\": true}, {\"id\": \"endpoint2\", \"healthy\": true}]}")
+
+      nx.ping_inference_router
+
+      # Verify page is marked for resolution
+      expect(Semaphore[name: "resolve", strand_id: page.id]).not_to be_nil
     end
 
     it "skips config update when unchanged" do
       expect(inference_router).to receive(:ubid).and_return("irubid")
       expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
-      ).and_return("dd8a549def177e5a6cbedeb511b55208") # md5sum of the test config.
+      ).and_return("8ffb16694fe5e619b27326450e52124f") # md5sum of the test config.
       expect(sshable).not_to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       )
       expect(sshable).not_to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
-      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
+      expect(sshable).to receive(:_cmd).with(
+        "curl -k -m 10 --no-progress-meter https://localhost:8080/stats"
+      ).and_return("{\"usage\": [], \"health\": []}")
       nx.ping_inference_router
     end
   end
