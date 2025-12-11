@@ -290,7 +290,7 @@ class PostgresServer < Sequel::Model
       ],
       max_file_retention: 120,
       interval: "15s",
-      additional_labels: {},
+      additional_labels: resource.tags.to_h { |key, value| ["pg_tags_label_#{key}", value] }, # rubocop:disable Style/HashTransformKeys
       metrics_dir: "/home/ubi/postgres/metrics",
       project_id: Config.postgres_service_project_id
     }
