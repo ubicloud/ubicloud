@@ -35,7 +35,13 @@ class Prog::SshKeyRotator < Prog::Base
   end
 
   def compute_authorized_keys
-    sshable.keys.map(&:public_key).join("\n")
+    keys = sshable.keys.map(&:public_key).join("\n")
+    # Managed VMs that have `ubi` do double duty for personnel access
+    # (bad) need operator keys to be merged in too.
+    if sshable.unix_user == "ubi" && Config.operator_ssh_public_keys
+      keys += "\n#{Config.operator_ssh_public_keys}"
+    end
+    keys
   end
 
   label def wait

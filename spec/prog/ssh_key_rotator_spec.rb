@@ -234,4 +234,25 @@ RSpec.describe Prog::SshKeyRotator do
       expect { skr.rotate_cleanup }.to hop("wait")
     end
   end
+
+  describe "#compute_authorized_keys" do
+    it "returns only sshable keys for rhizome user" do
+      result = skr.compute_authorized_keys
+      expect(result).to eq(sshable.keys.first.public_key)
+    end
+
+    it "includes operator keys for ubi user" do
+      sshable.update(unix_user: "ubi")
+      expect(Config).to receive(:operator_ssh_public_keys).and_return("ssh-ed25519 BBB operator").twice
+      result = skr.compute_authorized_keys
+      expect(result).to eq("#{sshable.keys.first.public_key}\nssh-ed25519 BBB operator")
+    end
+
+    it "does not include operator keys for ubi user if not configured" do
+      sshable.update(unix_user: "ubi")
+      expect(Config).to receive(:operator_ssh_public_keys).and_return(nil)
+      result = skr.compute_authorized_keys
+      expect(result).to eq(sshable.keys.first.public_key)
+    end
+  end
 end
