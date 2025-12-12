@@ -12,6 +12,7 @@ RSpec.describe Prog::Test::SshKeyRotation do
   let(:sshable) {
     s = create_mock_sshable(raw_private_key_1: original_key)
     allow(s).to receive(:ssh_key_rotator).and_return(ssh_key_rotator)
+    allow(s).to receive(:reload).and_return(s)
     s
   }
 
@@ -20,7 +21,9 @@ RSpec.describe Prog::Test::SshKeyRotation do
   }
 
   let(:ssh_key_rotator) {
-    instance_double(SshKeyRotator, strand: rotator_strand, incr_rotate_now: nil)
+    r = instance_double(SshKeyRotator, strand: rotator_strand, incr_rotate_now: nil, id: "test-rotator-id", next_rotation_at: Time.now + 24 * 60 * 60)
+    allow(r).to receive(:reload).and_return(r)
+    r
   }
 
   let(:strand) {
@@ -56,14 +59,23 @@ RSpec.describe Prog::Test::SshKeyRotation do
       )
     }
 
-    it "hops to verify_ssh when key has changed" do
+    it "hops to verify_ssh when key has changed and rotator is in wait state" do
       new_key = SshKey.generate.keypair
       allow(sshable).to receive(:raw_private_key_1).and_return(new_key)
+      allow(rotator_strand).to receive(:label).and_return("wait")
       expect { test_prog.wait_rotation }.to hop("verify_ssh")
     end
 
     it "naps if key has not changed yet" do
       # Key unchanged, still waiting for rotation
+      allow(rotator_strand).to receive(:label).and_return("rotate_cleanup")
+      expect { test_prog.wait_rotation }.to nap(5)
+    end
+
+    it "naps if key changed but rotator not yet in wait state" do
+      new_key = SshKey.generate.keypair
+      allow(sshable).to receive(:raw_private_key_1).and_return(new_key)
+      allow(rotator_strand).to receive(:label).and_return("rotate_cleanup")
       expect { test_prog.wait_rotation }.to nap(5)
     end
   end
@@ -88,6 +100,21 @@ RSpec.describe Prog::Test::SshKeyRotation do
   end
 
   describe "#verify_cleanup" do
+    before do
+      allow(rotator_strand).to receive(:label).and_return("wait")
+      allow(ssh_key_rotator).to receive(:next_rotation_at).and_return(Time.now + 24 * 60 * 60)
+    end
+
+    it "naps if rotator not yet in wait state" do
+      allow(rotator_strand).to receive(:label).and_return("rotate_cleanup")
+      expect { test_prog.verify_cleanup }.to nap(5)
+    end
+
+    it "naps if next rotation is too soon" do
+      allow(ssh_key_rotator).to receive(:next_rotation_at).and_return(Time.now + 1 * 60 * 60)
+      expect { test_prog.verify_cleanup }.to nap(5)
+    end
+
     it "hops to finish when test user does not exist" do
       allow(sshable).to receive(:_cmd).with("id rhizome_rotate 2>&1 || echo 'user_not_found'").and_return("user_not_found\n")
       expect { test_prog.verify_cleanup }.to hop("finish")
@@ -106,7 +133,7 @@ RSpec.describe Prog::Test::SshKeyRotation do
     it "fails if test user still exists" do
       allow(sshable).to receive(:_cmd).with("id rhizome_rotate 2>&1 || echo 'user_not_found'").and_return("uid=1001(rhizome_rotate) gid=1001(rhizome_rotate)")
       expect { test_prog.verify_cleanup }.to hop("failed")
-      expect(strand.exitval["msg"]).to eq("Test user rhizome_rotate still exists")
+      expect(strand.exitval["msg"]).to include("Test user rhizome_rotate still exists")
     end
   end
 

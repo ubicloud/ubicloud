@@ -121,11 +121,16 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   end
 
   label def wait_ssh_key_rotation
-    reap.each do |st|
-      fail_test "SSH key rotation test failed: #{st.exitval}" unless st.exitval&.dig("msg")&.include?("successfully")
-    end
-    hop_wait if strand.children.any?
-    hop_wait
+    children = strand.children_dataset.all
+    Clog.emit("claude-hetzner-test") { {claude_wait_ssh_key_rotation: {children_count: children.count, children_labels: children.map { "#{_1.prog}:#{_1.label}" }, children_exitvals: children.map(&:exitval)}} }
+
+    # reaper is called for each child BEFORE it's destroyed
+    reap(:wait, reaper: lambda { |child|
+      Clog.emit("claude-hetzner-test") { {claude_reaped_child: {prog: child.prog, exitval: child.exitval}} }
+      unless child.exitval&.dig("msg")&.include?("successfully")
+        fail_test "SSH key rotation test failed: #{child.exitval}"
+      end
+    })
   end
 
   label def wait

@@ -163,36 +163,68 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#wait_ssh_key_rotation" do
-    it "hops to wait on success" do
-      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "SSH key rotation verified successfully"})])
-      expect(hs_test.strand).to receive(:children).and_return([])
+    let(:children_dataset) { instance_double(Sequel::Dataset) }
+
+    before do
+      allow(hs_test.strand).to receive(:children_dataset).and_return(children_dataset)
+    end
+
+    it "hops to wait on success via reap" do
+      allow(children_dataset).to receive(:all).and_return([])
+      # reap with no children hops to :wait
+      expect(hs_test).to receive(:reap) do |hop_target, reaper:|
+        expect(hop_target).to eq(:wait)
+        # simulate hop
+        raise Prog::Base::Hop.new("Test::HetznerServer", "wait_ssh_key_rotation", {label: "wait", retval: nil})
+      end
       expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
     end
 
-    it "fails on unsuccessful rotation" do
-      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "failed"})])
-      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
-      expect(hs_test.strand).to receive(:children).and_return([])
-      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    it "fails on unsuccessful rotation via reaper lambda" do
+      failed_child = instance_double(Strand, prog: "Test::SshKeyRotation", label: "failed", exitval: {"msg" => "failed"})
+      allow(children_dataset).to receive(:all).and_return([failed_child])
+
+      expect(hs_test).to receive(:reap) do |hop_target, reaper:|
+        # Invoke reaper to test the lambda
+        expect { reaper.call(failed_child) }.to hop("failed")
+      end
+
+      hs_test.wait_ssh_key_rotation
     end
 
     it "fails when exitval is nil" do
-      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: nil)])
-      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
-      expect(hs_test.strand).to receive(:children).and_return([])
-      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+      failed_child = instance_double(Strand, prog: "Test::SshKeyRotation", label: "failed", exitval: nil)
+      allow(children_dataset).to receive(:all).and_return([failed_child])
+
+      expect(hs_test).to receive(:reap) do |hop_target, reaper:|
+        expect { reaper.call(failed_child) }.to hop("failed")
+      end
+
+      hs_test.wait_ssh_key_rotation
     end
 
     it "fails when exitval has no msg key" do
-      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {})])
-      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
-      expect(hs_test.strand).to receive(:children).and_return([])
-      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+      failed_child = instance_double(Strand, prog: "Test::SshKeyRotation", label: "failed", exitval: {})
+      allow(children_dataset).to receive(:all).and_return([failed_child])
+
+      expect(hs_test).to receive(:reap) do |hop_target, reaper:|
+        expect { reaper.call(failed_child) }.to hop("failed")
+      end
+
+      hs_test.wait_ssh_key_rotation
     end
 
-    it "hops to wait if children still running" do
-      expect(hs_test).to receive(:reap).and_return([])
-      expect(hs_test.strand).to receive(:children).and_return([instance_double(Strand)])
+    it "does not fail when child completed successfully" do
+      success_child = instance_double(Strand, prog: "Test::SshKeyRotation", label: "finish", exitval: {"msg" => "SSH key rotation verified successfully"})
+      allow(children_dataset).to receive(:all).and_return([success_child])
+
+      expect(hs_test).to receive(:reap) do |hop_target, reaper:|
+        # Reaper should NOT call fail_test for success
+        reaper.call(success_child)
+        # simulate hop to wait after successful reap
+        raise Prog::Base::Hop.new("Test::HetznerServer", "wait_ssh_key_rotation", {label: "wait", retval: nil})
+      end
+
       expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
     end
   end

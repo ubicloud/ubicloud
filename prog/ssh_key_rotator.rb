@@ -148,7 +148,9 @@ BASH
   end
 
   label def rotate_cleanup
-    sshable.cmd("sudo userdel -r :rotate_user 2>/dev/null || true", rotate_user: ROTATE_USER)
+    Clog.emit("claude-rotator") { {claude_rotate_cleanup_start: {sshable_id: sshable.id, rotate_user: ROTATE_USER}} }
+    result = sshable.cmd("sudo userdel -r :rotate_user 2>/dev/null; echo exit_code=$?", rotate_user: ROTATE_USER)
+    Clog.emit("claude-rotator") { {claude_rotate_cleanup_done: {result: result.strip}} }
     hop_wait
   end
 end

@@ -230,7 +230,7 @@ RSpec.describe Prog::SshKeyRotator do
 
   describe "#rotate_cleanup" do
     it "deletes test user and hops to wait" do
-      expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate 2>/dev/null || true")
+      expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate 2>/dev/null; echo exit_code=$?").and_return("exit_code=0")
       expect { skr.rotate_cleanup }.to hop("wait")
     end
   end
