@@ -1360,6 +1360,11 @@ paths:
               properties:
                 name:
                   type: string
+                tags:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PostgresTag'
+                  default: []
               additionalProperties: false
               required:
                 - name
