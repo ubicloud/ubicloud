@@ -267,18 +267,22 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   describe "#rewrite_dns_records" do
     it "rewrites the dns records" do
-      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2", private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not rewrite dns records if no vms" do
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return([])
       expect(nx.load_balancer).not_to receive(:dns_zone)
       expect { nx.rewrite_dns_records }.to hop("wait")
@@ -290,35 +294,44 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
-    it "does not create dns record if ephemeral_net4 doesn't exist" do
-      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
+    it "does not create public IPv4 or IPv6 dns records if the public IP addresses don't exist" do
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: nil, private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not create ipv4 dns record if stack is ipv6" do
       nx.load_balancer.update(stack: "ipv6")
-      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
+      vms = [instance_double(Vm, ip6_string: "fd10:9b0b:6b4b:8fb0::2", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not create ipv6 dns record if stack is ipv4" do
       nx.load_balancer.update(stack: "ipv4")
-      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6: nil)]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", private_ipv4_string: "1.2.3.4")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
   end
