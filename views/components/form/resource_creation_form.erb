@@ -38,7 +38,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v.to_s }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
       submitted_value = typecast_body_params.str(name)

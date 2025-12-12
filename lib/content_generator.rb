@@ -17,7 +17,7 @@ module ContentGenerator
     def self.enable_ipv4(location, value)
       unit_price = BillingRate.unit_price_from_resource_properties("IPAddress", "IPv4", location.name)
 
-      "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
+      unit_price && "Enable Public IPv4 ($#{"%.2f" % (unit_price * 60 * 672)}/mo)"
     end
 
     def self.family(location, family)
@@ -35,8 +35,8 @@ module ContentGenerator
       [
         size.display_name,
         "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
+        unit_price && "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
+        unit_price && "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
       ]
     end
 
@@ -47,8 +47,8 @@ module ContentGenerator
       [
         "#{storage_size}GB",
         nil,
-        "$#{"%.2f" % (storage_size * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size * unit_price * 60)}/hour"
+        unit_price && "$#{"%.2f" % (storage_size * unit_price * 60 * 672)}/mo",
+        unit_price && "$#{"%.3f" % (storage_size * unit_price * 60)}/hour"
       ]
     end
 
@@ -61,8 +61,8 @@ module ContentGenerator
       [
         (gpu_count == 0) ? "No GPU" : "#{gpu_count}x #{PciDevice.device_name(gpu[1])}",
         nil,
-        "$#{"%.2f" % (gpu_count * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour"
+        unit_price && "$#{"%.2f" % (gpu_count * unit_price * 60 * 672)}/mo",
+        unit_price && "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour"
       ]
     end
 
@@ -92,8 +92,8 @@ module ContentGenerator
       [
         size.name,
         "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
+        unit_price && "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
+        unit_price && "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
       ]
     end
 
@@ -103,8 +103,8 @@ module ContentGenerator
       [
         "#{storage_size}GB",
         nil,
-        "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
+        unit_price && "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
+        unit_price && "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
       ]
     end
 
@@ -122,8 +122,8 @@ module ContentGenerator
       [
         ha_type.description,
         "",
-        "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
-        "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
+        compute_unit_price && storage_unit_price && "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
+        compute_unit_price && storage_unit_price && "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
       ]
     end
 
@@ -163,13 +163,13 @@ module ContentGenerator
     end
 
     def self.cp_nodes(location, cp_nodes)
-      cp_node_price = 2 * BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
+      cp_node_price = BillingRate.unit_price_from_resource_properties("KubernetesControlPlaneVCpu", "standard", location.name)
       data = Option::KubernetesCPOptions.find { it.cp_node_count == cp_nodes }
       [
         data.title,
         data.explanation,
-        "$#{"%.2f" % (cp_nodes * cp_node_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour"
+        cp_node_price && "$#{"%.2f" % (cp_nodes * 2 * cp_node_price * 60 * 672)}/mo",
+        cp_node_price && "$#{"%.3f" % (cp_nodes * 2 * cp_node_price * 60)}/hour"
       ]
     end
 
