@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class Cert < Sequel::Model
-  one_through_one :load_balancer, join_table: :certs_load_balancers, left_key: :cert_id, right_key: :load_balancer_id
   one_to_one :load_balancer_cert
   one_to_one :strand, key: :id
 
