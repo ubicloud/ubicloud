@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class PciDevice < Sequel::Model
-  many_to_one :vm
+  many_to_one :vm, read_only: true
 
   def self.device_name(device_id)
     # https://download.nvidia.com/XFree86/Linux-x86_64/580.95.05/README/supportedchips.html

@@ -3,7 +3,7 @@
 require_relative "../../model"
 
 class DnsZone < Sequel::Model
-  one_to_one :strand, key: :id
+  one_to_one :strand, key: :id, read_only: true
   many_to_one :project, read_only: true
   many_to_many :dns_servers, remover: nil, clearer: nil, is_used: true
   one_to_many :records, class: :DnsRecord, remover: nil, clearer: nil

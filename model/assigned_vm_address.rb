@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class AssignedVmAddress < Sequel::Model
-  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, &:active
+  one_to_one :active_billing_record, class: :BillingRecord, key: :resource_id, read_only: true, &:active
 
   plugin ResourceMethods
 

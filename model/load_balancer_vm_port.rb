@@ -4,8 +4,8 @@ require_relative "../model"
 require_relative "../lib/net_ssh"
 
 class LoadBalancerVmPort < Sequel::Model
-  many_to_one :load_balancer_vm
-  many_to_one :load_balancer_port
+  many_to_one :load_balancer_vm, read_only: true
+  many_to_one :load_balancer_port, read_only: true
   plugin ResourceMethods
   include HealthMonitorMethods
 
