@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "sequel"
+require_relative "../model"
 
 class ProjectDiscountCode < Sequel::Model
   many_to_one :project
