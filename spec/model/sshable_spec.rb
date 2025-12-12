@@ -40,13 +40,13 @@ RSpec.describe Sshable do
     lock_script = <<LOCK
 exec 999>/dev/shm/session-lock-testlockname || exit 92
 flock -xn 999 || { echo "Another session active: " testlockname; exit 124; }
-exec -a session-lock-testlockname sleep infinity </dev/null >/dev/null 2>&1 &
+sleep infinity </dev/null >/dev/null 2>&1 &
 disown
 LOCK
 
     if File.directory?("/dev/shm")
       it "interlocks" do
-        portable_pkill = lambda { system(%q(ps -eo pid,args | awk '$2=="session-lock-testlockname"{print $1}' | xargs -I {} sh -c 'test -n "{}" && kill {}')) }
+        portable_pkill = lambda { system("fuser -k /dev/shm/session-lock-testlockname 2>/dev/null") }
         portable_pkill.call
         q_lock_script = NetSsh.command(":lock_script", lock_script:)
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
