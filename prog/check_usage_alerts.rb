@@ -4,7 +4,7 @@ class Prog::CheckUsageAlerts < Prog::Base
   label def wait
     begin_time = Date.new(Time.now.year, Time.now.month, 1).to_time
 
-    alerts = UsageAlert.where { last_triggered_at < begin_time }
+    alerts = UsageAlert.eager(:project).where { last_triggered_at < begin_time }.all
     alerts.each do |alert|
       cost = alert.project.current_invoice.content["cost"]
       alert.trigger if cost > alert.limit
