@@ -4,10 +4,10 @@ require_relative "../../model"
 
 class InferenceRouter < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_many :replicas, class: :InferenceRouterReplica, key: :inference_router_id
-  one_to_many :targets, class: :InferenceRouterTarget, key: :inference_router_id
-  many_to_one :load_balancer
-  many_to_one :private_subnet
+  one_to_many :replicas, class: :InferenceRouterReplica, key: :inference_router_id, read_only: true
+  one_to_many :targets, class: :InferenceRouterTarget, key: :inference_router_id, read_only: true
+  many_to_one :load_balancer, read_only: true
+  many_to_one :private_subnet, read_only: true
   many_to_one :location
 
   plugin ResourceMethods

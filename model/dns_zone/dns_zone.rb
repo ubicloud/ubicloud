@@ -4,8 +4,8 @@ require_relative "../../model"
 
 class DnsZone < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_many :dns_servers
-  one_to_many :records, class: :DnsRecord
+  many_to_many :dns_servers, remover: nil, clearer: nil, is_used: true
+  one_to_many :records, class: :DnsRecord, remover: nil, clearer: nil
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :refresh_dns_servers

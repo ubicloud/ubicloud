@@ -3,8 +3,8 @@
 require_relative "../../model"
 
 class InferenceRouterModel < Sequel::Model
-  one_to_many :inference_router_targets
-  one_through_one :inference_router, join_table: :inference_router_target
+  one_to_many :inference_router_targets, read_only: true, no_association_method: true
+  one_through_one :inference_router, join_table: :inference_router_target, read_only: true
 
   plugin ResourceMethods
 

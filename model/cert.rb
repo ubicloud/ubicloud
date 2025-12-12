@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class Cert < Sequel::Model
-  one_to_one :load_balancer_cert
+  one_to_one :load_balancer_cert, read_only: true, no_association_method: true
   one_to_one :strand, key: :id
 
   plugin :association_dependencies, load_balancer_cert: :destroy

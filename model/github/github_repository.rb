@@ -7,8 +7,8 @@ require_relative "../../model"
 class GithubRepository < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :installation, key: :installation_id, class: :GithubInstallation
-  one_to_many :runners, key: :repository_id, class: :GithubRunner
-  one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry
+  one_to_many :runners, key: :repository_id, class: :GithubRunner, read_only: true
+  one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry, remover: nil, clearer: nil
 
   plugin :association_dependencies, cache_entries: :destroy
 
