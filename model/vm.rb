@@ -89,8 +89,16 @@ class Vm < Sequel::Model
     (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
   end
 
+  def private_ipv4_string
+    private_ipv4.to_s
+  end
+
   def private_ipv6
     nic.private_ipv6.nth(2)
+  end
+
+  def private_ipv6_string
+    private_ipv6.to_s
   end
 
   def firewalls(opts = {})
