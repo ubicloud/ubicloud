@@ -284,9 +284,8 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
-    it "does not rewrite dns records if no dns zone" do
-      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
-      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+    it "does not check vms to dns if no dns zone" do
+      expect(nx.load_balancer).not_to receive(:vms_to_dns)
       expect(DnsRecord).not_to receive(:create)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
