@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class ApiKey < Sequel::Model
-  many_to_one :project
+  many_to_one :project, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :key
   include SubjectTag::Cleanup # personal access tokens

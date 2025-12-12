@@ -4,12 +4,12 @@ require_relative "../model"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
-  many_to_one :spdk_installation
-  many_to_one :vhost_block_backend
+  many_to_one :spdk_installation, read_only: true
+  many_to_one :vhost_block_backend, read_only: true
   many_to_one :storage_device
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
-  many_to_one :boot_image
+  many_to_one :boot_image, read_only: true
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 

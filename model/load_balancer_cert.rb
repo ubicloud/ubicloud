@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class LoadBalancerCert < Sequel::Model(:certs_load_balancers)
-  many_to_one :cert
+  many_to_one :cert, read_only: true
 
   def before_destroy
     cert.incr_destroy

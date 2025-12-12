@@ -5,7 +5,7 @@ require_relative "../model"
 class ProjectInvitation < Sequel::Model
   unrestrict_primary_key
 
-  many_to_one :project
+  many_to_one :project, read_only: true
 end
 
 # Table: project_invitation

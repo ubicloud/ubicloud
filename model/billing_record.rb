@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class BillingRecord < Sequel::Model
-  many_to_one :project
+  many_to_one :project, read_only: true
 
   dataset_module do
     where(:active, Sequel.function(:upper, :span) => nil)

@@ -6,23 +6,23 @@ require_relative "../model"
 class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  many_to_one :project
-  one_to_many :nics
-  many_to_many :private_subnets, join_table: :nic
+  many_to_one :project, read_only: true
+  one_to_many :nics, read_only: true
+  many_to_many :private_subnets, join_table: :nic, read_only: true
   one_to_one :sshable, key: :id
   one_to_one :assigned_vm_address, key: :dst_vm_id
-  one_to_many :vm_storage_volumes, order: Sequel.desc(:boot)
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
-  one_to_many :pci_devices
-  one_to_one :gpu_partition
-  one_through_one :load_balancer
-  one_to_one :load_balancer_vm
+  one_to_many :vm_storage_volumes, order: Sequel.desc(:boot), remover: nil, clearer: nil
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  one_to_many :pci_devices, read_only: true
+  one_to_one :gpu_partition, read_only: true
+  one_through_one :load_balancer, read_only: true
+  one_to_one :load_balancer_vm, read_only: true
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
-  many_to_one :vm_host_slice
+  many_to_one :vm_host_slice, read_only: true
   many_to_one :location
-  one_to_one :aws_instance, key: :id
-  one_to_one :init_script, class: :VmInitScript, key: :id
-  one_to_one :github_runner
+  one_to_one :aws_instance, key: :id, read_only: true
+  one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
+  one_to_one :github_runner, read_only: true
 
   many_through_many :private_subnet_firewalls,
     [
@@ -30,7 +30,7 @@ class Vm < Sequel::Model
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
     ],
     class: :Firewall
-  many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id
+  many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id, remover: nil, clearer: nil
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
