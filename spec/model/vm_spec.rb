@@ -500,4 +500,18 @@ RSpec.describe Vm do
       expect(json["gpu_partition_id"]).to eq(3)
     end
   end
+
+  describe "#private_ipv4_string" do
+    it "includes the private IPv4 address as a string" do
+      vm.define_singleton_method(:private_ipv4) { NetAddr.parse_ip("1.1.1.0") }
+      expect(vm.private_ipv4_string).to eq "1.1.1.0"
+    end
+  end
+
+  describe "#private_ipv6_string" do
+    it "includes the private IPv6 address as a string" do
+      vm.define_singleton_method(:private_ipv6) { NetAddr.parse_ip("::2") }
+      expect(vm.private_ipv6_string).to eq "::2"
+    end
+  end
 end
