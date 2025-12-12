@@ -10,6 +10,8 @@ class Sshable < Sequel::Model
   # in sshable_spec.rb.
   unrestrict_primary_key
 
+  one_to_one :ssh_key_rotator
+
   plugin ResourceMethods, encrypted_columns: [:raw_private_key_1, :raw_private_key_2]
 
   SSH_CONNECTION_ERRORS = [
