@@ -660,7 +660,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      nx.strand.stack[-1]["create_billing_record_done"] = true
       expect { nx.wait_sshable }.to hop("wait")
     end
 
@@ -672,7 +671,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
       expect(Clog).to receive(:emit).with("vm provisioned").and_yield
       allow(vm).to receive(:allocated_at).and_return(now - 100)
-      expect { nx.wait_sshable }.to hop("create_billing_record")
+      expect { nx.wait_sshable }.to hop("wait")
     end
   end
 
@@ -706,8 +705,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.ip4_enabled = true
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
-      nx.strand.stack[-1]["prep_done"] = true
-      expect { nx.create_billing_record }.to hop("wait")
+      expect { nx.create_billing_record }.to hop("prep")
         .and change(BillingRecord, :count).from(0).to(2)
       expect(vm.active_billing_records.map { it.billing_rate["resource_type"] }.sort).to eq(["IPAddress", "VmVCpu"])
     end
