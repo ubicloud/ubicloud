@@ -118,7 +118,7 @@ class Project < Sequel::Model
   end
 
   def current_invoice
-    begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
+    begin_time = invoices_dataset.get(:end_time) || Time.new(Time.now.year, Time.now.month, 1)
     end_time = Time.now
 
     if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id]).run.first)
