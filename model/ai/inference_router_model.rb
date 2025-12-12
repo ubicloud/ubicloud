@@ -15,6 +15,10 @@ class InferenceRouterModel < Sequel::Model
   def self.from_model_name(name)
     first(model_name: name)
   end
+
+  def name
+    model_name
+  end
 end
 
 # Table: inference_router_model
