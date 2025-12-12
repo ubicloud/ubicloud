@@ -213,7 +213,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "creates dns records and hops" do
-      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
+      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
@@ -225,7 +225,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "creates CNAME DNS records for AWS instances" do
       expect(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: true))
       expect(postgres_resource.representative_server.vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"))
-      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.").twice
+      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com.")
