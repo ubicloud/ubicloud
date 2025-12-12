@@ -131,6 +131,15 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       record_name = postgres_resource.hostname
       dns_zone.delete_record(record_name:)
       dns_zone.insert_record(record_name:, type:, ttl: 10, data:)
+
+      unless aws
+        dns_zone.insert_record(
+          record_name: "private-#{record_name}",
+          type: "A",
+          ttl: 10,
+          data: vm.private_ipv4_string
+        )
+      end
     end
 
     when_initial_provisioning_set? do
