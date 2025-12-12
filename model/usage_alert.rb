@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class UsageAlert < Sequel::Model
-  many_to_one :project
+  many_to_one :project, is_used: true
   many_to_one :user, class: :Account, key: :user_id
 
   plugin ResourceMethods

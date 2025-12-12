@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class BootImage < Sequel::Model
-  many_to_one :vm_host, key: :vm_host_id, class: :VmHost
+  many_to_one :vm_host, key: :vm_host_id, class: :VmHost, is_used: true
   one_to_many :vm_storage_volumes, key: :boot_image_id, class: :VmStorageVolume
 
   plugin ResourceMethods, etc_type: true

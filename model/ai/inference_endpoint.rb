@@ -4,7 +4,7 @@ require_relative "../../model"
 
 class InferenceEndpoint < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :project
+  many_to_one :project, is_used: true
   one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id
   one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
   one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
