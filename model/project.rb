@@ -3,35 +3,35 @@
 require_relative "../model"
 
 class Project < Sequel::Model
-  one_to_many :access_control_entries
-  one_to_many :subject_tags, order: :name
-  one_to_many :action_tags, order: :name
-  one_to_many :object_tags, order: :name
+  one_to_many :access_control_entries, read_only: true
+  one_to_many :subject_tags, order: :name, read_only: true
+  one_to_many :action_tags, order: :name, read_only: true
+  one_to_many :object_tags, order: :name, read_only: true
   many_to_one :billing_info
-  one_to_many :usage_alerts
-  one_to_many :github_installations
-  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id
+  one_to_many :usage_alerts, read_only: true
+  one_to_many :github_installations, read_only: true
+  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id, read_only: true
 
-  many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
+  many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id, remover: nil
   many_to_many :nics, join_table: :private_subnet, left_primary_key: :id, left_key: :project_id, right_key: :id, right_primary_key: :private_subnet_id, read_only: true
-  one_to_many :vms
-  one_to_many :minio_clusters
-  one_to_many :private_subnets
-  one_to_many :postgres_resources
-  one_to_many :firewalls
-  one_to_many :load_balancers
-  one_to_many :inference_endpoints
-  one_to_many :kubernetes_clusters
-  one_to_many :ssh_public_keys, order: :name
+  one_to_many :vms, read_only: true
+  one_to_many :minio_clusters, read_only: true
+  one_to_many :private_subnets, read_only: true
+  one_to_many :postgres_resources, read_only: true
+  one_to_many :firewalls, read_only: true
+  one_to_many :load_balancers, read_only: true
+  one_to_many :inference_endpoints, read_only: true
+  one_to_many :kubernetes_clusters, read_only: true
+  one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
-  one_to_many :invoices, order: Sequel.desc(:created_at)
-  one_to_many :quotas, class: :ProjectQuota
-  one_to_many :invitations, class: :ProjectInvitation
-  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
-  one_to_many :locations
+  one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
+  one_to_many :quotas, class: :ProjectQuota, no_association_method: true, remover: nil, clearer: nil
+  one_to_many :invitations, class: :ProjectInvitation, no_association_method: true, remover: nil, clearer: nil
+  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}, read_only: true
+  one_to_many :locations, read_only: true
   many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true
 
   dataset_module Pagination

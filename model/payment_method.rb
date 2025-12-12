@@ -4,7 +4,7 @@ require_relative "../model"
 require "stripe"
 
 class PaymentMethod < Sequel::Model
-  many_to_one :billing_info
+  many_to_one :billing_info, read_only: true
 
   plugin ResourceMethods
 

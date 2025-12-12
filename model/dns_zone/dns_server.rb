@@ -3,8 +3,8 @@
 require_relative "../../model"
 
 class DnsServer < Sequel::Model
-  many_to_many :dns_zones, order: :name
-  many_to_many :vms
+  many_to_many :dns_zones, order: :name, read_only: true
+  many_to_many :vms, remover: nil, clearer: nil, is_used: true
 
   plugin ResourceMethods
 
