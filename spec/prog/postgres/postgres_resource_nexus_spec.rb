@@ -209,14 +209,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#refresh_dns_record" do
     before do
       allow(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: false))
-      allow(postgres_resource.representative_server.vm).to receive(:ip4_string).and_return("1.1.1.1")
     end
 
     it "creates dns records and hops" do
+      expect(postgres_resource.representative_server.vm).to receive(:ip4_string).and_return("1.1.1.1")
+      expect(postgres_resource.representative_server.vm).to receive(:private_ipv4_string).and_return("1.1.1.2")
       expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
       dns_zone = instance_double(DnsZone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
       expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.2")
       expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
