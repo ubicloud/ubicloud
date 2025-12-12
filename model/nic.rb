@@ -3,12 +3,12 @@
 require_relative "../model"
 
 class Nic < Sequel::Model
-  many_to_one :private_subnet
-  many_to_one :vm
-  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel
-  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel
+  many_to_one :private_subnet, read_only: true
+  many_to_one :vm, read_only: true
+  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel, read_only: true
+  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel, read_only: true
   one_to_one :strand, key: :id
-  one_to_one :nic_aws_resource, key: :id
+  one_to_one :nic_aws_resource, key: :id, read_only: true
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
