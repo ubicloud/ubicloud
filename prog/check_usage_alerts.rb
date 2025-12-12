@@ -8,7 +8,7 @@ class Prog::CheckUsageAlerts < Prog::Base
     alerts.group_by(&:project).each do |project, project_alerts|
       cost = project.current_invoice.content["cost"]
       project_alerts.each do |alert|
-        alert.trigger if cost > alert.limit
+        alert.trigger(cost) if cost > alert.limit
       end
     end
 

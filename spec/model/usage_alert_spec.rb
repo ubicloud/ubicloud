@@ -10,6 +10,6 @@ RSpec.describe UsageAlert do
     expect(Util).to receive(:send_email)
     expect(Time).to receive(:now).and_return("dummy-time")
     expect(alert).to receive(:update).with(last_triggered_at: "dummy-time")
-    alert.trigger
+    alert.trigger(123)
   end
 end
