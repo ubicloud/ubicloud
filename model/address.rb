@@ -4,7 +4,6 @@ require_relative "../model"
 
 class Address < Sequel::Model
   one_to_many :assigned_vm_addresses, key: :address_id, class: :AssignedVmAddress
-  one_to_many :assigned_host_addresses, key: :address_id, class: :AssignedHostAddress
   many_to_one :vm_host, key: :routed_to_host_id
 
   plugin ResourceMethods
