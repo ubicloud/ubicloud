@@ -5,7 +5,6 @@ require_relative "../model"
 class VmHostSlice < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  one_to_many :vms
   one_to_many :cpus, class: :VmHostCpu, key: :vm_host_slice_id
 
   plugin ResourceMethods

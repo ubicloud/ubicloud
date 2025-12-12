@@ -3,8 +3,6 @@
 require_relative "../model"
 
 class FirewallRule < Sequel::Model
-  many_to_one :firewall, key: :firewall_id
-
   plugin ResourceMethods
 
   def ip6?

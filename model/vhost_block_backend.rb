@@ -3,9 +3,6 @@
 require_relative "../model"
 
 class VhostBlockBackend < Sequel::Model
-  many_to_one :vm_host
-  one_to_many :vm_storage_volumes
-
   plugin ResourceMethods, etc_type: true
 end
 
