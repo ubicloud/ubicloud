@@ -50,7 +50,7 @@ PGHOST=/var/run/postgresql
     return [] if blob_storage.nil?
 
     begin
-      list_objects("basebackups_005/")
+      list_objects("basebackups_005/", delimiter: "/")
         .select { it.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
@@ -133,17 +133,17 @@ PGHOST=/var/run/postgresql
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
   end
 
-  def list_objects(prefix)
+  def list_objects(prefix, delimiter: "")
     aws? ?
-    aws_list_objects(prefix)
-    : blob_storage_client.list_objects(ubid, prefix)
+    aws_list_objects(prefix, delimiter:)
+    : blob_storage_client.list_objects(ubid, prefix, delimiter:)
   end
 
-  def aws_list_objects(prefix)
-    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix)
+  def aws_list_objects(prefix, delimiter: "")
+    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:)
     objects = response.contents
     while response.is_truncated
-      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, continuation_token: response.next_continuation_token)
+      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:, continuation_token: response.next_continuation_token)
       objects.concat(response.contents)
     end
     objects
