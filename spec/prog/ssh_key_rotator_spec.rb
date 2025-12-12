@@ -229,18 +229,9 @@ RSpec.describe Prog::SshKeyRotator do
   end
 
   describe "#rotate_cleanup" do
-    it "hops to wait when user already removed" do
-      expect(sshable).to receive(:_cmd).with("id rhizome_rotate 2>&1 || echo 'user_not_found'").and_return("id: 'rhizome_rotate': no such user\n")
+    it "deletes user and hops to wait" do
+      expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate").and_return("")
       expect { skr.rotate_cleanup }.to hop("wait")
-    end
-
-    it "waits for processes to terminate and retries when user still exists" do
-      expect(sshable).to receive(:_cmd).with("id rhizome_rotate 2>&1 || echo 'user_not_found'").and_return("uid=1001(rhizome_rotate)")
-      expect(sshable).to receive(:_cmd).with("ps -u rhizome_rotate -o pid,cmd 2>/dev/null || true").and_return("PID CMD\n123 sshd")
-      expect(sshable).to receive(:_cmd).with("sudo journalctl -u ssh_key_rotate_prepare --no-pager -n 20 2>/dev/null || true").and_return("")
-      expect(sshable).to receive(:_cmd).with("sudo journalctl -u ssh_key_rotate_promote --no-pager -n 20 2>/dev/null || true").and_return("")
-      expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate 2>/dev/null || true")
-      expect { skr.rotate_cleanup }.to nap(5)
     end
   end
 
