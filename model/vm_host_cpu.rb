@@ -4,8 +4,6 @@ require_relative "../model"
 
 class VmHostCpu < Sequel::Model
   unrestrict_primary_key
-
-  many_to_one :vm_host
 end
 
 # Table: vm_host_cpu

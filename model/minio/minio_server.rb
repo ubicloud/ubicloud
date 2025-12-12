@@ -6,7 +6,6 @@ require_relative "../../lib/net_ssh"
 class MinioServer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster
 
