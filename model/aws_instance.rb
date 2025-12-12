@@ -3,8 +3,6 @@
 require_relative "../model"
 
 class AwsInstance < Sequel::Model
-  one_to_one :vm, key: :id
-
   plugin ResourceMethods, etc_type: true
 end
 

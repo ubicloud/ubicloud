@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class LocationAwsAz < Sequel::Model
-  many_to_one :location
   plugin ResourceMethods
 end
 
