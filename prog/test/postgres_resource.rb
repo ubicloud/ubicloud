@@ -49,10 +49,28 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   label def wait_postgres_resource
     if postgres_resource.strand.label == "wait" &&
         representative_server.run_query("SELECT 1") == "1"
-      hop_test_postgres
+      hop_test_ssh_key_rotation
     else
       nap 10
     end
+  end
+
+  label def test_ssh_key_rotation
+    bud Prog::Test::SshKeyRotation, {"subject_id" => representative_server.vm.sshable.id}
+    hop_wait_ssh_key_rotation
+  end
+
+  label def wait_ssh_key_rotation
+    reap.each do |st|
+      if st.exitval&.dig("msg")&.include?("successfully")
+        hop_test_postgres
+      else
+        update_stack({"fail_message" => "SSH key rotation test failed: #{st.exitval}"})
+        hop_destroy_postgres
+      end
+    end
+    nap 5 if strand.children.any?
+    hop_test_postgres
   end
 
   label def test_postgres

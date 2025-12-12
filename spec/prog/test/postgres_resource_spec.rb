@@ -39,14 +39,62 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#wait_postgres_resource" do
-    it "hops to test_basic_connectivity if the postgres resource is ready" do
+    it "hops to test_ssh_key_rotation if the postgres resource is ready" do
       expect(pgr_test).to receive(:postgres_resource).exactly(2).and_return(instance_double(Prog::Postgres::PostgresResourceNexus, strand: instance_double(Strand, label: "wait"), representative_server: instance_double(PostgresServer, run_query: "1")))
-      expect { pgr_test.wait_postgres_resource }.to hop("test_postgres")
+      expect { pgr_test.wait_postgres_resource }.to hop("test_ssh_key_rotation")
     end
 
     it "naps for 10 seconds if the postgres resource is not ready" do
       expect(pgr_test).to receive(:postgres_resource).exactly(2).and_return(instance_double(Prog::Postgres::PostgresResourceNexus, strand: instance_double(Strand, label: "wait"), representative_server: instance_double(PostgresServer, run_query: "")))
       expect { pgr_test.wait_postgres_resource }.to nap(10)
+    end
+  end
+
+  describe "#test_ssh_key_rotation" do
+    it "buds SshKeyRotation test and hops to wait" do
+      sshable = instance_double(Sshable, id: "sshable-id")
+      vm = instance_double(Vm, sshable: sshable)
+      server = instance_double(PostgresServer, vm: vm)
+      expect(pgr_test).to receive(:representative_server).and_return(server)
+      expect(pgr_test).to receive(:bud).with(Prog::Test::SshKeyRotation, {"subject_id" => "sshable-id"})
+      expect { pgr_test.test_ssh_key_rotation }.to hop("wait_ssh_key_rotation")
+    end
+  end
+
+  describe "#wait_ssh_key_rotation" do
+    it "hops to test_postgres on success" do
+      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "SSH key rotation verified successfully"})])
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("test_postgres")
+    end
+
+    it "records failure and hops to destroy on failure" do
+      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "failed"})])
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+      expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
+    end
+
+    it "records failure when exitval is nil" do
+      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: nil)])
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+      expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
+    end
+
+    it "records failure when exitval has no msg key" do
+      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {})])
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+      expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
+    end
+
+    it "naps if children still running" do
+      expect(pgr_test).to receive(:reap).and_return([])
+      expect(pgr_test.strand).to receive(:children).and_return([instance_double(Strand)])
+      expect { pgr_test.wait_ssh_key_rotation }.to nap(5)
+    end
+
+    it "hops to test_postgres when no children" do
+      expect(pgr_test).to receive(:reap).and_return([])
+      expect(pgr_test.strand).to receive(:children).and_return([])
+      expect { pgr_test.wait_ssh_key_rotation }.to hop("test_postgres")
     end
   end
 

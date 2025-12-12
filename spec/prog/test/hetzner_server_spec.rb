@@ -143,7 +143,7 @@ RSpec.describe Prog::Test::HetznerServer do
   end
 
   describe "#run_integration_specs" do
-    it "hops to wait" do
+    it "hops to test_ssh_key_rotation" do
       tmp_dir = "/var/storage/tests"
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
@@ -151,7 +151,49 @@ RSpec.describe Prog::Test::HetznerServer do
         "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
       )
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("wait")
+      expect { hs_test.run_integration_specs }.to hop("test_ssh_key_rotation")
+    end
+  end
+
+  describe "#test_ssh_key_rotation" do
+    it "buds SshKeyRotation test and hops to wait" do
+      expect(hs_test).to receive(:bud).with(Prog::Test::SshKeyRotation, {"subject_id" => hs_test.vm_host.sshable.id})
+      expect { hs_test.test_ssh_key_rotation }.to hop("wait_ssh_key_rotation")
+    end
+  end
+
+  describe "#wait_ssh_key_rotation" do
+    it "hops to wait on success" do
+      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "SSH key rotation verified successfully"})])
+      expect(hs_test.strand).to receive(:children).and_return([])
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    end
+
+    it "fails on unsuccessful rotation" do
+      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "failed"})])
+      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
+      expect(hs_test.strand).to receive(:children).and_return([])
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    end
+
+    it "fails when exitval is nil" do
+      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: nil)])
+      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
+      expect(hs_test.strand).to receive(:children).and_return([])
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    end
+
+    it "fails when exitval has no msg key" do
+      expect(hs_test).to receive(:reap).and_return([instance_double(Strand, exitval: {})])
+      expect(hs_test).to receive(:fail_test).with(/SSH key rotation test failed/)
+      expect(hs_test.strand).to receive(:children).and_return([])
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
+    end
+
+    it "hops to wait if children still running" do
+      expect(hs_test).to receive(:reap).and_return([])
+      expect(hs_test.strand).to receive(:children).and_return([instance_double(Strand)])
+      expect { hs_test.wait_ssh_key_rotation }.to hop("wait")
     end
   end
 
