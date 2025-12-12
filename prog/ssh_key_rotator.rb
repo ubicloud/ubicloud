@@ -148,9 +148,23 @@ BASH
   end
 
   label def rotate_cleanup
-    Clog.emit("claude-rotator") { {claude_rotate_cleanup_start: {sshable_id: sshable.id, rotate_user: ROTATE_USER}} }
-    result = sshable.cmd("sudo userdel -r :rotate_user 2>/dev/null; echo exit_code=$?", rotate_user: ROTATE_USER)
-    Clog.emit("claude-rotator") { {claude_rotate_cleanup_done: {result: result.strip}} }
-    hop_wait
+    # Check if user still exists
+    user_check = sshable.cmd("id :rotate_user 2>&1 || echo 'user_not_found'", rotate_user: ROTATE_USER)
+    if user_check.include?("user_not_found") || user_check.include?("no such user")
+      Clog.emit("claude-rotator") { {claude_rotate_cleanup_done: "user already removed"} }
+      hop_wait
+    end
+
+    # User still exists - log diagnostics and wait for processes to terminate naturally
+    procs = sshable.cmd("ps -u :rotate_user -o pid,cmd 2>/dev/null || true", rotate_user: ROTATE_USER).strip
+    journal_prepare = sshable.cmd("sudo journalctl -u ssh_key_rotate_prepare --no-pager -n 20 2>/dev/null || true").strip
+    journal_promote = sshable.cmd("sudo journalctl -u ssh_key_rotate_promote --no-pager -n 20 2>/dev/null || true").strip
+    Clog.emit("claude-rotator") { {claude_rotate_cleanup_waiting: {user: ROTATE_USER, processes: procs, journal_prepare: journal_prepare, journal_promote: journal_promote}} }
+
+    # Attempt deletion (will fail if processes still running, that's ok)
+    sshable.cmd("sudo userdel -r :rotate_user 2>/dev/null || true", rotate_user: ROTATE_USER)
+
+    # Retry - nap and check again
+    nap 5
   end
 end
