@@ -61,16 +61,12 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def wait_ssh_key_rotation
-    reap.each do |st|
-      if st.exitval&.dig("msg")&.include?("successfully")
-        hop_test_postgres
-      else
-        update_stack({"fail_message" => "SSH key rotation test failed: #{st.exitval}"})
+    reap(:test_postgres, reaper: lambda { |child|
+      unless child.exitval&.dig("msg")&.include?("successfully")
+        update_stack({"fail_message" => "SSH key rotation test failed: #{child.exitval}"})
         hop_destroy_postgres
       end
-    end
-    nap 5 if strand.children.any?
-    hop_test_postgres
+    })
   end
 
   label def test_postgres

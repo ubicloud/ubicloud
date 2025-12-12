@@ -62,38 +62,38 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#wait_ssh_key_rotation" do
-    it "hops to test_postgres on success" do
-      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "SSH key rotation verified successfully"})])
+    it "hops to test_postgres on success via reap" do
+      expect(pgr_test).to receive(:reap) do |hop_target, reaper:|
+        expect(hop_target).to eq(:test_postgres)
+        raise Prog::Base::Hop.new("Test::PostgresResource", "wait_ssh_key_rotation", {label: "test_postgres", retval: nil})
+      end
       expect { pgr_test.wait_ssh_key_rotation }.to hop("test_postgres")
     end
 
-    it "records failure and hops to destroy on failure" do
-      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {"msg" => "failed"})])
-      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+    it "records failure and hops to destroy on failure via reaper lambda" do
+      failed_child = instance_double(Strand, exitval: {"msg" => "failed"})
+      expect(pgr_test).to receive(:reap) do |hop_target, reaper:|
+        expect { reaper.call(failed_child) }.to hop("destroy_postgres")
+      end
+      pgr_test.wait_ssh_key_rotation
       expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
     end
 
     it "records failure when exitval is nil" do
-      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: nil)])
-      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
+      failed_child = instance_double(Strand, exitval: nil)
+      expect(pgr_test).to receive(:reap) do |hop_target, reaper:|
+        expect { reaper.call(failed_child) }.to hop("destroy_postgres")
+      end
+      pgr_test.wait_ssh_key_rotation
       expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
     end
 
-    it "records failure when exitval has no msg key" do
-      expect(pgr_test).to receive(:reap).and_return([instance_double(Strand, exitval: {})])
-      expect { pgr_test.wait_ssh_key_rotation }.to hop("destroy_postgres")
-      expect(pgr_test.strand.stack.first["fail_message"]).to include("SSH key rotation test failed")
-    end
-
-    it "naps if children still running" do
-      expect(pgr_test).to receive(:reap).and_return([])
-      expect(pgr_test.strand).to receive(:children).and_return([instance_double(Strand)])
-      expect { pgr_test.wait_ssh_key_rotation }.to nap(5)
-    end
-
-    it "hops to test_postgres when no children" do
-      expect(pgr_test).to receive(:reap).and_return([])
-      expect(pgr_test.strand).to receive(:children).and_return([])
+    it "does not fail when child completed successfully" do
+      success_child = instance_double(Strand, exitval: {"msg" => "SSH key rotation verified successfully"})
+      expect(pgr_test).to receive(:reap) do |hop_target, reaper:|
+        reaper.call(success_child)
+        raise Prog::Base::Hop.new("Test::PostgresResource", "wait_ssh_key_rotation", {label: "test_postgres", retval: nil})
+      end
       expect { pgr_test.wait_ssh_key_rotation }.to hop("test_postgres")
     end
   end
