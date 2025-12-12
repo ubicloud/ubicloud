@@ -28,10 +28,7 @@ class Prog::Vm::Nexus < Prog::Base
     vm_size = Validation.validate_vm_size(size, arch)
     Validation.validate_billing_rate("VmVCpu", vm_size.family, location.name)
 
-    storage_volumes ||= [{
-      size_gib: vm_size.storage_size_options.first,
-      encrypted: true
-    }]
+    storage_volumes ||= [{}]
 
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|

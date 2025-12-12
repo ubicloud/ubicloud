@@ -39,7 +39,7 @@ module Option
   end
 
   AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m8gd", "i8g"].freeze
-  non_storage_optimized_vm_storage_size_options = {2 => ["118"], 4 => ["237"], 8 => ["474"], 16 => ["950"], 32 => ["1900"], 64 => ["3800"]}
+  non_storage_optimized_vm_storage_size_options = {2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 64 => [3800]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
     "m6a" => non_storage_optimized_vm_storage_size_options,
@@ -48,7 +48,7 @@ module Option
     "m7a" => non_storage_optimized_vm_storage_size_options,
     "m7i" => non_storage_optimized_vm_storage_size_options,
     "m8gd" => non_storage_optimized_vm_storage_size_options,
-    "i8g" => {2 => ["468"], 4 => ["937"], 8 => ["1875"], 16 => ["3750"], 32 => ["7500"], 64 => ["15000"]}
+    "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 64 => [15000]}
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -174,7 +174,7 @@ module Option
     [name, PostgresSizeOption.new(name, *args)]
   end.freeze
 
-  POSTGRES_STORAGE_SIZE_OPTIONS = ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"].freeze
+  POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
 
   POSTGRES_VERSION_OPTIONS = {
     PostgresResource::Flavor::STANDARD => ["18", "17", "16"],
