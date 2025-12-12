@@ -270,4 +270,5 @@ end
 #  sshable_pkey     | PRIMARY KEY btree (id)
 #  sshable_host_key | UNIQUE btree (host)
 # Referenced By:
-#  vm_host | vm_host_id_fkey | (id) REFERENCES sshable(id)
+#  ssh_key_rotator | ssh_key_rotator_sshable_id_fkey | (sshable_id) REFERENCES sshable(id) ON DELETE CASCADE
+#  vm_host         | vm_host_id_fkey                 | (id) REFERENCES sshable(id)
