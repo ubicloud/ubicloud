@@ -127,19 +127,17 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if (dns_zone = postgres_resource.dns_zone)
       aws = postgres_resource.location.aws?
       vm = representative_server.vm
-      type, data = aws ? ["CNAME", vm.aws_instance.ipv4_dns_name + "."] : ["A", vm.ip4_string]
-
       record_name = postgres_resource.hostname
       dns_zone.delete_record(record_name:)
-      dns_zone.insert_record(record_name:, type:, ttl: 10, data:)
 
-      unless aws
-        dns_zone.insert_record(
-          record_name: "private-#{record_name}",
-          type: "A",
-          ttl: 10,
-          data: vm.private_ipv4_string
-        )
+      if aws
+        dns_zone.insert_record(record_name:, type: "CNAME", ttl: 10, data: vm.aws_instance.ipv4_dns_name + ".")
+      else
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.ip4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
+        record_name = "private-#{record_name}"
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end
     end
 
