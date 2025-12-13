@@ -23,6 +23,14 @@ RSpec.describe Sshable do
     expect(sa.raw_private_key_1).to eq(key)
   end
 
+  describe "#ssh_key_rotator" do
+    it "returns the associated ssh_key_rotator" do
+      sa.save_changes
+      rotator = SshKeyRotator.create_with_id(SshKeyRotator.generate_uuid, sshable_id: sa.id)
+      expect(sa.ssh_key_rotator).to eq(rotator)
+    end
+  end
+
   describe "#maybe_ssh_session_lock_name" do
     it "does not yield if SSH_SESSION_LOCK_NAME is not defined" do
       expect(sa.maybe_ssh_session_lock_name).to be_nil

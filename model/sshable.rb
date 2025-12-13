@@ -10,6 +10,8 @@ class Sshable < Sequel::Model
   # in sshable_spec.rb.
   unrestrict_primary_key
 
+  one_to_one :ssh_key_rotator
+
   plugin ResourceMethods, encrypted_columns: [:raw_private_key_1, :raw_private_key_2]
 
   SSH_CONNECTION_ERRORS = [
@@ -270,4 +272,5 @@ end
 #  sshable_pkey     | PRIMARY KEY btree (id)
 #  sshable_host_key | UNIQUE btree (host)
 # Referenced By:
-#  vm_host | vm_host_id_fkey | (id) REFERENCES sshable(id)
+#  ssh_key_rotator | ssh_key_rotator_sshable_id_fkey | (sshable_id) REFERENCES sshable(id) ON DELETE CASCADE
+#  vm_host         | vm_host_id_fkey                 | (id) REFERENCES sshable(id)
