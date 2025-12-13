@@ -16,14 +16,45 @@ RSpec.describe Prog::Vm::HostNexus do
     }
   }
 
-  let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
-  let(:spdk_installations) { [instance_double(SpdkInstallation, cpu_count: 4, hugepages: 4)] }
-  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1", total_memory_gib: 2), instance_double(VmHostSlice, name: "standard2", total_memory_gib: 3)] }
-  let(:vm_host) { instance_double(VmHost, spdk_installations: spdk_installations, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
   let(:sshable) { create_mock_sshable(raw_private_key_1: "bogus") }
+  let(:vm_host) { st.subject }
+
+  # Helper to create VMs associated with vm_host
+  def create_test_vm(memory_gib:)
+    project = Project.create(name: "test-project-#{SecureRandom.hex(4)}")
+    ps = PrivateSubnet.create(
+      name: "test-ps", project_id: project.id, location_id: vm_host.location_id,
+      net4: "10.0.0.0/26", net6: "fd10:9b0b:6b4b:8fbb::/64"
+    )
+    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+      project.id, name: "test-vm-#{SecureRandom.hex(4)}", private_subnet_id: ps.id,
+      location_id: vm_host.location_id, force_host_id: vm_host.id
+    )
+    vm = vm_st.subject
+    vm.update(vm_host_id: vm_host.id, memory_gib: memory_gib)
+    vm
+  end
+
+  # Helper to create SpdkInstallation for vm_host
+  def create_test_spdk(cpu_count: 4, hugepages: 4, version: "v1.0")
+    si = SpdkInstallation.create(
+      vm_host_id: vm_host.id, version: version, allocation_weight: 100
+    )
+    si.update(cpu_count: cpu_count, hugepages: hugepages)
+    si
+  end
+
+  # Helper to create VmHostSlice for vm_host
+  def create_test_slice(name:, total_memory_gib:, cores: 4)
+    VmHostSlice.create(
+      vm_host_id: vm_host.id, name: name, family: "standard",
+      cores: cores, total_cpu_percent: cores * 100, used_cpu_percent: 0,
+      total_memory_gib: total_memory_gib, used_memory_gib: 0
+    )
+  end
 
   before do
-    allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    allow(nx).to receive(:sshable).and_return(sshable)
     allow(sshable).to receive(:start_fresh_session).and_return(Net::SSH::Connection::Session.allocate)
   end
 
@@ -168,7 +199,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#prep" do
     it "starts a number of sub-programs" do
-      expect(vm_host).to receive(:net6).and_return(NetAddr.parse_net("2a01:4f9:2b:35a::/64"))
+      vm_host.update(net6: "2a01:4f9:2b:35a::/64")
       budded = []
       expect(nx).to receive(:bud) do
         budded << it
@@ -191,7 +222,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "learns the network from the host if it is not set a-priori" do
-      expect(vm_host).to receive(:net6).and_return(nil)
+      # vm_host.net6 is nil by default
       budded_learn_network = false
       expect(nx).to receive(:bud) do
         budded_learn_network ||= (it == Prog::LearnNetwork)
@@ -217,9 +248,6 @@ RSpec.describe Prog::Vm::HostNexus do
       Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
       Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
-      vm_host = st.subject
-      nx.singleton_class.remove_method(:vm_host)
-      nx.define_singleton_method(:vm_host) { vm_host }
       expect { nx.wait_prep }.to hop("setup_hugepages")
 
       vm_host.reload
@@ -283,16 +311,10 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "hops once SetupSpdk has returned" do
       nx.strand.retval = {"msg" => "SPDK was setup"}
-      vmh = instance_double(VmHost)
-      spdk_installation = SpdkInstallation.new(cpu_count: 4)
-      allow(vmh).to receive_messages(
-        spdk_installations: [spdk_installation],
-        total_cores: 48,
-        total_cpus: 96
-      )
-      allow(nx).to receive(:vm_host).and_return(vmh)
-      expect(vmh).to receive(:update).with({used_cores: 2})
+      create_test_spdk(cpu_count: 4)
+      vm_host.update(total_cores: 48, total_cpus: 96)
       expect { nx.setup_storage_backend }.to hop("download_boot_images")
+      expect(vm_host.reload.used_cores).to eq(2)
     end
 
     it "hops once SetupVhostBlockBackend has returned" do
@@ -387,66 +409,66 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#destroy" do
     it "updates allocation state and naps" do
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
-      expect(vm_host).to receive(:update).with(allocation_state: "draining")
+      vm_host.update(allocation_state: "accepting")
       expect { nx.destroy }.to nap(5)
+      expect(vm_host.reload.allocation_state).to eq("draining")
     end
 
     it "waits draining" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      vm_host.update(allocation_state: "draining")
+      create_test_vm(memory_gib: 1)
       expect(Clog).to receive(:emit).with("Cannot destroy the vm host with active virtual machines, first clean them up").and_call_original
       expect { nx.destroy }.to nap(15)
     end
 
     it "deletes and exists" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).to receive(:vms).and_return([])
-      expect(vm_host).to receive(:destroy)
-      expect(sshable).to receive(:destroy)
+      vm_host.update(allocation_state: "draining")
+      vm_host_id = vm_host.id
+      # Use the real sshable (not the mock) for destroy
+      RSpec::Mocks.space.proxy_for(nx).reset
       expect { nx.destroy }.to exit({"msg" => "vm host deleted"})
+      expect(VmHost[vm_host_id]).to be_nil
+      expect(Sshable[vm_host_id]).to be_nil
     end
   end
 
   describe "host graceful reboot" do
     it "prep_graceful_reboot sets allocation_state to draining if it is in accepting" do
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
-      expect(vm_host).to receive(:update).with(allocation_state: "draining")
-      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      vm_host.update(allocation_state: "accepting")
+      create_test_vm(memory_gib: 1)
       expect { nx.prep_graceful_reboot }.to nap(30)
+      expect(vm_host.reload.allocation_state).to eq("draining")
     end
 
     it "prep_graceful_reboot does not change allocation_state if it is already draining" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).not_to receive(:update)
-      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      vm_host.update(allocation_state: "draining")
+      create_test_vm(memory_gib: 1)
       expect { nx.prep_graceful_reboot }.to nap(30)
+      expect(vm_host.reload.allocation_state).to eq("draining")
     end
 
     it "prep_graceful_reboot fails if not in accepting or draining state" do
-      expect(vm_host).to receive(:allocation_state).and_return("unprepared")
-      expect(vm_host).not_to receive(:update)
-      expect(vm_host).not_to receive(:vms_dataset)
+      # vm_host starts as "unprepared" by default
       expect { nx.prep_graceful_reboot }.to raise_error(RuntimeError)
     end
 
     it "prep_graceful_reboot transitions to prep_reboot if there are no VMs" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).to receive(:vms_dataset).and_return([])
+      vm_host.update(allocation_state: "draining")
       expect { nx.prep_graceful_reboot }.to hop("prep_reboot")
     end
 
     it "prep_graceful_reboot transitions to nap if there are VMs" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).to receive(:vms_dataset).and_return([true])
+      vm_host.update(allocation_state: "draining")
+      create_test_vm(memory_gib: 1)
       expect { nx.prep_graceful_reboot }.to nap(30)
     end
   end
 
   describe "configure metrics" do
     it "configures the metrics and hops to wait" do
-      metrics_config = {
-        metrics_dir: "/home/rhizome/host/metrics"
-      }
+      # metrics_config is a computed property, not an FK - stub is OK
+      metrics_config = {metrics_dir: "/home/rhizome/host/metrics"}
+      allow(nx).to receive(:vm_host).and_return(vm_host)
       allow(vm_host).to receive(:metrics_config).and_return(metrics_config)
       expect(sshable).to receive(:_cmd).with("mkdir -p /home/rhizome/host/metrics")
       expect(sshable).to receive(:_cmd).with("tee /home/rhizome/host/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
@@ -460,11 +482,14 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "host reboot" do
     it "prep_reboot transitions to reboot" do
+      vm1 = create_test_vm(memory_gib: 1)
+      vm2 = create_test_vm(memory_gib: 2)
       expect(nx).to receive(:get_boot_id).and_return("xyz")
-      expect(vm_host).to receive(:update).with(last_boot_id: "xyz")
-      expect(vms).to all receive(:update).with(display_state: "rebooting")
       expect(nx).to receive(:decr_reboot)
       expect { nx.prep_reboot }.to hop("reboot")
+      expect(vm_host.reload.last_boot_id).to eq("xyz")
+      expect(vm1.reload.display_state).to eq("rebooting")
+      expect(vm2.reload.display_state).to eq("rebooting")
     end
 
     it "hops to prep_hardware_reset when needed, before checking other semaphores" do
@@ -474,87 +499,87 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "reboot naps if host sshable is not available" do
       expect(sshable).to receive(:available?).and_return(false)
-
       expect { nx.reboot }.to nap(30)
     end
 
     it "reboot naps if reboot-host returns empty string" do
+      vm_host.update(last_boot_id: "xyz")
       expect(sshable).to receive(:available?).and_return(true)
-      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return ""
-
       expect { nx.reboot }.to nap(30)
     end
 
     it "reboot updates last_boot_id and hops to verify_spdk" do
+      vm_host.update(last_boot_id: "xyz")
       expect(sshable).to receive(:available?).and_return(true)
-      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
-      expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
-
       expect { nx.reboot }.to hop("verify_spdk")
+      expect(vm_host.reload.last_boot_id).to eq("pqr")
     end
 
     it "reboot updates last_boot_id and hops to verify_hugepages when spdk is not instaled" do
-      expect(nx).to receive(:frame).and_return({"spdk_version" => nil, "vhost_block_backend_version" => "version"}).at_least(:once)
-      expect(sshable).to receive(:available?).and_return(true)
-      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
-      expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
-
-      expect { nx.reboot }.to hop("verify_hugepages")
+      nx_vhost = described_class.new(described_class.assemble("1.2.3.4", spdk_version: nil, vhost_block_backend_version: "someversion"))
+      vmh = nx_vhost.vm_host
+      vmh.update(last_boot_id: "xyz")
+      mock_ssh = create_mock_sshable
+      allow(nx_vhost).to receive(:sshable).and_return(mock_ssh)
+      expect(mock_ssh).to receive(:available?).and_return(true)
+      expect(mock_ssh).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
+      expect { nx_vhost.reboot }.to hop("verify_hugepages")
+      expect(vmh.reload.last_boot_id).to eq("pqr")
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
-      expect(vm_host).to receive(:spdk_installations).and_return([
-        SpdkInstallation.new(version: "v1.0"),
-        SpdkInstallation.new(version: "v3.0")
-      ])
+      create_test_spdk(version: "v1.0")
+      create_test_spdk(version: "v3.0")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify v1.0")
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify v3.0")
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
     it "start_slices starts slices" do
-      slice1 = instance_double(VmHostSlice)
-      slice2 = instance_double(VmHostSlice)
-      expect(vm_host).to receive(:slices).and_return([slice1, slice2])
-      expect(slice1).to receive(:incr_start_after_host_reboot)
-      expect(slice2).to receive(:incr_start_after_host_reboot)
+      slice1 = create_test_slice(name: "standard1", total_memory_gib: 2)
+      slice2 = create_test_slice(name: "standard2", total_memory_gib: 3)
+      Strand.create_with_id(slice1.id, prog: "Vm::VmHostSliceNexus", label: "wait")
+      Strand.create_with_id(slice2.id, prog: "Vm::VmHostSliceNexus", label: "wait")
       expect { nx.start_slices }.to hop("start_vms")
+      expect(Semaphore.where(strand_id: slice1.id, name: "start_after_host_reboot").count).to eq(1)
+      expect(Semaphore.where(strand_id: slice2.id, name: "start_after_host_reboot").count).to eq(1)
     end
 
     it "start_vms starts vms & becomes accepting & hops to wait if unprepared" do
-      expect(vms).to all receive(:incr_start_after_host_reboot)
-      expect(vm_host).to receive(:allocation_state).and_return("unprepared")
-      expect(vm_host).to receive(:update).with(allocation_state: "accepting")
+      create_test_vm(memory_gib: 1)
+      # vm_host starts as "unprepared" by default
       expect { nx.start_vms }.to hop("configure_metrics")
+      expect(vm_host.reload.allocation_state).to eq("accepting")
+      # Verify semaphore was created - incr_start_after_host_reboot increments semaphores for all VMs
+      expect(Semaphore.where(name: "start_after_host_reboot").count).to be >= 1
     end
 
-    it "start_vms starts vms & becomes accepting & hops to wait if was draining an in graceful reboot" do
-      expect(vm_host).to receive(:allocation_state).twice.and_return("draining")
+    it "start_vms starts vms & becomes accepting & hops to wait if was draining and in graceful reboot" do
+      vm_host.update(allocation_state: "draining")
+      create_test_vm(memory_gib: 1)
       expect(nx).to receive(:when_graceful_reboot_set?).and_yield
-      expect(vms).to all receive(:incr_start_after_host_reboot)
-      expect(vm_host).to receive(:update).with(allocation_state: "accepting")
       expect { nx.start_vms }.to hop("configure_metrics")
+      expect(vm_host.reload.allocation_state).to eq("accepting")
     end
 
     it "start_vms starts vms & raises if not in draining and in graceful reboot" do
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      vm_host.update(allocation_state: "accepting")
+      create_test_vm(memory_gib: 1)
       expect(nx).to receive(:when_graceful_reboot_set?).and_yield
-      expect(vms).to all receive(:incr_start_after_host_reboot)
       expect { nx.start_vms }.to raise_error(RuntimeError)
     end
 
     it "start_vms starts vms & hops to configure_metrics if accepting" do
-      expect(vms).to all receive(:incr_start_after_host_reboot)
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      vm_host.update(allocation_state: "accepting")
+      create_test_vm(memory_gib: 1)
       expect { nx.start_vms }.to hop("configure_metrics")
     end
 
     it "start_vms starts vms & hops to wait if draining" do
-      expect(vms).to all receive(:incr_start_after_host_reboot)
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
+      vm_host.update(allocation_state: "draining")
+      create_test_vm(memory_gib: 1)
       expect { nx.start_vms }.to hop("configure_metrics")
     end
 
@@ -566,33 +591,29 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "host hardware reset" do
     it "prep_hardware_reset transitions to hardware_reset" do
-      vms_dataset = instance_double(Vm.dataset.class)
-      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
-      expect(vms_dataset).to receive(:update).with(display_state: "rebooting")
+      vm1 = create_test_vm(memory_gib: 1)
       expect(nx).to receive(:decr_hardware_reset)
       expect { nx.prep_hardware_reset }.to hop("hardware_reset")
+      expect(vm1.reload.display_state).to eq("rebooting")
     end
 
     it "hardware_reset transitions to reboot if is in draining state" do
-      expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(vm_host).to receive(:hardware_reset)
+      vm_host.update(allocation_state: "draining")
+      # hardware_reset calls Hosting::Apis - stub at API level
+      expect(Hosting::Apis).to receive(:hardware_reset_server)
       expect { nx.hardware_reset }.to hop("reboot")
     end
 
     it "hardware_reset transitions to reboot if is not in draining state but has no vms" do
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
-      vms_dataset = instance_double(Vm.dataset.class)
-      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
-      expect(vms_dataset).to receive(:empty?).and_return(true)
-      expect(vm_host).to receive(:hardware_reset)
+      vm_host.update(allocation_state: "accepting")
+      # hardware_reset calls Hosting::Apis - stub at API level
+      expect(Hosting::Apis).to receive(:hardware_reset_server)
       expect { nx.hardware_reset }.to hop("reboot")
     end
 
     it "hardware_reset fails if has vms and is not in draining state" do
-      vms_dataset = instance_double(Vm.dataset.class)
-      expect(vm_host).to receive(:vms_dataset).and_return(vms_dataset)
-      expect(vms_dataset).to receive(:empty?).and_return(false)
-      expect(vm_host).to receive(:allocation_state).and_return("accepting")
+      vm_host.update(allocation_state: "accepting")
+      create_test_vm(memory_gib: 1)
       expect { nx.hardware_reset }.to raise_error RuntimeError, "Host has VMs and is not in draining state"
     end
   end
@@ -615,40 +636,62 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "fails if not enough hugepages for VMs" do
+      # Create real VMs that require more hugepages than available
+      # Total: 5, Spdk: 4 (from fixture), Free: 2 => available for VMs: 5-4=1
+      # But VMs need 3 (1+2) which exceeds available 1
+      create_test_spdk(cpu_count: 4, hugepages: 4)
+      create_test_vm(memory_gib: 1)
+      create_test_vm(memory_gib: 2)
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
-      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
     end
 
     it "fails if used hugepages exceed spdk hugepages" do
+      # No spdk installations (sum=0), so used hugepages (10-5=5) exceeds spdk hugepages (0)
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
     end
 
     it "calculates used memory for slices and hops" do
+      # Setup: spdk hugepages = 4, slice memory = 5 (2+3)
+      # Total=10, Free=8 => used=2 <= spdk_hugepages(4) OK
+      # available = 10-4=6 >= slice_mem(5) OK
+      # Result: used = spdk(4) + slice_mem(5) = 9
+      create_test_spdk(cpu_count: 4, hugepages: 4)
+      create_test_slice(name: "standard1", total_memory_gib: 2)
+      create_test_slice(name: "standard2", total_memory_gib: 3)
+      vm_host.update(accepts_slices: true)
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
-      expect(vm_host).to receive(:update)
-        .with(total_hugepages_1g: 10, used_hugepages_1g: 9)
-      expect(vm_host).to receive(:accepts_slices).and_return(true)
       expect { nx.verify_hugepages }.to hop("start_slices")
+      expect(vm_host.reload.total_hugepages_1g).to eq(10)
+      expect(vm_host.reload.used_hugepages_1g).to eq(9)
     end
 
     it "updates vm_host with hugepage stats and hops" do
+      # Setup: spdk hugepages = 4, vm memory = 3 (1+2)
+      # Total=10, Free=8 => used=2 <= spdk_hugepages(4) OK
+      # available = 10-4=6 >= vm_mem(3) OK
+      # Result: used = spdk(4) + vm_mem(3) = 7
+      create_test_spdk(cpu_count: 4, hugepages: 4)
+      create_test_vm(memory_gib: 1)
+      create_test_vm(memory_gib: 2)
+      # accepts_slices is false by default
       expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
-      expect(vm_host).to receive(:update)
-        .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
-      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to hop("start_slices")
+      expect(vm_host.reload.total_hugepages_1g).to eq(10)
+      expect(vm_host.reload.used_hugepages_1g).to eq(7)
     end
   end
 
   describe "#available?" do
     it "returns the available status when disks are healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      # Stub on nx.vm_host since let(:vm_host) may not be the same object
+      allow(nx).to receive(:vm_host).and_return(vm_host)
       expect(vm_host).to receive(:check_last_boot_id)
       expect(vm_host).to receive(:perform_health_checks).and_return(true)
       expect(nx.available?).to be true
@@ -656,6 +699,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "returns the available status when disks are not healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      allow(nx).to receive(:vm_host).and_return(vm_host)
       expect(vm_host).to receive(:check_last_boot_id)
       allow(vm_host).to receive(:perform_health_checks).and_return(false)
       expect(nx.available?).to be false
