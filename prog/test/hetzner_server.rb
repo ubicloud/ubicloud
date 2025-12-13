@@ -122,7 +122,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def wait_ssh_key_rotation
     children = strand.children_dataset.all
-    Clog.emit("claude-hetzner-test") { {claude_wait_ssh_key_rotation: {children_count: children.count, children_labels: children.map { "#{_1.prog}:#{_1.label}" }, children_exitvals: children.map(&:exitval)}} }
+    Clog.emit("claude-hetzner-test") { {claude_wait_ssh_key_rotation: {children_count: children.count, children_labels: children.map { "#{it.prog}:#{it.label}" }, children_exitvals: children.map(&:exitval)}} }
 
     # reaper is called for each child BEFORE it's destroyed
     reap(:wait, reaper: lambda { |child|

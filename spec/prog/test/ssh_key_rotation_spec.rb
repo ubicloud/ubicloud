@@ -11,8 +11,7 @@ RSpec.describe Prog::Test::SshKeyRotation do
 
   let(:sshable) {
     s = create_mock_sshable(raw_private_key_1: original_key)
-    allow(s).to receive(:ssh_key_rotator).and_return(ssh_key_rotator)
-    allow(s).to receive(:reload).and_return(s)
+    allow(s).to receive_messages(ssh_key_rotator: ssh_key_rotator, reload: s)
     s
   }
 

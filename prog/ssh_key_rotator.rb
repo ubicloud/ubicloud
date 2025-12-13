@@ -53,7 +53,7 @@ class Prog::SshKeyRotator < Prog::Base
       hop_rotate_start
     end
 
-    seconds = ssh_key_rotator.next_rotation_at - Time.now 
+    seconds = ssh_key_rotator.next_rotation_at - Time.now
     if seconds <= 0
       hop_rotate_start
     end
@@ -137,8 +137,8 @@ BASH
   end
 
   label def rotate_finalize
-    changed_records = sshable.this.exclude(raw_private_key_2: nil).
-      update(raw_private_key_1: Sequel[:raw_private_key_2], raw_private_key_2: nil)
+    changed_records = sshable.this.exclude(raw_private_key_2: nil)
+      .update(raw_private_key_1: Sequel[:raw_private_key_2], raw_private_key_2: nil)
 
     fail "Unexpected number of changed records: #{changed_records}" unless changed_records == 1
 
