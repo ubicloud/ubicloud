@@ -230,6 +230,13 @@ RSpec.describe Prog::SshKeyRotator do
 
   describe "#rotate_cleanup" do
     it "deletes user and hops to wait" do
+      expect(sshable).to receive(:_cmd).with("ps -u rhizome_rotate -o pid,comm,args 2>/dev/null || true").and_return("")
+      expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate").and_return("")
+      expect { skr.rotate_cleanup }.to hop("wait")
+    end
+
+    it "logs processes when they exist" do
+      expect(sshable).to receive(:_cmd).with("ps -u rhizome_rotate -o pid,comm,args 2>/dev/null || true").and_return("PID COMMAND\n123 sshd")
       expect(sshable).to receive(:_cmd).with("sudo userdel -r rhizome_rotate").and_return("")
       expect { skr.rotate_cleanup }.to hop("wait")
     end

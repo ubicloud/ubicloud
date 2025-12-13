@@ -148,6 +148,12 @@ BASH
   end
 
   label def rotate_cleanup
+    # Check what processes are using the rotate user before attempting deletion
+    procs = sshable.cmd("ps -u :rotate_user -o pid,comm,args 2>/dev/null || true", rotate_user: ROTATE_USER)
+    unless procs.strip.empty?
+      Clog.emit("Processes using rotate user") { {rotate_user_processes: {user: ROTATE_USER, output: procs}} }
+    end
+
     sshable.cmd("sudo userdel -r :rotate_user", rotate_user: ROTATE_USER)
     hop_wait
   end
