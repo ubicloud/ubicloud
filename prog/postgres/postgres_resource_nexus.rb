@@ -123,11 +123,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def refresh_dns_record
     decr_refresh_dns_record
 
-    type, data = postgres_resource.location.aws? ? ["CNAME", representative_server.vm.aws_instance.ipv4_dns_name + "."] : ["A", representative_server.vm.ip4_string]
+    if (dns_zone = postgres_resource.dns_zone)
+      aws = postgres_resource.location.aws?
+      vm = representative_server.vm
+      record_name = postgres_resource.hostname
+      dns_zone.delete_record(record_name:)
 
-    if postgres_resource.dns_zone
-      postgres_resource.dns_zone.delete_record(record_name: postgres_resource.hostname)
-      postgres_resource.dns_zone.insert_record(record_name: postgres_resource.hostname, type:, ttl: 10, data:)
+      if aws
+        dns_zone.insert_record(record_name:, type: "CNAME", ttl: 10, data: vm.aws_instance.ipv4_dns_name + ".")
+      else
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.ip4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
+        record_name = "private-#{record_name}"
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
+      end
     end
 
     when_initial_provisioning_set? do

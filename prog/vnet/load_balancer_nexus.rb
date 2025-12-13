@@ -173,27 +173,38 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   label def rewrite_dns_records
     decr_rewrite_dns_records
 
-    load_balancer.dns_zone&.delete_record(record_name: load_balancer.hostname)
+    if (dns_zone = load_balancer.dns_zone)
+      hostname = load_balancer.hostname
+      private_hostname = "private-#{hostname}"
+      dns_zone.delete_record(record_name: hostname)
+      dns_zone.delete_record(record_name: private_hostname)
 
-    load_balancer.vms_to_dns.each do |vm|
-      # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
-      if load_balancer.ipv4_enabled? && vm.ip4_string
-        load_balancer.dns_zone&.insert_record(
-          record_name: load_balancer.hostname,
-          type: "A",
-          ttl: 10,
-          data: vm.ip4_string
-        )
-      end
+      load_balancer.vms_to_dns.each do |vm|
+        ip_info = []
 
-      # Insert IPv6 record if stack is ipv6 or dual
-      if load_balancer.ipv6_enabled?
-        load_balancer.dns_zone&.insert_record(
-          record_name: load_balancer.hostname,
-          type: "AAAA",
-          ttl: 10,
-          data: vm.ip6_string
-        )
+        # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
+        if load_balancer.ipv4_enabled?
+          if vm.ip4_string
+            ip_info << [vm.ip4_string, "A", hostname]
+          end
+          ip_info << [vm.private_ipv4_string, "A", private_hostname]
+        end
+
+        if load_balancer.ipv6_enabled?
+          if vm.ip6_string
+            ip_info << [vm.ip6_string, "AAAA", hostname]
+          end
+          ip_info << [vm.private_ipv6_string, "AAAA", private_hostname]
+        end
+
+        ip_info.each do |data, type, record_name|
+          dns_zone.insert_record(
+            record_name:,
+            type:,
+            ttl: 10,
+            data:
+          )
+        end
       end
     end
 
