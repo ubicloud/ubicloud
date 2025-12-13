@@ -79,6 +79,11 @@ jobs:
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
 
+    - name: Check for unused associations
+      env:
+        CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
+      run: bundle exec rake unused_associations_check
+
     - name: Run CSI tests
       run: rake csi_spec
 

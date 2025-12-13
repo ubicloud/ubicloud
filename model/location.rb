@@ -6,10 +6,10 @@ class Location < Sequel::Model
   plugin ResourceMethods
   dataset_module Pagination
 
-  one_to_one :location_credential, key: :id
+  one_to_one :location_credential, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
-  one_to_many :location_aws_azs, key: :location_id, class: :LocationAwsAz
+  one_to_many :location_aws_azs, key: :location_id, class: :LocationAwsAz, remover: nil, clearer: nil
 
   plugin :association_dependencies, location_credential: :destroy
 

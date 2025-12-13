@@ -8,8 +8,8 @@ class PostgresServer < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :resource, class: :PostgresResource, key: :resource_id
   many_to_one :timeline, class: :PostgresTimeline, key: :timeline_id
-  one_to_one :vm, key: :id, primary_key: :vm_id
-  one_to_one :lsn_monitor, class: :PostgresLsnMonitor, key: :postgres_server_id
+  one_to_one :vm, key: :id, primary_key: :vm_id, read_only: true
+  one_to_one :lsn_monitor, class: :PostgresLsnMonitor, key: :postgres_server_id, read_only: true, is_used: true
 
   plugin :association_dependencies, lsn_monitor: :destroy
 

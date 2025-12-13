@@ -4,8 +4,8 @@ require_relative "../../model"
 
 class InferenceRouterTarget < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :inference_router
-  many_to_one :inference_router_model
+  many_to_one :inference_router, read_only: true, no_association_method: true
+  many_to_one :inference_router_model, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :api_key
   plugin SemaphoreMethods, :destroy

@@ -32,6 +32,12 @@ Sequel::Model.plugin :pg_eager_any_typed_array
 Sequel::Model.plugin :association_lazy_eager_option
 Sequel::Model.plugin :forbid_lazy_load if Config.unfrozen_test?
 
+if ENV["UNUSED_ASSOCIATIONS"]
+  Sequel::Model.plugin :unused_associations,
+    file: "unused-associations.json",
+    coverage_file: "unused-associations-coverage.json"
+end
+
 if (level = Config.database_logger_level) || Config.test?
   require "logger"
   LOGGER = Logger.new($stdout, level: level || "fatal")

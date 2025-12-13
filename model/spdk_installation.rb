@@ -3,8 +3,8 @@
 require_relative "../model"
 
 class SpdkInstallation < Sequel::Model
-  many_to_one :vm_host
-  one_to_many :vm_storage_volumes
+  many_to_one :vm_host, is_used: true
+  one_to_many :vm_storage_volumes, is_used: true
 
   plugin ResourceMethods, etc_type: true
 

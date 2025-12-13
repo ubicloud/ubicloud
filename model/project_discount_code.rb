@@ -1,11 +1,8 @@
 # frozen_string_literal: true
 
-require "sequel"
+require_relative "../model"
 
 class ProjectDiscountCode < Sequel::Model
-  many_to_one :project
-  many_to_one :discount_code
-
   plugin ResourceMethods
 end
 

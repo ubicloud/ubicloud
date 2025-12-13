@@ -4,7 +4,7 @@ require_relative "../model"
 
 class VmPool < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_many :vms, key: :pool_id
+  one_to_many :vms, key: :pool_id, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy

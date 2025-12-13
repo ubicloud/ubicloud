@@ -3,8 +3,6 @@
 require_relative "../model"
 
 class AccessControlEntry < Sequel::Model
-  many_to_one :project
-
   plugin ResourceMethods
 
   # use __id__ if you want the internal object id

@@ -4,7 +4,7 @@ require_relative "../model"
 require "excon"
 
 class OidcProvider < Sequel::Model
-  one_to_many :locked_domains
+  one_to_many :locked_domains, no_association_method: true, remover: nil, clearer: nil
 
   def self.name_for_ubid(ubid)
     OidcProvider[UBID.to_uuid(ubid)]&.display_name
