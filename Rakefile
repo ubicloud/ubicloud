@@ -331,7 +331,7 @@ end
 desc "Report associations that can be removed and association options that should be added"
 task :unused_associations_check do
   ENV["UNUSED_ASSOCIATIONS"] = "1"
-  spec.call({})
+  rspec.call({})
 
   ENV["FORCE_AUTOLOAD"] = "1"
   require "./loader"
