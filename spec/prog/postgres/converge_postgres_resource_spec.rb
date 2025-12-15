@@ -18,7 +18,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
   let(:postgres_resource) {
     pr = PostgresResource.create(
-      name: "pg-test", superuser_password: "dummy-password", ha_type: "none",
+      name: "pg-test", superuser_password: "dummy-password", ha_type: "sync",
       target_version: "17", location_id: location_id, project_id: project.id,
       user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
       target_storage_size_gib: 64, private_subnet_id: private_subnet.id
@@ -46,6 +46,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       location_id: resource.location_id, unix_user: "ubi"
     ).subject
     vm.update(vm_host_id: vm_host.id)
+    # Add storage volume to match target_storage_size_gib so needs_recycling? returns false by default
+    VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
     server = PostgresServer.create(
       timeline: timeline, resource_id: resource.id, vm_id: vm.id,
       representative_at: representative ? Time.now : nil,
@@ -440,24 +442,33 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "destroys extra servers but keeps those that don't need recycling and match current version" do
-      # Use instance_doubles for this complex test as needs_recycling? depends on VM state
-      representative = instance_double(PostgresServer, representative_at: "yesterday", needs_recycling?: false, created_at: 1, strand: instance_double(Strand, label: "wait"), version: "17")
-      recycling_server = instance_double(PostgresServer, representative_at: nil, needs_recycling?: true, created_at: 5, strand: instance_double(Strand, label: "wait"), version: "17")
-      unavailable_server = instance_double(PostgresServer, representative_at: nil, needs_recycling?: false, created_at: 4, strand: instance_double(Strand, label: "unavailable"), version: "17")
-      keep_server = instance_double(PostgresServer, representative_at: nil, needs_recycling?: false, created_at: 3, strand: instance_double(Strand, label: "wait"), version: "17")
-      extra_server = instance_double(PostgresServer, representative_at: nil, needs_recycling?: false, created_at: 2, strand: instance_double(Strand, label: "wait"), version: "17")
+      # Create servers and set created_at explicitly to control ordering
+      # The prune logic sorts by [ready_first, newer_first] and keeps target_standby_count servers
+      representative = create_server(representative: true)
+      extra_server = create_server
+      keep_server = create_server
+      unavailable_server = create_server
+      unavailable_server.strand.update(label: "unavailable")
+      recycling_server = create_server
+      recycling_server.incr_recycle
 
-      allow(postgres_resource).to receive_messages(servers: [representative, recycling_server, unavailable_server, keep_server, extra_server], representative_server: representative, target_standby_count: 1)
+      # Ensure created_at ordering: extra_server is older than keep_server (newer servers preferred)
+      extra_server.update(created_at: Time.now - 60)
+      keep_server.update(created_at: Time.now)
 
-      expect(recycling_server).to receive(:incr_destroy)
-      expect(unavailable_server).to receive(:incr_destroy)
-      expect(extra_server).to receive(:incr_destroy)
-
-      expect(representative).to receive(:incr_configure)
-      expect(keep_server).to receive(:incr_configure)
-      allow(postgres_resource).to receive(:incr_update_billing_records)
+      allow(postgres_resource).to receive(:target_standby_count).and_return(1)
 
       expect { nx.prune_servers }.to exit
+
+      # Verify correct servers are destroyed (recycling, unavailable, extra)
+      expect(recycling_server.reload.destroy_set?).to be true
+      expect(unavailable_server.reload.destroy_set?).to be true
+      expect(extra_server.reload.destroy_set?).to be true
+
+      # Verify correct servers are configured (representative, keep)
+      expect(representative.reload.configure_set?).to be true
+      expect(keep_server.reload.configure_set?).to be true
+      expect(keep_server.destroy_set?).to be false
     end
 
     it "destroys servers with older versions" do
