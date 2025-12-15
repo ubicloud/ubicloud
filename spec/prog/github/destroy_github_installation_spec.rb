@@ -5,9 +5,8 @@ require "octokit"
 
 RSpec.describe Prog::Github::DestroyGithubInstallation do
   subject(:dgi) {
-    described_class.new(Strand.new).tap {
-      it.instance_variable_set(:@github_installation, github_installation)
-    }
+    st = Strand.create(prog: "Github::DestroyGithubInstallation", label: "start", stack: [{"subject_id" => github_installation.id}])
+    described_class.new(st)
   }
 
   let(:project) { Project.create(name: "test-github-project") }
@@ -20,27 +19,22 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
     )
   }
 
-  # Helper to create GithubRepository with Strand
-  def create_test_repository(name: "test-repo")
-    id = GithubRepository.generate_uuid
-    repo = GithubRepository.create_with_id(id, installation_id: github_installation.id, name: name)
-    Strand.create_with_id(id, prog: "Github::GithubRepositoryNexus", label: "wait")
+  let(:repository) do
+    repo = GithubRepository.create(installation_id: github_installation.id, name: "ubicloud/ubicloud")
+    Strand.create_with_id(repo, prog: "Github::GithubRepositoryNexus", label: "wait")
     repo
   end
 
-  # Helper to create GithubRunner with Strand and VM
-  def create_test_runner(repository:)
+  let(:runner) do
     vm = create_vm
-    id = GithubRunner.generate_uuid
-    runner = GithubRunner.create_with_id(
-      id,
+    runner = GithubRunner.create(
       installation_id: github_installation.id,
       repository_id: repository.id,
       repository_name: repository.name,
       label: "ubicloud",
       vm_id: vm.id
     )
-    Strand.create_with_id(id, prog: "Github::GithubRunnerNexus", label: "wait")
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
     runner
   end
 
@@ -87,9 +81,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe "#destroy_resources" do
     it "hops after incrementing destroy for repositories and runners" do
-      repository = create_test_repository
-      runner = create_test_runner(repository: repository)
-
+      runner
       expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
 
       # Verify semaphores were created
@@ -101,13 +93,12 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe "#wait_resource_destroy" do
     it "naps if not all runners destroyed" do
-      repository = create_test_repository
-      create_test_runner(repository: repository)
+      runner
       expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "naps if not all repositories destroyed" do
-      create_test_repository
+      repository
       # No runners, but repository exists
       expect { dgi.wait_resource_destroy }.to nap(10)
     end
