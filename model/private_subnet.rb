@@ -108,6 +108,10 @@ class PrivateSubnet < Sequel::Model
   #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
   #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
   def random_private_ipv4
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
+  end
+
+  private def _random_private_ipv4
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
 
     # If the subnet size is /24 or higher like /26, exclude the first 4 and last 1 IPs
@@ -122,7 +126,7 @@ class PrivateSubnet < Sequel::Model
     end
 
     addr = net4.nth_subnet(cidr_size, random_offset)
-    return random_private_ipv4 if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
+    return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr
   end
