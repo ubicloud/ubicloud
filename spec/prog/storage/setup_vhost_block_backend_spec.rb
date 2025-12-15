@@ -17,7 +17,7 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
   let(:vm_host) { create_vm_host(used_hugepages_1g: 0, total_hugepages_1g: 20, total_cpus: 96, os_version: "ubuntu-24.04") }
 
   before do
-    allow(setup_vhost_block_backend).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(setup_vhost_block_backend).to receive_messages(sshable:, vm_host:)
   end
 
   describe "#start" do

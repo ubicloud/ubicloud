@@ -301,17 +301,17 @@ RSpec.describe Vm do
 
     expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
     expect(session[:ssh_session]).to receive(:_exec!).and_return("active\nactive\n")
-    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:_exec!).and_return("active\ninactive\n")
     expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
-    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
 
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
     expect(vm).to receive(:reload).and_return(vm)
     expect(vm).to receive(:incr_checkup)
-    expect(vm.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "includes init_script in params_json if set" do
@@ -338,17 +338,17 @@ RSpec.describe Vm do
       storage_device = instance_double(StorageDevice, name: "default")
       [
         instance_double(VmStorageVolume, disk_index: 0, device_id: "dev1",
-          size_gib: 1, boot: true, boot_image: boot_image,
+          size_gib: 1, boot: true, boot_image:,
           key_encryption_key_1: "key", spdk_version: "spdk1",
           use_bdev_ubi: false, skip_sync: false,
-          storage_device: storage_device,
+          storage_device:,
           max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil,
           vhost_block_backend_version: nil, num_queues: 1, queue_size: 256),
         instance_double(VmStorageVolume, disk_index: 1, device_id: "dev2",
           size_gib: 100, boot: false, boot_image: nil,
           key_encryption_key_1: nil, spdk_version: "spdk1",
           use_bdev_ubi: true, skip_sync: true,
-          storage_device: storage_device,
+          storage_device:,
           max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 300,
           vhost_block_backend_version: "v0.1-5", num_queues: 4, queue_size: 64)
       ]

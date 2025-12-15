@@ -45,7 +45,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   before do
     allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
-    allow(prog).to receive_messages(kubernetes_cluster: kubernetes_cluster, frame: {"node_id" => node.id})
+    allow(prog).to receive_messages(kubernetes_cluster:, frame: {"node_id" => node.id})
   end
 
   describe "random_ula_cidr" do

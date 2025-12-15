@@ -18,7 +18,7 @@ RSpec.describe Account do
     now = Time.now
     expect(Time).to receive(:now).and_return(now).at_least(:once)
     project = account.create_project_with_default_policy("project-1")
-    ApiKey.create_personal_access_token(account, project: project)
+    ApiKey.create_personal_access_token(account, project:)
     DB[:account_active_session_keys].insert(account_id: account.id, session_id: "session-id")
     project.update(billing_info_id: BillingInfo.create(stripe_id: "cus123").id)
     payment_method = project.billing_info.add_payment_method(stripe_id: "pm123")

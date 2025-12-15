@@ -40,7 +40,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     instance_double(
       VictoriaMetricsServer,
       id: "test-id",
-      vm: vm,
+      vm:,
       resource: victoria_metrics_resource,
       cert: "cert",
       cert_key: "cert_key",

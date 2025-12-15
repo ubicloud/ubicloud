@@ -16,7 +16,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
   let(:vm_host) {
     vmh = instance_double(VmHost)
     allow(vmh).to receive_messages(
-      sshable: sshable,
+      sshable:,
       spdk_installations: ["spdk_1", "spdk_2"],
       id: "d05761b4-2cad-8b71-a300-ded6153e02b2"
     )
@@ -24,7 +24,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
   }
   let(:spdk_installation) {
     si = instance_double(SpdkInstallation)
-    allow(si).to receive_messages(vm_host: vm_host, version: spdk_version)
+    allow(si).to receive_messages(vm_host:, version: spdk_version)
     si
   }
 

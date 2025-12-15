@@ -44,25 +44,25 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
           {encrypted: true, size_gib: 16, vring_workers: 1},
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
         ],
-        boot_image: boot_image,
+        boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        arch: arch,
+        arch:,
         allow_private_subnet_in_other_project: true,
-        exclude_host_ids: exclude_host_ids,
-        exclude_availability_zones: exclude_availability_zones,
-        availability_zone: availability_zone,
+        exclude_host_ids:,
+        exclude_availability_zones:,
+        availability_zone:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
       postgres_server = PostgresServer.create_with_id(
         ubid.to_uuid,
-        resource_id: resource_id,
-        timeline_id: timeline_id,
-        timeline_access: timeline_access,
-        representative_at: representative_at,
-        synchronization_status: synchronization_status,
+        resource_id:,
+        timeline_id:,
+        timeline_access:,
+        representative_at:,
+        synchronization_status:,
         vm_id: vm_st.id,
         version: server_version
       )

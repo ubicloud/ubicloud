@@ -489,7 +489,7 @@ module Scheduling::Allocator
     def select_cpuset(vm_host_id, n)
       # select the cpuset for the new slice
       cpus = VmHostCpu
-        .where(vm_host_id: vm_host_id, spdk: false, vm_host_slice_id: nil)
+        .where(vm_host_id:, spdk: false, vm_host_slice_id: nil)
         .order_by(Sequel.asc(:cpu_number))
         .limit(n)
         .map(&:cpu_number)
@@ -707,9 +707,9 @@ module Scheduling::Allocator
           use_bdev_ubi:,
           boot_image_id: image_id,
           skip_sync: volume["skip_sync"],
-          disk_index: disk_index,
+          disk_index:,
           key_encryption_key_1_id: key_encryption_key&.id,
-          spdk_installation_id: spdk_installation_id,
+          spdk_installation_id:,
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
@@ -734,7 +734,7 @@ module Scheduling::Allocator
       end
 
       def update
-        StorageDevice.dataset.where(id: id).update(available_storage_gib: Sequel[:available_storage_gib] - @allocated_storage_gib) if @allocated_storage_gib > 0
+        StorageDevice.dataset.where(id:).update(available_storage_gib: Sequel[:available_storage_gib] - @allocated_storage_gib) if @allocated_storage_gib > 0
       end
     end
   end

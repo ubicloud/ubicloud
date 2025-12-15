@@ -133,7 +133,7 @@ class Project < Sequel::Model
       "cost" => 0.0
     }
 
-    Invoice.new(project_id: id, content: content, begin_time: begin_time, end_time: end_time, created_at: Time.now, status: "current")
+    Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: Time.now, status: "current")
   end
 
   def current_resource_usage(resource_type)

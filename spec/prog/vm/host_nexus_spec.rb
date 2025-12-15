@@ -19,11 +19,11 @@ RSpec.describe Prog::Vm::HostNexus do
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:spdk_installations) { [instance_double(SpdkInstallation, cpu_count: 4, hugepages: 4)] }
   let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1", total_memory_gib: 2), instance_double(VmHostSlice, name: "standard2", total_memory_gib: 3)] }
-  let(:vm_host) { instance_double(VmHost, spdk_installations: spdk_installations, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
+  let(:vm_host) { instance_double(VmHost, spdk_installations:, vms:, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
   let(:sshable) { create_mock_sshable(raw_private_key_1: "bogus") }
 
   before do
-    allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
+    allow(nx).to receive_messages(vm_host:, sshable:)
     allow(sshable).to receive(:start_fresh_session).and_return(Net::SSH::Connection::Session.allocate)
   end
 

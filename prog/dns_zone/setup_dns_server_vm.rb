@@ -27,16 +27,16 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         Config.dns_service_project_id,
         sshable_unix_user: "ubi",
         location_id:,
-        name: name,
+        name:,
         size: vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: storage_size_gib}
         ],
-        boot_image: boot_image,
+        boot_image:,
         enable_ip4: true
       )
 
-      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
+      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id:}])
     end
   end
 

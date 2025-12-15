@@ -120,7 +120,7 @@ class KubernetesCluster < Sequel::Model
     rescue
       "down"
     end
-    aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    aggregate_readings(previous_pulse:, reading:)
   end
 
   def install_rhizome

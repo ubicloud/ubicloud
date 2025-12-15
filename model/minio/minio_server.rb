@@ -56,7 +56,7 @@ class MinioServer < Sequel::Model
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 9000)
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       minio_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
     }
   end
@@ -77,7 +77,7 @@ class MinioServer < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -100,7 +100,7 @@ class MinioServer < Sequel::Model
       access_key: cluster.admin_user,
       secret_key: cluster.admin_password,
       ssl_ca_data: cluster.root_certs,
-      socket: socket
+      socket:
     )
   end
 end

@@ -23,7 +23,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       vm: instance_double(
         Vm,
         id: "1c7d59ee-8d46-8374-9553-6144490ecec5",
-        sshable: sshable,
+        sshable:,
         ephemeral_net4: "1.1.1.1",
         private_subnets: [instance_double(PrivateSubnet)]
       ),
@@ -54,7 +54,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   before do
     allow(nx).to receive(:postgres_server).and_return(postgres_server)
-    allow(postgres_server).to receive_messages(resource: resource, read_replica?: false)
+    allow(postgres_server).to receive_messages(resource:, read_replica?: false)
   end
 
   describe ".assemble" do
@@ -910,7 +910,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       representative_server = instance_double(PostgresServer)
       expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
       expect(nx).to receive(:decr_unplanned_take_over)
-      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
+      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable:))
       expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
       expect(representative_server).to receive(:incr_destroy)
 
@@ -921,7 +921,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       representative_server = instance_double(PostgresServer)
       expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
       expect(nx).to receive(:decr_unplanned_take_over)
-      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
+      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable:))
       expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
       expect(representative_server).to receive(:incr_destroy)
 

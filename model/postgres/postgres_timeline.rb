@@ -124,8 +124,8 @@ PGDATA=/dat/#{version}/data
       force_path_style: true
     ) : Minio::Client.new(
       endpoint: blob_storage_endpoint,
-      access_key: access_key,
-      secret_key: secret_key,
+      access_key:,
+      secret_key:,
       ssl_ca_data: blob_storage.root_certs
     )
   end
@@ -141,10 +141,10 @@ PGDATA=/dat/#{version}/data
   end
 
   def aws_list_objects(prefix, delimiter: "")
-    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:)
+    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:)
     objects = response.contents
     while response.is_truncated
-      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:, continuation_token: response.next_continuation_token)
+      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:, continuation_token: response.next_continuation_token)
       objects.concat(response.contents)
     end
     objects

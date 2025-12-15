@@ -74,7 +74,7 @@ class Serializers::Invoice < Serializers::Base
                  cost_sum = line_items.sum { it.cost }
                  ItemData.new(
                    name: "#{line_items.count} x #{description} (Aggregated)",
-                   description: description,
+                   description:,
                    duration: duration_sum,
                    amount: amount_sum,
                    cost: cost_sum,

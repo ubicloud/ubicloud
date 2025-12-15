@@ -9,7 +9,7 @@ RSpec.describe Prog::DownloadFirmware do
   let(:vm_host) { create_vm_host }
 
   before do
-    allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(df).to receive_messages(sshable:, vm_host:)
   end
 
   describe "#start" do

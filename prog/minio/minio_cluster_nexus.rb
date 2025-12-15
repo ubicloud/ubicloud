@@ -33,13 +33,13 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       minio_cluster = MinioCluster.create(
         name: cluster_name,
         location_id: location.id,
-        admin_user: admin_user,
+        admin_user:,
         admin_password: SecureRandom.urlsafe_base64(15),
         private_subnet_id: subnet_st.id,
-        root_cert_1: root_cert_1,
-        root_cert_key_1: root_cert_key_1,
-        root_cert_2: root_cert_2,
-        root_cert_key_2: root_cert_key_2,
+        root_cert_1:,
+        root_cert_key_1:,
+        root_cert_2:,
+        root_cert_key_2:,
         project_id:
       ) { it.id = ubid.to_uuid }
 

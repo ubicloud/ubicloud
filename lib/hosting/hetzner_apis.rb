@@ -17,7 +17,7 @@ class Hosting::HetznerApis
     formatted_fingerprint = fingerprint.scan(/../).join(":")
     connection = create_connection
     connection.post(path: "/boot/#{server_id}/linux",
-      body: URI.encode_www_form(dist: dist, lang: "en", authorized_key: formatted_fingerprint),
+      body: URI.encode_www_form(dist:, lang: "en", authorized_key: formatted_fingerprint),
       expects: 200)
 
     connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
@@ -35,7 +35,7 @@ class Hosting::HetznerApis
 
   def add_key(name, key)
     create_connection.post(path: "/key",
-      body: URI.encode_www_form(name: name, data: key),
+      body: URI.encode_www_form(name:, data: key),
       expects: 201)
     nil
   end

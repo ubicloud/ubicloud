@@ -82,7 +82,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_flash_notice("Project created")
         expect(page).to have_content name
 
-        project = Project[name: name]
+        project = Project[name:]
         expect(project.accounts_dataset.count).to eq 1
         expect(project.access_control_entries.count).to eq 2
         expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member]

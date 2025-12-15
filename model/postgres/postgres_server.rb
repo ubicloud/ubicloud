@@ -110,7 +110,7 @@ class PostgresServer < Sequel::Model
     end
 
     {
-      configs: configs,
+      configs:,
       user_config: resource.user_config,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       private_subnets: vm.private_subnets.map {
@@ -123,18 +123,18 @@ class PostgresServer < Sequel::Model
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
-      metrics_config: metrics_config
+      metrics_config:
     }
   end
 
   def trigger_failover(mode:)
     unless representative_at
-      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid: ubid} }
+      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid:} }
       return false
     end
 
     unless (standby = failover_target)
-      Clog.emit("No suitable standby found for failover") { {ubid: ubid} }
+      Clog.emit("No suitable standby found for failover") { {ubid:} }
       return false
     end
 
@@ -214,7 +214,7 @@ class PostgresServer < Sequel::Model
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local_socket(File.join(health_monitor_socket_path, ".s.PGSQL.5432"), "/var/run/postgresql/.s.PGSQL.5432")
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       db_connection: nil
     }
   end
@@ -222,7 +222,7 @@ class PostgresServer < Sequel::Model
   def init_metrics_export_session
     ssh_session = vm.sshable.start_fresh_session
     {
-      ssh_session: ssh_session
+      ssh_session:
     }
   end
 
@@ -234,18 +234,18 @@ class PostgresServer < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {last_known_lsn: last_known_lsn})
+    pulse = aggregate_readings(previous_pulse:, reading:, data: {last_known_lsn:})
 
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
         begin
-          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { it.postgres_server_id = id }
+          PostgresLsnMonitor.new(last_known_lsn:) { it.postgres_server_id = id }
             .insert_conflict(
               target: :postgres_server_id,
-              update: {last_known_lsn: last_known_lsn}
+              update: {last_known_lsn:}
             ).save_changes
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid: ubid, last_known_lsn: last_known_lsn, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid:, last_known_lsn:, exception: Util.exception_to_hash(ex)}} }
         end
       end
 
@@ -322,7 +322,7 @@ class PostgresServer < Sequel::Model
 
   def switch_to_new_timeline(parent_id: timeline.id)
     update(
-      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id: parent_id).id,
+      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push"
     )
 
@@ -353,7 +353,7 @@ class PostgresServer < Sequel::Model
     if archival_backlog > archival_backlog_threshold
       Prog::PageNexus.assemble("#{ubid} archival backlog high",
         ["PGArchivalBacklogHigh", id], ubid,
-        severity: "warning", extra_data: {archival_backlog: archival_backlog})
+        severity: "warning", extra_data: {archival_backlog:})
     else
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
     end

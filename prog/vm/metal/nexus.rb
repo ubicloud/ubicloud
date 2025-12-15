@@ -79,15 +79,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       Scheduling::Allocator.allocate(
         vm, frame["storage_volumes"],
-        distinct_storage_devices: distinct_storage_devices,
-        allocation_state_filter: allocation_state_filter,
-        location_filter: location_filter,
-        location_preference: location_preference,
-        host_filter: host_filter,
-        host_exclusion_filter: host_exclusion_filter,
-        gpu_count: gpu_count,
-        gpu_device: gpu_device,
-        family_filter: family_filter
+        distinct_storage_devices:,
+        allocation_state_filter:,
+        location_filter:,
+        location_preference:,
+        host_filter:,
+        host_exclusion_filter:,
+        gpu_count:,
+        gpu_device:,
+        family_filter:
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
@@ -98,7 +98,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       unless Location[vm.location_id].name == "github-runners" && vm.created_at > Time.now - 60 * 60
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
-        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.from_uuidish(it).to_s }, extra_data: {queue_size: queued_vms.count, utilization: utilization})
+        Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.from_uuidish(it).to_s }, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
       nap 30

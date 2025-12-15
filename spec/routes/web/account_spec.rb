@@ -116,7 +116,7 @@ RSpec.describe Clover, "account" do
           challenge = JSON.parse(page.find_by_id("webauthn-setup-form")["data-credential-options"])["challenge"]
           fill_in "Key Name", with: "My Key #{i}"
           fill_in "Password", with: TEST_USER_PASSWORD if clear_last_password_entry
-          fill_in "webauthn-setup", with: webauthn_client.create(challenge: challenge).to_json, visible: false
+          fill_in "webauthn-setup", with: webauthn_client.create(challenge:).to_json, visible: false
           click_button "Setup Security Key"
           expect(page).to have_flash_notice "Security key is now setup, please make note of your recovery codes"
           expect(page.title).to eq("Ubicloud - Recovery Codes")
@@ -131,7 +131,7 @@ RSpec.describe Clover, "account" do
           click_button "Sign in"
           expect(page.title).to eq("Ubicloud - 2FA - Security Keys")
           challenge = JSON.parse(page.find_by_id("webauthn-auth-form")["data-credential-options"])["challenge"]
-          fill_in "webauthn_auth", with: webauthn_client.get(challenge: challenge).to_json, visible: false
+          fill_in "webauthn_auth", with: webauthn_client.get(challenge:).to_json, visible: false
           click_button "Authenticate Using Security Keys"
           expect(page).to have_flash_notice "You have been logged in"
         end
@@ -198,7 +198,7 @@ RSpec.describe Clover, "account" do
       webauthn_client = WebAuthn::FakeClient.new("http://localhost:9292")
       challenge = JSON.parse(page.find_by_id("webauthn-setup-form")["data-credential-options"])["challenge"]
       fill_in "Key Name", with: "My Key"
-      fill_in "webauthn-setup", with: webauthn_client.create(challenge: challenge).to_json, visible: false
+      fill_in "webauthn-setup", with: webauthn_client.create(challenge:).to_json, visible: false
       click_button "Setup Security Key"
 
       visit "/account/multifactor-manage"
