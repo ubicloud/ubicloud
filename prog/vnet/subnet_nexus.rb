@@ -79,7 +79,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       random_private_ipv4(location, project, cidr_size)
     end
 
-    selected_addr = random_private_ipv4(location, project, cidr_size) if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) } || project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id]
+    failure_message = if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) }
+      "Selected IPv4 subnet #{selected_addr} is banned"
+    elsif (private_subnet = project.private_subnets_dataset[net4: selected_addr.to_s, location_id: location.id])
+      "Selected IPv4 subnet #{selected_addr} is already in use by #{private_subnet.ubid}"
+    end
+
+    if failure_message
+      Clog.emit(failure_message)
+      selected_addr = random_private_ipv4(location, project, cidr_size)
+    end
 
     selected_addr
   end
