@@ -242,12 +242,10 @@ RSpec.describe Prog::DownloadBootImage do
 
   describe "#activate_boot_image" do
     it "activates the boot image" do
-      dataset = instance_double(Sequel::Dataset)
-      expect(BootImage).to receive(:where).with(vm_host_id: vm_host.id, name: "my-image", version: "20230303").and_return(dataset)
-      expect(dataset).to receive(:update) do |args|
-        expect(args[:activated_at]).to be <= Time.now
-      end
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      expect(bi.activated_at).to be_nil
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
+      expect(bi.reload.activated_at).not_to be_nil
     end
   end
 end
