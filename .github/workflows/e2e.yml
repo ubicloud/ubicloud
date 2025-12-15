@@ -176,6 +176,15 @@ jobs:
         echo '|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
         grep "runner_started" foreman.log | cut -d'|' -f2 | jq -r '[.runner_started.ubid, .runner_started.label, .runner_started.vm_ubid, .runner_started.duration] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
+    - name: Extract exception
+      if: always()
+      continue-on-error: true
+      run: |
+        echo "## Exceptions" >> $GITHUB_STEP_SUMMARY
+        echo '| Time | Thread | Class | Message | First Backtrace Line |' >> $GITHUB_STEP_SUMMARY
+        echo '|---|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
+        grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r '[.time, .thread, .exception.class, .exception.message, (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
+
     - name: Upload logs
       if: always()
       uses: actions/upload-artifact@v5
