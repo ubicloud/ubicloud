@@ -5,18 +5,15 @@ require "octokit"
 
 RSpec.describe Prog::Github::GithubRepositoryNexus do
   subject(:nx) {
-    described_class.new(Strand.new).tap {
-      it.instance_variable_set(:@github_repository, github_repository)
-    }
+    st = Strand.create_with_id(github_repository, prog: "Github::GithubRepositoryNexus", label: "wait")
+    described_class.new(st)
   }
 
   let(:project) { Project.create(name: "test") }
   let(:installation) { GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User") }
-  let(:github_repository_id) { GithubRepository.generate_uuid }
   let(:github_repository) {
-    GithubRepository.create_with_id(github_repository_id, name: "ubicloud/ubicloud", last_job_at: Time.now, installation_id: installation.id)
+    GithubRepository.create(name: "ubicloud/ubicloud", last_job_at: Time.now, installation_id: installation.id)
   }
-  let(:github_repository_strand) { Strand.create_with_id(github_repository_id, prog: "Github::GithubRepositoryNexus", label: "wait") }
 
   describe ".assemble" do
     it "creates github repository or updates last_job_at if the repository exists" do
@@ -99,7 +96,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "does not poll jobs if the project is not active" do
-      expect(github_repository.installation.project).to receive(:active?).and_return(false)
+      project.update(visible: false)
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(24 * 60 * 60)
     end
@@ -175,40 +172,37 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "deletes blob storage if there are no cache entries" do
-      expect(github_repository).to receive(:destroy_blob_storage)
+      expect(nx.github_repository).to receive(:destroy_blob_storage)
       nx.cleanup_cache
     end
   end
 
   describe "#wait" do
     it "checks queued jobs and cache usage then naps" do
-      expect(github_repository).to receive(:access_key).and_return("key")
+      github_repository.update(access_key: "key")
       expect(nx).to receive(:check_queued_jobs)
       expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(5 * 60)
     end
 
     it "does not check queued jobs but check cache usage if 6 hours passed from the last job" do
-      expect(github_repository).to receive(:access_key).and_return("key")
-      expect(github_repository).to receive(:last_job_at).and_return(Time.now - 7 * 60 * 60)
+      github_repository.update(access_key: "key", last_job_at: Time.now - 7 * 60 * 60)
       expect(nx).not_to receive(:check_queued_jobs)
       expect(nx).to receive(:cleanup_cache)
       expect { nx.wait }.to nap(15 * 60)
     end
 
     it "does not destroys repository and if not found but has active runners" do
-      github_repository_strand  # ensure strand exists
       GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
       expect(nx).to receive(:check_queued_jobs).and_raise(Octokit::NotFound)
       expect { nx.wait }.to nap(5 * 60)
-      expect(Semaphore.where(strand_id: github_repository_id, name: "destroy").count).to eq(0)
+      expect(Semaphore.where(strand_id: github_repository.id, name: "destroy").count).to eq(0)
     end
 
     it "destroys repository and if not found" do
-      github_repository_strand  # ensure strand exists
       expect(nx).to receive(:check_queued_jobs).and_raise(Octokit::NotFound)
       expect { nx.wait }.to nap(0)
-      expect(Semaphore.where(strand_id: github_repository_id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: github_repository.id, name: "destroy").count).to eq(1)
     end
 
     it "does not poll if it is disabled" do
@@ -231,16 +225,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       blob_storage_client = instance_double(Aws::S3::Client)
       expect(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
       expect(blob_storage_client).to receive(:delete_object)
-      expect(github_repository).to receive(:destroy_blob_storage)
+      expect(nx.github_repository).to receive(:destroy_blob_storage)
 
       expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
     end
 
     it "deletes resource and pops" do
       expect(nx).to receive(:decr_destroy)
-      expect(github_repository).to receive(:destroy)
-
       expect { nx.destroy }.to exit({"msg" => "github repository destroyed"})
+      expect(github_repository.exists?).to be false
     end
   end
 end
