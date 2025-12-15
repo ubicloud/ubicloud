@@ -303,12 +303,15 @@ RSpec.describe VmHost do
     expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
 
     Sshable.create_with_id(old_id, host: "1.1.0.0")
-    described_class.create_with_id(old_id, location_id: Location::HETZNER_FSN1_ID, family: "standard")
+    old_vm_host = described_class.create_with_id(old_id, location_id: Location::HETZNER_FSN1_ID, family: "standard")
 
     adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: old_id)
-    expect(Address).to receive(:where).with(cidr: "1.1.1.0/30").and_return([adr]).once
 
-    expect(adr).to receive(:assigned_vm_addresses).and_return([instance_double(Vm)]).at_least(:once)
+    # Create a real VM and AssignedVmAddress to make the address already assigned
+    project = Project.create(name: "test-project")
+    vm = Prog::Vm::Nexus.assemble("a a", project.id, force_host_id: old_vm_host.id).subject
+    AssignedVmAddress.create(address_id: adr.id, dst_vm_id: vm.id, ip: "1.1.1.1/32")
+
     expect {
       vh.create_addresses
     }.to raise_error RuntimeError, "BUG: failover ip 1.1.1.0/30 is already assigned to a vm"
@@ -597,13 +600,20 @@ RSpec.describe VmHost do
 
   describe "#provider_name" do
     it "returns the provider name" do
-      expect(vh).to receive(:provider).and_return(instance_double(HostProvider, provider_name: "hetzner"))
-      expect(vh.provider_name).to eq("hetzner")
+      sa = Sshable.create(host: "provider-test.localhost", raw_private_key_1: SshKey.generate.keypair)
+      vm_host = described_class.create_with_id(sa, location_id: Location::HETZNER_FSN1_ID, family: "standard")
+      HostProvider.create do |hp|
+        hp.id = vm_host.id
+        hp.server_identifier = "test-server-123"
+        hp.provider_name = "hetzner"
+      end
+      expect(vm_host.provider_name).to eq("hetzner")
     end
 
     it "returns nil if there is no provider" do
-      expect(vh).to receive(:provider).and_return(nil)
-      expect(vh.provider_name).to be_nil
+      sa = Sshable.create(host: "no-provider.localhost", raw_private_key_1: SshKey.generate.keypair)
+      vm_host = described_class.create_with_id(sa, location_id: Location::HETZNER_FSN1_ID, family: "standard")
+      expect(vm_host.provider_name).to be_nil
     end
   end
 
