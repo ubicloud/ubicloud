@@ -58,26 +58,31 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   end
 
   def self.random_private_ipv6(location, project)
+    until_random_ip("Could not find random IPv6 after 1000 iterations") { _random_private_ipv6(location, project) }
+  end
+
+  def self._random_private_ipv6(location, project)
     network_address = NetAddr::IPv6.new((SecureRandom.bytes(7) + 0xfd.chr).unpack1("Q<") << 64)
     network_mask = NetAddr::Mask128.new(64)
     selected_addr = NetAddr::IPv6Net.new(network_address, network_mask)
 
-    selected_addr = random_private_ipv6(location, project) if project.private_subnets_dataset[net6: selected_addr.to_s, location_id: location.id]
-
-    selected_addr
+    selected_addr unless project.private_subnets_dataset[net6: selected_addr.to_s, location_id: location.id]
   end
+  private_class_method :_random_private_ipv6
 
   def self.random_private_ipv4(location, project, cidr_size = 26)
+    until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4(location, project, cidr_size) }
+  end
+
+  def self._random_private_ipv4(location, project, cidr_size)
     raise ArgumentError, "CIDR size must be between 0 and 32" unless cidr_size.between?(0, 32)
 
     private_range = PrivateSubnet.random_subnet(cidr_size)
     addr = NetAddr::IPv4Net.parse(private_range)
 
-    selected_addr = if addr.netmask.prefix_len < cidr_size
-      addr.nth_subnet(cidr_size, SecureRandom.random_number(2**(cidr_size - addr.netmask.prefix_len) - 1).to_i + 1)
-    else
-      random_private_ipv4(location, project, cidr_size)
-    end
+    return unless addr.netmask.prefix_len < cidr_size
+
+    selected_addr = addr.nth_subnet(cidr_size, SecureRandom.random_number(2**(cidr_size - addr.netmask.prefix_len) - 1).to_i + 1)
 
     failure_message = if PrivateSubnet::BANNED_IPV4_SUBNETS.any? { it.rel(selected_addr) }
       "Selected IPv4 subnet #{selected_addr} is banned"
@@ -87,9 +92,20 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
     if failure_message
       Clog.emit(failure_message)
-      selected_addr = random_private_ipv4(location, project, cidr_size)
+      return
     end
 
     selected_addr
   end
+  private_class_method :_random_private_ipv4
+
+  def self.until_random_ip(message)
+    1000.times do |i|
+      if (ip = yield)
+        return ip
+      end
+    end
+    raise message
+  end
+  private_class_method :until_random_ip
 end

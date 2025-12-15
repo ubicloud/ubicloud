@@ -21,6 +21,26 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     nx.instance_variable_set(:@private_subnet, ps)
   end
 
+  describe ".until_random_ip" do
+    it "raises if no ip is found by the block after 1000 iterations" do
+      i = 0
+      expect {
+        described_class.until_random_ip("bad") do
+          i += 1
+          nil
+        end
+      }.to raise_error RuntimeError, "bad"
+      expect(i).to eq 1000
+    end
+
+    it "returns first ip found by block" do
+      ips = [nil, nil, "1.2.3.4", "1.2.3.5"]
+      ip = described_class.until_random_ip("bad") { ips.shift }
+      expect(ip).to eq "1.2.3.4"
+      expect(ips).to eq ["1.2.3.5"]
+    end
+  end
+
   describe ".assemble" do
     it "fails if project doesn't exist" do
       expect {
