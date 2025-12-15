@@ -69,8 +69,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "waits for dns_record to be seen by all servers" do
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")).at_least(:once)
-      dns_record = instance_double(DnsRecord, id: SecureRandom.uuid)
-      expect(DnsRecord).to receive(:[]).with(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", tombstoned: false, data: "content").and_return(dns_record)
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
       expect { nx.wait_dns_update }.to nap(10)
     end
 
@@ -177,8 +176,8 @@ RSpec.describe Prog::Vnet::CertNexus do
       created_at = Time.new(2021, 1, 1, 0, 0, 0)
       expect(cert).to receive(:created_at).and_return(created_at)
       expect(Time).to receive(:now).and_return(created_at + 60 * 60 * 24 * 30 * 3 + 1)
-      expect(cert).to receive(:incr_destroy)
       expect { nx.wait }.to nap(0)
+      expect(Semaphore.where(strand_id: cert.id, name: "destroy").count).to eq(1)
     end
   end
 
