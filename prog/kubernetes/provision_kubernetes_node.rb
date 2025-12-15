@@ -83,7 +83,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   label def bootstrap_rhizome
     nap 5 unless vm.strand.label == "wait"
 
-    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s :private_ipv4 -o ens3 -j MASQUERADE", private_ipv4: vm.nics.first.private_ipv4)
+    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s :private_ipv4 ! -d :subnet_ipv4_range -o ens3 -m state --state NEW -j MASQUERADE", private_ipv4: vm.nics.first.private_ipv4, subnet_ipv4_range: kubernetes_cluster.private_subnet.net4)
     vm.sshable.cmd("sudo nft --file -", stdin: <<TEMPLATE)
 table ip6 pod_access;
 delete table ip6 pod_access;
