@@ -1,15 +1,19 @@
 # frozen_string_literal: true
 
+require_relative "../../../model/spec_helper"
+
 RSpec.describe Prog::Vnet::Metal::NicNexus do
   subject(:nx) {
     described_class.new(st)
   }
 
   let(:st) { Strand.new }
+  let(:project) { Project.create(name: "test") }
   let(:ps) {
     PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "10.0.0.0/26", state: "waiting", project_id: Project.create(name: "test").id).tap { it.id = "57afa8a7-2357-4012-9632-07fbe13a3133" }
+      net4: "10.0.0.0/26", state: "waiting", project_id: project.id)
   }
+  let(:ps_strand) { Strand.create_with_id(ps, prog: "Vnet::SubnetNexus", label: "wait") }
 
   describe "#start" do
     it "naps if nothing to do" do
@@ -29,16 +33,18 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
     end
 
     it "incrs refresh_keys when setup_nic is set" do
-      private_subnet = instance_double(PrivateSubnet)
-      nic = instance_double(Nic, private_subnet: private_subnet)
+      ps_strand  # ensure strand exists for semaphore
+      nic = Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.1", mac: "00:00:00:00:00:00",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-setup", state: "initializing")
 
       expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
       expect(nx).to receive(:decr_setup_nic)
-      expect(private_subnet).to receive(:incr_refresh_keys)
-      expect(nic).to receive(:update).with(state: "creating")
       expect { nx.wait_setup }.to nap(5)
+      expect(nic.reload.state).to eq("creating")
+      expect(Semaphore.where(strand_id: ps.id, name: "refresh_keys").count).to eq(1)
     end
 
     it "starts rekeying if setup is triggered" do
@@ -49,7 +55,11 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
   end
 
   describe "#wait" do
-    let(:nic) { instance_double(Nic, private_subnet: instance_double(PrivateSubnet, location: instance_double(Location, aws?: false), incr_refresh_keys: true)) }
+    let(:nic) {
+      Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:def::",
+        private_ipv4: "10.0.0.2", mac: "00:00:00:00:00:01",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-wait", state: "active")
+    }
 
     before do
       allow(nx).to receive(:nic).and_return(nic)
@@ -71,7 +81,11 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
   end
 
   describe "#rekey" do
-    let(:nic) { instance_double(Nic) }
+    let(:nic) {
+      Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:1::",
+        private_ipv4: "10.0.0.3", mac: "00:00:00:00:00:02",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-rekey", state: "active")
+    }
 
     before do
       allow(nx).to receive(:nic).and_return(nic)
@@ -120,39 +134,30 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
 
     it "hops to wait if drop_old_state is completed, updates state if it's not active yet" do
       expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
-      expect(nic).to receive(:state).and_return("creating")
-      expect(nic).to receive(:update).with(state: "active")
+      nic.update(state: "creating")
       expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+      expect(nic.reload.state).to eq("active")
     end
 
-    it "hops to wait if drop_old_state is completed, doesn't update state and refreshes keys if it's already active" do
+    it "hops to wait if drop_old_state is completed, doesn't update state if it's already active" do
       expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
-      expect(nic).to receive(:state).and_return("active")
-      expect(nic).not_to receive(:update)
-      expect(nic).not_to receive(:private_subnet)
-      expect(ps).not_to receive(:incr_refresh_keys)
+      nic.update(state: "active")
       expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
+      expect(nic.reload.state).to eq("active")
     end
   end
 
   describe "#destroy" do
-    let(:ps) {
-      PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fbb::/64",
-        net4: "1.1.1.0/26", state: "waiting", project_id: Project.create(name: "test").id)
+    let(:destroy_project) { Project.create(name: "destroy-test") }
+    let(:destroy_ps) {
+      PrivateSubnet.create(name: "destroy-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10:9b0b:6b4b:8fcc::/64",
+        net4: "1.1.1.0/26", state: "waiting", project_id: destroy_project.id)
     }
+    let(:destroy_ps_strand) { Strand.create_with_id(destroy_ps, prog: "Vnet::SubnetNexus", label: "wait") }
     let(:nic) {
-      Nic.new(private_subnet_id: ps.id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.1",
-        mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
-    }
-    let(:ipsec_tunnels) {
-      [
-        instance_double(IpsecTunnel),
-        instance_double(IpsecTunnel)
-      ]
+      Nic.create(private_subnet_id: destroy_ps.id, private_ipv6: "fd10:9b0b:6b4b:8fcc:abc::",
+        private_ipv4: "1.1.1.1", mac: "00:00:00:00:00:03",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-destroy", state: "active")
     }
 
     before do
@@ -160,34 +165,32 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
     end
 
     it "destroys nic" do
-      expect(nic).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(ps).to receive(:incr_refresh_keys).and_return(true)
-      expect(nic).to receive(:destroy).and_return(true)
+      destroy_ps_strand  # ensure strand exists for semaphore
       expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+      expect(nic.exists?).to be false
+      expect(Semaphore.where(strand_id: destroy_ps.id, name: "refresh_keys").count).to eq(1)
     end
 
     it "fails if there is vm attached" do
-      expect(nic).to receive(:vm).and_return(true)
+      vm = create_vm(project_id: destroy_project.id)
+      nic.update(vm_id: vm.id)
       expect { nx.destroy }.to nap(5)
     end
   end
 
   describe "nic fetch" do
-    let(:nic) {
-      Nic.new(private_subnet_id: ps.id,
-        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
-        private_ipv4: "10.0.0.1",
-        mac: "00:00:00:00:00:00",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
-        name: "default-nic").tap { it.id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e" }
+    let(:fetch_nic) {
+      Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:2::",
+        private_ipv4: "10.0.0.4", mac: "00:00:00:00:00:04",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-fetch", state: "active")
     }
 
     before do
-      nx.instance_variable_set(:@nic, nic)
+      nx.instance_variable_set(:@nic, fetch_nic)
     end
 
     it "returns nic" do
-      expect(nx.nic).to eq(nic)
+      expect(nx.nic).to eq(fetch_nic)
     end
   end
 end
