@@ -107,5 +107,4 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
     raise message
   end
-  private_class_method :until_random_ip
 end
