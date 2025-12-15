@@ -145,6 +145,8 @@ BASH
 
   label def rotate_cleanup
     # Check what processes are using the rotate user before attempting deletion
+    sshable.cmd("sudo loginctl terminate-user :rotate_user", rotate_user: ROTATE_USER)
+
     procs = sshable.cmd("ps -u :rotate_user -o pid,comm,args 2>/dev/null || true", rotate_user: ROTATE_USER)
     unless procs.strip.empty?
       Clog.emit("Processes using rotate user") { {rotate_user_processes: {user: ROTATE_USER, output: procs}} }
