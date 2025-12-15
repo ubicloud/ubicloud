@@ -15,6 +15,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       project_id: minio_project.id
     )
   }
+  let(:minio_cluster_strand) { Strand.create_with_id(minio_cluster, prog: "Minio::MinioClusterNexus", label: "wait") }
   let(:ps) {
     Prog::Vnet::SubnetNexus.assemble(minio_project.id, name: "minio-cluster-name", location_id: Location::HETZNER_FSN1_ID)
   }
@@ -22,7 +23,6 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
   let(:minio_project) { Project.create(name: "default") }
 
   before do
-    allow(minio_cluster).to receive(:project).and_return(minio_project)
     allow(Config).to receive(:minio_service_project_id).and_return(minio_project.id)
   end
 
@@ -65,27 +65,22 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe "#wait_servers" do
     it "waits if nothing to do" do
-      st = instance_double(Strand, label: "wait_servers")
-      ms = instance_double(MinioServer, strand: st)
-      expect(nx.minio_pool).to receive(:servers).and_return([ms])
+      # Server strand starts at "start", not "wait" - so it waits
       expect { nx.wait_servers }.to nap(5)
     end
 
     it "hops to wait if all servers are waiting" do
-      st = instance_double(Strand, label: "wait")
-      ms = instance_double(MinioServer, strand: st)
-      expect(nx.minio_pool).to receive(:servers).and_return([ms])
+      nx.minio_pool.servers.each { it.strand.update(label: "wait") }
       expect { nx.wait_servers }.to hop("wait")
     end
 
     it "triggers reconfigure if addition_pool_set" do
-      st = instance_double(Strand, label: "wait")
-      ms = instance_double(MinioServer, strand: st)
-      expect(nx.minio_pool).to receive(:servers).and_return([ms])
-      expect(nx).to receive(:when_add_additional_pool_set?).and_yield
-      expect(nx.minio_pool.cluster).to receive(:incr_reconfigure)
-      expect(nx).to receive(:decr_add_additional_pool)
+      minio_cluster_strand
+      nx.minio_pool.servers.each { it.strand.update(label: "wait") }
+      nx.incr_add_additional_pool
       expect { nx.wait_servers }.to hop("wait")
+      expect(Semaphore.where(strand_id: nx.minio_pool.id, name: "add_additional_pool").count).to eq(0)
+      expect(Semaphore.where(strand_id: minio_cluster.id, name: "reconfigure").count).to eq(1)
     end
   end
 
@@ -97,24 +92,23 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
 
   describe "#destroy" do
     it "increments destroy semaphore of minio servers and hops to wait_servers_destroy" do
-      expect(nx).to receive(:decr_destroy)
-      ms = instance_double(MinioServer)
-      expect(ms).to receive(:incr_destroy)
-      expect(nx.minio_pool).to receive(:servers).and_return([ms])
+      nx.incr_destroy
+      server_ids = nx.minio_pool.servers.map(&:id)
       expect { nx.destroy }.to hop("wait_servers_destroyed")
+      expect(Semaphore.where(strand_id: nx.minio_pool.id, name: "destroy").count).to eq(0)
+      server_ids.each { expect(Semaphore.where(strand_id: it, name: "destroy").count).to eq(1) }
     end
   end
 
   describe "#wait_servers_destroyed" do
     it "naps if there are still minio servers" do
-      expect(nx.minio_pool).to receive(:servers).and_return([true])
+      # Pool already has servers from assemble
       expect { nx.wait_servers_destroyed }.to nap(5)
     end
 
     it "pops if all minio servers are destroyed" do
-      expect(nx.minio_pool).to receive(:servers).and_return([])
-      expect(nx.minio_pool).to receive(:destroy)
-
+      # Destroy all servers to simulate they're gone
+      MinioServer.where(minio_pool_id: nx.minio_pool.id).destroy
       expect { nx.wait_servers_destroyed }.to exit({"msg" => "pool destroyed"})
     end
   end
