@@ -40,9 +40,24 @@ RSpec.describe MinioServer do
   end
 
   it "returns private ipv4 address properly" do
-    nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("192.168.0.0/32"))
-    expect(ms.vm).to receive(:nics).and_return([nic]).at_least(:once)
-    expect(ms.private_ipv4_address).to eq("192.168.0.0")
+    ps = PrivateSubnet.create(
+      name: "test-ps",
+      location_id: Location::HETZNER_FSN1_ID,
+      net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "10.0.0.0/26",
+      state: "waiting",
+      project_id: ms.vm.project_id
+    )
+    Nic.create(
+      private_subnet_id: ps.id,
+      private_ipv4: "192.168.0.5/32",
+      private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+      mac: "00:00:00:00:00:01",
+      name: "test-nic",
+      vm_id: ms.vm.id,
+      state: "active"
+    )
+    expect(ms.private_ipv4_address).to eq("192.168.0.5")
   end
 
   it "returns public ipv4 address properly" do
@@ -149,11 +164,16 @@ RSpec.describe MinioServer do
   end
 
   it "generates /etc/hosts entries properly when there are multiple servers" do
-    servers = [instance_double(described_class, id: ms.id, public_ipv4_address: "1.1.1.1", hostname: "minio-cluster-name1.minio.ubicloud.com"),
-      instance_double(described_class, id: 2, public_ipv4_address: "1.1.1.2", hostname: "minio-cluster-name2.minio.ubicloud.com")]
-    mc = instance_double(MinioCluster, name: "minio-cluster-name", servers: servers)
-    expect(ms).to receive(:cluster).and_return(mc).at_least(:once)
-    expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name2.minio.ubicloud.com")
+    vm2 = create_vm(project_id: ms.cluster.project_id, name: "test-vm-2")
+    AssignedVmAddress.create(dst_vm_id: vm2.id, ip: "1.1.1.2/32")
+    described_class.create(
+      minio_pool_id: ms.pool.id,
+      vm_id: vm2.id,
+      index: 1,
+      cert: "cert2"
+    )
+
+    expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name1.minio.ubicloud.com")
   end
 
   describe "#url" do
