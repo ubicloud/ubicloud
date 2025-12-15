@@ -4,7 +4,6 @@ require_relative "../spec_helper"
 
 RSpec.describe VictoriaMetricsServer do
   subject(:vms) {
-    vm = create_vm(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
     vmr = VictoriaMetricsResource.create(
       location_id: Location::HETZNER_FSN1_ID,
       name: "victoria-metrics-cluster",
@@ -14,15 +13,31 @@ RSpec.describe VictoriaMetricsServer do
       root_cert_2: "dummy-root-cert-2",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      project_id: vm.project_id
+      project_id: project.id
     )
 
-    described_class.create(
+    server = described_class.create(
       victoria_metrics_resource_id: vmr.id,
       vm_id: vm.id,
       cert: "cert",
       cert_key: "cert-key"
     )
+    Strand.create_with_id(server, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait")
+    server
+  }
+
+  let(:project) { Project.create(name: "vm-test-project") }
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+      net4: "10.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+    )
+  }
+  let(:vm) {
+    Prog::Vm::Nexus.assemble_with_sshable(
+      project.id, name: "test-vm", private_subnet_id: private_subnet.id,
+      location_id: Location::HETZNER_FSN1_ID
+    ).subject.update(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
   }
 
   it "returns public ipv6 address properly" do
@@ -43,8 +58,9 @@ RSpec.describe VictoriaMetricsServer do
       unix_server = instance_double(UNIXServer)
       forward = instance_double(Net::SSH::Service::Forward)
       session = Net::SSH::Connection::Session.allocate
-      sshable = Sshable.new
       client = instance_double(VictoriaMetrics::Client)
+
+      sshable = vms.vm.sshable
 
       expect(FileUtils).to receive(:rm_rf).with(socket_path)
       expect(FileUtils).to receive(:mkdir_p).with(socket_path)
@@ -52,8 +68,6 @@ RSpec.describe VictoriaMetricsServer do
       expect(forward).to receive(:local)
       expect(session).to receive(:forward).and_return(forward)
       expect(sshable).to receive(:start_fresh_session).and_return(session)
-      expect(vms.vm).to receive(:sshable).and_return(sshable)
-      expect(vms).to receive(:private_ipv4_address).and_return("192.168.1.1")
       expect(VictoriaMetrics::Client).to receive(:new).with(
         endpoint: vms.endpoint,
         ssl_ca_data: vms.resource.root_certs,
@@ -120,16 +134,10 @@ RSpec.describe VictoriaMetricsServer do
       session = {victoria_metrics_client: client}
 
       expect(client).to receive(:health).and_return(false)
-      expect(vms).to receive(:aggregate_readings).with(
-        previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60},
-        reading: "down"
-      ).and_return({reading: "down", reading_rpt: 6, reading_chg: fixed_time - 60})
+      previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60}
 
-      expect(vms).to receive(:reload).and_return(vms)
-      expect(vms).to receive(:checkup_set?).and_return(false)
-      expect(vms).to receive(:incr_checkup)
-
-      vms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60})
+      vms.check_pulse(session: session, previous_pulse: previous_pulse)
+      expect(vms.reload.checkup_set?).to be true
     end
 
     it "does not increment checkup semaphore when already set" do
@@ -137,16 +145,11 @@ RSpec.describe VictoriaMetricsServer do
       session = {victoria_metrics_client: client}
 
       expect(client).to receive(:health).and_return(false)
-      expect(vms).to receive(:aggregate_readings).with(
-        previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60},
-        reading: "down"
-      ).and_return({reading: "down", reading_rpt: 6, reading_chg: fixed_time - 60})
+      vms.incr_checkup  # Pre-set the semaphore
+      previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60}
 
-      expect(vms).to receive(:reload).and_return(vms)
-      expect(vms).to receive(:checkup_set?).and_return(true)
-      expect(vms).not_to receive(:incr_checkup)
-
-      vms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60})
+      vms.check_pulse(session: session, previous_pulse: previous_pulse)
+      expect(vms.reload.strand.semaphores.count { it.name == "checkup" }).to eq(1)
     end
   end
 
@@ -198,8 +201,9 @@ RSpec.describe VictoriaMetricsServer do
 
   describe "#private_ipv4_address" do
     it "returns the vms private ipv4 address" do
-      expect(vms.vm).to receive(:private_ipv4).and_return("10.0.0.43")
-      expect(vms.private_ipv4_address).to eq("10.0.0.43")
+      # VM created by assemble_with_sshable has a NIC with private IPv4
+      # Verify it returns the same value as vm.private_ipv4
+      expect(vms.private_ipv4_address).to eq(vms.vm.private_ipv4.to_s)
     end
   end
 end
