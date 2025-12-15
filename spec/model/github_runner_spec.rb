@@ -23,6 +23,8 @@ RSpec.describe GithubRunner do
 
   it "can log duration with a vm" do
     vm = github_runner.vm
+    boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)
+    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 75, disk_index: 0, boot_image_id: boot_image.id)
     expect(clog_emit_hash).to eq({
       repository_name: "test-repo",
       ubid: github_runner.ubid,
@@ -31,6 +33,7 @@ RSpec.describe GithubRunner do
       conclusion: nil,
       vm_ubid: vm.ubid,
       arch: vm.arch,
+      boot_image: boot_image.version,
       cores: vm.cores,
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
@@ -50,6 +53,7 @@ RSpec.describe GithubRunner do
       conclusion: nil,
       vm_ubid: vm.ubid,
       arch: vm.arch,
+      boot_image: vm.boot_image,
       cores: vm.cores,
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
@@ -71,6 +75,7 @@ RSpec.describe GithubRunner do
       conclusion: nil,
       vm_ubid: vm.ubid,
       arch: vm.arch,
+      boot_image: vm.boot_image,
       cores: vm.cores,
       vcpus: vm.vcpus
     })
