@@ -10,11 +10,13 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     }
   }
 
+  let(:project) { Project.create(name: "test") }
+  let(:installation) { GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User") }
+  let(:github_repository_id) { GithubRepository.generate_uuid }
   let(:github_repository) {
-    GithubRepository.new(name: "ubicloud/ubicloud", last_job_at: Time.now).tap {
-      it.id = "31b9c46a-602a-8616-ae2f-41775cb592dd"
-    }
+    GithubRepository.create_with_id(github_repository_id, name: "ubicloud/ubicloud", last_job_at: Time.now, installation_id: installation.id)
   }
+  let(:github_repository_strand) { Strand.create_with_id(github_repository_id, prog: "Github::GithubRepositoryNexus", label: "wait") }
 
   describe ".assemble" do
     it "creates github repository or updates last_job_at if the repository exists" do
@@ -42,14 +44,16 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     before do
       allow(Github).to receive(:installation_client).and_return(client)
       allow(client).to receive(:auto_paginate=)
-      installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User")
-      expect(github_repository).to receive(:installation).and_return(installation).at_least(:once)
-      expect(installation).to receive(:project).and_return(instance_double(Project, active?: true)).at_least(:once)
     end
 
     it "creates extra runner if needed" do
       GithubCustomLabel.create(installation_id: github_repository.installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
       GithubCustomLabel.create(installation_id: github_repository.installation.id, name: "custom-label-2", alias_for: "ubicloud-standard-8")
+
+      # Create existing runners (idle, no workflow_job) - these reduce the number of new runners needed
+      GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud", workflow_job: nil)
+      GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "ubicloud-standard-8", workflow_job: nil)
+      GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "custom-label-1", workflow_job: nil)
 
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued"},
@@ -69,12 +73,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 2, 1).and_return({jobs: [
         {status: "queued", labels: ["ubicloud"]}
       ]})
-      expect(github_repository).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset)).at_least(:once)
-      expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "ubicloud", workflow_job: nil).and_return([instance_double(GithubRunner)])
-      expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "ubicloud-standard-4", workflow_job: nil).and_return([])
-      expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "ubicloud-standard-8", workflow_job: nil).and_return([instance_double(GithubRunner)])
-      expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "custom-label-1", workflow_job: nil).and_return([instance_double(GithubRunner)])
-      expect(github_repository.runners_dataset).to receive(:where).with(actual_label: "custom-label-2", workflow_job: nil).and_return([])
       expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud", actual_label: "ubicloud").twice
       expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4")
       expect(Prog::Github::GithubRunnerNexus).not_to receive(:assemble).with(github_repository.installation, repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-8", actual_label: "ubicloud-standard-8")
@@ -88,7 +86,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
       now = Time.now
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
-      expect(Time).to receive(:now).and_return(now)
+      allow(Time).to receive(:now).and_return(now)
       nx.check_queued_jobs
       expect(nx.polling_interval).to eq(8 * 60)
     end
@@ -111,10 +109,6 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     let(:blob_storage_client) { instance_double(Aws::S3::Client) }
 
     before do
-      project = Project.create(name: "test")
-      installation = GithubInstallation.create(installation_id: 123, project_id: project.id, name: "test-user", type: "User")
-      github_repository.installation_id = installation.id
-      github_repository.save_changes
       allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
     end
 
@@ -203,16 +197,18 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "does not destroys repository and if not found but has active runners" do
+      github_repository_strand  # ensure strand exists
+      GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
       expect(nx).to receive(:check_queued_jobs).and_raise(Octokit::NotFound)
-      expect(github_repository).to receive(:runners).and_return([instance_double(GithubRunner)])
-      expect(github_repository).not_to receive(:incr_destroy)
       expect { nx.wait }.to nap(5 * 60)
+      expect(Semaphore.where(strand_id: github_repository_id, name: "destroy").count).to eq(0)
     end
 
     it "destroys repository and if not found" do
+      github_repository_strand  # ensure strand exists
       expect(nx).to receive(:check_queued_jobs).and_raise(Octokit::NotFound)
-      expect(github_repository).to receive(:incr_destroy)
       expect { nx.wait }.to nap(0)
+      expect(Semaphore.where(strand_id: github_repository_id, name: "destroy").count).to eq(1)
     end
 
     it "does not poll if it is disabled" do
@@ -225,7 +221,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
   describe "#destroy" do
     it "does not destroy if has active runner" do
-      expect(github_repository).to receive(:runners).and_return([instance_double(GithubRunner)])
+      GithubRunner.create(repository_id: github_repository.id, repository_name: "ubicloud/ubicloud", label: "ubicloud")
       expect { nx.destroy }.to nap(5 * 60)
     end
 
