@@ -10,12 +10,8 @@ class Prog::SshKeyRotator < Prog::Base
 
   def self.assemble(sshable_id)
     DB.transaction do
-      unless (sshable = Sshable[sshable_id])
-        fail "Sshable not found"
-      end
-
       id = SshKeyRotator.generate_uuid
-      SshKeyRotator.create_with_id(id, sshable_id: sshable.id)
+      SshKeyRotator.create_with_id(id, sshable_id: sshable_id)
       Strand.create_with_id(id, prog: "SshKeyRotator", label: "wait")
     end
   end
