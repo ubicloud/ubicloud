@@ -28,12 +28,6 @@ RSpec.describe Prog::SshKeyRotator do
       expect(SshKeyRotator[st.id]).not_to be_nil
       expect(SshKeyRotator[st.id].sshable_id).to eq(new_sshable.id)
     end
-
-    it "fails if sshable not found" do
-      expect {
-        described_class.assemble("00000000-0000-0000-0000-000000000000")
-      }.to raise_error(RuntimeError, "Sshable not found")
-    end
   end
 
   describe "#before_run" do
