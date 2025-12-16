@@ -22,8 +22,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     DB.transaction do
       postgres_timeline = PostgresTimeline.create(
         parent_id: parent_id,
-        access_key: SecureRandom.hex(16),
-        secret_key: SecureRandom.hex(32),
+        access_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(16),
+        secret_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(32),
         location_id: location.id
       )
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
