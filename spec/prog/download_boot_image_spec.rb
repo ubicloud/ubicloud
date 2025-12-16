@@ -12,8 +12,10 @@ RSpec.describe Prog::DownloadBootImage do
   let(:vm_host) { create_vm_host }
 
   before do
-    allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
-    allow(dbi_without_version).to receive_messages(sshable: sshable, vm_host: vm_host)
+    dbi.instance_variable_set(:@sshable, sshable)
+    dbi.instance_variable_set(:@vm_host, vm_host)
+    dbi_without_version.instance_variable_set(:@sshable, sshable)
+    dbi_without_version.instance_variable_set(:@vm_host, vm_host)
   end
 
   describe "#start" do
@@ -226,7 +228,8 @@ RSpec.describe Prog::DownloadBootImage do
     it "checks the correct path if version is nil" do
       BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
       dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
-      allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
+      dbi.instance_variable_set(:@sshable, sshable)
+      dbi.instance_variable_set(:@vm_host, vm_host)
       sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
@@ -245,7 +248,7 @@ RSpec.describe Prog::DownloadBootImage do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       expect(bi.activated_at).to be_nil
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
-      expect(bi.reload.activated_at).not_to be_nil
+      expect(bi.reload.activated_at).to be <= Time.now
     end
   end
 end
