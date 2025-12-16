@@ -23,7 +23,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
       target_storage_size_gib: 64, private_subnet_id: private_subnet.id
     )
-    Strand.create_with_id(pr.id, prog: "Postgres::PostgresResourceNexus", label: "wait")
+    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
     pr
   }
 
@@ -53,14 +53,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       representative_at: representative ? Time.now : nil,
       synchronization_status: "ready", timeline_access: timeline_access, version: version
     )
-    Strand.create_with_id(server.id, prog: "Postgres::PostgresServerNexus", label: "wait")
+    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
     server
-  end
-
-  def create_mock_sshable_for_vm(vm)
-    sshable = create_mock_sshable(host: "1.1.1.1")
-    allow(vm).to receive(:sshable).and_return(sshable)
-    sshable
   end
 
   it "exits if destroy is set" do
@@ -76,7 +70,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
-      Strand.create_with_id(parent.id, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
       postgres_resource.update(parent_id: parent.id)
       allow(parent).to receive(:ready_for_read_replica?).and_return(false)
       allow(postgres_resource).to receive(:parent).and_return(parent)
@@ -91,7 +85,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
-      Strand.create_with_id(parent.id, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
       postgres_resource.update(parent_id: parent.id)
       allow(parent).to receive(:ready_for_read_replica?).and_return(true)
       allow(postgres_resource).to receive(:parent).and_return(parent)
@@ -176,7 +170,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
-      Strand.create_with_id(parent.id, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
       # Create a server for parent so it has a timeline
       create_server(timeline: parent_timeline, representative: true, timeline_access: "push", resource: parent)
 
@@ -270,7 +264,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
-      Strand.create_with_id(parent.id, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
       postgres_resource.update(parent_id: parent.id)
 
       allow(postgres_resource).to receive_messages(in_maintenance_window?: true, has_enough_fresh_servers?: true, version: "16")
@@ -302,7 +296,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
   describe "#upgrade_standby" do
     let(:candidate) { create_server(version: "16") }
-    let(:sshable) { create_mock_sshable_for_vm(candidate.vm) }
+    let(:sshable) { candidate.vm.sshable }
 
     before do
       strand.update(label: "upgrade_standby")
@@ -384,7 +378,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   describe "#upgrade_failed" do
     let(:candidate) { create_server(version: "16") }
     let(:primary) { create_server(representative: true) }
-    let(:sshable) { create_mock_sshable_for_vm(candidate.vm) }
+    let(:sshable) { candidate.vm.sshable }
 
     before do
       strand.update(label: "upgrade_failed")
@@ -394,7 +388,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "logs failure, raises a page and destroys candidate server" do
-      expect(sshable).to receive(:cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
+      expect(sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed").and_yield.twice
       expect(Prog::PageNexus).to receive(:assemble)
       expect(primary).to receive(:incr_unfence)
@@ -405,7 +399,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "unfences primary if it is fenced" do
-      allow(sshable).to receive(:cmd).and_return("")
+      allow(sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
       expect(primary).to receive(:incr_unfence)
 
@@ -414,7 +408,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "does not unfence if primary is not fenced" do
       primary.strand.update(label: "wait")
-      allow(sshable).to receive(:cmd).and_return("")
+      allow(sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
       expect(primary).not_to receive(:incr_unfence)
 
