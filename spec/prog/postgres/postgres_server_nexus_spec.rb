@@ -1159,16 +1159,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#taking_over" do
-    it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run promote_postgres sudo postgres/bin/promote 16", {log: true, stdin: nil}).twice
+    it "triggers promote if promote command is not sent yet" do
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16")
 
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("NotStarted", "Failed")
-      expect { nx.taking_over }.to nap(0)
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
       expect { nx.taking_over }.to nap(0)
     end
 
+    it "triggers a page and retries if promote command is failed" do
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16")
+
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
+      expect { nx.taking_over }.to nap(0)
+      expect(Page.where(summary: "#{postgres_server.ubid} promotion failed").count).to eq(1)
+    end
+
     it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, representative: false, timeline_access: "fetch")
 
@@ -1188,6 +1195,36 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
         expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
       end
+    end
+
+    it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
+      page = Prog::PageNexus.assemble(
+        "#{postgres_server.ubid} promotion failed",
+        ["PGPromotionFailed", postgres_server.id],
+        postgres_server.ubid
+      ).subject
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, representative: false, timeline_access: "fetch")
+
+      expect { nx.taking_over }.to hop("configure")
+
+      postgres_server.reload
+      expect(postgres_server.timeline_access).to eq("push")
+      expect(postgres_server.representative_at).not_to be_nil
+      expect(postgres_server.synchronization_status).to eq("ready")
+
+      expect(standby.reload.synchronization_status).to eq("catching_up")
+
+      expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
+
+      [postgres_server, standby].each do |server|
+        expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
+        expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
+        expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
+      end
+
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
 
     it "naps if script return unknown status" do
