@@ -955,15 +955,50 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#taking_over" do
-    it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16").twice
+    it "triggers promote if promote command is not sent yet" do
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16")
 
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted", "Failed")
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
       expect { nx.taking_over }.to nap(0)
+    end
+
+    it "triggers a page and retries if promote command is failed" do
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "pgubid promotion failed", ["PGPromotionFailed", postgres_server.id],
+        "pgubid"
+      ).and_return(instance_double(Prog::PageNexus, bud: nil))
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16")
+
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
       expect { nx.taking_over }.to nap(0)
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
+      expect(Page).to receive(:from_tag_parts).with("PGPromotionFailed", postgres_server.id).and_return(nil)
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+
+      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
+      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
+      expect(postgres_server).to receive(:primary?).and_return(true)
+      expect(postgres_server).to receive(:incr_configure)
+      expect(postgres_server).to receive(:incr_configure_metrics)
+      expect(postgres_server).to receive(:incr_restart)
+
+      standby = instance_double(PostgresServer, primary?: false)
+      expect(standby).to receive(:update).with(synchronization_status: "catching_up")
+      expect(standby).to receive(:incr_configure)
+      expect(standby).to receive(:incr_configure_metrics)
+      expect(standby).to receive(:incr_restart)
+
+      expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
+
+      expect { nx.taking_over }.to hop("configure")
+    end
+
+    it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
+      page = instance_double(Page)
+      expect(Page).to receive(:from_tag_parts).with("PGPromotionFailed", postgres_server.id).and_return(page)
+      expect(page).to receive(:incr_resolve)
       expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
