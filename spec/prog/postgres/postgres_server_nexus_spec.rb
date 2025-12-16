@@ -779,6 +779,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
+    it "decrements and calls attach_s3_policy_if_needed if configure_s3_new_timeline is set" do
+      expect(nx).to receive(:when_configure_s3_new_timeline_set?).and_yield
+      expect(nx).to receive(:decr_configure_s3_new_timeline)
+      expect(postgres_server).to receive(:attach_s3_policy_if_needed)
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
     it "pushes restart if restart is set" do
       expect(nx).to receive(:when_restart_set?).and_yield
       expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original

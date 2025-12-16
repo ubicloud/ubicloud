@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials
+    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -311,8 +311,8 @@ class PostgresServer < Sequel::Model
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push"
     )
-
-    refresh_walg_credentials
+    increment_s3_new_timeline
+    incr_refresh_walg_credentials
   end
 
   def refresh_walg_credentials
