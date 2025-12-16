@@ -592,6 +592,56 @@ usermod -L ubuntu
     end
   end
 
+  describe "#cloudwatch_policy" do
+    it "finds policy on first page" do
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}], is_truncated: false)
+      policy = nx.cloudwatch_policy
+      expect(policy).not_to be_nil
+      expect(policy.policy_name).to eq("#{vm.name}-cw-agent-policy")
+    end
+
+    it "paginates through multiple pages to find policy" do
+      # First page: no match, has more pages
+      first_response = iam_client.stub_data(:list_policies, {
+        policies: [{policy_name: "other-policy-1", arn: "arn:aws:iam::aws:policy/other-policy-1"}],
+        is_truncated: true,
+        marker: "next-page-marker"
+      })
+
+      # Second page: has the policy we're looking for
+      second_response = iam_client.stub_data(:list_policies, {
+        policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}],
+        is_truncated: false
+      })
+
+      iam_client.stub_responses(:list_policies, first_response, second_response)
+
+      policy = nx.cloudwatch_policy
+      expect(policy).not_to be_nil
+      expect(policy.policy_name).to eq("#{vm.name}-cw-agent-policy")
+    end
+
+    it "returns nil when policy not found after all pages" do
+      # First page: no match, has more pages
+      first_response = iam_client.stub_data(:list_policies, {
+        policies: [{policy_name: "other-policy-1", arn: "arn:aws:iam::aws:policy/other-policy-1"}],
+        is_truncated: true,
+        marker: "next-page-marker"
+      })
+
+      # Second page: no match, last page
+      second_response = iam_client.stub_data(:list_policies, {
+        policies: [{policy_name: "other-policy-2", arn: "arn:aws:iam::aws:policy/other-policy-2"}],
+        is_truncated: false
+      })
+
+      iam_client.stub_responses(:list_policies, first_response, second_response)
+
+      policy = nx.cloudwatch_policy
+      expect(policy).to be_nil
+    end
+  end
+
   describe "#cleanup_roles" do
     it "cleans up roles" do
       allow(Config).to receive(:aws_postgres_iam_access).and_return(true)

@@ -368,7 +368,22 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def cloudwatch_policy
-    @cloudwatch_policy ||= iam_client.list_policies(scope: "Local").policies.find { |p| p.policy_name == policy_name }
+    @cloudwatch_policy ||= begin
+      marker = nil
+      found_policy = nil
+      loop do
+        response = iam_client.list_policies(scope: "Local", marker: marker, max_items: 100)
+        policy = response.policies.find { |p| p.policy_name == policy_name }
+        if policy
+          found_policy = policy
+          break
+        end
+
+        break unless response.is_truncated
+        marker = response.marker
+      end
+      found_policy
+    end
   end
 
   def policy_name
