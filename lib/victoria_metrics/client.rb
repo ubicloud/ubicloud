@@ -18,9 +18,9 @@ class VictoriaMetrics::Client
         cert = OpenSSL::X509::Certificate.new(cert_pem)
         cert_store.add_cert(cert)
       end
-      Excon.new(endpoint, socket: socket, ssl_cert_store: cert_store)
+      Excon.new(endpoint, socket:, ssl_cert_store: cert_store)
     else
-      Excon.new(endpoint, socket: socket)
+      Excon.new(endpoint, socket:)
     end
   end
 
@@ -73,7 +73,7 @@ class VictoriaMetrics::Client
       headers["Authorization"] = "Basic #{auth}"
     end
 
-    response = @client.request(method: method, path: full_path, body: body, headers: headers)
+    response = @client.request(method:, path: full_path, body:, headers:)
     if [200, 204, 206, 404].include?(response.status)
       response
     else

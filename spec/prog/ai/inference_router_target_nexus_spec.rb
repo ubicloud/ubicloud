@@ -12,7 +12,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   let(:inference_router) do
     Prog::Ai::InferenceRouterNexus.assemble(
       project_id: project.id,
-      location_id: location_id
+      location_id:
     )
   end
 
@@ -45,7 +45,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       name: "target",
       priority: 1,
       type: "runpod",
-      config: config,
+      config:,
       inflight_limit: 10
     )
   end
@@ -54,7 +54,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
     Firewall.create(
       name: "inference-router-firewall",
       project_id: project.id,
-      location_id: location_id,
+      location_id:,
       description: "inference-router-firewall"
     )
 

@@ -21,7 +21,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
     DB.transaction do
       postgres_timeline = PostgresTimeline.create(
-        parent_id: parent_id,
+        parent_id:,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
         location_id: location.id

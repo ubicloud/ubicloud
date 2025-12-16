@@ -34,7 +34,7 @@ module Util
     create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{common_name}",
       extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
-      duration: duration
+      duration:
     ).map(&:to_pem)
   end
 

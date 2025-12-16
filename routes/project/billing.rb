@@ -111,7 +111,7 @@ class Clover
           end
         rescue
           # Log and redirect if Stripe card error or our manual raise
-          Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
+          Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id:}} }
           raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
         end
 
@@ -121,7 +121,7 @@ class Clover
             @project.update(billing_info_id: billing_info.id)
           end
 
-          PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
+          PaymentMethod.create(billing_info_id: billing_info.id, stripe_id:, card_fingerprint:, preauth_intent_id: payment_intent.id, preauth_amount:)
         end
 
         unless @project.billing_info.has_address?

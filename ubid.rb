@@ -282,7 +282,7 @@ class UBID
     variant = get_bits(bottom_bits, 62, 63)
     rand_b = get_bits(bottom_bits, 0, 61)
 
-    from_parts(unix_ts_ms, type, rand_a, rand_b, version: version, variant: variant)
+    from_parts(unix_ts_ms, type, rand_a, rand_b, version:, variant:)
   end
 
   def self.from_parts(unix_ts_ms, type, rand_a, rand_b, version: 0b1000, variant: 0b10)

@@ -26,8 +26,8 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
   }
 
   before do
-    allow(nx).to receive_messages(vm_host_slice: vm_host_slice)
-    allow(vm_host_slice).to receive_messages(vm_host: vm_host)
+    allow(nx).to receive_messages(vm_host_slice:)
+    allow(vm_host_slice).to receive_messages(vm_host:)
     (0..15).each { |i|
       VmHostCpu.create(
         spdk: i < 2,

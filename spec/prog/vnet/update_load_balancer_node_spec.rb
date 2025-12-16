@@ -38,7 +38,7 @@ RSpec.describe Prog::Vnet::UpdateLoadBalancerNode do
 
   before do
     lb.add_vm(vm)
-    allow(nx).to receive_messages(vm: vm, load_balancer: lb)
+    allow(nx).to receive_messages(vm:, load_balancer: lb)
     allow(vm).to receive_messages(ip4: NetAddr::IPv4.parse("100.100.100.100"), ip6: NetAddr::IPv6.parse("2a02:a464:deb2:a000::2"))
     allow(vm).to receive(:vm_host).and_return(instance_double(VmHost, sshable: Sshable.new))
   end

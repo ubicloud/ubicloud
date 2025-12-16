@@ -75,26 +75,26 @@ class Invoice < Sequel::Model
     end
 
     if status != "unpaid"
-      Clog.emit("Invoice already charged.") { {invoice_already_charged: {ubid: ubid, status: status}} }
+      Clog.emit("Invoice already charged.") { {invoice_already_charged: {ubid:, status:}} }
       return true
     end
 
     amount = content["cost"].to_f.round(2)
     if amount < Config.minimum_invoice_charge_threshold
       update(status: "below_minimum_threshold")
-      Clog.emit("Invoice cost is less than minimum charge cost.") { {invoice_below_threshold: {ubid: ubid, cost: amount}} }
+      Clog.emit("Invoice cost is less than minimum charge cost.") { {invoice_below_threshold: {ubid:, cost: amount}} }
       send_success_email
       return true
     end
 
     unless (billing_info = BillingInfo[content.dig("billing_info", "id")])
-      Clog.emit("Invoice doesn't have billing info.") { {invoice_no_billing: {ubid: ubid}} }
+      Clog.emit("Invoice doesn't have billing info.") { {invoice_no_billing: {ubid:}} }
       return false
     end
 
     if content["bank_transfer_info"]
       update(status: "waiting_transfer")
-      Clog.emit("Invoice is waiting for transfer.") { {invoice_waiting_transfer: {ubid: ubid, cost: amount}} }
+      Clog.emit("Invoice is waiting for transfer.") { {invoice_waiting_transfer: {ubid:, cost: amount}} }
       send_success_email
       return true
     end
@@ -111,17 +111,17 @@ class Invoice < Sequel::Model
           payment_method: pm.stripe_id
         })
       rescue Stripe::CardError => e
-        Clog.emit("Invoice couldn't charged.") { {invoice_not_charged: {ubid: ubid, payment_method: pm.ubid, error: e.message}} }
+        Clog.emit("Invoice couldn't charged.") { {invoice_not_charged: {ubid:, payment_method: pm.ubid, error: e.message}} }
         errors << e.message
         next
       end
 
       unless payment_intent.status == "succeeded"
-        Clog.emit("BUG: payment intent should succeed here") { {invoice_not_charged: {ubid: ubid, payment_method: pm.ubid, intent_id: payment_intent.id, error: payment_intent.status}} }
+        Clog.emit("BUG: payment intent should succeed here") { {invoice_not_charged: {ubid:, payment_method: pm.ubid, intent_id: payment_intent.id, error: payment_intent.status}} }
         next
       end
 
-      Clog.emit("Invoice charged.") { {invoice_charged: {ubid: ubid, payment_method: pm.ubid, cost: amount}} }
+      Clog.emit("Invoice charged.") { {invoice_charged: {ubid:, payment_method: pm.ubid, cost: amount}} }
       self.status = "paid"
       content.merge!({
         "payment_method" => {
@@ -137,7 +137,7 @@ class Invoice < Sequel::Model
       return true
     end
 
-    Clog.emit("Invoice couldn't charged with any payment method.") { {invoice_not_charged: {ubid: ubid}} }
+    Clog.emit("Invoice couldn't charged with any payment method.") { {invoice_not_charged: {ubid:}} }
     send_failure_email(errors)
     false
   end

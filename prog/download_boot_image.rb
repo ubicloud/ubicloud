@@ -172,7 +172,7 @@ class Prog::DownloadBootImage < Prog::Base
     BootImage.create(
       vm_host_id: vm_host.id,
       name: image_name,
-      version: version,
+      version:,
       activated_at: nil,
       size_gib: 0
     )
@@ -193,7 +193,7 @@ class Prog::DownloadBootImage < Prog::Base
       sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
       sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
       if Config.production? && !Config.is_e2e
-        BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
+        BootImage.where(vm_host_id: vm_host.id, name: image_name, version:).destroy
       else
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       end
@@ -204,7 +204,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def update_available_storage_space
-    image = BootImage[vm_host_id: vm_host.id, name: image_name, version: version]
+    image = BootImage[vm_host_id: vm_host.id, name: image_name, version:]
     image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
@@ -218,7 +218,7 @@ class Prog::DownloadBootImage < Prog::Base
     BootImage.where(
       vm_host_id: vm_host.id,
       name: image_name,
-      version: version
+      version:
     ).update(activated_at: Time.now)
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end

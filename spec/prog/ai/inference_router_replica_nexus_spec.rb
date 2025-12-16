@@ -51,7 +51,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
-    allow(nx).to receive_messages(vm: vm, inference_router: inference_router, inference_router_replica: replica)
+    allow(nx).to receive_messages(vm:, inference_router:, inference_router_replica: replica)
     allow(vm).to receive(:sshable).and_return(sshable)
     load_balancer.add_vm(vm)
     cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)

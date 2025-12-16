@@ -35,7 +35,7 @@ class Prog::LearnCpu < Prog::Base
   label def start
     arch = get_arch
     topo = get_topology
-    topo.total_dies = count_dies(total_sockets: topo.total_sockets, arch: arch)
-    pop(arch: arch, **topo.to_h)
+    topo.total_dies = count_dies(total_sockets: topo.total_sockets, arch:)
+    pop(arch:, **topo.to_h)
   end
 end

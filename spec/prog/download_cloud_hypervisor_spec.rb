@@ -9,7 +9,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
   let(:vm_host) { create_vm_host }
 
   before do
-    allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(df).to receive_messages(sshable:, vm_host:)
   end
 
   describe "#start" do
@@ -24,13 +24,13 @@ RSpec.describe Prog::DownloadCloudHypervisor do
 
     it "fails if sha256 for cloud-hypervisor is nil" do
       df = described_class.new(Strand.new(stack: [{"version" => "35.0", "sha256_ch_bin" => nil, "sha256_ch_remote" => "anothersha"}]))
-      allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
+      allow(df).to receive_messages(sshable:, vm_host:)
       expect { df.start }.to raise_error RuntimeError, "SHA-256 digest of cloud-hypervisor is required"
     end
 
     it "fails if sha256 for ch-remote is nil" do
       df = described_class.new(Strand.new(stack: [{"version" => "35.0", "sha256_ch_bin" => "thesha", "sha256_ch_remote" => nil}]))
-      allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
+      allow(df).to receive_messages(sshable:, vm_host:)
       expect { df.start }.to raise_error RuntimeError, "SHA-256 digest of ch-remote is required"
     end
   end
@@ -44,7 +44,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
 
     it "uses known sha256s" do
       df = described_class.new(Strand.new(stack: [{"version" => "35.1", "sha256_ch_bin" => nil, "sha256_ch_remote" => nil}]))
-      allow(df).to receive_messages(sshable: sshable, vm_host: vm_host)
+      allow(df).to receive_messages(sshable:, vm_host:)
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_ch_35.1").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer host/bin/download-cloud-hypervisor\\ 35.1\\ e8426b0733248ed559bea64eb04d732ce8a471edc94807b5e2ecfdfc57136ab4\\ 337bd88183f6886f1c7b533499826587360f23168eac5aabf38e6d6b977c93b0 download_ch_35.1")
       expect { df.download }.to nap(15)

@@ -37,7 +37,7 @@ RSpec.describe Clover, "github" do
     vm = create_vm
     login_runtime(vm)
     repository = instance_double(GithubRepository, access_key: nil)
-    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(instance_double(GithubRunner, repository: repository))
+    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(instance_double(GithubRunner, repository:))
     expect(repository).to receive(:setup_blob_storage)
 
     post "/runtime/github/caches"
@@ -49,7 +49,7 @@ RSpec.describe Clover, "github" do
     vm = create_vm
     login_runtime(vm)
     repository = instance_double(GithubRepository, access_key: nil)
-    runner = instance_double(GithubRunner, repository: repository)
+    runner = instance_double(GithubRunner, repository:)
     expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(runner)
     expect(runner).to receive(:ubid).and_return(nil)
     expect(repository).to receive(:ubid).and_return(nil)
@@ -79,7 +79,7 @@ RSpec.describe Clover, "github" do
           [nil, "v1"],
           ["k1", nil]
         ].each do |key, version|
-          params = {key: key, version: version}.compact
+          params = {key:, version:}.compact
           post "/runtime/github/caches", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for/)
@@ -204,7 +204,7 @@ RSpec.describe Clover, "github" do
           [nil, "upload-id", 100],
           [["etag-1", "etag-2"], nil, 100]
         ].each do |etags, upload_id, size|
-          params = {etags: etags, uploadId: upload_id, size: size}.compact
+          params = {etags:, uploadId: upload_id, size:}.compact
           post "/runtime/github/caches/commit", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for /)
@@ -264,7 +264,7 @@ RSpec.describe Clover, "github" do
           [nil, "v1"],
           ["", "v1"]
         ].each do |keys, version|
-          params = {keys: keys, version: version}.compact
+          params = {keys:, version:}.compact
           get "/runtime/github/cache", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for |empty string provided for parameter keys/)
@@ -329,7 +329,7 @@ RSpec.describe Clover, "github" do
           ["k2", "v1", "main"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k2", version: "v1"}
@@ -387,7 +387,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
 
         get "/runtime/github/caches", {key: "k1"}
@@ -405,7 +405,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         get "/runtime/github/caches", {key: "k1"}
 

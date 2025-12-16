@@ -26,7 +26,7 @@ RSpec.describe Prog::Vnet::CertServer do
 
   let(:vm) {
     vm_host = instance_double(VmHost, sshable: Sshable.new)
-    instance_double(Vm, inhost_name: "test-vm", vm_host: vm_host, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+    instance_double(Vm, inhost_name: "test-vm", vm_host:, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
   }
 
   before do

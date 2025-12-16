@@ -17,7 +17,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
   let(:vm_host) { create_vm_host(used_hugepages_1g: 0, total_hugepages_1g: 20, total_cpus: 96, os_version: "ubuntu-24.04") }
 
   before do
-    allow(setup_spdk).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(setup_spdk).to receive_messages(sshable:, vm_host:)
   end
 
   describe "#start" do
@@ -65,7 +65,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
   describe "#update_database" do
     it "updates the database and exits" do
       hugepages = 3
-      SpdkInstallation.create_with_id(vm_host, version: spdk_version, vm_host_id: vm_host.id, hugepages: hugepages, allocation_weight: 0)
+      SpdkInstallation.create_with_id(vm_host, version: spdk_version, vm_host_id: vm_host.id, hugepages:, allocation_weight: 0)
       expect { setup_spdk.update_database }.to exit({"msg" => "SPDK was setup"})
       expect(vm_host.reload.used_hugepages_1g).to eq(hugepages)
       expect(vm_host.spdk_installations.first.allocation_weight).to eq(50)

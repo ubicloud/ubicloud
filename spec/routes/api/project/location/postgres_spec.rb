@@ -428,7 +428,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
-          restore_target: restore_target
+          restore_target:
 
         }.to_json
 

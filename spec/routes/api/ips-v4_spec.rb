@@ -14,7 +14,7 @@ RSpec.describe Clover, "ips-v4" do
       3.1.1.0/30
       5.1.1.0/32
     ].each do |cidr|
-      Address.create(cidr: cidr, routed_to_host_id: hosts.sample.id)
+      Address.create(cidr:, routed_to_host_id: hosts.sample.id)
     end
 
     addresses = Util.calculate_ips_v4

@@ -112,7 +112,7 @@ module Csi
           topology = existing ? existing[:accessible_topology] : selected_topology
           CreateVolumeResponse.new(
             volume: Volume.new(
-              volume_id: volume_id,
+              volume_id:,
               capacity_bytes: req.capacity_range.required_bytes,
               volume_context: req.parameters.to_h.merge("size_bytes" => req.capacity_range.required_bytes.to_s),
               accessible_topology: [topology]

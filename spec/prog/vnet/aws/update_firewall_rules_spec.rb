@@ -14,7 +14,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
     nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32"), private_ipv6: NetAddr::IPv6Net.parse("fd00::1/128"), ubid_to_tap_name: "tap0")
     ephemeral_net6 = NetAddr::IPv6Net.parse("fd00::1/79")
     location = Location.create(name: "us-west-2", provider: "aws", display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    instance_double(Vm, project: instance_double(Project, get_ff_ipv6_disabled: false), private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6: ephemeral_net6, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: location.id)
+    instance_double(Vm, project: instance_double(Project, get_ff_ipv6_disabled: false), private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6:, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: location.id)
   }
 
   describe "#before_run" do

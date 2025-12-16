@@ -22,9 +22,9 @@ RSpec.describe InvoiceGenerator do
       project_id: project.id,
       resource_id: resource.id,
       resource_name: name,
-      span: span,
-      billing_rate_id: billing_rate_id,
-      amount: amount
+      span:,
+      billing_rate_id:,
+      amount:
     )
   end
 

@@ -40,8 +40,8 @@ ff02::3 ip6-allhosts
 #{minio_server.generate_etc_hosts_entry}
 ECHO
       config_json = JSON.generate({
-        minio_config: minio_config,
-        hosts: hosts,
+        minio_config:,
+        hosts:,
         cert: minio_server.cert,
         cert_key: minio_server.cert_key,
         ca_bundle: minio_server.cluster.root_certs

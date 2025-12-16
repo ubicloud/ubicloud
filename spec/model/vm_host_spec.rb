@@ -14,7 +14,7 @@ RSpec.describe VmHost do
   let(:cidr) { NetAddr::IPv4Net.parse("0.0.0.0/30") }
   let(:address) {
     Address.new(
-      cidr: cidr,
+      cidr:,
       routed_to_host_id: "46683a25-acb1-4371-afe9-d39f303e44b4"
     )
   }
@@ -399,12 +399,12 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
     expect(vh).to receive(:reload).and_return(vh)
     expect(vh).to receive(:incr_checkup)
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse on a non-default mountpoint with kernel errors" do
@@ -421,7 +421,7 @@ RSpec.describe VmHost do
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     expect(vh).to receive(:check_storage_read_write).and_return(true)
     allow(session[:ssh_session]).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("Nov 04 12:18:04 ubuntu kernel: Buffer I/O error on dev sda, logical block 1032, lost async page write", 0))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse on a with read/write errors" do
@@ -441,7 +441,7 @@ RSpec.describe VmHost do
     expect(session[:ssh_session]).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("failed to write file", 1))
     expect(session[:ssh_session]).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     expect(session[:ssh_session]).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("could not remove file", 1))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse with kernel errors" do
@@ -459,7 +459,7 @@ RSpec.describe VmHost do
     expect(vh).to receive(:check_storage_nvme).and_return(true)
     expect(vh).to receive(:check_storage_read_write).and_return(true)
     allow(session[:ssh_session]).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("exit code 1", 1))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse with smartctl errors" do
@@ -474,7 +474,7 @@ RSpec.describe VmHost do
     allow(vh).to receive(:disk_device_names).and_return(["nvme0n1"])
 
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo smartctl -j -H /dev/nvme0n1 | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("false\n", 0))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse with nvme errors" do
@@ -490,7 +490,7 @@ RSpec.describe VmHost do
 
     expect(vh).to receive(:check_storage_smartctl).and_return(true)
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("1\n", 0))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   it "checks pulse with no nvme errors" do
@@ -508,7 +508,7 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
     expect(vh).to receive(:check_storage_read_write).and_return(true)
     expect(vh).to receive(:check_storage_kernel_logs).and_return(true)
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
   it "checks pulse on a non-default mountpoint with faulty read/write on disk" do
@@ -529,14 +529,14 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo bash -c head\\ -c\\ 1M\\ \\</dev/zero\\ \\>\\ #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("wrong-hash  /test-file\n", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
-    expect(vh.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
     it "#check_pulse", "reraises the exception for exception class: #{ex.class}" do
       expect(vh).to receive(:perform_health_checks).and_raise(ex)
-      expect { vh.check_pulse(session: session, previous_pulse: "notnil") }.to raise_error(ex)
+      expect { vh.check_pulse(session:, previous_pulse: "notnil") }.to raise_error(ex)
     end
   end
 

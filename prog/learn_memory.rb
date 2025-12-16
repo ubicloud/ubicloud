@@ -23,6 +23,6 @@ class Prog::LearnMemory < Prog::Base
     # customer, we compute CPU memory allocation ratio against
     # physical memory.
     mem_gib = parse_sum(sshable.cmd("sudo /usr/sbin/dmidecode -t memory | fgrep Size:"))
-    pop mem_gib: mem_gib
+    pop mem_gib:
   end
 end

@@ -9,7 +9,7 @@ class RunpodClient
   end
 
   def create_pod(name, config)
-    response = @connection.get(path: "v1/pods", query: {name: name}, expects: 200)
+    response = @connection.get(path: "v1/pods", query: {name:}, expects: 200)
     pods = JSON.parse(response.body)
     return pods.first["id"] if pods.any?
 

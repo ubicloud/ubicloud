@@ -29,7 +29,7 @@ class MetricsTargetResource
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
-      Clog.emit("Metrics export has finished.") { {metrics_export_success: {ubid: @resource.ubid, count: count}} }
+      Clog.emit("Metrics export has finished.") { {metrics_export_success: {ubid: @resource.ubid, count:}} }
       @last_export_success = true
     rescue => ex
       @last_export_success = false

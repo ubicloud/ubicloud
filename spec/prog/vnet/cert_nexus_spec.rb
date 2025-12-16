@@ -125,7 +125,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert).to receive(:csr_key).and_return("der_key")
       expect(OpenSSL::PKey::EC).to receive(:new).with("der_key").and_return(ec)
       expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: ec, common_name: "cert-hostname").and_return(csr)
-      expect(acme_order).to receive(:finalize).with(csr: csr)
+      expect(acme_order).to receive(:finalize).with(csr:)
       expect { nx.cert_finalization }.to hop("wait_cert_finalization")
     end
   end

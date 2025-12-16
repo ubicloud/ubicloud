@@ -20,7 +20,7 @@ class Clover
           email = typecast_params.nonempty_str!("email")
           handle_validation_failure("project/user")
 
-          if ProjectInvitation[project_id: @project.id, email: email]
+          if ProjectInvitation[project_id: @project.id, email:]
             raise_web_error("'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
             raise_web_error("You can't have more than 50 pending invitations.")
@@ -32,7 +32,7 @@ class Clover
             end
           end
 
-          user = Account.exclude(status_id: 3)[email: email]
+          user = Account.exclude(status_id: 3)[email:]
 
           DB.transaction do
             if user
@@ -59,7 +59,7 @@ class Clover
                 button_title: "Join Project",
                 button_link: "#{Config.base_url}#{@project.path}/dashboard")
             else
-              @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+              @project.add_invitation(email:, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
               audit_log(@project, "add_invitation")
 
               Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
@@ -375,7 +375,7 @@ class Clover
       r.delete "invitation", String do |email|
         authorize("Project:user", @project)
 
-        @project.invitations_dataset.where(email: email).destroy
+        @project.invitations_dataset.where(email:).destroy
         audit_log(@project, "destroy_invitation")
         # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."

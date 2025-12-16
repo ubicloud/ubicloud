@@ -60,7 +60,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     cert, cert_key = create_certificate
-    victoria_metrics_server.update(cert: cert, cert_key: cert_key)
+    victoria_metrics_server.update(cert:, cert_key:)
 
     hop_bootstrap_rhizome
   end

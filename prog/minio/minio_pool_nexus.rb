@@ -14,12 +14,12 @@ class Prog::Minio::MinioPoolNexus < Prog::Base
       id = MinioPool.generate_uuid
 
       minio_pool = MinioPool.create_with_id(id,
-        cluster_id: cluster_id,
-        start_index: start_index,
-        server_count: server_count,
-        drive_count: drive_count,
-        storage_size_gib: storage_size_gib,
-        vm_size: vm_size)
+        cluster_id:,
+        start_index:,
+        server_count:,
+        drive_count:,
+        storage_size_gib:,
+        vm_size:)
 
       minio_pool.server_count.times do |i|
         Prog::Minio::MinioServerNexus.assemble(minio_pool.id, minio_pool.start_index + i)

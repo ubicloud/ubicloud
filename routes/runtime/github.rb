@@ -18,7 +18,7 @@ class Clover
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
 
-      dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version: version)
+      dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version:)
 
       unless repository.installation.project.get_ff_access_all_cache_scopes
         # Clients can send multiple keys, and we look for caches in multiple scopes.
@@ -78,7 +78,7 @@ class Clover
           scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
           entries = repository.cache_entries_dataset
             .exclude(committed_at: nil)
-            .where(key: key, scope: scopes)
+            .where(key:, scope: scopes)
             .order(:version).all
 
           {
@@ -152,7 +152,7 @@ class Clover
 
           max_chunk_size = 32 * 1024 * 1024 # 32MB
           presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
-            repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id: upload_id, part_number: it, expires_in: 900)
+            repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id:, part_number: it, expires_in: 900)
           end
 
           {
@@ -169,14 +169,14 @@ class Clover
         upload_id = typecast_params.nonempty_str!("uploadId")
         size = typecast_params.pos_int!("size")
 
-        entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
+        entry = GithubCacheEntry[repository_id: repository.id, upload_id:, committed_at: nil]
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
 
         begin
           repository.blob_storage_client.complete_multipart_upload({
             bucket: repository.bucket_name,
             key: entry.blob_key,
-            upload_id: upload_id,
+            upload_id:,
             multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex

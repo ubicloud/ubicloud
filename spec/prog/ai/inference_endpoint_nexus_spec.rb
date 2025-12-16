@@ -11,7 +11,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   let(:replicas) { Array.new(2) { instance_double(InferenceEndpointReplica, strand: instance_double(Strand, label: "wait")) } }
 
   before do
-    allow(nx).to receive_messages(inference_endpoint: inference_endpoint, replicas: replicas)
+    allow(nx).to receive_messages(inference_endpoint:, replicas:)
     allow(inference_endpoint).to receive(:replicas).and_return(replicas)
   end
 

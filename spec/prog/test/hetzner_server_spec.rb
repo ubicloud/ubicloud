@@ -14,7 +14,7 @@ RSpec.describe Prog::Test::HetznerServer do
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
                                                "server_id" => "1234",
                                                "additional_boot_images" => [],
-                                               "setup_host" => true}, hetzner_api: hetzner_api, vm_host: vm_host)
+                                               "setup_host" => true}, hetzner_api:, vm_host:)
   }
 
   describe "#assemble" do

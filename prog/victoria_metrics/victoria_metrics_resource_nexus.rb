@@ -39,7 +39,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
       firewall = Firewall.create(name: "#{victoria_metrics_resource.ubid}-firewall", location_id: location.id, description: "VictoriaMetrics default firewall", project_id: Config.victoria_metrics_service_project_id)
 
       private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.victoria_metrics_service_project_id, name: "#{victoria_metrics_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).id
-      victoria_metrics_resource.update(private_subnet_id: private_subnet_id)
+      victoria_metrics_resource.update(private_subnet_id:)
       victoria_metrics_resource.set_firewall_rules
 
       Prog::VictoriaMetrics::VictoriaMetricsServerNexus.assemble(victoria_metrics_resource.id)

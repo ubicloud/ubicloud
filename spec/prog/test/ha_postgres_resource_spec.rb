@@ -9,8 +9,8 @@ RSpec.describe Prog::Test::HaPostgresResource do
   let(:working_representative_server) { instance_double(PostgresServer, run_query: "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1") }
   let(:faulty_representative_server) { instance_double(PostgresServer, run_query: "") }
   let(:vm) { instance_double(Vm, sshable: Sshable.new) }
-  let(:servers) { [instance_double(PostgresServer, ubid: "1234", timeline_access: "push", vm: vm), instance_double(PostgresServer, ubid: "5678", timeline_access: "fetch", vm: vm)] }
-  let(:servers_after_failover) { [instance_double(PostgresServer, ubid: "5678", timeline_access: "push", vm: vm), instance_double(PostgresServer, ubid: "9012", timeline_access: "fetch", vm: vm)] }
+  let(:servers) { [instance_double(PostgresServer, ubid: "1234", timeline_access: "push", vm:), instance_double(PostgresServer, ubid: "5678", timeline_access: "fetch", vm:)] }
+  let(:servers_after_failover) { [instance_double(PostgresServer, ubid: "5678", timeline_access: "push", vm:), instance_double(PostgresServer, ubid: "9012", timeline_access: "fetch", vm:)] }
 
   describe ".assemble" do
     it "creates a strand and service projects" do
@@ -73,7 +73,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
 
   describe "#trigger_failover" do
     it "triggers a failover and hops to wait_failover" do
-      expect(pgr_test).to receive(:postgres_resource).at_least(:once).and_return(instance_double(PostgresResource, servers: servers, version: "16"))
+      expect(pgr_test).to receive(:postgres_resource).at_least(:once).and_return(instance_double(PostgresResource, servers:, version: "16"))
       expect(vm.sshable).to receive(:_cmd).with("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/16/main/conf.d/001-service.conf")
       expect(vm.sshable).to receive(:_cmd).with("ps aux | grep -v grep | grep '/usr/lib/postgresql/16/bin/postgres' | awk '{print $2}' | xargs sudo kill -9")
       expect(pgr_test).to receive(:update_stack).with({"primary_ubid" => "1234"})

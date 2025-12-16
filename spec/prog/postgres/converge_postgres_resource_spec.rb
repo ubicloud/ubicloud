@@ -33,7 +33,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   describe "#start" do
     it "naps if read replica parent is not ready" do
       parent = instance_double(PostgresResource, ready_for_read_replica?: false)
-      allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent:)
 
       expect { nx.start }.to nap(60)
     end
@@ -41,7 +41,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "registers a deadline and hops to provision_servers if read replica parent is ready" do
       parent = instance_double(PostgresResource, ready_for_read_replica?: true)
       expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
-      allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent:)
 
       expect { nx.start }.to hop("provision_servers")
     end

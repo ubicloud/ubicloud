@@ -28,15 +28,15 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     DB.transaction do
       lb = LoadBalancer.create(
-        private_subnet_id: private_subnet_id, name: name, algorithm: algorithm,
-        custom_hostname: custom_hostname, custom_hostname_dns_zone_id: custom_hostname_dns_zone_id,
-        stack: stack, project_id: ps.project_id,
-        health_check_endpoint: health_check_endpoint,
-        health_check_interval: health_check_interval,
-        health_check_timeout: health_check_timeout,
-        health_check_up_threshold: health_check_up_threshold,
-        health_check_down_threshold: health_check_down_threshold,
-        health_check_protocol: health_check_protocol,
+        private_subnet_id:, name:, algorithm:,
+        custom_hostname:, custom_hostname_dns_zone_id:,
+        stack:, project_id: ps.project_id,
+        health_check_endpoint:,
+        health_check_interval:,
+        health_check_timeout:,
+        health_check_up_threshold:,
+        health_check_down_threshold:,
+        health_check_protocol:,
         cert_enabled:
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }

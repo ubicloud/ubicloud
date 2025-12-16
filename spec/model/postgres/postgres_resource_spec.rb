@@ -63,7 +63,7 @@ RSpec.describe PostgresResource do
     standby_server2 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now)
     primary_server = instance_double(PostgresServer, representative_at: Time.now)
     boot_image = instance_double(BootImage, version: "20240801")
-    volume = instance_double(VmStorageVolume, boot_image: boot_image, boot: true)
+    volume = instance_double(VmStorageVolume, boot_image:, boot: true)
     vm = instance_double(Vm, vm_storage_volumes: [volume])
     location = instance_double(Location, aws?: false)
 
@@ -81,7 +81,7 @@ RSpec.describe PostgresResource do
     standby_server2 = instance_double(PostgresServer, representative_at: nil, created_at: Time.now)
     primary_server = instance_double(PostgresServer, representative_at: Time.now)
     boot_image = instance_double(BootImage, version: "20240729")
-    volume = instance_double(VmStorageVolume, boot_image: boot_image, boot: true)
+    volume = instance_double(VmStorageVolume, boot_image:, boot: true)
     vm = instance_double(Vm, vm_storage_volumes: [volume])
     location = instance_double(Location, aws?: false)
 
@@ -129,7 +129,7 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:version).and_return("16")
     expect(postgres_resource).to receive(:target_version).and_return("17")
     strand = instance_double(Strand, label: "wait_bootstrap_rhizome")
-    candidate_server = instance_double(PostgresServer, strand: strand, synchronization_status: "ready")
+    candidate_server = instance_double(PostgresServer, strand:, synchronization_status: "ready")
     expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
     expect(postgres_resource.has_enough_ready_servers?).to be(false)
   end
@@ -138,7 +138,7 @@ RSpec.describe PostgresResource do
     expect(postgres_resource).to receive(:version).and_return("16")
     expect(postgres_resource).to receive(:target_version).and_return("17")
     strand = instance_double(Strand, label: "wait")
-    candidate_server = instance_double(PostgresServer, strand: strand, synchronization_status: "ready")
+    candidate_server = instance_double(PostgresServer, strand:, synchronization_status: "ready")
     expect(postgres_resource).to receive(:upgrade_candidate_server).at_least(:once).and_return(candidate_server)
     expect(postgres_resource.has_enough_ready_servers?).to be(true)
   end

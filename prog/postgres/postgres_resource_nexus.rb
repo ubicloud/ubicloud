@@ -58,7 +58,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
       private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).subject
       private_subnet_id = private_subnet.id
-      postgres_resource.update(private_subnet_id: private_subnet_id)
+      postgres_resource.update(private_subnet_id:)
 
       # Internal firewall, will be directly attached to postgres server VMs
       internal_firewall = Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
@@ -80,7 +80,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         ])
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
 
       Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
     end

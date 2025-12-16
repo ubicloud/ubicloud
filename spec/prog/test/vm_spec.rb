@@ -50,7 +50,7 @@ RSpec.describe Prog::Test::Vm do
     project = Project.create(name: "default")
     allow(project).to receive(:vms).and_return([vm1, vm2, vm3])
     allow(vm1).to receive(:project).and_return project
-    allow(vm_test).to receive_messages(sshable: sshable, vm: vm1)
+    allow(vm_test).to receive_messages(sshable:, vm: vm1)
   }
 
   describe "#start" do

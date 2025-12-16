@@ -16,9 +16,9 @@ class Minio::Client
       cert = OpenSSL::X509::Certificate.new(cert_pem)
       cert_store.add_cert(cert)
     end
-    @creds = {access_key: access_key, secret_key: secret_key}
+    @creds = {access_key:, secret_key:}
     @endpoint = endpoint
-    @client = Excon.new(endpoint, socket: socket, ssl_cert_store: ssl_ca_data.empty? ? nil : cert_store)
+    @client = Excon.new(endpoint, socket:, ssl_cert_store: ssl_ca_data.empty? ? nil : cert_store)
     @signer = Minio::HeaderSigner.new
     @crypto = Minio::Crypto.new
   end
@@ -166,7 +166,7 @@ class Minio::Client
     headers = @signer.build_headers(method, uri, body, @creds, REGION, needs_md5)
 
     full_path = uri.path + (uri.query ? "?" + uri.query : "")
-    response = @client.request(method: method, path: full_path, headers: headers, body: body)
+    response = @client.request(method:, path: full_path, headers:, body:)
     if [200, 204, 206, 404].include?(response.status)
       response
     else
@@ -183,7 +183,7 @@ class Minio::Client
     encoding_type = doc.xpath("//xmlns:EncodingType").text
     # Process 'Contents' elements
     objects = doc.xpath("//xmlns:Contents").map do |node|
-      Blob.from_xml(node, bucket_name, encoding_type: encoding_type)
+      Blob.from_xml(node, bucket_name, encoding_type:)
     end
 
     # Note to future: We may need to process 'CommonPrefixes' elements
@@ -233,12 +233,12 @@ class Minio::Client
       key = element.at_xpath("xmlns:Key").text
       key = CGI.unescape(key) if encoding_type == "url"
 
-      new(bucket_name, key, last_modified: last_modified, etag: etag, size: size,
+      new(bucket_name, key, last_modified:, etag:, size:,
         version_id: element.at_xpath("xmlns:VersionId")&.text,
         is_latest: element.at_xpath("xmlns:IsLatest")&.text,
         storage_class: element.at_xpath("xmlns:StorageClass")&.text,
-        owner_id: owner_id, owner_name: owner_name, metadata: metadata,
-        is_delete_marker: is_delete_marker)
+        owner_id:, owner_name:, metadata:,
+        is_delete_marker:)
     end
   end
 end

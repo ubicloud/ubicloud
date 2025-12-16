@@ -207,7 +207,7 @@ class VmHost < Sequel::Model
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
 
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:)
         end
 
         unless is_failover_ip
@@ -223,7 +223,7 @@ class VmHost < Sequel::Model
 
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome(install_specs: false)
-    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs:}])
   end
 
   # Introduced for downloading a new boot image via REPL.
@@ -237,7 +237,7 @@ class VmHost < Sequel::Model
     fail ArgumentError, "No version provided" if version.nil?
     fail ArgumentError, "No SHA-256 digest provided" if sha256.nil?
 
-    Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
+    Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version:, sha256:}])
   end
 
   # Introduced for downloading cloud hypervisor via REPL.
@@ -251,7 +251,7 @@ class VmHost < Sequel::Model
     end
     fail ArgumentError, "No version provided" if version.nil?
 
-    Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
+    Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version:, sha256_ch_bin:, sha256_ch_remote:}])
   end
 
   def set_data_center
@@ -400,7 +400,7 @@ class VmHost < Sequel::Model
       Clog.emit("Exception in VmHost #{ubid}") { Util.exception_to_hash(e) }
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup

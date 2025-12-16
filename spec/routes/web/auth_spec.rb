@@ -512,11 +512,11 @@ RSpec.describe Clover, "auth" do
     def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
       expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
       OmniAuth.config.add_mock(provider, {
-        provider: provider,
+        provider:,
         uid: "123456790",
         info: {
           name:,
-          email: email
+          email:
         }
       })
     end

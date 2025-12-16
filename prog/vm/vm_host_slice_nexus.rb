@@ -6,9 +6,9 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
   def self.assemble_with_host(name, vm_host, family:, allowed_cpus:, memory_gib:, is_shared: false)
     DB.transaction do
       vm_host_slice = VmHostSlice.create(
-        name: name,
-        is_shared: is_shared,
-        family: family,
+        name:,
+        is_shared:,
+        family:,
         cores: 0,
         total_cpu_percent: 0,
         used_cpu_percent: 0,

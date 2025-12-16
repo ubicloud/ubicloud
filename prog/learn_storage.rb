@@ -20,7 +20,7 @@ class Prog::LearnStorage < Prog::Base
       next unless (name = rec.optional_name)
 
       sds << StorageDevice.new(
-        vm_host_id: vm_host.id, name: name,
+        vm_host_id: vm_host.id, name:,
         available_storage_gib: rec.avail_gib,
         total_storage_gib: rec.size_gib,
         unix_device_list: find_underlying_unix_device_ids(rec.unix_device)

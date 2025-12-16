@@ -33,7 +33,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       inference_endpoint.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceEndpointReplica.create(
-        inference_endpoint_id: inference_endpoint_id,
+        inference_endpoint_id:,
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
@@ -222,7 +222,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resp = vm.sshable.cmd("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
     project_usage = JSON.parse(resp)["projects"]
-    Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
+    Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage:} }
     update_billing_records(project_usage, "input", "prompt_token_count")
     update_billing_records(project_usage, "output", "completion_token_count")
   end
@@ -262,7 +262,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens:, exception: Util.exception_to_hash(ex)}} }
       end
     end
   end

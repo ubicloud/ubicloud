@@ -161,7 +161,7 @@ sel src 0.0.0.0/0 dst 0.0.0.0/0"
 
     it "skips if the dst tunnel nic is not rekeying" do
       src_nic = instance_double(Nic, rekey_payload: nil)
-      not_rekeying_nic_tun = instance_double(IpsecTunnel, src_nic: src_nic)
+      not_rekeying_nic_tun = instance_double(IpsecTunnel, src_nic:)
       expect(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([not_rekeying_nic_tun])
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state").and_return(states_data)
       expect(tunnel.src_nic.vm.vm_host.sshable).to receive(:_cmd).with("sudo ip -n hellovm xfrm state delete src 2a01:4f8:10a:128b:4919:: dst 2a01:4f8:10a:128b:7537:: proto esp spi 0x610a9eb5").and_return(true)

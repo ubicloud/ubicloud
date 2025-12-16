@@ -21,7 +21,7 @@ class Prog::InstallRhizome < Prog::Base
     file_hash_map = {} # pun intended
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
-      Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base: base) do |file|
+      Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base:) do |file|
         next if !frame["install_specs"] && file.end_with?("_spec.rb")
 
         full_path = base + "/" + file

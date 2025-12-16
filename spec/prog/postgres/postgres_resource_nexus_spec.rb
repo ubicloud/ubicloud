@@ -114,7 +114,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
 
-      described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: restore_target)
+      described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:)
     end
 
     it "creates internal firewall and customer private subnet and firewall" do
@@ -200,7 +200,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "triggers pg_current_xact_id and pops" do
       representative_server = instance_double(PostgresServer)
       expect(representative_server).to receive(:run_query).with("SELECT pg_current_xact_id()")
-      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource, representative_server: representative_server))
+      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource, representative_server:))
 
       expect { nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
     end

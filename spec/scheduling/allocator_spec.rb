@@ -67,7 +67,7 @@ RSpec.describe Al do
       allow(project).to receive_messages(
         get_ff_allocator_diagnostics: nil
       )
-      allow(vm).to receive_messages(project: project)
+      allow(vm).to receive_messages(project:)
     end
 
     it "fails if no valid allocation is found" do

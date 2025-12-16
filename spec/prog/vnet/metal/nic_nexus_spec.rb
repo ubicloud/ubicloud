@@ -30,7 +30,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
 
     it "incrs refresh_keys when setup_nic is set" do
       private_subnet = instance_double(PrivateSubnet)
-      nic = instance_double(Nic, private_subnet: private_subnet)
+      nic = instance_double(Nic, private_subnet:)
 
       expect(nx).to receive(:nic).and_return(nic).at_least(:once)
       expect(nx).to receive(:decr_vm_allocated)

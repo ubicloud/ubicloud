@@ -109,16 +109,16 @@ RSpec.describe MinioServer do
     ms.pool.update(server_count: 2)
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
-    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [
       {state: "online", endpoint: "1.2.3.5:9000", drives: [{state: "ok"}]},
       {state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}
     ]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
   end
 
   it "checks pulse without endpoint for single server" do
@@ -131,13 +131,13 @@ RSpec.describe MinioServer do
     expect(ms).not_to receive(:incr_checkup)
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
-    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
   end
 
   it "increments checkup semaphore if pulse is down for a while" do
@@ -148,7 +148,7 @@ RSpec.describe MinioServer do
 
     expect(session[:minio_client]).to receive(:admin_info).and_raise(RuntimeError)
     expect(ms).to receive(:incr_checkup)
-    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
   end
 
   it "returns endpoint properly" do

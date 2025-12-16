@@ -12,8 +12,8 @@ RSpec.describe Prog::DownloadBootImage do
   let(:vm_host) { create_vm_host }
 
   before do
-    allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
-    allow(dbi_without_version).to receive_messages(sshable: sshable, vm_host: vm_host)
+    allow(dbi).to receive_messages(sshable:, vm_host:)
+    allow(dbi_without_version).to receive_messages(sshable:, vm_host:)
   end
 
   describe "#start" do
@@ -226,7 +226,7 @@ RSpec.describe Prog::DownloadBootImage do
     it "checks the correct path if version is nil" do
       BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
       dbi = described_class.new(Strand.new(stack: [{"image_name" => "my-image", "custom_url" => "https://example.com/my-image.raw", "version" => nil}]))
-      allow(dbi).to receive_messages(sshable: sshable, vm_host: vm_host)
+      allow(dbi).to receive_messages(sshable:, vm_host:)
       sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",

@@ -10,7 +10,7 @@ RSpec.describe Serializers::Nic do
       private_ipv4 = NetAddr::IPv4Net.parse("192.168.1.0/24")
       private_ipv6 = NetAddr::IPv6Net.parse("fd91:4ef3:a586:943d:c2ae::/79")
 
-      nic = Nic.new_with_id(name: "nic-name", private_ipv4: private_ipv4, private_ipv6: private_ipv6)
+      nic = Nic.new_with_id(name: "nic-name", private_ipv4:, private_ipv6:)
       nic.associations[:vm] = vm
 
       expected_result = {
@@ -30,7 +30,7 @@ RSpec.describe Serializers::Nic do
       private_ipv4 = NetAddr::IPv4Net.parse("10.23.34.53/32")
       private_ipv6 = NetAddr::IPv6Net.parse("fd91:4ef3:a586:943d:c2ae::/79")
 
-      nic = Nic.new_with_id(name: "nic-name", private_ipv4: private_ipv4, private_ipv6: private_ipv6)
+      nic = Nic.new_with_id(name: "nic-name", private_ipv4:, private_ipv6:)
       nic.associations[:vm] = vm
 
       expected_result = {

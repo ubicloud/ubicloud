@@ -20,7 +20,7 @@ class Prog::RotateStorageKek < Prog::Base
       algorithm: key_wrapping_algorithm,
       key: Base64.encode64(key_wrapping_key),
       init_vector: Base64.encode64(key_wrapping_iv),
-      auth_data: auth_data
+      auth_data:
     )
 
     vm_storage_volume.update({key_encryption_key_2_id: key_encryption_key.id})
