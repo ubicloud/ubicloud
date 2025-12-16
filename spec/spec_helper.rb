@@ -310,6 +310,16 @@ RSpec.configure do |config|
       addr = Address.create(cidr: cidr.to_s, routed_to_host_id: host.id)
       AssignedVmAddress.create(ip: ipv4, address_id: addr.id, dst_vm_id: vm.id)
     end
+
+    def refresh_frame(prog, new_frame: nil, new_values: nil)
+      st = prog.strand
+      fail "cannot pass both new_frame and new_values" if new_frame && new_values
+      st.stack.first.merge!(new_values) if new_values
+      st.stack[0] = new_frame if new_frame
+      st.modified!(:stack)
+      st.save_changes
+      prog.instance_variable_set(:@frame, nil)
+    end
   end)
 end
 
