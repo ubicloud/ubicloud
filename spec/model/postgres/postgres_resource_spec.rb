@@ -328,4 +328,16 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.ready_for_read_replica?).to be false
     end
   end
+
+  describe "#install_rhizome" do
+    it "installs rhizome on all servers" do
+      server1 = instance_double(PostgresServer, vm: instance_double(Vm, id: "1"))
+      server2 = instance_double(PostgresServer, vm: instance_double(Vm, id: "2"))
+      expect(postgres_resource).to receive(:servers).and_return([server1, server2])
+      [server1, server2].each do |server|
+        expect(Strand).to receive(:create).with(prog: "InstallRhizome", label: "start", stack: [{subject_id: server.vm.id, target_folder: "postgres", install_specs: false}])
+      end
+      postgres_resource.install_rhizome
+    end
+  end
 end
