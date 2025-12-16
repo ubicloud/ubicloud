@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "aws-sdk-iam"
+
 class PostgresServer < Sequel::Model
   module Aws
     private
@@ -24,8 +26,18 @@ class PostgresServer < Sequel::Model
 
     def aws_attach_s3_policy_if_needed
       if Config.aws_postgres_iam_access && vm.aws_instance.iam_role
-        timeline.location.location_credential.iam_client.attach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: timeline.aws_s3_policy_arn)
+        client.attach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: timeline.aws_s3_policy_arn)
+        aws_detach_parent_s3_policy
       end
+    end
+
+    def aws_detach_parent_s3_policy
+      client.detach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: timeline.parent.aws_s3_policy_arn) if timeline.parent
+    rescue ::Aws::IAM::Errors::NoSuchEntity
+    end
+
+    def client
+      @client ||= timeline.location.location_credential.iam_client
     end
   end
 end

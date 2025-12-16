@@ -5,7 +5,7 @@ require "aws-sdk-s3"
 
 class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_one :parent, key: :parent_id, class: self
+  many_to_one :parent, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}
   many_to_one :location
 
