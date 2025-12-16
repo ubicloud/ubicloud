@@ -490,15 +490,21 @@ RSpec.describe PostgresServer do
     it "switches to new timeline with current parent" do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
       expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
-      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { postgres_server.switch_to_new_timeline }.not_to raise_error
     end
 
     it "switches to new timeline without current parent" do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
       expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push")
-      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
+    end
+
+    it "configure new timeline on AWS" do
+      location.update(provider: "aws")
+      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
+      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
+      expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
     end
   end
 
@@ -535,17 +541,35 @@ RSpec.describe PostgresServer do
         AwsInstance.create_with_id(vm, iam_role: "role")
         iam_client = Aws::IAM::Client.new(stub_responses: true)
         LocationCredential.create(location:, assume_role: "role")
+
         expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed
       end
 
-      it "does not call attach_role_policy when aws_postgres_iam_access is not configured" do
+      it "detaches parent timeline when Config.aws_postgres_iam_access set" do
         location.update(provider: "aws")
-        expect(Config).to receive(:aws_postgres_iam_access).and_return(false)
+        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+        AwsInstance.create_with_id(vm, iam_role: "role")
+        iam_client = Aws::IAM::Client.new(stub_responses: true)
         LocationCredential.create(location:, assume_role: "role")
-        expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
+
+        parent = PostgresTimeline.create(location:)
+        timeline.update(parent:)
+        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+        expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+        expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
+        postgres_server.attach_s3_policy_if_needed
+      end
+
+      it "does not detach parent timeline when Config.aws_postgres_iam_access not set" do
+        location.update(provider: "aws")
+        AwsInstance.create_with_id(vm, iam_role: "role")
+        LocationCredential.create(location:, assume_role: "role")
+
+        expect(postgres_server.vm.aws_instance).not_to receive(:iam_role)
         postgres_server.attach_s3_policy_if_needed
       end
 

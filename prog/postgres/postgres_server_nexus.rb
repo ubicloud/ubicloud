@@ -445,7 +445,6 @@ SQL
 
     if !is_in_recovery
       postgres_server.switch_to_new_timeline
-
       hop_configure
     end
 
@@ -503,6 +502,11 @@ SQL
     when_refresh_walg_credentials_set? do
       decr_refresh_walg_credentials
       postgres_server.refresh_walg_credentials
+    end
+
+    when_configure_s3_new_timeline_set? do
+      decr_configure_s3_new_timeline
+      postgres_server.attach_s3_policy_if_needed
     end
 
     if postgres_server.read_replica? && postgres_server.resource.parent
