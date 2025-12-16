@@ -44,6 +44,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline = PostgresTimeline[st.id]
       expect(postgres_timeline).not_to be_nil
     end
+
+    it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
+      allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
+
+      tl = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
+      expect(tl.access_key).not_to be_nil
+      expect(tl.secret_key).not_to be_nil
+
+      location = Location.create(name: "l1", display_name: "l1", ui_name: "l1", visible: true, provider: "aws")
+      tl = described_class.assemble(location_id: location.id).subject
+      expect(tl.access_key).to be_nil
+      expect(tl.secret_key).to be_nil
+    end
   end
 
   describe "#start" do
