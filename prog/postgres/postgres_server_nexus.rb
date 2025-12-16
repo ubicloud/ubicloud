@@ -636,6 +636,7 @@ SQL
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
+      Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
       postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
@@ -643,7 +644,12 @@ SQL
       postgres_server.resource.servers.each(&:incr_restart)
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
-    when "Failed", "NotStarted"
+    when "Failed"
+      Prog::PageNexus.assemble("#{postgres_server.ubid} promotion failed",
+        ["PGPromotionFailed", postgres_server.id], postgres_server.ubid)
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
+      nap 0
+    when "NotStarted"
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     end
