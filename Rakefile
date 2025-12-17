@@ -418,7 +418,11 @@ task "annotate" do
   require_relative "model"
   DB.loggers.clear
   require "sequel/annotate"
-  Sequel::Annotate.annotate(Dir["model/**/*.rb"])
+  ignore_dirs = %w[aws metal]
+  files = Dir["model/**/*.rb"].reject do |file|
+    ignore_dirs.include?(File.basename(File.dirname(file)))
+  end
+  Sequel::Annotate.annotate(files)
 end
 
 desc "Build sdk gem"
