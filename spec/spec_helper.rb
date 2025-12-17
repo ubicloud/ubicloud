@@ -161,6 +161,10 @@ RSpec.configure do |config|
   # as the one that triggered the failure.
   Kernel.srand config.seed
 
+  # Negated matcher for compound expectations: expect { }.to do_something.and not_change(Model, :count)
+  # See: https://github.com/rspec/rspec-expectations/issues/664#issuecomment-307814722
+  RSpec::Matchers.define_negated_matcher :not_change, :change
+
   # Custom matcher to expect Progs to hop new label
   # If expected_label is not provided, it expects to hop any label.
   # If expected_prog is not provided, it expects to hop to label at old prog.
