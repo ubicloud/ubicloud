@@ -159,11 +159,6 @@ class PrivateSubnet < Sequel::Model
           .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
         cycle: {columns: :id})
   end
-
-  def old_aws_subnet?
-    location.aws? && net4.netmask.prefix_len == DEFAULT_SUBNET_PREFIX_LEN
-  end
-
   def incr_destroy_if_only_used_internally(ubid:, vm_ids:)
     firewalls_dataset = self.firewalls_dataset
 
