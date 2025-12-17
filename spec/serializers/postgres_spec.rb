@@ -3,63 +3,97 @@
 require_relative "../spec_helper"
 
 RSpec.describe Serializers::Postgres do
-  let(:pg) { PostgresResource.new(name: "pg-name", location_id: Location::HETZNER_FSN1_ID).tap { it.id = "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b" } }
+  let(:project) { Project.create(name: "pg-test-project") }
+  let(:location_id) { Location::HETZNER_FSN1_ID }
+  let(:location) { Location[location_id] }
+  let(:timeline) { PostgresTimeline.create(location_id: location_id) }
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "pg-subnet", project_id: project.id, location_id: location_id,
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+    )
+  }
+  let(:time) {
+    t = Time.now
+    expect(Time).to receive(:now).and_return(t).at_least(:once)
+    t
+  }
 
-  before do
-    allow(pg).to receive(:project).and_return(instance_double(Project, get_ff_postgres_hostname_override: nil))
+  let(:pg) {
+    PostgresResource.create(
+      name: "pg-name", superuser_password: "dummy-password", ha_type: "none",
+      target_version: "17", location_id: location_id, project_id: project.id,
+      user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
+      target_storage_size_gib: 64, private_subnet_id: private_subnet.id
+    )
+  }
+
+  def create_representative_server(primary: true)
+    vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
+    server = PostgresServer.create(
+      timeline:, resource_id: pg.id, vm_id: vm.id,
+      representative_at: Time.now,
+      synchronization_status: "ready",
+      timeline_access: primary ? "push" : "fetch",
+      version: "17"
+    )
+    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    server
   end
 
-  it "can serialize when no earliest restore time" do
-    time = Time.now
-    expect(pg).to receive(:customer_firewall).and_return(nil)
-    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, earliest_restore_time: nil, latest_restore_time: time)).exactly(3)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "17")).at_least(:once)
+  it "can serialize when no earliest restore time (but latest is always present)" do
+    time
+    create_representative_server(primary: true)
     data = described_class.serialize(pg, {detailed: true})
-    expect(data[:earliest_restore_time]).to be_nil
-    expect(data[:latest_restore_time]).to eq(time.utc.iso8601)
+    expect(data.fetch(:earliest_restore_time)).to be_nil
+    expect(data.fetch(:latest_restore_time)).to eq(time.utc.iso8601)
   end
 
   it "can serialize when earliest_restore_time calculation raises an exception" do
-    time = Time.now
-    expect(pg).to receive(:customer_firewall).and_return(nil)
-    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, latest_restore_time: time)).exactly(4)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "17")).at_least(:once)
+    time
+    create_representative_server(primary: true)
     expect(pg.timeline).to receive(:earliest_restore_time).and_raise("error")
     data = described_class.serialize(pg, {detailed: true})
-    expect(data[:earliest_restore_time]).to be_nil
-    expect(data[:latest_restore_time]).to eq(time.utc.iso8601)
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data.fetch(:latest_restore_time)).to eq(time.utc.iso8601)
   end
 
   it "can serialize when have earliest/latest restore times" do
-    time = Time.now
-    expect(pg).to receive(:customer_firewall).and_return(nil)
-    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, earliest_restore_time: time, latest_restore_time: time)).exactly(3)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: true, vm: nil, strand: nil, storage_size_gib: 64, version: "17")).at_least(:once)
+    time
+    create_representative_server(primary: true)
+    pg.timeline.update(cached_earliest_backup_at: time)
+    pg.reload
     data = described_class.serialize(pg, {detailed: true})
-    expect(data[:earliest_restore_time]).to eq(time.utc.iso8601)
-    expect(data[:latest_restore_time]).to eq(time.utc.iso8601)
+    expect(data.fetch(:earliest_restore_time)).to eq((time + 5 * 60).utc.iso8601)
+    expect(data.fetch(:latest_restore_time)).to eq(time.utc.iso8601)
   end
 
   it "can serialize when not primary" do
-    expect(pg).to receive(:customer_firewall).and_return(nil)
-    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:representative_server).and_return(instance_double(PostgresServer, primary?: false, vm: nil, strand: nil, storage_size_gib: 64, version: "17")).at_least(:once)
+    create_representative_server(primary: false)
     data = described_class.serialize(pg, {detailed: true})
-    expect(data[:earliest_restore_time]).to be_nil
-    expect(data[:latest_restore_time]).to be_nil
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
   end
 
   it "can serialize when there is no server" do
-    expect(pg).to receive(:customer_firewall).and_return(nil)
-    expect(pg).to receive(:strand).and_return(instance_double(Strand, label: "start", children: [])).at_least(:once)
-    expect(pg).to receive(:timeline).and_return(instance_double(PostgresTimeline, earliest_restore_time: nil, latest_restore_time: nil))
-    expect(pg).to receive(:representative_server).and_return(nil).at_least(:once)
     data = described_class.serialize(pg, {detailed: true})
-    expect(data[:primary?]).to be_nil
-    expect(data[:earliest_restore_time]).to be_nil
-    expect(data[:latest_restore_time]).to be_nil
+    expect(data.fetch(:primary)).to be_nil
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
+  end
+
+  it "can serialize when timeline exists but representative server is nil" do
+    vm = create_hosted_vm(project, private_subnet, "pg-vm-nonrep")
+    PostgresServer.create(
+      timeline:, resource_id: pg.id, vm_id: vm.id,
+      representative_at: nil,
+      synchronization_status: "ready",
+      timeline_access: "push",
+      version: "17"
+    )
+    data = described_class.serialize(pg, {detailed: true})
+    expect(data.fetch(:primary)).to be_nil
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
   end
 end
