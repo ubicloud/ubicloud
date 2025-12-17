@@ -28,7 +28,7 @@ AUTOLOAD_CONSTANTS = ["UBID"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
-autoload_normal = ->(subdirectory, include_first: false, flat: false) do
+autoload_normal = ->(subdirectory, include_first: false, flat: false, exclude_dirs: nil) do
   absolute = File.join(__dir__, subdirectory)
   rgx = if flat
     # No matter how deep the file system traversal, this Regexp
@@ -51,6 +51,7 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
   end
 
   Unreloader.autoload(absolute) do |f|
+    next if exclude_dirs&.include?(File.basename(File.dirname(f)))
     full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
     AUTOLOAD_CONSTANTS << full_name unless AUTOLOAD_CONSTANTS.frozen?
     full_name
@@ -102,7 +103,7 @@ module Serializers; end
 
 module VictoriaMetrics; end
 
-autoload_normal.call("model", flat: true)
+autoload_normal.call("model", flat: true, exclude_dirs: %w[aws metal])
 %w[lib clover.rb clover_admin.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
