@@ -38,7 +38,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   }
 
   before do
-    allow(nx).to receive(:postgres_resource).and_return(pg)
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project.id)
   end
 
@@ -50,7 +49,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     ).subject
     vm.update(vm_host_id: vm_host.id)
     if subnet_az
-      NicAwsResource.create_with_id(vm.nic.id, subnet_az: subnet_az)
+      NicAwsResource.create_with_id(vm.nic.id, subnet_az:)
     end
     if upgrade_candidate
       boot_image = BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
@@ -59,9 +58,9 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
     end
     server = PostgresServer.create(
-      timeline: timeline, resource_id: resource.id, vm_id: vm.id,
+      timeline:, resource_id: resource.id, vm_id: vm.id,
       representative_at: representative ? Time.now : nil,
-      synchronization_status: "ready", timeline_access: timeline_access, version: version
+      synchronization_status: "ready", timeline_access:, version:
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
     server
@@ -238,7 +237,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server = create_server(representative: true, timeline_access: "push")
       server.incr_recycle
       standby = create_server(representative: false, timeline_access: "fetch")
-      expect(pg.representative_server).to receive(:trigger_failover).with(mode: "planned").and_wrap_original do |m, **args|
+      expect(nx.postgres_resource.representative_server).to receive(:trigger_failover).with(mode: "planned") do
         standby.incr_planned_take_over
         true
       end
