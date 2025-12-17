@@ -36,6 +36,7 @@ class Vm < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: :public_key
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
     :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop, :migrate_to_separate_progs
   include HealthMonitorMethods
@@ -70,10 +71,6 @@ class Vm < Sequel::Model
 
   def ip4_string
     ip4&.to_s
-  end
-
-  def ip6
-    location.aws? ? ephemeral_net6&.nth(0) : ephemeral_net6&.nth(2)
   end
 
   def ip6_string
@@ -198,12 +195,6 @@ class Vm < Sequel::Model
   # happen on a single host, pushing into the allocation process.
   def self.ubid_to_name(id)
     id.to_s[0..7]
-  end
-
-  def update_firewall_rules_prog
-    prog = Prog::Vnet
-    prog = location.aws? ? prog::Aws : prog::Metal
-    prog::UpdateFirewallRules
   end
 
   def inhost_name
