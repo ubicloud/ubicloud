@@ -588,13 +588,10 @@ RSpec.describe PostgresServer do
 
   if Config.unfrozen_test?
     describe "#attach_s3_policy_if_needed" do
-      before do
-        allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
-        AwsInstance.create_with_id(vm, iam_role: "role")
-      end
-
       it "calls attach_role_policy when needs s3 policy attachment" do
         location.update(provider: "aws")
+        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+        AwsInstance.create_with_id(vm, iam_role: "role")
         iam_client = Aws::IAM::Client.new(stub_responses: true)
         LocationCredential.create(location:, assume_role: "role")
         expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
@@ -603,8 +600,17 @@ RSpec.describe PostgresServer do
         postgres_server.attach_s3_policy_if_needed
       end
 
+      it "does not call attach_role_policy when aws_postgres_iam_access is not configured" do
+        location.update(provider: "aws")
+        expect(Config).to receive(:aws_postgres_iam_access).and_return(false)
+        LocationCredential.create(location:, assume_role: "role")
+        expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
+        postgres_server.attach_s3_policy_if_needed
+      end
+
       it "does not call attach_role_policy when needs s3 policy attachment" do
-        expect(postgres_server).not_to receive(:vm)
+        LocationCredential.create(location:, assume_role: "role")
+        expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
         postgres_server.attach_s3_policy_if_needed
       end
     end

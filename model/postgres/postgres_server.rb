@@ -14,6 +14,7 @@ class PostgresServer < Sequel::Model
   plugin :association_dependencies, lsn_monitor: :destroy
 
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
     :destroy, :recycle, :promote, :refresh_walg_credentials
@@ -22,6 +23,10 @@ class PostgresServer < Sequel::Model
 
   def self.victoria_metrics_client
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
+  end
+
+  def aws?
+    (vm || timeline).location.aws?
   end
 
   def configure_hash
@@ -102,11 +107,7 @@ class PostgresServer < Sequel::Model
         configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
       end
 
-      if timeline.aws?
-        configs[:log_line_prefix] = "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '"
-        configs[:log_connections] = "on"
-        configs[:log_disconnections] = "on"
-      end
+      add_provider_configs(configs)
     end
 
     {
@@ -291,6 +292,7 @@ class PostgresServer < Sequel::Model
       "match[]": "{__name__!~'#{exclude_pattern}'}"
     }
     query_str = URI.encode_www_form(query_params)
+    additional_labels = resource.tags.to_h { |key, value| ["pg_tags_label_#{key}", value] } # rubocop:disable Style/HashTransformKeys
 
     {
       endpoints: [
@@ -298,22 +300,10 @@ class PostgresServer < Sequel::Model
       ],
       max_file_retention: 120,
       interval: "15s",
-      additional_labels: resource.tags.to_h { |key, value| ["pg_tags_label_#{key}", value] }, # rubocop:disable Style/HashTransformKeys
+      additional_labels:,
       metrics_dir: "/home/ubi/postgres/metrics",
       project_id: Config.postgres_service_project_id
     }
-  end
-
-  def storage_device_paths
-    if vm.location.aws?
-      # On AWS, pick the largest block device to use as the data disk,
-      # since the device path detected by the VmStorageVolume is not always
-      # correct.
-      storage_device_count = vm.vm_storage_volumes.count { it.boot == false }
-      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n:storage_device_count |  awk '{print \"/dev/\"$1}'", storage_device_count:).strip.split
-    else
-      [vm.vm_storage_volumes.find { it.boot == false }.device_path]
-    end
   end
 
   def taking_over?
@@ -334,13 +324,7 @@ class PostgresServer < Sequel::Model
 
     walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
-    vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: timeline.blob_storage.root_certs) unless timeline.aws?
-  end
-
-  def attach_s3_policy_if_needed
-    if Config.aws_postgres_iam_access && timeline.aws? && vm.aws_instance.iam_role
-      timeline.location.location_credential.iam_client.attach_role_policy(role_name: vm.aws_instance.iam_role, policy_arn: timeline.aws_s3_policy_arn)
-    end
+    refresh_walg_blob_storage_credentials
   end
 
   def observe_archival_backlog(session:)
