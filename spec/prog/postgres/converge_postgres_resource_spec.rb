@@ -5,6 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Postgres::ConvergePostgresResource do
   subject(:nx) { described_class.new(strand) }
 
+  let(:postgres_service_project) { Project.create(name: "postgres-service-project") }
   let(:project) { Project.create(name: "converge-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
@@ -16,37 +17,41 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     )
   }
 
-  let(:postgres_resource) {
+  let(:pg) {
     pr = PostgresResource.create(
-      name: "pg-test", superuser_password: "dummy-password", ha_type: "sync",
+      name: "pg-test", superuser_password: "dummy-password", ha_type: "none",
       target_version: "17", location_id: location_id, project_id: project.id,
       user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
       target_storage_size_gib: 64, private_subnet_id: private_subnet.id
     )
     Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
+    Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id: location_id, project_id: postgres_service_project.id)
     pr
   }
 
   let(:strand) {
     Strand.create(
       prog: "Postgres::ConvergePostgresResource", label: "start",
-      parent_id: postgres_resource.strand.id,
-      stack: [{"subject_id" => postgres_resource.id}]
+      parent_id: pg.strand.id,
+      stack: [{"subject_id" => pg.id}]
     )
   }
 
   before do
-    allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
+    allow(nx).to receive(:postgres_resource).and_return(pg)
+    allow(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project.id)
   end
 
-  def create_server(version: "17", representative: false, vm_host_data_center: nil, timeline: self.timeline, timeline_access: "fetch", resource: postgres_resource)
+  def create_server(version: "17", representative: false, vm_host_data_center: nil, timeline: self.timeline, timeline_access: "fetch", resource: pg, subnet_az: nil)
     vm_host = create_vm_host(location_id: resource.location_id, data_center: vm_host_data_center)
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: resource.private_subnet_id,
       location_id: resource.location_id, unix_user: "ubi"
     ).subject
     vm.update(vm_host_id: vm_host.id)
-    # Add storage volume to match target_storage_size_gib so needs_recycling? returns false by default
+    if subnet_az
+      NicAwsResource.create_with_id(vm.nic.id, subnet_az: subnet_az)
+    end
     VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
     server = PostgresServer.create(
       timeline: timeline, resource_id: resource.id, vm_id: vm.id,
@@ -58,7 +63,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   it "exits if destroy is set" do
-    expect(nx).to receive(:when_destroy_set?).and_yield
+    nx.incr_destroy
     expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
   end
 
@@ -71,14 +76,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      postgres_resource.update(parent_id: parent.id)
-      allow(parent).to receive(:ready_for_read_replica?).and_return(false)
-      allow(postgres_resource).to receive(:parent).and_return(parent)
+      pg.update(parent_id: parent.id)
 
       expect { nx.start }.to nap(60)
     end
 
     it "registers a deadline and hops to provision_servers if read replica parent is ready" do
+      parent_timeline = PostgresTimeline.create(location_id: location_id, cached_earliest_backup_at: Time.now)
       parent = PostgresResource.create(
         name: "pg-parent2", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id: location_id, project_id: project.id,
@@ -86,9 +90,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      postgres_resource.update(parent_id: parent.id)
-      allow(parent).to receive(:ready_for_read_replica?).and_return(true)
-      allow(postgres_resource).to receive(:parent).and_return(parent)
+      create_server(timeline: parent_timeline, representative: true, timeline_access: "push", resource: parent)
+      pg.update(parent_id: parent.id)
 
       expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
       expect { nx.start }.to hop("provision_servers")
@@ -98,68 +101,71 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   describe "#provision_servers" do
     before do
       strand.update(label: "provision_servers")
-      create_server(representative: true, vm_host_data_center: "dc1")
-      create_server(representative: false, vm_host_data_center: "dc2")
     end
 
     it "hops to wait_servers_to_be_ready if there are enough fresh servers" do
-      allow(postgres_resource).to receive(:has_enough_fresh_servers?).and_return(true)
+      create_server(representative: true, vm_host_data_center: "dc1")
       expect { nx.provision_servers }.to hop("wait_servers_to_be_ready")
     end
 
     it "does not provision a new server if there is a server that is not assigned to a vm_host" do
-      server = postgres_resource.servers.first
+      server = create_server(representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
       server.vm.update(vm_host_id: nil)
-      expect(Prog::Postgres::PostgresServerNexus).not_to receive(:assemble)
+      initial_count = PostgresServer.count
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.count).to eq(initial_count)
     end
 
-    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
+    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true" do
+      server = create_server(representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
+      initial_count = PostgresServer.count
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.count).to eq(initial_count + 1)
     end
 
     it "provisions a new server but excludes currently used data centers" do
+      server = create_server(representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(false)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble) do |**kwargs|
-        expect(kwargs[:exclude_host_ids].size).to eq(2)
-      end
+      initial_count = PostgresServer.count
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.count).to eq(initial_count + 1)
     end
 
     it "provisions a new server but excludes currently used az for aws" do
-      servers = [
-        instance_double(PostgresServer, needs_recycling?: false, version: "17", vm: instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "a")))),
-        instance_double(PostgresServer, needs_recycling?: false, version: "17", vm: instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "b"))))
-      ]
-      allow(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME)
-      allow(postgres_resource).to receive_messages(servers: servers, has_enough_fresh_servers?: false, use_different_az_set?: true)
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b")))
+      location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      server1 = create_server(representative: true, subnet_az: "a")
+      server2 = create_server(subnet_az: "b")
+      server1.incr_recycle
+      server2.incr_recycle
+      pg.incr_use_different_az
+      initial_count = PostgresServer.count
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.count).to eq(initial_count + 1)
     end
 
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
-      representative_server = instance_double(
-        PostgresServer,
-        needs_recycling?: false,
-        version: "17",
-        representative_at: Time.now,
-        vm: instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "a")))
-      )
-      servers = [representative_server]
-      allow(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME)
-      allow(postgres_resource).to receive_messages(servers: servers, has_enough_fresh_servers?: false, representative_server: representative_server, use_different_az_set?: false)
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a"))
+      location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      server = create_server(representative: true, subnet_az: "a")
+      server.incr_recycle
+      initial_count = PostgresServer.count
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a")).and_call_original
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.count).to eq(initial_count + 1)
     end
 
     it "provisions a new server with the correct timeline for a regular instance" do
+      server = create_server(representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: timeline.id))
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.order(:created_at).last.timeline_id).to eq(timeline.id)
     end
 
     it "provisions a new server with the correct timeline for a read replica" do
@@ -171,14 +177,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      # Create a server for parent so it has a timeline
       create_server(timeline: parent_timeline, representative: true, timeline_access: "push", resource: parent)
-
-      postgres_resource.update(parent_id: parent.id)
+      pg.update(parent_id: parent.id)
+      server = create_server(representative: true, vm_host_data_center: "dc1")
+      server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
 
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent_timeline.id))
       expect { nx.provision_servers }.to nap
+      expect(PostgresServer.order(:created_at).last.timeline_id).to eq(parent_timeline.id)
     end
   end
 
@@ -188,17 +194,17 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to provision_servers if there is not enough fresh servers" do
-      allow(postgres_resource).to receive(:has_enough_fresh_servers?).and_return(false)
       expect { nx.wait_servers_to_be_ready }.to hop("provision_servers")
     end
 
     it "hops to wait_for_maintenance_window if there are enough ready servers" do
-      allow(postgres_resource).to receive_messages(has_enough_fresh_servers?: true, has_enough_ready_servers?: true)
+      create_server(representative: true)
       expect { nx.wait_servers_to_be_ready }.to hop("wait_for_maintenance_window")
     end
 
     it "waits if there are not enough ready servers" do
-      allow(postgres_resource).to receive_messages(has_enough_fresh_servers?: true, has_enough_ready_servers?: false)
+      server = create_server(representative: true)
+      server.strand.update(label: "configure")
       expect { nx.wait_servers_to_be_ready }.to nap
     end
   end
@@ -213,51 +219,50 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to prune_servers if the representative server does not need recycling" do
-      server = create_server(representative: true)
-      allow(server).to receive(:needs_recycling?).and_return(false)
-      allow(postgres_resource).to receive_messages(representative_server: server, ongoing_failover?: false)
+      create_server(representative: true)
       expect { nx.recycle_representative_server }.to hop("prune_servers")
     end
 
     it "hops to provision_servers if there are not enough ready servers" do
       server = create_server(representative: true)
-      allow(server).to receive(:needs_recycling?).and_return(true)
-      allow(postgres_resource).to receive_messages(representative_server: server, ongoing_failover?: false, has_enough_ready_servers?: false)
+      server.incr_recycle
       expect { nx.recycle_representative_server }.to hop("provision_servers")
     end
 
-    it "triggers failover directly when called" do
-      server = create_server(representative: true)
-      allow(server).to receive(:needs_recycling?).and_return(true)
-      allow(postgres_resource).to receive_messages(representative_server: server, ongoing_failover?: false, has_enough_ready_servers?: true)
-      expect(server).to receive(:trigger_failover)
+    it "triggers failover when representative needs recycling and standby is ready" do
+      server = create_server(representative: true, timeline_access: "push")
+      server.incr_recycle
+      standby = create_server(representative: false, timeline_access: "fetch")
+      allow_any_instance_of(PostgresServer).to receive(:current_lsn).and_return("0/1000000")
       expect { nx.recycle_representative_server }.to nap(60)
+      expect(standby.reload.planned_take_over_set?).to be true
     end
   end
 
   describe "#wait_for_maintenance_window" do
     before do
       strand.update(label: "wait_for_maintenance_window")
+      pg.update(maintenance_window_start_at: nil)
     end
 
     it "hops to provision_servers if there are not enough fresh servers" do
-      allow(postgres_resource).to receive_messages(in_maintenance_window?: true, has_enough_fresh_servers?: false)
       expect { nx.wait_for_maintenance_window }.to hop("provision_servers")
     end
 
     it "hops to recycle_representative_server if in maintenance window and not upgrading" do
-      allow(postgres_resource).to receive_messages(in_maintenance_window?: true, has_enough_fresh_servers?: true, version: "16", target_version: "16")
+      create_server(representative: true)
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
-    it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading for regular instances" do
+    it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
       server = create_server(representative: true, version: "16")
-      allow(postgres_resource).to receive_messages(in_maintenance_window?: true, has_enough_fresh_servers?: true, version: "16", representative_server: server)
-      expect(server).to receive(:incr_fence)
+      create_server(representative: false, version: "16")
+      allow(pg).to receive(:has_enough_fresh_servers?).and_return(true)
       expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
+      expect(server.reload.fence_set?).to be true
     end
 
-    it "fences primary and hops to recycle_representative_server if in maintenance window and upgrading for read replicas" do
+    it "hops to recycle_representative_server if in maintenance window and upgrading for read replicas" do
       parent = PostgresResource.create(
         name: "pg-parent-maint", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id: location_id, project_id: project.id,
@@ -265,14 +270,16 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      postgres_resource.update(parent_id: parent.id)
+      pg.update(parent_id: parent.id)
+      create_server(representative: true, version: "16")
+      create_server(representative: false, version: "16")
+      allow(pg).to receive(:has_enough_fresh_servers?).and_return(true)
 
-      allow(postgres_resource).to receive_messages(in_maintenance_window?: true, has_enough_fresh_servers?: true, version: "16")
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
 
     it "waits if not in maintenance window" do
-      allow(postgres_resource).to receive(:in_maintenance_window?).and_return(false)
+      pg.update(maintenance_window_start_at: (Time.now.utc.hour + 12) % 24)
       expect { nx.wait_for_maintenance_window }.to nap(10 * 60)
     end
   end
@@ -300,7 +307,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "upgrade_standby")
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
     end
 
     it "hops to update_metadata when upgrade succeeds" do
@@ -331,13 +338,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "update_metadata")
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
     end
 
-    it "creates new timeline and updates candidate server metadata and hops to recycle_representative_server" do
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).with(location_id: location_id).and_call_original
-
+    it "creates new timeline and updates candidate server metadata" do
+      initial_timeline_count = PostgresTimeline.count
       expect { nx.update_metadata }.to hop("wait_upgrade_candidate")
+      expect(PostgresTimeline.count).to eq(initial_timeline_count + 1)
 
       candidate.reload
       expect(candidate.version).to eq("17")
@@ -356,21 +363,21 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "hops to recycle_representative_server when candidate is ready" do
       candidate = create_server(version: "16")
       candidate.strand.update(label: "wait")
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to hop("recycle_representative_server")
     end
 
     it "waits when candidate is waiting for restart" do
       candidate = create_server(version: "16")
       candidate.incr_restart
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to nap(5)
     end
 
     it "waits when candidate is not ready" do
       candidate = create_server(version: "16")
       candidate.strand.update(label: "configure")
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to nap(5)
     end
   end
@@ -383,83 +390,80 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     before do
       strand.update(label: "upgrade_failed")
       primary.strand.update(label: "wait_in_fence")
-      allow(nx).to receive(:upgrade_candidate).and_return(candidate)
-      allow(postgres_resource).to receive(:representative_server).and_return(primary)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
     end
 
     it "logs failure, raises a page and destroys candidate server" do
       expect(sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed").and_yield.twice
-      expect(Prog::PageNexus).to receive(:assemble)
-      expect(primary).to receive(:incr_unfence)
+      initial_page_count = Page.count
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
 
+      expect(Page.count).to eq(initial_page_count + 1)
       expect(candidate.reload.destroy_set?).to be true
+      expect(primary.reload.unfence_set?).to be true
     end
 
     it "unfences primary if it is fenced" do
       allow(sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
-      expect(primary).to receive(:incr_unfence)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
+
+      expect(primary.reload.unfence_set?).to be true
     end
 
     it "does not unfence if primary is not fenced" do
       primary.strand.update(label: "wait")
       allow(sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
-      expect(primary).not_to receive(:incr_unfence)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
+
+      expect(primary.reload.unfence_set?).to be false
     end
 
     it "handles case when candidate is nil" do
-      allow(nx).to receive(:upgrade_candidate).and_return(nil)
-      allow(primary).to receive(:incr_unfence)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(nil)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
+
+      expect(primary.reload.unfence_set?).to be true
     end
 
     it "handles case when candidate is not nil but destroy_set? is true" do
       candidate.incr_destroy
-      allow(primary).to receive(:incr_unfence)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
+
+      expect(primary.reload.unfence_set?).to be true
     end
   end
 
   describe "#prune_servers" do
     before do
       strand.update(label: "prune_servers")
+      pg.update(ha_type: "async")
     end
 
-    it "destroys extra servers but keeps those that don't need recycling and match current version" do
-      # Create servers and set created_at explicitly to control ordering
-      # The prune logic sorts by [ready_first, newer_first] and keeps target_standby_count servers
+    it "destroys extra servers but keeps target_standby_count standbys" do
       representative = create_server(representative: true)
-      extra_server = create_server
       keep_server = create_server
+      extra_server = create_server
       unavailable_server = create_server
       unavailable_server.strand.update(label: "unavailable")
       recycling_server = create_server
       recycling_server.incr_recycle
 
-      # Ensure created_at ordering: extra_server is older than keep_server (newer servers preferred)
-      extra_server.update(created_at: Time.now - 60)
+      extra_server.update(created_at: Time.now - 120)
       keep_server.update(created_at: Time.now)
-
-      allow(postgres_resource).to receive(:target_standby_count).and_return(1)
 
       expect { nx.prune_servers }.to exit
 
-      # Verify correct servers are destroyed (recycling, unavailable, extra)
       expect(recycling_server.reload.destroy_set?).to be true
       expect(unavailable_server.reload.destroy_set?).to be true
       expect(extra_server.reload.destroy_set?).to be true
-
-      # Verify correct servers are configured (representative, keep)
       expect(representative.reload.configure_set?).to be true
       expect(keep_server.reload.configure_set?).to be true
       expect(keep_server.destroy_set?).to be false
@@ -479,7 +483,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   describe "#upgrade_candidate" do
     it "returns the upgrade candidate server" do
       candidate = create_server(version: "16")
-      allow(postgres_resource).to receive(:upgrade_candidate_server).and_return(candidate)
+      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect(nx.upgrade_candidate).to eq(candidate)
     end
   end
