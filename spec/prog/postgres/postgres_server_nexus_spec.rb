@@ -963,18 +963,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "triggers a page and retries if promote command is failed" do
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "pgubid promotion failed", ["PGPromotionFailed", postgres_server.id],
-        "pgubid"
-      ).and_return(instance_double(Prog::PageNexus, bud: nil))
       expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16")
-
       expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
+
       expect { nx.taking_over }.to nap(0)
+
+      page = Page.first(tag: "PGPromotionFailed-#{postgres_server.id}")
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("pgubid promotion failed")
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(Page).to receive(:from_tag_parts).with("PGPromotionFailed", postgres_server.id).and_return(nil)
       expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
@@ -996,9 +995,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
-      page = instance_double(Page)
-      expect(Page).to receive(:from_tag_parts).with("PGPromotionFailed", postgres_server.id).and_return(page)
-      expect(page).to receive(:incr_resolve)
+      page = Page.create(summary: "test page", tag: "PGPromotionFailed-#{postgres_server.id}")
+      Strand.create_with_id(page, prog: "PageNexus", label: "wait")
       expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 
       expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
@@ -1017,6 +1015,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
 
       expect { nx.taking_over }.to hop("configure")
+
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
 
     it "naps if script return unknown status" do
