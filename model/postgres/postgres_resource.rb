@@ -20,6 +20,7 @@ class PostgresResource < Sequel::Model
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
   include ObjectTag::Cleanup
 
@@ -182,23 +183,6 @@ class PostgresResource < Sequel::Model
 
   def incr_restart
     Semaphore.incr(servers_dataset.select(:id), "restart")
-  end
-
-  def upgrade_candidate_server
-    if location.aws?
-      # TODO: We check if the AWS server is running the latest AMI version tracked in
-      # the pg_aws_ami table. We can optimize this to consider more AMIs by tracking
-      # the creation times in the pg_aws_ami table.
-      servers
-        .reject(&:representative_at)
-        .select { |server| PgAwsAmi.where(aws_ami_id: server.vm.boot_image).count > 0 }
-        .max_by(&:created_at)
-    else
-      servers
-        .reject(&:representative_at)
-        .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[target_version] } }
-        .max_by(&:created_at)
-    end
   end
 
   def upgrade_stage
