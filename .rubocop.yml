@@ -84,6 +84,9 @@ RSpec/SubjectStub:
 RSpec/ExpectInHook:
   Enabled: false
 
+RSpec/ExpectInLet:
+  Enabled: false
+
 RSpec/InstanceVariable:
   Enabled: false
 
