@@ -276,6 +276,58 @@ class Clover
         end
       end
 
+      r.post "enable-privatelink" do
+        authorize("Postgres:edit", pg)
+
+        if pg.privatelink_aws_resource
+          # Already enabled, return current state (idempotent)
+          if api?
+            next Serializers::Postgres.serialize(pg, {detailed: true})
+          else
+            flash["notice"] = "PrivateLink is already enabled for '#{pg.name}'"
+            next r.redirect(pg, "/settings")
+          end
+        end
+
+        DB.transaction do
+          pg.incr_enable_privatelink
+          audit_log(pg, "enable_privatelink")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "PrivateLink is being enabled for '#{pg.name}'"
+          r.redirect pg, "/settings"
+        end
+      end
+
+      r.post "disable-privatelink" do
+        authorize("Postgres:edit", pg)
+
+        unless pg.privatelink_aws_resource
+          # Already disabled, return success (idempotent)
+          if api?
+            next 204
+          else
+            flash["notice"] = "PrivateLink is not enabled for '#{pg.name}'"
+            next r.redirect(pg, "/settings")
+          end
+        end
+
+        DB.transaction do
+          pg.incr_disable_privatelink
+          audit_log(pg, "disable_privatelink")
+        end
+
+        if api?
+          204
+        else
+          flash["notice"] = "PrivateLink is being disabled for '#{pg.name}'"
+          r.redirect pg, "/settings"
+        end
+      end
+
       r.post "promote" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
