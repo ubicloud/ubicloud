@@ -331,13 +331,35 @@ RSpec.describe PostgresResource do
 
   describe "#install_rhizome" do
     it "installs rhizome on all servers" do
-      server1 = instance_double(PostgresServer, vm: instance_double(Vm, id: "1"))
-      server2 = instance_double(PostgresServer, vm: instance_double(Vm, id: "2"))
-      expect(postgres_resource).to receive(:servers).and_return([server1, server2])
-      [server1, server2].each do |server|
-        expect(Strand).to receive(:create).with(prog: "InstallRhizome", label: "start", stack: [{subject_id: server.vm.id, target_folder: "postgres", install_specs: false}])
+      project = Project.create(name: "test-project")
+      private_subnet = PrivateSubnet.create(
+        name: "test-subnet", project:, location_id: Location::HETZNER_FSN1_ID,
+        net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+        net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+      )
+      resource = described_class.create(
+        name: "test-pg", project:, location_id: Location::HETZNER_FSN1_ID,
+        ha_type: PostgresResource::HaType::NONE, target_version: "16",
+        target_vm_size: "standard-2", target_storage_size_gib: 64,
+        superuser_password: "test-pass"
+      )
+      timeline = PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID)
+
+      vm1 = Prog::Vm::Nexus.assemble_with_sshable(project.id, name: "test-vm-1", private_subnet_id: private_subnet.id, location_id: Location::HETZNER_FSN1_ID).subject
+      vm2 = Prog::Vm::Nexus.assemble_with_sshable(project.id, name: "test-vm-2", private_subnet_id: private_subnet.id, location_id: Location::HETZNER_FSN1_ID).subject
+
+      PostgresServer.create(resource:, timeline:, vm_id: vm1.id, timeline_access: "push", synchronization_status: "ready", version: "16", representative_at: Time.now)
+      PostgresServer.create(resource:, timeline:, vm_id: vm2.id, timeline_access: "fetch", synchronization_status: "catching_up", version: "16")
+
+      resource.install_rhizome
+
+      strands = Strand.where(prog: "InstallRhizome").all
+      expect(strands.size).to eq(2)
+      expect(strands.map { it.stack.first["subject_id"] }).to contain_exactly(vm1.id, vm2.id)
+      strands.each do |strand|
+        expect(strand.stack.first["target_folder"]).to eq("postgres")
+        expect(strand.stack.first["install_specs"]).to be false
       end
-      postgres_resource.install_rhizome
     end
   end
 end
