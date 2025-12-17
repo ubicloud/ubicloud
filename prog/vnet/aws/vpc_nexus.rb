@@ -129,6 +129,8 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet.nics.each(&:incr_destroy)
     private_subnet.remove_all_firewalls
 
+    hop_finish unless private_subnet_aws_resource
+
     ignore_invalid_id do
       client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
     end
@@ -150,9 +152,12 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     ignore_invalid_id do
       client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
     end
+    hop_finish
+  end
 
+  label def finish
     nap 5 unless private_subnet.nics.empty?
-    private_subnet_aws_resource.destroy
+    private_subnet_aws_resource&.destroy
     private_subnet.destroy
     pop "vpc destroyed"
   end
