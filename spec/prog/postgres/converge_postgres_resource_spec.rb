@@ -238,7 +238,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server = create_server(representative: true, timeline_access: "push")
       server.incr_recycle
       standby = create_server(representative: false, timeline_access: "fetch")
-      allow_any_instance_of(PostgresServer).to receive(:current_lsn).and_return("0/1000000")
+      expect(pg.representative_server).to receive(:trigger_failover).with(mode: "planned").and_wrap_original do |m, **args|
+        standby.incr_planned_take_over
+        true
+      end
       expect { nx.recycle_representative_server }.to nap(60)
       expect(standby.reload.planned_take_over_set?).to be true
     end
@@ -305,30 +308,32 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   describe "#upgrade_standby" do
+    let(:candidate) { create_server(version: "16", upgrade_candidate: true) }
+
     before do
       strand.update(label: "upgrade_standby")
-      create_server(version: "16", upgrade_candidate: true)
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
     end
 
     it "hops to update_metadata when upgrade succeeds" do
-      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Succeeded")
-      expect_any_instance_of(Sshable).to receive(:d_clean).with("upgrade_postgres")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Succeeded")
+      expect(candidate.vm.sshable).to receive(:d_clean).with("upgrade_postgres")
       expect { nx.upgrade_standby }.to hop("update_metadata")
     end
 
     it "hops to upgrade_failed when upgrade fails" do
-      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
       expect { nx.upgrade_standby }.to hop("upgrade_failed")
     end
 
     it "starts upgrade when not started" do
-      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
-      expect_any_instance_of(Sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
+      expect(candidate.vm.sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17")
       expect { nx.upgrade_standby }.to nap(5)
     end
 
     it "naps if status of the upgrade is unknown" do
-      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Unknown")
+      expect(candidate.vm.sshable).to receive(:d_check).with("upgrade_postgres").and_return("Unknown")
       expect { nx.upgrade_standby }.to nap(5)
     end
   end
