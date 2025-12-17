@@ -130,6 +130,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource.dns_zone.insert_record(record_name: postgres_resource.hostname, type:, ttl: 10, data:)
     end
 
+    # Update PrivateLink NLB target to point to new representative server
+    postgres_resource.privatelink_aws_resource&.incr_update_target
+
     when_initial_provisioning_set? do
       hop_initialize_certificates
     end
@@ -256,6 +259,26 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         postgres_resource.update(parent_id: nil)
       end
       decr_promote
+    end
+
+    when_enable_privatelink_set? do
+      unless postgres_resource.location.aws?
+        fail "PrivateLink is only supported on AWS"
+      end
+
+      if postgres_resource.privatelink_aws_resource
+        fail "PrivateLink is already enabled"
+      end
+
+      Prog::Postgres::PostgresPrivatelinkAwsNexus.assemble(postgres_resource_id: postgres_resource.id)
+      decr_enable_privatelink
+    end
+
+    when_disable_privatelink_set? do
+      if postgres_resource.privatelink_aws_resource
+        postgres_resource.privatelink_aws_resource.incr_destroy
+      end
+      decr_disable_privatelink
     end
 
     nap 30

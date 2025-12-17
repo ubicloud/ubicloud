@@ -14,13 +14,14 @@ class PostgresResource < Sequel::Model
   many_to_one :private_subnet
   many_to_one :location, key: :location_id, class: :Location
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}
+  one_to_one :privatelink_aws_resource, class: :PostgresPrivatelinkAwsResource, key: :postgres_resource_id
 
   plugin :association_dependencies, metric_destinations: :destroy
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
-  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
+  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command, :enable_privatelink, :disable_privatelink
   include ObjectTag::Cleanup
 
   def display_location
@@ -221,6 +222,10 @@ class PostgresResource < Sequel::Model
 
   def ready_for_read_replica?
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
+  end
+
+  def privatelink_service_name
+    privatelink_aws_resource&.service_name
   end
 
   module HaType
