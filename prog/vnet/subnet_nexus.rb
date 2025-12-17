@@ -70,7 +70,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   def self.random_private_ipv4(location, project, cidr_size = 26)
     raise ArgumentError, "CIDR size must be between 0 and 32" unless cidr_size.between?(0, 32)
 
-    private_range = PrivateSubnet.random_subnet
+    private_range = PrivateSubnet.random_subnet(cidr_size)
     addr = NetAddr::IPv4Net.parse(private_range)
 
     selected_addr = if addr.netmask.prefix_len < cidr_size

@@ -65,11 +65,17 @@ class PrivateSubnet < Sequel::Model
 
   plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate
 
-  def self.random_subnet
+  def self.random_subnet(cidr_size)
     subnet_dict = PRIVATE_SUBNET_RANGES.each_with_object({}) do |subnet, hash|
       prefix_length = Integer(subnet.split("/").last, 10)
+      next unless prefix_length < cidr_size
       hash[subnet] = (2**16 + 2**12 + 2**8 - 2**prefix_length)
     end
+
+    if subnet_dict.empty?
+      raise "No subnet found for cidr size #{cidr_size}"
+    end
+
     subnet_dict.max_by { |_, weight| rand**(1.0 / weight) }.first
   end
 

@@ -119,6 +119,17 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       project = Project.create(name: "test-project")
       expect { described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 33) }.to raise_error(ArgumentError)
     end
+
+    it "raises an error when no subnet is found" do
+      project = Project.create(name: "test-project")
+      expect { described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 8) }.to raise_error(RuntimeError, "No subnet found for cidr size 8")
+    end
+
+    it "filters out subnets that are smaller than the requested cidr size" do
+      project = Project.create(name: "test-project")
+      expect(SecureRandom).to receive(:random_number).with(2**(10 - 8) - 1).and_return(1)
+      expect(described_class.random_private_ipv4(Location[name: "hetzner-fsn1"], project, 10).to_s).to eq("10.128.0.0/10")
+    end
   end
 
   describe ".random_private_ipv6" do
