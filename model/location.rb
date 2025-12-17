@@ -4,12 +4,12 @@ require_relative "../model"
 
 class Location < Sequel::Model
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
   dataset_module Pagination
 
   one_to_one :location_credential, key: :id
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
-  one_to_many :location_aws_azs, key: :location_id, class: :LocationAwsAz
 
   plugin :association_dependencies, location_credential: :destroy
 
@@ -48,31 +48,6 @@ class Location < Sequel::Model
 
   def aws?
     provider == "aws"
-  end
-
-  def pg_ami(pg_version, arch)
-    PgAwsAmi.find(aws_location_name: name, pg_version:, arch:).aws_ami_id
-  end
-
-  def aws_azs
-    v = location_aws_azs_dataset.all
-    return v unless v.empty?
-
-    raise "azs is only valid for aws locations" unless aws?
-
-    set_aws_azs
-  end
-
-  private
-
-  def set_aws_azs
-    get_azs_from_aws.map do |az|
-      LocationAwsAz.create(location_id: id, zone_id: az.zone_id, az: az.zone_name.delete_prefix(name))
-    end
-  end
-
-  def get_azs_from_aws
-    location_credential.client.describe_availability_zones.availability_zones
   end
 end
 
