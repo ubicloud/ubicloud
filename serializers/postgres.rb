@@ -19,7 +19,10 @@ class Serializers::Postgres < Serializers::Base
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
-      tags: pg.tags || []
+      tags: pg.tags || [],
+      privatelink: {
+        enabled: false
+      }
     }
 
     if options[:detailed]
@@ -41,6 +44,17 @@ class Serializers::Postgres < Serializers::Base
           Clog.emit("Failed to get earliest restore time") { Util.exception_to_hash(ex) }
         end
         base[:latest_restore_time] = pg.timeline.latest_restore_time&.utc&.iso8601
+      end
+
+      # Add PrivateLink information if enabled
+      if pg.privatelink_aws_resource
+        base.merge!(
+          privatelink: {
+            enabled: true,
+            state: pg.privatelink_aws_resource.display_state,
+            service_name: pg.privatelink_aws_resource.service_name
+          }
+        )
       end
     end
 
