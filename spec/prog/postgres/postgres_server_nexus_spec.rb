@@ -973,50 +973,67 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(page.summary).to eq("pgubid promotion failed")
     end
 
-    it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+    context "when promote succeeds with real models" do
+      def create_postgres_cluster
+        user_project = Project.create(name: "test-project")
+        postgres_project = Project.create(name: "postgres-service")
+        allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
-      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
-      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server).to receive(:incr_configure_metrics)
-      expect(postgres_server).to receive(:incr_restart)
+        resource = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID,
+          name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 64
+        ).subject
 
-      standby = instance_double(PostgresServer, primary?: false)
-      expect(standby).to receive(:update).with(synchronization_status: "catching_up")
-      expect(standby).to receive(:incr_configure)
-      expect(standby).to receive(:incr_configure_metrics)
-      expect(standby).to receive(:incr_restart)
+        primary = resource.servers.first
+        primary.update(timeline_access: "fetch", representative_at: nil)
+        primary_strand = primary.strand
 
-      expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
+        standby_strand = described_class.assemble(
+          resource_id: resource.id, timeline_id: resource.timeline.id,
+          timeline_access: "fetch"
+        )
+        standby = PostgresServer[standby_strand.id]
 
-      expect { nx.taking_over }.to hop("configure")
-    end
+        [resource, primary, primary_strand, standby]
+      end
 
-    it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
-      page = Page.create(summary: "test page", tag: "PGPromotionFailed-#{postgres_server.id}")
-      Strand.create_with_id(page, prog: "PageNexus", label: "wait")
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+      it "updates the metadata and hops to configure if promote command is succeeded" do
+        resource, primary, primary_strand, standby = create_postgres_cluster
+        primary_nx = described_class.new(primary_strand)
+        sshable = primary_nx.postgres_server.vm.sshable
 
-      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
-      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server).to receive(:incr_configure_metrics)
-      expect(postgres_server).to receive(:incr_restart)
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Succeeded")
 
-      standby = instance_double(PostgresServer, primary?: false)
-      expect(standby).to receive(:update).with(synchronization_status: "catching_up")
-      expect(standby).to receive(:incr_configure)
-      expect(standby).to receive(:incr_configure_metrics)
-      expect(standby).to receive(:incr_restart)
+        expect { primary_nx.taking_over }.to hop("configure")
 
-      expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
+        expect(primary.reload.timeline_access).to eq("push")
+        expect(primary.representative_at).not_to be_nil
+        expect(primary.synchronization_status).to eq("ready")
 
-      expect { nx.taking_over }.to hop("configure")
+        expect(standby.reload.synchronization_status).to eq("catching_up")
 
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+        expect(Semaphore.where(strand_id: resource.id, name: "refresh_dns_record").count).to eq(1)
+        [primary, standby].each do |server|
+          expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
+          expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
+          expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
+        end
+      end
+
+      it "resolves existing page when promote succeeds" do
+        _, primary, primary_strand, _ = create_postgres_cluster
+        primary_nx = described_class.new(primary_strand)
+        sshable = primary_nx.postgres_server.vm.sshable
+
+        page = Page.create(summary: "test page", tag: "PGPromotionFailed-#{primary.id}")
+        Strand.create_with_id(page, prog: "PageNexus", label: "wait")
+
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Succeeded")
+
+        expect { primary_nx.taking_over }.to hop("configure")
+
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
     end
 
     it "naps if script return unknown status" do
