@@ -206,6 +206,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to nap(5)
     end
 
+    it "hops to finish if aws resource not exists" do
+      aws_resource.destroy
+      nx.private_subnet.reload
+      expect { nx.destroy }.to hop("finish")
+    end
+
     it "deletes the security group and hops to delete_internet_gateway" do
       client.stub_responses(:delete_security_group)
       expect(client).to receive(:delete_security_group).with({group_id: "sg-0123456789abcdefg"}).and_call_original
@@ -237,17 +243,33 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       it "deletes the vpc" do
         client.stub_responses(:delete_vpc)
         expect(client).to receive(:delete_vpc).with({vpc_id: "vpc-0123456789abcdefg"}).and_call_original
-        expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
+        expect { nx.delete_vpc }.to hop("finish")
       end
 
+      it "hops if vpc is not found" do
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
+        expect { nx.delete_vpc }.to hop("finish")
+      end
+    end
+
+    describe "#finish" do
       it "naps if there are nics" do
         create_hosted_vm(ps.project, ps, "vm1")
-        expect { nx.delete_vpc }.to nap(5)
+        expect { nx.finish }.to nap(5)
       end
 
-      it "pops if vpc is not found" do
-        client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
-        expect { nx.delete_vpc }.to exit({"msg" => "vpc destroyed"})
+      it "pops after destroying resources" do
+        expect { nx.finish }.to exit({"msg" => "vpc destroyed"})
+        expect(ps.exists?).to be false
+        expect(aws_resource.exists?).to be false
+      end
+
+      it "pops even aws resource not exists" do
+        aws_resource.destroy
+        nx.private_subnet.reload
+        expect(aws_resource.exists?).to be false
+        expect { nx.finish }.to exit({"msg" => "vpc destroyed"})
+        expect(ps.exists?).to be false
       end
     end
   end
