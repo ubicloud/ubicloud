@@ -106,6 +106,8 @@ class Clover < Roda
     detach_vm
     disassociate
     disconnect
+    disable_privatelink
+    enable_privatelink
     promote
     remove_account
     remove_member
