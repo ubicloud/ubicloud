@@ -46,7 +46,7 @@ LOCK
 
     if File.directory?("/dev/shm")
       it "interlocks" do
-        portable_pkill = lambda { system("fuser -k /dev/shm/session-lock-testlockname 2>/dev/null") }
+        portable_pkill = lambda { system("fuser -k /dev/shm/session-lock-testlockname >/dev/null 2>&1") }
         portable_pkill.call
         q_lock_script = NetSsh.command(":lock_script", lock_script:)
         expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
