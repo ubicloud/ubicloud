@@ -34,7 +34,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     # 3. AWS will fail the call if there's a conflict, and we can simply retry
     ipv_6_cidr_block = NetAddr::IPv6Net.parse(vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block).nth_subnet(64, SecureRandom.random_number(2**8))
     subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]})
-    subnet_id, subnet_az = if private_subnet.old_aws_subnet?
+    subnet_id, subnet_az = if old_subnet?
       subnet = client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0]
       [subnet.subnet_id, subnet.availability_zone]
     elsif subnet_response.subnets.empty?
@@ -61,7 +61,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def wait_subnet_created
-    subnet_response = if private_subnet.old_aws_subnet?
+    subnet_response = if old_subnet?
       hop_create_network_interface
     else
       client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]}).subnets[0]
@@ -193,6 +193,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   private
+
+  def old_subnet?
+    private_subnet.net4.netmask.prefix_len == PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN
+  end
 
   def ignore_invalid_nic
     yield

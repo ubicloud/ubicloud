@@ -64,7 +64,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     end
 
     it "creates a subnet and hops to wait_subnet_created" do
-      expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)
+      expect(nx).to receive(:old_subnet?).and_return(false)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:describe_subnets, subnets: [])
       client.stub_responses(:create_subnet, subnet: {subnet_id: "subnet-0123456789abcdefg"})
@@ -76,7 +76,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     end
 
     it "reuses existing subnet" do
-      expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(false)
+      expect(nx).to receive(:old_subnet?).and_return(false)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       expect(client).not_to receive(:create_route_table)
@@ -86,7 +86,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     end
 
     it "reuses existing subnet for old aws subnet" do
-      expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(true)
+      expect(nx).to receive(:old_subnet?).and_return(true)
       client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
       client.stub_responses(:modify_subnet_attribute)
@@ -99,7 +99,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
 
   describe "#wait_subnet_created" do
     it "just hops to create the network interface for old aws subnet" do
-      expect(nic.private_subnet).to receive(:old_aws_subnet?).and_return(true)
+      expect(nx).to receive(:old_subnet?).and_return(true)
       expect { nx.wait_subnet_created }.to hop("create_network_interface")
     end
 
