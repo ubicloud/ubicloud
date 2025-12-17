@@ -40,7 +40,7 @@ class Serializers::Postgres < Serializers::Base
         rescue => ex
           Clog.emit("Failed to get earliest restore time") { Util.exception_to_hash(ex) }
         end
-        base[:latest_restore_time] = pg.timeline.latest_restore_time&.utc&.iso8601
+        base[:latest_restore_time] = pg.timeline.latest_restore_time.utc.iso8601
       end
     end
 
