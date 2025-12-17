@@ -10,6 +10,7 @@ class PostgresTimeline < Sequel::Model
   many_to_one :location
 
   plugin ResourceMethods, encrypted_columns: :secret_key
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
@@ -29,7 +30,7 @@ AWS_SECRET_ACCESS_KEY=#{secret_key}
 WALG_S3_PREFIX=s3://#{ubid}
 AWS_ENDPOINT=#{blob_storage_endpoint}
 #{walg_credentials}
-AWS_REGION=#{aws? ? location.name : "us-east-1"}
+AWS_REGION=#{walg_config_region}
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
 PGDATA=/dat/#{version}/data
@@ -102,91 +103,12 @@ PGDATA=/dat/#{version}/data
 
   S3BlobStorage = Struct.new(:url)
 
-  def blob_storage
-    @blob_storage ||= if aws?
-      S3BlobStorage.new("https://s3.#{location.name}.amazonaws.com")
-    else
-      DB.ignore_duplicate_queries do
-        MinioCluster[project_id: Config.postgres_service_project_id, location_id: location.id] || MinioCluster[project_id: Config.minio_service_project_id, location_id: location.id]
-      end
-    end
-  end
-
   def blob_storage_endpoint
     @blob_storage_endpoint ||= blob_storage.url || blob_storage.ip4_urls.sample
   end
 
-  def blob_storage_client
-    @blob_storage_client ||= aws? ? Aws::S3::Client.new(
-      region: location.name,
-      credentials: location.location_credential.credentials,
-      endpoint: blob_storage_endpoint,
-      force_path_style: true
-    ) : Minio::Client.new(
-      endpoint: blob_storage_endpoint,
-      access_key: access_key,
-      secret_key: secret_key,
-      ssl_ca_data: blob_storage.root_certs
-    )
-  end
-
   def blob_storage_policy
     {Version: "2012-10-17", Statement: [{Effect: "Allow", Action: ["s3:*"], Resource: ["arn:aws:s3:::#{ubid}*"]}]}
-  end
-
-  def list_objects(prefix, delimiter: "")
-    aws? ?
-    aws_list_objects(prefix, delimiter:)
-    : blob_storage_client.list_objects(ubid, prefix, delimiter:)
-  end
-
-  def aws_list_objects(prefix, delimiter: "")
-    response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:)
-    objects = response.contents
-    while response.is_truncated
-      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:, continuation_token: response.next_continuation_token)
-      objects.concat(response.contents)
-    end
-    objects
-  end
-
-  def create_bucket
-    aws? ? aws_create_bucket : blob_storage_client.create_bucket(ubid)
-  end
-
-  def aws_create_bucket
-    location_constraint = (location.name == "us-east-1") ? nil : {location_constraint: location.name}
-    blob_storage_client.create_bucket(bucket: ubid, create_bucket_configuration: location_constraint)
-  end
-
-  def set_lifecycle_policy
-    aws? ?
-      blob_storage_client.put_bucket_lifecycle_configuration({
-        bucket: ubid,
-        lifecycle_configuration: {
-          rules: [
-            {
-              id: "DeleteOldBackups",
-              status: "Enabled",
-              expiration: {
-                days: BACKUP_BUCKET_EXPIRATION_DAYS
-              },
-              filter: {}
-            }
-          ]
-        }
-      })
-    : blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
-  end
-
-  alias_method :aws_s3_policy_name, :ubid
-
-  def aws_iam_account_id
-    location.location_credential.aws_iam_account_id
-  end
-
-  def aws_s3_policy_arn
-    "arn:aws:iam::#{aws_iam_account_id}:policy/#{aws_s3_policy_name}"
   end
 end
 
