@@ -42,7 +42,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project.id)
   end
 
-  def create_server(version: "17", representative: false, vm_host_data_center: nil, timeline: self.timeline, timeline_access: "fetch", resource: pg, subnet_az: nil)
+  def create_server(version: "17", representative: false, vm_host_data_center: nil, timeline: self.timeline, timeline_access: "fetch", resource: pg, subnet_az: nil, upgrade_candidate: false)
     vm_host = create_vm_host(location_id: resource.location_id, data_center: vm_host_data_center)
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: resource.private_subnet_id,
@@ -52,7 +52,12 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     if subnet_az
       NicAwsResource.create_with_id(vm.nic.id, subnet_az: subnet_az)
     end
-    VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
+    if upgrade_candidate
+      boot_image = BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
+      VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: true, disk_index: 0, boot_image_id: boot_image.id)
+    else
+      VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
+    end
     server = PostgresServer.create(
       timeline: timeline, resource_id: resource.id, vm_id: vm.id,
       representative_at: representative ? Time.now : nil,
@@ -256,8 +261,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "fences primary and hops to wait_fence_primary if in maintenance window and upgrading" do
       server = create_server(representative: true, version: "16")
-      create_server(representative: false, version: "16")
-      allow(pg).to receive(:has_enough_fresh_servers?).and_return(true)
+      create_server(version: "16", upgrade_candidate: true)
       expect { nx.wait_for_maintenance_window }.to hop("wait_fence_primary")
       expect(server.reload.fence_set?).to be true
     end
@@ -272,8 +276,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
       pg.update(parent_id: parent.id)
       create_server(representative: true, version: "16")
-      create_server(representative: false, version: "16")
-      allow(pg).to receive(:has_enough_fresh_servers?).and_return(true)
+      create_server(version: "16", upgrade_candidate: true)
 
       expect { nx.wait_for_maintenance_window }.to hop("recycle_representative_server")
     end
@@ -302,43 +305,40 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   end
 
   describe "#upgrade_standby" do
-    let(:candidate) { create_server(version: "16") }
-    let(:sshable) { candidate.vm.sshable }
-
     before do
       strand.update(label: "upgrade_standby")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
+      create_server(version: "16", upgrade_candidate: true)
     end
 
     it "hops to update_metadata when upgrade succeeds" do
-      expect(sshable).to receive(:d_check).with("upgrade_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:d_clean).with("upgrade_postgres")
+      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Succeeded")
+      expect_any_instance_of(Sshable).to receive(:d_clean).with("upgrade_postgres")
       expect { nx.upgrade_standby }.to hop("update_metadata")
     end
 
     it "hops to upgrade_failed when upgrade fails" do
-      expect(sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
+      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Failed")
       expect { nx.upgrade_standby }.to hop("upgrade_failed")
     end
 
     it "starts upgrade when not started" do
-      expect(sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17")
+      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("NotStarted")
+      expect_any_instance_of(Sshable).to receive(:d_run).with("upgrade_postgres", "sudo", "postgres/bin/upgrade", "17")
       expect { nx.upgrade_standby }.to nap(5)
     end
 
     it "naps if status of the upgrade is unknown" do
-      expect(sshable).to receive(:d_check).with("upgrade_postgres").and_return("Unknown")
+      expect_any_instance_of(Sshable).to receive(:d_check).with("upgrade_postgres").and_return("Unknown")
       expect { nx.upgrade_standby }.to nap(5)
     end
   end
 
   describe "#update_metadata" do
-    let(:candidate) { create_server(version: "16") }
+    let(:candidate) { create_server(version: "16", upgrade_candidate: true) }
 
     before do
       strand.update(label: "update_metadata")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
+      candidate # force lazy let to create the candidate
     end
 
     it "creates new timeline and updates candidate server metadata" do
@@ -361,40 +361,36 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to recycle_representative_server when candidate is ready" do
-      candidate = create_server(version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.strand.update(label: "wait")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to hop("recycle_representative_server")
     end
 
     it "waits when candidate is waiting for restart" do
-      candidate = create_server(version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.incr_restart
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to nap(5)
     end
 
     it "waits when candidate is not ready" do
-      candidate = create_server(version: "16")
+      candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.strand.update(label: "configure")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
       expect { nx.wait_upgrade_candidate }.to nap(5)
     end
   end
 
   describe "#upgrade_failed" do
-    let(:candidate) { create_server(version: "16") }
     let(:primary) { create_server(representative: true) }
-    let(:sshable) { candidate.vm.sshable }
 
     before do
       strand.update(label: "upgrade_failed")
       primary.strand.update(label: "wait_in_fence")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
     end
 
     it "logs failure, raises a page and destroys candidate server" do
-      expect(sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+      expect(candidate.vm.sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
       expect(Clog).to receive(:emit).with("Postgres resource upgrade failed").and_yield.twice
       initial_page_count = Page.count
 
@@ -406,7 +402,9 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "unfences primary if it is fenced" do
-      allow(sshable).to receive(:_cmd).and_return("")
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+      allow(candidate.vm.sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
@@ -415,8 +413,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "does not unfence if primary is not fenced" do
+      candidate = create_server(version: "16", upgrade_candidate: true)
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
       primary.strand.update(label: "wait")
-      allow(sshable).to receive(:_cmd).and_return("")
+      allow(candidate.vm.sshable).to receive(:_cmd).and_return("")
       allow(Clog).to receive(:emit)
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
@@ -425,14 +425,13 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "handles case when candidate is nil" do
-      allow(pg).to receive(:upgrade_candidate_server).and_return(nil)
-
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
 
       expect(primary.reload.unfence_set?).to be true
     end
 
     it "handles case when candidate is not nil but destroy_set? is true" do
+      candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.incr_destroy
 
       expect { nx.upgrade_failed }.to nap(6 * 60 * 60)
@@ -482,8 +481,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
   describe "#upgrade_candidate" do
     it "returns the upgrade candidate server" do
-      candidate = create_server(version: "16")
-      allow(pg).to receive(:upgrade_candidate_server).and_return(candidate)
+      candidate = create_server(version: "16", upgrade_candidate: true)
       expect(nx.upgrade_candidate).to eq(candidate)
     end
   end
