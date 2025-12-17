@@ -14,13 +14,14 @@ class VmStorageVolume < Sequel::Model
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
+
+  def aws?
+    vm.location.aws?
+  end
 
   def device_id
     "#{vm.inhost_name}_#{disk_index}"
-  end
-
-  def device_path
-    vm.location.aws? ? "/dev/nvme#{disk_index}n1" : "/dev/disk/by-id/virtio-#{device_id}"
   end
 
   def spdk_version
