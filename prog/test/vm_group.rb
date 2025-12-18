@@ -10,6 +10,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
+        "first_boot" => true,
         "test_slices" => test_slices,
         "vms" => [],
         "boot_images" => boot_images,
@@ -61,7 +62,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms
-    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it}) }
+    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it, first_boot: frame["first_boot"]}) }
     hop_wait_verify_vms
   end
 
@@ -101,7 +102,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def verify_connected_subnets
     if retval&.dig("msg") == "Verified Connected Subnets!"
-      if frame["test_reboot"]
+      if frame["test_reboot"] && frame["first_boot"]
         hop_test_reboot
       else
         hop_destroy_resources
@@ -120,7 +121,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def wait_reboot
     if vm_host.strand.label == "wait" && vm_host.strand.semaphores.empty?
       # Run VM tests again, but avoid rebooting again
-      update_stack({"test_reboot" => false})
+      update_stack({"first_boot" => false})
       hop_verify_vms
     end
 

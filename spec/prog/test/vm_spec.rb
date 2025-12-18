@@ -64,7 +64,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:_cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:_cmd).with("ls -s ~/1.txt").and_return "500004 /home/xyz/1.txt"
-      expect { vm_test.verify_dd }.to hop("install_packages")
+      expect { vm_test.verify_dd }.to hop("storage_persistence")
     end
 
     it "fails to verify if size is not in expected range" do
@@ -73,6 +73,44 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
       expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected size after dd"})
       expect { vm_test.verify_dd }.to hop("failed")
+    end
+  end
+
+  describe "#storage_persistence" do
+    it "creates files on first boot" do
+      expect(vm_test).to receive(:frame).and_return({"first_boot" => true})
+      expect(sshable).to receive(:_cmd).with("mkdir ~/persistence_test")
+      (1..5).each do |i|
+        some_sha256 = "sha256_#{i}"
+        expect(sshable).to receive(:_cmd).with("head -c 1M /dev/urandom | tee /tmp/persistence-test | sha256sum | awk '{print $1}'").and_return(some_sha256)
+        expect(sshable).to receive(:_cmd).with("mv /tmp/persistence-test /home/ubi/persistence_test/#{some_sha256}")
+      end
+      expect { vm_test.storage_persistence }.to hop("install_packages")
+    end
+
+    it "verifies files on subsequent boots" do
+      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
+      (1..5).each do |i|
+        some_sha256 = "sha256_#{i}"
+        expect(sshable).to receive(:_cmd).with("sha256sum /home/ubi/persistence_test/#{some_sha256} | awk '{print $1}'").and_return(some_sha256)
+      end
+      expect { vm_test.storage_persistence }.to hop("install_packages")
+    end
+
+    it "fails if number of files is unexpected" do
+      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\n")
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "persistence test: unexpected number of files"})
+      expect { vm_test.storage_persistence }.to hop("failed")
+    end
+
+    it "fails if file content mismatches" do
+      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
+      expect(sshable).to receive(:_cmd).with("sha256sum /home/ubi/persistence_test/sha256_1 | awk '{print $1}'").and_return("different_sha256")
+      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "persistence test: file content mismatch"})
+      expect { vm_test.storage_persistence }.to hop("failed")
     end
   end
 
