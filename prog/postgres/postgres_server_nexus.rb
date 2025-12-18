@@ -469,6 +469,10 @@ SQL
       hop_fence
     end
 
+    when_lockout_set? do
+      hop_lockout
+    end
+
     when_unplanned_take_over_set? do
       register_deadline("wait", 5 * 60)
       hop_prepare_for_unplanned_take_over
@@ -556,6 +560,10 @@ SQL
   end
 
   label def unavailable
+    when_lockout_set? do
+      hop_lockout
+    end
+
     nap 0 if postgres_server.resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
 
     when_configure_set? do
@@ -625,15 +633,41 @@ SQL
     decr_unplanned_take_over
 
     representative_server = postgres_server.resource.representative_server
+    representative_server.incr_lockout
 
-    begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m immediate", version:)
-    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
-    end
+    hop_wait_representative_lockout
+  end
 
-    representative_server.incr_destroy
+  label def wait_representative_lockout
+    representative_server = postgres_server.resource.representative_server
+    nap 5 unless representative_server.nil? || representative_server.strand&.label == "destroy"
 
     hop_taking_over
+  end
+
+  label def lockout
+    decr_lockout
+
+    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
+    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
+    unless postgres_server.resource.location.aws?
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    end
+
+    hop_wait_lockout_attempt
+  end
+
+  label def wait_lockout_attempt
+    reaper = lambda do |child|
+      if child.exitval == "lockout_succeeded"
+        update_stack({"lockout_succeeded" => true})
+      end
+    end
+
+    reap(:destroy, fallthrough: true, reaper:)
+    hop_destroy if strand.stack.first["lockout_succeeded"]
+
+    nap 0.5
   end
 
   label def prepare_for_planned_take_over

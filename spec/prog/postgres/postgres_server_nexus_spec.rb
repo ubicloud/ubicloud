@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require_relative "../../model/spec_helper"
+require_relative "spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresServerNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-project") }
-  let(:postgres_resource) { create_postgres_resource }
+  let(:postgres_resource) { create_postgres_resource(location_id:) }
   let(:postgres_timeline) { create_postgres_timeline }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource, timeline: postgres_timeline) }
   let(:st) { postgres_server.strand }
@@ -21,90 +21,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
     )
   }
-
-  def create_postgres_timeline
-    tl = PostgresTimeline.create(
-      location_id:,
-      access_key: "dummy-access-key",
-      secret_key: "dummy-secret-key"
-    )
-    Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
-    tl
-  end
-
-  def create_postgres_resource(location_id: self.location_id, target_version: "16")
-    pr = PostgresResource.create(
-      name: "pg-test-#{SecureRandom.hex(4)}",
-      superuser_password: "dummy-password",
-      ha_type: "none",
-      target_version:,
-      location_id:,
-      project:,
-      user_config: {},
-      pgbouncer_user_config: {},
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      root_cert_1: "root_cert_1",
-      root_cert_2: "root_cert_2",
-      server_cert: "server_cert",
-      server_cert_key: "server_cert_key"
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
-    pr
-  end
-
-  def create_read_replica_resource(parent: postgres_resource, with_strand: false)
-    pr = PostgresResource.create(
-      name: "pg-replica-#{SecureRandom.hex(4)}",
-      superuser_password: "dummy-password",
-      ha_type: "none",
-      target_version: "16",
-      location_id:,
-      project:,
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      parent:
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait") if with_strand
-    pr
-  end
-
-  def create_postgres_server(resource:, timeline: create_postgres_timeline, timeline_access: "push", representative: true, version: "16")
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
-      project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: private_subnet.id,
-      location_id:, unix_user: "ubi"
-    ).subject
-    VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
-    server = PostgresServer.create(
-      timeline:,
-      resource:,
-      vm_id: vm.id,
-      representative_at: representative ? Time.now : nil,
-      synchronization_status: "ready",
-      timeline_access:,
-      version:
-    )
-    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "start")
-    server
-  end
-
-  def create_standby_nexus(prime_sshable: false)
-    server
-    standby_record = create_postgres_server(
-      resource: postgres_resource, timeline: postgres_timeline,
-      representative: false, timeline_access: "fetch", version: "16"
-    )
-    standby_nx = described_class.new(standby_record.strand)
-    ps = standby_nx.postgres_server
-    resource = ps.resource
-    rep = resource.representative_server
-    if prime_sshable
-      rep.vm.associations[:sshable] = rep.vm.sshable
-      [standby_nx, rep.vm.sshable]
-    else
-      standby_nx
-    end
-  end
 
   before do
     allow(Config).to receive(:postgres_service_project_id).and_return(service_project.id)
@@ -737,7 +653,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait for read replicas if configure command is succeeded" do
-      replica_resource = create_read_replica_resource
+      replica_resource = create_read_replica_resource(parent: postgres_resource)
       replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
       replica_nx = described_class.new(replica_server.strand)
       replica_sshable = replica_nx.postgres_server.vm.sshable
@@ -848,7 +764,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait if replica and caught up" do
-      replica_resource = create_read_replica_resource
+      replica_resource = create_read_replica_resource(parent: postgres_resource)
       replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
       replica_nx = described_class.new(replica_server.strand)
       expect(replica_nx.postgres_server).to receive(:lsn_caught_up).and_return(true)
@@ -918,6 +834,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to fence if fence is set" do
       nx.incr_fence
       expect { nx.wait }.to hop("fence")
+    end
+
+    it "hops to lockout if lockout is set" do
+      nx.incr_lockout
+      expect { nx.wait }.to hop("lockout")
     end
 
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
@@ -990,7 +911,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     describe "read replica" do
-      let(:replica_resource) { create_read_replica_resource }
+      let(:replica_resource) { create_read_replica_resource(parent: postgres_resource) }
       let(:replica_server_record) {
         create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
       }
@@ -1049,6 +970,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to configure if configure is set" do
       nx.incr_configure
       expect { nx.unavailable }.to hop("configure")
+    end
+
+    it "hops to lockout if lockout is set" do
+      nx.incr_lockout
+      expect { nx.unavailable }.to hop("lockout")
     end
 
     it "hops to wait if the server is available" do
@@ -1126,26 +1052,111 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#prepare_for_unplanned_take_over" do
     let(:standby_nx) { @standby_nx }
-    let(:representative_sshable) { @representative_sshable }
 
     before do
-      @standby_nx, @representative_sshable = create_standby_nexus(prime_sshable: true)
+      server
+      @standby_nx = create_standby_nexus
     end
 
-    it "stops postgres in representative server and destroys it" do
+    it "increments lockout for primary and hops to wait_representative_lockout" do
       standby_nx.incr_unplanned_take_over
-      expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
-      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("wait_representative_lockout")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+    end
+  end
+
+  describe "#wait_representative_lockout" do
+    let(:standby_nx) { @standby_nx }
+
+    before do
+      server
+      @standby_nx = create_standby_nexus
     end
 
-    it "handles SSH connection errors gracefully and continues with destroy" do
-      standby_nx.incr_unplanned_take_over
-      expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
-      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
-      expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+    it "naps if representative server is in wait_lockout_attempt state" do
+      postgres_server.strand.update(label: "wait_lockout_attempt")
+      expect { standby_nx.wait_representative_lockout }.to nap(5)
+    end
+
+    it "naps if representative server is in non-destroy state" do
+      postgres_server.strand.update(label: "wait")
+      expect { standby_nx.wait_representative_lockout }.to nap(5)
+    end
+
+    it "hops to taking_over when in destroy" do
+      postgres_server.strand.update(label: "destroy")
+      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
+    end
+
+    it "hops to taking_over if representative server is nil" do
+      postgres_server.update(representative_at: nil)
+      standby_nx.postgres_server.reload
+      expect(standby_nx.postgres_server.resource.representative_server).to be_nil
+
+      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
+    end
+
+    it "naps if representative server exists but strand is nil" do
+      postgres_server.strand.destroy
+
+      expect { standby_nx.wait_representative_lockout }.to nap(5)
+    end
+  end
+
+  describe "#lockout" do
+    it "buds lockout child programs and hops to wait_lockout_attempt" do
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { nx.lockout }.to hop("wait_lockout_attempt")
+      expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
+    end
+
+    it "skips host_routing lockout on AWS" do
+      aws_location = Location.create(
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
+        visible: true,
+        provider: "aws",
+        project_id: project.id
+      )
+      aws_resource = create_postgres_resource(location_id: aws_location.id)
+      aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
+      aws_nx = described_class.new(aws_server.strand)
+
+      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
+    end
+  end
+
+  describe "#wait_lockout_attempt" do
+    it "hops to destroy when lockout succeeds" do
+      nx.strand.update(label: "wait_lockout_attempt", stack: [{"lockout_succeeded" => true}])
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
+    end
+
+    it "naps when children are still running" do
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      expect { nx.wait_lockout_attempt }.to nap(0.5)
+    end
+
+    it "updates stack when a child exits with lockout_succeeded and hops to destroy" do
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
+      child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_succeeded"))
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
+    end
+
+    it "hops to destroy when all children complete without success" do
+      child1 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
+      child1.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
+      child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
     end
   end
 
@@ -1255,7 +1266,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     describe "read_replica" do
       it "updates the representative server, refreshes dns and destroys the old representative_server and hops to configure when read_replica" do
-        replica_resource = create_read_replica_resource(with_strand: true)
+        replica_resource = create_read_replica_resource(parent: postgres_resource, with_strand: true)
         replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
         replica_nx = described_class.new(replica_server.strand)
         replica_server_obj = replica_nx.postgres_server
