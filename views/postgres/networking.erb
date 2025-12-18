@@ -4,7 +4,7 @@
       <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Firewall Rules</h3>
       <p class="text-gray-500 mt-2">
       <% if firewall = @pg.customer_firewall %>
-          You can 
+          You can
           <a class="text-orange-600" href="<%= path(firewall) %>/networking">manage firewall rules using the firewall for this PostgreSQL database</a>.
       <% else %>
           The firewall related to this PostgreSQL database was deleted or detached from the related private subnet,
@@ -15,3 +15,62 @@
     </div>
   </div>
 </div>
+
+<% if @edit_perm && @pg.location.aws? %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">AWS PrivateLink</h3>
+        <p class="text-gray-500 mt-2">
+          AWS PrivateLink enables private connectivity to your database from your AWS VPC without traversing the public internet.
+        </p>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <% if @pg.privatelink_aws_resource %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="space-y-4">
+            <% if @pg.privatelink_aws_resource.service_name %>
+              <div>
+                <label class="block text-sm font-medium text-gray-700">VPC Endpoint Service Name</label>
+                <%== part("components/copyable_content", content: @pg.privatelink_aws_resource.service_name, classes: "!flex justify-between mt-1") %>
+                <p class="mt-2 text-sm text-gray-500">
+                  Use this service name to create a VPC endpoint in your AWS account. Once created, you'll receive a DNS name to connect to your database privately.
+                </p>
+              </div>
+            <% end %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Disable PrivateLink</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>Remove the PrivateLink configuration and delete the VPC Endpoint Service.</p>
+                </div>
+              </div>
+              <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <% form(action: "#{path(@pg)}/disable-privatelink", method: :post) do %>
+                  <%== part("components/form/submit_button", text: "Disable PrivateLink") %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <div class="px-4 py-5 sm:p-6">
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Enable AWS PrivateLink</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>Create a VPC Endpoint Service to allow private connectivity from your AWS VPCs.</p>
+              </div>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <% form(action: "#{path(@pg)}/enable-privatelink", method: :post) do %>
+                <%== part("components/form/submit_button", text: "Enable PrivateLink") %>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

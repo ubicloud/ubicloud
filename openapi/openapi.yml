@@ -1343,6 +1343,43 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/enable-privatelink':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: enablePostgresDatabasePrivateLink
+      summary: Enable AWS PrivateLink for a Postgres Database
+      description: >-
+        Enables AWS PrivateLink for private connectivity to the Postgres database.
+        This creates a VPC Endpoint Service that customers can connect to from their own VPCs.
+        Only available for databases in AWS locations.
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/disable-privatelink':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: disablePostgresDatabasePrivateLink
+      summary: Disable AWS PrivateLink for a Postgres Database
+      description: >-
+        Disables and removes the AWS PrivateLink configuration for the Postgres database.
+        This will delete the VPC Endpoint Service and associated resources.
+      responses:
+        '204':
+          description: PrivateLink disabled successfully
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica':
     post:
       operationId: createPostgresDatabaseReadReplica
@@ -2723,6 +2760,23 @@ components:
           description: Parent Postgres database
           type: string
           nullable: true
+        privatelink:
+          description: AWS PrivateLink configuration
+          type: object
+          properties:
+            enabled:
+              description: Whether PrivateLink is enabled
+              type: boolean
+            state:
+              description: Current state of PrivateLink (creating, available, deleting)
+              type: string
+              nullable: true
+            service_name:
+              description: AWS VPC Endpoint Service name for connecting via PrivateLink
+              type: string
+              nullable: true
+          required:
+            - enabled
         tags:
           description: Tags of the Postgres database
           type: array

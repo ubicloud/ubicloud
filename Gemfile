@@ -95,3 +95,5 @@ end
 group :test, :development do
   gem "sequel-annotate"
 end
+
+gem "aws-sdk-elasticloadbalancingv2", "~> 1.145"
