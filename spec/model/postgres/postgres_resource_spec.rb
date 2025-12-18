@@ -115,7 +115,7 @@ RSpec.describe PostgresResource do
     old_boot_image = BootImage.create(name: "postgres16-ubuntu-2204", version: "20240701", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby.vm.id, boot: true).update(boot_image_id: old_boot_image.id)
     # Refresh to get fresh association data
-    expect(described_class[postgres_resource.id].has_enough_fresh_servers?).to be(false)
+    expect(postgres_resource.reload.has_enough_fresh_servers?).to be(false)
   end
 
   it "returns upgrade_candidate_server when candidate is available and location is not aws" do
