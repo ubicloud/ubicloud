@@ -61,9 +61,9 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_vms" do
     it "runs tests for the first vm" do
-      expect(vg_test).to receive(:frame).and_return({"vms" => ["111", "222"]})
-      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "111"})
-      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "222"})
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["111", "222"], "first_boot" => true}).at_least(:once)
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "111", first_boot: true})
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "222", first_boot: true})
       expect { vg_test.verify_vms }.to hop("wait_verify_vms")
     end
   end

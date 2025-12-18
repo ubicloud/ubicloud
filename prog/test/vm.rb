@@ -20,6 +20,31 @@ class Prog::Test::Vm < Prog::Test::Base
       fail_test "unexpected size after dd"
     end
 
+    hop_storage_persistence
+  end
+
+  label def storage_persistence
+    # Verifies that data written to storage volumes persists across reboots
+    # On first boot, create files with random content and store their sha256 sums
+    # On subsequent boots, verify that the files still exist and their content matches
+    num_files = 5
+    first_boot = frame.fetch("first_boot", true)
+    if first_boot
+      sshable.cmd("mkdir ~/persistence_test")
+      (1..num_files).each do |_|
+        sha256 = sshable.cmd("head -c 1M /dev/urandom | tee /tmp/persistence-test | sha256sum | awk '{print $1}'").strip
+        sshable.cmd("mv /tmp/persistence-test :file", file: File.join("/home/ubi/persistence_test", sha256))
+      end
+    else
+      files = sshable.cmd("ls ~/persistence_test").split
+      fail_test "persistence test: unexpected number of files" if files.size != num_files
+
+      files.each do |file|
+        sha256 = sshable.cmd("sha256sum :file | awk '{print $1}'", file: File.join("/home/ubi/persistence_test", file)).strip
+        fail_test "persistence test: file content mismatch" unless sha256 == file
+      end
+    end
+
     hop_install_packages
   end
 
