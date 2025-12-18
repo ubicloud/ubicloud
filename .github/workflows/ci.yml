@@ -16,8 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: [ubicloud-standard-8, ubicloud-standard-8-arm]
+        distro: [default, alpine]
     name: Ruby CI - ${{matrix.runs-on}}
     runs-on: ${{matrix.runs-on}}
+    container:
+      image: ${{ matrix.distro == 'alpine' && 'ruby:3.4.7-alpine3.21' || null }}
     timeout-minutes: 25
 
     steps:
