@@ -280,7 +280,7 @@ $(".connection-info-format-selector select, .connection-info-format-selector inp
 function setupFormOptionUpdates() {
   $('#creation-form').on('change', 'input', function () {
     let name = $(this).attr('name');
-    option_dirty[name] = $(this).val();
+    option_dirty[name] = $(this).val().replace(/\./g, '-');
 
     if ($(this).attr('type') !== 'radio') {
       return;
@@ -291,7 +291,7 @@ function setupFormOptionUpdates() {
 
 function redrawChildOptions(name) {
   if (option_children[name]) {
-    let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');;
+    let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');
     let classes = $("input[name=" + name + "]:checked").parent().attr('class');
     classes = classes ? classes.split(" ") : [];
     classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
