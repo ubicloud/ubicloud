@@ -13,6 +13,7 @@ RSpec.describe PostgresResource do
     )
   }
   let(:timeline) { PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID) }
+  let(:vm_host) { create_vm_host }
 
   let(:postgres_resource) {
     described_class.create(
@@ -105,7 +106,6 @@ RSpec.describe PostgresResource do
 
     # Create standby with boot image that has proper version
     standby = create_server(resource: postgres_resource, timeline:, representative: false, version: "16")
-    vm_host = create_vm_host
     good_boot_image = BootImage.create(name: "postgres17-ubuntu-2204", version: "20240801", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby.vm.id, boot: true).update(boot_image_id: good_boot_image.id)
 
@@ -131,7 +131,6 @@ RSpec.describe PostgresResource do
     standby2.update(created_at: Time.now)
 
     # Set up boot images with proper version for upgrade
-    vm_host = create_vm_host
     boot_image = BootImage.create(name: "postgres17-ubuntu-2204", version: "20240801", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby1.vm.id, boot: true).update(boot_image_id: boot_image.id)
     VmStorageVolume.where(vm_id: standby2.vm.id, boot: true).update(boot_image_id: boot_image.id)
@@ -149,7 +148,6 @@ RSpec.describe PostgresResource do
     standby1 = create_server(resource: postgres_resource, timeline:, representative: false, version: "16")
     standby2 = create_server(resource: postgres_resource, timeline:, representative: false, version: "16")
 
-    vm_host = create_vm_host
     boot_image = BootImage.create(name: "postgres16-ubuntu-2204", version: "20240729", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby1.vm.id, boot: true).update(boot_image_id: boot_image.id)
     VmStorageVolume.where(vm_id: standby2.vm.id, boot: true).update(boot_image_id: boot_image.id)
@@ -225,7 +223,6 @@ RSpec.describe PostgresResource do
     standby.strand.update(label: "wait_bootstrap_rhizome")
 
     # Set up boot image for candidate
-    vm_host = create_vm_host
     boot_image = BootImage.create(name: "postgres17-ubuntu-2204", version: "20240801", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby.vm.id, boot: true).update(boot_image_id: boot_image.id)
 
@@ -240,7 +237,6 @@ RSpec.describe PostgresResource do
     standby.strand.update(label: "wait")
 
     # Set up boot image for candidate
-    vm_host = create_vm_host
     boot_image = BootImage.create(name: "postgres17-ubuntu-2204", version: "20240801", vm_host_id: vm_host.id, size_gib: 10)
     VmStorageVolume.where(vm_id: standby.vm.id, boot: true).update(boot_image_id: boot_image.id)
 
@@ -328,26 +324,29 @@ RSpec.describe PostgresResource do
     end
   end
 
-  it "returns in_maintenance_window? correctly" do
-    # nil maintenance_window_start_at => always in window
-    expect(postgres_resource.in_maintenance_window?).to be(true)
+  describe "#in_maintenance_window?" do
+    it "returns true when maintenance_window_start_at is nil" do
+      expect(postgres_resource.in_maintenance_window?).to be(true)
+    end
 
-    # Set maintenance_window_start_at to 1 (1 AM UTC), with 2 hour duration (MAINTENANCE_DURATION_IN_HOURS)
-    # Window is 1 AM - 3 AM UTC
-    postgres_resource.update(maintenance_window_start_at: 1)
+    context "with maintenance window starting at 1 AM UTC" do
+      before { postgres_resource.update(maintenance_window_start_at: 1) }
 
-    # Test the calculation logic: (current_hour - start) % 24 < MAINTENANCE_DURATION_IN_HOURS
-    # At 2 AM UTC - within window (1 hour after start) => true
-    time_2am = Time.utc(2025, 5, 1, 2, 0, 0)
-    expect((time_2am.utc.hour - 1) % 24 < PostgresResource::MAINTENANCE_DURATION_IN_HOURS).to be(true)
+      it "returns true at 2 AM (within 2-hour window)" do
+        allow(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 2, 0, 0))
+        expect(postgres_resource.in_maintenance_window?).to be(true)
+      end
 
-    # At 3 AM UTC - outside window (2 hours after start, duration is 2) => false
-    time_3am = Time.utc(2025, 5, 1, 3, 0, 0)
-    expect((time_3am.utc.hour - 1) % 24 < PostgresResource::MAINTENANCE_DURATION_IN_HOURS).to be(false)
+      it "returns false at 3 AM (end of 2-hour window)" do
+        allow(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 3, 0, 0))
+        expect(postgres_resource.in_maintenance_window?).to be(false)
+      end
 
-    # At midnight UTC - outside window (23 hours after start) => false
-    time_midnight = Time.utc(2025, 5, 1, 0, 0, 0)
-    expect((time_midnight.utc.hour - 1) % 24 < PostgresResource::MAINTENANCE_DURATION_IN_HOURS).to be(false)
+      it "returns false at midnight (outside window)" do
+        allow(Time).to receive(:now).and_return(Time.utc(2025, 5, 1, 0, 0, 0))
+        expect(postgres_resource.in_maintenance_window?).to be(false)
+      end
+    end
   end
 
   it "returns target_standby_count correctly" do
