@@ -21,8 +21,6 @@ RSpec.describe PostgresServer do
       project:,
       location:,
       ha_type: PostgresResource::HaType::NONE,
-      user_config: {},
-      pgbouncer_user_config: {},
       target_version: "16",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
@@ -55,7 +53,63 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
+  def create_postgres_resource(name, **)
+    PostgresResource.create(
+      name:, project:, location:,
+      ha_type: PostgresResource::HaType::NONE,
+      target_version: "16", target_vm_size: "standard-2", target_storage_size_gib: 64,
+      superuser_password: "super",
+      **
+    )
+  end
+
+  def add_data_volume(target_vm = vm, size_gib: 64)
+    VmStorageVolume.create(vm: target_vm, disk_index: 0, boot: false, size_gib:)
+  end
+
+  def create_failover_server(prefix:, label:, vm_size: "standard-2")
+    @failover_counter = (@failover_counter || 0) + 1
+    server_vm = create_hosted_vm(project, private_subnet, "#{prefix}-#{@failover_counter}")
+    family, vcpus = vm_size.split("-")
+    server_vm.update(family:, vcpus: vcpus.to_i, arch: "x64", cpu_percent_limit: nil)
+    add_data_volume(server_vm)
+    server = described_class.create(
+      timeline:, resource:, vm_id: server_vm.id,
+      synchronization_status: "ready", timeline_access: "fetch", version: "16"
+    )
+    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
+    server
+  end
+
+  def stub_current_lsn(lsn_by_id)
+    resource.servers.each do |s|
+      next unless (lsn = lsn_by_id[s.id])
+      allow(s).to receive(:_run_query)
+        .with(satisfy { |sql| sql.include?("_lsn") })
+        .and_return(lsn)
+    end
+  end
+
+  def down_pulse
+    {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30}
+  end
+
+  def check_pulse_session(db_connection: DB)
+    {ssh_session: Net::SSH::Connection::Session.allocate, db_connection:}
+  end
+
   describe "#configure" do
+    before do
+      resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
+    end
+
+    it "does not set archival related configs if blob storage is not configured" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(nil)
+      expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
+    end
+  end
+
+  describe "#configure", "with blob storage" do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
       MinioCluster.create(
@@ -64,23 +118,7 @@ RSpec.describe PostgresServer do
     end
 
     def create_standby_resource(suffix)
-      PostgresResource.create(
-        name: "postgres-standby-#{suffix}",
-        project:,
-        location:,
-        ha_type: PostgresResource::HaType::SYNC,
-        user_config: {},
-        pgbouncer_user_config: {},
-        target_version: "16",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "super"
-      )
-    end
-
-    it "does not set archival related configs if blob storage is not configured" do
-      allow(Config).to receive(:postgres_service_project_id).and_return(nil)
-      expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
+      create_postgres_resource("postgres-standby-#{suffix}", ha_type: PostgresResource::HaType::SYNC)
     end
 
     it "sets configs that are specific to primary" do
@@ -93,10 +131,11 @@ RSpec.describe PostgresServer do
     end
 
     it "sets archive_command for walg client according to resource.use_old_walg_command_set?" do
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
-      expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(false).at_least(:once)
-      expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
+      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      resource.incr_use_old_walg_command
+      expect(postgres_server.reload.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
+      Semaphore.where(strand_id: resource.id, name: "use_old_walg_command").destroy
+      expect(postgres_server.reload.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
     end
 
     it "sets synchronous_standby_names for sync replication mode" do
@@ -131,15 +170,18 @@ RSpec.describe PostgresServer do
     end
 
     it "sets configs that are specific to standby" do
-      postgres_server.timeline_access = "fetch"
-      expect(postgres_server).to receive(:doing_pitr?).and_return(false).at_least(:once)
-      expect(resource).to receive(:replication_connection_string)
+      postgres_server.update(timeline_access: "fetch", representative_at: nil)
+      primary_vm = create_hosted_vm(project, private_subnet, "primary")
+      described_class.create(
+        timeline:, resource:, vm_id: primary_vm.id, representative_at: Time.now,
+        timeline_access: "push", version: "16"
+      )
       expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
     it "sets configs that are specific to restoring servers" do
       postgres_server.update(timeline_access: "fetch")
-      expect(resource).to receive(:restore_target)
+      resource.update(restore_target: Time.now)
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
@@ -151,14 +193,12 @@ RSpec.describe PostgresServer do
     end
 
     it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
+      resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
     end
 
     it "puts lantern_extras to shared_preload_libraries for Lantern" do
-      postgres_server.timeline_access = "push"
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
+      resource.update(flavor: PostgresResource::Flavor::LANTERN)
       expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
@@ -176,75 +216,65 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
-      expect(postgres_server).to receive(:representative_at).and_return(nil)
-      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", instance_of(Hash))
+      postgres_server.update(representative_at: nil)
+      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", {ubid: postgres_server.ubid})
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "logs error when no suitable standby found" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
-      expect(postgres_server).to receive(:failover_target).and_return(nil)
-      expect(Clog).to receive(:emit).with("No suitable standby found for failover", instance_of(Hash))
+      expect(Clog).to receive(:emit).with("No suitable standby found for failover", {ubid: postgres_server.ubid})
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "returns true only when failover is successfully triggered" do
-      standby = described_class.create(
-        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
-        synchronization_status: "ready", timeline_access: "fetch", version: "16"
-      )
-      expect(postgres_server).to receive(:failover_target).and_return(standby)
-      expect(standby).to receive(:incr_planned_take_over)
+      add_data_volume
+      standby = create_failover_server(prefix: "standby", label: "wait")
+      stub_current_lsn(standby.id => "0/0")
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
+      expect(standby.reload.planned_take_over_set?).to be true
     end
   end
 
-  it "#read_replica?" do
-    expect(postgres_server.resource).to receive(:read_replica?).and_return(true)
-    expect(postgres_server).to be_read_replica
-    expect(postgres_server.resource).to receive(:read_replica?).and_return(false)
-    expect(postgres_server).not_to be_read_replica
+  describe "#read_replica?" do
+    it "returns true when resource has parent_id and no restore_target" do
+      resource.update(parent_id: create_postgres_resource("parent").id)
+      expect(postgres_server).to be_read_replica
+    end
+
+    it "returns false when resource has no parent_id" do
+      expect(postgres_server).not_to be_read_replica
+    end
   end
 
   describe "#failover_target" do
     before do
-      postgres_server.representative_at = Time.now
-      allow(postgres_server).to receive(:read_replica?).and_return(false)
-      allow(resource).to receive(:servers).and_return([
-        postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true)
-      ])
+      postgres_server.update(representative_at: Time.now)
+      add_data_volume
     end
 
     it "returns nil if there is no standby" do
-      expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
       expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns nil if there is no fresh standby" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
-      standby_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
-      expect(standby_server).to receive(:resource).at_least(:once).and_return(resource)
-      expect(standby_server).to receive(:representative_at).and_return(nil).at_least(:once)
-      expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4", sshable: Sshable.new))
-
-      expect(resource).to receive(:servers).and_return([postgres_server, standby_server]).at_least(:once)
-      expect(resource).to receive(:target_vm_size).and_return("standard-2")
+      create_failover_server(prefix: "standby", label: "wait", vm_size: "standard-4")
       expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns the standby with highest lsn in sync replication" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
-      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+      resource.update(ha_type: PostgresResource::HaType::SYNC)
+      create_failover_server(prefix: "standby", label: "wait_catch_up")
+      standby2 = create_failover_server(prefix: "standby", label: "wait")
+      standby3 = create_failover_server(prefix: "standby", label: "wait")
+      stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
+      expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
     end
 
-    it "returns nil if last_known_lsn in unknown for async replication" do
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: nil))
+    it "returns nil if last_known_lsn is unknown for async replication" do
+      resource.update(ha_type: PostgresResource::HaType::ASYNC)
+      PostgresLsnMonitor.create { it.postgres_server_id = postgres_server.id }
+      standby = create_failover_server(prefix: "standby", label: "wait")
+      stub_current_lsn(standby.id => "1/10")
       expect(postgres_server.failover_target).to be_nil
     end
 
@@ -253,55 +283,57 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target).to be_nil
     end
 
-    it "returns nil if lsn difference is too hign for async replication" do
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "2/0")).twice
+    it "returns nil if lsn difference is too high for async replication" do
+      resource.update(ha_type: PostgresResource::HaType::ASYNC)
+      PostgresLsnMonitor.create { |m|
+        m.postgres_server_id = postgres_server.id
+        m.last_known_lsn = "2/0"
+      }
+      standby = create_failover_server(prefix: "standby", label: "wait")
+      stub_current_lsn(standby.id => "1/10")
       expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns the standby with highest lsn if lsn difference is not high in async replication" do
-      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "1/11")).twice
-      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
-    end
-  end
-
-  describe "#failover_target read_replica" do
-    before do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
-      allow(postgres_server).to receive(:read_replica?).and_return(true)
-
-      allow(resource).to receive(:servers).and_return([
-        postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true)
-      ])
+      resource.update(ha_type: PostgresResource::HaType::ASYNC)
+      PostgresLsnMonitor.create { |m|
+        m.postgres_server_id = postgres_server.id
+        m.last_known_lsn = "1/11"
+      }
+      create_failover_server(prefix: "standby", label: "wait_catch_up")
+      standby2 = create_failover_server(prefix: "standby", label: "wait")
+      standby3 = create_failover_server(prefix: "standby", label: "wait")
+      stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
+      expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
     end
 
-    it "returns nil if there is no replica to failover" do
-      expect(resource).to receive(:servers).and_return([postgres_server]).at_least(:once)
-      expect(postgres_server.failover_target).to be_nil
-    end
+    context "when read replica" do
+      before do
+        resource.update(parent_id: create_postgres_resource("parent-resource").id)
+      end
 
-    it "returns nil if there is no fresh read_replica" do
-      replica_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
-      expect(replica_server).to receive(:resource).at_least(:once).and_return(resource)
-      expect(replica_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(replica_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4"))
-      expect(resource).to receive(:servers).and_return([postgres_server, replica_server]).at_least(:once)
-      expect(resource).to receive(:target_vm_size).and_return("standard-2")
-      expect(postgres_server.failover_target).to be_nil
-    end
+      it "returns nil if there is no replica to failover" do
+        expect(postgres_server.failover_target).to be_nil
+      end
 
-    it "returns the replica with highest lsn" do
-      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+      it "returns nil if there is no fresh read_replica" do
+        create_failover_server(prefix: "replica", label: "wait", vm_size: "standard-4")
+        expect(postgres_server.failover_target).to be_nil
+      end
+
+      it "returns the replica with highest lsn" do
+        create_failover_server(prefix: "replica", label: "wait_catch_up")
+        replica2 = create_failover_server(prefix: "replica", label: "wait")
+        replica3 = create_failover_server(prefix: "replica", label: "wait")
+        stub_current_lsn(replica2.id => "1/5", replica3.id => "1/10")
+        expect(postgres_server.failover_target.ubid).to eq(replica3.ubid)
+      end
     end
   end
 
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
-      VmStorageVolume.create(vm:, disk_index: 0, boot: false, size_gib: 64)
+      add_data_volume
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
@@ -311,19 +343,22 @@ RSpec.describe PostgresServer do
   end
 
   describe "lsn_caught_up" do
+    it "returns true if read replica and the parent is nil" do
+      postgres_server.resource.update(parent_id: PostgresResource.generate_uuid)
+      expect(postgres_server.read_replica?).to be(true)
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+
+    it "returns true when no representative server" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(representative_at: nil)
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+  end
+
+  describe "lsn_caught_up", "with parent resource" do
     before do
-      parent_resource = PostgresResource.create(
-        project:,
-        name: "postgres-resource-parent",
-        ha_type: PostgresResource::HaType::NONE,
-        user_config: {},
-        pgbouncer_user_config: {},
-        location:,
-        target_version: "16",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "super"
-      )
+      parent_resource = create_postgres_resource("postgres-resource-parent")
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
       described_class.create(
         timeline:, resource: parent_resource, vm_id: parent_vm.id, representative_at: Time.now,
@@ -348,12 +383,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
-    it "returns true if read replica and the parent is nil" do
-      postgres_server.resource.update(parent_id: PostgresResource.generate_ubid.to_uuid)
-      expect(postgres_server.read_replica?).to be(true)
-      expect(postgres_server.lsn_caught_up).to be(true)
-    end
-
     it "returns false if the diff is more than 80MB" do
       expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
@@ -365,12 +394,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
-    end
-
-    it "returns true when no representative server" do
-      expect(postgres_server).to receive(:read_replica?).and_return(false)
-      postgres_server.update(representative_at: nil)
-      expect(postgres_server.lsn_caught_up).to be(true)
     end
   end
 
@@ -389,89 +412,51 @@ RSpec.describe PostgresServer do
     postgres_server.init_metrics_export_session
   end
 
-  it "checks pulse" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: DB
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
-
-    expect(postgres_server).not_to receive(:incr_checkup)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(false)
-
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+  it "checks pulse for restoring server (not primary, not standby) and does not trigger checkup when pulse recovers" do
+    postgres_server.update(timeline_access: "fetch")
+    result = postgres_server.check_pulse(session: check_pulse_session, previous_pulse: down_pulse)
+    expect(result[:reading]).to eq("up")
+    expect(postgres_server.reload.checkup_set?).to be false
   end
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
-
+    postgres_server.update(timeline_access: "fetch", representative_at: nil)
+    primary_vm = create_hosted_vm(project, private_subnet, "primary")
+    described_class.create(
+      timeline:, resource:, vm_id: primary_vm.id, representative_at: Time.now,
+      timeline_access: "push", version: "16"
+    )
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:reload).and_return(postgres_server)
-    expect(postgres_server).to receive(:incr_checkup)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(true)
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: down_pulse)
+    expect(postgres_server.reload.checkup_set?).to be true
   end
 
   it "uses pg_current_wal_lsn to track lsn for primaries" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
-
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_current_wal_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:primary?).and_return(true)
-
-    expect(postgres_server).to receive(:reload).and_return(postgres_server)
-    expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: down_pulse)
+    expect(postgres_server.reload.checkup_set?).to be true
   end
 
-  it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
-
+  it "uses pg_last_wal_replay_lsn to track lsn for restoring servers" do
+    postgres_server.update(timeline_access: "fetch")
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
-    expect(postgres_server).to receive(:primary?).and_return(false)
-    expect(postgres_server).to receive(:standby?).and_return(false)
-
-    expect(postgres_server).to receive(:reload).and_return(postgres_server)
-    expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session:, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: down_pulse)
+    expect(postgres_server.reload.checkup_set?).to be true
   end
 
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
-    lsn_monitor = instance_double(PostgresLsnMonitor, last_known_lsn: "1/5")
-    expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
-    expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
-    expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
+    expect(PostgresLsnMonitor).to receive(:new).and_wrap_original do |m, &block|
+      lsn_monitor = m.call(&block)
+      expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
+      lsn_monitor
+    end
     expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor", instance_of(Hash)).and_call_original
-    expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
 
@@ -498,37 +483,49 @@ RSpec.describe PostgresServer do
 
   describe "#taking_over?" do
     it "returns true if the strand label is 'taking_over'" do
-      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "taking_over")
       expect(postgres_server.taking_over?).to be true
     end
 
-    it "returns false if the strand label is not 'wait'" do
-      expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+    it "returns false if the strand label is not 'taking_over'" do
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
       expect(postgres_server.taking_over?).to be false
     end
   end
 
   describe "#switch_to_new_timeline" do
     it "switches to new timeline with current parent" do
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
-      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
+      old_timeline = postgres_server.timeline
+      postgres_server.switch_to_new_timeline
+      postgres_server.reload
+      expect(postgres_server.timeline_id).not_to eq(old_timeline.id)
+      expect(postgres_server.timeline_access).to eq("push")
+      expect(postgres_server.timeline.parent_id).to eq(old_timeline.id)
     end
 
     it "switches to new timeline without current parent" do
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push")
-      expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
+      old_timeline = postgres_server.timeline
+      postgres_server.switch_to_new_timeline(parent_id: nil)
+      postgres_server.reload
+      expect(postgres_server.timeline_id).not_to eq(old_timeline.id)
+      expect(postgres_server.timeline_access).to eq("push")
+      expect(postgres_server.timeline.parent_id).to be_nil
     end
 
     it "configure new timeline on AWS" do
-      location.update(provider: "aws")
-      expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
-      expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+      location.update(provider: "aws", name: "us-east-1")
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+      old_timeline_id = postgres_server.timeline_id
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl stop wal-g")
       expect(postgres_server).to receive(:refresh_walg_credentials)
-      expect { postgres_server.switch_to_new_timeline }.not_to raise_error
+
+      postgres_server.switch_to_new_timeline
+
+      postgres_server.reload
+      expect(postgres_server.timeline_id).not_to eq(old_timeline_id)
+      expect(postgres_server.timeline_access).to eq("push")
+      expect(postgres_server.timeline.parent_id).to eq(old_timeline_id)
+      expect(postgres_server.configure_s3_new_timeline_set?).to be true
     end
   end
 
@@ -540,32 +537,55 @@ RSpec.describe PostgresServer do
     end
 
     it "refreshes walg credentials if timeline has blob storage not on aws" do
-      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(Config).to receive(:minio_service_project_id).and_return(project_service.id).at_least(:once)
+      expect(Config).to receive(:minio_host_name).and_return("minio.test").at_least(:once)
+      DnsZone.create(project_id: project_service.id, name: "minio.test")
+      MinioCluster.create(project_id: project_service.id, location:, name: "walg-minio", admin_user: "root", admin_password: "root", root_cert_1: "root_certs")
+      expected_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{timeline.ubid}
+AWS_ENDPOINT=https://walg-minio.minio.test:9000
+
+AWS_REGION=us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/16/data
+      WALG_CONF
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: expected_config)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
     it "refreshes walg credentials if timeline has blob storage on aws" do
-      location.update(provider: "aws")
-      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
-      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      location.update(provider: "aws", name: "us-east-1")
+      expected_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{timeline.ubid}
+AWS_ENDPOINT=https://s3.us-east-1.amazonaws.com
+
+AWS_REGION=us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/16/data
+      WALG_CONF
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: expected_config)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
     it "does not restart wal-g if use_old_walg_command_set is true" do
-      expect(postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(true)
-      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
-      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
-      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(Config).to receive(:minio_service_project_id).and_return(project_service.id).at_least(:once)
+      expect(Config).to receive(:minio_host_name).and_return("minio.test").at_least(:once)
+      DnsZone.create(project_id: project_service.id, name: "minio.test")
+      MinioCluster.create(project_id: project_service.id, location:, name: "walg-minio", admin_user: "root", admin_password: "root", root_cert_1: "root_certs")
+      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      resource.incr_use_old_walg_command
+
+      expected_config = timeline.generate_walg_config(postgres_server.version)
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: expected_config)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo systemctl restart wal-g")
-      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+
+      postgres_server.refresh_walg_credentials
     end
   end
 
@@ -575,7 +595,7 @@ RSpec.describe PostgresServer do
 
     it "calls observe_archival_backlog at export counts where count % 12 == 1" do
       session[:export_count] = 12
-      allow(postgres_server).to receive(:scrape_endpoints).and_return([])
+      expect(postgres_server).to receive(:scrape_endpoints).and_return([])
       expect(postgres_server).to receive(:observe_archival_backlog).with(session)
       expect(postgres_server).not_to receive(:observe_metrics_backlog)
 
@@ -593,7 +613,7 @@ RSpec.describe PostgresServer do
 
     it "does not call observe_archival_backlog or observe_metrics_backlog on every export" do
       session[:export_count] = 2
-      allow(postgres_server).to receive(:scrape_endpoints).and_return([])
+      expect(postgres_server).to receive(:scrape_endpoints).and_return([])
       expect(postgres_server).not_to receive(:observe_archival_backlog).with(session)
       expect(postgres_server).not_to receive(:observe_metrics_backlog).with(session)
 
@@ -620,44 +640,52 @@ RSpec.describe PostgresServer do
     }
 
     before do
-      allow(postgres_server).to receive(:archival_backlog_threshold).and_return(10)
+      # Use 32 GiB storage which gives threshold of 10 (32*1024/1600*5 = 102, then capped)
+      # For smaller threshold, use smaller storage: 5 GiB => 5*1024/1600*5 = 16, rounded to 16
+      add_data_volume(vm, size_gib: 5)
     end
 
     it "checks archival backlog and does nothing if it is within limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_return("5\n")
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(nil)
 
-      postgres_server.observe_archival_backlog(session)
+      expect { postgres_server.observe_archival_backlog(session) }
+        .not_to change(Page, :count)
     end
 
     it "checks archival backlog and creates a page if it is outside of limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("15\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} archival backlog high",
-        ["PGArchivalBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {archival_backlog: 15}
-      )
+      ).and_return("20\n")
 
-      postgres_server.observe_archival_backlog(session)
+      expect { postgres_server.observe_archival_backlog(session) }
+        .to change(Page, :count).by(1)
+
+      page = Page.first(tag: Page.generate_tag(["PGArchivalBacklogHigh", postgres_server.id]))
+      expect(page.summary).to eq("#{postgres_server.ubid} archival backlog high")
+      expect(page.severity).to eq("warning")
+      expect(page.details["archival_backlog"]).to eq(20)
     end
 
     it "checks archival backlog and resolves a page if it is back within limits" do
-      existing_page = instance_double(Page)
+      tag = Page.generate_tag(["PGArchivalBacklogHigh", postgres_server.id])
+      existing_page = Page.create(summary: "test page", tag:, severity: "warning")
+      Strand.create_with_id(existing_page, prog: "PageNexus", label: "wait")
+
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_return("3\n")
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(existing_page)
-      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_archival_backlog(session)
+      expect(existing_page.reload.resolve_set?).to be true
     end
+  end
+
+  describe "#observe_archival_backlog", "with SSH error" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
 
     it "logs errors when checking archival backlog fails" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
@@ -671,12 +699,12 @@ RSpec.describe PostgresServer do
 
   describe "#archival_backlog_threshold" do
     it "returns 1000 if the storage size is large" do
-      allow(postgres_server).to receive(:storage_size_gib).and_return(1024)
+      expect(postgres_server).to receive(:storage_size_gib).and_return(1024)
       expect(postgres_server.archival_backlog_threshold).to eq(1000)
     end
 
     it "returns smaller threshold for smaller storage sizes" do
-      allow(postgres_server).to receive(:storage_size_gib).and_return(100)
+      expect(postgres_server).to receive(:storage_size_gib).and_return(100)
       expect(postgres_server.archival_backlog_threshold).to eq(320)
     end
   end
@@ -741,6 +769,14 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#metrics_config" do
+    it "includes additional_labels from resource tags" do
+      postgres_server.resource.update(tags: {"env" => "prod", "team" => "devops"})
+      config = postgres_server.metrics_config
+      expect(config[:additional_labels]).to eq({"pg_tags_label_env" => "prod", "pg_tags_label_team" => "devops"})
+    end
+  end
+
   if Config.unfrozen_test?
     describe "#attach_s3_policy_if_needed" do
       it "calls attach_role_policy when needs s3 policy attachment" do
@@ -786,13 +822,6 @@ RSpec.describe PostgresServer do
         expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
         postgres_server.attach_s3_policy_if_needed
       end
-    end
-  end
-
-  describe "#run_query" do
-    it "raises if given interpolated string" do
-      string = "string"
-      expect { postgres_server.run_query("interpolated #{string}") }.to raise_error(NetSsh::PotentialInsecurity)
     end
   end
 end
