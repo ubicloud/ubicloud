@@ -31,14 +31,14 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
       opt_val = if option[name].is_a?(Sequel::Model)
         option[name].ubid
       elsif type == "select"
-        option[name][:value]
+        option[name][:value].to_s
       else
-        option[name]
+        option[name].to_s
       end
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v.to_s }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
       submitted_value = typecast_body_params.str(name)
@@ -48,7 +48,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
       checked = parents_selected && (selected_in_form_submission || selected_in_pre_selection || first_of_its_kind)
       selected_options[name] = opt_val if checked
 
-      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.to_s.tr(".", "-")}" }
+      opt_classes = parents.map { |k, v| "form_#{k} form_#{k}_#{v.tr(".", "-")}" }
       opt_classes << "hidden" unless parents_selected
       opt_classes = opt_classes.join(" ")
 
