@@ -173,11 +173,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
       }.to raise_error NoMethodError, "undefined method 'aws_ami_id' for nil"
     end
-
-    # NOTE: The "unknown flavor" error path is unreachable with real data because
-    # the flavor column has a DB enum constraint. The case statement's else branch
-    # is defensive code that can only be triggered via mocking. Removing this test
-    # as it violates democking guidelines and tests unreachable production code.
   end
 
   describe "#before_run" do
