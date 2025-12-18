@@ -224,7 +224,7 @@ class PostgresResource < Sequel::Model
   end
 
   def install_rhizome
-    servers.each do |ps|
+    servers_dataset.eager(:vm).all.each do |ps|
       Strand.create(
         prog: "InstallRhizome", label: "start",
         stack: [
