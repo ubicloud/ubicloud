@@ -932,6 +932,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("fence")
     end
 
+    it "hops to lockout if lockout is set" do
+      nx.incr_lockout
+      expect { nx.wait }.to hop("lockout")
+    end
+
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
       nx.incr_unplanned_take_over
       expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
@@ -1055,6 +1060,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#unavailable" do
+    it "hops to lockout if lockout is set" do
+      nx.incr_lockout
+      expect { nx.unavailable }.to hop("lockout")
+    end
+
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
@@ -1110,26 +1120,111 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#prepare_for_unplanned_take_over" do
     let(:standby_nx) { @standby_nx }
-    let(:representative_sshable) { @representative_sshable }
 
     before do
-      @standby_nx, @representative_sshable = create_standby_nexus(prime_sshable: true)
+      server
+      @standby_nx = create_standby_nexus
     end
 
-    it "stops postgres in representative server and destroys it" do
+    it "increments lockout for primary and hops to wait_representative_lockout" do
       standby_nx.incr_unplanned_take_over
-      expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
-      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("wait_representative_lockout")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
+    end
+  end
+
+  describe "#wait_representative_lockout" do
+    let(:standby_nx) { @standby_nx }
+
+    before do
+      server
+      @standby_nx = create_standby_nexus
+    end
+
+    it "naps if representative server is in wait_lockout_attempt state" do
+      postgres_server.strand.update(label: "wait_lockout_attempt")
+      expect { standby_nx.wait_representative_lockout }.to nap(5)
+    end
+
+    it "naps if representative server is in wait state" do
+      postgres_server.strand.update(label: "wait")
+      expect { standby_nx.wait_representative_lockout }.to nap(5)
+    end
+
+    it "destroys representative server and hops to taking_over when not in waiting states" do
+      # Ensure representative server exists and is not in a waiting state
+      postgres_server.strand.update(label: "start")
+      representative_server = standby_nx.postgres_server.resource.representative_server
+      expect(representative_server).not_to be_nil
+      expect(representative_server.id).to eq(postgres_server.id)
+
+      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
     end
 
-    it "handles SSH connection errors gracefully and continues with destroy" do
-      standby_nx.incr_unplanned_take_over
-      expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
-      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
-      expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+    it "hops to taking_over if representative server is nil" do
+      postgres_server.update(representative_at: nil)
+      standby_nx.postgres_server.reload
+      expect(standby_nx.postgres_server.resource.representative_server).to be_nil
+
+      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
+    end
+  end
+
+  describe "#lockout" do
+    it "buds lockout child programs and hops to wait_lockout_attempt" do
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { nx.lockout }.to hop("wait_lockout_attempt")
+      expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
+    end
+
+    it "skips host_routing lockout on AWS" do
+      aws_location = Location.create(
+        name: "us-west-2",
+        display_name: "aws-us-west-2",
+        ui_name: "aws-us-west-2",
+        visible: true,
+        provider: "aws",
+        project_id: project.id
+      )
+      aws_resource = create_postgres_resource(location_id: aws_location.id)
+      aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
+      aws_nx = described_class.new(aws_server.strand)
+
+      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
+    end
+  end
+
+  describe "#wait_lockout_attempt" do
+    it "hops to destroy when lockout succeeds" do
+      nx.strand.update(label: "wait_lockout_attempt", stack: [{"lockout_succeeded" => true}])
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
+    end
+
+    it "naps when children are still running" do
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      expect { nx.wait_lockout_attempt }.to nap(0.5)
+    end
+
+    it "updates stack when a child exits with lockout_succeeded and hops to destroy" do
+      Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
+      child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_succeeded"))
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
+    end
+
+    it "hops to destroy when all children complete without success" do
+      child1 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
+      child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
+      child1.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
+      child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
+      expect { nx.wait_lockout_attempt }.to hop("destroy")
     end
   end
 

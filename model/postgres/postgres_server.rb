@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline
+    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -373,7 +373,7 @@ class PostgresServer < Sequel::Model
     [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
-  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
+  FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_in_lockout", "wait_representative_lockout"].freeze
 end
 
 # Table: postgres_server
