@@ -85,11 +85,23 @@ class Prog::Test::VmGroup < Prog::Test::Base
     test_slices = frame.fetch("test_slices")
 
     if !test_slices || (retval&.dig("msg") == "Verified VM Host Slices!")
-      hop_verify_firewall_rules
+      hop_verify_storage_rpc
     end
 
     slices = frame["vms"].map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
     push Prog::Test::VmHostSlices, {"slices" => slices}
+  end
+
+  label def verify_storage_rpc
+    frame["vms"].each do |id|
+      vm = Vm[id]
+      command = {command: "version"}.to_json
+      response = JSON.parse(vm_host.sshable.cmd("sudo nc -U /var/storage/:inhost_name/0/rpc.sock -q 0", inhost_name: vm.inhost_name, stdin: command))
+      expected_version = Config.vhost_block_backend_version.delete_prefix("v")
+      fail_test "Failed to get vhost-block-backend version for VM #{vm.id} using RPC" unless response["version"] == expected_version
+    end
+
+    hop_verify_firewall_rules
   end
 
   label def verify_firewall_rules

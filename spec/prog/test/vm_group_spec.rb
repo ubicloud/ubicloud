@@ -141,7 +141,41 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to verify_firewall_rules if tests are done" do
       expect(vg_test).to receive(:frame).and_return({"test_slices" => true})
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM Host Slices!"})
-      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
+      expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
+    end
+  end
+
+  describe "#verify_storage_rpc" do
+    it "verifies vhost-block-backend version for each vm using RPC" do
+      command = {command: "version"}.to_json
+      expected_response = {version: Config.vhost_block_backend_version.delete_prefix("v")}.to_json + "\n"
+      vm_host = instance_double(VmHost, sshable: Sshable.create)
+      allow(vg_test).to receive(:vm_host).and_return(vm_host)
+      vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
+      vm2 = instance_double(Vm, id: "vm2", inhost_name: "vm234567")
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1", "vm2"]}).at_least(:once)
+      expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
+      expect(Vm).to receive(:[]).with("vm2").and_return(vm2)
+
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm234567/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
+
+      expect { vg_test.verify_storage_rpc }.to hop("verify_firewall_rules")
+    end
+
+    it "fails if unable to get vhost-block-backend version using RPC" do
+      command = {command: "version"}.to_json
+      sshable = Sshable.create
+      vm_host = instance_double(VmHost, sshable: sshable)
+      allow(vg_test).to receive(:vm_host).and_return(vm_host)
+      vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1"]}).at_least(:once)
+      expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
+
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return("{\"error\": \"some error\"}\n")
+
+      expect(vg_test.strand).to receive(:update).with(exitval: {msg: "Failed to get vhost-block-backend version for VM vm1 using RPC"})
+      expect { vg_test.verify_storage_rpc }.to hop("failed")
     end
   end
 
