@@ -223,6 +223,17 @@ class PostgresResource < Sequel::Model
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
   end
 
+  def install_rhizome
+    servers.each do |ps|
+      Strand.create(
+        prog: "InstallRhizome", label: "start",
+        stack: [
+          {subject_id: ps.vm.id, target_folder: "postgres", install_specs: false}
+        ]
+      )
+    end
+  end
+
   module HaType
     NONE = "none"
     ASYNC = "async"

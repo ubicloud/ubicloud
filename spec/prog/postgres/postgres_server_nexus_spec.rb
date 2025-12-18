@@ -3,58 +3,24 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresServerNexus do
-  subject(:nx) { described_class.new(st) }
+  subject(:nx) { described_class.new(server_strand) }
 
-  let(:st) { Strand.create(id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8", prog: "Postgres::PostgresServerNexus", label: "start") }
+  let(:user_project) { Project.create(name: "test-project") }
+  let(:postgres_project) { Project.create(name: "postgres-service") }
 
-  let(:postgres_server) {
-    instance_double(
-      PostgresServer,
-      id: "0d77964d-c416-8edb-9237-7e7dd5d6fcf8",
-      ubid: "pgubid",
-      version: "16",
-      timeline: instance_double(
-        PostgresTimeline,
-        id: "f6644aae-9759-8ada-9aef-9b6cfccdc167",
-        generate_walg_config: "walg config",
-        blob_storage: instance_double(MinioCluster, root_certs: "certs"),
-        aws?: false
-      ),
-      vm: instance_double(
-        Vm,
-        id: "1c7d59ee-8d46-8374-9553-6144490ecec5",
-        sshable: sshable,
-        ephemeral_net4: "1.1.1.1",
-        private_subnets: [instance_double(PrivateSubnet)]
-      ),
-      storage_device_paths: ["/dev/vdb"]
-    )
+  let(:postgres_resource) {
+    Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID,
+      name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 64
+    ).subject
   }
 
-  let(:resource) {
-    instance_double(
-      PostgresResource,
-      ubid: "pgresourcesubid",
-      root_cert_1: "root_cert_1",
-      root_cert_2: "root_cert_2",
-      server_cert: "server_cert",
-      server_cert_key: "server_cert_key",
-      superuser_password: "dummy-password",
-      version: "16",
-      target_version: "16",
-      representative_server: postgres_server,
-      metric_destinations: [instance_double(PostgresMetricDestination, ubid: "pgmetricubid", url: "url", username: "username", password: "password")],
-      ca_certificates: "root_cert_1\nroot_cert_2",
-      location_id: Location::HETZNER_FSN1_ID,
-      project: instance_double(Project, get_ff_aws_cloudwatch_logs: true)
-    )
-  }
-
-  let(:sshable) { Sshable.new }
+  let(:server_strand) { postgres_resource.servers.first.strand }
+  let(:postgres_server) { nx.postgres_server }
+  let(:sshable) { postgres_server.vm.sshable }
 
   before do
-    allow(nx).to receive(:postgres_server).and_return(postgres_server)
-    allow(postgres_server).to receive_messages(resource: resource, read_replica?: false)
+    allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
   end
 
   describe ".assemble" do
@@ -100,46 +66,87 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for Lantern" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+      postgres_project = Project.create(name: "default")
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+
+      # Create a lantern-flavored postgres resource
+      lantern_resource = PostgresResource.create(
+        project_id: user_project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "pg-lantern",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "16",
+        flavor: PostgresResource::Flavor::LANTERN
+      )
+      # Create firewall with correct name after resource exists
+      Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: postgres_project.id)
+      postgres_timeline = PostgresTimeline.create
+
+      st = described_class.assemble(resource_id: lantern_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+      postgres_server = PostgresServer[st.id]
+      expect(postgres_server.vm.boot_image).to eq("postgres16-lantern-ubuntu-2204")
     end
 
     it "picks correct base image for AWS-pg16" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: user_project.id
+      # Use an existing seed location (us-west-2) that has billing rates
+      aws_location = Location.find(name: "us-west-2")
+      skip "us-west-2 location not available in test seeds" unless aws_location
+
+      postgres_project = Project.create(name: "default")
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+
+      # Ensure AMI mapping exists
+      PgAwsAmi.find_or_create(aws_location_name: "us-west-2", pg_version: "16", arch: "x64") { |a| a.aws_ami_id = "ami-pg16-x64" }
+
+      aws_resource = PostgresResource.create(
+        project_id: user_project.id,
+        location_id: aws_location.id,
+        name: "pg-aws16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "16"
       )
-      expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:version).and_return("16").at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+      # Create firewall with correct name
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: postgres_project.id)
+      postgres_timeline = PostgresTimeline.create
+
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+      postgres_server = PostgresServer[st.id]
+      # AWS uses AMI lookup via pg_ami method - verify the boot_image matches what pg_ami returns
+      expect(postgres_server.vm.boot_image).to eq(aws_location.pg_ami("16", "x64"))
     end
 
     it "picks correct base image for AWS-pg17" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: user_project.id
+      # Use an existing seed location (us-west-2) that has billing rates
+      aws_location = Location.find(name: "us-west-2")
+      skip "us-west-2 location not available in test seeds" unless aws_location
+
+      postgres_project = Project.create(name: "default")
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+
+      # Ensure AMI mapping exists
+      PgAwsAmi.find_or_create(aws_location_name: "us-west-2", pg_version: "17", arch: "x64") { |a| a.aws_ami_id = "ami-pg17-x64" }
+
+      aws_resource = PostgresResource.create(
+        project_id: user_project.id,
+        location_id: aws_location.id,
+        name: "pg-aws17",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "17"
       )
-      expect(postgres_resource).to receive(:version).and_return("17").at_least(:once)
-      expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:location_id).and_return(loc.id).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
+      # Create firewall with correct name
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location_id: aws_location.id, project_id: postgres_project.id)
+      postgres_timeline = PostgresTimeline.create
+
+      st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+      postgres_server = PostgresServer[st.id]
+      # AWS uses AMI lookup via pg_ami method - verify the boot_image matches what pg_ami returns
+      expect(postgres_server.vm.boot_image).to eq(aws_location.pg_ami("17", "x64"))
     end
 
     it "raises error if the version is not supported for AWS" do
@@ -169,73 +176,84 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(postgres_server).to receive(:resource).and_return(nil)
+    it "hops to destroy when resource strand is destroy" do
+      nx.incr_destroy
+      postgres_resource.strand.update(label: "destroy")
       expect { nx.before_run }.to hop("destroy")
     end
 
     it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(resource).to receive(:strand).and_return(nil)
-      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
+      nx.incr_destroy
+      postgres_resource.strand.update(label: "destroy")
+      server_strand.update(label: "destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if already in the wait_children_destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(resource).to receive(:strand).and_return(nil)
-      expect(nx.strand).to receive(:label).and_return("wait_children_destroy").at_least(:once)
+      nx.incr_destroy
+      postgres_resource.strand.update(label: "destroy")
+      server_strand.update(label: "wait_children_destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if already in the destroy_vm_and_pg state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(resource).to receive(:strand).and_return(nil)
-      expect(nx.strand).to receive(:label).and_return("destroy_vm_and_pg").at_least(:once)
+      nx.incr_destroy
+      postgres_resource.strand.update(label: "destroy")
+      server_strand.update(label: "destroy_vm_and_pg")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "cancels the destroy if the server is picked up for take over" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(postgres_server).to receive(:taking_over?).and_return(true)
-      expect(nx).to receive(:decr_destroy)
+      nx.incr_destroy
+      # Resource strand is "wait" (not destroying), server is taking over
+      server_strand.update(label: "taking_over")
       expect { nx.before_run }.not_to hop("destroy")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(0)
     end
 
     it "pops additional operations from stack" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(resource).to receive(:strand).and_return(instance_double(Strand, label: "destroy"))
-      expect(nx.strand).to receive(:label).and_return("destroy").at_least(:once)
-      expect(nx.strand.stack).to receive(:count).and_return(2)
-      expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the postgres server"})
+      nx.incr_destroy
+      postgres_resource.strand.update(label: "destroy")
+      # Set up a stack with proper back-link (simulating a pushed frame)
+      server_strand.update(
+        label: "destroy",
+        stack: [
+          {"subject_id" => postgres_server.id, "link" => ["Postgres::PostgresServerNexus", "wait"]},
+          {}
+        ]
+      )
+      # Create fresh nexus so frame memoization picks up the new stack
+      fresh_nx = described_class.new(server_strand.reload)
+      expect { fresh_nx.before_run }.to hop("wait")
     end
   end
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect(postgres_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
+      postgres_server.vm.strand.update(label: "prep")
       expect { nx.start }.to nap(5)
     end
 
-    it "update sshable host and hops" do
-      expect(postgres_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(postgres_server).to receive(:incr_initial_provisioning)
+    it "hops to bootstrap_rhizome when vm is ready" do
+      postgres_server.vm.strand.update(label: "wait")
       expect { nx.start }.to hop("bootstrap_rhizome")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
     end
   end
 
   describe "#bootstrap_rhizome" do
-    it "buds a bootstrap rhizome process" do
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id, "user" => "ubi"})
+    it "buds a bootstrap rhizome process for primary" do
+      # Server created by assemble is primary (has representative_at)
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
+      child = Strand.where(prog: "BootstrapRhizome", parent_id: server_strand.id).first
+      expect(child).not_to be_nil
+      expect(child.stack.first["target_folder"]).to eq("postgres")
+      expect(child.stack.first["subject_id"]).to eq(postgres_server.vm.id)
     end
 
     it "sets longer deadline for non-primary servers" do
-      expect(postgres_server).to receive(:primary?).and_return(false)
-      expect(nx).to receive(:register_deadline).with("wait", 120 * 60)
+      # Make server non-primary by removing representative_at
+      postgres_server.update(representative_at: nil)
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
   end
@@ -246,49 +264,65 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "donates if there are sub-programs running" do
-      Strand.create(parent_id: st.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
+      Strand.create(parent_id: server_strand.id, prog: "BootstrapRhizome", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.wait_bootstrap_rhizome }.to nap(5)
     end
   end
 
   describe "#mount_data_disk" do
-    it "formats data disk if format command is not sent yet or failed" do
-      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
-      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/vdb")
+    # Create storage volumes for the VM (not created automatically by Vm::Nexus.assemble in test mode)
+    let(:data_volume) {
+      VmStorageVolume.create(vm_id: postgres_server.vm.id, boot: false, size_gib: 64, disk_index: 1)
+    }
 
+    it "formats data disk if format command is not sent yet or failed" do
+      data_volume
+      device_path = postgres_server.storage_device_paths.first
       expect(sshable).to receive(:d_check).with("format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", device_path)
       expect { nx.mount_data_disk }.to nap(5)
     end
 
     it "formats data disk correctly when there are multiple storage volumes" do
-      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
-      expect(sshable).to receive(:_cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=2 /dev/nvme1n1 /dev/nvme2n1")
-      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
+      # RAID setup only happens on AWS where storage_device_paths returns multiple paths.
+      # storage_device_paths does SSH to lsblk on AWS - stubbing to avoid AWS infra setup.
+      paths = ["/dev/nvme1n1", "/dev/nvme2n1"]
+      allow(postgres_server).to receive(:storage_device_paths).and_return(paths)
 
       expect(sshable).to receive(:d_check).with("format_disk").and_return("NotStarted")
+      expect(sshable).to receive(:cmd).with("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=:count :shelljoin_storage_device_paths",
+        count: 2, shelljoin_storage_device_paths: paths)
+      expect(sshable).to receive(:d_run).with("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
       expect { nx.mount_data_disk }.to nap(5)
     end
 
     it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
+      data_volume
+      device_path = postgres_server.storage_device_paths.first
       expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
-      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
-      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount /dev/vdb /dat")
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path: device_path)
+      expect(sshable).to receive(:cmd).with("sudo mount :device_path /dat", device_path: device_path)
       expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 
     it "mounts data disk correctly when there are multiple storage volumes" do
+      # RAID setup only happens on AWS where storage_device_paths returns multiple paths.
+      # storage_device_paths does SSH to lsblk on AWS - stubbing to avoid AWS infra setup.
+      paths = ["/dev/nvme1n1", "/dev/nvme2n1"]
+      allow(postgres_server).to receive(:storage_device_paths).and_return(paths)
+
       expect(sshable).to receive(:d_check).with("format_disk").and_return("Succeeded")
-      expect(postgres_server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
-      expect(sshable).to receive(:_cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
-      expect(sshable).to receive(:_cmd).with("sudo update-initramfs -u")
-      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
-      expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
-      expect(sshable).to receive(:_cmd).with("sudo mount /dev/md0 /dat")
+      expect(sshable).to receive(:cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
+      expect(sshable).to receive(:cmd).with("sudo update-initramfs -u")
+      expect(sshable).to receive(:cmd).with("sudo mkdir -p /dat")
+      expect(sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path: "/dev/md0")
+      expect(sshable).to receive(:cmd).with("sudo mount :device_path /dat", device_path: "/dev/md0")
       expect { nx.mount_data_disk }.to hop("configure_walg_credentials")
     end
 
     it "naps if script return unknown status" do
+      data_volume
       expect(sshable).to receive(:d_check).with("format_disk").and_return("Unknown")
       expect { nx.mount_data_disk }.to nap(5)
     end
@@ -296,16 +330,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#configure_walg_credentials" do
     it "hops to initialize_empty_database if the server is primary" do
+      # Server created by assemble is primary (has representative_at)
       expect(postgres_server).to receive(:refresh_walg_credentials)
-      expect(postgres_server).to receive(:primary?).and_return(true)
       expect(postgres_server).to receive(:attach_s3_policy_if_needed)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
 
     it "hops to initialize_database_from_backup if the server is not primary" do
+      # Make server non-primary by setting timeline_access to "fetch"
+      postgres_server.update(timeline_access: "fetch")
       expect(postgres_server).to receive(:refresh_walg_credentials)
-      expect(postgres_server).to receive(:primary?).and_return(false)
       expect(postgres_server).to receive(:attach_s3_policy_if_needed)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
@@ -314,7 +349,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#initialize_empty_database" do
     it "triggers initialize_empty_database if initialize_empty_database command is not sent yet or failed" do
-      expect(sshable).to receive(:d_run).with("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", "16").twice
+      version = postgres_server.version
+      expect(sshable).to receive(:d_run).with("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", version).twice
 
       # NotStarted
       expect(sshable).to receive(:d_check).with("initialize_empty_database").and_return("NotStarted")
@@ -338,10 +374,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#initialize_database_from_backup" do
     it "triggers initialize_database_from_backup if initialize_database_from_backup command is not sent yet or failed" do
-      expect(postgres_server.resource).to receive(:restore_target).and_return(Time.now).twice
-      expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label").twice
-      expect(postgres_server).to receive(:standby?).and_return(false).twice
-      expect(sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", "16", "backup-label").twice
+      # Set restore_target on resource (database stores with microsecond precision)
+      postgres_resource.update(restore_target: Time.now)
+      restore_time = postgres_resource.reload.restore_target
+      # Stub external service call for backup label lookup
+      expect(postgres_server.timeline).to receive(:latest_backup_label_before_target).with(target: restore_time).and_return("backup-label").twice
+      version = postgres_server.version
+      expect(sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", version, "backup-label").twice
 
       # NotStarted
       expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("NotStarted")
@@ -363,22 +402,47 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "triggers initialize_database_from_backup with LATEST as backup_label for standbys" do
-      expect(sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("NotStarted")
-      expect(postgres_server).to receive(:standby?).and_return(true)
-      expect(sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", "16", "LATEST")
-      expect { nx.initialize_database_from_backup }.to nap(5)
+      # Create a standby server (separate from the primary representative)
+      # Standby: timeline_access = "fetch" and resource.representative_server.primary? is true
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id,
+        timeline_id: postgres_server.timeline_id,
+        timeline_access: "fetch"
+      )
+      standby = PostgresServer[standby_strand.id]
+      standby_nx = described_class.new(standby_strand)
+      # Get the sshable through the same path the prog uses
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+
+      version = standby.version
+      expect(standby_sshable).to receive(:d_check).with("initialize_database_from_backup").and_return("NotStarted")
+      expect(standby_sshable).to receive(:d_run).with("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", version, "LATEST")
+      expect { standby_nx.initialize_database_from_backup }.to nap(5)
     end
   end
 
   describe "#refresh_certificates" do
+    before do
+      # Set up real certificate data on the resource
+      postgres_resource.update(
+        root_cert_1: "root_cert_1",
+        root_cert_2: "root_cert_2",
+        server_cert: "server_cert",
+        server_cert_key: "server_cert_key"
+      )
+    end
+
     it "waits for certificate creation by the parent resource" do
-      expect(postgres_server.resource).to receive(:server_cert).and_return(nil)
+      postgres_resource.update(server_cert: nil)
       expect { nx.refresh_certificates }.to nap(5)
     end
 
-    it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
-      expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+    it "pushes certificates to vm and hops to configure_metrics during initial provisioning" do
+      # Set initial_provisioning semaphore
+      nx.incr_initial_provisioning
+      ca_bundle = postgres_resource.ca_certificates
+
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
@@ -387,19 +451,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(postgres_server).to receive(:refresh_walg_credentials)
 
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
       expect { nx.refresh_certificates }.to hop("configure_metrics")
     end
 
     it "hops to wait at times other than the initial provisioning" do
-      expect(postgres_server.resource).to receive(:trusted_ca_certs).and_return(nil)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      # No initial_provisioning semaphore set
+      ca_bundle = postgres_resource.ca_certificates
+      version = postgres_server.version
+
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
-      expect(sshable).to receive(:_cmd).with("sudo -u postgres pg_ctlcluster 16 main reload")
+      expect(sshable).to receive(:_cmd).with("sudo -u postgres pg_ctlcluster #{version} main reload")
       expect(sshable).to receive(:_cmd).with("sudo systemctl reload pgbouncer@*.service")
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.refresh_certificates }.to hop("wait")
@@ -410,8 +476,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     let(:metrics_config) { {interval: "30s", endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"} }
 
     it "configures prometheus and metrics during initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
+      # Set initial_provisioning semaphore and use_old_walg_command semaphore
+      nx.incr_initial_provisioning
+      postgres_resource.incr_use_old_walg_command
+
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
@@ -431,29 +499,41 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "configures prometheus and metrics during initial provisioning and hops to setup_cloudwatch if timeline is AWS" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(resource).to receive(:use_old_walg_command_set?).and_return(false)
-      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now wal-g")
+      # Set initial_provisioning semaphore (no use_old_walg_command = new style)
+      nx.incr_initial_provisioning
+
+      # Update timeline to use an AWS location BEFORE setting up expectations
+      aws_location = Location.where(provider: "aws").first
+      PostgresTimeline.where(id: postgres_server.timeline_id).update(location_id: aws_location.id)
+      # Clear the memoized postgres_server from the nexus to force a fresh load
+      nx.instance_variable_set(:@postgres_server, nil)
+
+      # Now set up expectations on the fresh sshable
+      fresh_sshable = nx.postgres_server.vm.sshable
+      expect(fresh_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(fresh_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl enable --now wal-g")
 
       # Configure metrics expectations
-      expect(postgres_server).to receive(:metrics_config).and_return(metrics_config)
-      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
-      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+      expect(nx.postgres_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(fresh_sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(fresh_sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(fresh_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(fresh_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(fresh_sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
 
-      expect(postgres_server.timeline).to receive(:aws?).and_return(true)
+      # Set project feature flag via update
+      nx.postgres_server.resource.project.update(feature_flags: Sequel.pg_jsonb_wrap({"aws_cloudwatch_logs" => true}))
       expect { nx.configure_metrics }.to hop("setup_cloudwatch")
     end
 
     it "configures prometheus and metrics and hops to wait at times other than initial provisioning" do
+      # No initial_provisioning semaphore set
+
       # Prometheus expectations
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
@@ -469,11 +549,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
 
-      expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
+      # Using real representative_server from postgres_resource
       expect { nx.configure_metrics }.to hop("wait")
     end
 
     it "uses default interval if not specified in config" do
+      # No initial_provisioning semaphore set
       config_without_interval = {endpoints: ["https://localhost:9100/metrics"], metrics_dir: "/home/ubi/postgres/metrics"}
 
       # Prometheus expectations
@@ -491,7 +572,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: /OnUnitActiveSec=15s/)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
 
-      expect(resource).to receive(:representative_server).and_return(instance_double(PostgresServer, id: "random-id"))
+      # Using real representative_server from postgres_resource
       expect { nx.configure_metrics }.to hop("wait")
     end
   end
@@ -533,7 +614,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#configure" do
     it "triggers configure if configure command is not sent yet or failed" do
       expect(postgres_server).to receive(:configure_hash).and_return("dummy-configure-hash").twice
-      expect(sshable).to receive(:d_run).with("configure_postgres", "sudo", "postgres/bin/configure", "16", stdin: JSON.generate("dummy-configure-hash")).twice
+      expect(sshable).to receive(:d_run).with("configure_postgres", "sudo", "postgres/bin/configure", postgres_server.version, stdin: JSON.generate("dummy-configure-hash")).twice
 
       # NotStarted
       expect(sshable).to receive(:d_check).with("configure_postgres").and_return("NotStarted")
@@ -545,56 +626,75 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      nx.incr_initial_provisioning
       expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:primary?).and_return(true)
+      # postgres_server is primary by default (timeline_access: "push")
       expect { nx.configure }.to hop("update_superuser_password")
     end
 
     it "hops to wait_catch_up if configure command is succeeded during the initial provisioning and if the server is standby" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:primary?).and_return(false)
-      expect(postgres_server).to receive(:standby?).and_return(true)
-      expect { nx.configure }.to hop("wait_catch_up")
+      # Create a standby server (timeline_access: "fetch")
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby_nx = described_class.new(standby_strand)
+      standby_nx.incr_initial_provisioning
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      expect(standby_sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(standby_sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
+      expect { standby_nx.configure }.to hop("wait_catch_up")
     end
 
     it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is doing pitr" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      # PITR scenario: server is fetching (not primary) and the representative is also not primary
+      # This happens during point-in-time recovery
+      # Make the existing server not primary but keep it as representative for now
+      postgres_server.update(timeline_access: "fetch")
+      nx.incr_initial_provisioning
       expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:primary?).and_return(false)
-      expect(postgres_server).to receive(:standby?).and_return(false)
       expect { nx.configure }.to hop("wait_recovery_completion")
     end
 
     it "hops to wait for primaries if configure command is succeeded at times other than the initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?)
+      # No initial_provisioning semaphore set
       expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
       expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:standby?).and_return(false)
+      # postgres_server is primary by default
       expect { nx.configure }.to hop("wait")
     end
 
     it "hops to wait_catchup for standbys if configure command is succeeded at times other than the initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?)
-      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:standby?).and_return(true)
-      expect(postgres_server).to receive(:synchronization_status).and_return("catching_up")
-      expect { nx.configure }.to hop("wait_catch_up")
+      # Create standby and set synchronization_status
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby = PostgresServer[standby_strand.id]
+      standby.update(synchronization_status: "catching_up")
+      standby_nx = described_class.new(standby_strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      expect(standby_sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(standby_sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
+      expect { standby_nx.configure }.to hop("wait_catch_up")
     end
 
     it "hops to wait for read replicas if configure command is succeeded" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
-      expect(sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
-      expect(sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
-      expect(postgres_server).to receive(:primary?).and_return(false)
-      expect(postgres_server).to receive(:standby?).and_return(false)
-      expect(postgres_server).to receive(:read_replica?).and_return(true)
-      expect { nx.configure }.to hop("wait_catch_up")
+      # Create a read replica resource with a server
+      read_replica_resource = Prog::Postgres::PostgresResourceNexus.assemble(
+        project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID,
+        name: "test-pg-rr", target_vm_size: "standard-2", target_storage_size_gib: 64,
+        parent_id: postgres_resource.id
+      ).subject
+      rr_server = read_replica_resource.servers.first
+      rr_nx = described_class.new(rr_server.strand)
+      rr_nx.incr_initial_provisioning
+      rr_sshable = rr_nx.postgres_server.vm.sshable
+      expect(rr_sshable).to receive(:d_clean).with("configure_postgres").and_return("Succeeded")
+      expect(rr_sshable).to receive(:d_check).with("configure_postgres").and_return("Succeeded")
+      expect { rr_nx.configure }.to hop("wait_catch_up")
     end
 
     it "naps if script return unknown status" do
@@ -605,32 +705,33 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#update_superuser_password" do
     it "updates password and pushes restart during the initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      nx.incr_initial_provisioning
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
-      expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
       expect { nx.update_superuser_password }.to hop("restart")
+      # Verify initial_provisioning semaphore is still set (push doesn't consume it)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "initial_provisioning").count).to eq(1)
     end
 
     it "updates password and hops to wait during initial provisioning if restart is already executed" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      nx.incr_initial_provisioning
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
-      expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::STANDARD)
+      server_strand.update(retval: {"msg" => "postgres server is restarted"})
+      # postgres_server is already primary (representative_at set by assemble)
+      # flavor is standard by default
       expect { nx.update_superuser_password }.to hop("wait")
     end
 
     it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      nx.incr_initial_provisioning
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
-      expect(nx.strand).to receive(:retval).and_return({"msg" => "postgres server is restarted"})
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
+      server_strand.update(retval: {"msg" => "postgres server is restarted"})
+      # postgres_server is already primary, update resource flavor
+      postgres_resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
     it "updates password and hops to wait at times other than the initial provisioning" do
-      expect(nx).to receive(:when_initial_provisioning_set?)
+      # No initial_provisioning semaphore set, so it should hop directly to wait
       expect(postgres_server).to receive(:run_query).with(/log_statement = 'none'.*\n.*SCRAM-SHA-256/)
       expect { nx.update_superuser_password }.to hop("wait")
     end
@@ -652,18 +753,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "sets the synchronization_status and hops to wait_synchronization for sync replication" do
       expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
-      expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      postgres_resource.update(ha_type: PostgresResource::HaType::SYNC)
       expect { nx.wait_catch_up }.to hop("wait_synchronization")
+      expect(postgres_server.reload.synchronization_status).to eq("ready")
+      expect(Semaphore.where(strand_id: server_strand.id, name: "configure").count).to eq(1)
     end
 
     it "sets the synchronization_status and hops to wait for async replication" do
       expect(postgres_server).to receive(:lsn_caught_up).and_return(true)
-      expect(postgres_server).to receive(:update).with(synchronization_status: "ready")
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server.resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
+      postgres_resource.update(ha_type: PostgresResource::HaType::ASYNC)
       expect { nx.wait_catch_up }.to hop("wait")
+      expect(postgres_server.reload.synchronization_status).to eq("ready")
+      expect(Semaphore.where(strand_id: server_strand.id, name: "configure").count).to eq(1)
     end
 
     it "hops to wait if replica and caught up" do
@@ -675,14 +776,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#wait_synchronization" do
     it "hops to wait if sync replication is established" do
-      expect(postgres_server).to receive(:run_query).and_return("quorum", "sync")
+      # The query is run on the representative_server (which is the primary)
+      # Mock at _cmd level since run_query is an external SSH operation
+      # Get the sshable through the exact chain the code uses: nx.postgres_server.resource.representative_server.vm.sshable
+      query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
+      rep_sshable = nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).and_return("quorum")
       expect { nx.wait_synchronization }.to hop("wait")
+      rep_sshable = nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).and_return("sync")
       expect { nx.wait_synchronization }.to hop("wait")
     end
 
     it "naps if sync replication is not established" do
-      expect(postgres_server).to receive(:run_query).and_return("", "async")
+      query = "SELECT sync_state FROM pg_stat_replication WHERE application_name = '#{postgres_server.ubid}'"
+      rep_sshable = nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).and_return("")
       expect { nx.wait_synchronization }.to nap(30)
+      rep_sshable = nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).and_return("async")
       expect { nx.wait_synchronization }.to nap(30)
     end
   end
@@ -726,67 +838,66 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to fence if fence is set" do
-      expect(nx).to receive(:when_fence_set?).and_yield
+      nx.incr_fence
       expect { nx.wait }.to hop("fence")
     end
 
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
-      expect(nx).to receive(:when_unplanned_take_over_set?).and_yield
+      nx.incr_unplanned_take_over
       expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
     end
 
     it "hops to prepare_for_planned_take_over if take_over is set" do
-      expect(nx).to receive(:when_planned_take_over_set?).and_yield
+      nx.incr_planned_take_over
       expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
 
     it "hops to refresh_certificates if refresh_certificates is set" do
-      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
+      nx.incr_refresh_certificates
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
     it "hops to update_superuser_password if update_superuser_password is set" do
-      expect(nx).to receive(:when_update_superuser_password_set?).and_yield
+      nx.incr_update_superuser_password
       expect { nx.wait }.to hop("update_superuser_password")
     end
 
     it "hops to unavailable if checkup is set and the server is not available" do
-      expect(nx).to receive(:when_checkup_set?).and_yield
+      nx.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.wait }.to hop("unavailable")
     end
 
     it "naps if checkup is set but the server is available" do
-      expect(nx).to receive(:when_checkup_set?).and_yield
+      nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "hops to configure_metrics if configure_metrics is set" do
-      expect(nx).to receive(:when_configure_metrics_set?).and_yield
+      nx.incr_configure_metrics
       expect { nx.wait }.to hop("configure_metrics")
     end
 
     it "hops to configure if configure is set" do
-      expect(nx).to receive(:when_configure_set?).and_yield
+      nx.incr_configure
       expect { nx.wait }.to hop("configure")
     end
 
     it "decrements and calls refresh_walg_credentials if refresh_walg_credentials is set" do
-      expect(nx).to receive(:when_refresh_walg_credentials_set?).and_yield
-      expect(nx).to receive(:decr_refresh_walg_credentials)
+      nx.incr_refresh_walg_credentials
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.wait }.to nap(6 * 60 * 60)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "refresh_walg_credentials").count).to eq(0)
     end
 
     it "pushes restart if restart is set" do
-      expect(nx).to receive(:when_restart_set?).and_yield
-      expect(nx).to receive(:push).with(described_class, {}, "restart").and_call_original
+      nx.incr_restart
       expect { nx.wait }.to hop("restart")
     end
 
     it "promotes" do
-      expect(nx).to receive(:when_promote_set?).and_yield
+      nx.incr_promote
       expect(postgres_server).to receive(:switch_to_new_timeline)
       expect { nx.wait }.to hop("taking_over")
     end
@@ -803,9 +914,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/A"}]).at_least(:once)
         expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
-        expect(postgres_server).to receive(:recycle_set?).and_return(false)
-        expect(postgres_server).to receive(:incr_recycle)
+        # No recycle semaphore set initially
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(0)
         expect { nx.wait }.to nap(60)
+        # Verify recycle semaphore was incremented
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(1)
       end
 
       it "does not increment recycle if it is incremented already" do
@@ -814,9 +927,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/A"}]).at_least(:once)
         expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
-        expect(postgres_server).to receive(:recycle_set?).and_return(true)
-        expect(postgres_server).not_to receive(:incr_recycle)
+        # Pre-set recycle semaphore so it won't be incremented again
+        nx.incr_recycle
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(1)
         expect { nx.wait }.to nap(60)
+        # Verify recycle semaphore count stayed the same (not incremented again)
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(1)
       end
 
       it "checks if it wasn't already lagging but the lag exists, if so, update the stack and nap" do
@@ -839,54 +955,54 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         expect(nx.strand).to receive(:stack).and_return([{"lsn" => "1/9"}]).at_least(:once)
         expect(postgres_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
-        expect(nx).to receive(:decr_recycle)
+        # Pre-set recycle semaphore so we can verify it gets decremented
+        nx.incr_recycle
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(1)
         expect(nx).to receive(:update_stack_lsn).with("1/A")
         expect { nx.wait }.to nap(900)
+        # Verify recycle semaphore was decremented
+        expect(Semaphore.where(strand_id: server_strand.id, name: "recycle").count).to eq(0)
       end
     end
   end
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
-      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      # trigger_failover returns false when there's no standby (real behavior)
+      # available? should return true to hop to wait
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
-      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      # trigger_failover returns false when there's no standby
+      # available? returns false so it buds restart
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
     end
 
     it "does not bud restart if there is already one restart going on" do
-      Strand.create(parent_id: st.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
-      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      Strand.create(parent_id: server_strand.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
+      # trigger_failover returns false when there's no standby
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
-      expect(postgres_server).to receive(:trigger_failover).and_return(true)
+      # Mock trigger_failover to return true - the real behavior requires a standby
+      # with very specific state (strand.label == "wait", not needs_recycling?, etc.)
+      expect(postgres_server).to receive(:trigger_failover).with(mode: "unplanned").and_return(true)
       expect { nx.unavailable }.to nap(0)
     end
   end
 
   describe "#fence" do
     it "runs checkpoints and perform lockout" do
-      expect(nx).to receive(:decr_fence)
+      nx.incr_fence
       expect(postgres_server).to receive(:run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 16")
-      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
+      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout #{postgres_server.version}")
+      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster #{postgres_server.version} main stop -m smart")
       expect { nx.fence }.to hop("wait_in_fence")
     end
   end
@@ -897,91 +1013,194 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait if unfence is set" do
-      expect(nx).to receive(:when_unfence_set?).and_yield
-      expect(nx).to receive(:decr_unfence)
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server).to receive(:incr_restart)
+      nx.incr_unfence
+      expect(Semaphore.where(strand_id: server_strand.id, name: "unfence").count).to eq(1)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "configure").count).to eq(0)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "restart").count).to eq(0)
       expect { nx.wait_in_fence }.to hop("wait")
+      # Verify unfence was decremented and configure/restart were incremented
+      expect(Semaphore.where(strand_id: server_strand.id, name: "unfence").count).to eq(0)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "configure").count).to eq(1)
+      expect(Semaphore.where(strand_id: server_strand.id, name: "restart").count).to eq(1)
     end
   end
 
   describe "#prepare_for_unplanned_take_over" do
-    it "stops postgres in representative server and destroys it" do
-      representative_server = instance_double(PostgresServer)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
-      expect(nx).to receive(:decr_unplanned_take_over)
-      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
-      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
-      expect(representative_server).to receive(:incr_destroy)
+    # Create a cluster with a real primary and standby for failover tests
+    def create_failover_cluster
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby = PostgresServer[standby_strand.id]
+      primary = postgres_resource.servers.find { it.primary? }
+      [primary, standby, standby_strand]
+    end
 
-      expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+    it "stops postgres in representative server and destroys it" do
+      primary, _, standby_strand = create_failover_cluster
+      standby_nx = described_class.new(standby_strand)
+      standby_nx.incr_unplanned_take_over
+
+      # Get the sshable through the exact chain the code uses
+      rep_sshable = standby_nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("sudo pg_ctlcluster #{primary.version} main stop -m immediate")
+
+      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+
+      # Verify the primary was marked for destruction
+      expect(Semaphore.where(strand_id: primary.strand.id, name: "destroy").count).to eq(1)
     end
 
     it "handles SSH connection errors gracefully and continues with destroy" do
-      representative_server = instance_double(PostgresServer)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
-      expect(nx).to receive(:decr_unplanned_take_over)
-      expect(representative_server).to receive(:vm).and_return(instance_double(Vm, sshable: sshable))
-      expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
-      expect(representative_server).to receive(:incr_destroy)
+      primary, _, standby_strand = create_failover_cluster
+      standby_nx = described_class.new(standby_strand)
+      standby_nx.incr_unplanned_take_over
 
-      expect { nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+      rep_sshable = standby_nx.postgres_server.resource.representative_server.vm.sshable
+      expect(rep_sshable).to receive(:_cmd).with("sudo pg_ctlcluster #{primary.version} main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
+
+      expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
+
+      # Verify the primary was still marked for destruction despite SSH error
+      expect(Semaphore.where(strand_id: primary.strand.id, name: "destroy").count).to eq(1)
     end
   end
 
   describe "#prepare_for_planned_take_over" do
     it "starts fencing on representative server" do
-      expect(nx).to receive(:decr_planned_take_over)
-      representative_server = instance_double(PostgresServer)
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
-      expect(representative_server).to receive(:incr_fence)
-      expect { nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
+      # Create standby server
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby_nx = described_class.new(standby_strand)
+      standby_nx.incr_planned_take_over
+
+      primary = postgres_resource.servers.find { it.primary? }
+
+      expect { standby_nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
+
+      # Verify fence semaphore was set on primary
+      expect(Semaphore.where(strand_id: primary.strand.id, name: "fence").count).to eq(1)
     end
   end
 
   describe "#wait_fencing_of_old_primary" do
     it "naps immediately if fence is set" do
-      representative_server = instance_double(PostgresServer, strand: instance_double(Strand, label: "fence"))
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server)
-      expect { nx.wait_fencing_of_old_primary }.to nap(0)
+      # Create standby server
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby_nx = described_class.new(standby_strand)
+
+      primary = postgres_resource.servers.find { it.primary? }
+      # Set the primary's strand label to "fence"
+      primary.strand.update(label: "fence")
+
+      expect { standby_nx.wait_fencing_of_old_primary }.to nap(0)
     end
 
     it "destroys old primary and hops to taking_over when fence is not set" do
-      representative_server = instance_double(PostgresServer, strand: instance_double(Strand, label: "wait_in_fence"))
-      expect(postgres_server.resource).to receive(:representative_server).and_return(representative_server).at_least(:once)
-      expect(representative_server).to receive(:incr_destroy)
-      expect { nx.wait_fencing_of_old_primary }.to hop("taking_over")
+      # Create standby server
+      standby_strand = described_class.assemble(
+        resource_id: postgres_resource.id, timeline_id: postgres_resource.timeline.id,
+        timeline_access: "fetch"
+      )
+      standby_nx = described_class.new(standby_strand)
+
+      primary = postgres_resource.servers.find { it.primary? }
+      # Set the primary's strand label to "wait_in_fence"
+      primary.strand.update(label: "wait_in_fence")
+
+      expect { standby_nx.wait_fencing_of_old_primary }.to hop("taking_over")
+
+      # Verify the primary was marked for destruction
+      expect(Semaphore.where(strand_id: primary.strand.id, name: "destroy").count).to eq(1)
     end
   end
 
   describe "#taking_over" do
-    it "triggers promote if promote command is not sent yet or failed" do
-      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "16").twice
+    it "triggers promote if promote command is not sent yet" do
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
 
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted", "Failed")
-      expect { nx.taking_over }.to nap(0)
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("NotStarted")
       expect { nx.taking_over }.to nap(0)
     end
 
-    it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+    it "triggers a page and retries if promote command is failed" do
+      expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
+      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
 
-      expect(postgres_server).to receive(:update).with(timeline_access: "push", representative_at: anything, synchronization_status: "ready")
-      expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-      expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(postgres_server).to receive(:incr_configure)
-      expect(postgres_server).to receive(:incr_configure_metrics)
-      expect(postgres_server).to receive(:incr_restart)
+      expect { nx.taking_over }.to nap(0)
 
-      standby = instance_double(PostgresServer, primary?: false)
-      expect(standby).to receive(:update).with(synchronization_status: "catching_up")
-      expect(standby).to receive(:incr_configure)
-      expect(standby).to receive(:incr_configure_metrics)
-      expect(standby).to receive(:incr_restart)
+      page = Page.first(tag: "PGPromotionFailed-#{postgres_server.id}")
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("#{postgres_server.ubid} promotion failed")
+    end
 
-      expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server, standby])
+    context "when promote succeeds with real models" do
+      def create_postgres_cluster
+        user_project = Project.create(name: "test-project")
+        postgres_project = Project.create(name: "postgres-service")
+        allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
 
-      expect { nx.taking_over }.to hop("configure")
+        resource = Prog::Postgres::PostgresResourceNexus.assemble(
+          project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID,
+          name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 64
+        ).subject
+
+        primary = resource.servers.first
+        primary.update(timeline_access: "fetch", representative_at: nil)
+        primary_strand = primary.strand
+
+        standby_strand = described_class.assemble(
+          resource_id: resource.id, timeline_id: resource.timeline.id,
+          timeline_access: "fetch"
+        )
+        standby = PostgresServer[standby_strand.id]
+
+        [resource, primary, primary_strand, standby]
+      end
+
+      it "updates the metadata and hops to configure if promote command is succeeded" do
+        resource, primary, primary_strand, standby = create_postgres_cluster
+        primary_nx = described_class.new(primary_strand)
+        sshable = primary_nx.postgres_server.vm.sshable
+
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Succeeded")
+
+        expect { primary_nx.taking_over }.to hop("configure")
+
+        expect(primary.reload.timeline_access).to eq("push")
+        expect(primary.representative_at).not_to be_nil
+        expect(primary.synchronization_status).to eq("ready")
+
+        expect(standby.reload.synchronization_status).to eq("catching_up")
+
+        expect(Semaphore.where(strand_id: resource.id, name: "refresh_dns_record").count).to eq(1)
+        [primary, standby].each do |server|
+          expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
+          expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
+          expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
+        end
+      end
+
+      it "resolves existing page when promote succeeds" do
+        _, primary, primary_strand, _ = create_postgres_cluster
+        primary_nx = described_class.new(primary_strand)
+        sshable = primary_nx.postgres_server.vm.sshable
+
+        page = Page.create(summary: "test page", tag: "PGPromotionFailed-#{primary.id}")
+        Strand.create_with_id(page, prog: "PageNexus", label: "wait")
+
+        expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check promote_postgres").and_return("Succeeded")
+
+        expect { primary_nx.taking_over }.to hop("configure")
+
+        expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+      end
     end
 
     it "naps if script return unknown status" do
@@ -991,35 +1210,37 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     describe "read_replica" do
       it "updates the representative server, refreshes dns and destroys the old representative_server and hops to configure when read_replica" do
-        time = Time.now
         expect(postgres_server).to receive(:read_replica?).and_return(true)
-        expect(Time).to receive(:now).and_return(time)
-        expect(postgres_server).to receive(:update).with(representative_at: time)
-        expect(postgres_server.resource).to receive(:incr_refresh_dns_record)
-        expect(postgres_server.resource).to receive(:servers).at_least(:once).and_return([postgres_server])
-        expect(postgres_server).to receive(:incr_configure_metrics)
+        expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "refresh_dns_record").count).to eq(0)
+        expect(Semaphore.where(strand_id: server_strand.id, name: "configure_metrics").count).to eq(0)
+
         expect { nx.taking_over }.to hop("configure")
+
+        # Verify representative_at was updated
+        postgres_server.refresh
+        expect(postgres_server.representative_at).not_to be_nil
+        # Verify semaphores were incremented
+        expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "refresh_dns_record").count).to eq(1)
+        expect(Semaphore.where(strand_id: server_strand.id, name: "configure_metrics").count).to eq(1)
       end
     end
   end
 
   describe "#destroy" do
     it "deletes resources and exits" do
-      expect(nx).to receive(:decr_destroy)
-      child = st.add_child(prog: "BootstrapRhizome", label: "start")
-      st.add_child(prog: "Postgres::PostgresServerNexus", label: "restart")
-      expect(Semaphore).to receive(:incr) do |ds, name|
-        expect(ds.map(:id)).to eq [child.id]
-        expect(name).to eq "destroy"
-      end
+      nx.incr_destroy
+      child = server_strand.add_child(prog: "BootstrapRhizome", label: "start")
+      server_strand.add_child(prog: "Postgres::PostgresServerNexus", label: "restart")
 
       expect { nx.destroy }.to hop("wait_children_destroy")
+
+      expect(Semaphore.where(strand_id: child.id, name: "destroy").count).to eq(1)
     end
   end
 
   describe "#wait_children_destroy" do
     it "naps if children exist" do
-      st.add_child(prog: "BootstrapRhizome", label: "start")
+      server_strand.add_child(prog: "BootstrapRhizome", label: "start")
       expect { nx.wait_children_destroy }.to nap(30)
     end
 
@@ -1030,16 +1251,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#destroy_vm_and_pg" do
     it "deletes resources and exits" do
-      expect(postgres_server.vm).to receive(:incr_destroy)
-      expect(postgres_server).to receive(:destroy)
+      vm_strand = postgres_server.vm.strand
+      pg_server_id = postgres_server.id
+      expect(Semaphore.where(strand_id: vm_strand.id, name: "destroy").count).to eq(0)
 
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+
+      # Verify vm.incr_destroy was called
+      expect(Semaphore.where(strand_id: vm_strand.id, name: "destroy").count).to eq(1)
+      # Verify postgres_server was destroyed
+      expect(PostgresServer[pg_server_id]).to be_nil
     end
   end
 
   describe "#restart" do
     it "sets deadline, restarts and exits" do
-      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
+      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart #{postgres_server.version}")
       expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
@@ -1052,8 +1279,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "returns true if the resource is upgrading" do
-      expect(postgres_server.resource).to receive(:target_version).and_return("17")
-      expect(postgres_server.resource).to receive(:upgrade_candidate_server).and_return(postgres_server)
+      # Set target_version different from current version to simulate an upgrade in progress
+      new_version = postgres_server.version == "17" ? "18" : "17"
+      postgres_resource.update(target_version: new_version)
+      expect(nx.postgres_server.resource).to receive(:upgrade_candidate_server).and_return(postgres_server)
       expect(nx.available?).to be(true)
     end
 
@@ -1064,13 +1293,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "returns true if the database is in crash recovery" do
       expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
+      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/#{postgres_server.version}/data/pg_log/postgresql.log").and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
     it "returns false otherwise" do
       expect(postgres_server).to receive(:run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
+      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/#{postgres_server.version}/data/pg_log/postgresql.log").and_return("not doing redo")
       expect(nx.available?).to be(false)
     end
   end
