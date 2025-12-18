@@ -88,9 +88,10 @@ jobs:
             -w /app                      \
             ruby:3.4.7-alpine3.21        \
             sh -c '
+              bundle config set path vendor/bundle &&
+              bundle install --jobs 4 --retry 3 &&
               bundle exec rake
             '
-
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
 
