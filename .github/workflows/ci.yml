@@ -84,7 +84,8 @@ jobs:
           build-base \
           ruby-dev \
           linux-headers \
-          postgresql-dev
+          postgresql-dev \
+          libffi-dev
         WORKDIR /app
         EOF
 
