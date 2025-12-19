@@ -75,8 +75,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def trigger_test_runs
     test_runs.each do |test_run|
-      unless trigger_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
+      unless (response = trigger_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"]))
+        puts "===== Issue: #{response.inspect}"
+        puts response
+        puts client.last_response.inspect
+        puts client.last_response
+        update_stack({"fail_message" => "1 Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
         hop_clean_resources
       end
     end
@@ -92,10 +96,12 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   label def check_test_runs
     test_runs.each do |test_run|
       latest_run = latest_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
-
+      puts "===== Latest run: #{latest_run.inspect}"
+      puts latest_run
+      puts "===== Frame created at: #{frame["created_at"]}"
       # In case the run can not be triggered in the previous state
       if latest_run[:created_at] < Time.parse(frame["created_at"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
+        update_stack({"fail_message" => "2 Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
         break
       end
 
