@@ -88,7 +88,7 @@ jobs:
             -w /app                      \
             ruby:3.4.7-alpine3.21        \
             sh -c '
-              apk add --no-cache build-base ruby-dev linux-headers postgresql-dev
+              sudo apk add --no-cache build-base ruby-dev linux-headers postgresql-dev
               bundle config set path vendor/bundle &&
               bundle install --jobs 4 --retry 3 &&
               bundle exec rake
