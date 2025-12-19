@@ -55,14 +55,14 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
-  def create_postgres_resource(name, **overrides)
+  def create_postgres_resource(name, **)
     PostgresResource.create(
       name:, project:, location:,
       ha_type: PostgresResource::HaType::NONE,
       user_config: {}, pgbouncer_user_config: {},
       target_version: "16", target_vm_size: "standard-2", target_storage_size_gib: 64,
       superuser_password: "super",
-      **overrides
+      **
     )
   end
 
