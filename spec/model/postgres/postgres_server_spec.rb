@@ -56,20 +56,25 @@ RSpec.describe PostgresServer do
   end
 
   def create_postgres_resource(name, **overrides)
-    PostgresResource.create({
+    PostgresResource.create(
       name:, project:, location:,
       ha_type: PostgresResource::HaType::NONE,
       user_config: {}, pgbouncer_user_config: {},
       target_version: "16", target_vm_size: "standard-2", target_storage_size_gib: 64,
-      superuser_password: "super"
-    }.merge(overrides))
+      superuser_password: "super",
+      **overrides
+    )
+  end
+
+  def add_data_volume(target_vm = vm, size_gib: 64)
+    VmStorageVolume.create(vm: target_vm, disk_index: 0, boot: false, size_gib:)
   end
 
   def create_failover_server(prefix:, label:, vm_size: "standard-2")
     server_vm = create_hosted_vm(project, private_subnet, "#{prefix}-#{SecureRandom.hex(4)}")
     family, vcpus = vm_size.split("-")
     server_vm.update(family:, vcpus: vcpus.to_i, arch: "x64", cpu_percent_limit: nil)
-    VmStorageVolume.create(vm: server_vm, disk_index: 0, boot: false, size_gib: 64)
+    add_data_volume(server_vm)
     server = described_class.create(
       timeline:, resource:, vm_id: server_vm.id,
       synchronization_status: "ready", timeline_access: "fetch", version: "16"
@@ -198,7 +203,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true only when failover is successfully triggered" do
-      VmStorageVolume.create(vm:, disk_index: 0, boot: false, size_gib: 64)
+      add_data_volume
       standby = create_failover_server(prefix: "standby", label: "wait")
       stub_current_lsn(standby.id => "0/0")
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
@@ -220,7 +225,7 @@ RSpec.describe PostgresServer do
   describe "#failover_target" do
     before do
       postgres_server.update(representative_at: Time.now)
-      VmStorageVolume.create(vm:, disk_index: 0, boot: false, size_gib: 64)
+      add_data_volume
     end
 
     it "returns nil if there is no standby" do
@@ -299,7 +304,7 @@ RSpec.describe PostgresServer do
 
   describe "storage_size_gib" do
     it "returns the storage size in GiB" do
-      VmStorageVolume.create(vm:, disk_index: 0, boot: false, size_gib: 64)
+      add_data_volume
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
