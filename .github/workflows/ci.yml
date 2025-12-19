@@ -81,6 +81,7 @@ jobs:
         cat > Dockerfile.alpine-test <<'EOF'
         FROM ruby:3.4.7-alpine3.21
         RUN apk add --no-cache \
+          bash \
           build-base \
           ruby-dev \
           linux-headers \
