@@ -90,20 +90,21 @@ jobs:
 
     - name: Run controlplane tests in Alpine container
       run: |
-          HOST_UID=$(id -u runner)
-          HOST_GID=$(id -g runner)
+        HOST_UID=$(id -u runner)
+        HOST_GID=$(id -g runner)
 
-          docker run --rm                \
-            -u "${HOST_UID}:${HOST_GID}" \
-            --network=host               \
-            -v "$PWD:/app"               \
-            -w /app                      \
-            ruby:3.4.7-alpine3.21        \
-            sh -c '
-              bundle config set path vendor/bundle &&
-              bundle install --jobs 4 --retry 3 &&
-              bundle exec rake
-            '
+        docker run --rm \
+          -u "${HOST_UID}:${HOST_GID}" \
+          --network=host \
+          -v /var/run/postgresql:/var/run/postgresql \
+          -v "$PWD:/app" \
+          -w /app \
+          clover-ruby-alpine-test \
+          sh -c '
+            bundle config set path vendor/bundle &&
+            bundle install --jobs 4 --retry 3 &&
+            bundle exec rake
+          '
     - name: Run dataplane tests
       run: bundle exec rake rhizome_spec
 
