@@ -76,6 +76,18 @@ jobs:
     - name: Run controlplane tests
       run: bundle exec rake
 
+    - name: Build Alpine test image
+      run: |
+        cat > Dockerfile.alpine-test <<'EOF'
+        FROM ruby:3.4.7-alpine3.21
+        RUN apk add --no-cache \
+          build-base \
+          ruby-dev \
+          linux-headers \
+          postgresql-dev
+        WORKDIR /app
+        EOF
+
     - name: Run controlplane tests in Alpine container
       run: |
           HOST_UID=$(id -u runner)
@@ -88,7 +100,6 @@ jobs:
             -w /app                      \
             ruby:3.4.7-alpine3.21        \
             sh -c '
-              sudo apk add --no-cache build-base ruby-dev linux-headers postgresql-dev
               bundle config set path vendor/bundle &&
               bundle install --jobs 4 --retry 3 &&
               bundle exec rake
