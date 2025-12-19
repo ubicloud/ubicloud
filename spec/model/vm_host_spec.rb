@@ -407,6 +407,7 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
+    allow(session[:ssh_session]).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
     expect(host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
@@ -515,6 +516,7 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo nvme smart-log /dev/nvme0n1 | grep \"critical_warning\" | awk '{print $3}'").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("0\n", 0))
     expect(vh).to receive(:check_storage_read_write).and_return(true)
     expect(vh).to receive(:check_storage_kernel_logs).and_return(true)
+    expect(vh).to receive(:check_clock_source).and_return(true)
     expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
@@ -550,6 +552,27 @@ RSpec.describe VmHost do
   it "#render_arch errors on an unexpected architecture" do
     expect(vh).to receive(:arch).and_return("nope")
     expect { vh.render_arch(arm64: "a", x64: "x") }.to raise_error RuntimeError, "BUG: inexhaustive render code"
+  end
+
+  describe "#check_clock_source" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+
+    it "succeeds if arm64 machine uses arch_sys_counter" do
+      vh.arch = "arm64"
+      expect(session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("arch_sys_counter", 0))
+      expect(vh.check_clock_source(session)).to be true
+    end
+
+    it "succeeds if it uses tsc" do
+      expect(session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("tsc hpet acpi_pm \n", 0))
+      expect(vh.check_clock_source(session)).to be true
+    end
+
+    it "fails if it uses hpet" do
+      expect(session).to receive(:_exec!).with("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("hpet acpi_pm \n", 0))
+      expect(Clog).to receive(:emit).with("unexpected clock source", Hash).and_call_original
+      expect(vh.check_clock_source(session)).to be false
+    end
   end
 
   describe "#check_last_boot_id" do

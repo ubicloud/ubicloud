@@ -348,6 +348,18 @@ class VmHost < Sequel::Model
     error_count.empty?
   end
 
+  def check_clock_source(ssh_session)
+    clock_source = ssh_session.exec!("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").strip
+    clock_status = if arch == "arm64"
+      clock_source == "arch_sys_counter"
+    else
+      clock_source.start_with?("tsc")
+    end
+
+    Clog.emit("unexpected clock source", {unexpected_clock_source: {vm_host_ubid: ubid, clock_source:}}) unless clock_status
+    clock_status
+  end
+
   def check_last_boot_id(ssh_session)
     boot_id = ssh_session.exec!("cat /proc/sys/kernel/random/boot_id")
     fail "Failed to exec on session: #{boot_id}" unless boot_id.exitstatus.zero?
@@ -386,7 +398,8 @@ class VmHost < Sequel::Model
     check_storage_smartctl(ssh_session, device_names) &&
       check_storage_nvme(ssh_session, device_names) &&
       check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
-      check_storage_kernel_logs(ssh_session, device_names)
+      check_storage_kernel_logs(ssh_session, device_names) &&
+      check_clock_source(ssh_session)
   end
 
   def check_pulse(session:, previous_pulse:)
