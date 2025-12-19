@@ -88,6 +88,8 @@ jobs:
         WORKDIR /app
         EOF
 
+        docker build -t clover-ruby-alpine-test -f Dockerfile.alpine-test .
+
     - name: Run controlplane tests in Alpine container
       run: |
         HOST_UID=$(id -u runner)
