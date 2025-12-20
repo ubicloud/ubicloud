@@ -17,7 +17,7 @@ class Clover
         r.redirect installation, "/runner"
       end
 
-      unless (@project = project = Project[session.delete("github_installation_project_id")])
+      unless (@project = project = current_account.projects_dataset.with_pk(session.delete("github_installation_project_id")))
         flash["error"] = "You should initiate the GitHub App installation request from the project's GitHub runner integration page."
         Clog.emit("GitHub callback failed due to lack of project in the session") { {installation_failed: {id: installation_id, account_ubid: current_account.ubid}} }
         r.redirect "/project"
