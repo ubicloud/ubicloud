@@ -21,13 +21,8 @@ class Clover
 
       begin
         DB.transaction do
-          hash = ProjectDiscountCode.dataset.returning.insert(
-            id: ProjectDiscountCode.generate_uuid,
-            project_id: @project.id,
-            discount_code_id: discount.id
-          ).first
           @project.this.update(credit: Sequel[:credit] + discount.credit_amount.to_f)
-          audit_log(ProjectDiscountCode.call(hash), "create")
+          audit_log(@project.insert_project_discount_code(discount), "create")
         end
       rescue Sequel::UniqueConstraintViolation
         raise_web_error("Discount code has already been applied to this project.")
