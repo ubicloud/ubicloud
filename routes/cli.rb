@@ -12,7 +12,7 @@ class Clover
         next "! Invalid request: No or invalid argv parameter provided\n"
       end
 
-      project_id = env["clover.project_id"] = ApiKey.where(id: rodauth.session["pat_id"]).get(:project_id)
+      project_id = env["clover.project_id"] = ApiKey.project_id_for_personal_access_token(rodauth.session["pat_id"])
       env["clover.project_ubid"] = UBID.from_uuidish(project_id).to_s
       r.halt UbiCli.process(argv, env)
     end

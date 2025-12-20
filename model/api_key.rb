@@ -23,6 +23,10 @@ class ApiKey < Sequel::Model
     create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
   end
 
+  def self.project_id_for_personal_access_token(id)
+    where(id:).get(:project_id)
+  end
+
   def before_validation
     if new?
       self.key ||= ApiKey.random_key
