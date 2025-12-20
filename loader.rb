@@ -146,6 +146,8 @@ if force_autoload
       TYPE2CLASS[str[..1]]
     end
   end
+
+  Clover.models_loaded
 end
 
 case Config.mail_driver
