@@ -172,9 +172,7 @@ class Clover
   end
 
   def postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
-      .or(provider: "aws", project_id: nil)
-      .all + @project.locations
+    Location.postgres_locations + @project.locations
   end
 
   def validate_postgres_input(name, postgres_params)
