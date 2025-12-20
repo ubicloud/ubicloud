@@ -17,6 +17,9 @@ class GithubRepository < Sequel::Model
   dataset_module Pagination
 
   CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
+  def self.cache_size_limit
+    CACHE_SIZE_LIMIT
+  end
 
   alias_method :bucket_name, :ubid
 
