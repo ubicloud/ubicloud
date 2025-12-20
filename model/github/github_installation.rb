@@ -6,6 +6,7 @@ class GithubInstallation < Sequel::Model
   many_to_one :project
   one_to_many :runners, key: :installation_id, class: :GithubRunner
   one_to_many :repositories, key: :installation_id, class: :GithubRepository
+  one_to_many :custom_labels, class: :GithubCustomLabel, key: :installation_id, read_only: true
   many_to_many :cache_entries, join_table: :github_repository, right_key: :id, right_primary_key: :repository_id, left_key: :installation_id, class: :GithubCacheEntry
 
   plugin ResourceMethods
