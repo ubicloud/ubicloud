@@ -20,7 +20,7 @@ class Clover
           email = typecast_params.nonempty_str!("email")
           handle_validation_failure("project/user")
 
-          if ProjectInvitation[project_id: @project.id, email: email]
+          if @project.invitations_dataset.first(email:)
             raise_web_error("'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
             raise_web_error("You can't have more than 50 pending invitations.")
@@ -235,7 +235,7 @@ class Clover
                     ace = AccessControlEntry.new(project_id: @project.id)
                     audit_action = "create"
                   else
-                    next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
+                    next unless (ace = @project.access_control_entries_dataset.with_pk(UBID.to_uuid(ubid)))
                     check_ace_subject(ace.subject_id)
                     if deleted == "true"
                       ace.destroy

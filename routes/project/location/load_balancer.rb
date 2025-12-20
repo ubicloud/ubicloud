@@ -19,7 +19,7 @@ class Clover
       end
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])
-      @lb = lb = LoadBalancer.first(filter)
+      @lb = lb = @project.load_balancers_dataset.first(filter)
 
       check_found_object(lb)
 

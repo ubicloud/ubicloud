@@ -7,12 +7,12 @@ connectable_subnets = @ps.project
   .exclude(id: @ps.id)
   .exclude(id: connected_subnet_ids)
 connectable_subnets = dataset_authorize(connectable_subnets, "PrivateSubnet:connect").all
-connected_subnet_ds = PrivateSubnet.where(id: connected_subnet_ids)
+connected_subnet_ds = @project.private_subnets_dataset.where(id: connected_subnet_ids)
 supports_disconnect = has_permission?("PrivateSubnet:disconnect", @ps.id)
 
 @ps.firewalls(eager: :location)
 perm_checks = {
-  "Firewall:view" => Firewall.where(id: @ps.firewalls.map(&:id)),
+  "Firewall:view" => @project.firewalls_dataset.where(id: @ps.firewalls.map(&:id)),
   "PrivateSubnet:view" => connected_subnet_ds,
   "PrivateSubnet:disconnect" => connected_subnet_ds
 }

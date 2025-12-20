@@ -1,7 +1,7 @@
 <% 
 @vm.firewalls(eager: [:firewall_rules, :location])
 viewable_fws =
-  dataset_authorize(Firewall.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
+  dataset_authorize(@project.firewalls_dataset.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
     .select_hash(:id, Sequel.as(true, :v))
     .transform_keys! { UBID.from_uuidish(it).to_s } %>
 

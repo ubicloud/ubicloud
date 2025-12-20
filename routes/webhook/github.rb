@@ -92,8 +92,7 @@ class Clover
       return error("A workflow_job without runner_id")
     end
 
-    runner = GithubRunner.first(
-      installation_id: installation.id,
+    runner = installation.runners_dataset.first(
       repository_name:,
       runner_id:
     )
