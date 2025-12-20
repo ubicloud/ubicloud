@@ -16,7 +16,9 @@ class GithubRepository < Sequel::Model
   plugin SemaphoreMethods, :destroy
   dataset_module Pagination
 
-  CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
+  def self.cache_size_limit
+    10_737_418_240 # 10GB
+  end
 
   alias_method :bucket_name, :ubid
 
