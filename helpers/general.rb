@@ -180,7 +180,7 @@ class Clover < Roda
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
     account.create_project_with_default_policy("Default")
-    ProjectInvitation.where(email: account.email).all do |inv|
+    account.invitations.each do |inv|
       account.add_project(inv.project)
       inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
       inv.destroy
