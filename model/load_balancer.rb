@@ -182,6 +182,10 @@ class LoadBalancer < Sequel::Model
     stack == Stack::IPV6 || stack == Stack::DUAL
   end
 
+  def self.stack_options
+    [Stack::IPV4, Stack::IPV6, Stack::DUAL].freeze
+  end
+
   module Stack
     IPV4 = "ipv4"
     IPV6 = "ipv6"
