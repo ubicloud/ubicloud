@@ -104,7 +104,7 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
-          if size && size > GithubRepository::CACHE_SIZE_LIMIT
+          if size && size > GithubRepository.cache_size_limit
             fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
           end
 
@@ -147,8 +147,8 @@ class Clover
 
           # If size is not provided, it means that the client doesn't
           # let us know the size of the cache. In this case, we use the
-          # GithubRepository::CACHE_SIZE_LIMIT as the size.
-          size ||= GithubRepository::CACHE_SIZE_LIMIT
+          # GithubRepository.cache_size_limit as the size.
+          size ||= GithubRepository.cache_size_limit
 
           max_chunk_size = 32 * 1024 * 1024 # 32MB
           presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
