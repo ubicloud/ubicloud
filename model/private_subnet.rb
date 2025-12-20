@@ -40,6 +40,18 @@ class PrivateSubnet < Sequel::Model
       .all
   end
 
+  def attached_vms
+    vms_dataset
+      .association_join(:strand)
+      .exclude(label: "destroy")
+      .exclude(Sequel[:vm][:id] => Semaphore
+        .where(
+          strand_id: nics_dataset.select(:vm_id),
+          name: "destroy"
+        )
+        .select(:strand_id))
+  end
+
   def all_nics
     nics + connected_subnets.flat_map(&:nics)
   end
