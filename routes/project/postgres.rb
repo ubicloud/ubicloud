@@ -10,7 +10,9 @@ class Clover
     r.web do
       r.post true do
         handle_validation_failure("postgres/create")
-        @location ||= Location[typecast_params.ubid_uuid("location")]
+        # Skip security check to allow this, as Postgres resources perform their
+        # own location validation based on option trees.
+        @location ||= ::Location[typecast_params.ubid_uuid("location")]
         postgres_post(typecast_params.nonempty_str("name"))
       end
 
