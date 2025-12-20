@@ -489,11 +489,11 @@ Done in 767ms.
 After that, start up the web server.
 
 ```sh
-$ bundle exec rackup
+$ bundle exec puma
 ```
 
 And then visiting [http://localhost:9292](http://localhost:9292), you can
-create an account. Check the rackup log for the verification link to navigate
+create an account. Check the puma log for the verification link to navigate
 to, in production, we would send that output as email. Having verified, log
 in. You'll see the "Getting Started" page.
 

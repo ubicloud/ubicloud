@@ -64,7 +64,6 @@ group :development do
   gem "cuprite"
   gem "foreman"
   gem "pry-byebug"
-  gem "rackup"
 end
 
 group :rubocop do
