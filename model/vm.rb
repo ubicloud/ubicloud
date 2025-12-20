@@ -22,6 +22,7 @@ class Vm < Sequel::Model
   many_to_one :location
   one_to_one :aws_instance, key: :id
   one_to_one :init_script, class: :VmInitScript, key: :id
+  one_to_one :github_runner
 
   many_through_many :private_subnet_firewalls,
     [
@@ -42,6 +43,10 @@ class Vm < Sequel::Model
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
+
+  def self.from_runtime_jwt_payload(jwt_payload)
+    jwt_payload && first(id: UBID.to_uuid(jwt_payload["sub"]))
+  end
 
   def display_location
     location.display_name

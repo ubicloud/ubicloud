@@ -973,7 +973,7 @@ class Clover < Roda
         response.json = true
         response.skip_content_security_policy!
 
-        unless (jwt_payload = get_runtime_jwt_payload) && (@vm = Vm[id: UBID.to_uuid(jwt_payload["sub"])])
+        unless (@vm = Vm.from_runtime_jwt_payload(get_runtime_jwt_payload))
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 

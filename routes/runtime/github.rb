@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:runtime_prefix, "github") do |r|
-    if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
+    if (runner = @vm.github_runner).nil? || (repository = runner.repository).nil?
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
 
