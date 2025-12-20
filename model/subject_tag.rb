@@ -14,6 +14,10 @@ class SubjectTag < Sequel::Model
     end
   end
 
+  def self.admin_tag?(id)
+    !where(id:, name: "Admin").empty?
+  end
+
   def self.subject_id_map_for_project_and_accounts(project_id, account_ids)
     DB[:applied_subject_tag]
       .join(:subject_tag, id: :tag_id)

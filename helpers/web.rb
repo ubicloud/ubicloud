@@ -194,7 +194,7 @@ class Clover < Roda
     # Do not allow modifiction or addition of an ace entry with the Admin subject,
     # which is reserved for full access.
     if UBID.uuid_class_match?(subject, ApiKey) ||
-        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag[subject].name == "Admin"
+        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag.admin_tag?(subject)
       raise Authorization::Unauthorized
     end
   end
