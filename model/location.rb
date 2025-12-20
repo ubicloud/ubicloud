@@ -33,6 +33,12 @@ class Location < Sequel::Model
     end
   end
 
+  def self.postgres_locations
+    where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
+      .or(provider: "aws", project_id: nil)
+      .all
+  end
+
   def visible_or_for_project?(proj_id, project_ff_visible_locations)
     (visible && project_id.nil?) || project_id == proj_id || project_ff_visible_locations&.include?(name)
   end
