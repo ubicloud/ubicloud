@@ -717,16 +717,9 @@ class Clover < Roda
           close_account_view
         end
       end
-      account = Account[account_id]
-      # Do not allow to close account if the project has resources and
+      # Do not allow closing account if the project has resources and
       # the account is the only user
-      projects_dataset = Project
-        .where(id: DB[:access_tag]
-          .select_group(:project_id)
-          .where(project_id: account.projects_dataset.select(Sequel[:project][:id]))
-          .having(Sequel.function(:count).* => 1))
-
-      if (project = projects_dataset.first_project_with_resources)
+      if (project = Account[account_id].first_sole_project_with_resources)
         fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end

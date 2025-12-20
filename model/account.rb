@@ -40,6 +40,15 @@ class Account < Sequel::Model(:accounts)
     project
   end
 
+  def first_sole_project_with_resources
+    Project
+      .where(id: DB[:access_tag]
+        .select_group(:project_id)
+        .where(project_id: projects_dataset.select(Sequel[:project][:id]))
+        .having(Sequel.function(:count).* => 1))
+      .first_project_with_resources
+  end
+
   def suspend
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
