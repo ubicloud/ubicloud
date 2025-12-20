@@ -32,6 +32,7 @@ class Project < Sequel::Model
   one_to_many :invitations, class: :ProjectInvitation
   one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
   one_to_many :locations
+  many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true
 
   dataset_module Pagination
 
