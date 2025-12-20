@@ -64,7 +64,7 @@ class Clover
 
     if (label = job_labels.find { Github.runner_labels.key?(it) })
       actual_label = label
-    elsif (custom_label = GithubCustomLabel.first(installation_id: installation.id, name: job_labels))
+    elsif (custom_label = installation.custom_labels_dataset.first(name: job_labels))
       actual_label = custom_label.name
       label = custom_label.alias_for
     end
