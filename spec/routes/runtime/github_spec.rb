@@ -37,7 +37,7 @@ RSpec.describe Clover, "github" do
     vm = create_vm
     login_runtime(vm)
     repository = instance_double(GithubRepository, access_key: nil)
-    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(instance_double(GithubRunner, repository: repository))
+    expect(Vm).to receive(:from_runtime_jwt_payload).and_return(instance_double(Vm, github_runner: instance_double(GithubRunner, repository: repository)))
     expect(repository).to receive(:setup_blob_storage)
 
     post "/runtime/github/caches"
@@ -50,7 +50,7 @@ RSpec.describe Clover, "github" do
     login_runtime(vm)
     repository = instance_double(GithubRepository, access_key: nil)
     runner = instance_double(GithubRunner, repository: repository)
-    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(runner)
+    expect(Vm).to receive(:from_runtime_jwt_payload).and_return(instance_double(Vm, github_runner: runner))
     expect(runner).to receive(:ubid).and_return(nil)
     expect(repository).to receive(:ubid).and_return(nil)
     expect(repository).to receive(:setup_blob_storage).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
