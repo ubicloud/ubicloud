@@ -76,14 +76,13 @@ class Clover
     end
 
     if data["action"] == "queued"
-      st = Prog::Github::GithubRunnerNexus.assemble(
+      runner = Prog::Github::GithubRunnerNexus.assemble(
         installation,
         repository_name:,
         label:,
         actual_label:,
         default_branch: data["repository"]["default_branch"]
-      )
-      runner = GithubRunner[st.id]
+      ).subject
 
       return success("GithubRunner[#{runner.ubid}] created")
     end
