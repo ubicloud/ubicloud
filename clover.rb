@@ -920,6 +920,14 @@ class Clover < Roda
       session.delete("last_password_entry")
       ""
     end
+
+    hash_branch("set_github_installation_project_id") do |r|
+      r.get :ubid_uuid do |id|
+        no_authorization_needed
+        session["github_installation_project_id"] = id
+        ""
+      end
+    end
   end
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
