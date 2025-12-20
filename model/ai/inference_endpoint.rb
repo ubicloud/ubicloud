@@ -11,6 +11,9 @@ class InferenceEndpoint < Sequel::Model
   many_to_one :location, key: :location_id, class: :Location
 
   dataset_module Pagination
+  dataset_module do
+    where :is_public, :is_public
+  end
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :maintenance
