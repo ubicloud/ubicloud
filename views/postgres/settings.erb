@@ -19,10 +19,7 @@
                     "components/form/select",
                     name: "maintenance_window_start_at",
                     placeholder: "No Maintenance Window",
-                    options:
-                      (0..23).map do
-                        [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + PostgresResource::MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
-                      end,
+                    options: PostgresResource.maintenance_hour_options,
                     label: "Maintenance Window:",
                     selected: @pg.maintenance_window_start_at
                   ) %>

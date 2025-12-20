@@ -24,6 +24,10 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
   include ObjectTag::Cleanup
 
+  def self.available_flavors(include_lantern: false)
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !include_lantern }
+  end
+
   def display_location
     location.display_name
   end
@@ -213,16 +217,42 @@ class PostgresResource < Sequel::Model
     SYNC = "sync"
   end
 
+  def self.ha_type_none
+    HaType::NONE
+  end
+
   module Flavor
     STANDARD = "standard"
     PARADEDB = "paradedb"
     LANTERN = "lantern"
   end
 
+  def self.default_flavor
+    Flavor::STANDARD
+  end
+
+  def self.partner_notification_flavors
+    [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN]
+  end
+
+  def requires_partner_notification_email?
+    self.class.partner_notification_flavors.include?(flavor)
+  end
+
   DEFAULT_VERSION = "17"
   LATEST_VERSION = "18"
 
+  def self.default_version
+    DEFAULT_VERSION
+  end
+
   MAINTENANCE_DURATION_IN_HOURS = 2
+
+  def self.maintenance_hour_options
+    Array.new(24) do
+      [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
 
   UPGRADE_IMAGE_MIN_VERSIONS = {
     "17" => "20240801",

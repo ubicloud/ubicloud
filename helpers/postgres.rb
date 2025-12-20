@@ -5,11 +5,11 @@ class Clover
     authorize("Postgres:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
+    flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size")
     storage_size = typecast_params.pos_int("storage_size")
-    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
-    version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
+    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
+    version = typecast_params.nonempty_str("version", PostgresResource.default_version)
     user_config = typecast_params.Hash("pg_config", {})
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
@@ -99,7 +99,7 @@ class Clover
   end
 
   def send_notification_mail_to_partners(resource, user_email)
-    if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
+    if resource.requires_partner_notification_email? && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
       Util.send_email(email, "New #{flavor_name} Postgres database has been created.",
         greeting: "Hello #{flavor_name} team,",
@@ -122,7 +122,7 @@ class Clover
     options.add_option(name: "flavor", values: flavor || postgres_flavors.keys)
 
     options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
-      flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
+      flavor == PostgresResource.default_flavor || location.provider != "aws"
     end
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
@@ -160,7 +160,7 @@ class Clover
   end
 
   def postgres_flavors
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k, _| k == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+    PostgresResource.available_flavors(include_lantern: @project.get_ff_postgres_lantern)
   end
 
   def postgres_require_customer_firewall!

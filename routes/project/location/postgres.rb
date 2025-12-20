@@ -257,7 +257,7 @@ class Clover
             name:,
             target_vm_size: pg.target_vm_size,
             target_storage_size_gib: pg.target_storage_size_gib,
-            ha_type: PostgresResource::HaType::NONE,
+            ha_type: PostgresResource.ha_type_none,
             target_version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,
