@@ -1,6 +1,7 @@
 <%
-  @flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
-  @flavor = PostgresResource::Flavor::STANDARD unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
+  default_flavor = PostgresResource.default_flavor
+  @flavor = typecast_params.nonempty_str("flavor", default_flavor)
+  @flavor = default_flavor unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
   effective_quota = @project.effective_quota_value("PostgresVCpu")
@@ -9,7 +10,7 @@
   @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
 
   @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
-  logo = nil if @flavor == PostgresResource::Flavor::STANDARD
+  logo = nil if @flavor == default_flavor
 %>
 
 <%== render("components/billing_warning") %>
@@ -49,7 +50,7 @@
     {name: "ha_type", type: "radio_small_cards", label: "High Availability", required: "required", content_generator: ContentGenerator::Postgres.method(:ha_type)},
   ]
 
-  if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(@flavor)
+  if PostgresResource.partner_notification_flavors.include?(@flavor)
     form_elements << {name: "partnership_notice", type: "partnership_notice", label: "Partnership Notice", required: "required", content_generator: ContentGenerator::Postgres.method(:partnership_notice)}
   end
 

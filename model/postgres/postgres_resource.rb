@@ -213,16 +213,42 @@ class PostgresResource < Sequel::Model
     SYNC = "sync"
   end
 
+  def self.ha_type_none
+    HaType::NONE
+  end
+
   module Flavor
     STANDARD = "standard"
     PARADEDB = "paradedb"
     LANTERN = "lantern"
   end
 
+  def self.default_flavor
+    Flavor::STANDARD
+  end
+
+  def self.partner_notification_flavors
+    [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN]
+  end
+
+  def requires_partner_notification_email?
+    self.class.partner_notification_flavors.include?(flavor)
+  end
+
   DEFAULT_VERSION = "17"
   LATEST_VERSION = "18"
 
+  def self.default_version
+    DEFAULT_VERSION
+  end
+
   MAINTENANCE_DURATION_IN_HOURS = 2
+
+  def self.maintenance_hour_options
+    Array.new(24) do
+      [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
+    end
+  end
 
   UPGRADE_IMAGE_MIN_VERSIONS = {
     "17" => "20240801",
