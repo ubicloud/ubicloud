@@ -95,6 +95,15 @@ class Project < Sequel::Model
     RESOURCE_ASSOCIATION_DATASET_METHODS.any? { !send(it).empty? }
   end
 
+  def insert_project_discount_code(discount)
+    hash = ProjectDiscountCode.dataset.returning.insert(
+      id: ProjectDiscountCode.generate_uuid,
+      project_id: id,
+      discount_code_id: discount.id
+    ).first
+    ProjectDiscountCode.call(hash)
+  end
+
   def soft_delete
     DB.transaction do
       DB[:access_tag].where(project_id: id).delete
