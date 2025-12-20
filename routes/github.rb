@@ -9,7 +9,7 @@ class Clover
       setup_action = typecast_params.str("setup_action")
       code_response = Github.oauth_client.exchange_code_for_token(oauth_code)
 
-      if (installation = GithubInstallation[installation_id: installation_id])
+      if (installation = GithubInstallation.with_github_installation_id(installation_id))
         @project = installation.project
         authorize("Project:github", installation.project)
         flash["notice"] = "GitHub runner integration is already enabled for #{installation.project.name} project."

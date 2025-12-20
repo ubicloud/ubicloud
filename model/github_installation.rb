@@ -12,6 +12,10 @@ class GithubInstallation < Sequel::Model
   plugin ResourceMethods
   dataset_module Pagination
 
+  def self.with_github_installation_id(installation_id)
+    first(installation_id:)
+  end
+
   def total_active_runner_vcpus
     runners_dataset.total_active_runner_vcpus
   end

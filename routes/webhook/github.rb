@@ -37,7 +37,7 @@ class Clover
   end
 
   def handle_installation(data)
-    installation = GithubInstallation[installation_id: data["installation"]["id"]]
+    installation = GithubInstallation.with_github_installation_id(data["installation"]["id"])
     case data["action"]
     when "deleted"
       return error("Unregistered installation") unless installation
@@ -51,7 +51,7 @@ class Clover
   end
 
   def handle_workflow_job(data)
-    unless (installation = GithubInstallation[installation_id: data["installation"]["id"]])
+    unless (installation = GithubInstallation.with_github_installation_id(data["installation"]["id"]))
       return error("Unregistered installation")
     end
 
