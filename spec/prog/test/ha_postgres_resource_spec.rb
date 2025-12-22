@@ -147,6 +147,18 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
     end
 
+    it "logs that no primary was found after failover" do
+      refresh_frame(pgr_test, new_values: {"primary_ubid" => pgr_test.postgres_resource.representative_server.ubid})
+      allow(pgr_test.representative_server).to receive(:run_query).and_return("")
+      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
+      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
+      expect(Clog).to receive(:emit).with(/Postgres servers after failover: .*/).once.ordered
+      expect(Clog).to receive(:emit).with("No new primary found after failover").once.ordered
+      expect(Clog).to receive(:emit).with("Running read queries after failover").once.ordered
+
+      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
+    end
+
     it "hops to destroy_postgres if the standby does not exit read-only mode" do
       allow(pgr_test.representative_server).to receive(:run_query).and_return("4159.90\n415.99\n4.1", "")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
