@@ -911,6 +911,18 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/upgrade"
         expect(page).to have_content "Your database is already on the latest version."
       end
+
+      it "shows correct error page if upgrade validation fails" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page.title).to eq "Ubicloud - pg-with-permission"
+
+        pg.update(target_version: "18")
+        click_button "Start Upgrade"
+        expect(page).to have_flash_error "Validation failed for following fields: needs_convergence"
+        expect(page).to have_text "Database cluster is waiting for convergence, please wait for it to complete"
+        expect(page).to have_current_path "#{project.path}#{pg.path}/upgrade", ignore_query: true
+      end
     end
   end
 end
