@@ -21,7 +21,6 @@ end
 # Columns:
 #  id                           | uuid                     | PRIMARY KEY
 #  created_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  updated_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  model_name                   | text                     | NOT NULL
 #  tags                         | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  visible                      | boolean                  | NOT NULL DEFAULT false
