@@ -43,6 +43,10 @@ end %>
 <div class="p-6">
   <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">Upgrade</h3>
 
+  <% flash["errors"]&.each_value do |msg| %>
+    <p class="text-red-900 mt-2"><%= msg %></p>
+  <% end %>
+
   <% if @pg.display_state == "creating" %>
     <p class="text-gray-500 mt-2">Upgrade operation is not available while the database is being created.</p>
   <% elsif @pg.target_version != @pg.version %>
