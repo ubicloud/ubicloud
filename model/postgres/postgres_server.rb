@@ -330,7 +330,6 @@ end
 # Columns:
 #  id                     | uuid                     | PRIMARY KEY
 #  created_at             | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at             | timestamp with time zone | NOT NULL DEFAULT now()
 #  resource_id            | uuid                     | NOT NULL
 #  vm_id                  | uuid                     |
 #  timeline_id            | uuid                     | NOT NULL

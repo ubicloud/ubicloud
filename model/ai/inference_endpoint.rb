@@ -57,7 +57,6 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  is_public         | boolean                  | NOT NULL DEFAULT false
 #  visible           | boolean                  | NOT NULL DEFAULT true
 #  boot_image        | text                     | NOT NULL
