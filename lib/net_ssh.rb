@@ -25,15 +25,22 @@ module NetSsh
 
       if command.frozen?
         unless kw.empty?
-          command = Sequel.lit(command, kw.to_h do |k, v|
-            v = if k.start_with?("shelljoin_")
-              v.shelljoin
-            else
-              v.to_s.shellescape
+          re = /:(#{Regexp.union(kw.keys.map(&:to_s))})\b/
+          result = +""
+          until command.empty?
+            pre, _, command = command.partition(re)
+            q = $1
+            result << pre
+            if q && !q.empty?
+              v = kw[q.to_sym]
+              result << if q.start_with?("shelljoin_")
+                v.shelljoin
+              else
+                v.to_s.shellescape
+              end
             end
-            [k, Sequel.lit(v)]
-          end)
-          command = DB.literal(command).freeze
+          end
+          command = result.freeze
         end
       else
         raise PotentialInsecurity, "Interpolated string passed to #{klass}##{method} at #{caller(2, 1).first}\nReplace interpolation with :placeholders and provide values for placeholders in keyword arguments."
