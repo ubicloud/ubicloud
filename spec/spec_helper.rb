@@ -320,6 +320,11 @@ RSpec.configure do |config|
       st.save_changes
       prog.instance_variable_set(:@frame, nil)
     end
+
+    def frame_value(prog, key)
+      prog.strand.reload
+      prog.strand.stack.first[key]
+    end
   end)
 end
 
