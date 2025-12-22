@@ -170,5 +170,6 @@ end
 #  kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  kubernetes_cluster_services_lb_id_fkey    | (services_lb_id) REFERENCES load_balancer(id)
 # Referenced By:
-#  kubernetes_node     | kubernetes_node_kubernetes_cluster_id_fkey     | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
-#  kubernetes_nodepool | kubernetes_nodepool_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_etcd_backup | kubernetes_etcd_backup_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_node        | kubernetes_node_kubernetes_cluster_id_fkey        | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_nodepool    | kubernetes_nodepool_kubernetes_cluster_id_fkey    | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
