@@ -173,21 +173,22 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
-    it "waits manual intervation if it's failed in production" do
-      expect(Config).to receive(:production?).and_return(true)
-      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
-      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
-      expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[\"#{vm_host.ubid}\"]"
-    end
-
-    it "retries downloading image if it is failed somewhere other than production" do
-      expect(Config).to receive(:production?).and_return(false)
+    it "retries downloading images if failed less than 10 times" do
       expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
       expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
-      expect { dbi.download }.to raise_error RuntimeError, "Failed to download 'my-image' image on VmHost[\"#{vm_host.ubid}\"]"
+      expect { dbi.download }.to nap(15)
+        .and change { dbi.strand.stack.first["restarted"] }.from(nil).to(1)
+    end
+
+    it "waits manual intervention if failed more than 10 times" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
+      refresh_frame(dbi, new_values: {"restarted" => 10})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(Clog).to receive(:emit).with("Failed to download boot image").and_call_original
+      expect { dbi.download }.to nap(15)
+        .and change(bi, :exists?).from(true).to(false)
     end
 
     it "waits for the download to complete" do

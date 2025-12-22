@@ -190,14 +190,16 @@ class Prog::DownloadBootImage < Prog::Base
       params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
     when "Failed"
-      sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
-      sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
-      if Config.production? && !Config.is_e2e
-        BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
-      else
+      restarted = frame["restarted"] || 0
+      if restarted < 10
+        sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
+        sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+        update_stack({"restarted" => restarted + 1})
+      else
+        vm_host.boot_images_dataset.where(name: image_name, version:).destroy
+        Clog.emit("Failed to download boot image") { {failed_boot_image_download: [vm_host, {image_name:, version:}]} }
       end
-      fail "Failed to download '#{image_name}' image on #{vm_host}"
     end
 
     nap 15
