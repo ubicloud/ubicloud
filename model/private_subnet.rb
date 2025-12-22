@@ -11,6 +11,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :load_balancers
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id
+  one_to_one :privatelink_aws_resource, key: :private_subnet_id
 
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
