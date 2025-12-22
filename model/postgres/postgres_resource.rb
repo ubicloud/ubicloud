@@ -234,7 +234,6 @@ end
 # Columns:
 #  id                          | uuid                     | PRIMARY KEY
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at                  | timestamp with time zone | NOT NULL DEFAULT now()
 #  project_id                  | uuid                     | NOT NULL
 #  name                        | text                     | NOT NULL
 #  target_vm_size              | text                     | NOT NULL
