@@ -70,6 +70,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def trigger_failover
+    Clog.emit("Postgres servers before failover: #{postgres_resource.servers.map { |s| "[#{s.ubid}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
     primary = postgres_resource.servers.find { it.timeline_access == "push" }
     update_stack({"primary_ubid" => primary.ubid})
     version = postgres_resource.version
@@ -93,11 +94,24 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def test_postgres_after_failover
+    Clog.emit("Postgres servers after failover: #{postgres_resource.servers.map { |s| "[#{s.ubid}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
+
+    new_candidate = postgres_resource.servers.filter { |s| s.ubid != frame["primary_ubid"] }.min_by(&:created_at)
+    if new_candidate
+      # Get last few log lines from the new candidate for debugging.
+      log_lines = new_candidate.vm.sshable.cmd("sudo tail -n 20 /dat/:version/data/pg_log/postgresql.log", version: new_candidate.version)
+      Clog.emit("Last log lines from new candidate (#{new_candidate.ubid}):\n#{log_lines}")
+    else
+      Clog.emit("No new primary found after failover")
+    end
+
+    Clog.emit("Running read queries after failover")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run read queries after failover"})
       hop_destroy_postgres
     end
 
+    Clog.emit("Running write queries after failover")
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run write queries after failover"})
     end
