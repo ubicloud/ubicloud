@@ -13,7 +13,7 @@
     "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch"
   },
   "engines": {
-    "node": "24.6.0",
-    "npm": "11.5.2"
+    "node": "24.12.0",
+    "npm": "11.6.2"
   }
 }
