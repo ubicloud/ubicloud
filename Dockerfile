@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24.6-alpine3.23 AS frontend-builder
+FROM docker.io/library/node:24.12-alpine3.23 AS frontend-builder
 WORKDIR /app
 COPY tailwind.config.js package.json package-lock.json ./
 COPY views/ ./views/
