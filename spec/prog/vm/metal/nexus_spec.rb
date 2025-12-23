@@ -61,7 +61,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "fails if location doesn't exist" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: nil)
-      }.to raise_error RuntimeError, "No existing location"
+      }.to raise_error RuntimeError, "No existing location in project"
     end
 
     it "creates Subnet and Nic if not passed" do
@@ -97,34 +97,34 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "fails if given nic_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "Given nic doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
+      }.to raise_error RuntimeError, "Given nic is not available in the given project or location or is assigned to an existing VM"
     end
 
     it "fails if given subnet_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, private_subnet_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-      }.to raise_error RuntimeError, "Given subnet doesn't exist with the id 0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
+      }.to raise_error RuntimeError, "Given subnet is not available in the given project"
     end
 
     it "fails if nic is assigned to a different vm" do
       nic.update(vm_id: vm.id)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is assigned to a VM already"
+      }.to raise_error RuntimeError, "Given nic is not available in the given project or location or is assigned to an existing VM"
     end
 
     it "fails if nic subnet is in another location" do
       private_subnet.update(location_id: Location::LEASEWEB_WDC02_ID)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is created in a different location"
+      }.to raise_error RuntimeError, "Given nic is not available in the given project or location or is assigned to an existing VM"
     end
 
     it "fails if subnet of nic belongs to another project" do
       private_subnet.update(project_id: Project.create(name: "project-2").id)
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: nic.id)
-      }.to raise_error RuntimeError, "Given nic is not available in the given project"
+      }.to raise_error RuntimeError, "Given nic is not available in the given project or location or is assigned to an existing VM"
     end
 
     it "fails if subnet belongs to another project" do
