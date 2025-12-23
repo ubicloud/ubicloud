@@ -58,7 +58,11 @@ KillUserProcesses=yes
 LOGIND
 
   label def setup
-    pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
+    if retval&.dig("msg") == "installed rhizome"
+      # Create rotator after rhizome is fully installed
+      Prog::SshKeyRotator.assemble(sshable.id)
+      pop "rhizome user bootstrapped and source installed"
+    end
 
     key_data = sshable.keys.map(&:private_key)
     Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"))

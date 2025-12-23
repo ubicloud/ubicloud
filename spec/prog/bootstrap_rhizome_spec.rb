@@ -94,7 +94,10 @@ FIXTURE
       expect { br.setup }.to hop("start", "InstallRhizome")
     end
 
-    it "exits once InstallRhizome has returned" do
+    it "creates rotator and exits once InstallRhizome has returned" do
+      sshable = create_mock_sshable
+      expect(br).to receive(:sshable).and_return(sshable)
+      expect(Prog::SshKeyRotator).to receive(:assemble).with(sshable.id)
       br.strand.retval = {"msg" => "installed rhizome"}
       expect { br.setup }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
     end
