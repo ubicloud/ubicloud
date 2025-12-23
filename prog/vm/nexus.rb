@@ -21,8 +21,8 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Cannot force and exclude the same host"
     end
 
-    unless (location = Location[location_id])
-      fail "No existing location"
+    unless (location = (allow_private_subnet_in_other_project ? Location : Location.for_project(project_id)).with_pk(location_id))
+      fail "No existing location in project"
     end
 
     vm_size = Validation.validate_vm_size(size, arch)
@@ -66,30 +66,21 @@ class Prog::Vm::Nexus < Prog::Base
       # - If the user did not provide nic_id but the private_subnet_id and that subnet exists
       # then we create a nic on that subnet.
       # - If the user provided neither nic_id nor private_subnet_id, that's OK, we create both.
-      nic = nil
-      subnet = if nic_id
-        nic = Nic[nic_id]
-        raise("Given nic doesn't exist with the id #{nic_id}") unless nic
-        raise("Given nic is assigned to a VM already") if nic.vm_id
-        raise("Given nic is created in a different location") if nic.private_subnet.location_id != location.id
-        raise("Given nic is not available in the given project") unless project.private_subnets.any? { |ps| ps.id == nic.private_subnet_id }
+      if nic_id
+        nic = project.nics_dataset
+          .where(location_id: location.id, vm_id: nil)
+          .with_pk(nic_id)
+        raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless nic
+      else
+        if private_subnet_id
+          subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
+            .with_pk(private_subnet_id)
 
-        nic.private_subnet
-      end
-
-      unless nic
-        subnet = if private_subnet_id
-          subnet = PrivateSubnet[private_subnet_id]
-          raise "Given subnet doesn't exist with the id #{private_subnet_id}" unless subnet
-          unless allow_private_subnet_in_other_project
-            raise "Given subnet is not available in the given project" unless project.private_subnets.any? { |ps| ps.id == subnet.id }
-          end
-
-          subnet
+          raise "Given subnet is not available in the given project" unless subnet
         elsif new_private_subnet_name
-          Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
+          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
         else
-          project.default_private_subnet(location)
+          subnet = project.default_private_subnet(location)
         end
         nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone).subject
       end

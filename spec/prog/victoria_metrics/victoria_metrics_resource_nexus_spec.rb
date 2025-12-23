@@ -81,6 +81,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       }.not_to raise_error
 
       private_location.update(project_id: victoria_metrics_project.id)
+      expect(Config).to receive(:victoria_metrics_service_project_id).and_return(victoria_metrics_project.id).at_least(:once)
       described_class.assemble(victoria_metrics_project.id, "vm-name", private_location.id, "admin", "standard-2", 128)
     end
   end
