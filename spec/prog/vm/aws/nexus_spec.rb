@@ -453,6 +453,61 @@ usermod -L ubuntu
       expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
       expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InsufficientInstanceCapacity)
     end
+
+    describe "when unsupported instance type error" do
+      let(:nic) { vm.nics.first }
+
+      before do
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported in availability zone"))
+        expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")])).at_least(:once)
+        nic.strand.stack.push({"exclude_availability_zones" => []})
+        NicAwsResource.create_with_id(nic, network_interface_id: "eni-0123456789abcdefg", subnet_az: "a")
+      end
+
+      it "retries by excluding the failed AZ on first failure" do
+        expect(Clog).to receive(:emit).with("unsupported instance type").and_call_original
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
+        expect(st.stack.last["retry_count"]).to eq(1)
+        expect(nic.reload.destroy_set?).to be true
+      end
+
+      it "increments retry count on subsequent failures" do
+        refresh_frame(nx, new_values: {"retry_count" => 2})
+        nic.strand.stack.first["exclude_availability_zones"] = ["b", "c"]
+        expect(Clog).to receive(:emit).with("unsupported instance type").and_call_original
+        expect(nx).to receive(:update_stack).with({
+          "exclude_availability_zones" => ["b", "c", "a"],
+          "retry_count" => 3
+        }).and_call_original
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      end
+
+      it "avoids duplicate AZs in exclusion list" do
+        nic.strand.stack.first["exclude_availability_zones"] = ["a", "b"]
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
+      end
+
+      it "raises exception after 5 retry attempts" do
+        refresh_frame(nx, new_values: {"retry_count" => 5})
+        expect(Clog).not_to receive(:emit).with("unsupported instance type")
+        expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::Unsupported)
+        expect(nic.reload.destroy_set?).to be false
+      end
+
+      it "logs retry count in emission" do
+        refresh_frame(nx, new_values: {"retry_count" => 3})
+        expect(Clog).to receive(:emit).with("unsupported instance type").and_wrap_original do |m, a, &b|
+          expect(b.call).to eq(unsupported_instance_type: {
+            vm:,
+            message: "Instance type not supported in availability zone",
+            retry_count: 4
+          })
+        end
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      end
+    end
   end
 
   describe "#wait_instance_created" do
@@ -481,6 +536,46 @@ usermod -L ubuntu
     it "naps if the instance is not running" do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
       expect { nx.wait_instance_created }.to nap(1)
+    end
+  end
+
+  describe "#wait_old_nic_deleted" do
+    let(:old_nic) { vm.nics.first }
+    let(:private_subnet_id) { old_nic.private_subnet_id }
+
+    before do
+      st.stack.first["private_subnet_id"] = private_subnet_id
+      st.stack.first["exclude_availability_zones"] = ["a", "b"]
+      nx.instance_variable_set(:@frame, nil) # Clear cached frame
+    end
+
+    it "naps if old NIC still exists" do
+      expect(vm.nic).not_to be_nil
+      expect { nx.wait_old_nic_deleted }.to nap(1)
+    end
+
+    it "creates new NIC and hops to wait_nic_recreated when old NIC is deleted" do
+      old_nic.update(vm_id: nil)
+      vm.reload
+
+      expect { nx.wait_old_nic_deleted }.to hop("wait_nic_recreated")
+      expect(vm.reload.nic.id).not_to eq(old_nic.id)
+      expect(vm.nic.strand.label).to eq("start")
+      expect(vm.nic.strand.stack.first["exclude_availability_zones"]).to eq(["a", "b"])
+    end
+  end
+
+  describe "#wait_nic_recreated" do
+    let(:nic) { vm.nics.first }
+
+    it "naps if NIC strand is not in wait state" do
+      nic.strand.update(label: "start")
+      expect { nx.wait_nic_recreated }.to nap(1)
+    end
+
+    it "hops to create_instance when NIC strand is in wait state" do
+      nic.strand.update(label: "wait")
+      expect { nx.wait_nic_recreated }.to hop("create_instance")
     end
   end
 
