@@ -21,7 +21,12 @@ class PostgresResource < Sequel::Model
     # The third element is the availability zone of the representative server,
     # which is the availability zone of the new server.
     def aws_new_server_exclusion_filters
-      [[], servers.map { it.vm.nic.nic_aws_resource.subnet_az }.uniq, representative_server.vm.nic.nic_aws_resource.subnet_az]
+      exclude_availability_zones, availability_zone = if use_different_az_set?
+        [servers.map { it.vm.nic.nic_aws_resource.subnet_az }.uniq, nil]
+      else
+        [[], representative_server.vm.nic.nic_aws_resource.subnet_az]
+      end
+      [[], exclude_availability_zones, availability_zone]
     end
   end
 end
