@@ -19,7 +19,7 @@ class PostgresResource < Sequel::Model
     # The third element is the availability zone of the representative server,
     # which is nil for metal.
     def metal_new_server_exclusion_filters
-      return [[], [], nil] if Config.allow_unspread_servers || postgres_resource.location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
+      return [[], [], nil] if Config.allow_unspread_servers || location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
       [VmHost.where(data_center: servers.map { it.vm.vm_host.data_center }.uniq).map(&:id), [], nil]
     end
   end
