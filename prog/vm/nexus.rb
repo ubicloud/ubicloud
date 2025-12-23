@@ -57,6 +57,7 @@ class Prog::Vm::Nexus < Prog::Base
     Validation.validate_os_user_name(unix_user)
 
     DB.transaction do
+      subnet = nil
       # Here the logic is the following;
       # - If the user provided nic_id, that nic has to exist and we fetch private_subnet
       # from the reference of nic. We just assume it and not even check the validity of the
@@ -71,6 +72,7 @@ class Prog::Vm::Nexus < Prog::Base
           .where(location_id: location.id, vm_id: nil)
           .with_pk(nic_id)
         raise "Given nic is not available in the given project or location or is assigned to an existing VM" unless nic
+        subnet = nic.private_subnet
       else
         if private_subnet_id
           subnet = (allow_private_subnet_in_other_project ? PrivateSubnet : project.private_subnets_dataset)
@@ -151,7 +153,8 @@ class Prog::Vm::Nexus < Prog::Base
           "hypervisor" => hypervisor,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
-          "alternative_families" => alternative_families
+          "alternative_families" => alternative_families,
+          "private_subnet_id" => subnet.id
         }]
       ) { it.id = vm.id }
     end
