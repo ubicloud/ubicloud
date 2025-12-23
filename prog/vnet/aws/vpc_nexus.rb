@@ -64,7 +64,6 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     # that the VM is running.
     allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
     hop_create_route_table
-
   end
 
   label def create_route_table
@@ -104,7 +103,19 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
 
-    hop_wait
+    hop_create_az_subnets
+  end
+
+  label def create_az_subnets
+    (private_subnet.aws_subnets - private_subnet.aws_azs).uniq.each do |az|
+      client.create_subnet({
+        vpc_id: private_subnet_aws_resource.vpc_id,
+        cidr_block: NetAddr::IPv4Net.new(private_subnet.net4.network, NetAddr::Mask32.new(24)).to_s,
+        ipv_6_cidr_block: NetAddr::IPv6Net.parse(private_subnet.net6.to_s).nth_subnet(64, SecureRandom.random_number(2**8)).to_s,
+        availability_zone: az,
+        tag_specifications: Util.aws_tag_specifications("subnet", private_subnet.name + "-" + az)
+      })
+    end
   end
 
   label def wait
