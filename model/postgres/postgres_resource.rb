@@ -108,6 +108,12 @@ class PostgresResource < Sequel::Model
     representative_server&.version || target_version
   end
 
+  def provision_new_standby
+    exclude_host_ids, exclude_availability_zones, availability_zone = new_server_exclusion_filters
+    timeline_id = read_replica? ? parent.timeline.id : timeline.id
+    Prog::Postgres::PostgresServerNexus.assemble(resource_id: id, timeline_id:, timeline_access: "fetch", exclude_host_ids:, exclude_availability_zones:, availability_zone:)
+  end
+
   def target_standby_count
     Option::POSTGRES_HA_OPTIONS[ha_type].standby_count
   end
