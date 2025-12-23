@@ -562,7 +562,13 @@ SQL
 
     if available?
       decr_checkup
+      decr_recycle
       hop_wait
+    end
+
+    unless postgres_server.recycle_set?
+      postgres_server.incr_recycle
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", stack: [{subject_id: postgres_server.resource.id}])
     end
 
     bud self.class, {}, :restart
