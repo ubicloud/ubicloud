@@ -23,24 +23,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
     if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
-      exclude_host_ids = []
-      exclude_availability_zones = []
-      availability_zone = nil
-      if !Config.allow_unspread_servers && postgres_resource.location.provider == HostProvider::HETZNER_PROVIDER_NAME
-        used_data_centers = postgres_resource.servers.map { it.vm.vm_host.data_center }.uniq
-        exclude_host_ids = VmHost.where(data_center: used_data_centers).map(&:id)
-      end
-
-      if postgres_resource.location.provider == HostProvider::AWS_PROVIDER_NAME
-        if postgres_resource.use_different_az_set?
-          exclude_availability_zones = postgres_resource.servers.map { it.vm.nic.nic_aws_resource.subnet_az }.uniq
-        else
-          availability_zone = postgres_resource.representative_server.vm.nic.nic_aws_resource.subnet_az
-        end
-      end
-
-      timeline_id = postgres_resource.read_replica? ? postgres_resource.parent.timeline.id : postgres_resource.timeline.id
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access: "fetch", exclude_host_ids:, exclude_availability_zones:, availability_zone:)
+      postgres_resource.provision_new_standby
     end
 
     nap 5
