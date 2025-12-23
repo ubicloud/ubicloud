@@ -65,58 +65,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap
     end
 
-    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
-      allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
-      expect { nx.provision_servers }.to nap
-    end
-
-    it "provisions a new server but excludes currently used data centers" do
-      allow(Config).to receive(:allow_unspread_servers).and_return(false)
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
-      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, data_center: "dc1")))
-      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost, data_center: "dc2")))
-      expect(VmHost).to receive(:where).with(data_center: ["dc1", "dc2"]).and_return([instance_double(VmHost, id: "vmh-id-1"), instance_double(VmHost, id: "vmh-id-2")])
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: ["vmh-id-1", "vmh-id-2"]))
-      expect { nx.provision_servers }.to nap
-    end
-
-    it "provisions a new server but excludes currently used az for aws" do
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
-      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "a"))))
-      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "b"))))
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a", "b"]))
-      expect(postgres_resource).to receive(:use_different_az_set?).and_return(true)
-      expect { nx.provision_servers }.to nap
-    end
-
-    it "provisions a new server in a used az for aws if use_different_az_set? is false" do
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
-      allow(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "a"))))
-      allow(postgres_resource.servers[1]).to receive(:vm).and_return(instance_double(Vm, vm_host: instance_double(VmHost), nic: instance_double(Nic, nic_aws_resource: instance_double(NicAwsResource, subnet_az: "b"))))
-      expect(postgres_resource).to receive(:representative_server).and_return(postgres_resource.servers[0])
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a"))
-      expect(postgres_resource).to receive(:use_different_az_set?).and_return(false)
-      expect { nx.provision_servers }.to nap
-    end
-
-    it "provisions a new server with the correct timeline for a regular instance" do
-      allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      allow(postgres_resource).to receive(:read_replica?).and_return(false)
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "timeline-id"))
-      expect { nx.provision_servers }.to nap
-    end
-
-    it "provisions a new server with the correct timeline for a read replica" do
-      allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      allow(postgres_resource).to receive_messages(read_replica?: true, parent: instance_double(PostgresResource, timeline: instance_double(PostgresTimeline, id: "rr-timeline-id")))
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "rr-timeline-id"))
+    it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
+      expect(postgres_resource.servers[0]).to receive(:vm).and_return(instance_double(Vm, vm_host: nil))
+      expect(postgres_resource.location).to receive(:aws?).and_return(true)
+      expect(postgres_resource).to receive(:provision_new_standby)
       expect { nx.provision_servers }.to nap
     end
   end

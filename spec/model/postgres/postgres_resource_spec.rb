@@ -60,6 +60,83 @@ RSpec.describe PostgresResource do
     expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
   end
 
+  describe "#provision_new_standby" do
+    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      vm_rep = create_hosted_vm(project, private_subnet, "pg-vm-rep")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_rep.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: []))
+      postgres_resource.provision_new_standby
+    end
+
+    it "provisions a new server but excludes currently used data centers" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(false)
+      vm_1 = create_hosted_vm(project, private_subnet, "pg-vm-1")
+      vm_2 = create_hosted_vm(project, private_subnet, "pg-vm-2")
+      vm_host_1 = create_vm_host
+      vm_host_1.update(data_center: "dc1")
+      vm_1.update(vm_host_id: vm_host_1.id)
+      vm_2.update(vm_host_id: vm_host_1.id)
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_1.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_1.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+      expect(VmHost).to receive(:where).with(data_center: ["dc1"]).and_return([instance_double(VmHost, id: "vmh-id-1"), instance_double(VmHost, id: "vmh-id-2")])
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: ["vmh-id-1", "vmh-id-2"]))
+      postgres_resource.provision_new_standby
+    end
+
+    it "provisions a new server but excludes currently used az for aws" do
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+      vm = create_hosted_vm(project, private_subnet, "pg-vm")
+      NicAwsResource.create_with_id(vm.nic.id, subnet_az: "a")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16")
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a"]))
+      expect(postgres_resource).to receive(:use_different_az_set?).and_return(true)
+      postgres_resource.provision_new_standby
+    end
+
+    it "provisions a new server in a used az for aws if use_different_az_set? is false" do
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+      vm_1 = create_hosted_vm(project, private_subnet, "pg-vm-1")
+      vm_2 = create_hosted_vm(project, private_subnet, "pg-vm-2")
+      NicAwsResource.create_with_id(vm_1.nic.id, subnet_az: "a")
+      NicAwsResource.create_with_id(vm_2.nic.id, subnet_az: "b")
+      server_1 = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_1.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_2.id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16")
+      expect(postgres_resource).to receive(:representative_server).and_return(server_1)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a"))
+      expect(postgres_resource).to receive(:use_different_az_set?).and_return(false)
+      postgres_resource.provision_new_standby
+    end
+
+    it "provisions a new server with the correct timeline for a regular instance" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      allow(postgres_resource).to receive(:read_replica?).and_return(false)
+      allow(postgres_resource).to receive(:timeline).and_return(instance_double(PostgresTimeline, id: "timeline-id"))
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "timeline-id"))
+      postgres_resource.provision_new_standby
+    end
+
+    it "provisions a new server with the correct timeline for a read replica" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent: instance_double(PostgresResource, timeline: instance_double(PostgresTimeline, id: "rr-timeline-id")))
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: "rr-timeline-id"))
+      postgres_resource.provision_new_standby
+    end
+  end
+
   it "returns has_enough_fresh_servers correctly" do
     # Create a server that doesn't need recycling (matches target_vm_size, target_storage_size_gib, target_version)
     vm = create_hosted_vm(project, private_subnet, "pg-vm-fresh")
