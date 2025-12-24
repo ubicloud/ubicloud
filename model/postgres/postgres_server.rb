@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout
+    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -83,6 +83,7 @@ class PostgresServer < Sequel::Model
       configs["allow_alter_system"] = "off"
     end
 
+    caught_up_standbys = nil
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
@@ -93,14 +94,18 @@ class PostgresServer < Sequel::Model
       end
 
       if primary?
+        caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
         if resource.ha_type == PostgresResource::HaType::SYNC
-          caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
+        end
+        if version.to_i >= 17
+          configs[:synchronized_standby_slots] = "'#{caught_up_standbys.map(&:ubid).join(",")}'"
         end
       end
 
       if standby?
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
+        configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready
       end
 
       if doing_pitr?
@@ -118,6 +123,7 @@ class PostgresServer < Sequel::Model
       configs:,
       user_config: resource.user_config,
       pgbouncer_user_config: resource.pgbouncer_user_config,
+      physical_slots: caught_up_standbys&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
@@ -192,7 +198,7 @@ class PostgresServer < Sequel::Model
   def failover_target
     target = resource.servers
       .reject { it.representative_at }
-      .select { it.strand.label == "wait" && !it.needs_recycling? }
+      .select { it.strand.label == "wait" && !it.needs_recycling? && it.physical_slot_ready }
       .map { {server: it, lsn: it.current_lsn} }
       .max_by { lsn2int(it[:lsn]) }
 

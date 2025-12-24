@@ -101,6 +101,7 @@ class PostgresResource < Sequel::Model
       sslcert: "/etc/ssl/certs/server.crt",
       sslkey: "/etc/ssl/certs/server.key",
       sslmode: "verify-full",
+      dbname: "postgres",
       application_name:
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 

@@ -87,6 +87,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
     end
 
+    it "sets synchronized_standby_slots on Postgres 17" do
+      postgres_server.update(version: "17")
+      expect(postgres_server.configure_hash[:configs]).to include(:synchronized_standby_slots)
+    end
+
     it "sets archive_command for walg client according to resource.use_old_walg_command_set?" do
       expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
       expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
@@ -136,6 +141,13 @@ RSpec.describe PostgresServer do
       postgres_server.update(timeline_access: "fetch")
       expect(resource).to receive(:restore_target)
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
+    end
+
+    it "sets primary_slot_name to ubid on standby when physical_slot_ready" do
+      postgres_server.timeline_access = "fetch"
+      expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to be_nil
+      postgres_server.physical_slot_ready = true
+      expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to eq("'#{postgres_server.ubid}'")
     end
 
     it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
@@ -200,9 +212,9 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true)
       ])
     end
 
@@ -261,9 +273,9 @@ RSpec.describe PostgresServer do
 
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true)
       ])
     end
 
