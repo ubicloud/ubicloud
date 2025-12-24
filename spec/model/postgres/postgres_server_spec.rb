@@ -138,6 +138,13 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
+    it "sets primary_slot_name to ubid on standby when use_physical_slot" do
+      postgres_server.timeline_access = "fetch"
+      expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to be_nil
+      postgres_server.use_physical_slot = true
+      expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to eq("'#{postgres_server.ubid}'")
+    end
+
     it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
       postgres_server.timeline_access = "push"
       expect(resource).to receive(:flavor).and_return(PostgresResource::Flavor::PARADEDB)
