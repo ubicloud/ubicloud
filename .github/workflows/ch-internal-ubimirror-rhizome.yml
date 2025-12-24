@@ -24,7 +24,11 @@ jobs:
     runs-on: ${{matrix.runs-on}}
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+      - name: Setup tool cache directory
+        shell: bash
+        run: |
+          sudo mkdir -p /opt/hostedtoolcache && sudo chown -R "$(whoami)":"$(whoami)" /opt/hostedtoolcache
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:

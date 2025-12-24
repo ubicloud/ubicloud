@@ -21,6 +21,7 @@ class PostgresServer < Sequel::Model
     end
 
     def metal_increment_s3_new_timeline
+      # nothing
     end
   end
 end

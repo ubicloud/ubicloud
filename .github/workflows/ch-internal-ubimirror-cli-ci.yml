@@ -29,7 +29,7 @@ jobs:
     runs-on: ${{matrix.runs-on}}
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up Clover
         uses: ./.github/actions/setup-clover
       - name: Set up Go
@@ -45,7 +45,7 @@ jobs:
       - name: Run go fmt and check it makes no changes
         run: "cd cli && go fmt && git diff --stat --exit-code"
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@v9
         with:
           version: v2.1.5
           working-directory: cli

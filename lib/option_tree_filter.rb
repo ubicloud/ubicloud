@@ -43,7 +43,7 @@ class OptionTreeFilter
               location: location_name,
               family: family_name,
               size: size_name
-            }.merge(size_data.reject { |k, _| k == "name" })
+            }.merge(size_data.except("name"))
           end
         end
       end

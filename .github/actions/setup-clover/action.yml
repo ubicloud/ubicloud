@@ -78,6 +78,16 @@ runs:
         ruby-version: .tool-versions
         bundler-cache: true
 
+    - name: Ensure main bundle is complete
+      shell: bash
+      env:
+        LANG: en_US.UTF-8
+        LC_ALL: en_US.UTF-8
+        PGHOST: /home/runner
+      run: |
+        # Ensure git dependencies are checked out
+        bundle check || bundle install
+
     - name: Create .env.rb file
       shell: bash
       run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"

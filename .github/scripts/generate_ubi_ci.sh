@@ -64,6 +64,18 @@ rsync --no-motd --out-format="%n" --dry-run -Iu --backup -az -f'P .git/***'  -f'
   log "Adding [INTERNAL] prefix to workflow name in $new_file"
   yq eval -i '.name = "[INTERNAL] " + .name' "$new_file"
   
+  # Add tool cache directory setup step before ruby/setup-ruby steps
+  log "Adding tool cache setup before ruby setup actions in $new_file"
+  for job in $(yq eval '.jobs | keys | .[]' "$new_file"); do
+    step_count=$(yq eval ".jobs.$job.steps | length" "$new_file")
+    for ((i=step_count-1; i>=0; i--)); do
+      uses=$(yq eval ".jobs.$job.steps[$i].uses // \"\"" "$new_file")
+      if [[ "$uses" == *"ruby/setup-ruby"* ]]; then
+        yq eval -i ".jobs.$job.steps |= (.[0:$i] + [{\"name\": \"Setup tool cache directory\", \"shell\": \"bash\", \"run\": \"sudo mkdir -p /opt/hostedtoolcache && sudo chown -R \\\"\$(whoami)\\\":\\\"\$(whoami)\\\" /opt/hostedtoolcache\n\"}] + .[$i:])" "$new_file"
+      fi
+    done
+  done
+  
   log "Applied runner replacements to $new_file"
 done
 

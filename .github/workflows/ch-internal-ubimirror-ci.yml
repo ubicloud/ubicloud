@@ -18,19 +18,15 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Check out code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
       - name: Set up Clover
         uses: ./.github/actions/setup-clover
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
         with:
-          node-version-file: "package.json"
-      - name: Install node packages
-        run: npm ci
+          setup-node: true
       - name: Run erb-formatter
         run: bundle exec rake linter:erb_formatter
       - name: Cache rubocop
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: /home/runner/.cache/rubocop_cache
           key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
@@ -40,6 +36,12 @@ jobs:
         run: bundle exec rake linter:brakeman
       - name: Run linter:openapi
         run: bundle exec rake linter:openapi
+      - name: Run linter:xss_check
+        run: bundle exec rake linter:xss_check
+      - name: Run linter:cmd_exec
+        run: bundle exec rake linter:cmd_exec
+      - name: Run check_missing_admin_model_specs
+        run: bundle exec rake check_missing_admin_model_specs
       - name: Run annotate
         run: bundle exec rake annotate
       - name: Refresh sequel caches
@@ -58,7 +60,7 @@ jobs:
         run: rake csi_spec
       - name: Archive code coverage results
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: code-coverage-report-${{ matrix.runs-on }}
           path: coverage/
