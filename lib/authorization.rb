@@ -25,8 +25,9 @@ module Authorization
         DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id)
           .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:action_id, :level])
-      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, it] }) | DB[:action_ids].where(action_id: nil).exists)
+        args: [:action_id, :level],
+        cycle: {columns: :action_id})
+      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].exclude(:is_cycle).select(:action_id)].map { [:id, it] }) | DB[:action_ids].where(action_id: nil).exists)
       .select_order_map(:name)
   end
 
@@ -56,7 +57,10 @@ module Authorization
         DB[table].join(:tag, tag_id: column)
           .select(Sequel[table][:tag_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:tag_id, :level]).select(:tag_id)
+        args: [:tag_id, :level],
+        cycle: {columns: :tag_id})
+      .exclude(:is_cycle)
+      .select(:tag_id)
   end
 
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
@@ -129,7 +133,10 @@ module Authorization
         DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
           .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:object_id, :level]).select(:object_id)
+        args: [:object_id, :level],
+        cycle: {columns: :object_id})
+      .exclude(:is_cycle)
+      .select(:object_id)
 
     if dataset.model == ObjectTag
       # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
