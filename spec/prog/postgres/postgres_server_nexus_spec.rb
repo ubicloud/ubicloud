@@ -596,6 +596,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to nap(5)
     end
 
+    it "handles use_physical_slot semaphore" do
+      expect(server).to receive(:configure_hash).and_return("dummy-configure-hash")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 run configure_postgres sudo postgres/bin/configure 16", {log: true, stdin: JSON.generate("dummy-configure-hash")})
+      server.incr_use_physical_slot
+      expect { nx.configure }.to nap(5)
+      expect(server.use_physical_slot_set?).to be true
+      expect(server.physical_slot_ready).to be true
+    end
+
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
@@ -661,6 +671,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
       expect(replica_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
       expect { replica_nx.configure }.to hop("wait_catch_up")
+    end
+
+    it "updates use_physical_slot semaphores on standbys when primary configured" do
+      standby_nx = create_standby_nexus(prime_sshable: false)
+      standby_nx.postgres_server.update(synchronization_status: "ready")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
+      expect { nx.configure }.to hop("wait")
+      expect(standby_nx.postgres_server.reload.use_physical_slot_set?).to be true
+      expect(standby_nx.postgres_server.configure_set?).to be true
+    end
+
+    it "does not update use_physical_slot semaphores on standbys when standby configured" do
+      standby_nx = create_standby_nexus(prime_sshable: false)
+      standby_nx.postgres_server.update(synchronization_status: "ready")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 clean configure_postgres").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check configure_postgres").and_return("Succeeded")
+      nx.postgres_server.timeline_access = "fetch"
+      expect { nx.configure }.to hop("wait")
+      expect(standby_nx.postgres_server.reload.use_physical_slot_set?).to be false
+      expect(standby_nx.postgres_server.configure_set?).to be false
     end
 
     it "naps if script return unknown status" do

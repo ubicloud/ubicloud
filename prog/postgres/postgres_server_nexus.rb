@@ -362,8 +362,20 @@ CONFIG
       end
 
       hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
+
+      if postgres_server.primary?
+        postgres_server.resource.servers.select { it.standby? && it.synchronization_status == "ready" && !it.physical_slot_ready }.each do |standby|
+          standby.incr_use_physical_slot
+          standby.incr_configure
+        end
+      end
+
       hop_wait
     when "Failed", "NotStarted"
+      if postgres_server.use_physical_slot_set?
+        postgres_server.update(physical_slot_ready: true)
+        decr_use_physical_slot
+      end
       configure_hash = postgres_server.configure_hash
       vm.sshable.d_run("configure_postgres", "sudo", "postgres/bin/configure", postgres_server.version, stdin: JSON.generate(configure_hash))
     end

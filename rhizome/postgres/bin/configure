@@ -83,6 +83,7 @@ host    replication     all             ::1/128                 scram-sha-256
 # Allow replication connection using special replication user for
 # HA standbys
 hostssl replication     ubi_replication all                     cert map=standby2replication
+hostssl postgres        ubi_replication all                     cert map=standby2replication
 
 # Allow certificate authentication for specific users
 #{cert_auth_users}
@@ -120,6 +121,17 @@ safe_write_to_file("/etc/systemd/system/postgresql@.service.d/hugepages.conf", e
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
+
+if configure_hash["physical_slots"]
+  if configure_hash["physical_slots"].size == 0
+    r "sudo", "-u", "postgres", "psql", "-c", "select pg_catalog.pg_drop_replication_slot(slot_name) from pg_catalog.pg_replication_slots where slot_name like 'pv%' and LENGTH(slot_name) = 26 and slot_type = 'physical'"
+  else
+    r "sudo", "-u", "postgres", "psql", "-c", "select pg_catalog.pg_drop_replication_slot(slot_name) from pg_catalog.pg_replication_slots where slot_name like 'pv%' and LENGTH(slot_name) = 26 and slot_type = 'physical' and slot_name not in (#{configure_hash["physical_slots"].map { |x| "'#{x}'" }.join(",")})"
+    configure_hash["physical_slots"].each do |ubid|
+      r "sudo", "-u", "postgres", "psql", "-c", "select pg_catalog.pg_create_physical_replication_slot('#{ubid}', false) where not exists (select 1 from pg_catalog.pg_replication_slots where slot_type = 'physical' and slot_name = '#{ubid}')"
+    end
+  end
+end
 
 pgbouncer_setup = PgBouncerSetup.new(v, configure_hash["configs"]["max_connections"], configure_hash["pgbouncer_instances"], configure_hash["pgbouncer_user_config"])
 pgbouncer_setup.setup
