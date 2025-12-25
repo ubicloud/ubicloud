@@ -57,12 +57,12 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
       next if firewall_rule.ip6?
-      allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
+      allow_ingress(firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
     end
 
     # Allow SSH ingress from the internet so that the controlplane can verify
     # that the VM is running.
-    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
+    allow_ingress(22, 22, "0.0.0.0/0")
     hop_create_route_table
 
   end
@@ -182,14 +182,14 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     @client ||= location.location_credential.client
   end
 
-  def allow_ingress(group_id, from_port, to_port, cidr)
+  def allow_ingress(from_port, to_port, cidr_ip)
     client.authorize_security_group_ingress({
-      group_id: group_id,
+      group_id: private_subnet_aws_resource.security_group_id,
       ip_permissions: [{
         ip_protocol: "tcp",
-        from_port: from_port,
-        to_port: to_port,
-        ip_ranges: [{cidr_ip: cidr}]
+        from_port:,
+        to_port:,
+        ip_ranges: [{cidr_ip:}]
       }]
     })
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate
