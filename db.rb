@@ -24,7 +24,7 @@ Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_
 begin
   POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_connections: Config.db_pool_monitor, pool_timeout: Config.database_timeout, driver_options:) if Config.postgres_monitor_database_url
 rescue Sequel::DatabaseConnectionError => ex
-  Clog.emit("Failed to connect to Postgres Monitor database") { {database_connection_failed: {exception: Util.exception_to_hash(ex)}} }
+  Clog.emit("Failed to connect to Postgres Monitor database") { {database_connection_failed: Util.exception_to_hash(ex)} }
 end
 
 # Load Sequel Database/Global extensions here
