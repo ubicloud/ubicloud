@@ -178,6 +178,22 @@ class CloverAdmin < Roda
     "Project" => {
       "add_credit" => object_action("Add credit", "Added credit", {credit: "float!"}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
+      end,
+      "set_feature_flag" => object_action("Set Feature Flag", "Set feature flag", {
+        name: {
+          typecast: :str!,
+          type: "select",
+          add_blank: true,
+          options: Project.instance_methods.filter_map { it.to_s.delete_prefix("set_ff_") if it.start_with?("set_ff_") }
+        },
+        value: {typecast: :nonempty_str, placeholder: "JSON", required: nil}
+      }) do |obj, name, value|
+        begin
+          value = JSON.parse(value) if value
+        rescue JSON::ParserError
+          fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
+        end
+        obj.send("set_ff_#{name}", value)
       end
     },
     "Strand" => {
