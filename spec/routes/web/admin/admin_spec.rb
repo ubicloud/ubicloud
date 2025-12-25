@@ -644,6 +644,44 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
   end
 
+  it "supports setting feature flags of Project" do
+    p = Project.create(name: "Default")
+
+    fill_in "UBID or UUID", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+
+    click_link "Set Feature Flag"
+    path = page.current_path
+
+    [
+      ["allocator_diagnostics", "", nil],
+      ["access_all_cache_scopes", "true", true],
+      ["aws_alien_runners_ratio", "0.8", 0.8],
+      ["enable_m6id", "false", false],
+      ["gpu_runner", "1", 1],
+      ["visible_locations", '["eu-central-h1","eu-central-h2"]', ["eu-central-h1", "eu-central-h2"]],
+      ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}]
+    ].each do |name, value, expected_value|
+      visit path
+      select name, from: "name"
+      fill_in "value", with: value
+      click_button "Set Feature Flag"
+      expect(p.reload.send("get_ff_#{name}")).to eq(expected_value)
+      expect(page).to have_flash_notice("Set feature flag")
+      expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    end
+
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
+    visit path
+    select "free_runner_upgrade_until", from: "name"
+    fill_in "value", with: "invalid_json"
+    click_button "Set Feature Flag"
+    expect(page).to have_content "InvalidRequest: invalid JSON for feature flag value"
+  ensure
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+  end
+
   it "lists multiple info pages with proper links and content in table format" do
     info_pages = [["first", "tag1", Time.now], ["second", "tag2", Time.now - 1], ["third", "tag3", Time.now - 2]].map do |summary, tag, created_at|
       Page.create(summary:, tag:, severity: "info", created_at:)
