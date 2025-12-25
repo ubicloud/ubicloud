@@ -33,7 +33,7 @@ class MonitorableResource
         @session[:ssh_session].loop(0.01) { run_event_loop }
       rescue => ex
         event_loop_failed = true
-        Clog.emit("SSH event loop has failed.") { {event_loop_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("SSH event loop has failed.") { {event_loop_failure: {ubid: @resource.ubid}.merge(Util.exception_to_hash(ex))} }
         @session[:ssh_session].shutdown!
         begin
           @session[:ssh_session].close
@@ -65,7 +65,7 @@ class MonitorableResource
         @session.merge!(@resource.init_health_monitor_session)
         retry
       end
-      Clog.emit("Pulse checking has failed.") { {pulse_check_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Pulse checking has failed.") { {pulse_check_failure: {ubid: @resource.ubid}.merge(Util.exception_to_hash(ex))} }
       # TODO: Consider raising the exception here, and let the caller handle it.
     end
 
