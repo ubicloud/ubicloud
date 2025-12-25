@@ -1,8 +1,15 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
 <% form(method: :post, id: "action-form") do |f| %>
-  <% @params.keys.each do |name| %>
-    <%== f.input("text", key: name, label: name, required: true) %>
+  <% @params.each do |name, value| %>
+    <%
+      type = "text"
+      if value.is_a?(Hash)
+        type = value.fetch(:type, "text")
+        value_opts = value
+      end
+    %>
+    <%== f.input(type, key: name, label: name, required: true, **value_opts) %>
   <% end %>
   <%== f.button(@label) %>
 <% end %>
