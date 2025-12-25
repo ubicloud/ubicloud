@@ -21,9 +21,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
     vpc_id = if vpc_response.vpcs.empty?
-      client.create_vpc({cidr_block: private_subnet.net4.to_s,
+      client.create_vpc({
+        cidr_block: private_subnet.net4.to_s,
         amazon_provided_ipv_6_cidr_block: true,
-        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)}).vpc.vpc_id
+        tag_specifications: Util.aws_tag_specifications("vpc", private_subnet.name)
+      }).vpc.vpc_id
     else
       vpc_response.vpcs.first.vpc_id
     end
@@ -33,7 +35,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
+    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).vpcs.first
 
     nap 1 unless vpc.state == "available"
 
@@ -50,7 +52,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
       })
     rescue Aws::EC2::Errors::InvalidGroupDuplicate
-      client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
+      client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups.first
     end
 
     private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
@@ -70,8 +72,8 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def create_route_table
     # Step 3: Update the route table for ipv_6 traffic
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
-    route_table_id = route_table_response.route_tables[0].route_table_id
-    private_subnet_aws_resource.update(route_table_id: route_table_id)
+    route_table_id = route_table_response.route_tables.first.route_table_id
+    private_subnet_aws_resource.update(route_table_id:)
     internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
     if internet_gateway_response.internet_gateways.empty?
