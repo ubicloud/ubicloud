@@ -1,8 +1,15 @@
 # frozen_string_literal: true
 
 require "aws-sdk-ec2"
+require "forwardable"
+
 class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
+
+  extend Forwardable
+
+  def_delegators :private_subnet, :private_subnet_aws_resource, :location
+  def_delegators :private_subnet_aws_resource, :vpc_id, :security_group_id, :internet_gateway_id
 
   def before_run
     when_destroy_set? do
@@ -35,20 +42,17 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def wait_vpc_created
-    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).vpcs.first
+    vpc_state = client.describe_vpcs({filters: [{name: "vpc-id", values: [vpc_id]}]}).vpcs.first.state
 
-    nap 1 unless vpc.state == "available"
+    nap 1 unless vpc_state == "available"
 
-    client.modify_vpc_attribute({
-      vpc_id: vpc.vpc_id,
-      enable_dns_hostnames: {value: true}
-    })
+    client.modify_vpc_attribute({vpc_id:, enable_dns_hostnames: {value: true}})
 
     security_group_response = begin
       client.create_security_group({
         group_name: "aws-#{location.name}-#{private_subnet.ubid}",
         description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
-        vpc_id: private_subnet_aws_resource.vpc_id,
+        vpc_id:,
         tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
       })
     rescue Aws::EC2::Errors::InvalidGroupDuplicate
@@ -66,12 +70,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     # that the VM is running.
     allow_ingress(22, 22, "0.0.0.0/0")
     hop_create_route_table
-
   end
 
   label def create_route_table
     # Step 3: Update the route table for ipv_6 traffic
-    route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
+    route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [vpc_id]}]})
     route_table_id = route_table_response.route_tables.first.route_table_id
     private_subnet_aws_resource.update(route_table_id:)
     internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
@@ -81,13 +84,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name)
       }).internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
-      client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
+      client.attach_internet_gateway({internet_gateway_id:, vpc_id:})
     else
       internet_gateway = internet_gateway_response.internet_gateways.first
       internet_gateway_id = internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
       if internet_gateway.attachments.empty?
-        client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
+        client.attach_internet_gateway({internet_gateway_id:, vpc_id:})
       end
     end
 
@@ -134,25 +137,25 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     hop_finish unless private_subnet_aws_resource
 
     ignore_invalid_id do
-      client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
+      client.delete_security_group({group_id: security_group_id})
     end
     hop_delete_internet_gateway
   end
 
   label def delete_internet_gateway
     ignore_invalid_id do
-      client.detach_internet_gateway({internet_gateway_id: private_subnet_aws_resource.internet_gateway_id, vpc_id: private_subnet_aws_resource.vpc_id})
+      client.detach_internet_gateway({internet_gateway_id:, vpc_id:})
     end
 
     ignore_invalid_id do
-      client.delete_internet_gateway({internet_gateway_id: private_subnet_aws_resource.internet_gateway_id})
+      client.delete_internet_gateway({internet_gateway_id:})
     end
     hop_delete_vpc
   end
 
   label def delete_vpc
     ignore_invalid_id do
-      client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
+      client.delete_vpc({vpc_id:})
     end
     hop_finish
   end
@@ -176,17 +179,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     Clog.emit("ID not found for aws vpc") { {ignored_aws_vpc_failure: {exception: Util.exception_to_hash(e, backtrace: nil)}} }
   end
 
-  def location
-    @location ||= private_subnet.location
-  end
-
   def client
     @client ||= location.location_credential.client
   end
 
   def allow_ingress(from_port, to_port, cidr_ip)
     client.authorize_security_group_ingress({
-      group_id: private_subnet_aws_resource.security_group_id,
+      group_id: security_group_id,
       ip_permissions: [{
         ip_protocol: "tcp",
         from_port:,
@@ -195,9 +194,5 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       }]
     })
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate
-  end
-
-  def private_subnet_aws_resource
-    @private_subnet_aws_resource ||= private_subnet.private_subnet_aws_resource
   end
 end
