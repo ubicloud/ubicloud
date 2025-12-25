@@ -151,10 +151,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       client.stub_responses(:describe_internet_gateways, internet_gateways: [])
       client.stub_responses(:create_internet_gateway, internet_gateway: {internet_gateway_id: "igw-0123456789abcdefg"})
       client.stub_responses(:create_route, Aws::EC2::Errors::RouteAlreadyExists.new(nil, nil))
+      client.stub_responses(:create_route)
       client.stub_responses(:attach_internet_gateway)
       expect(client).to receive(:describe_route_tables).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
+      expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect { nx.create_route_table }.to hop("wait")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-0123456789abcdefg")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")

@@ -96,13 +96,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     begin
       client.create_route({
-        route_table_id: route_table_id,
+        route_table_id:,
         destination_ipv_6_cidr_block: "::/0",
         gateway_id: internet_gateway_id
       })
+    rescue Aws::EC2::Errors::RouteAlreadyExists
+    end
 
+    begin
       client.create_route({
-        route_table_id: route_table_id,
+        route_table_id:,
         destination_cidr_block: "0.0.0.0/0",
         gateway_id: internet_gateway_id
       })
