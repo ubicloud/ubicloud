@@ -145,7 +145,7 @@ class MonitorRunner
     shutdown! unless @shutdown
     nil
   rescue => ex
-    Clog.emit("Pulse checking or resource scanning has failed.") { {pulse_checking_or_resource_scanning_failure: {exception: Util.exception_to_hash(ex)}} }
+    Clog.emit("Pulse checking or resource scanning has failed.") { {pulse_checking_or_resource_scanning_failure: Util.exception_to_hash(ex)} }
     ThreadPrinter.run
     Kernel.exit! 2
   end

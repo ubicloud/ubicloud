@@ -246,7 +246,7 @@ class PostgresServer < Sequel::Model
               update: {last_known_lsn: last_known_lsn}
             ).save_changes
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid: ubid, last_known_lsn: last_known_lsn, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid:, last_known_lsn:}.merge(Util.exception_to_hash(ex))} }
         end
       end
 
