@@ -116,7 +116,6 @@ end
 # Columns:
 #  id                        | uuid                     | PRIMARY KEY
 #  created_at                | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at                | timestamp with time zone | NOT NULL DEFAULT now()
 #  parent_id                 | uuid                     |
 #  access_key                | text                     |
 #  secret_key                | text                     |
