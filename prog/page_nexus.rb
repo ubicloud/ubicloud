@@ -5,10 +5,19 @@ class Prog::PageNexus < Prog::Base
 
   def self.assemble(summary, tag_parts, related_resources, severity: "error", extra_data: {})
     DB.transaction do
-      return if Page.from_tag_parts(tag_parts)
+      details = extra_data.merge({"related_resources" => Array(related_resources)})
+      tag = Page.generate_tag(tag_parts)
+      page = Page.new(summary:, details:, tag:, severity:)
+      page.skip_auto_validations(:unique) do
+        page.insert_conflict(
+          target: :tag,
+          conflict_where: {resolved_at: nil},
+          update: {summary: Sequel[:excluded][:summary], details: Sequel[:excluded][:details], severity: Sequel[:excluded][:severity]}
+        ).save_changes
+      end
 
-      pg = Page.create(summary:, details: extra_data.merge({"related_resources" => Array(related_resources)}), tag: Page.generate_tag(tag_parts), severity:)
-      Strand.create_with_id(pg, prog: "PageNexus", label: "start")
+      Strand.new(prog: "PageNexus", label: "start") { it.id = page.id }
+        .insert_conflict(target: :id).save_changes
     end
   end
 
