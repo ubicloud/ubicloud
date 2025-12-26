@@ -37,7 +37,7 @@ class Clover
   end
 
   def handle_installation(data)
-    installation = GithubInstallation[installation_id: data["installation"]["id"]]
+    installation = GithubInstallation.with_github_installation_id(data["installation"]["id"])
     case data["action"]
     when "deleted"
       return error("Unregistered installation") unless installation
@@ -51,7 +51,7 @@ class Clover
   end
 
   def handle_workflow_job(data)
-    unless (installation = GithubInstallation[installation_id: data["installation"]["id"]])
+    unless (installation = GithubInstallation.with_github_installation_id(data["installation"]["id"]))
       return error("Unregistered installation")
     end
 
@@ -64,7 +64,7 @@ class Clover
 
     if (label = job_labels.find { Github.runner_labels.key?(it) })
       actual_label = label
-    elsif (custom_label = GithubCustomLabel.first(installation_id: installation.id, name: job_labels))
+    elsif (custom_label = installation.custom_labels_dataset.first(name: job_labels))
       actual_label = custom_label.name
       label = custom_label.alias_for
     end
@@ -76,14 +76,13 @@ class Clover
     end
 
     if data["action"] == "queued"
-      st = Prog::Github::GithubRunnerNexus.assemble(
+      runner = Prog::Github::GithubRunnerNexus.assemble(
         installation,
         repository_name:,
         label:,
         actual_label:,
         default_branch: data["repository"]["default_branch"]
-      )
-      runner = GithubRunner[st.id]
+      ).subject
 
       return success("GithubRunner[#{runner.ubid}] created")
     end
@@ -92,8 +91,7 @@ class Clover
       return error("A workflow_job without runner_id")
     end
 
-    runner = GithubRunner.first(
-      installation_id: installation.id,
+    runner = installation.runners_dataset.first(
       repository_name:,
       runner_id:
     )

@@ -43,17 +43,7 @@ class Clover
         r.delete do
           authorize("PrivateSubnet:delete", ps)
 
-          vms_dataset = ps.vms_dataset
-            .association_join(:strand)
-            .exclude(label: "destroy")
-            .exclude(Sequel[:vm][:id] => Semaphore
-              .where(
-                strand_id: ps.nics_dataset.select(:vm_id),
-                name: "destroy"
-              )
-              .select(:strand_id))
-
-          unless vms_dataset.empty?
+          unless ps.attached_vms.empty?
             fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
           end
 

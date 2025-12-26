@@ -19,7 +19,7 @@ class Clover
           pat = nil
           DB.transaction do
             pat = ApiKey.create_personal_access_token(current_account, project: @project)
-            SubjectTag[project_id: @project.id, name: "Admin"].add_subject(pat.id)
+            @project.subject_tags_dataset.first(name: "Admin").add_subject(pat.id)
             audit_log(pat, "create")
           end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
@@ -90,7 +90,7 @@ class Clover
                     ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
                     audit_action = "create"
                   else
-                    next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
+                    next unless (ace = @project.access_control_entries_dataset.first(subject_id: token.id, id: UBID.to_uuid(ubid)))
                     if deleted == "true"
                       ace.destroy
                       audit_log(ace, "destroy")

@@ -8,6 +8,10 @@ class PaymentMethod < Sequel::Model
 
   plugin ResourceMethods
 
+  def self.fraud?(card_fingerprint)
+    !where(fraud: true, card_fingerprint:).empty?
+  end
+
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
       @stripe_data ||= Stripe::PaymentMethod.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year])

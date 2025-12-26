@@ -81,7 +81,7 @@ class Clover
         stripe_id = setup_intent["payment_method"]
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
-        unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
+        if PaymentMethod.fraud?(card_fingerprint)
           raise_web_error("Payment method you added is labeled as fraud. Please contact support.")
         end
 
@@ -151,7 +151,7 @@ class Clover
         end
 
         r.delete :ubid_uuid do |id|
-          next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
+          next unless (payment_method = @project.payment_methods_dataset.with_pk(id))
 
           unless payment_method.billing_info.payment_methods_dataset.count > 1
             response.status = 400
@@ -168,7 +168,7 @@ class Clover
       end
 
       r.on "invoice", ["current", :ubid_uuid] do |id|
-        next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
+        next unless (invoice = (id == "current") ? @project.current_invoice : @project.invoices_dataset.with_pk(:id))
 
         r.get true do
           if invoice.status == "current"

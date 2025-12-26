@@ -2,7 +2,7 @@
 
 class Clover
   hash_branch(:runtime_prefix, "github") do |r|
-    if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
+    if (runner = @vm.github_runner).nil? || (repository = runner.repository).nil?
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
 
@@ -104,11 +104,11 @@ class Clover
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
-          if size && size > GithubRepository::CACHE_SIZE_LIMIT
+          if size && size > GithubRepository.cache_size_limit
             fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
           end
 
-          unless GithubCacheEntry.where(repository_id: runner.repository.id, scope:, key:, version:).empty?
+          unless repository.cache_entries_dataset.where(scope:, key:, version:).empty?
             fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
           end
 
@@ -147,8 +147,8 @@ class Clover
 
           # If size is not provided, it means that the client doesn't
           # let us know the size of the cache. In this case, we use the
-          # GithubRepository::CACHE_SIZE_LIMIT as the size.
-          size ||= GithubRepository::CACHE_SIZE_LIMIT
+          # GithubRepository.cache_size_limit as the size.
+          size ||= GithubRepository.cache_size_limit
 
           max_chunk_size = 32 * 1024 * 1024 # 32MB
           presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
@@ -169,7 +169,7 @@ class Clover
         upload_id = typecast_params.nonempty_str!("uploadId")
         size = typecast_params.pos_int!("size")
 
-        entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
+        entry = repository.cache_entries_dataset.first(upload_id: upload_id, committed_at: nil)
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
 
         begin

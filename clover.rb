@@ -717,16 +717,9 @@ class Clover < Roda
           close_account_view
         end
       end
-      account = Account[account_id]
-      # Do not allow to close account if the project has resources and
+      # Do not allow closing account if the project has resources and
       # the account is the only user
-      projects_dataset = Project
-        .where(id: DB[:access_tag]
-          .select_group(:project_id)
-          .where(project_id: account.projects_dataset.select(Sequel[:project][:id]))
-          .having(Sequel.function(:count).* => 1))
-
-      if (project = projects_dataset.first_project_with_resources)
+      if (project = Account[account_id].first_sole_project_with_resources)
         fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end
@@ -927,6 +920,14 @@ class Clover < Roda
       session.delete("last_password_entry")
       ""
     end
+
+    hash_branch("set_github_installation_project_id") do |r|
+      r.get :ubid_uuid do |id|
+        no_authorization_needed
+        session["github_installation_project_id"] = id
+        ""
+      end
+    end
   end
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
@@ -980,7 +981,7 @@ class Clover < Roda
         response.json = true
         response.skip_content_security_policy!
 
-        unless (jwt_payload = get_runtime_jwt_payload) && (@vm = Vm[id: UBID.to_uuid(jwt_payload["sub"])])
+        unless (@vm = Vm.from_runtime_jwt_payload(get_runtime_jwt_payload))
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
