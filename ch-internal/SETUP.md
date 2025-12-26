@@ -39,7 +39,7 @@ bundle exec rake dev_up
 
 ## Run tests:
 ```bash
-COVERAGE=1 bundle exec rspec
+FORCE_AUTOLOAD=1 COVERAGE=1 bundle exec rspec
 ```
 
 View coverage at via `open coverage/index.html`

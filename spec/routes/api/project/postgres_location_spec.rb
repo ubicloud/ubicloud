@@ -64,5 +64,35 @@ RSpec.describe Clover, "postgres-location" do
       expect(family_names).to eq(family_names.uniq)
       expect(aws["available_postgres_versions"]).to contain_exactly("18", "17", "16")
     end
+
+    it "skips AWS locations with no availability data" do
+      Location.create(name: "ap-fake-1", provider: "aws", ui_name: "AWS", display_name: "Fake AWS", visible: true)
+      get "/project/#{project.ubid}/postgres-location"
+      expect(last_response.status).to eq(200)
+      response = JSON.parse(last_response.body)["items"]
+      expect(response.map { |l| l["name"] }).not_to include("ap-fake-1")
+    end
+
+    it "returns AWS locations as-is when accept_missing_provider_availability is true" do
+      aws_location = Location.create(name: "ap-fake-1", provider: "aws", ui_name: "AWS", display_name: "Fake AWS", visible: true)
+      pg_location = described_class::PostgresLocation.new(aws_location, ["17", "16"], [{name: "m8gd", sizes: []}])
+
+      result = described_class.filter_with_availability([pg_location], accept_missing_provider_availability: true)
+      expect(result.length).to eq(1)
+      expect(result.first.location.name).to eq("ap-fake-1")
+    end
+
+    it "filters out families with no available sizes" do
+      Location.create(name: "us-east-2", provider: "aws", ui_name: "AWS", display_name: "display-aws-region-1", visible: true)
+
+      get "/project/#{project.ubid}/postgres-location"
+      expect(last_response.status).to eq(200)
+      response = JSON.parse(last_response.body)["items"]
+      aws = response.find { |loc| loc["name"] == "us-east-2" }
+      # All returned families should have at least one size
+      aws["available_vm_families"].each do |family|
+        expect(family["sizes"]).not_to be_empty
+      end
+    end
   end
 end

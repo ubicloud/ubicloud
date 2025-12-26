@@ -19,7 +19,7 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install -y libssl-dev libffi-dev libpq-dev build-essential locales
+        sudo apt-get install -y libssl-dev libffi-dev libpq-dev build-essential locales psmisc
 
         # Generate and set locale
         sudo locale-gen en_US.UTF-8

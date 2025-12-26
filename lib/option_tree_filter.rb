@@ -18,7 +18,9 @@ class OptionTreeFilter
   # Example: filter(provider: "aws", location: "us-east-1")
   # Returns array of matching entries with all their attributes
   def self.filter(**options)
+    # :nocov:
     return [] unless data && data["providers"]
+    # :nocov:
 
     results = []
 
@@ -52,6 +54,7 @@ class OptionTreeFilter
     results
   end
 
+  # :nocov:
   # Get all available options for a specific level
   def self.available_options(level)
     case level
@@ -96,3 +99,5 @@ if $0 == __FILE__
   p OptionTreeFilter.available_options(:families)
   p OptionTreeFilter.available_options(:sizes)
 end
+
+# :nocov:

@@ -1,0 +1,128 @@
+name: Deploy PR to Dev
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  pull-requests: write # needed for comment posting and reaction
+  contents: read # needed for code checkout
+
+jobs:
+  collect-changes:
+    name: "Collect latest tags for PR"
+    # Only run if the PR is open and the comment has the right command
+    if: github.event.issue.pull_request && (github.event.comment.body == 'deploy dev' || github.event.comment.body == '/deploy dev')
+    runs-on: k8s-nano
+    outputs:
+      services: ${{ steps.latest-pr-tags.outputs.result }}
+      authorized: ${{ steps.check-team.outputs.authorized }}
+    steps:
+      - name: React to comment
+        uses: actions/github-script@v8
+        with:
+          script: |
+            github.rest.reactions.createForIssueComment({
+              comment_id: context.payload.comment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              content: 'eyes'
+            })
+      - name: Generate Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.WORKFLOW_AUTH_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_AUTH_PRIVATE_KEY }}
+          owner: ClickHouse
+      - name: Check team membership
+        id: check-team
+        uses: actions/github-script@v8
+        with:
+          github-token: ${{ steps.generate-token.outputs.token }}
+          script: |
+            try {
+              await github.rest.teams.getMembershipForUserInOrg({
+                org: 'ClickHouse',
+                team_slug: 'clickgres',
+                username: context.payload.comment.user.login
+              })
+              core.setOutput('authorized', 'true')
+            } catch (error) {
+              if (error.status === 404) {
+                core.setOutput('authorized', 'false')
+                core.setFailed(`User ${context.payload.comment.user.login} is not a member of ClickHouse/clickgres`)
+              } else {
+                throw error
+              }
+            }
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.issue.pull_request.head.sha }} # always checkout the PR head sha
+      - run: npm install semver # needed for the github-script action
+      - name: Filter latest PR tags
+        id: latest-pr-tags
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const semver = require('semver')
+            const latestPrTags = require ('./.github/scripts/latest-pr-tags.js')
+            return latestPrTags({exec, semver}, context.issue.number)
+
+  # then for each of those changes run the deploy job
+  do-deploy:
+    if: ${{ needs.collect-changes.outputs.services != '{}' }}
+    name: "Deploy"
+    needs: [collect-changes]
+    strategy:
+      max-parallel: 1
+      matrix:
+        services: ${{ fromJSON(needs.collect-changes.outputs.services) }}
+    uses: ./.github/workflows/ch-internal-reusable-call-clickgres-builds.yml
+    with:
+      ubicloud-version: ${{ matrix.services.version }}
+    secrets: inherit
+
+  notify:
+    name: "Notify release"
+    # Skip if the first step was skipped, as that means it's not the right comment
+    if: ${{ always() && needs.collect-changes.result != 'skipped'}}
+    needs: [collect-changes, do-deploy]
+    runs-on: k8s-nano
+    steps:
+      - name: "Comment on PR"
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const authorized = '${{ needs.collect-changes.outputs.authorized }}'
+            if (authorized === 'false') {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `@${context.payload.comment.user.login} you are not authorized to deploy. Only members of ClickHouse/clickgres team can deploy.`
+              })
+              return
+            }
+            const status = '${{ needs.do-deploy.result }}'
+            var body
+            switch(status) {
+              case 'cancelled':
+              case 'failure':
+                body = `Failed to deploy changes. Please check the [action logs](${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}}) for details.`
+                break
+              case 'skipped':
+                body = 'No changes detected to deploy. Please verify if all CI steps (tests, builds, etc.) have successfully completed.'
+                break
+              default:
+                const services = ${{ needs.collect-changes.outputs.services || '[]'}}
+                const changes = services.map(s => `- ${s.service}: \`${s.version}\``).join('\n')
+                body = `Deployed changes:\n${changes}`
+            }
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })

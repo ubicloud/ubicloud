@@ -47,6 +47,10 @@ on:
         description: "Push the image"
         required: false
         type: boolean
+      prNumber:
+        description: "PR number to use for the build"
+        required: false
+        type: string
 
 jobs:
   build-and-push:
@@ -70,6 +74,9 @@ jobs:
         id: ecr-tags
         run: |
           tags="${{steps.login-ecr.outputs.registry}}/${{ inputs.tags }}"
+          if [[ -n "${{ inputs.prNumber }}" ]]; then
+            tags="${tags},${tags}-pr-${{inputs.prNumber}}"
+          fi
           echo "tags=$tags" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v5
         with:

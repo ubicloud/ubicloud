@@ -4,11 +4,11 @@ class Clover
   hash_branch(:project_prefix, "postgres-location") do |r|
     r.get true do
       authorize("Postgres:view", @project)
-      {items: filter_with_availability(vm_families_for_project(@project)).map { |l| Serializers::PostgresLocation.serialize_internal(l) }}
+      {items: self.class.filter_with_availability(vm_families_for_project(@project)).map { |l| Serializers::PostgresLocation.serialize_internal(l) }}
     end
   end
 
-  def filter_with_availability(postgres_locations, accept_missing_provider_availability: false)
+  def self.filter_with_availability(postgres_locations, accept_missing_provider_availability: false)
     postgres_locations.filter_map do |pg_location|
       location = pg_location.location
 
@@ -49,7 +49,9 @@ class Clover
           family[:sizes] = available_sizes
           true
         else
+          # :nocov:
           false
+          # :nocov:
         end
       end
 

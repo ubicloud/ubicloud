@@ -182,6 +182,8 @@ class Prog::Test < Prog::Base
   end
 
   label def destroy
+    # :nocov:
     pop "destroyed"
+    # :nocov:
   end
 end

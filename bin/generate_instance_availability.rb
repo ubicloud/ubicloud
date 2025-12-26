@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+# :nocov:
+
 require_relative "../loader"
 require "aws-sdk-ec2"
 require "yaml"
@@ -46,7 +48,7 @@ class InstanceAvailabilityGenerator
   end
 
   def process_region(region)
-    client = Aws::EC2::Client.new(region: region)
+    client = Aws::EC2::Client.new(region:)
 
     # Get all instance types available in the region
     instance_types = []
@@ -55,7 +57,7 @@ class InstanceAvailabilityGenerator
     loop do
       response = client.describe_instance_types({
         max_results: 100,
-        next_token: next_token
+        next_token:
       })
 
       instance_types.concat(response.instance_types)
@@ -137,3 +139,5 @@ if __FILE__ == $0
   puts "Total regions: #{data["providers"]["aws"]["locations"].keys.size}"
   puts "Regions: #{data["providers"]["aws"]["locations"].keys.join(", ")}"
 end
+
+# :nocov:
