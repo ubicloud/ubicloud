@@ -15,7 +15,7 @@ paths:
   /project:
     get:
       operationId: listProjects
-      summary: List all projects visible to the logged in user.
+      summary: List all projects
       parameters:
         - $ref: '#/components/parameters/start_after'
         - $ref: '#/components/parameters/page_size'
@@ -78,7 +78,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getFirewall
-      summary: Return the list of firewalls in the project
+      summary: List all firewalls
       responses:
         '200':
           $ref: '#/components/responses/Firewalls'
@@ -91,7 +91,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getGithubInstallations
-      summary: Return the list of GitHub installations in the project
+      summary: List all GitHub installations
       responses:
         '200':
           $ref: '#/components/responses/GithubInstallations'
@@ -105,7 +105,7 @@ paths:
       - $ref: '#/components/parameters/github_installation_reference'
     get:
       operationId: getGithubInstallation
-      summary: Return information for a single GitHub installation
+      summary: Get a GitHub installation
       responses:
         '200':
           $ref: '#/components/responses/GithubInstallation'
@@ -119,7 +119,7 @@ paths:
       - $ref: '#/components/parameters/github_installation_reference'
     get:
       operationId: getGithubInstallationRepositories
-      summary: Return repositories for a single GitHub installation in the project
+      summary: List repositories for a GitHub installation
       responses:
         '200':
           $ref: '#/components/responses/GithubRepositories'
@@ -134,7 +134,7 @@ paths:
       - $ref: '#/components/parameters/github_repository_reference'
     get:
       operationId: getGithubRepository
-      summary: Return information for a single GitHub repository for an installation in the project
+      summary: Get a GitHub repository
       responses:
         '200':
           $ref: '#/components/responses/GithubRepository'
@@ -149,7 +149,7 @@ paths:
       - $ref: '#/components/parameters/github_repository_reference'
     get:
       operationId: getGithubCacheEntries
-      summary: Return information for a all cache entries for a GitHub repository for an installation in the project
+      summary: List all cache entries for a GitHub repository
       responses:
         '200':
           $ref: '#/components/responses/GithubCacheEntries'
@@ -159,7 +159,7 @@ paths:
         - GitHub
     delete:
       operationId: deleteAllGithubCacheEntries
-      summary: Delete all cache entries for a GitHub repository for an installation in the project
+      summary: Delete all cache entries for a GitHub repository
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -175,7 +175,7 @@ paths:
       - $ref: '#/components/parameters/github_cache_entry_id'
     get:
       operationId: getGithubCacheEntry
-      summary: Return information for a single cache entry for a GitHub repository for an installation in the project
+      summary: Get a cache entry for a GitHub repository
       responses:
         '200':
           $ref: '#/components/responses/GithubCacheEntry'
@@ -185,7 +185,7 @@ paths:
         - GitHub
     delete:
       operationId: deleteGithubCacheEntry
-      summary: Delete a cache entry for a GitHub repository for an installation in the project
+      summary: Delete a cache entry for a GitHub repository
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -198,7 +198,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getInferenceApiKeys
-      summary: Return the list of inference API keys in the project
+      summary: List all inference API keys
       responses:
         '200':
           $ref: '#/components/responses/InferenceApiKeys'
@@ -251,7 +251,7 @@ paths:
   '/project/{project_id}/kubernetes-cluster':
     get:
       operationId: listProjectKubernetesClusters
-      summary: List all KubernetesClusters created under the given project ID and visible to logged in user
+      summary: List all kubernetes clusters
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/start_after'
@@ -267,7 +267,7 @@ paths:
   '/project/{project_id}/load-balancer':
     get:
       operationId: listLoadBalancers
-      summary: List Load Balancers in a specific project
+      summary: List all load balancers
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/start_after'
@@ -286,7 +286,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getLocationFirewall
-      summary: Return the list of firewalls in the project and location
+      summary: List firewalls in a location
       responses:
         '200':
           $ref: '#/components/responses/Firewalls'
@@ -301,7 +301,7 @@ paths:
       - $ref: '#/components/parameters/firewall_reference'
     delete:
       operationId: deleteLocationFirewall
-      summary: Delete a specific firewall
+      summary: Delete a firewall
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -311,7 +311,7 @@ paths:
         - Firewall
     get:
       operationId: getLocationFirewallDetails
-      summary: Get details of a specific firewall
+      summary: Get firewall details
       responses:
         '200':
           $ref: '#/components/responses/FirewallDetailed'
@@ -465,7 +465,7 @@ paths:
       - $ref: '#/components/parameters/firewall_rule_id'
     delete:
       operationId: deleteLocationFirewallFirewallRule
-      summary: Delete a specific firewall rule
+      summary: Delete a firewall rule
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -530,7 +530,7 @@ paths:
   '/project/{project_id}/location/{location}/kubernetes-cluster':
     get:
       operationId: listLocationKubernetesClusters
-      summary: List KubernetesClusters in a specific location of a project
+      summary: List kubernetes clusters in a location
       parameters:
         - $ref: '#/components/parameters/location'
         - $ref: '#/components/parameters/project_id'
@@ -551,7 +551,7 @@ paths:
       - $ref: '#/components/parameters/kubernetes_cluster_reference'
     delete:
       operationId: deleteKubernetesCluster
-      summary: Delete a specific KubernetesCluster
+      summary: Delete a kubernetes cluster
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -561,7 +561,7 @@ paths:
         - Kubernetes Cluster
     get:
       operationId: getKubernetesClusterDetails
-      summary: Get details of a specific KubernetesCluster in a location
+      summary: Get kubernetes cluster details
       responses:
         '200':
           $ref: '#/components/responses/KubernetesCluster'
@@ -571,7 +571,7 @@ paths:
         - Kubernetes Cluster
     post:
       operationId: createKubernetesCluster
-      summary: Create a new KubernetesCluster in a specific location of a project
+      summary: Create a new kubernetes cluster
       requestBody:
         required: true
         content:
@@ -609,7 +609,7 @@ paths:
       - $ref: '#/components/parameters/kubernetes_cluster_reference'
     get:
       operationId: getKubernetesKubeconfigFile
-      summary: Get kubeconfig.yaml of a specific KubernetesCluster in a location
+      summary: Get kubeconfig file
       responses:
         '200':
           $ref: '#/components/responses/Kubeconfig'
@@ -677,7 +677,7 @@ paths:
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers
-      summary: List Load Balancers in a specific location of a project
+      summary: List load balancers in a location
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -698,7 +698,7 @@ paths:
       - $ref: '#/components/parameters/load_balancer_reference'
     delete:
       operationId: deleteLoadBalancer
-      summary: Delete a specific Load Balancer
+      summary: Delete a load balancer
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -708,7 +708,7 @@ paths:
         - Load Balancer
     get:
       operationId: getLoadBalancerDetails
-      summary: Get details of a specific Load Balancer in a location
+      summary: Get load balancer details
       responses:
         '200':
           $ref: '#/components/responses/LoadBalancer'
@@ -718,7 +718,7 @@ paths:
         - Load Balancer
     patch:
       operationId: patchLocationLoadBalancer
-      summary: Update a Load Balancer in a specific location of a project
+      summary: Update a load balancer
       requestBody:
         required: true
         content:
@@ -766,7 +766,7 @@ paths:
         - Load Balancer
     post:
       operationId: createLocationLoadBalancer
-      summary: Create a new Load Balancer in a specific location of a project
+      summary: Create a new load balancer
       requestBody:
         required: true
         content:
@@ -819,7 +819,7 @@ paths:
       - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: attachVmLocationLoadBalancer
-      summary: Attach a VM to a Load Balancer in a specific location of a project
+      summary: Attach a VM to a load balancer
       requestBody:
         required: true
         content:
@@ -847,7 +847,7 @@ paths:
       - $ref: '#/components/parameters/load_balancer_reference'
     post:
       operationId: detachVmLocationLoadBalancer
-      summary: Detach a VM from a Load Balancer in a specific location of a project
+      summary: Detach a VM from a load balancer
       requestBody:
         required: true
         content:
@@ -927,7 +927,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
-      summary: List Postgres Databases in a specific location of a project
+      summary: List postgres databases in a location
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -948,7 +948,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     delete:
       operationId: deletePostgresDatabase
-      summary: Delete a specific Postgres Database
+      summary: Delete a postgres database
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -958,7 +958,7 @@ paths:
         - Postgres Database
     get:
       operationId: getPostgresDatabaseDetails
-      summary: Get details of a specific Postgres database in a location
+      summary: Get postgres database details
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -968,7 +968,7 @@ paths:
         - Postgres Database
     post:
       operationId: createPostgresDatabase
-      summary: Create a new Postgres Database in a specific location of a project
+      summary: Create a new postgres database
       requestBody:
         required: true
         content:
@@ -1024,7 +1024,7 @@ paths:
         - Postgres Database
     patch:
       operationId: patchPostgresDatabase
-      summary: Update a Postgres Database in a specific location of a project
+      summary: Update a postgres database
       requestBody:
         required: true
         content:
@@ -1076,7 +1076,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresCACertificatesByName
-      summary: Download CA certificates for a specific Postgres Database in a location with name
+      summary: Download CA certificates
       responses:
         '200':
           description: CA certificate file
@@ -1101,7 +1101,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresDatabaseConfig
-      summary: Get configuration for a specific Postgres Database
+      summary: Get postgres database configuration
       responses:
         '200':
           description: Successful response
@@ -1115,7 +1115,7 @@ paths:
         - Postgres Database
     post:
       operationId: updatePostgresDatabaseConfig
-      summary: Update configuration for a specific Postgres Database
+      summary: Update postgres database configuration
       requestBody:
         required: true
         content:
@@ -1135,7 +1135,7 @@ paths:
         - Postgres Database
     patch:
       operationId: patchPostgresDatabaseConfig
-      summary: Partially update configuration for a specific Postgres Database
+      summary: Partially update postgres database configuration
       requestBody:
         required: true
         content:
@@ -1160,7 +1160,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: listLocationPostgresFirewallRules
-      summary: List location Postgres firewall rules
+      summary: List postgres firewall rules
       responses:
         '200':
           $ref: '#/components/responses/PostgresFirewallRules'
@@ -1203,7 +1203,7 @@ paths:
       - $ref: '#/components/parameters/firewall_rule_id'
     patch:
       operationId: patchLocationPostgresFirewallRule
-      summary: Update a specific Postgres firewall rule
+      summary: Update a postgres firewall rule
       requestBody:
         required: true
         content:
@@ -1229,7 +1229,7 @@ paths:
         - Postgres Firewall Rule
     delete:
       operationId: deleteLocationPostgresFirewallRule
-      summary: Delete a specific firewall rule
+      summary: Delete a postgres firewall rule
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1296,7 +1296,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getPostgresDatabaseMetrics
-      summary: Get metrics for a specific Postgres Database in a location
+      summary: Get postgres database metrics
       parameters:
         - name: start
           in: query
@@ -1335,7 +1335,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: promotePostgresDatabase
-      summary: Promote a specific Postgres Read Replica Database
+      summary: Promote a postgres read replica
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1438,7 +1438,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: restartPostgresDatabase
-      summary: Restart a specific Postgres Database
+      summary: Restart a postgres database
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1449,7 +1449,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore':
     post:
       operationId: restorePostgresDatabase
-      summary: Restore a new Postgres database in a specific location of a project
+      summary: Restore a postgres database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1518,7 +1518,7 @@ paths:
         - Postgres Database
     get:
       operationId: getPostgresDatabaseUpgradeStatus
-      summary: Get details of a specific Postgres database upgrade
+      summary: Get postgres database upgrade status
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1533,7 +1533,7 @@ paths:
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
-      summary: List Private Subnets in a specific location of a project
+      summary: List private subnets in a location
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1554,7 +1554,7 @@ paths:
       - $ref: '#/components/parameters/private_subnet_reference'
     delete:
       operationId: deletePrivateSubnet
-      summary: Delete a specific Private Subnet
+      summary: Delete a private subnet
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1564,7 +1564,7 @@ paths:
         - Private Subnet
     get:
       operationId: getPrivateSubnetDetails
-      summary: Get details of a specific Private Subnet in a location
+      summary: Get private subnet details
       responses:
         '200':
           $ref: '#/components/responses/PrivateSubnet'
@@ -1574,7 +1574,7 @@ paths:
         - Private Subnet
     post:
       operationId: createPrivateSubnet
-      summary: Create a new Private Subnet in a specific location of a project
+      summary: Create a new private subnet
       requestBody:
         required: false
         content:
@@ -1664,7 +1664,7 @@ paths:
   '/project/{project_id}/location/{location}/vm':
     get:
       operationId: listLocationVMs
-      summary: List VMs in a specific location of a project
+      summary: List VMs in a location
       parameters:
         - $ref: '#/components/parameters/location'
         - $ref: '#/components/parameters/project_id'
@@ -1685,7 +1685,7 @@ paths:
       - $ref: '#/components/parameters/vm_reference'
     delete:
       operationId: deleteVM
-      summary: Delete a specific VM
+      summary: Delete a VM
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1695,7 +1695,7 @@ paths:
         - Virtual Machine
     get:
       operationId: getVMDetails
-      summary: Get details of a specific VM in a location
+      summary: Get VM details
       responses:
         '200':
           $ref: '#/components/responses/Vm'
@@ -1705,7 +1705,7 @@ paths:
         - Virtual Machine
     post:
       operationId: createVM
-      summary: Create a new VM in a specific location of a project
+      summary: Create a new VM
       requestBody:
         required: true
         content:
@@ -1785,7 +1785,7 @@ paths:
       - $ref: '#/components/parameters/vm_reference'
     post:
       operationId: restartVM
-      summary: Restart a specific VM
+      summary: Restart a VM
       responses:
         '200':
           $ref: '#/components/responses/Vm'
@@ -1810,7 +1810,7 @@ paths:
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases
-      summary: List visible Postgres Databases
+      summary: List all postgres databases
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/tags'
@@ -1829,7 +1829,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getPrivateLocations
-      summary: Return the list of private locations in the project
+      summary: List all private locations
       responses:
         '200':
           $ref: '#/components/responses/PrivateLocations'
@@ -1884,7 +1884,7 @@ paths:
       - $ref: '#/components/parameters/private_location_name'
     delete:
       operationId: deletePrivateLocation
-      summary: Delete a specific private location
+      summary: Delete a private location
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1894,7 +1894,7 @@ paths:
         - Private Location
     get:
       operationId: getPrivateLocationDetails
-      summary: Get details of a specific private location
+      summary: Get private location details
       responses:
         '200':
           $ref: '#/components/responses/PrivateLocation'
@@ -1904,7 +1904,7 @@ paths:
         - Private Location
     post:
       operationId: updatePrivateLocation
-      summary: Update a specific private location name
+      summary: Update a private location
       requestBody:
         required: true
         content:
@@ -1928,7 +1928,7 @@ paths:
   '/project/{project_id}/private-subnet':
     get:
       operationId: listPSs
-      summary: List visible Private Subnets
+      summary: List all private subnets
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/start_after'
@@ -1946,7 +1946,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getSshPublicKeys
-      summary: Return the list of SSH public keys in the project
+      summary: List all SSH public keys
       responses:
         '200':
           $ref: '#/components/responses/SshPublicKeys'
@@ -2006,7 +2006,7 @@ paths:
         - SSH Public Key
     delete:
       operationId: deleteSshPublicKey
-      summary: Delete a specific SSH public key
+      summary: Delete an SSH public key
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -2017,7 +2017,7 @@ paths:
   '/project/{project_id}/vm':
     get:
       operationId: listProjectVMs
-      summary: List all VMs created under the given project ID and visible to logged in user
+      summary: List all VMs
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/start_after'
