@@ -25,6 +25,6 @@ firewall-rules:
   4: frtrp88sbzke2mn45n1vj6mmrh  ::/0  6432  
 metric-destinations:
   1: md8ntmx8e1764nwc7p970vf3xw  foo  https://baz.example.com
-read-replicas:
+read-replicas: []
 ca-certificates:
 

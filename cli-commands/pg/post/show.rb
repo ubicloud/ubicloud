@@ -40,11 +40,6 @@ UbiCli.on("pg").run_on("show") do
         data[key].each_with_index do |md, i|
           body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
         end
-      when :read_replicas
-        body << "read-replicas:\n"
-        sdk_object.read_replicas.each do |rr|
-          body << "  " << rr[:location] << "/" << rr[:name] << "\n"
-        end
       when :ca_certificates
         body << "ca-certificates:\n" << data[key].to_s << "\n"
       else

@@ -1,4 +1,4 @@
 maintenance-window-start-at: 
 read-replica: false
 parent: 
-read-replicas:
+read-replicas: []
