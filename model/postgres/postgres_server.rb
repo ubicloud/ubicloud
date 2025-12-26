@@ -17,7 +17,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials
+    :destroy, :recycle, :promote, :refresh_walg_credentials, :stop
   include HealthMonitorMethods
   include MetricsTargetMethods
 
