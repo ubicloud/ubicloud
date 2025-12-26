@@ -92,7 +92,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "allows browsing by class when using Autoforme" do
-    project = Project.create(name: "Default")
+    # project name tests invalid ubid look-alike
+    project = Project.create(name: "test-upstream-20251224-arm")
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
     click_link "Vm"
     expect(page.title).to eq "Ubicloud Admin - Vm - Browse"
