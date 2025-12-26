@@ -13,5 +13,20 @@ class PostgresResource < Sequel::Model
         .select { |server| PgAwsAmi.where(aws_ami_id: server.vm.boot_image).count > 0 }
         .max_by(&:created_at)
     end
+
+    # The first element is the list of vm_hosts to exclude from the new server,
+    # which is empty for aws servers.
+    # The second element is the list of availability zones to exclude from the new server,
+    # which is the list of all used availability zones.
+    # The third element is the availability zone of the representative server,
+    # which is the availability zone of the new server.
+    def aws_new_server_exclusion_filters
+      exclude_availability_zones, availability_zone = if use_different_az_set?
+        [servers.map { it.vm.nic.nic_aws_resource.subnet_az }.uniq, nil]
+      else
+        [[], representative_server.vm.nic.nic_aws_resource.subnet_az]
+      end
+      [[], exclude_availability_zones, availability_zone]
+    end
   end
 end
