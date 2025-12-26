@@ -147,12 +147,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
   end
 
-  def github_client
-    @github_client ||= Github.installation_client(installation.installation_id, auto_paginate: true)
+  def client
+    @client ||= installation.client(auto_paginate: true)
   end
 
   def busy?
-    github_client.get(runners_path(github_runner.runner_id))[:busy]
+    client.get(runners_path(github_runner.runner_id))[:busy]
   rescue Octokit::NotFound
   end
 
@@ -359,7 +359,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
     data = {name: github_runner.ubid.to_s, labels: [github_runner.actual_label || github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
-    response = github_client.post(runners_path("generate-jitconfig"), data)
+    response = client.post(runners_path("generate-jitconfig"), data)
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
     vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config])
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
@@ -375,7 +375,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # process terminated prematurely before hop wait. We can't be sure if the
     # script was started or not without checking the runner status. We need to
     # locate the runner using the name and decide delete or continue to wait.
-    runners = github_client.paginate(runners_path) do |data, last_response|
+    runners = client.paginate(runners_path) do |data, last_response|
       data[:runners].concat last_response.data[:runners]
     end
     unless (runner = runners[:runners].find { it[:name] == github_runner.ubid.to_s })
@@ -387,7 +387,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # register it again.
     if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
       Clog.emit("Deregistering runner because it already exists") { [github_runner, {existing_runner: {runner_id:}}] }
-      github_client.delete(runners_path(runner_id))
+      client.delete(runners_path(runner_id))
       nap 5
     end
 
@@ -501,7 +501,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         register_deadline("wait_vm_destroy", 2 * 60 * 60)
         nap 15
       when false
-        github_client.delete(runners_path(github_runner.runner_id))
+        client.delete(runners_path(github_runner.runner_id))
         nap 5
       end
     end
