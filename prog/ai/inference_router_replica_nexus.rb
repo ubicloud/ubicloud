@@ -13,6 +13,17 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
 
   def_delegators :inference_router_replica, :vm, :inference_router, :load_balancer_vm_port
 
+  PAGE_TYPES = {
+    unhealthy_replica: {
+      message: "Replica %s of inference router %s is unavailable",
+      tag: "InferenceRouterReplicaUnavailable"
+    },
+    unhealthy_endpoints: {
+      message: "Replica %s of inference router %s has unhealthy endpoints",
+      tag: "InferenceRouterReplicaUnhealthyEndpoints"
+    }
+  }.freeze
+
   def self.assemble(inference_router_id)
     ubid = InferenceRouterReplica.generate_ubid
     DB.transaction do
@@ -202,7 +213,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     load_balancer_vm_port.reload.state == "up"
   end
 
-  def create_page
+  def create_page(type = :unhealthy_replica, details = {})
     extra_data = {
       inference_router_ubid: inference_router.ubid,
       inference_router_location: inference_router.location.name,
@@ -214,15 +225,21 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       vm_ubid: vm.ubid,
       vm_ip: vm.sshable.host,
       vm_host_ubid: vm.vm_host.ubid,
-      vm_host_ip: vm.vm_host.sshable.host
+      vm_host_ip: vm.vm_host.sshable.host,
+      **details
     }
-    Prog::PageNexus.assemble("Replica #{inference_router_replica.ubid.to_s[0..7]} of inference router #{inference_router.name} is unavailable",
-      ["InferenceRouterReplicaUnavailable", inference_router_replica.ubid],
-      inference_router_replica.ubid, severity: "warning", extra_data:)
+
+    page_details = PAGE_TYPES[type] || fail("BUG: unknown page type #{type}")
+
+    Prog::PageNexus.assemble(
+      format(page_details[:message], inference_router_replica.ubid.to_s[0..7], inference_router.name),
+      [page_details[:tag], inference_router_replica.ubid],
+      inference_router_replica.ubid, severity: "warning", extra_data:
+    )
   end
 
-  def resolve_page
-    Page.from_tag_parts("InferenceRouterReplicaUnavailable", inference_router_replica.ubid)&.incr_resolve
+  def resolve_page(type = :unhealthy_replica)
+    Page.from_tag_parts(PAGE_TYPES[type][:tag], inference_router_replica.ubid)&.incr_resolve
   end
 
   def update_config
@@ -307,14 +324,25 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     end
   end
 
-  # pushes latest config to inference router and collects billing information
+  # pushes latest config to inference router and collects billing and health information
   def ping_inference_router
     update_config
-    usage_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
-    project_usage = JSON.parse(usage_response)
-    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage: project_usage} }
+    stats_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
+    stats = JSON.parse(stats_response)
+    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, stats: stats} }
+
+    project_usage = stats["usage"]
     update_billing_records(project_usage, "prompt_billing_resource", "prompt_token_count")
     update_billing_records(project_usage, "completion_billing_resource", "completion_token_count")
+
+    endpoint_healths = stats["health"]
+    unhealthy_endpoints = endpoint_healths.reject { it["healthy"] }.map { it["id"] }
+    if unhealthy_endpoints.any?
+      Clog.emit("Some endpoints are unhealthy.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, unhealthy_endpoints: unhealthy_endpoints} }
+      create_page(:unhealthy_endpoints, {unhealthy_endpoints:})
+    else
+      resolve_page(:unhealthy_endpoints)
+    end
   end
 
   def update_billing_records(project_usage, billing_resource_key, usage_key)
