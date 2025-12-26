@@ -42,6 +42,10 @@ end
         @snap.decr(name)
       end
 
+      define_method :"#{name}_set?" do
+        @snap.set?(name)
+      end
+
       class_eval %{
 def when_#{name}_set?
   if @snap.set?(#{name.inspect})
@@ -72,9 +76,10 @@ end
   end
 
   def before_run
-    if defined?(hop_destroy) && defined?(when_destroy_set?)
-      when_destroy_set? do
-        hop_destroy if @strand.label != "destroy"
+    if defined?(hop_destroy)
+      unless destroying_set?
+        fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
+        hop_destroy if destroy_set?
       end
     end
   end
