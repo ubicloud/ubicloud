@@ -5,10 +5,21 @@ class Prog::PageNexus < Prog::Base
 
   def self.assemble(summary, tag_parts, related_resources, severity: "error", extra_data: {})
     DB.transaction do
-      return if Page.from_tag_parts(tag_parts)
-
-      pg = Page.create(summary: summary, details: extra_data.merge({"related_resources" => Array(related_resources)}), tag: Page.generate_tag(tag_parts), severity: severity)
-      Strand.create_with_id(pg, prog: "PageNexus", label: "start")
+      if (pg = Page.from_tag_parts(tag_parts))
+        pg.update(
+          summary: summary,
+          details: extra_data.merge({"related_resources" => Array(related_resources)}),
+          severity: severity
+        )
+      else
+        pg = Page.create(
+          summary: summary,
+          details: extra_data.merge({"related_resources" => Array(related_resources)}),
+          tag: Page.generate_tag(tag_parts),
+          severity: severity
+        )
+        Strand.create_with_id(pg, prog: "PageNexus", label: "start")
+      end
     end
   end
 
