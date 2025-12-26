@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class HostProvider < Sequel::Model
-  many_to_one :vm_host, key: :id
+  many_to_one :vm_host, key: :id, is_used: true
 
   HETZNER_PROVIDER_NAME = "hetzner"
   LEASEWEB_PROVIDER_NAME = "leaseweb"

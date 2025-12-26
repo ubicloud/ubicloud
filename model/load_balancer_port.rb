@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class LoadBalancerPort < Sequel::Model
-  many_to_one :load_balancer
+  many_to_one :load_balancer, read_only: true
   plugin ResourceMethods
   include HealthMonitorMethods
 end

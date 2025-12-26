@@ -4,7 +4,7 @@ require_relative "../model"
 
 class LockedDomain < Sequel::Model
   unrestrict_primary_key
-  many_to_one :oidc_provider
+  many_to_one :oidc_provider, read_only: true
 end
 
 # Table: locked_domain

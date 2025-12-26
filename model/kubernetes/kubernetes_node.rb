@@ -3,10 +3,10 @@
 require_relative "../../model"
 
 class KubernetesNode < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :vm
-  many_to_one :kubernetes_cluster
-  many_to_one :kubernetes_nodepool
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :vm, read_only: true
+  many_to_one :kubernetes_cluster, read_only: true
+  many_to_one :kubernetes_nodepool, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :retire
