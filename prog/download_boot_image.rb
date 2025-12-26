@@ -26,7 +26,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_r2?
-    frame["download_r2"] || Config.is_e2e
+    frame["download_r2"] || Config.production?
   end
 
   def url
