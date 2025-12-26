@@ -27,8 +27,9 @@ FROM docker.io/library/ruby:3.4.9-alpine3.23
 # - postgresql-client: Required for postgresql gem at runtime
 # - gcompat: Required for nokogiri gem at runtime. https://nokogiri.org/tutorials/installing_nokogiri.html#linux-musl-error-loading-shared-library
 # - foreman: Helps to start different parts of app based on Procfile
+# - coreutils: to have same base binaries as local
 RUN apk update --no-cache && \
-    apk add tzdata curl postgresql-client gcompat libffi --no-cache && \
+    apk add tzdata curl postgresql-client gcompat libffi coreutils --no-cache && \
     gem install foreman
 
 RUN adduser -D ubicloud && \
