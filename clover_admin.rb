@@ -84,7 +84,11 @@ class CloverAdmin < Roda
     raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
 
     Clog.emit("admin route exception") { Util.exception_to_hash(e) }
-    @page_title = "Internal Server Error"
+    @page_title = if e.is_a?(CloverError)
+      "#{e.type}: #{e.message}"
+    else
+      "Internal Server Error"
+    end
     view(content: "")
   end
 
@@ -174,6 +178,17 @@ class CloverAdmin < Roda
     "Project" => {
       "add_credit" => object_action("Add credit", "Added credit", {credit: "float!"}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
+      end,
+      "set_feature_flag" => object_action("Set Feature Flag", "Set feature flag", {
+        name: {typecast: :str!, type: "select", options: [""] + Project.instance_methods.filter_map { it.to_s.delete_prefix("set_ff_") if it.start_with?("set_ff_") }},
+        value: {typecast: :nonempty_str, placeholder: "JSON", required: nil}
+      }) do |obj, name, value|
+        begin
+          value = JSON.parse(value) if value
+        rescue JSON::ParserError
+          fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
+        end
+        obj.send("set_ff_#{name}", value)
       end
     },
     "Strand" => {
@@ -430,7 +445,7 @@ class CloverAdmin < Roda
             end
 
             r.post do
-              params = action.params.map { |k, v| typecast_params.send(v, k.to_s) }
+              params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
               action.call(@obj, *params)
               flash["notice"] = action.flash
               r.redirect("/model/#{@obj.class}/#{ubid}")
