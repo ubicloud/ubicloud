@@ -31,10 +31,10 @@ RSpec.describe SemSnap do
   it "operates immediately by default in non-block form" do
     snap = described_class.new(st.id)
     snap.incr(:test)
-    delete_set = instance_double(Sequel::Model::DatasetMethods)
-    expect(delete_set).to receive(:destroy)
-    expect(Semaphore).to receive(:where).and_return(delete_set)
-    snap.decr(:test)
+
+    expect { snap.decr(:test) }.to change {
+      Semaphore.where(strand_id: st.id).count
+    }.from(1).to(0)
   end
 
   it "reads semaphores at initialization" do
