@@ -360,14 +360,29 @@ RSpec.describe Validation do
   end
 
   describe "#validate_vcpu_quota" do
-    it "sufficient cpu quota" do
-      p = instance_double(Project, current_resource_usage: 5, effective_quota_value: 10, quota_available?: true)
-      expect { described_class.validate_vcpu_quota(p, "VmVCpu", 2) }.not_to raise_error
+    let(:project) { Project.create(name: "test-quota-project") }
+
+    before do
+      project.add_quota(quota_id: ProjectQuota.default_quotas["VmVCpu"]["id"], value: 10)
     end
 
-    it "insufficient cpu quota" do
-      p = instance_double(Project, current_resource_usage: 10, effective_quota_value: 10, quota_available?: false)
-      expect { described_class.validate_vcpu_quota(p, "VmVCpu", 2) }.to raise_error described_class::ValidationFailed
+    it "raises error on quota violation" do
+      create_five_vcpu = ->(name) do
+        Vm.create(
+          unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE", name: name, family: "standard", cores: 1,
+          vcpus: 5, cpu_percent_limit: 100, cpu_burst_percent_limit: 100, memory_gib: 4,
+          arch: "x64", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: true,
+          created_at: Time.now, location_id: Location::HETZNER_FSN1_ID, project_id: project.id
+        )
+      end
+      create_five_vcpu["first"]
+
+      # Not hitting quota limit yet.
+      described_class.validate_vcpu_quota(project, "VmVCpu", 2)
+      create_five_vcpu["second"]
+
+      # Now it's full, so it hits the quota limit.
+      expect { described_class.validate_vcpu_quota(project, "VmVCpu", 2) }.to raise_error described_class::ValidationFailed
     end
   end
 
