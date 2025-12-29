@@ -9,7 +9,9 @@ RSpec.describe SemSnap do
         snap.incr(:test)
       }.to change { snap.set?(:test) }.from(false).to(true)
 
-      expect(Semaphore.where(strand_id: st.id).empty?).to be false
+      # Use `#all` throughout for better error message printing, even
+      # if not required for test constrints.
+      expect(Semaphore.where(strand_id: st.id).all).not_to be_empty
 
       expect {
         snap.decr(:test)
@@ -20,10 +22,10 @@ RSpec.describe SemSnap do
 
       # Deletions are deferred until block completion to reduce
       # time the records spend locked.
-      expect(Semaphore.where(strand_id: st.id).empty?).to be false
+      expect(Semaphore.where(strand_id: st.id).all).not_to be_empty
     end
 
-    expect(Semaphore.where(strand_id: st.id).empty?).to be true
+    expect(Semaphore.where(strand_id: st.id).all).to be_empty
   end
 
   it "operates immediately by default in non-block form" do
