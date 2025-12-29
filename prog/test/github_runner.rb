@@ -14,7 +14,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
     if provider == "aws"
       github_test_project.set_ff_aws_alien_runners_ratio(1)
-      location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: github_test_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
+      location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: github_service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
       LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
     end
 
