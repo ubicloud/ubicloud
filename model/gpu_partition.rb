@@ -3,10 +3,6 @@
 require_relative "../model"
 
 class GpuPartition < Sequel::Model
-  many_to_one :vm_host
-  one_to_one :vm, key: :id, primary_key: :vm_id
-  many_to_many :pci_devices
-
   plugin ResourceMethods, etc_type: true
 end
 

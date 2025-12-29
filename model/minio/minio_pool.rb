@@ -3,9 +3,9 @@
 require_relative "../../model"
 
 class MinioPool < Sequel::Model
-  many_to_one :cluster, class: :MinioCluster
-  one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index
-  one_to_one :strand, key: :id
+  many_to_one :cluster, class: :MinioCluster, read_only: true
+  one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index, read_only: true
+  one_to_one :strand, key: :id, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :add_additional_pool

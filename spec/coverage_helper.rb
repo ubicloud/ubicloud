@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
-if (suite = ENV.delete("COVERAGE"))
+if ENV["UNUSED_ASSOCIATIONS"]
+  require "coverage"
+  Coverage.start(methods: true)
+  at_exit { Sequel::Model.update_associations_coverage }
+elsif (suite = ENV.delete("COVERAGE"))
   require "simplecov"
 
   SimpleCov.start do

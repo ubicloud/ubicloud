@@ -3,7 +3,6 @@
 require_relative "../model"
 
 class AccountIdentity < Sequel::Model(:account_identities)
-  many_to_one :account
 end
 
 # Table: account_identities
