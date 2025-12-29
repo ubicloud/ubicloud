@@ -93,10 +93,12 @@ RSpec.describe GithubRunner do
   end
 
   it "provisions a spare runner" do
-    expect(Prog::Github::GithubRunnerNexus).to receive(:assemble)
-      .with(github_runner.installation, repository_name: github_runner.repository_name, label: github_runner.label)
-      .and_return(instance_double(Strand, subject: instance_double(described_class)))
-    github_runner.provision_spare_runner
+    spare_runner = github_runner.provision_spare_runner
+
+    expect(spare_runner).to be_a(described_class)
+    expect(spare_runner.installation_id).to eq(github_runner.installation_id)
+    expect(spare_runner.repository_name).to eq(github_runner.repository_name)
+    expect(spare_runner.label).to eq(github_runner.label)
   end
 
   it "initiates a new health monitor session" do
