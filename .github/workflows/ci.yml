@@ -39,7 +39,7 @@ jobs:
       run: bundle exec rake linter:erb_formatter
 
     - name: Cache rubocop
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: /home/runner/.cache/rubocop_cache
         key: ${{ matrix.runs-on }}-rubocop-cache-${{ hashFiles('Gemfile.lock', '.rubocop.yml') }}
@@ -84,7 +84,7 @@ jobs:
 
     - name: Archive code coverage results
       if: failure()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: code-coverage-report-${{ matrix.runs-on }}
         path: coverage/
