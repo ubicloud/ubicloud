@@ -72,17 +72,17 @@ $(".delete-btn").on("click", function (event) {
   let url = $(this).data("url");
   let csrf = $(this).data("csrf");
   let confirmation = $(this).data("confirmation");
-  let confirmationMessage = $(this).data("confirmation-message");
+  let confirmationMessage = $(this).data("confirmation-message") || "Are you sure to delete?";
   let redirect = $(this).data("redirect");
   let method = $(this).data("method");
 
   if (confirmation) {
-    if (prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
+    if (prompt(`${confirmationMessage}\nPlease type "${confirmation}" to confirm deletion`, "") != confirmation) {
       alert("Could not confirm resource name");
       event.preventDefault();
       return;
     }
-  } else if (!confirm(confirmationMessage || "Are you sure to delete?")) {
+  } else if (!confirm(confirmationMessage)) {
     event.preventDefault();
     return;
   }
@@ -1021,7 +1021,7 @@ function setupPgConfigCard() {
     const keyInput = createConfigGroup.find("input").eq(0);
     const valueInput = createConfigGroup.find("input").eq(1);
     if (!keyInput[0].reportValidity()) return;
-    
+
     const placeHolderGroup = $(addBtn).closest(".group").siblings(".config-placeholder-group");
     const configId = placeHolderGroup.data("config-id");
 
