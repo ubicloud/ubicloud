@@ -448,7 +448,6 @@ RSpec.describe PostgresServer do
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
-    expect(postgres_server).to receive(:observe_archival_backlog)
     expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor").and_call_original
     expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
@@ -525,64 +524,6 @@ RSpec.describe PostgresServer do
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
-    end
-  end
-
-  describe "#observe_archival_backlog" do
-    let(:session) {
-      {ssh_session: Net::SSH::Connection::Session.allocate}
-    }
-
-    before do
-      allow(postgres_server).to receive(:archival_backlog_threshold).and_return(10)
-    end
-
-    it "checks archival backlog and does nothing if it is within limits" do
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("5\n")
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(nil)
-
-      postgres_server.observe_archival_backlog(session:)
-    end
-
-    it "checks archival backlog and creates a page if it is outside of limits" do
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("15\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} archival backlog high",
-        ["PGArchivalBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {archival_backlog: 15}
-      )
-
-      postgres_server.observe_archival_backlog(session:)
-    end
-
-    it "checks archival backlog and resolves a page if it is back within limits" do
-      existing_page = instance_double(Page)
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("3\n")
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(existing_page)
-      expect(existing_page).to receive(:incr_resolve)
-
-      postgres_server.observe_archival_backlog(session:)
-    end
-  end
-
-  describe "#archival_backlog_threshold" do
-    it "returns 1000 if the storage size is large" do
-      allow(postgres_server).to receive(:storage_size_gib).and_return(1024)
-      expect(postgres_server.archival_backlog_threshold).to eq(1000)
-    end
-
-    it "returns smaller threshold for smaller storage sizes" do
-      allow(postgres_server).to receive(:storage_size_gib).and_return(100)
-      expect(postgres_server.archival_backlog_threshold).to eq(320)
     end
   end
 

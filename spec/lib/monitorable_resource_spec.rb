@@ -53,7 +53,7 @@ RSpec.describe MonitorableResource do
       expect(session[:ssh_session]).to receive(:close)
       expect(Thread).to receive(:new).and_call_original
       expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
-      expect(Clog).to receive(:emit).at_least(:once).and_call_original
+      expect(Clog).to receive(:emit).twice.and_call_original
       r_w_event_loop.check_pulse
     end
 
