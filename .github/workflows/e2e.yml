@@ -187,7 +187,7 @@ jobs:
 
     - name: Upload logs
       if: always()
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: e2e-${{ github.run_id }}-logs
         path: foreman.log
