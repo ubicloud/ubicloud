@@ -10,7 +10,9 @@ RSpec.describe Firewall do
   }
 
   let(:ps) {
-    PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
+    private_subnet = PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "2001:db8::/64", net4: "10.0.0.0/24", project_id:)
+    Strand.create(prog: "Vnet::SubnetNexus", label: "wait", id: private_subnet.id)
+    private_subnet
   }
 
   it "inserts firewall rules" do
@@ -22,11 +24,11 @@ RSpec.describe Firewall do
     expect(pr.end).to eq(5433)
   end
 
-  it "increments VMs update_firewall_rules if there is a VM" do
-    private_subnet = instance_double(PrivateSubnet)
-    expect(fw).to receive(:private_subnets).and_return([private_subnet])
-    expect(private_subnet).to receive(:incr_update_firewall_rules)
-    fw.insert_firewall_rule("0.0.0.0/0", nil)
+  it "increments update_firewall_rules semaphore on associated private subnets" do
+    fw.associate_with_private_subnet(ps, apply_firewalls: false)
+    expect {
+      fw.insert_firewall_rule("0.0.0.0/0", nil)
+    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
   end
 
   it "bulk sets firewall rules" do
@@ -38,8 +40,9 @@ RSpec.describe Firewall do
   end
 
   it "associates with a private subnet" do
-    expect(ps).to receive(:incr_update_firewall_rules)
-    fw.associate_with_private_subnet(ps)
+    expect {
+      fw.associate_with_private_subnet(ps)
+    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
 
     expect(fw.private_subnets.count).to eq(1)
     expect(fw.private_subnets.first.id).to eq(ps.id)
@@ -49,8 +52,10 @@ RSpec.describe Firewall do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect(fw.private_subnets.count).to eq(1)
 
-    expect(ps).to receive(:incr_update_firewall_rules)
-    fw.disassociate_from_private_subnet(ps)
+    expect {
+      fw.disassociate_from_private_subnet(ps)
+    }.to change { ps.reload.update_firewall_rules_set? }.from(false).to(true)
+
     expect(fw.reload.private_subnets.count).to eq(0)
     expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
   end
@@ -59,8 +64,10 @@ RSpec.describe Firewall do
     fw.associate_with_private_subnet(ps, apply_firewalls: false)
     expect(fw.private_subnets.count).to eq(1)
 
-    expect(ps).not_to receive(:incr_update_firewall_rules)
-    fw.disassociate_from_private_subnet(ps, apply_firewalls: false)
+    expect {
+      fw.disassociate_from_private_subnet(ps, apply_firewalls: false)
+    }.not_to change { ps.reload.update_firewall_rules_set? }.from(false)
+
     expect(fw.reload.private_subnets.count).to eq(0)
     expect(PrivateSubnetFirewall.where(firewall_id: fw.id).count).to eq(0)
   end
