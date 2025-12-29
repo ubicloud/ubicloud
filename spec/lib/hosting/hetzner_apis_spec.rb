@@ -1,14 +1,18 @@
 # frozen_string_literal: true
 
 RSpec.describe Hosting::HetznerApis do
-  let(:vm_host) {
-    instance_double(
-      VmHost,
-      provider_name: HostProvider::HETZNER_PROVIDER_NAME,
-      sshable: create_mock_sshable(host: "1.1.1.1")
-    )
+  let(:vmh) {
+    vmh = create_vm_host
+    vmh.sshable.update(host: "1.1.1.1")
+    vmh
   }
-  let(:hetzner_host) { instance_double(HostProvider, provider_name: HostProvider::HETZNER_PROVIDER_NAME, connection_string: "https://robot-ws.your-server.de", server_identifier: "123", user: "user1", password: "pass", vm_host: vm_host) }
+  let(:hetzner_host) {
+    HostProvider.create do |hp|
+      hp.id = vmh.id
+      hp.server_identifier = "123"
+      hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
+    end
+  }
   let(:hetzner_apis) { described_class.new(hetzner_host) }
 
   describe "reimage" do
