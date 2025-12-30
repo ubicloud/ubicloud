@@ -361,10 +361,8 @@ RSpec.describe UBID do
     expect(string_kv(described_class.decode(nic.ubid))).to eq(string_kv(nic))
   end
 
-  it "fails to decode unknown type" do
-    expect {
-      described_class.decode("han2sefsk4f61k91z77vn0y978")
-    }.to raise_error UBIDParseError, "Couldn't decode ubid: han2sefsk4f61k91z77vn0y978"
+  it "returns nil when decoding unknown type" do
+    expect(described_class.decode("han2sefsk4f61k91z77vn0y978")).to be_nil
   end
 
   it "can be inspected" do

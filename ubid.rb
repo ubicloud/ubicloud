@@ -211,11 +211,9 @@ class UBID
 
   def self.decode(ubid)
     ubid_str = ubid.to_s
-    uuid = UBID.parse(ubid_str).to_uuid
-    klass = class_for_ubid(ubid)
-    fail UBIDParseError.new("Couldn't decode ubid: #{ubid_str}") if klass.nil?
-
-    klass[uuid]
+    if (uuid = UBID.to_uuid(ubid_str)) && (klass = class_for_ubid(ubid))
+      klass[uuid]
+    end
   end
 
   def self.from_uuidish(uuidish)
