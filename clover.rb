@@ -220,7 +220,7 @@ class Clover < Roda
   end
 
   plugin :error_handler do |e|
-    if Config.test? && ENV["SHOW_ERRORS"]
+    if Config.test? && (ENV["SHOW_ERRORS"] || request.admin?)
       raise e
     end
 
