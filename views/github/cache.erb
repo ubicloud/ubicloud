@@ -33,7 +33,7 @@
             <% entries.each do |entry| %>
               <tr id="entry-<%= entry.ubid %>" class="hidden cache-group-<%= repository_id %>">
                 <td class="py-3 pl-4 pr-3 text-sm sm:pl-6 w-full" scope="row">
-                  <div class="font-medium text-gray-900"><%= entry.key %></div>
+                  <div class="font-medium text-gray-900 break-all"><%= entry.key %></div>
                   <div class="mt-1 text-gray-500 text-xs ">created <span title="<%= entry.created_at.strftime("%Y-%m-%d %H:%M UTC") %>"><%= humanize_time(entry.created_at) %></span></div>
                 </td>
                 <td class="px-3 py-3 text-sm text-gray-500">
