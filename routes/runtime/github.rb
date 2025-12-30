@@ -134,7 +134,7 @@ class Clover
               # :nocov:
               retry
             else
-              Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+              Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
               fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
             end
           end
@@ -180,10 +180,10 @@ class Clover
             multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
-          Clog.emit("could not complete multipart upload") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("could not complete multipart upload") { {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
         rescue Aws::S3::Errors::ServiceUnavailable => ex
-          Clog.emit("s3 service unavailable") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("s3 service unavailable") { {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
           fail CloverError.new(503, "ServiceUnavailable", "Service unavailable")
         end
 

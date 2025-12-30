@@ -117,12 +117,12 @@ class Prog::Vnet::CertNexus < Prog::Base
     begin
       acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
     rescue Acme::Client::Error::AlreadyRevoked => ex
-      Clog.emit("Certificate is already revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Certificate is already revoked") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
     rescue Acme::Client::Error::NotFound => ex
-      Clog.emit("Certificate is not found") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Certificate is not found") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
     rescue Acme::Client::Error::Unauthorized => ex
       if ex.message.include?("The certificate has expired and cannot be revoked")
-        Clog.emit("Certificate is expired and cannot be revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Certificate is expired and cannot be revoked") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
       else
         raise ex
       end
