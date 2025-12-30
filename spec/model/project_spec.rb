@@ -175,11 +175,9 @@ RSpec.describe Project do
     expect { grst.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(0).to(2)
     gr2 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
     grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
-    expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 2
     expect { grst2.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(2).to(62)
 
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
-    expect(project.current_resource_usage("PostgresVCpu")).to eq 0
     expect {
       Prog::Postgres::PostgresResourceNexus.assemble(project_id: project.id, location_id: Location::HETZNER_FSN1_ID, name: "a", target_vm_size: "standard-2", target_storage_size_gib: 64)
     }.to change { project.current_resource_usage("PostgresVCpu") }.from(0).to(2)
