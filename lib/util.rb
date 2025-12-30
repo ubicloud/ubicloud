@@ -71,8 +71,18 @@ module Util
     [cert, key]
   end
 
-  def self.exception_to_hash(ex, backtrace: ex.backtrace)
-    {exception: {message: ex.message, class: ex.class.to_s, backtrace:, cause: ex.cause.inspect}}
+  def self.exception_to_hash(ex, backtrace: ex.backtrace, into: {})
+    into[:exception] = {message: ex.message, class: ex.class.to_s, backtrace:}
+    # Don't log causes if we aren't logging backtraces
+    if backtrace && (cause = ex.cause)
+      array = into[:causes] = []
+      while cause && (cause != ex)
+        ex = cause
+        cause = ex.cause
+        array << {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace}
+      end
+    end
+    into
   end
 
   def self.safe_write_to_file(filename, content)

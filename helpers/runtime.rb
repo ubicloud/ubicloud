@@ -22,7 +22,7 @@ class Clover < Roda
     begin
       jobs = runner.installation.client.workflow_run_jobs(runner.repository_name, run_id)[:jobs]
     rescue Octokit::ClientError, Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError => ex
-      log_context[:expection] = Util.exception_to_hash(ex)
+      Util.exception_to_hash(ex, into: log_context)
       Clog.emit("Could not list the jobs of the workflow run ") { {runner_scope_failure: log_context} }
       return
     end

@@ -246,7 +246,7 @@ class PostgresServer < Sequel::Model
               update: {last_known_lsn:}
             ).save_changes
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid:, last_known_lsn:, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})} }
         end
       end
 
@@ -311,6 +311,7 @@ class PostgresServer < Sequel::Model
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push"
     )
+
     increment_s3_new_timeline
     incr_refresh_walg_credentials
   end

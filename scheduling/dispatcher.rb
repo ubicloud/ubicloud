@@ -472,13 +472,6 @@ class Scheduling::Dispatcher
     strand.run(STRAND_RUNTIME)
   rescue => ex
     Clog.emit("exception terminates strand run") { Util.exception_to_hash(ex) }
-
-    cause = ex
-    loop do
-      break unless (cause = cause.cause)
-
-      Clog.emit("nested exception") { Util.exception_to_hash(cause) }
-    end
     ex
   ensure
     Thread.current[:apoptosis_at] = nil
