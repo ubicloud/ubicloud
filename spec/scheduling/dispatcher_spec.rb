@@ -422,9 +422,8 @@ RSpec.describe Scheduling::Dispatcher do
 
       # Go to the trouble of emitting those exceptions to provoke
       # plausible crashes in serialization.
-      expect(Config).to receive(:test?).and_return(false).twice
-      expect($stdout).to receive(:write).with(a_string_matching(/outer test error/))
-      expect($stdout).to receive(:write).with(a_string_matching(/nested test error/))
+      expect(Config).to receive(:test?).and_return(false)
+      expect($stdout).to receive(:write).with(a_string_matching(/outer test error.*nested test error/))
 
       start_queue = Queue.new
       finish_queue = Queue.new

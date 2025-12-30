@@ -186,7 +186,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     server_data = minio_server.server_data
     server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
   rescue => ex
-    Clog.emit("Minio server is down") { {minio_server_down: {ubid: minio_server.ubid, exception: Util.exception_to_hash(ex)}} }
+    Clog.emit("Minio server is down") { {minio_server_down: Util.exception_to_hash(ex, into: {ubid: minio_server.ubid})} }
     false
   end
 
