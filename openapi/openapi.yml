@@ -105,7 +105,7 @@ paths:
       - $ref: '#/components/parameters/github_installation_reference'
     get:
       operationId: getGithubInstallation
-      summary: Get a GitHub installation
+      summary: Get GitHub installation details
       responses:
         '200':
           $ref: '#/components/responses/GithubInstallation'
@@ -134,7 +134,7 @@ paths:
       - $ref: '#/components/parameters/github_repository_reference'
     get:
       operationId: getGithubRepository
-      summary: Get a GitHub repository
+      summary: Get GitHub repository details
       responses:
         '200':
           $ref: '#/components/responses/GithubRepository'
@@ -175,7 +175,7 @@ paths:
       - $ref: '#/components/parameters/github_cache_entry_id'
     get:
       operationId: getGithubCacheEntry
-      summary: Get a cache entry for a GitHub repository
+      summary: Get cache entry details
       responses:
         '200':
           $ref: '#/components/responses/GithubCacheEntry'
@@ -185,7 +185,7 @@ paths:
         - GitHub
     delete:
       operationId: deleteGithubCacheEntry
-      summary: Delete a cache entry for a GitHub repository
+      summary: Delete a cache entry
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -230,7 +230,7 @@ paths:
       - $ref: '#/components/parameters/inference_api_key_id'
     get:
       operationId: getInferenceApiKey
-      summary: Get a specific inference API key
+      summary: Get inference API key details
       responses:
         '200':
           $ref: '#/components/responses/InferenceApiKey'
@@ -475,7 +475,7 @@ paths:
         - Firewall Rule
     get:
       operationId: getLocationFirewallFirewallRuleDetails
-      summary: Get details of a firewall rule
+      summary: Get firewall rule details
       responses:
         '200':
           $ref: '#/components/responses/FirewallRule'
@@ -927,7 +927,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
-      summary: List postgres databases in a location
+      summary: List PostgreSQL databases in a location
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -948,7 +948,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     delete:
       operationId: deletePostgresDatabase
-      summary: Delete a postgres database
+      summary: Delete a PostgreSQL database
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -958,7 +958,7 @@ paths:
         - Postgres Database
     get:
       operationId: getPostgresDatabaseDetails
-      summary: Get postgres database details
+      summary: Get PostgreSQL database details
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -968,7 +968,7 @@ paths:
         - Postgres Database
     post:
       operationId: createPostgresDatabase
-      summary: Create a new postgres database
+      summary: Create a new PostgreSQL database
       requestBody:
         required: true
         content:
@@ -1024,7 +1024,7 @@ paths:
         - Postgres Database
     patch:
       operationId: patchPostgresDatabase
-      summary: Update a postgres database
+      summary: Update a PostgreSQL database
       requestBody:
         required: true
         content:
@@ -1061,7 +1061,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: listPostgresDatabaseBackups
-      summary: List backups for a specific Postgres database
+      summary: List backups for a specific PostgreSQL database
       responses:
         '200':
           $ref: '#/components/responses/PostgresBackups'
@@ -1076,7 +1076,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresCACertificatesByName
-      summary: Download CA certificates
+      summary: Download CA certificates for a PostgreSQL database
       responses:
         '200':
           description: CA certificate file
@@ -1101,7 +1101,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     get:
       operationId: getPostgresDatabaseConfig
-      summary: Get postgres database configuration
+      summary: Get PostgreSQL database configuration
       responses:
         '200':
           description: Successful response
@@ -1115,7 +1115,7 @@ paths:
         - Postgres Database
     post:
       operationId: updatePostgresDatabaseConfig
-      summary: Update postgres database configuration
+      summary: Replace PostgreSQL database configuration
       requestBody:
         required: true
         content:
@@ -1135,7 +1135,7 @@ paths:
         - Postgres Database
     patch:
       operationId: patchPostgresDatabaseConfig
-      summary: Partially update postgres database configuration
+      summary: Update PostgreSQL database configuration
       requestBody:
         required: true
         content:
@@ -1160,7 +1160,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: listLocationPostgresFirewallRules
-      summary: List postgres firewall rules
+      summary: List PostgreSQL firewall rules
       responses:
         '200':
           $ref: '#/components/responses/PostgresFirewallRules'
@@ -1170,7 +1170,7 @@ paths:
         - Postgres Firewall Rule
     post:
       operationId: createLocationPostgresFirewallRule
-      summary: Create a new Postgres firewall rule
+      summary: Create a new PostgreSQL firewall rule
       requestBody:
         required: true
         content:
@@ -1203,7 +1203,7 @@ paths:
       - $ref: '#/components/parameters/firewall_rule_id'
     patch:
       operationId: patchLocationPostgresFirewallRule
-      summary: Update a postgres firewall rule
+      summary: Update a PostgreSQL firewall rule
       requestBody:
         required: true
         content:
@@ -1229,7 +1229,7 @@ paths:
         - Postgres Firewall Rule
     delete:
       operationId: deleteLocationPostgresFirewallRule
-      summary: Delete a postgres firewall rule
+      summary: Delete a PostgreSQL firewall rule
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1244,7 +1244,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     post:
       operationId: createLocationPostgresMetricDestination
-      summary: Create a new Postgres Metric Destination
+      summary: Create a new PostgreSQL metric destination
       requestBody:
         required: true
         content:
@@ -1281,7 +1281,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     delete:
       operationId: deleteLocationPostgresMetricDestination
-      summary: Delete a specific Metric Destination
+      summary: Delete a specific metric destination
       responses:
         '204':
           $ref: '#/components/responses/Delete'
@@ -1296,7 +1296,7 @@ paths:
       - $ref: '#/components/parameters/project_id'
     get:
       operationId: getPostgresDatabaseMetrics
-      summary: Get postgres database metrics
+      summary: Get PostgreSQL database metrics
       parameters:
         - name: start
           in: query
@@ -1335,7 +1335,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: promotePostgresDatabase
-      summary: Promote a postgres read replica
+      summary: Promote a PostgreSQL read replica
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1346,7 +1346,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/read-replica':
     post:
       operationId: createPostgresDatabaseReadReplica
-      summary: Create a read replica of the Postgres database
+      summary: Create a read replica of the PostgreSQL database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1383,7 +1383,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: renamePostgres
-      summary: Rename a Postgres database
+      summary: Rename a PostgreSQL database
       requestBody:
         required: true
         content:
@@ -1392,7 +1392,7 @@ paths:
               type: object
               properties:
                 name:
-                  description: New name for postgres database
+                  description: New name for PostgreSQL database
                   type: string
               additionalProperties: false
               required:
@@ -1407,7 +1407,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/reset-superuser-password':
     post:
       operationId: resetSuperuserPassword
-      summary: Reset superuser password of the Postgres database
+      summary: Reset superuser password of the PostgreSQL database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1438,7 +1438,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: restartPostgresDatabase
-      summary: Restart a postgres database
+      summary: Restart a PostgreSQL database
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
@@ -1449,7 +1449,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/restore':
     post:
       operationId: restorePostgresDatabase
-      summary: Restore a postgres database
+      summary: Restore a PostgreSQL database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1479,7 +1479,7 @@ paths:
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
     post:
       operationId: setMaintenanceWindow
-      summary: Set maintenance window for the Postgres database
+      summary: Set maintenance window for the PostgreSQL database
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1508,7 +1508,7 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: upgradePostgresDatabase
-      summary: Upgrade a Postgres database to the next major version
+      summary: Upgrade a PostgreSQL database to the next major version
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabaseUpgradeStatus'
@@ -1518,7 +1518,7 @@ paths:
         - Postgres Database
     get:
       operationId: getPostgresDatabaseUpgradeStatus
-      summary: Get postgres database upgrade status
+      summary: Get PostgreSQL database upgrade status
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/location'
@@ -1810,7 +1810,7 @@ paths:
   '/project/{project_id}/postgres':
     get:
       operationId: listPostgresDatabases
-      summary: List all postgres databases
+      summary: List all PostgreSQL databases
       parameters:
         - $ref: '#/components/parameters/project_id'
         - $ref: '#/components/parameters/tags'
@@ -1976,7 +1976,7 @@ paths:
       - $ref: '#/components/parameters/ssh_public_key_reference'
     get:
       operationId: getSshPublicKey
-      summary: Get a specific SSH public key
+      summary: Get SSH public key details
       responses:
         '200':
           $ref: '#/components/responses/SshPublicKey'
