@@ -8,15 +8,6 @@ GIT
       pg (~> 1.3)
 
 GIT
-  remote: https://github.com/janko/rodauth-omniauth.git
-  revision: 477810179ba0cab8d459be1a0d87dca5b57ec94b
-  ref: 477810179ba0cab8d459be1a0d87dca5b57ec94b
-  specs:
-    rodauth-omniauth (0.6.0)
-      omniauth (~> 2.0)
-      rodauth (~> 2.36)
-
-GIT
   remote: https://github.com/ubicloud/erb-formatter.git
   revision: df3174476986706828f7baf3e5e6f5ec8ecd849b
   ref: df3174476986706828f7baf3e5e6f5ec8ecd849b
@@ -307,6 +298,9 @@ GEM
     rodauth (2.41.0)
       roda (>= 2.6.0)
       sequel (>= 4)
+    rodauth-omniauth (0.6.2)
+      omniauth (~> 2.0)
+      rodauth (~> 2.36)
     rodish (2.0.1)
       optparse
     rotp (6.3.0)
@@ -494,7 +488,7 @@ DEPENDENCIES
   reline
   roda (>= 3.96)
   rodauth (>= 2.41)
-  rodauth-omniauth!
+  rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
   rotp
   rqrcode

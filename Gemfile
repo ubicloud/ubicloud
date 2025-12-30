@@ -38,7 +38,7 @@ gem "refrigerator", ">= 1"
 gem "reline" # Remove it when pry adds it as a dependency
 gem "roda", ">= 3.96"
 gem "rodauth", ">= 2.41"
-gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
+gem "rodauth-omniauth", ">= 0.6.2"
 gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
