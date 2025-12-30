@@ -35,7 +35,7 @@ class VictoriaMetricsServer < Sequel::Model
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 8427)
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       victoria_metrics_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
     }
   end
@@ -46,7 +46,7 @@ class VictoriaMetricsServer < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -61,9 +61,9 @@ class VictoriaMetricsServer < Sequel::Model
 
   def client(socket: nil)
     VictoriaMetrics::Client.new(
-      endpoint: endpoint,
+      endpoint:,
       ssl_ca_data: resource.root_certs,
-      socket: socket,
+      socket:,
       username: resource.admin_user,
       password: resource.admin_password
     )

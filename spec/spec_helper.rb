@@ -287,7 +287,7 @@ RSpec.configure do |config|
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
-        arch: arch
+        arch:
       }
 
       args = args_from_size.merge(args)

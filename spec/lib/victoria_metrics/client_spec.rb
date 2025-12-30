@@ -4,7 +4,7 @@ require "spec_helper"
 
 RSpec.describe VictoriaMetrics::Client do
   let(:endpoint) { "http://localhost:8428" }
-  let(:client) { described_class.new(endpoint: endpoint) }
+  let(:client) { described_class.new(endpoint:) }
   let(:cert) { "-----BEGIN CERTIFICATE-----\nMIIDCzCCAfOgAwIBAgIUasLyHvpgRtp3/8N9pRPE7f89Gi4wDQYJKoZIhvcNAQEL\nBQAwFTETMBEGA1UEAwwKTXkgVGVzdCBDQTAeFw0yNTA2MDIwOTE2MjFaFw0zNTA1\nMzEwOTE2MjFaMBUxEzARBgNVBAMMCk15IFRlc3QgQ0EwggEiMA0GCSqGSIb3DQEB\nAQUAA4IBDwAwggEKAoIBAQC0WFDSoccSl95/VL4U73JYAYgg1ar96Mo9VJn5H+Y0\nvyfKUI7DWrqZtiqYlCr01nN52FFHwEBgCIYr+aa5MmMHZfe0nbeDK4AbsZKJHr0Z\nBfJfqI9pRxVd9MyRcU2XTAeDWRK3k3sRj6webU2MFxUvF7xB2Wx2+rNhLZhB+d8t\nZSRpwFiX9rgMKYkycY1kV4ZurUT72ct/Q+dNCTTUOel/brMDQhdn02PYAUKgh2UB\nELeooXt1JPedjSH41ShV2yEBA1NyTctaVp3tWfiq+b4p0ZiV/ekoBtkDe5WtaNo1\nxgvRGH/rcOfTraZKokgqCVCG1Ka4DrkvSsaTlOe9XrQlAgMBAAGjUzBRMB0GA1Ud\nDgQWBBQUnKN3Du3ihaNNK3Q9+lztEI4pajAfBgNVHSMEGDAWgBQUnKN3Du3ihaNN\nK3Q9+lztEI4pajAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQAG\ndJijmtiYx2dCw50V3QhjyVyTvhFf1B9XUKGP2i0IPApULXqDGll47iIGo6i1yD7V\n7hjpV0BCtFlNH5nH2bZ0zyUi3XCLTqlnHM8+tI6ZUMWRq2lJAgILVHH/D/VUTUl6\nS+h6rGbtzNBCz2jmP3LiL2lmfcPivJpim5RPtAbApyt7fvHWD8aGQWZHpLYn+2v5\n1laUkm55cvWlsnC27PeNT00/3Eu96dqMiLHFJgKkUGFJMr+49X+BTaLcCUXCja+s\n4nXqhVt+iVVk1RtVS/b1C17DvxnV5g1NAFiZQOx5Gfsr5v8SafKCgR/4xm/kGfEz\nIkfEWqyeWXMj/JRB2yCy\n-----END CERTIFICATE-----" }
 
   describe "#initialize" do
@@ -13,7 +13,7 @@ RSpec.describe VictoriaMetrics::Client do
     end
 
     it "creates a client with SSL configuration" do
-      client = described_class.new(endpoint: endpoint, ssl_ca_data: cert)
+      client = described_class.new(endpoint:, ssl_ca_data: cert)
 
       excon_client = client.instance_variable_get(:@client)
       expect(excon_client).to be_a(Excon::Connection)
@@ -21,7 +21,7 @@ RSpec.describe VictoriaMetrics::Client do
     end
 
     it "creates a client without SSL configuration when ssl_ca_data is not provided" do
-      client = described_class.new(endpoint: endpoint)
+      client = described_class.new(endpoint:)
 
       excon_client = client.instance_variable_get(:@client)
       expect(excon_client).to be_a(Excon::Connection)
@@ -31,7 +31,7 @@ RSpec.describe VictoriaMetrics::Client do
     context "with authentication" do
       let(:username) { "user" }
       let(:password) { "pass" }
-      let(:client) { described_class.new(endpoint: endpoint, username: username, password: password) }
+      let(:client) { described_class.new(endpoint:, username:, password:) }
 
       it "creates a client with authentication credentials" do
         expect(client.instance_variable_get(:@username)).to eq(username)
@@ -68,7 +68,7 @@ RSpec.describe VictoriaMetrics::Client do
     context "with authentication" do
       let(:username) { "user" }
       let(:password) { "pass" }
-      let(:client) { described_class.new(endpoint: endpoint, username: username, password: password) }
+      let(:client) { described_class.new(endpoint:, username:, password:) }
 
       before do
         stub_request(:get, "#{endpoint}/test")
@@ -124,7 +124,7 @@ RSpec.describe VictoriaMetrics::Client do
     let(:samples) { "metric{label=\"value\"} 42.5" }
     let(:time) { Time.now }
     let(:timestamp_msec) { (time.to_f * 1000).to_i }
-    let(:scrape) { instance_double(VictoriaMetrics::Client::Scrape, time: time, samples: samples) }
+    let(:scrape) { instance_double(VictoriaMetrics::Client::Scrape, time:, samples:) }
 
     before do
       allow(client).to receive(:gzip).with(samples).and_return("gzipped_data")
@@ -182,7 +182,7 @@ RSpec.describe VictoriaMetrics::Client do
     context "with authentication" do
       let(:username) { "user" }
       let(:password) { "pass" }
-      let(:client) { described_class.new(endpoint: endpoint, username: username, password: password) }
+      let(:client) { described_class.new(endpoint:, username:, password:) }
 
       before do
         stub_request(:post, "#{endpoint}/api/v1/import/prometheus?timestamp=#{timestamp_msec}")
@@ -246,7 +246,7 @@ RSpec.describe VictoriaMetrics::Client do
       end
 
       it "returns formatted series data" do
-        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        result = client.query_range(query:, start_ts:, end_ts:)
 
         expect(result.length).to eq(2)
         expect(result[0]["labels"]).to eq({"job" => "api", "instance" => "server1"})
@@ -256,7 +256,7 @@ RSpec.describe VictoriaMetrics::Client do
       end
 
       it "constructs the correct query parameters" do
-        client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        client.query_range(query:, start_ts:, end_ts:)
 
         expected_step = client.send(:step_seconds, start_ts, end_ts)
         query_params = [
@@ -287,7 +287,7 @@ RSpec.describe VictoriaMetrics::Client do
       end
 
       it "returns an empty array" do
-        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        result = client.query_range(query:, start_ts:, end_ts:)
         expect(result).to eq([])
       end
     end
@@ -306,7 +306,7 @@ RSpec.describe VictoriaMetrics::Client do
       end
 
       it "returns an empty array" do
-        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        result = client.query_range(query:, start_ts:, end_ts:)
         expect(result).to eq([])
       end
     end
@@ -327,7 +327,7 @@ RSpec.describe VictoriaMetrics::Client do
       end
 
       it "returns an empty array" do
-        result = client.query_range(query: query, start_ts: start_ts, end_ts: end_ts)
+        result = client.query_range(query:, start_ts:, end_ts:)
         expect(result).to eq([])
       end
     end
@@ -351,7 +351,7 @@ RSpec.describe VictoriaMetrics::Client do
     it "initializes a Scrape object with time and samples" do
       time = Time.now
       samples = "metric{label=\"value\"} 42.5"
-      scrape = VictoriaMetrics::Client::Scrape.new(time: time, samples: samples)
+      scrape = VictoriaMetrics::Client::Scrape.new(time:, samples:)
 
       expect(scrape).to be_a(VictoriaMetrics::Client::Scrape)
       expect(scrape.time).to eq(time)

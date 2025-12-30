@@ -9,7 +9,7 @@ class CloudflareClient
   end
 
   def create_token(name, policies)
-    response = @connection.post(path:, body: {name: name, policies: policies}.to_json, expects: 200)
+    response = @connection.post(path:, body: {name:, policies:}.to_json, expects: 200)
     data = JSON.parse(response.body)
     [data["result"]["id"], data["result"]["value"]]
   end

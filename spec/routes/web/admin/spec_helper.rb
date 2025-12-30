@@ -41,7 +41,7 @@ RSpec.configure do |config|
 
     def admin_webauthn_auth
       challenge = JSON.parse(page.find_by_id("webauthn-auth-form")["data-credential-options"])["challenge"]
-      fill_in "webauthn_auth", with: admin_webauthn_client.get(challenge: challenge).to_json
+      fill_in "webauthn_auth", with: admin_webauthn_client.get(challenge:).to_json
       click_button "Authenticate Using WebAuthn"
     end
   end)

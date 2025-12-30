@@ -16,7 +16,7 @@ RSpec.describe IpsecTunnel do
       Vm,
       ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:c0b4::/79"),
       inhost_name: "vm12345",
-      vm_host: vm_host
+      vm_host:
     )
   }
   let(:dst_vm) {
@@ -24,7 +24,7 @@ RSpec.describe IpsecTunnel do
       Vm,
       ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:bdc8::/79"),
       inhost_name: "vm67890",
-      vm_host: vm_host
+      vm_host:
     )
   }
   let(:src_nic) {

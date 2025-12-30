@@ -28,7 +28,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       vpc_response.vpcs.first.vpc_id
     end
 
-    private_subnet_aws_resource.update(vpc_id: vpc_id)
+    private_subnet_aws_resource.update(vpc_id:)
     hop_wait_vpc_created
   end
 
@@ -71,7 +71,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     # Step 3: Update the route table for ipv_6 traffic
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
-    private_subnet_aws_resource.update(route_table_id: route_table_id)
+    private_subnet_aws_resource.update(route_table_id:)
     internet_gateway_response = client.describe_internet_gateways({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
     if internet_gateway_response.internet_gateways.empty?
@@ -91,13 +91,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     begin
       client.create_route({
-        route_table_id: route_table_id,
+        route_table_id:,
         destination_ipv_6_cidr_block: "::/0",
         gateway_id: internet_gateway_id
       })
 
       client.create_route({
-        route_table_id: route_table_id,
+        route_table_id:,
         destination_cidr_block: "0.0.0.0/0",
         gateway_id: internet_gateway_id
       })
@@ -184,11 +184,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   def allow_ingress(group_id, from_port, to_port, cidr)
     client.authorize_security_group_ingress({
-      group_id: group_id,
+      group_id:,
       ip_permissions: [{
         ip_protocol: "tcp",
-        from_port: from_port,
-        to_port: to_port,
+        from_port:,
+        to_port:,
         ip_ranges: [{cidr_ip: cidr}]
       }]
     })

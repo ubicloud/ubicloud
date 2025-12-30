@@ -774,7 +774,7 @@ RSpec.describe Clover, "access control" do
 
     it "does not show ApiKeys on subject tag membership page" do
       tag = SubjectTag.create(project_id: project.id, name: "test-subject")
-      api_key = ApiKey.create_personal_access_token(user, project: project)
+      api_key = ApiKey.create_personal_access_token(user, project:)
       tag.add_member(api_key.id)
       visit "#{project.path}/user/access-control/tag/subject/#{tag.ubid}"
       expect(page.html).not_to include "Current Members of Subject Tag"

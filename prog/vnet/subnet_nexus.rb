@@ -47,7 +47,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
 
         firewall = Firewall.create(name: firewall_name, location_id: location.id, project_id:)
         DB.ignore_duplicate_queries do
-          ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr: cidr, port_range: Sequel.pg_range(port_range)) }
+          ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr:, port_range: Sequel.pg_range(port_range)) }
         end
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)

@@ -18,7 +18,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       ubid = KubernetesCluster.generate_ubid
       subnet = if private_subnet_id
-        PrivateSubnet[id: private_subnet_id, project_id: project_id] || fail("Given subnet is not available in the project")
+        PrivateSubnet[id: private_subnet_id, project_id:] || fail("Given subnet is not available in the project")
       else
         # Will create customer private subnet with customer firewall
         Prog::Vnet::SubnetNexus.assemble(

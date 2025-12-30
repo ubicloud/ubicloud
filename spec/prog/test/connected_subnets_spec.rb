@@ -35,8 +35,8 @@ RSpec.describe Prog::Test::ConnectedSubnets do
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:update_firewall_rules).with(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
-      vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable: sshable, ip4: NetAddr::IPv4.parse("0.0.0.0"), boot_image: "debian-12")
-      vm2 = instance_double(Vm, id: "3f2f4ed0-88b1-49c6-b66a-0d2ed4910ad0", sshable: sshable, boot_image: "almalinux-9")
+      vm1 = instance_double(Vm, id: "1ae5f1c2-2f48-4eac-84e3-cfe35b2a9865", sshable:, ip4: NetAddr::IPv4.parse("0.0.0.0"), boot_image: "debian-12")
+      vm2 = instance_double(Vm, id: "3f2f4ed0-88b1-49c6-b66a-0d2ed4910ad0", sshable:, boot_image: "almalinux-9")
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(sshable).to receive(:_cmd).with("sudo yum install -y nc")
       expect(sshable).to receive(:_cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd")
@@ -77,8 +77,8 @@ ExecStart=nc -l 8080 -6
     it "tests connection between the two subnets and fails" do
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
       expect(connected_subnets_test).to receive(:ps_single).and_return(ps_single).at_least(:once)
-      vm1 = instance_double(Vm, sshable: sshable, ip4: NetAddr::IPv4.parse("0.0.0.0"))
-      vm2 = instance_double(Vm, sshable: sshable)
+      vm1 = instance_double(Vm, sshable:, ip4: NetAddr::IPv4.parse("0.0.0.0"))
+      vm2 = instance_double(Vm, sshable:)
       expect(ps_multiple).to receive(:vms).and_return([vm1, vm2]).at_least(:once)
       expect(ps_single).to receive(:vms).and_return([vm2]).at_least(:once)
       expect(sshable).to receive(:_cmd).with("ping -c 2 google.com").at_least(:once)
@@ -103,7 +103,7 @@ ExecStart=nc -l 8080 -6
       expect(connected_subnets_test).to receive(:frame).and_return({"firewalls" => "connected_private_ipv4"})
       expect(connected_subnets_test).to receive(:ps_multiple).and_return(ps_multiple).at_least(:once)
 
-      vm1 = instance_double(Vm, sshable: sshable, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/26"))])
+      vm1 = instance_double(Vm, sshable:, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/26"))])
       vm2 = instance_double(Vm)
       expect(connected_subnets_test).to receive(:vm_to_be_connected).and_return(vm1).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
@@ -129,7 +129,7 @@ ExecStart=nc -l 8080 -6
 
     it "tests connection between the two subnets and hops to perform_blocked_private_ipv4" do
       expect(connected_subnets_test).to receive(:frame).and_return({"firewalls" => "connected_private_ipv6"})
-      vm1 = instance_double(Vm, sshable: sshable, nics: [instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("2001:db8::/64"))], private_ipv6: NetAddr::IPv6.parse("2001:db8::2"))
+      vm1 = instance_double(Vm, sshable:, nics: [instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("2001:db8::/64"))], private_ipv6: NetAddr::IPv6.parse("2001:db8::2"))
       vm2 = instance_double(Vm)
       expect(connected_subnets_test).to receive(:vm_to_be_connected).and_return(vm1).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
@@ -155,7 +155,7 @@ ExecStart=nc -l 8080 -6
 
     it "tests connection between the two subnets and hops to perform_blocked_private_ipv6" do
       expect(connected_subnets_test).to receive(:frame).and_return({"firewalls" => "blocked_private_ipv4"})
-      vm1 = instance_double(Vm, sshable: sshable, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/26"))])
+      vm1 = instance_double(Vm, sshable:, nics: [instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/26"))])
       vm2 = instance_double(Vm)
       expect(connected_subnets_test).to receive(:vm_to_be_connected).and_return(vm1).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
@@ -181,7 +181,7 @@ ExecStart=nc -l 8080 -6
 
     it "tests connection between the two subnets and hops to perform_tests_public_blocked" do
       expect(connected_subnets_test).to receive(:frame).and_return({"firewalls" => "blocked_private_ipv6"})
-      vm1 = instance_double(Vm, sshable: sshable, nics: [instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("2001:db8::/64"))], private_ipv6: NetAddr::IPv6.parse("2001:db8::2"))
+      vm1 = instance_double(Vm, sshable:, nics: [instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("2001:db8::/64"))], private_ipv6: NetAddr::IPv6.parse("2001:db8::2"))
       vm2 = instance_double(Vm)
       expect(connected_subnets_test).to receive(:vm_to_be_connected).and_return(vm1).at_least(:once)
       expect(connected_subnets_test).to receive(:vm_to_connect).and_return(vm2).at_least(:once)
@@ -284,7 +284,7 @@ ExecStart=nc -l 8080 -6
   describe ".test_connection" do
     it "tests the connection" do
       to_connect_ip = "1.1.1.1"
-      connecting = instance_double(Vm, sshable: sshable, inhost_name: "connecting")
+      connecting = instance_double(Vm, sshable:, inhost_name: "connecting")
       expect(sshable).to receive(:_cmd).with("nc -zvw 1 1.1.1.1 8080").and_return("success!")
       expect { connected_subnets_test.test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true) }.not_to raise_error
 

@@ -369,7 +369,7 @@ RSpec.describe Validation do
     it "raises error on quota violation" do
       create_five_vcpu = ->(name) do
         Vm.create(
-          unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE", name: name, family: "standard", cores: 1,
+          unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE", name:, family: "standard", cores: 1,
           vcpus: 5, cpu_percent_limit: 100, cpu_burst_percent_limit: 100, memory_gib: 4,
           arch: "x64", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: true,
           created_at: Time.now, location_id: Location::HETZNER_FSN1_ID, project_id: project.id

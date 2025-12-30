@@ -97,7 +97,7 @@ RSpec.describe VictoriaMetricsServer do
         reading: "up"
       ).and_return({reading: "up", reading_rpt: 1, reading_chg: fixed_time})
 
-      result = vms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 3, reading_chg: fixed_time - 60})
+      result = vms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 3, reading_chg: fixed_time - 60})
       expect(result).to eq({reading: "up", reading_rpt: 1, reading_chg: fixed_time})
     end
 
@@ -111,7 +111,7 @@ RSpec.describe VictoriaMetricsServer do
         reading: "down"
       ).and_return({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
 
-      result = vms.check_pulse(session: session, previous_pulse: {reading: "up", reading_rpt: 2, reading_chg: fixed_time - 30})
+      result = vms.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 2, reading_chg: fixed_time - 30})
       expect(result).to eq({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
     end
 
@@ -125,7 +125,7 @@ RSpec.describe VictoriaMetricsServer do
         reading: "down"
       ).and_return({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
 
-      result = vms.check_pulse(session: session, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: fixed_time - 10})
+      result = vms.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: fixed_time - 10})
       expect(result).to eq({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
     end
 
@@ -136,7 +136,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(client).to receive(:health).and_return(false)
       previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60}
 
-      vms.check_pulse(session: session, previous_pulse: previous_pulse)
+      vms.check_pulse(session:, previous_pulse:)
       expect(vms.reload.checkup_set?).to be true
     end
 
@@ -148,7 +148,7 @@ RSpec.describe VictoriaMetricsServer do
       vms.incr_checkup  # Pre-set the semaphore
       previous_pulse = {reading: "down", reading_rpt: 5, reading_chg: fixed_time - 60}
 
-      vms.check_pulse(session: session, previous_pulse: previous_pulse)
+      vms.check_pulse(session:, previous_pulse:)
       expect(vms.reload.strand.semaphores.count { it.name == "checkup" }).to eq(1)
     end
   end
@@ -171,12 +171,12 @@ RSpec.describe VictoriaMetricsServer do
       expect(VictoriaMetrics::Client).to receive(:new).with(
         endpoint: vms.endpoint,
         ssl_ca_data: vms.resource.root_certs,
-        socket: socket,
+        socket:,
         username: vms.resource.admin_user,
         password: vms.resource.admin_password
       )
 
-      vms.client(socket: socket)
+      vms.client(socket:)
     end
   end
 

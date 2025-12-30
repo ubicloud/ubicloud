@@ -47,7 +47,7 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_return(true)
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
   it "checks pulse on with no changes to the internal services" do
@@ -64,7 +64,7 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_return(false)
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
   it "checks pulse and fails" do
@@ -81,13 +81,13 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   describe "#kubectl" do
     it "create a new client" do
       session = Net::SSH::Connection::Session.allocate
-      expect(kc.client(session: session)).to be_an_instance_of(Kubernetes::Client)
+      expect(kc.client(session:)).to be_an_instance_of(Kubernetes::Client)
     end
   end
 

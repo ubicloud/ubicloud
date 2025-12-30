@@ -538,7 +538,7 @@ namespace :linter do
         display_content = "#{display_content[0...100]}..." if display_content.length > 100
 
         findings << {
-          file: file,
+          file:,
           line: line_number,
           content: display_content,
           full_line: lines[line_number - 1].strip

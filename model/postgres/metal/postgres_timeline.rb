@@ -17,8 +17,8 @@ class PostgresTimeline < Sequel::Model
     def metal_blob_storage_client
       @blob_storage_client ||= Minio::Client.new(
         endpoint: blob_storage_endpoint,
-        access_key: access_key,
-        secret_key: secret_key,
+        access_key:,
+        secret_key:,
         ssl_ca_data: blob_storage.root_certs
       )
     end

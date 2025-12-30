@@ -394,7 +394,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # The runner script is already started. We persist the runner_id and allow
     # wait label to decide the next step.
     Clog.emit("The runner already exists but the runner script is started too") { [github_runner, {existing_runner: {runner_id:}}] }
-    github_runner.update(runner_id: runner_id, ready_at: Time.now)
+    github_runner.update(runner_id:, ready_at: Time.now)
     hop_wait
   end
 

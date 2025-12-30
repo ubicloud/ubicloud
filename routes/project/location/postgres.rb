@@ -448,9 +448,9 @@ class Clover
             query = s.query.gsub("$ubicloud_resource_id", pg.ubid)
             begin
               series_query_result = tsdb_client.query_range(
-                query: query,
-                start_ts: start_ts,
-                end_ts: end_ts
+                query:,
+                start_ts:,
+                end_ts:
               )
 
               # This can be a two cases:
@@ -465,10 +465,10 @@ class Clover
 
               series_query_result
             rescue VictoriaMetrics::ClientError => e
-              Clog.emit("Could not query VictoriaMetrics") { {error: e.message, query: query} }
+              Clog.emit("Could not query VictoriaMetrics") { {error: e.message, query:} }
 
               if single_query
-                raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query: query})
+                raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query:})
               end
             end
           end

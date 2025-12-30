@@ -43,7 +43,7 @@ class InferenceEndpoint < Sequel::Model
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE if Config.development?
     http.use_ssl = (uri.scheme == "https")
     req = Net::HTTP::Post.new(uri.request_uri, header)
-    req.body = {model: model_name, messages: [{role: "user", content: content}]}.to_json
+    req.body = {model: model_name, messages: [{role: "user", content:}]}.to_json
     http.request(req)
   end
 

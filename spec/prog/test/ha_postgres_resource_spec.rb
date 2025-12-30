@@ -12,7 +12,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     # Create service projects for tests
     Project.create_with_id(postgres_service_project_id, name: "service-project")
     Project.create_with_id(minio_service_project_id, name: "minio-service-project")
-    allow(Config).to receive_messages(postgres_service_project_id: postgres_service_project_id, minio_service_project_id: minio_service_project_id)
+    allow(Config).to receive_messages(postgres_service_project_id:, minio_service_project_id:)
   end
 
   describe ".assemble" do

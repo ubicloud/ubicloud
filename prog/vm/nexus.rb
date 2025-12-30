@@ -82,13 +82,13 @@ class Prog::Vm::Nexus < Prog::Base
         else
           subnet = project.default_private_subnet(location)
         end
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone).subject
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
       end
 
       vm = Vm.create(
-        public_key: public_key,
-        unix_user: unix_user,
-        name: name,
+        public_key:,
+        unix_user:,
+        name:,
         family: vm_size.family,
         cores: 0, # this will be updated after allocation is complete based on the host's topology
         vcpus: vm_size.vcpus,
@@ -96,10 +96,10 @@ class Prog::Vm::Nexus < Prog::Base
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
         location_id: location.id,
-        boot_image: boot_image,
+        boot_image:,
         ip4_enabled: enable_ip4,
-        pool_id: pool_id,
-        arch: arch,
+        pool_id:,
+        arch:,
         project_id:
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)

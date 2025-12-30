@@ -58,7 +58,7 @@ class GithubRunner < Sequel::Model
   end
 
   def provision_spare_runner
-    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name: repository_name, label: label).subject
+    Prog::Github::GithubRunnerNexus.assemble(installation, repository_name:, label:).subject
   end
 
   def init_health_monitor_session
@@ -74,11 +74,11 @@ class GithubRunner < Sequel::Model
     rescue
       "down"
     end
-    aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {available_memory: available_memory})
+    aggregate_readings(previous_pulse:, reading:, data: {available_memory:})
   end
 
   def custom_label
-    GithubCustomLabel.first(name: actual_label, installation_id: installation_id)
+    GithubCustomLabel.first(name: actual_label, installation_id:)
   end
 
   alias_method :name, :ubid

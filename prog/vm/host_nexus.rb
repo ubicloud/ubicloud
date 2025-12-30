@@ -94,7 +94,7 @@ class Prog::Vm::HostNexus < Prog::Base
       case st.prog
       when "LearnOs"
         os_version = st.exitval.fetch("os_version")
-        vm_host.update(os_version: os_version, accepts_slices: os_supports_slices?(os_version))
+        vm_host.update(os_version:, accepts_slices: os_supports_slices?(os_version))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
@@ -103,11 +103,11 @@ class Prog::Vm::HostNexus < Prog::Base
         total_cores = st.exitval.fetch("total_cores")
         total_cpus = st.exitval.fetch("total_cpus")
         kwargs = {
-          arch: arch,
+          arch:,
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
-          total_cores: total_cores,
-          total_cpus: total_cpus
+          total_cores:,
+          total_cpus:
         }
         vm_host.update(**kwargs)
         (0..total_cpus - 1).each do |cpu|

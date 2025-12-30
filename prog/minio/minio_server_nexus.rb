@@ -62,7 +62,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ip4_string)
     cert, cert_key = create_certificate
-    minio_server.update(cert: cert, cert_key: cert_key)
+    minio_server.update(cert:, cert_key:)
 
     hop_bootstrap_rhizome
   end
@@ -131,7 +131,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def refresh_certificates
     cert, cert_key = create_certificate
-    minio_server.update(cert: cert, cert_key: cert_key, certificate_last_checked_at: Time.now)
+    minio_server.update(cert:, cert_key:, certificate_last_checked_at: Time.now)
 
     incr_reconfigure
     hop_wait
