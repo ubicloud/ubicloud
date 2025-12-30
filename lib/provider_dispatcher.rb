@@ -8,7 +8,7 @@ module ProviderDispatcher
     methods = {}
     PROVIDERS.each do |const|
       subdir = const.to_s.downcase
-      require File.join(dir, const.to_s.downcase, file)
+      load File.join(dir, const.to_s.downcase, file)
       implementation = model.const_get(const)
       model.include implementation
 
