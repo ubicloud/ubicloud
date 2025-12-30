@@ -136,7 +136,7 @@ RSpec.describe Clover, "firewall" do
 
         expect(page.title).to eq("Ubicloud - #{name}")
         expect(page).to have_flash_notice("'#{name}' is created")
-        fw = Firewall[name: name]
+        fw = Firewall[name:]
         expect(fw.private_subnets.first.id).to eq(ps.id)
 
         visit "#{project.path}#{ps.path}/networking"

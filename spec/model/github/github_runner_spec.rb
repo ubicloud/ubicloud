@@ -117,9 +117,9 @@ RSpec.describe GithubRunner do
     }
 
     expect(session[:ssh_session]).to receive(:_exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")
-    github_runner.check_pulse(session: session, previous_pulse: pulse)
+    github_runner.check_pulse(session:, previous_pulse: pulse)
 
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
-    github_runner.check_pulse(session: session, previous_pulse: pulse)
+    github_runner.check_pulse(session:, previous_pulse: pulse)
   end
 end

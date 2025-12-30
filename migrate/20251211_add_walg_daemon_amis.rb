@@ -16,13 +16,13 @@ Sequel.migration do
   ]
   up do
     ami_ids.each do |location_name, arch, new_ami_id, _|
-      from(:pg_aws_ami).where(aws_location_name: location_name, arch: arch).update(aws_ami_id: new_ami_id)
+      from(:pg_aws_ami).where(aws_location_name: location_name, arch:).update(aws_ami_id: new_ami_id)
     end
   end
 
   down do
     ami_ids.each do |location_name, arch, _, old_ami_id|
-      from(:pg_aws_ami).where(aws_location_name: location_name, arch: arch).update(aws_ami_id: old_ami_id)
+      from(:pg_aws_ami).where(aws_location_name: location_name, arch:).update(aws_ami_id: old_ami_id)
     end
   end
 end

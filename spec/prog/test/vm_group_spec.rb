@@ -98,7 +98,7 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
@@ -116,10 +116,10 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
 
       strand = instance_double(Strand)
-      allow(vg_test).to receive_messages(strand: strand)
+      allow(vg_test).to receive_messages(strand:)
       expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
@@ -166,7 +166,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "fails if unable to get vhost-block-backend version using RPC" do
       command = {command: "version"}.to_json
       sshable = Sshable.create
-      vm_host = instance_double(VmHost, sshable: sshable)
+      vm_host = instance_double(VmHost, sshable:)
       allow(vg_test).to receive(:vm_host).and_return(vm_host)
       vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
       expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1"]}).at_least(:once)

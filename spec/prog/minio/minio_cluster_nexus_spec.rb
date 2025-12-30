@@ -166,8 +166,8 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       private_subnet = nx.minio_cluster.private_subnet
       private_subnet_id = private_subnet.id
       # Destroy servers first (FK constraint), then pools
-      MinioServer.where(minio_pool_id: MinioPool.where(cluster_id: cluster_id).select(:id)).destroy
-      MinioPool.where(cluster_id: cluster_id).destroy
+      MinioServer.where(minio_pool_id: MinioPool.where(cluster_id:).select(:id)).destroy
+      MinioPool.where(cluster_id:).destroy
       expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
       expect(private_subnet.firewalls_dataset.count).to eq 0
       expect(Semaphore.where(strand_id: private_subnet_id, name: "destroy").count).to eq(1)

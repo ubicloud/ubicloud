@@ -38,14 +38,14 @@ RSpec.describe MetricsTargetMethods do
         expect(mock_tsdb_client).not_to receive(:import_prometheus)
         expect(test_instance).not_to receive(:mark_pending_scrapes_as_done)
 
-        test_instance.export_metrics(session: session, tsdb_client: mock_tsdb_client)
+        test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
       end
     end
 
     context "when scrape results exist" do
       let(:time) { Time.now }
       let(:scrape_result_a) { VictoriaMetrics::Client::Scrape.new(time: time - 10, samples: "metric1{} 1") }
-      let(:scrape_result_b) { VictoriaMetrics::Client::Scrape.new(time: time, samples: "metric2{} 2") }
+      let(:scrape_result_b) { VictoriaMetrics::Client::Scrape.new(time:, samples: "metric2{} 2") }
       let(:scrape_results) { [scrape_result_a, scrape_result_b] }
 
       before do
@@ -57,7 +57,7 @@ RSpec.describe MetricsTargetMethods do
       it "does not call import_prometheus or mark_pending_scrapes_as_done if tsdb_client is nil" do
         expect(mock_tsdb_client).not_to receive(:import_prometheus)
         expect(test_instance).not_to receive(:mark_pending_scrapes_as_done)
-        test_instance.export_metrics(session: session, tsdb_client: nil)
+        test_instance.export_metrics(session:, tsdb_client: nil)
       end
 
       it "imports all scrapes and marks them as done" do
@@ -65,7 +65,7 @@ RSpec.describe MetricsTargetMethods do
         expect(mock_tsdb_client).to receive(:import_prometheus).with(scrape_result_b, {foo: "bar"})
         expect(test_instance).to receive(:mark_pending_scrapes_as_done).with(session, time)
 
-        test_instance.export_metrics(session: session, tsdb_client: mock_tsdb_client)
+        test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
       end
     end
   end

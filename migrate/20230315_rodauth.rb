@@ -36,7 +36,7 @@ Sequel.migration do
       if database_type == :mysql
         {null: false}
       else
-        {null: false, default: Sequel.date_add(Sequel::CURRENT_TIMESTAMP, days: days)}
+        {null: false, default: Sequel.date_add(Sequel::CURRENT_TIMESTAMP, days:)}
       end
     end
 

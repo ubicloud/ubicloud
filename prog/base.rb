@@ -109,7 +109,7 @@ end
       fail Hop.new(old_prog, old_label,
         {retval: outval,
          stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
-         prog: prog, label: label})
+         prog:, label:})
     else
       fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
@@ -191,7 +191,7 @@ end
     new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
 
     fail Hop.new(old_prog, old_label,
-      {prog: Strand.prog_verify(prog), label: label,
+      {prog: Strand.prog_verify(prog), label:,
        stack: [new_frame] + strand.stack, retval: nil})
   end
 
@@ -200,7 +200,7 @@ end
     strand.add_child(
       id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
-      label: label,
+      label:,
       stack: Sequel.pg_jsonb_wrap([new_frame])
     )
   end
@@ -324,7 +324,7 @@ end
     fail "BUG: not valid hop target" unless self.class.labels.include? label
 
     label = label.to_s
-    fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
+    fail Hop.new(@strand.prog, @strand.label, {label:, retval: nil})
   end
 
   def register_deadline(deadline_target, deadline_in, allow_extension: false)

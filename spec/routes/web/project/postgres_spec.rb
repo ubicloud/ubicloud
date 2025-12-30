@@ -111,7 +111,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can create new PostgreSQL database in a custom AWS region" do
         project.set_ff_private_locations(true)
-        private_location = create_private_location(project: project)
+        private_location = create_private_location(project:)
         Location.where(id: [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]).destroy
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
@@ -209,7 +209,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can not create new ParadeDB PostgreSQL database in a customer specific location" do
         project
-        private_location = create_private_location(project: project)
+        private_location = create_private_location(project:)
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
 

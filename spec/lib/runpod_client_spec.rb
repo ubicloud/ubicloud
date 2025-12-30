@@ -20,7 +20,7 @@ RSpec.describe RunpodClient do
       let(:response) { instance_double(Excon::Response, body: pods_response.to_json) }
 
       it "returns the existing pod id" do
-        expect(connection).to receive(:get).with(path: "v1/pods", query: {name: name}, expects: 200).and_return(response)
+        expect(connection).to receive(:get).with(path: "v1/pods", query: {name:}, expects: 200).and_return(response)
         expect(JSON).to receive(:parse).with(response.body).and_return(pods_response)
         expect(client.create_pod(name, config)).to eq("existing-id")
       end

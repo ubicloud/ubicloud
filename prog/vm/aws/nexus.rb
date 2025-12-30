@@ -372,7 +372,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       marker = nil
       found_policy = nil
       loop do
-        response = iam_client.list_policies(scope: "Local", marker: marker, max_items: 100)
+        response = iam_client.list_policies(scope: "Local", marker:, max_items: 100)
         policy = response.policies.find { |p| p.policy_name == policy_name }
         if policy
           found_policy = policy

@@ -90,7 +90,7 @@ ff02::3 ip6-allhosts
 127.0.0.1 minio-cluster-name0.minio.ubicloud.com
 ECHO
       JSON.generate({
-        minio_config: minio_config,
+        minio_config:,
         hosts: minio_hosts,
         cert: "cert",
         cert_key: "key",

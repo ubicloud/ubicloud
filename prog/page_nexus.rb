@@ -7,7 +7,7 @@ class Prog::PageNexus < Prog::Base
     DB.transaction do
       return if Page.from_tag_parts(tag_parts)
 
-      pg = Page.create(summary: summary, details: extra_data.merge({"related_resources" => Array(related_resources)}), tag: Page.generate_tag(tag_parts), severity: severity)
+      pg = Page.create(summary:, details: extra_data.merge({"related_resources" => Array(related_resources)}), tag: Page.generate_tag(tag_parts), severity:)
       Strand.create_with_id(pg, prog: "PageNexus", label: "start")
     end
   end

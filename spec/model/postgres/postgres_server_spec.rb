@@ -382,7 +382,7 @@ RSpec.describe PostgresServer do
     expect(postgres_server).to receive(:primary?).and_return(false)
     expect(postgres_server).to receive(:standby?).and_return(false)
 
-    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
@@ -401,7 +401,7 @@ RSpec.describe PostgresServer do
     expect(postgres_server).to receive(:incr_checkup)
     expect(postgres_server).to receive(:primary?).and_return(false)
     expect(postgres_server).to receive(:standby?).and_return(true)
-    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
   it "uses pg_current_wal_lsn to track lsn for primaries" do
@@ -420,7 +420,7 @@ RSpec.describe PostgresServer do
 
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
   it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
@@ -440,7 +440,7 @@ RSpec.describe PostgresServer do
 
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
-    postgres_server.check_pulse(session: session, previous_pulse: pulse)
+    postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do

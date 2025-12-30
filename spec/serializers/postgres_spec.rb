@@ -6,10 +6,10 @@ RSpec.describe Serializers::Postgres do
   let(:project) { Project.create(name: "pg-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
-  let(:timeline) { PostgresTimeline.create(location_id: location_id) }
+  let(:timeline) { PostgresTimeline.create(location_id:) }
   let(:private_subnet) {
     PrivateSubnet.create(
-      name: "pg-subnet", project_id: project.id, location_id: location_id,
+      name: "pg-subnet", project_id: project.id, location_id:,
       net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
     )
   }
@@ -22,7 +22,7 @@ RSpec.describe Serializers::Postgres do
   let(:pg) {
     PostgresResource.create(
       name: "pg-name", superuser_password: "dummy-password", ha_type: "none",
-      target_version: "17", location_id: location_id, project_id: project.id,
+      target_version: "17", location_id:, project_id: project.id,
       user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
       target_storage_size_gib: 64, private_subnet_id: private_subnet.id
     )

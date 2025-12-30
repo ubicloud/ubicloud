@@ -162,7 +162,7 @@ RSpec.describe Clover, "github" do
   def workflow_job_object(runner_id: 123, label: "ubicloud")
     {
       id: 232323,
-      runner_id: runner_id,
+      runner_id:,
       labels: [label],
       name: "test workflow job name",
       job_name: "test job name",
@@ -176,10 +176,10 @@ RSpec.describe Clover, "github" do
 
   def workflow_job_payload(action:, installation_id: installation.installation_id, repository_name: "my-repo", workflow_job: workflow_job_object)
     {
-      action: action,
+      action:,
       installation: {id: installation_id},
       repository: {full_name: repository_name, default_branch: "main"},
-      workflow_job: workflow_job
+      workflow_job:
     }
   end
 

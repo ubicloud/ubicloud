@@ -34,10 +34,10 @@ class PostgresTimeline < Sequel::Model
     end
 
     def aws_list_objects(prefix, delimiter: "")
-      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:)
+      response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:)
       objects = response.contents
       while response.is_truncated
-        response = blob_storage_client.list_objects_v2(bucket: ubid, prefix: prefix, delimiter:, continuation_token: response.next_continuation_token)
+        response = blob_storage_client.list_objects_v2(bucket: ubid, prefix:, delimiter:, continuation_token: response.next_continuation_token)
         objects.concat(response.contents)
       end
       objects

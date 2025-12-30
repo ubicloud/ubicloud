@@ -31,7 +31,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       inference_router.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceRouterReplica.create(
-        inference_router_id: inference_router_id,
+        inference_router_id:,
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
@@ -292,7 +292,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         key: OpenSSL::PKey.read(inference_router.load_balancer.active_cert.csr_key).to_pem
       },
       projects: eligible_projects,
-      routes: routes
+      routes:
     }
     new_config = new_config.merge(JSON.parse(File.read("config/inference_router_config.json")))
     new_config_json = JSON.generate(new_config)
@@ -312,7 +312,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     update_config
     usage_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
     project_usage = JSON.parse(usage_response)
-    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage: project_usage} }
+    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage:} }
     update_billing_records(project_usage, "prompt_billing_resource", "prompt_token_count")
     update_billing_records(project_usage, "completion_billing_resource", "completion_token_count")
   end
@@ -351,7 +351,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens:, exception: Util.exception_to_hash(ex)}} }
       end
     end
   end

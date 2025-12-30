@@ -40,7 +40,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       end
 
       timeline_id = postgres_resource.read_replica? ? postgres_resource.parent.timeline.id : postgres_resource.timeline.id
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access: "fetch", exclude_host_ids: exclude_host_ids, exclude_availability_zones: exclude_availability_zones, availability_zone: availability_zone)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access: "fetch", exclude_host_ids:, exclude_availability_zones:, availability_zone:)
     end
 
     nap 5

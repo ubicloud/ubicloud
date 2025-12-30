@@ -12,7 +12,7 @@ class Clover < Roda
   end
 
   def get_scope_from_github(runner, run_id)
-    log_context = {runner_ubid: runner.ubid, repository_ubid: runner.repository.ubid, run_id: run_id}
+    log_context = {runner_ubid: runner.ubid, repository_ubid: runner.repository.ubid, run_id:}
     if run_id.nil? || run_id.empty?
       Clog.emit("The run_id is blank") { {runner_scope_failure: log_context} }
       return

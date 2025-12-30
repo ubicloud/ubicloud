@@ -7,7 +7,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   def self.assemble(installation, name, default_branch)
     DB.transaction do
-      repository = GithubRepository.new(installation_id: installation.id, name: name)
+      repository = GithubRepository.new(installation_id: installation.id, name:)
       repository.skip_auto_validations(:unique) do
         updates = {last_job_at: Time.now}
         updates[:default_branch] = default_branch if default_branch
@@ -69,7 +69,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       # will generate more in the next cycle.
       next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
 
-      Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label: label, actual_label: actual_label, count: required_runner_count}} }
+      Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label:, actual_label:, count: required_runner_count}} }
 
       required_runner_count.times do
         Prog::Github::GithubRunnerNexus.assemble(

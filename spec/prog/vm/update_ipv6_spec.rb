@@ -55,7 +55,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   def create_load_balancer(cert_enabled:)
     lb = LoadBalancer.create(
       name: "test-lb", private_subnet_id: private_subnet.id, project_id: project.id,
-      health_check_endpoint: "/health", cert_enabled: cert_enabled
+      health_check_endpoint: "/health", cert_enabled:
     )
     LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)
     lb

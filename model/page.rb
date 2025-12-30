@@ -98,7 +98,7 @@ class Page < Sequel::Model
 
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
-    Page.active.where(tag: tag).first
+    Page.active.where(tag:).first
   end
 
   private

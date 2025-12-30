@@ -51,7 +51,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
-    allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
+    allow(nx).to receive_messages(vm:, inference_endpoint:, inference_endpoint_replica: replica)
     allow(vm).to receive(:sshable).and_return(sshable)
     load_balancer.add_vm(vm)
   end

@@ -11,7 +11,7 @@ class Prog::ResolveGloballyBlockedDnsnames < Prog::Base
       begin
         addr_info = Socket.getaddrinfo(dns_name, nil)
       rescue SocketError
-        Clog.emit("Failed to resolve blocked dns name") { {dns_name: dns_name} }
+        Clog.emit("Failed to resolve blocked dns name") { {dns_name:} }
         next
       end
 

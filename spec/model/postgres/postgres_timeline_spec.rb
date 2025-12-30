@@ -54,7 +54,7 @@ PGDATA=/dat/17/data
       instance_double(
         PostgresServer,
         strand: instance_double(Strand, label: "wait"),
-        vm: instance_double(Vm, sshable: sshable)
+        vm: instance_double(Vm, sshable:)
       )
     }
 
