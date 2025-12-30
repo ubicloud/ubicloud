@@ -40,7 +40,7 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
             # handled differently.
             yield r
           rescue => ex
-            Clog.emit("Monitoring job has failed.") { {monitoring_job_failure: {resource: r.resource, exception: Util.exception_to_hash(ex)}} }
+            Clog.emit("Monitoring job has failed.") { {monitoring_job_failure: {resource: r.resource}.merge(Util.exception_to_hash(ex))} }
             r.resource.incr_checkup if r.resource.respond_to?(:incr_checkup) && !r.resource.checkup_set?
           ensure
             # We unset the started at time so we will not check for stuck pulses

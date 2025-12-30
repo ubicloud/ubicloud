@@ -262,7 +262,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens:}.merge(Util.exception_to_hash(ex))} }
       end
     end
   end
