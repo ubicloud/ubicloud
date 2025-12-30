@@ -682,6 +682,52 @@ RSpec.describe CloverAdmin do
     ENV.delete("DONT_RAISE_ADMIN_ERRORS")
   end
 
+  it "supports setting quota of Project" do
+    p = Project.create(name: "Default")
+
+    fill_in "UBID or UUID", with: p.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+
+    click_link "Set Quota"
+    path = page.current_path
+
+    # Create a new quota
+    select "VmVCpu", from: "resource_type"
+    fill_in "value", with: 512
+    click_button "Set Quota"
+    expect(page).to have_flash_notice("Set quota")
+    expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
+    expect(p.effective_quota_value("VmVCpu")).to eq(512)
+
+    # Update existing quota
+    visit path
+    select "VmVCpu", from: "resource_type"
+    fill_in "value", with: 1024
+    click_button "Set Quota"
+    expect(page).to have_flash_notice("Set quota")
+    expect(p.effective_quota_value("VmVCpu")).to eq(1024)
+
+    # Set quota to zero
+    visit path
+    select "VmVCpu", from: "resource_type"
+    fill_in "value", with: 0
+    click_button "Set Quota"
+    expect(page).to have_flash_notice("Set quota")
+    expect(p.effective_quota_value("VmVCpu")).to eq(0)
+
+    2.times do
+      # Remove quota when value is blank
+      # Ensure value being blank doesn't add quota
+      visit path
+      select "VmVCpu", from: "resource_type"
+      fill_in "value", with: ""
+      click_button "Set Quota"
+      expect(page).to have_flash_notice("Set quota")
+      expect(p.effective_quota_value("VmVCpu")).to eq(32)
+    end
+  end
+
   it "lists multiple info pages with proper links and content in table format" do
     info_pages = [["first", "tag1", Time.now], ["second", "tag2", Time.now - 1], ["third", "tag3", Time.now - 2]].map do |summary, tag, created_at|
       Page.create(summary:, tag:, severity: "info", created_at:)

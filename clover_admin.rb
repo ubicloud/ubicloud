@@ -186,7 +186,11 @@ class CloverAdmin < Roda
           add_blank: true,
           options: Project.instance_methods.filter_map { it.to_s.delete_prefix("set_ff_") if it.start_with?("set_ff_") }
         },
-        value: {typecast: :nonempty_str, placeholder: "JSON", required: nil}
+        value: {
+          typecast: :nonempty_str,
+          placeholder: "JSON",
+          required: nil
+        }
       }) do |obj, name, value|
         begin
           value = JSON.parse(value) if value
@@ -194,6 +198,31 @@ class CloverAdmin < Roda
           fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
         end
         obj.send("set_ff_#{name}", value)
+      end,
+      "set_quota" => object_action("Set Quota", "Set quota", {
+        resource_type: {
+          typecast: :str!,
+          type: "select",
+          add_blank: true,
+          options: ProjectQuota.default_quotas.keys
+        },
+        value: {
+          typecast: :int,
+          type: "number",
+          placeholder: "blank to reset to default",
+          required: nil
+        }
+      }) do |obj, resource_type, value|
+        quota_id = ProjectQuota.default_quotas[resource_type]["id"]
+        if (existing_quota = obj.quotas_dataset.first(quota_id:))
+          if value
+            existing_quota.update(value:)
+          else
+            existing_quota.destroy
+          end
+        elsif value
+          obj.add_quota(quota_id:, value:)
+        end
       end
     },
     "Strand" => {
