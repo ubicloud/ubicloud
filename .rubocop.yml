@@ -34,6 +34,9 @@ Rake:
 Sequel:
   Enabled: true
 
+Style/HashSyntax:
+  EnforcedShorthandSyntax: always
+
 Style/HashTransformKeys:
   Enabled: true
 
