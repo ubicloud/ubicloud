@@ -25,6 +25,20 @@ RSpec.describe KubernetesCluster do
     expect(kc.path).to eq("/location/eu-central-h1/kubernetes-cluster/kc-name")
   end
 
+  it "#display_state shows appropriate state" do
+    kc.strand = Strand.new(prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
+    expect(kc.display_state).to eq "running"
+    kc.strand.label = "start"
+    expect(kc.display_state).to eq "creating"
+    kc.incr_destroy
+    kc.reload
+    expect(kc.display_state).to eq "deleting"
+    Semaphore.dataset.destroy
+    kc.incr_destroying
+    kc.reload
+    expect(kc.display_state).to eq "deleting"
+  end
+
   it "initiates a new health monitor session" do
     sshable = Sshable.new
     expect(kc).to receive(:sshable).and_return(sshable)
