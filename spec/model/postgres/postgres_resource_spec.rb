@@ -332,8 +332,13 @@ RSpec.describe PostgresResource do
       server
     end
 
-    it "returns 'deleting' when strand label is 'destroy'" do
-      postgres_resource.strand.update(label: "destroy")
+    it "returns 'deleting' when destroy semaphore is set" do
+      postgres_resource.incr_destroy
+      expect(postgres_resource.display_state).to eq("deleting")
+    end
+
+    it "returns 'deleting' when destroying semaphore is set" do
+      postgres_resource.incr_destroying
       expect(postgres_resource.display_state).to eq("deleting")
     end
 
