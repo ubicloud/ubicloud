@@ -311,7 +311,7 @@ class PostgresServer < Sequel::Model
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push"
     )
-    incr_configure_s3_new_timeline if timeline.aws?
+    increment_s3_new_timeline
     incr_refresh_walg_credentials
   end
 
