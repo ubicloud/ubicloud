@@ -46,19 +46,21 @@ RSpec.describe InferenceEndpoint do
       end
     end
 
-    context "when state is deleting" do
-      before { strand.update(label: "destroy") }
-
-      it "returns 'deleting'" do
-        expect(inference_endpoint.display_state).to eq("deleting")
-      end
-    end
-
-    context "when state is creating" do
+    context "when state is wait_replicas" do
       before { strand.update(label: "wait_replicas") }
 
       it "returns 'creating'" do
         expect(inference_endpoint.display_state).to eq("creating")
+      end
+
+      it "returns 'deleting' when destroy semaphore is set" do
+        inference_endpoint.incr_destroy
+        expect(inference_endpoint.display_state).to eq("deleting")
+      end
+
+      it "returns 'deleting' when destroying semaphore is set" do
+        inference_endpoint.incr_destroying
+        expect(inference_endpoint.display_state).to eq("deleting")
       end
     end
   end
