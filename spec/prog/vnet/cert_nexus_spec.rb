@@ -13,12 +13,45 @@ RSpec.describe Prog::Vnet::CertNexus do
   }
   let(:st) { described_class.assemble("cert-hostname", dns_zone.id) }
   let(:cert) { st.subject }
+  let(:client) { instance_double(Acme::Client) }
+  let(:account_key) { Clec::Cert.ec_key }
+
+  def setup_order(new_order: false, with_order: true)
+    dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
+    authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge)
+    order = instance_double(Acme::Client::Resources::Order, authorizations: [authorization], url: "test-order-url") if with_order
+
+    unless new_order
+      expect(Acme::Client).to receive(:new).and_return(client)
+      if with_order
+        expect(client).to receive(:order).with(url: "test-order-url").and_return(order)
+        cert.update(order_url: "test-order-url", account_key: account_key.to_der, kid: "x")
+      else
+        cert.update(account_key: account_key.to_der, kid: "x")
+      end
+    end
+
+    order
+  end
+
+  def use_add_private(identifiers: [])
+    st.stack = [{"restarted" => 0, "add_private" => true}]
+    nx.instance_variable_set(:@frame, nil)
+    identifiers << "private-#{cert.hostname}"
+  end
 
   describe ".assemble" do
     it "creates a new certificate" do
       st = described_class.assemble("test-hostname", dns_zone.id)
       expect(st.subject.hostname).to eq "test-hostname"
       expect(st.label).to eq "start"
+      expect(st.stack[0]["add_private"]).to be false
+    end
+
+    it "supports add_private argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, add_private: true)
+      expect(Cert[st.id].hostname).to eq "test-hostname"
+      expect(st.stack[0]["add_private"]).to be true
     end
 
     it "fails if dns_zone is not valid" do
@@ -30,25 +63,21 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#start" do
-    let(:order) {
-      dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
-      authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge)
-      instance_double(Acme::Client::Resources::Order, authorizations: [authorization], url: "test-order-url")
-    }
+    [true, false].each do |use_add_private|
+      it "registers a deadline and starts the certificate creation process#{" when adding private DNS name" if use_add_private}" do
+        identifiers = [cert.hostname]
+        use_add_private(identifiers:) if use_add_private
+        order = setup_order(new_order: true)
+        expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
+        expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+        expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+        expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
-    it "registers a deadline and starts the certificate creation process" do
-      client = instance_double(Acme::Client)
-      key = Clec::Cert.ec_key
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(key)
-      expect(Acme::Client).to receive(:new).with(private_key: key, directory: Config.acme_directory).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
-      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name"))
-
-      expect { nx.start }.to hop("wait_dns_update")
-      expect(cert.reload.kid).to eq("test-kid")
-      expect(cert.order_url).to eq("test-order-url")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
+        expect { nx.start }.to hop("wait_dns_update")
+        expect(cert.reload.kid).to eq("test-kid")
+        expect(cert.order_url).to eq("test-order-url")
+        expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
+      end
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -62,45 +91,48 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#wait_dns_update" do
+    before do
+      @order = setup_order
+      @dns_record = DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
+    end
+
     it "waits for dns_record to be seen by all servers" do
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")).at_least(:once)
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
       expect { nx.wait_dns_update }.to nap(10)
     end
 
     it "requests validation when dns_record is seen by all servers" do
-      challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_content: "content")
-      expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
-      dns_record = DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "content")
-      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: dns_record.id, dns_server_id: nil)
+      DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: @dns_record.id, dns_server_id: nil)
 
-      expect(challenge).to receive(:request_validation)
+      expect(@order.authorizations.first.dns).to receive(:request_validation)
       expect { nx.wait_dns_update }.to hop("wait_dns_validation")
     end
   end
 
   describe "#wait_dns_validation" do
-    let(:challenge) {
-      instance_double(Acme::Client::Resources::Challenges::DNS01, status: "pending", record_name: "test-record-name", record_content: "content")
-    }
-
     before do
-      expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
+      @order = setup_order
+      @challenge = @order.authorizations.first.dns
     end
 
-    it "waits for dns_challenge to be validated" do
+    it "waits for dns_challenge to be validated if pending" do
+      expect(@challenge).to receive(:status).and_return("pending")
+      expect { nx.wait_dns_validation }.to nap(10)
+    end
+
+    it "waits for dns_challenge to be validated if processing" do
+      expect(@challenge).to receive(:status).and_return("processing")
       expect { nx.wait_dns_validation }.to nap(10)
     end
 
     it "hops to restart if dns_challenge validation fails" do
-      expect(challenge).to receive(:status).and_return("failed")
+      expect(@challenge).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("DNS validation failed", instance_of(Hash)).and_call_original
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
       expect { nx.wait_dns_validation }.to hop("restart")
     end
 
     it "hops to cert_finalization when dns_challenge is valid" do
-      expect(challenge).to receive(:status).and_return("valid")
+      expect(@challenge).to receive(:status).and_return("valid")
 
       key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
@@ -110,46 +142,56 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#cert_finalization" do
-    it "finalizes the certificate" do
-      csr = instance_double(Acme::Client::CertificateRequest)
-      acme_order = instance_double(Acme::Client::Resources::Order)
-      expect(nx).to receive(:acme_order).and_return(acme_order).at_least(:once)
-      key = Clec::Cert.ec_key
-      cert.update(csr_key: key.to_der)
-      expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), common_name: "cert-hostname").and_return(csr)
-      expect(acme_order).to receive(:finalize).with(csr:)
-      expect { nx.cert_finalization }.to hop("wait_cert_finalization")
+    [true, false].each do |use_add_private|
+      it "finalizes the certificate#{" when adding private DNS name" if use_add_private}" do
+        names = []
+        use_add_private(identifiers: names) if use_add_private
+        csr = instance_double(Acme::Client::CertificateRequest)
+        key = Clec::Cert.ec_key
+        cert.update(csr_key: key.to_der)
+        expect(Acme::Client::CertificateRequest).to receive(:new).with(private_key: instance_of(OpenSSL::PKey::EC), common_name: "cert-hostname", names:).and_return(csr)
+        expect(setup_order).to receive(:finalize).with(csr:)
+        expect { nx.cert_finalization }.to hop("wait_cert_finalization")
+      end
     end
   end
 
   describe "#wait_cert_finalization" do
-    let(:acme_order) {
-      instance_double(Acme::Client::Resources::Order, status: "processing")
-    }
-
     before do
-      expect(nx).to receive(:acme_order).and_return(acme_order).at_least(:once)
+      @acme_order = setup_order
     end
 
     it "waits for certificate to be finalized" do
+      expect(@acme_order).to receive(:status).and_return("processing")
       expect { nx.wait_cert_finalization }.to nap(10)
     end
 
     it "hops to restart if certificate finalization fails" do
-      challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, status: "pending", record_name: "test-record-name", record_content: "content")
-      expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
-      expect(acme_order).to receive(:status).and_return("failed")
+      expect(@acme_order).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("Certificate finalization failed", instance_of(Hash)).and_call_original
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+
       expect { nx.wait_cert_finalization }.to hop("restart")
+        .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
     end
 
     it "updates the certificate when certificate is valid" do
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name"))
-      expect(acme_order).to receive(:status).and_return("valid")
-      expect(acme_order).to receive(:certificate).and_return("test-certificate")
+      expect(@acme_order).to receive(:status).and_return("valid")
+      expect(@acme_order).to receive(:certificate).and_return("test-certificate")
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
       expect { nx.wait_cert_finalization }.to hop("wait")
+        .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
+      expect(cert.reload.cert).to eq("test-certificate")
+    end
+
+    it "deletes private DNS record if add_private is set" do
+      use_add_private(identifiers: [])
+      expect(@acme_order).to receive(:status).and_return("valid")
+      expect(@acme_order).to receive(:certificate).and_return("test-certificate")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      expect { nx.wait_cert_finalization }.to hop("wait")
+        .and change { DnsRecord.where(:tombstoned).count }.from(0).to(2)
       expect(cert.reload.cert).to eq("test-certificate")
     end
   end
@@ -194,10 +236,8 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#destroy" do
     it "revokes the certificate and deletes the dns record" do
-      client = instance_double(Acme::Client)
+      setup_order
       cert.update(cert: "test-cert")
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
-      expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).with(certificate: "test-cert", reason: "cessationOfOperation")
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
 
@@ -206,7 +246,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "does not revoke the certificate if it doesn't exist" do
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
+      setup_order
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
       expect(cert).to exist
 
@@ -215,7 +255,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "skips deleting the dns record if dns_challenge doesn't exist" do
-      expect(nx).to receive(:dns_challenge).and_return(nil)
+      setup_order
       expect(cert).to exist
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
@@ -241,12 +281,10 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "emits a log and continues if the cert is already revoked" do
-      client = instance_double(Acme::Client)
+      setup_order
       cert.update(cert: "test-cert")
-      expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::AlreadyRevoked.new("already revoked"))
       expect(Clog).to receive(:emit).with("Certificate is already revoked", instance_of(Hash)).and_call_original
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
@@ -254,12 +292,10 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "emits a log and continues if the cert is not found" do
-      client = instance_double(Acme::Client)
+      setup_order
       cert.update(cert: "test-cert")
-      expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::NotFound.new("not found"))
       expect(Clog).to receive(:emit).with("Certificate is not found", instance_of(Hash)).and_call_original
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
@@ -267,12 +303,10 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "emits a log and continues if the cert is revoked previously and we get Unauthorized" do
-      client = instance_double(Acme::Client)
+      setup_order
       cert.update(cert: "test-cert")
-      expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate has expired and cannot be revoked"))
       expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked", instance_of(Hash)).and_call_original
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
 
       expect { nx.destroy }.to exit({"msg" => "certificate revoked and destroyed"})
@@ -280,9 +314,8 @@ RSpec.describe Prog::Vnet::CertNexus do
     end
 
     it "fires an exception if the cert is not authorized and the message is not about the certificate being expired" do
-      client = instance_double(Acme::Client)
+      setup_order(with_order: false)
       cert.update(cert: "test-cert")
-      expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate is not authorized"))
 
       expect { nx.destroy }.to raise_error(Acme::Client::Error::Unauthorized)
@@ -316,16 +349,6 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "returns nil if order_url is nil" do
       expect(nx.acme_order).to be_nil
-    end
-  end
-
-  describe "#dns_challenge" do
-    it "returns the dns challenge" do
-      order = instance_double(Acme::Client::Resources::Order)
-      expect(nx).to receive(:acme_order).and_return(order)
-      expect(order).to receive(:authorizations).and_return([instance_double(Acme::Client::Resources::Authorization, dns: "dns")])
-
-      expect(nx.dns_challenge).to eq "dns"
     end
   end
 
