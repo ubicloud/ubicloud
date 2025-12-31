@@ -8,7 +8,7 @@ class Prog::Vnet::CertNexus < Prog::Base
 
   REVOKE_REASON = "cessationOfOperation"
 
-  def self.assemble(hostname, dns_zone_id)
+  def self.assemble(hostname, dns_zone_id, add_private: false)
     unless Config.development? || DnsZone[dns_zone_id]
       fail "Given DNS zone doesn't exist with the id #{dns_zone_id}"
     end
@@ -16,7 +16,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     DB.transaction do
       cert = Cert.create(hostname:, dns_zone_id:)
 
-      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
+      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0, "add_private" => add_private}])
     end
   end
 
@@ -32,57 +32,75 @@ class Prog::Vnet::CertNexus < Prog::Base
     account_key = OpenSSL::PKey::EC.generate("prime256v1")
     client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory)
     account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
-    order = client.new_order(identifiers: [cert.hostname])
-    authorization = order.authorizations.first
+    identifiers = [cert.hostname]
+    identifiers << "private-#{cert.hostname}" if frame["add_private"]
+    order = client.new_order(identifiers:)
     cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
-    dns_challenge = authorization.dns
-    dns_zone.insert_record(record_name: dns_record_name, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
+    order.authorizations.each do |authorization|
+      dns_challenge = authorization.dns
+      # With multiple authorizations for separate DNS challenge records, there doesn't
+      # seem to be a way to tie an authorization to a specific DNS name. So add all
+      # authorizations to all names we are requesting.
+      each_dns_record_name(dns_challenge) do |record_name|
+        dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
+      end
+    end
 
     hop_wait_dns_update
   end
 
   label def wait_dns_update
-    dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: dns_record_name + ".", tombstoned: false, data: dns_challenge.record_content]
-    if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
-      nap 10
+    each_dns_challenge do |dns_challenge|
+      each_dns_record_name(dns_challenge) do |name|
+        dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
+        if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
+          nap 10
+        end
+      end
     end
 
-    dns_challenge.request_validation
+    each_dns_challenge(&:request_validation)
 
     hop_wait_dns_validation
   end
 
   label def wait_dns_validation
-    case dns_challenge.status
-    when "pending", "processing"
-      nap 10
-    when "valid"
-      cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
-      hop_cert_finalization
-    else
-      Clog.emit("DNS validation failed", {order_status: dns_challenge.status})
-      dns_zone.delete_record(record_name: dns_record_name)
-      hop_restart
+    each_dns_challenge do |dns_challenge|
+      case (order_status = dns_challenge.status)
+      when "pending", "processing"
+        # do nothing
+      when "valid"
+        # Any valid challenge is sufficient according to RFC 8555 Section 7.1.4
+        cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+        hop_cert_finalization
+      else
+        Clog.emit("DNS validation failed", {order_status:})
+        cleanup_dns_challenge_records
+        hop_restart
+      end
     end
+
+    # All challenges in pending or processing
+    nap 10
   end
 
   label def cert_finalization
-    acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname))
+    names = frame["add_private"] ? ["private-#{cert.hostname}"] : []
+    acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
     hop_wait_cert_finalization
   end
 
   label def wait_cert_finalization
-    case acme_order.status
+    case (order_status = acme_order.status)
     when "processing"
       nap 10
     when "valid"
       cert.update(cert: acme_order.certificate, created_at: Time.now)
-
-      dns_zone.delete_record(record_name: dns_record_name)
+      cleanup_dns_challenge_records
       hop_wait
     else
-      Clog.emit("Certificate finalization failed", {order_status: acme_order.status})
-      dns_zone.delete_record(record_name: dns_record_name)
+      Clog.emit("Certificate finalization failed", {order_status:})
+      cleanup_dns_challenge_records
       hop_restart
     end
   end
@@ -128,7 +146,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       end
     end
 
-    dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
+    cleanup_dns_challenge_records
     cert.destroy
     pop "certificate revoked and destroyed"
   end
@@ -136,20 +154,34 @@ class Prog::Vnet::CertNexus < Prog::Base
   def acme_client
     # If the private_key is not yet set, we did not start the communication with
     # ACME server yet, therefore, we return nil.
-    Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid) if cert.account_key
+    if cert.account_key
+      @acme_client ||= Acme::Client.new(private_key: Util.parse_key(cert.account_key), directory: Config.acme_directory, kid: cert.kid)
+    end
   end
 
   def acme_order
     # If the order_url is set, acme_client cannot be nil, so, this is nullref safe
-    acme_client.order(url: cert.order_url) if cert.order_url
+    if cert.order_url
+      @acme_order ||= acme_client.order(url: cert.order_url)
+    end
   end
 
-  def dns_challenge
-    acme_order&.authorizations&.first&.dns
+  def each_dns_challenge
+    acme_order&.authorizations&.each { yield it.dns }
   end
 
-  def dns_record_name
-    dns_challenge.record_name + "." + cert.hostname
+  def each_dns_record_name(dns_challenge)
+    name = dns_challenge.record_name
+    yield(name + "." + cert.hostname)
+    yield(name + ".private-" + cert.hostname) if frame["add_private"]
+  end
+
+  def cleanup_dns_challenge_records
+    each_dns_challenge do |dns_challenge|
+      each_dns_record_name(dns_challenge) do |record_name|
+        dns_zone.delete_record(record_name:)
+      end
+    end
   end
 
   def dns_zone
