@@ -41,6 +41,8 @@ require "logger"
 require "sequel/core"
 require "webmock/rspec"
 
+RSpec::Matchers.define_negated_matcher :not_change, :change
+
 def Object.method_added(method)
   if self == Object && method != :Nokogiri && method != :CSV
     raise "unexpected Object##{method} defined\n#{caller(1, 3).join("\n")}"
