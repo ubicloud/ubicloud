@@ -337,6 +337,16 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("deleting")
     end
 
+    it "returns 'deleting' when destroy semaphore is set" do
+      postgres_resource.incr_destroy
+      expect(postgres_resource.display_state).to eq("deleting")
+    end
+
+    it "returns 'deleting' when destroying semaphore is set" do
+      postgres_resource.incr_destroying
+      expect(postgres_resource.display_state).to eq("deleting")
+    end
+
     it "returns 'unavailable' when representative server's strand label is 'unavailable'" do
       create_representative_server(strand_label: "unavailable")
       expect(postgres_resource.display_state).to eq("unavailable")
