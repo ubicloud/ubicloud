@@ -45,7 +45,7 @@
       <td><%= k %></td>
       <td>
         <% if v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
-          <a href="/model/<%= column_class %>/<%= v %>"><%= obj.admin_label %></a>
+          <a href="/model/<%= column_class %>/<%= v %>" title="<%= v %>"><%= obj.admin_label %></a>
         <% elsif v&.is_a?(Sequel::Postgres::JSONBHash) %>
           <pre><%== linkify_ubids(JSON.pretty_generate(v)) %></pre>
         <% else %>
@@ -82,7 +82,7 @@
       <h3><%= assoc %></h3>
       <ul>
       <% assoc_objs.each do %>
-        <li><a href="/model/<%= associated_class %>/<%= it.ubid %>"><%= it.admin_label %></a></li>
+        <li><a href="/model/<%= associated_class %>/<%= it.ubid %>" title="<%= it.ubid %>"><%= it.admin_label %></a></li>
       <% end %>
       </ul>
     </div>
