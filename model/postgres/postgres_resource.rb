@@ -45,7 +45,7 @@ class PostgresResource < Sequel::Model
   end
 
   def display_state
-    return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
+    return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
     server_strand_label = representative_server&.strand&.label
     return "unavailable" if server_strand_label == "unavailable"
