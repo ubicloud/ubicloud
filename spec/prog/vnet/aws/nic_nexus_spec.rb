@@ -179,6 +179,14 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect { nx.attach_eip_network_interface }.to hop("wait")
     end
 
+    it "associates the elastic ip with the network interface if it has no addresses" do
+      expect(nic.nic_aws_resource).to receive(:eip_allocation_id).and_return("eip-0123456789abcdefg").at_least(:once)
+      client.stub_responses(:describe_addresses, addresses: [])
+      client.stub_responses(:associate_address)
+      expect(client).not_to receive(:associate_address)
+      expect { nx.attach_eip_network_interface }.to nap(1)
+    end
+
     it "skips association if elastic ip is already associated" do
       client.stub_responses(:describe_addresses, addresses: [{allocation_id: "eip-0123456789abcdefg", network_interface_id: "eni-existing"}])
       expect(client).not_to receive(:associate_address)
