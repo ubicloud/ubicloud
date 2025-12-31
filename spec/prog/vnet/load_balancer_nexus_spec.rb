@@ -85,8 +85,9 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       dns_zone = DnsZone.create(name: "test-dns-zone", project_id: nx.load_balancer.private_subnet.project_id)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.create_new_cert }.to hop("wait_cert_provisioning")
-      expect(Strand.where(prog: "Vnet::CertNexus").count).to eq 2
-      expect(nx.load_balancer.certs.count).to eq 2
+        .and change { Strand.where(prog: "Vnet::CertNexus").count }.from(1).to(2)
+        .and change { Strand.where(prog: "Vnet::CertNexus").all.select { it.stack[0]["add_private"] }.count }.from(0).to(1)
+        .and change { nx.load_balancer.certs.count }.from(1).to(2)
     end
 
     it "creates a cert without dns zone in development" do
