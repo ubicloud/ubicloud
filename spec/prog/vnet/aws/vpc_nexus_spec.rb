@@ -24,8 +24,9 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
   describe "#start" do
     it "creates PrivateSubnetAwsResource and hops to create_vpc" do
-      expect(PrivateSubnetAwsResource).to receive(:create_with_id).with(ps.id)
+      aws_resource.destroy
       expect { nx.start }.to hop("create_vpc")
+      expect(ps.private_subnet_aws_resource).not_to be_nil
     end
   end
 
@@ -34,7 +35,8 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
     it "creates a vpc" do
       client.stub_responses(:describe_vpcs, vpcs: [])
-      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_return(instance_double(Aws::EC2::Types::CreateVpcResult, vpc: instance_double(Aws::EC2::Types::Vpc, vpc_id: "vpc-0123456789abcdefg")))
+      client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
+      expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_call_original
       expect { nx.create_vpc }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
     end
@@ -181,9 +183,10 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     it "extends deadline if a vm prevents destroy" do
       vm = create_hosted_vm(ps.project, ps, "vm1")
       vm.incr_prevent_destroy
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60, allow_extension: true)
 
       expect { nx.destroy }.to nap(5)
+      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 10 * 60)
+      expect(nx.strand.stack.first.fetch("deadline_target")).to be_nil
     end
 
     it "fails if there are active resources" do
