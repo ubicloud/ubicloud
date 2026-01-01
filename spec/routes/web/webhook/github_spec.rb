@@ -57,11 +57,11 @@ RSpec.describe Clover, "github" do
     end
 
     it "destroys installation when receive deleted action" do
-      expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble).with(installation)
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
+      expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(1)
     end
   end
 
@@ -98,22 +98,21 @@ RSpec.describe Clover, "github" do
 
     it "uses custom label if label is an existing custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
-      st = Strand.new(id: runner.id)
-      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud-standard-4", actual_label: "custom-label-1", default_branch: "main").and_return(st)
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "custom-label-1")))
 
       expect(page.status_code).to eq(200)
-      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
+      created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud-standard-4", actual_label: "custom-label-1")
+      expect(created_runner).not_to be_nil
+      expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
     end
 
     it "creates runner when receive queued action" do
-      st = Strand.new(id: runner.id)
-      expect(Prog::Github::GithubRunnerNexus).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud", default_branch: "main").and_return(st)
-
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
       expect(page.status_code).to eq(200)
-      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
+      created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
+      expect(created_runner).not_to be_nil
+      expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
     end
 
     it "fails if not queued and runner_id is empty" do
