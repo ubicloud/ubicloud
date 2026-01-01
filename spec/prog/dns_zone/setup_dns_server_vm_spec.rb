@@ -62,12 +62,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   end
 
   describe ".vms_in_sync?" do
-    let(:vms) {
-      vms = [create_vm, create_vm]
-      vms[0].sshable = Sshable.new
-      vms[1].sshable = Sshable.new
-      vms
-    }
+    let(:vms) { [create_vm_with_sshable, create_vm_with_sshable] }
 
     it "returns true if no VMs are given" do
       expect(described_class.vms_in_sync?(nil)).to be true
@@ -112,7 +107,6 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "hops to prepare when VM is ready but not on AWS" do
-      expect(prog.vm.location).to receive(:aws?).and_return(false)
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
@@ -120,7 +114,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "configures firewall when AWS VM is ready" do
-      expect(prog.vm.location).to receive(:aws?).and_return(true).at_least(:once)
+      prog.vm.location.update(provider: "aws")
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
@@ -129,13 +123,13 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "reuses firewall when AWS VM is ready with existing firewall" do
+      prog.vm.location.update(provider: "aws")
       fw = Firewall.create(name: "dns", location: prog.vm.location, project_id: Config.dns_service_project_id)
       fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")
       fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "udp")
       fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "tcp")
       fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "tcp")
 
-      expect(prog.vm.location).to receive(:aws?).and_return(true).at_least(:once)
       prog.vm.strand.update(label: "wait")
       expect(prog.strand.stack.first["deadline_at"]).to be_nil
       expect { prog.start }.to hop("prepare")
@@ -165,12 +159,13 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "runs some commands to install and configure knot on the vm" do
       expect(prog.sshable).to receive(:_cmd).with("true").and_return(true)
 
+      dzs
       zone_conf = <<-CONF
+  - domain: "k8s.ubicloud.com."
   - domain: "zone1.domain.io."
   - domain: "zone2.domain.io."
       CONF
 
-      expect(prog.ds).to receive(:dns_zones).and_return(dzs) # To ensure the order
       expect(prog.sshable).to receive(:_cmd).with(/sudo apt-get -y install knot/)
       expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
 
@@ -185,7 +180,8 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "writes knot zone template for each zone" do
-      expect(dzs).to all(receive(:refresh_dns_servers_set?).and_return(false))
+      dzs
+      Semaphore.where(name: "refresh_dns_servers").destroy
 
       f1 = <<-CONF
 zone1.domain.io.          3600    SOA     ns.zone1.domain.io. zone1.domain.io. 37 86400 7200 1209600 3600
@@ -205,9 +201,14 @@ k8s.ubicloud.com.          3600    NS      toruk.
       expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/k8s.ubicloud.com.zone > /dev/null", stdin: f3)
 
       expect(prog.sshable).to receive(:_cmd).with("sudo systemctl restart knot")
-      expect(dzs).to all(receive(:purge_obsolete_records))
 
       knotc_input = <<-INPUT
+zone-abort k8s.ubicloud.com
+zone-begin k8s.ubicloud.com
+zone-set k8s.ubicloud.com #{dzs[2].records.first.name} 10 A #{dzs[2].records.first.data}
+[\\S\\s]*
+zone-commit k8s.ubicloud.com
+zone-flush k8s.ubicloud.com
 zone-abort zone1.domain.io
 zone-begin zone1.domain.io
 zone-set zone1.domain.io #{dzs[0].records.first.name} 10 A #{dzs[0].records.first.data}
@@ -220,26 +221,19 @@ zone-set zone2.domain.io #{dzs[1].records.first.name} 10 A #{dzs[1].records.firs
 [\\S\\s]*
 zone-commit zone2.domain.io
 zone-flush zone2.domain.io
-zone-abort k8s.ubicloud.com
-zone-begin k8s.ubicloud.com
-zone-set k8s.ubicloud.com #{dzs[2].records.first.name} 10 A #{dzs[2].records.first.data}
-[\\S\\s]*
-zone-commit k8s.ubicloud.com
-zone-flush k8s.ubicloud.com
       INPUT
       expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: /#{knotc_input.strip}/)
 
-      expect(prog.ds).to receive(:dns_zones).at_least(:once).and_return(dzs) # To ensure the order
       expect { prog.sync_zones }.to hop("validate")
     end
   end
 
   describe "#validate" do
     it "validates the setup by checking outputs from different vms" do
-      dummy_vm = instance_double(Vm, id: Vm.generate_uuid)
-      dummy_sshable = Sshable.new
-      expect(prog.ds).to receive(:vms).thrice.and_return([dummy_vm])
-      expect(dummy_vm).to receive(:sshable).twice.and_return(dummy_sshable)
+      dummy_vm = create_vm_with_sshable
+      prog
+      ds.add_vm(dummy_vm)
+      dummy_sshable = prog.ds.vms.first.sshable
 
       expect(prog.vm.sshable).to receive(:_cmd).twice
         .with("sudo -u knot knotc", stdin: "zone-read --")
@@ -256,24 +250,28 @@ zone-flush k8s.ubicloud.com
         .with("sudo -u knot knotc", stdin: "zone-read --")
         .and_return("line2\nline1")
 
-      expect(prog.ds).to receive(:add_vm)
-
       # Same output but different order, doesn't matter
       expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
     end
 
     it "doesn't add the same VM twice" do
-      dummy_vm = instance_double(Vm, id: Vm.generate_uuid)
-      dummy_sshable = Sshable.new
-      expect(prog.ds).to receive(:vms).twice.and_return([dummy_vm, prog.vm])
-      expect(dummy_vm).to receive(:sshable).and_return(dummy_sshable)
-
-      expect(prog.vm.sshable).to receive(:_cmd).at_least(:once).and_return("l1\nl2")
-      expect(dummy_sshable).to receive(:_cmd).and_return("l1\nl2")
-
-      expect(prog.ds).not_to receive(:add_vm)
+      dummy_vm = create_vm_with_sshable
+      prog
+      ds.add_vm(dummy_vm)
+      ds.add_vm(prog.vm)
+      prog.ds.vms.each { |vm| expect(vm.sshable).to receive(:_cmd).and_return("l1\nl2") }
+      expect(prog.vm.sshable).to receive(:_cmd).and_return("l1\nl2")
 
       expect { prog.validate }.to exit({"msg" => "created VM for DnsServer"})
     end
+  end
+
+  def create_vm_with_sshable
+    vm = Vm.create(unix_user: "ubi", public_key: "ssh-ed25519 key", name: Vm.generate_uuid, family: "standard",
+      cores: 0, vcpus: 2, cpu_percent_limit: 200, cpu_burst_percent_limit: 0, memory_gib: 8, arch: "x64",
+      location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy", display_state: "running",
+      ip4_enabled: false, created_at: Time.now, project_id: project.id)
+    Sshable.create_with_id(vm)
+    vm
   end
 end
