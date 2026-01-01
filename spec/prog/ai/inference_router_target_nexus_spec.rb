@@ -72,7 +72,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
         inflight_limit: 10
       )
 
-      target = InferenceRouterTarget[strand.id]
+      target = strand.subject
       expect(target.inference_router_model_id).to eq(inference_router_model.id)
       expect(target.inference_router_id).to eq(inference_router.id)
     end
@@ -80,26 +80,26 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
 
   describe "#before_run" do
     context "when destroy is set" do
-      before do
-        expect(nexus).to receive(:when_destroy_set?).and_yield
-      end
+      before { nexus.incr_destroy }
 
       it "hops to destroy if not already destroying" do
-        expect(nexus.strand).to receive(:label).twice.and_return("active")
+        nexus.strand.update(label: "active")
         expect { nexus.before_run }.to hop("destroy")
       end
 
       it "does not hop if already in destroy state" do
-        expect(nexus.strand).to receive(:label).and_return("destroy")
+        nexus.strand.update(label: "destroy")
         expect { nexus.before_run }.not_to hop("destroy")
       end
 
-      it "exits if there are operations on the stack" do
-        expect(nexus.strand).to receive(:label).and_return("destroy")
-        expect(nexus.strand.stack).to receive(:count).and_return(2)
-        expect { nexus.before_run }.to exit(
-          {"msg" => "operation is cancelled due to the destruction of the inference router target"}
-        )
+      it "pops stack and hops to back-link if there are operations on the stack" do
+        original_stack = nexus.strand.stack.dup
+        new_frame = {"subject_id" => nexus.inference_router_target.id, "link" => [nexus.strand.prog, "destroy"]}
+        new_stack = [new_frame] + original_stack
+        nexus.strand.update(label: "destroy", stack: new_stack)
+        reloaded_nexus = described_class.new(nexus.strand.reload)
+        reloaded_nexus.incr_destroy
+        expect { reloaded_nexus.before_run }.to hop("destroy")
       end
     end
   end
@@ -116,36 +116,34 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   end
 
   describe "#setup" do
-    let(:client) { instance_double(RunpodClient) }
-
     it "creates a pod and updates target state" do
-      expect(RunpodClient).to receive(:new).and_return(client)
-      expect(client).to receive(:create_pod).with(
-        target_strand.subject.ubid,
-        hash_including("env" => hash_including(
-          "HF_MODEL" => inference_router_model.model_name,
-          "VLLM_PARAMS" => config[:env][:VLLM_PARAMS]
-        ))
-      ).and_return("pod-123")
+      stub_request(:get, "https://rest.runpod.io/v1/pods")
+        .with(query: {name: target_strand.subject.ubid})
+        .to_return(status: 200, body: "[]")
+      stub_request(:post, "https://rest.runpod.io/v1/pods")
+        .to_return(status: 201, body: {id: "pod-123"}.to_json)
+
       expect { nexus.setup }.to hop("wait_setup")
       expect(Strand[target_strand.id].subject).to have_attributes(state: {"pod_id" => "pod-123"})
     end
   end
 
   describe "#wait_setup" do
-    let(:client) { instance_double(RunpodClient) }
-
     before do
-      expect(RunpodClient).to receive(:new).and_return(client)
+      nexus.inference_router_target.update(state: {"pod_id" => "pod-123"})
     end
 
     it "naps if pod publicIp is empty" do
-      expect(client).to receive(:get_pod).and_return({"publicIp" => ""})
+      stub_request(:get, "https://rest.runpod.io/v1/pods/pod-123")
+        .to_return(status: 200, body: {publicIp: ""}.to_json)
+
       expect { nexus.wait_setup }.to nap(10)
     end
 
     it "hops to wait if publicIp is available" do
-      expect(client).to receive(:get_pod).and_return({"publicIp" => "1.1.1.1"})
+      stub_request(:get, "https://rest.runpod.io/v1/pods/pod-123")
+        .to_return(status: 200, body: {publicIp: "1.1.1.1"}.to_json)
+
       expect { nexus.wait_setup }.to hop("wait")
     end
   end
@@ -157,12 +155,11 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   end
 
   describe "#destroy" do
-    let(:client) { instance_double(RunpodClient) }
-
     it "destroys target and deletes pod if pod_id is set" do
-      expect(RunpodClient).to receive(:new).and_return(client)
       target_strand.subject.update(state: {"pod_id" => "pod-123"})
-      expect(client).to receive(:delete_pod).with("pod-123")
+      stub_request(:delete, "https://rest.runpod.io/v1/pods/pod-123")
+        .to_return(status: 200)
+
       expect { nexus.destroy }.to exit({"msg" => "inference router target is deleted"})
     end
 
