@@ -37,14 +37,20 @@ JSON
   end
 
   describe "#start" do
+    let(:vm_host) { Prog::Vm::HostNexus.assemble("::1").subject }
+    let(:ln) { described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}])) }
+
     it "exits, saving the ip6 address" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
-      vm_host = instance_double(VmHost)
-      expect(vm_host).to receive(:update).with(ip6: "2a01:4f8:173:1ed3::2", net6: "2a01:4f8:173:1ed3::/64")
-      expect(lm).to receive(:sshable).and_return(sshable)
-      expect(lm).to receive(:vm_host).and_return(vm_host)
-      expect { lm.start }.to exit({"msg" => "learned network information"})
+      expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return(ip6_interface_output)
+      expect { ln.start }.to exit({"msg" => "learned network information"})
+      vm_host.reload
+      expect(vm_host.ip6.to_s).to eq("2a01:4f8:173:1ed3::2")
+      expect(vm_host.net6.to_s).to eq("2a01:4f8:173:1ed3::/64")
+    end
+
+    it "pops if there is no global unique address prefix provided" do
+      expect(ln.sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
+      expect { ln.start }.to exit({"msg" => "learned network information"})
     end
   end
 
@@ -84,13 +90,6 @@ JSON
 ]
 JSON
       }.to raise_error RuntimeError, "only one global unique address prefix supported on interface"
-    end
-
-    it "pops if there is no global unique address prefix provided" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with("/usr/sbin/ip -j -6 addr show scope global").and_return("[]")
-      expect(lm).to receive(:sshable).and_return(sshable)
-      expect { lm.start }.to exit({"msg" => "learned network information"})
     end
   end
 end
