@@ -8,9 +8,17 @@ RSpec.describe Clover, "cli pg restore" do
   end
 
   it "schedules a restore of the database to the given time" do
+    MinioCluster.create(
+      project_id: @project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "walg-minio",
+      admin_user: "admin",
+      admin_password: "password",
+      root_cert_1: "dummy-certs"
+    )
+
     backup = Struct.new(:key, :last_modified)
     restore_target = Time.now.utc
-    expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
     expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
