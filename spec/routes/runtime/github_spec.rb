@@ -36,24 +36,34 @@ RSpec.describe Clover, "github" do
   it "setups blob storage if no access key" do
     vm = create_vm
     login_runtime(vm)
-    repository = instance_double(GithubRepository, access_key: nil)
-    expect(Vm).to receive(:from_runtime_jwt_payload).and_return(instance_double(Vm, github_runner: instance_double(GithubRunner, repository:)))
-    expect(repository).to receive(:setup_blob_storage)
+    installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test"))
+    repository = GithubRepository.create(name: "test", access_key: nil, installation:)
+    GithubRunner.create(vm_id: vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id)
+    blob_storage_client = instance_double(Aws::S3::Client)
+    allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+    expect(blob_storage_client).to receive(:create_bucket)
+    cloudflare_client = instance_double(CloudflareClient)
+    allow(CloudflareClient).to receive(:new).and_return(cloudflare_client)
+    expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
 
     post "/runtime/github/caches"
 
     expect(last_response).to have_runtime_error(400, "missing parameter for key")
+    expect(repository.reload.access_key).to eq("test-key")
   end
 
   it "handles errors when attempting to setup blob storage" do
     vm = create_vm
     login_runtime(vm)
-    repository = instance_double(GithubRepository, access_key: nil)
-    runner = instance_double(GithubRunner, repository:)
-    expect(Vm).to receive(:from_runtime_jwt_payload).and_return(instance_double(Vm, github_runner: runner))
-    expect(runner).to receive(:ubid).and_return(nil)
-    expect(repository).to receive(:ubid).and_return(nil)
-    expect(repository).to receive(:setup_blob_storage).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
+    installation = GithubInstallation.create(installation_id: 456, name: "test-user2", type: "User", project: Project.create(name: "test2"))
+    repository = GithubRepository.create(name: "test2", access_key: nil, installation:)
+    GithubRunner.create(vm_id: vm.id, repository_name: "test2", label: "ubicloud", repository_id: repository.id)
+    blob_storage_client = instance_double(Aws::S3::Client)
+    allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+    expect(blob_storage_client).to receive(:create_bucket)
+    cloudflare_client = instance_double(CloudflareClient)
+    allow(CloudflareClient).to receive(:new).and_return(cloudflare_client)
+    expect(cloudflare_client).to receive(:create_token).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
 
     post "/runtime/github/caches"
 
