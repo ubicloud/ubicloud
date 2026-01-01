@@ -56,10 +56,11 @@ RSpec.describe MonitorResourceType do
         raise StandardError
       end
 
-      @mr = MonitorableResource.new(VmHost.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" })
+      vm_host = create_vm_host
+      @mr = MonitorableResource.new(vm_host)
       expect(@mr).to receive(:open_resource_session)
       expect(Clog).to receive(:emit).with("Monitoring job has failed.").and_call_original
-      expect(@mr.resource).to receive(:incr_checkup)
+      expect(vm_host).to receive(:incr_checkup)
       @mrt.submit_queue.push(@mr)
     end
 
@@ -76,21 +77,24 @@ RSpec.describe MonitorResourceType do
       expect(@mr.resource).to receive(:respond_to?).with(:incr_checkup).and_return(false)
       @mrt.submit_queue.push(@mr)
     end
+  end
 
+  describe "thread pool checkup semaphore" do
     it "does not call incr_checkup if checkup is already set" do
-      @started_at = nil
       @mrt = described_class.create(Object, :foo, 2, [[]]) do
-        @started_at = it.monitor_job_started_at
         raise StandardError
       end
 
-      resource = VmHost.new { it.id = "f9249e31-0a70-8f71-b08c-72d857c878d2" }
-      @mr = MonitorableResource.new(resource)
+      vm_host = create_vm_host
+      Strand.create_with_id(vm_host, prog: "Vm::HostNexus", label: "wait")
+      vm_host.incr_checkup
 
-      expect(resource).to receive(:checkup_set?).and_return(true)
-      expect(resource).not_to receive(:incr_checkup)
+      mr = MonitorableResource.new(vm_host)
+      @mrt.submit_queue.push(mr)
 
-      @mrt.submit_queue.push(@mr)
+      result = @mrt.finish_queue.pop(timeout: 1)
+      expect(result).to eq(mr)
+      expect(Semaphore.where(strand_id: vm_host.id, name: "checkup").count).to eq(1)
     end
   end
 
