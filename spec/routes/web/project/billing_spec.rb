@@ -157,7 +157,6 @@ RSpec.describe Clover, "billing" do
         {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}}
       ).at_least(:once)
       expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
-      expect(Strand).to receive(:create).with(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
       visit "#{project.path}/billing"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
@@ -170,6 +169,8 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
       expect(page).to have_field("Tax ID", with: "DE456789")
+      expect(Strand.where(prog: "ValidateVat").count).to eq(1)
+      expect(Strand.where(prog: "ValidateVat").first.stack.first["subject_id"]).to eq(billing_info.id)
     end
 
     it "can remove tax id" do
@@ -500,7 +501,9 @@ RSpec.describe Clover, "billing" do
         end
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice.update(status: "current")
-        expect(InvoiceGenerator).to receive(:new).and_return(instance_double(InvoiceGenerator, run: [invoice])).at_least(:once)
+        generator = InvoiceGenerator.new(bi.span.begin, bi.span.end, project_ids: [billing_info.project.id])
+        allow(generator).to receive(:run).and_return([invoice])
+        expect(InvoiceGenerator).to receive(:new).and_return(generator).at_least(:once)
 
         visit "#{project.path}/billing/invoice/current"
 
@@ -668,8 +671,7 @@ RSpec.describe Clover, "billing" do
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         pdf = invoice.generate_pdf
-        response = instance_double(Aws::S3::Types::GetObjectOutput, body: instance_double(StringIO, read: pdf))
-        expect(blob_storage_client).to receive(:get_object).with(bucket: "ubicloud-invoices", key: invoice.blob_key).and_return(response)
+        blob_storage_client.stub_responses(:get_object, body: pdf)
 
         visit "#{project.path}/billing"
         click_link invoice.name
