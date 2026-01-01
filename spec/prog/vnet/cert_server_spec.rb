@@ -24,19 +24,16 @@ RSpec.describe Prog::Vnet::CertServer do
     lb
   }
 
-  let(:vm) {
-    vm_host = instance_double(VmHost, sshable: Sshable.new)
-    instance_double(Vm, inhost_name: "test-vm", vm_host:, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
-  }
+  let(:vmh) { create_vm_host }
+  let(:vm) { create_vm(vm_host_id: vmh.id) }
 
-  before do
-    allow(lb).to receive(:active_cert).and_return(lb.certs.first)
-    allow(Vm).to receive(:[]).and_return(vm)
+  def sshable
+    @sshable ||= nx.vm.vm_host.sshable
   end
 
   describe ".before_run" do
     it "pops if vm is nil" do
-      expect(nx).to receive(:vm).and_return(nil)
+      refresh_frame(nx, new_frame: {"subject_id" => lb.id, "vm_id" => SecureRandom.uuid})
       expect { nx.before_run }.to exit({"msg" => "vm is destroyed"})
     end
 
@@ -47,40 +44,39 @@ RSpec.describe Prog::Vnet::CertServer do
     end
 
     it "if vm exists, does nothing" do
-      expect(nx).to receive(:vm).and_return(vm)
-      nx.before_run
+      expect { nx.before_run }.not_to exit
     end
   end
 
   describe "#reshare_certificate" do
     it "puts the certificate and pops" do
-      expect(nx).to receive(:put_cert_to_vm)
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server put-certificate #{vm.inhost_name}", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
       expect { nx.reshare_certificate }.to exit({"msg" => "certificate is reshared"})
     end
   end
 
   describe "#put_certificate" do
     it "puts the certificate to vm and hops to start_certificate_server" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server put-certificate test-vm", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server put-certificate #{vm.inhost_name}", stdin: JSON.generate({cert_payload: "cert", cert_key_payload: OpenSSL::PKey::EC.new(cert.csr_key).to_pem}))
       expect { nx.put_certificate }.to exit({"msg" => "certificate server is setup"})
     end
 
     it "naps if load_balancer.active_cert is nil" do
-      expect(nx.load_balancer).to receive(:active_cert).and_return(nil)
+      lb.certs.each(&:destroy)
       expect { nx.put_certificate }.to nap(5)
     end
   end
 
   describe "#setup_cert_server" do
     it "starts the certificate server and pops" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server setup test-vm")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server setup #{vm.inhost_name}")
       expect { nx.setup_cert_server }.to hop("put_certificate")
     end
   end
 
   describe "#remove_cert_server" do
     it "removes the certificate files, server and hops to remove_load_balancer" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server stop_and_remove test-vm")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-cert-server stop_and_remove #{vm.inhost_name}")
 
       expect { nx.remove_cert_server }.to exit({"msg" => "certificate resources and server are removed"})
     end
@@ -88,14 +84,12 @@ RSpec.describe Prog::Vnet::CertServer do
 
   describe ".put_cert_to_vm" do
     it "fails if certificate is nil" do
-      lb.certs.map { it.update(cert: nil) }
+      lb.certs.each(&:destroy)
       expect { nx.put_cert_to_vm }.to raise_error(RuntimeError, "BUG: certificate is nil")
     end
 
     it "fails if certificate payload is nil" do
-      lb.certs.map { it.update(cert: nil) }
-      expect(nx.load_balancer).to receive(:active_cert).and_return(lb.certs.first)
-
+      cert.update(cert: nil)
       expect { nx.put_cert_to_vm }.to raise_error(RuntimeError, "BUG: certificate is nil")
     end
   end
