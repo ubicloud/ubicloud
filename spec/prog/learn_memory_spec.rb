@@ -3,7 +3,9 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnMemory do
-  subject(:lm) { described_class.new(Strand.new) }
+  subject(:lm) { described_class.new(Strand.create_with_id(sshable, prog: "LearnMemory", label: "start")) }
+
+  let(:sshable) { Sshable.create }
 
   let(:four_units) do
     <<EOS
@@ -17,9 +19,7 @@ EOS
 
   describe "#start" do
     it "exits, saving the number of memory" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with("sudo /usr/sbin/dmidecode -t memory | fgrep Size:").and_return(four_units)
-      expect(lm).to receive(:sshable).and_return(sshable)
+      expect(lm.sshable).to receive(:_cmd).with("sudo /usr/sbin/dmidecode -t memory | fgrep Size:").and_return(four_units)
       expect { lm.start }.to exit({mem_gib: 64})
     end
   end
