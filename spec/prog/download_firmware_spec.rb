@@ -3,14 +3,18 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::DownloadFirmware do
-  subject(:df) { described_class.new(Strand.new(stack: [{"version" => "202405", "sha256" => "thesha"}])) }
+  subject(:df) { described_class.new(strand) }
 
-  let(:sshable) { vm_host.sshable }
   let(:vm_host) { create_vm_host }
-
-  before do
-    allow(df).to receive_messages(sshable:, vm_host:)
-  end
+  let(:sshable) { df.sshable }
+  let(:strand) {
+    Strand.create_with_id(
+      vm_host,
+      prog: "DownloadFirmware",
+      label: "start",
+      stack: [{"version" => "202405", "sha256" => "thesha"}]
+    )
+  }
 
   describe "#start" do
     it "hops to download" do
@@ -18,12 +22,12 @@ RSpec.describe Prog::DownloadFirmware do
     end
 
     it "fails if version is nil" do
-      df = described_class.new(Strand.new(stack: [{"version" => nil, "sha256" => "thesha"}]))
+      refresh_frame(df, new_frame: {"version" => nil, "sha256" => "thesha"})
       expect { df.start }.to raise_error RuntimeError, "Version is required"
     end
 
     it "fails if sha256 is nil" do
-      df = described_class.new(Strand.new(stack: [{"version" => "202405", "sha256" => nil}]))
+      refresh_frame(df, new_frame: {"version" => "202405", "sha256" => nil})
       expect { df.start }.to raise_error RuntimeError, "SHA-256 digest is required"
     end
   end
