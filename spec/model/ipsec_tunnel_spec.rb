@@ -4,48 +4,47 @@ require_relative "spec_helper"
 
 RSpec.describe IpsecTunnel do
   subject(:ipsec_tunnel) {
-    described_class.new(
-      src_nic_id: src_nic.id,
-      dst_nic_id: dst_nic.id
-    )
+    described_class.create(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id)
   }
 
-  let(:vm_host) { instance_double(VmHost, sshable: Sshable.new) }
-  let(:src_vm) {
-    instance_double(
-      Vm,
-      ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:c0b4::/79"),
-      inhost_name: "vm12345",
-      vm_host:
+  let(:ps) {
+    PrivateSubnet.create(
+      name: "test-ps",
+      location_id: Location::HETZNER_FSN1_ID,
+      net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "10.0.0.0/26",
+      state: "waiting",
+      project_id: Project.create(name: "test-project").id
     )
   }
-  let(:dst_vm) {
-    instance_double(
-      Vm,
-      ephemeral_net6: NetAddr.parse_net("2a01:4f8:10a:128b:bdc8::/79"),
-      inhost_name: "vm67890",
-      vm_host:
-    )
-  }
+  let(:vm_host) { create_vm_host }
+  let(:src_vm) { create_vm(name: "src-vm", vm_host_id: vm_host.id) }
+  let(:dst_vm) { create_vm(name: "dst-vm", vm_host_id: vm_host.id) }
   let(:src_nic) {
-    instance_double(Nic,
-      id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e",
-      private_ipv6: "fd1b:9793:dcef:cd0a:264c::/79",
-      private_ipv4: "10.9.39.31/32",
-      vm: src_vm,
-      encryption_key: "12345678901234567890123456789012")
+    Nic.create(
+      private_subnet_id: ps.id,
+      private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+      private_ipv4: "10.0.0.1",
+      mac: "00:00:00:00:00:01",
+      name: "src-nic",
+      vm_id: src_vm.id,
+      state: "active"
+    )
   }
   let(:dst_nic) {
-    instance_double(Nic,
-      id: "46ca6ded-b056-4723-bd91-612959f52f6f",
-      private_ipv6: "fd1b:9793:dcef:cd0a:72b6::/79",
-      private_ipv4: "10.9.39.9/32",
-      vm: dst_vm,
-      encryption_key: "12345678901234567890123456789012")
+    Nic.create(
+      private_subnet_id: ps.id,
+      private_ipv6: "fd10:9b0b:6b4b:8fbb:def::",
+      private_ipv4: "10.0.0.2",
+      mac: "00:00:00:00:00:02",
+      name: "dst-nic",
+      vm_id: dst_vm.id,
+      state: "active"
+    )
   }
 
   it "returns vm_name properly" do
-    expect(ipsec_tunnel.vm_name(src_nic)).to eq("vm12345")
-    expect(ipsec_tunnel.vm_name(dst_nic)).to eq("vm67890")
+    expect(ipsec_tunnel.vm_name(src_nic)).to eq(src_vm.inhost_name)
+    expect(ipsec_tunnel.vm_name(dst_nic)).to eq(dst_vm.inhost_name)
   end
 end
