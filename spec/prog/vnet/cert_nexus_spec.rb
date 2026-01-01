@@ -23,7 +23,7 @@ RSpec.describe Prog::Vnet::CertNexus do
   describe ".assemble" do
     it "creates a new certificate" do
       st = described_class.assemble("test-hostname", dns_zone.id)
-      expect(Cert[st.id].hostname).to eq "test-hostname"
+      expect(st.subject.hostname).to eq "test-hostname"
       expect(st.label).to eq "start"
     end
 
