@@ -45,8 +45,22 @@ RSpec.describe Clover, "postgres" do
   end
 
   describe "authenticated" do
+    let(:postgres_project) { Project.create(name: "default") }
+
+    def create_minio_cluster_for_blob_storage
+      allow(Config).to receive(:minio_host_name).and_return("minio.test")
+      DnsZone.create(project_id: postgres_project.id, name: "minio.test")
+      MinioCluster.create(
+        project_id: postgres_project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "walg-minio",
+        admin_user: "admin",
+        admin_password: "password",
+        root_cert_1: "dummy-certs"
+      )
+    end
+
     before do
-      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
 
@@ -54,9 +68,7 @@ RSpec.describe Clover, "postgres" do
       allow(Minio::Client).to receive(:new).and_return(client)
 
       vmc = instance_double(VictoriaMetrics::Client, query_range: [nil])
-      vms = instance_double(VictoriaMetricsServer, client: vmc)
-      vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-      allow(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+      allow(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
     end
 
     describe "list" do
@@ -112,7 +124,16 @@ RSpec.describe Clover, "postgres" do
       it "can create new PostgreSQL database in a custom AWS region" do
         project.set_ff_private_locations(true)
         private_location = create_private_location(project:)
-        Location.where(id: [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]).destroy
+        # Delete public locations that would show in the form
+        loc_ids = [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]
+        ps_ids = PrivateSubnet.where(location_id: loc_ids).select_map(:id)
+        LoadBalancer.where(private_subnet_id: ps_ids).destroy
+        PrivateSubnet.where(id: ps_ids).destroy
+        Firewall.where(location_id: loc_ids).destroy
+        PostgresTimeline.where(location_id: loc_ids).destroy
+        Location.where(id: loc_ids).destroy
+        # Delete seeded aws-us-west-2 location to avoid display_name conflict
+        Location.where(display_name: "aws-us-west-2", project_id: nil).destroy
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
@@ -160,7 +181,13 @@ RSpec.describe Clover, "postgres" do
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
-        Location[Location::HETZNER_FSN1_ID].destroy
+        loc_id = Location::HETZNER_FSN1_ID
+        ps_ids = PrivateSubnet.where(location_id: loc_id).select_map(:id)
+        LoadBalancer.where(private_subnet_id: ps_ids).destroy
+        PrivateSubnet.where(id: ps_ids).destroy
+        Firewall.where(location_id: loc_id).destroy
+        PostgresTimeline.where(location_id: loc_id).destroy
+        Location[loc_id].destroy
 
         click_button "Create"
         expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
@@ -305,9 +332,7 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "64.0 GB is used (50.0%)"
@@ -318,9 +343,7 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "90"]]}])
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90.0%)")
@@ -330,7 +353,7 @@ RSpec.describe Clover, "postgres" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        expect(VictoriaMetricsResource).to receive(:first).at_least(:once).and_return(nil)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).at_least(:once).and_return(nil)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "128 GB"
@@ -349,9 +372,7 @@ RSpec.describe Clover, "postgres" do
 
         vmc = instance_double(VictoriaMetrics::Client)
         expect(vmc).to receive(:query_range).and_raise(Excon::Error::Socket)
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "128 GB"
@@ -464,9 +485,9 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can restore PostgreSQL database" do
+        create_minio_cluster_for_blob_storage
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         visit "#{project.path}#{pg.path}/backup-restore"
@@ -484,7 +505,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows proper message when there is no backups to restore" do
-        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
 
         visit "#{project.path}#{pg.path}/backup-restore"
