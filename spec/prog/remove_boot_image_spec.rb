@@ -3,16 +3,14 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::RemoveBootImage do
-  subject(:rbi) { described_class.new(Strand.new(stack: [{}])) }
+  subject(:rbi) {
+    strand = Strand.create_with_id(boot_image, prog: "RemoveBootImage", label: "start")
+    described_class.new(strand)
+  }
 
-  let(:sshable) { vm_host.sshable }
+  let(:sshable) { rbi.boot_image.vm_host.sshable }
   let(:vm_host) { create_vm_host }
   let(:boot_image) { BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14) }
-
-  before do
-    allow(rbi).to receive(:boot_image).and_return(boot_image)
-    allow(boot_image).to receive(:vm_host).and_return(vm_host)
-  end
 
   describe "#start" do
     it "deactivates and hops to wait_volumes" do
@@ -27,7 +25,8 @@ RSpec.describe Prog::RemoveBootImage do
     end
 
     it "waits for volumes to be removed" do
-      expect(boot_image).to receive(:vm_storage_volumes).and_return([1])
+      vm = create_vm(vm_host_id: vm_host.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, boot_image_id: boot_image.id)
       expect { rbi.wait_volumes }.to nap(30)
     end
   end
@@ -47,7 +46,6 @@ RSpec.describe Prog::RemoveBootImage do
 
   describe "#update_database" do
     it "updates storage and destroys boot image" do
-      boot_image.id
       storage_device = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 100, total_storage_gib: 200)
       expect { rbi.update_database }.to exit({"msg" => "Boot image was removed."})
       expect(BootImage[boot_image.id]).to be_nil
