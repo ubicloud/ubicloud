@@ -46,7 +46,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe ".before_run" do
     it "pops if installation already deleted" do
-      expect(dgi).to receive(:github_installation).and_return(nil)
+      github_installation.destroy
       expect { dgi.before_run }.to exit({"msg" => "github installation is destroyed"})
     end
 
@@ -58,8 +58,8 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe "#start" do
     it "hops after registering deadline" do
-      expect(dgi).to receive(:register_deadline)
       expect { dgi.start }.to hop("delete_installation")
+      expect(dgi.strand.stack.first["deadline_at"]).not_to be_nil
     end
   end
 
