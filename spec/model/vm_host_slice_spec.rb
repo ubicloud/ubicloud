@@ -20,7 +20,6 @@ RSpec.describe VmHostSlice do
   let(:vm_host) { create_vm_host(total_cores: 4, total_cpus: 8, used_cores: 1) }
 
   before do
-    allow(vm_host_slice).to receive(:vm_host).and_return(vm_host)
     (0..15).each { |i|
       VmHostCpu.create(
         vm_host_id: vm_host.id,
@@ -114,12 +113,12 @@ RSpec.describe VmHostSlice do
 
   describe "availability monitoring" do
     it "initiates a new health monitor session" do
-      allow(vm_host_slice).to receive_messages(vm_host:)
-      expect(vm_host.sshable).to receive(:start_fresh_session)
+      expect(vm_host_slice.vm_host.sshable).to receive(:start_fresh_session)
       vm_host_slice.init_health_monitor_session
     end
 
     it "checks pulse" do
+      Strand.create_with_id(vm_host_slice, prog: "Vm::VmHostSliceNexus", label: "wait")
       session = {
         ssh_session: Net::SSH::Connection::Session.allocate
       }
@@ -128,23 +127,19 @@ RSpec.describe VmHostSlice do
         reading_rpt: 5,
         reading_chg: Time.now - 30
       }
-      allow(vm_host_slice).to receive_messages(vm_host:)
 
-      expect(vm_host_slice).to receive(:inhost_name).and_return("standard.slice").at_least(:once)
       expect(session[:ssh_session]).to receive(:_exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once
       expect(session[:ssh_session]).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.effective").and_return("2-3\n").once
       expect(session[:ssh_session]).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("root\n").once
       expect(vm_host_slice.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
       expect(session[:ssh_session]).to receive(:_exec!).with("systemctl is-active standard.slice").and_return("active\ninactive\n").once
-      expect(vm_host_slice).to receive(:reload).and_return(vm_host_slice)
-      expect(vm_host_slice).to receive(:incr_checkup)
       expect(vm_host_slice.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+      expect(Semaphore.where(strand_id: vm_host_slice.id, name: "checkup").count).to eq(1)
 
       expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
-      expect(vm_host_slice).to receive(:reload).and_return(vm_host_slice)
-      expect(vm_host_slice).to receive(:incr_checkup)
       expect(vm_host_slice.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+      expect(Semaphore.where(strand_id: vm_host_slice.id, name: "checkup").count).to eq(1)
     end
   end
 end
