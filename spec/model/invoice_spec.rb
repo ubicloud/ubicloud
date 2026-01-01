@@ -64,7 +64,7 @@ RSpec.describe Invoice do
   describe ".send_success_email" do
     it "sends email for waiting transfers" do
       invoice.update(status: "waiting_transfer")
-      expect(invoice).to receive(:persist)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       invoice.send_success_email
       expect(Mail::TestMailer.deliveries.length).to eq 1
       expect(Mail::TestMailer.deliveries.first.html_part.body).to include("Please follow the bank transfer instructions at the bottom of the invoice to complete the payment.")
@@ -79,7 +79,7 @@ RSpec.describe Invoice do
 
     it "fails if the status is unexpected" do
       invoice.update(status: "fraud")
-      expect(invoice).to receive(:persist)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect { invoice.send_success_email }.to raise_error(RuntimeError, "BUG: unexpected invoice status fraud")
       expect(Mail::TestMailer.deliveries.length).to eq 0
     end
@@ -99,9 +99,9 @@ RSpec.describe Invoice do
     end
 
     it "not charge if less than minimum charge threshold" do
-      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com"}, cost: 0.4)
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, cost: 0.4)
       expect(Clog).to receive(:emit).with("Invoice cost is less than minimum charge cost.").and_call_original
-      expect(invoice).to receive(:persist)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: "2025/03/below_minimum_threshold/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf"))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("below_minimum_threshold")
       expect(Mail::TestMailer.deliveries.length).to eq 1
@@ -113,9 +113,9 @@ RSpec.describe Invoice do
     end
 
     it "not charge and wait for transfer if no payment methods" do
-      update_content(bank_transfer_info: {"Beneficiary" => "Ubicloud B.V."}, billing_info: {"id" => billing_info.id, "email" => "customer@example.com"})
+      update_content(bank_transfer_info: {"Beneficiary" => "Ubicloud B.V."}, billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"})
       expect(Clog).to receive(:emit).with("Invoice is waiting for transfer.").and_call_original
-      expect(invoice).to receive(:persist)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("waiting_transfer")
     end
@@ -151,7 +151,7 @@ RSpec.describe Invoice do
     end
 
     it "can charge from a correct payment method even some of them are not working" do
-      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com"}, resources: [{"cost" => 4.3384, "line_items" => [{"cost" => 4.3384, "amount" => 5423.0, "duration" => 1, "location" => "global", "description" => "standard-2 GitHub Runner", "resource_type" => "GitHubRunnerMinutes", "resource_family" => "standard-2"}], "resource_id" => "ed0b26bf-53c4-82d2-9a00-21e5f05dc364", "resource_name" => "Daily Usage 2024-02-26"}])
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, resources: [{"cost" => 4.3384, "line_items" => [{"cost" => 4.3384, "amount" => 5423.0, "duration" => 1, "location" => "global", "description" => "standard-2 GitHub Runner", "resource_type" => "GitHubRunnerMinutes", "resource_family" => "standard-2"}], "resource_id" => "ed0b26bf-53c4-82d2-9a00-21e5f05dc364", "resource_name" => "Daily Usage 2024-02-26"}])
       payment_method1 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", created_at: Time.now + 20)
       payment_method2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2", created_at: Time.now + 10)
       payment_method3 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_3", created_at: Time.now)
@@ -164,7 +164,7 @@ RSpec.describe Invoice do
       # rubocop:enable RSpec/VerifiedDoubles
       expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original
       expect(Clog).to receive(:emit).with("Invoice charged.").and_call_original
-      expect(invoice).to receive(:persist)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("paid")
       expect(project.reload.reputation).to eq("verified")
@@ -175,15 +175,16 @@ RSpec.describe Invoice do
     end
 
     it "does not update project reputation if cost is less than 5" do
-      update_content(billing_info: {"id" => billing_info.id}, cost: 4)
+      update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, cost: 4)
       PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1", order: 1)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::PaymentIntent).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(invoice).to receive(:send_success_email)
+      expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("paid")
       expect(project.reload.reputation).to eq("new")
+      expect(Mail::TestMailer.deliveries.length).to eq 1
     end
   end
 
@@ -209,7 +210,6 @@ RSpec.describe Invoice do
 
   describe ".generate_download_link" do
     it "generates a presigned URL for PDF" do
-      allow(Config).to receive(:invoices_bucket_name).and_return("invoices-bucket")
       url_presigner = instance_double(Aws::S3::Presigner)
       allow(Aws::S3::Presigner).to receive(:new).with(client:).and_return(url_presigner)
 
