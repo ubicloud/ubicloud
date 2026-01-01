@@ -3,28 +3,31 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::DnsZone::DnsZoneNexus do
-  subject(:nx) { described_class.new(Strand.new(id: DnsZone.generate_uuid)) }
+  subject(:nx) { described_class.new(dns_zone.strand) }
 
-  let(:dns_zone) { DnsZone.create(project_id: SecureRandom.uuid, name: "postgres.ubicloud.com") }
+  let(:prj) { Project.create(name: "test-prj") }
+  let(:dns_zone) {
+    dz = DnsZone.create(project_id: prj.id, name: "postgres.ubicloud.com")
+    Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
+    dz.add_dns_server(dns_server)
+    dz
+  }
   let(:dns_server) { DnsServer.create(name: "ns.ubicloud.com") }
-  let(:vm) { instance_double(Vm, id: "788525ed-d6f0-4937-a844-323d4fd91946") }
-  let(:sshable) { Sshable.new }
-
-  before do
-    allow(vm).to receive(:sshable).and_return(sshable)
-    allow(dns_server).to receive(:vms).and_return([vm])
-    allow(dns_zone).to receive(:dns_servers).and_return([dns_server])
-    allow(nx).to receive(:dns_zone).and_return(dns_zone)
-  end
+  let(:vm) {
+    v = create_vm(project_id: prj.id, name: "dns-vm")
+    Sshable.create_with_id(v, unix_user: "root", host: "test-host")
+    dns_server.add_vm(v)
+    v
+  }
 
   describe "#wait" do
     it "hops to refresh_dns_servers if refresh_dns_servers semaphore is set" do
-      expect(nx).to receive(:when_refresh_dns_servers_set?).and_yield
+      nx.incr_refresh_dns_servers
       expect { nx.wait }.to hop("refresh_dns_servers")
     end
 
-    it "hops to purge_obsolete_records if if last purge happened more than 1 hour ago" do
-      expect(dns_zone).to receive(:last_purged_at).and_return(Time.now - 60 * 60 * 2)
+    it "hops to purge_obsolete_records if last purge happened more than 1 hour ago" do
+      dns_zone.update(last_purged_at: Time.now - 60 * 60 * 2)
       expect { nx.wait }.to hop("purge_obsolete_records")
     end
 
@@ -35,6 +38,7 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
 
   describe "#refresh_dns_servers" do
     before do
+      vm
       r1 = DnsRecord.create(name: "test-pg-1", type: "A", ttl: 10, data: "1.2.3.4")
       r2 = DnsRecord.create(name: "test-pg-2", type: "A", ttl: 10, data: "5.6.7.8")
       r3 = DnsRecord.create(name: "test-pg-3", type: "A", ttl: 10, data: "9.10.11.12", tombstoned: true)
@@ -45,6 +49,8 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
 
       DB[:seen_dns_records_by_dns_servers].insert(dns_record_id: r1.id, dns_server_id: dns_server.id)
     end
+
+    let(:sshable) { nx.dns_zone.dns_servers.first.vms.first.sshable }
 
     it "does not push anything if there is no unseen records" do
       DB[:seen_dns_records_by_dns_servers].insert(DB[:dns_record].select(:id, dns_server.id))
