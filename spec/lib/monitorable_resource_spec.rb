@@ -3,9 +3,50 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe MonitorableResource do
-  let(:postgres_server) { PostgresServer.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
+  let(:project) { Project.create(name: "test-project") }
+  let(:location_id) { Location::HETZNER_FSN1_ID }
+
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "test-subnet", project_id: project.id, location_id:,
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+    )
+  }
+
+  let(:postgres_resource) {
+    PostgresResource.create(
+      name: "pg-test",
+      superuser_password: "dummy",
+      ha_type: "none",
+      target_version: "16",
+      location_id:,
+      project_id: project.id,
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    )
+  }
+
+  let(:postgres_timeline) { PostgresTimeline.create(location_id:) }
+
+  let(:postgres_server) {
+    vm = Prog::Vm::Nexus.assemble_with_sshable(
+      project.id, name: "pg-vm", private_subnet_id: private_subnet.id,
+      location_id:, unix_user: "ubi"
+    ).subject
+    PostgresServer.create(
+      timeline: postgres_timeline,
+      resource_id: postgres_resource.id,
+      vm_id: vm.id,
+      representative_at: Time.now,
+      synchronization_status: "ready",
+      timeline_access: "push",
+      version: "16"
+    )
+  }
+
+  let(:vm_host) { create_vm_host }
+
   let(:r_w_event_loop) { described_class.new(postgres_server) }
-  let(:vm_host) { VmHost.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" } }
   let(:r_without_event_loop) { described_class.new(vm_host) }
 
   describe "#open_resource_session" do
@@ -18,13 +59,12 @@ RSpec.describe MonitorableResource do
     end
 
     it "sets session to resource's init_health_monitor_session" do
-      expect(postgres_server).to receive(:reload).and_return(postgres_server)
       expect(postgres_server).to receive(:init_health_monitor_session).and_return("session")
       expect { r_w_event_loop.open_resource_session }.to change { r_w_event_loop.instance_variable_get(:@session) }.from(nil).to("session")
     end
 
     it "sets deleted to true if resource is deleted" do
-      expect(postgres_server).to receive(:reload).and_raise(Sequel::NoExistingObject)
+      postgres_server.destroy
       expect { r_w_event_loop.open_resource_session }.to change(r_w_event_loop, :deleted).from(false).to(true)
     end
 
