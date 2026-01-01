@@ -13,10 +13,11 @@ RSpec.describe Clover, "cli pg create-read-replica" do
     expect(body).to eq "! Unexpected response status: 400\nDetails: Parent server is not ready for read replicas. There are no backups, yet.\n"
 
     pg = PostgresResource.first(name: "test-pg")
-    expect(@project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
-    expect(described_class).to receive(:authorized_project).with(@account, @project.id).and_return(@project)
-    expect(@project).to receive(:quota_available?).and_return(true)
-    expect(pg).to receive(:ready_for_read_replica?).and_return(true)
+    server = pg.representative_server
+    server.vm.update(family: "standard", vcpus: 2, memory_gib: 8, arch: "x64")
+    VmStorageVolume.create(vm_id: server.vm_id, size_gib: 64, boot: false, use_bdev_ubi: false, skip_sync: false, disk_index: 1)
+    pg.timeline.update(cached_earliest_backup_at: Time.now)
+
     body = cli(%w[pg eu-central-h1/test-pg create-read-replica test-pg-rr])
     pg = PostgresResource.first(name: "test-pg-rr")
     expect(pg.display_location).to eq "eu-central-h1"
