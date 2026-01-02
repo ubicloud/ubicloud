@@ -19,5 +19,8 @@ class PostgresServer < Sequel::Model
     def metal_attach_s3_policy_if_needed
       # nothing
     end
+
+    def metal_increment_s3_new_timeline
+    end
   end
 end
