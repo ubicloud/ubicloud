@@ -992,7 +992,7 @@ paths:
                   description: PostgreSQL version
                   type: string
                 restrict_by_default:
-                  description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
+                  description: ignored (deprecated)
                   type: boolean
                 private_subnet_name:
                   description: 'Name for the private subnet (if not provided, a name will be auto-generated)'

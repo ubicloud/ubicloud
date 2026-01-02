@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, no_firewall: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -27,7 +27,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
 
-      if firewall_id
+      if no_firewall
+        # nothing
+      elsif firewall_id
         unless (firewall = firewall_dataset.first(Sequel[:firewall][:id] => firewall_id))
           fail "Firewall with id #{firewall_id} and location #{location.name} does not exist"
         end
@@ -50,7 +52,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
           ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr:, port_range: Sequel.pg_range(port_range)) }
         end
       end
-      firewall.associate_with_private_subnet(ps, apply_firewalls: false)
+      firewall&.associate_with_private_subnet(ps, apply_firewalls: false)
 
       prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Metal::SubnetNexus"
       Strand.create_with_id(id, prog:, label: "start")

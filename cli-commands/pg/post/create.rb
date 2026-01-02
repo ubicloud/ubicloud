@@ -12,7 +12,7 @@ UbiCli.on("pg").run_on("create") do
     on("-c", "--pg-config=config", "postgres config (e.g key1=value1,key2=value2)")
     on("-u", "--pgbouncer-config=config", "pgbouncer config (e.g. key1=value1,key2=value2)")
     on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
-    on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
+    on("-R", "--restrict-by-default", "ignored (deprecated)")
     on("-P", "--private-subnet-name=name", "override name of created private subnet")
   end
   help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
@@ -23,6 +23,7 @@ UbiCli.on("pg").run_on("create") do
 
   run do |opts, cmd|
     params = underscore_keys(opts[:pg_create])
+    params.delete(:restrict_by_default)
     pg_tags_to_hash(params, cmd)
     params_to_hash(params, :pg_config, "config", cmd)
     params_to_hash(params, :pgbouncer_config, "pgbouncer config", cmd)

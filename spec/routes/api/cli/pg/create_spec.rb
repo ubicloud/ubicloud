@@ -20,7 +20,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.ha_type).to eq "none"
     expect(pg.version).to eq "17"
     expect(pg.flavor).to eq "standard"
-    expect(pg.pg_firewall_rules_dataset.count).to eq 4
+    expect(pg.customer_firewall).to be_nil
     expect(pg.tags).to eq([])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
@@ -40,7 +40,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.user_config).to eq({"max_connections" => "100", "wal_level" => "logical"})
     expect(pg.pgbouncer_user_config).to eq({"max_client_conn" => "100"})
     expect(pg.flavor).to eq "paradedb"
-    expect(pg.pg_firewall_rules_dataset.count).to eq 0
+    expect(pg.customer_firewall).to be_nil
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
@@ -52,6 +52,7 @@ RSpec.describe Clover, "cli pg create" do
     pg = PostgresResource.first
     expect(pg).to be_a PostgresResource
     expect(pg.name).to eq "test-pg"
+    expect(pg.customer_firewall).to be_nil
     expect(pg.private_subnet.name).to eq "my-custom-subnet"
     expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
   end
