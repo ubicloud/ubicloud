@@ -77,19 +77,18 @@ usermod -L ubuntu
 
   describe "#before_run" do
     it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.incr_destroy
       expect { nx.before_run }.to hop("destroy")
     end
 
-    it "does not hop to destroy if already in the destroy state" do
-      ["destroy", "cleanup_roles"].each do |label|
-        expect(nx).to receive(:when_destroy_set?).and_yield
-        st.label = label
-        expect { nx.before_run }.not_to hop("destroy")
-      end
+    it "does not hop to destroy if already destroying" do
+      nx.incr_destroy
+      nx.incr_destroying
+      expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "stops billing before hops to destroy" do
+      nx.incr_destroy
       br = BillingRecord.create(
         project_id: vm.project.id,
         resource_id: vm.id,
@@ -99,14 +98,7 @@ usermod -L ubuntu
       )
 
       expect(vm).to receive(:active_billing_records).and_return([br])
-      expect(nx).to receive(:when_destroy_set?).and_yield
       expect(br).to receive(:finalize)
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "hops to destroy if billing record is not found" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(vm.active_billing_records).to be_empty
       expect { nx.before_run }.to hop("destroy")
     end
   end
