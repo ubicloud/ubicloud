@@ -25,6 +25,13 @@ RSpec.describe Prog::Vnet::CertNexus do
       st = described_class.assemble("test-hostname", dns_zone.id)
       expect(Cert[st.id].hostname).to eq "test-hostname"
       expect(st.label).to eq "start"
+      expect(st.stack[0]["add_private"]).to be false
+    end
+
+    it "supports add_private argument" do
+      st = described_class.assemble("test-hostname", dns_zone.id, add_private: true)
+      expect(Cert[st.id].hostname).to eq "test-hostname"
+      expect(st.stack[0]["add_private"]).to be true
     end
 
     it "fails if dns_zone is not valid" do
@@ -42,19 +49,27 @@ RSpec.describe Prog::Vnet::CertNexus do
       instance_double(Acme::Client::Resources::Order, authorizations: [authorization], url: "test-order-url")
     }
 
-    it "registers a deadline and starts the certificate creation process" do
-      client = instance_double(Acme::Client)
-      key = Clec::Cert.ec_key
-      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(key)
-      expect(Acme::Client).to receive(:new).with(private_key: key, directory: Config.acme_directory).and_return(client)
-      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
-      expect(client).to receive(:new_order).with(identifiers: [cert.hostname]).and_return(order)
-      expect(cert).to receive(:update).with(kid: "test-kid", account_key: key.to_der, order_url: "test-order-url")
-      expect(nx).to receive(:dns_zone).and_return(dns_zone)
-      expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name"))
-      expect(dns_zone).to receive(:insert_record).with(record_name: "test-record-name.cert-hostname", type: "test-record-type", ttl: 600, data: "test-record-content")
+    [true, false].each do |use_add_private|
+      it "registers a deadline and starts the certificate creation process#{" when adding private DNS name" if use_add_private}" do
+        identifiers = [cert.hostname]
+        if use_add_private
+          st.stack = [{"restarted" => 0, "add_private" => true}]
+          nx.instance_variable_set(:@frame, nil)
+          identifiers << "private-#{cert.hostname}"
+        end
+        client = instance_double(Acme::Client)
+        key = Clec::Cert.ec_key
+        expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(key)
+        expect(Acme::Client).to receive(:new).with(private_key: key, directory: Config.acme_directory).and_return(client)
+        expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+        expect(client).to receive(:new_order).with(identifiers:).and_return(order)
+        expect(cert).to receive(:update).with(kid: "test-kid", account_key: key.to_der, order_url: "test-order-url")
+        expect(nx).to receive(:dns_zone).and_return(dns_zone)
+        expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name"))
+        expect(dns_zone).to receive(:insert_record).with(record_name: "test-record-name.cert-hostname", type: "test-record-type", ttl: 600, data: "test-record-content")
 
-      expect { nx.start }.to hop("wait_dns_update")
+        expect { nx.start }.to hop("wait_dns_update")
+      end
     end
 
     it "creates a self-signed certificate in development environments without dns" do
