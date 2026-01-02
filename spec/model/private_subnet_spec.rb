@@ -14,14 +14,6 @@ RSpec.describe PrivateSubnet do
     )
   }
 
-  let(:nic) { instance_double(Nic, id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e") }
-  let(:existing_nic) {
-    instance_double(Nic,
-      id: "46ca6ded-b056-4723-bd91-612959f52f6f",
-      private_ipv4: "10.9.39.5/32",
-      private_ipv6: "fd1b:9793:dcef:cd0a:c::/79")
-  }
-
   it "disallows VM ubid format as name" do
     ps = described_class.new(name: described_class.generate_ubid.to_s)
     ps.validate
@@ -47,18 +39,28 @@ RSpec.describe PrivateSubnet do
       expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:c::/79"
     end
 
-    it "returns random private ipv4 when ip exists" do
-      private_subnet
-      expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
-      expect(private_subnet).to receive(:nics).and_return([existing_nic]).twice
-      expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
-    end
+    context "when ip exists" do
+      before do
+        private_subnet.save_changes
+        Nic.create(
+          private_subnet_id: private_subnet.id,
+          private_ipv4: "10.9.39.5/32",
+          private_ipv6: "fd1b:9793:dcef:cd0a:c::/79",
+          mac: "00:00:00:00:00:01",
+          name: "existing-nic",
+          state: "active"
+        )
+      end
 
-    it "returns random private ipv6 when ip exists" do
-      private_subnet
-      expect(SecureRandom).to receive(:random_number).with(32766).and_return(5, 6)
-      expect(private_subnet).to receive(:nics).and_return([existing_nic]).twice
-      expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:e::/79"
+      it "returns random private ipv4" do
+        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
+        expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
+      end
+
+      it "returns random private ipv6" do
+        expect(SecureRandom).to receive(:random_number).with(32766).and_return(5, 6)
+        expect(private_subnet.random_private_ipv6.to_s).to eq "fd1b:9793:dcef:cd0a:e::/79"
+      end
     end
   end
 
@@ -139,33 +141,61 @@ RSpec.describe PrivateSubnet do
   end
 
   describe ".create_tunnels" do
+    let(:ps) {
+      described_class.create(
+        name: "tunnel-test-ps",
+        location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd10:9b0b:6b4b:8fbb::/64",
+        net4: "10.0.0.0/26",
+        state: "waiting",
+        project_id: Project.create(name: "tunnel-test-project").id
+      )
+    }
     let(:src_nic) {
-      instance_double(Nic, id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b")
+      Nic.create(
+        private_subnet_id: ps.id,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.1",
+        mac: "00:00:00:00:00:01",
+        name: "src-nic",
+        state: "active"
+      )
     }
     let(:dst_nic) {
-      instance_double(Nic, id: "6a187cc1-291b-8eac-bdfc-96801fa3118d")
+      Nic.create(
+        private_subnet_id: ps.id,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb:def::",
+        private_ipv4: "10.0.0.2",
+        mac: "00:00:00:00:00:02",
+        name: "dst-nic",
+        state: "active"
+      )
     }
 
     it "creates tunnels if doesn't exist" do
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+      ps.create_tunnels([src_nic, dst_nic], dst_nic)
+      expect(IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]).not_to be_nil
+      expect(IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]).not_to be_nil
     end
 
     it "skips existing tunnels" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(false)
+      IpsecTunnel.create(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id)
+      expect(IpsecTunnel.count).to eq 1
 
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
-      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+      ps.create_tunnels([src_nic, dst_nic], dst_nic)
+
+      expect(IpsecTunnel.count).to eq 2
+      expect(IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]).not_to be_nil
     end
 
     it "skips existing tunnels - 2" do
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(false)
-      expect(IpsecTunnel).to receive(:[]).with(src_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d", dst_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b").and_return(true)
+      IpsecTunnel.create(src_nic_id: dst_nic.id, dst_nic_id: src_nic.id)
+      expect(IpsecTunnel.count).to eq 1
 
-      expect(IpsecTunnel).to receive(:create).with(src_nic_id: "8ce8a85c-c3d6-86ac-bfdf-022bad69440b", dst_nic_id: "6a187cc1-291b-8eac-bdfc-96801fa3118d").and_return(true)
-      private_subnet.create_tunnels([src_nic, dst_nic], dst_nic)
+      ps.create_tunnels([src_nic, dst_nic], dst_nic)
+
+      expect(IpsecTunnel.count).to eq 2
+      expect(IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]).not_to be_nil
     end
   end
 
