@@ -14,6 +14,7 @@ class Clover
     pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
     with_firewall_rules = !typecast_params.bool("restrict_by_default")
+    private_subnet_name = typecast_params.nonempty_str("private_subnet_name") if api?
 
     postgres_params = {
       "flavor" => flavor,
@@ -46,6 +47,7 @@ class Clover
         ha_type:,
         with_firewall_rules:,
         flavor:,
+        private_subnet_name:,
         user_config:,
         pgbouncer_user_config:,
         tags:

@@ -600,6 +600,7 @@ Options:
     -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
     -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
     -R, --restrict-by-default        restrict access by default (add firewall rules to allow access)
+    -P, --private-subnet-name=name   override name of created private subnet
 
 Allowed Option Values:
     Flavor: standard paradedb lantern

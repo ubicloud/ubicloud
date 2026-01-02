@@ -13,6 +13,7 @@ UbiCli.on("pg").run_on("create") do
     on("-u", "--pgbouncer-config=config", "pgbouncer config (e.g. key1=value1,key2=value2)")
     on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
     on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
+    on("-P", "--private-subnet-name=name", "override name of created private subnet")
   end
   help_option_values("Flavor:", Option::POSTGRES_FLAVOR_OPTIONS.keys)
   help_option_values("Replication Type:", Option::POSTGRES_HA_OPTIONS.keys)
