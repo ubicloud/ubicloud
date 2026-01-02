@@ -13,33 +13,31 @@ RSpec.describe GithubCacheEntry do
     before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
 
     it "deletes the object" do
-      expect(entry).to receive(:committed_at).and_return(Time.now)
+      entry.update(committed_at: Time.now)
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
       entry.destroy
     end
 
     it "ignores if the object already deleted" do
-      expect(entry).to receive(:committed_at).and_return(Time.now)
+      entry.update(committed_at: Time.now)
       expect(client).to receive(:delete_object).and_raise(Aws::S3::Errors::NoSuchKey.new(nil, nil))
       entry.destroy
     end
 
     it "aborts the multipart upload if the cache not committed yet" do
-      expect(entry).to receive(:committed_at).and_return(nil)
       expect(client).to receive(:abort_multipart_upload).with(bucket: repository.bucket_name, key: entry.blob_key, upload_id: entry.upload_id)
       expect(client).to receive(:delete_object)
       entry.destroy
     end
 
     it "ignores if the multipart upload already aborted" do
-      expect(entry).to receive(:committed_at).and_return(nil)
       expect(client).to receive(:abort_multipart_upload).and_raise(Aws::S3::Errors::NoSuchUpload.new(nil, nil))
       expect(client).to receive(:delete_object)
       entry.destroy
     end
   end
 
-  describe ".destory_where" do
+  describe ".destroy_where" do
     let(:client) { instance_double(Aws::S3::Client) }
 
     before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
@@ -63,10 +61,15 @@ RSpec.describe GithubCacheEntry do
     end
   end
 
-  describe "#destory_where" do
+  describe "#destroy_where" do
+    let(:client) { instance_double(Aws::S3::Client) }
+
+    before { allow(Aws::S3::Client).to receive(:new).and_return(client) }
+
     it "destroy the objects if it is matched by the filter" do
       archive_count = ArchivedRecord.count
-      expect(entry).to receive(:after_destroy).and_return(nil)
+      expect(client).to receive(:abort_multipart_upload)
+      expect(client).to receive(:delete_object)
       expect(entry.destroy_where(key: "k1")).to eq entry
       expect(entry).not_to exist
       expect(ArchivedRecord.count).to eq(archive_count + 1)
@@ -74,7 +77,6 @@ RSpec.describe GithubCacheEntry do
 
     it "does not destroy the object if it is not matched by the filter" do
       archive_count = ArchivedRecord.count
-      expect(entry).not_to receive(:after_destroy)
       expect(entry.destroy_where(key: "k2")).to be_nil
       expect(entry).to exist
       expect(ArchivedRecord.count).to eq archive_count

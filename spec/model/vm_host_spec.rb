@@ -329,17 +329,21 @@ RSpec.describe VmHost do
   end
 
   it "initiates a new health monitor session" do
-    sshable = Sshable.new
-    expect(vh).to receive(:sshable).and_return(sshable)
-    expect(sshable).to receive(:start_fresh_session)
-    vh.init_health_monitor_session
+    sshable = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+    vh_with_sshable = described_class.create_with_id(sshable, location_id: Location::HETZNER_FSN1_ID, family: "standard",
+      net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+      ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2"))
+    expect(vh_with_sshable.sshable).to receive(:start_fresh_session)
+    vh_with_sshable.init_health_monitor_session
   end
 
   it "initiates a new health monitor session for metrics exporter" do
-    sshable = Sshable.new
-    expect(vh).to receive(:sshable).and_return(sshable)
-    expect(sshable).to receive(:start_fresh_session)
-    vh.init_metrics_export_session
+    sshable = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+    vh_with_sshable = described_class.create_with_id(sshable, location_id: Location::HETZNER_FSN1_ID, family: "standard",
+      net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+      ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2"))
+    expect(vh_with_sshable.sshable).to receive(:start_fresh_session)
+    vh_with_sshable.init_metrics_export_session
   end
 
   it "returns disk device ids when StorageDevice has unix_device_list" do
@@ -362,26 +366,30 @@ RSpec.describe VmHost do
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for SSD disks" do
-    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"])
-    sshable = Sshable.new
-    expect(sd).to receive(:vm_host).and_return(vh)
-    expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
-    expect(vh).to receive(:sshable).and_return(sshable)
-    allow(vh).to receive(:storage_devices).and_return([sd])
-    expect(vh.disk_device_ids).to eq(["wwn-random-id1"])
+    sshable = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+    vh_with_sshable = described_class.create_with_id(sshable, location_id: Location::HETZNER_FSN1_ID, family: "standard",
+      net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+      ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2"))
+    StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["sda"], vm_host_id: vh_with_sshable.id)
+
+    expect(vh_with_sshable.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep sda\\$ | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").and_return("wwn-random-id1")
+    expect(vh_with_sshable.disk_device_ids).to eq(["wwn-random-id1"])
   end
 
   it "converts disk devices when StorageDevice has unix_device_list with the old formatting for NVMe disks" do
-    sd = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"])
-    sshable = Sshable.new
-    expect(sd).to receive(:vm_host).and_return(vh)
-    expect(sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
-    expect(vh).to receive(:sshable).and_return(sshable)
-    allow(vh).to receive(:storage_devices).and_return([sd])
-    expect(vh.disk_device_ids).to eq(["nvme-eui.random-id"])
+    sshable = Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair)
+    vh_with_sshable = described_class.create_with_id(sshable, location_id: Location::HETZNER_FSN1_ID, family: "standard",
+      net6: NetAddr.parse_net("2a01:4f9:2b:35a::/64"),
+      ip6: NetAddr.parse_ip("2a01:4f9:2b:35a::2"))
+    StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100, unix_device_list: ["nvme0n1"], vm_host_id: vh_with_sshable.id)
+
+    expect(vh_with_sshable.sshable).to receive(:_cmd).with("ls -l /dev/disk/by-id/ | grep nvme0n1\\$ | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").and_return("nvme-eui.random-id")
+    expect(vh_with_sshable.disk_device_ids).to eq(["nvme-eui.random-id"])
   end
 
   it "checks pulse" do
+    host = create_vm_host
+    Strand.create_with_id(host, prog: "Prog::Vm::HostNexus", label: "wait")
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate
     }
@@ -391,7 +399,7 @@ RSpec.describe VmHost do
       reading_chg: Time.now - 30
     }
 
-    allow(vh).to receive(:disk_device_names).and_return(["sda"])
+    allow(host).to receive(:disk_device_names).and_return(["sda"])
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo smartctl -j -H /dev/sda -d scsi | jq .smart_status.passed").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("true\n", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("lsblk --json").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new('{"blockdevices": [{"name": "fd0","maj:min": "2:0","rm": true,"size": "4K","ro": false,"type": "disk","mountpoints": [null]},{"name": "sda","maj:min": "8:0","rm": false,"size": "2.2G","ro": false,"type": "disk","mountpoints": [null],"children": [{"name": "sda1","maj:min": "8:1","rm": false,"size": "2.1G","ro": false,"type": "part","mountpoints": ["/"]},{"name": "sda14","maj:min": "8:14","rm": false,"size": "4M","ro": false,"type": "part","mountpoints": [null]}]}]}', 0))
     file_path = "/test-file-monitor"
@@ -399,12 +407,11 @@ RSpec.describe VmHost do
     allow(session[:ssh_session]).to receive(:_exec!).with("sha256sum #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_path}\n", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("sudo rm #{file_path}").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
     allow(session[:ssh_session]).to receive(:_exec!).with("journalctl -kS -1min --no-pager").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("random ok logs", 0))
-    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
 
     expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
-    expect(vh).to receive(:reload).and_return(vh)
-    expect(vh).to receive(:incr_checkup)
-    expect(vh.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(host.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(Semaphore.where(strand_id: host.id, name: "checkup").count).to eq(1)
   end
 
   it "checks pulse on a non-default mountpoint with kernel errors" do

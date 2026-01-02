@@ -117,7 +117,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit "#{p.path}/dashboard"
-    expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Invited-project Dashboard")
   end
 
   it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
@@ -163,7 +163,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit p.path
-    expect(page.title).to eq("Ubicloud - #{p.name}")
+    expect(page.title).to eq("Ubicloud - Invited-project")
   end
 
   it "can remember login" do
@@ -176,12 +176,12 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
   end
 
   it "has correct current user when logged in via remember token" do
-    account = create_account
+    create_account
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
@@ -190,10 +190,10 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     page.refresh
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
   end
 
   it "can reset password" do
@@ -278,7 +278,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     account.suspend
 
@@ -302,7 +302,7 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     account.suspend
     page.refresh
@@ -536,7 +536,7 @@ RSpec.describe Clover, "auth" do
       click_button "Close Account"
 
       expect(page.title).to eq("Ubicloud - Close Account")
-      expect(page).to have_flash_error("'#{project.name}' project has some resources. Delete all related resources first.")
+      expect(page).to have_flash_error("'Default' project has some resources. Delete all related resources first.")
     end
   end
 
@@ -839,7 +839,7 @@ RSpec.describe Clover, "auth" do
       expect(account).not_to be_nil
       expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
     end
 
     it "can login existing account" do
@@ -853,7 +853,7 @@ RSpec.describe Clover, "auth" do
       expect(Account.count).to eq(1)
       expect(AccountIdentity.count).to eq(1)
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
     end
 
     it "can not login existing account before linking it" do

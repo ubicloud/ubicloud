@@ -4,10 +4,13 @@ require_relative "../model/spec_helper"
 
 RSpec.describe Prog::InstallDnsmasq do
   subject(:idm) {
+    sshable
     described_class.new(st)
   }
 
-  let(:st) { Strand.new(prog: "InstallDnsmasq") }
+  let(:sshable_id) { Sshable.generate_uuid }
+  let(:sshable) { Sshable.create_with_id(sshable_id) }
+  let(:st) { Strand.create_with_id(sshable_id, prog: "InstallDnsmasq", label: "start") }
 
   describe "#start" do
     it "starts sub-programs to install dependencies and download dnsmasq concurrently" do
@@ -33,32 +36,23 @@ RSpec.describe Prog::InstallDnsmasq do
 
   describe "#compile_and_install" do
     it "runs a compile command and pops" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with "(cd dnsmasq && make -sj$(nproc) && sudo make install)"
-      expect(idm).to receive(:sshable).and_return(sshable)
-
+      expect(idm.sshable).to receive(:_cmd).with "(cd dnsmasq && make -sj$(nproc) && sudo make install)"
       expect { idm.compile_and_install }.to exit({"msg" => "compiled and installed dnsmasq"})
     end
   end
 
   describe "#install_build_dependencies" do
     it "installs dependencies and pops" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with "sudo apt-get -y install make gcc"
-      expect(idm).to receive(:sshable).and_return(sshable)
-
+      expect(idm.sshable).to receive(:_cmd).with "sudo apt-get -y install make gcc"
       expect { idm.install_build_dependencies }.to exit({"msg" => "installed build dependencies"})
     end
   end
 
   describe "#git_clone_dnsmasq" do
     it "fetches a version and pops" do
-      sshable = Sshable.new
-      expect(sshable).to receive(:_cmd).with <<CMD.rstrip
+      expect(idm.sshable).to receive(:_cmd).with <<CMD.rstrip
 git init dnsmasq && (cd dnsmasq &&   git fetch https://github.com/ubicloud/dnsmasq.git b6769234bca9b0eabfe4768832b88d2cdb187092 --depth=1 &&  git checkout b6769234bca9b0eabfe4768832b88d2cdb187092 &&  git fsck --full)
 CMD
-      expect(idm).to receive(:sshable).and_return(sshable)
-
       expect { idm.git_clone_dnsmasq }.to exit({"msg" => "downloaded and verified dnsmasq successfully"})
     end
   end

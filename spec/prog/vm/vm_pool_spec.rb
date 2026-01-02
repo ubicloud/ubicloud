@@ -3,23 +3,23 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Vm::VmPool do
-  subject(:nx) {
-    described_class.new(st).tap {
-      it.instance_variable_set(:@vm_pool, pool)
-    }
-  }
+  subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.new }
+  let(:pool_id) { VmPool.generate_uuid }
 
-  let(:project_id) { Project.create(name: "test-project").id }
-
-  let(:pool) {
-    VmPool.create(
+  let(:st) {
+    VmPool.create_with_id(
+      pool_id,
       size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
       storage_size_gib: 86, storage_encrypted: true, storage_skip_sync: true,
       arch: "x64"
     )
+    Strand.create_with_id(pool_id, prog: "Vm::VmPool", label: "start")
   }
+
+  let(:pool) { nx.vm_pool }
+
+  let(:project_id) { Project.create(name: "test-project").id }
 
   describe ".assemble" do
     it "creates the entity and strand properly" do
@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::VmPool do
         storage_size_gib: 86, storage_encrypted: true,
         storage_skip_sync: false, arch: "x64"
       )
-      pool = VmPool[st.id]
+      pool = st.subject
       expect(pool).not_to be_nil
       expect(pool.size).to eq(3)
       expect(pool.vm_size).to eq("standard-2")
