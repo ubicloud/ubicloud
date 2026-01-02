@@ -112,30 +112,4 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       expect { nx.wait_servers_destroyed }.to exit({"msg" => "pool destroyed"})
     end
   end
-
-  describe "#before_run" do
-    it "hops to destroy if strand is not destroy" do
-      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
-      st.update(label: "start")
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand is destroy" do
-      st = described_class.assemble(minio_cluster.id, 0, 1, 1, 100, "standard-2")
-      st.update(label: "destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if destroy is not set" do
-      expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand label is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
 end

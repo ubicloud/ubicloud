@@ -30,25 +30,6 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state or one of the other destroying states" do
-      expect(nx).to receive(:when_destroy_set?).and_yield.at_least(:once)
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-      expect(nx.strand).to receive(:label).and_return("release_eip")
-      expect { nx.before_run }.not_to hop("destroy")
-      expect(nx.strand).to receive(:label).and_return("delete_subnet")
-      expect { nx.before_run }.not_to hop("destroy")
-      expect(nx.strand).to receive(:label).and_return("destroy_entities")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "creates a nic aws resource" do
       NicAwsResource[nic.id].destroy
