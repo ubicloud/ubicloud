@@ -3,46 +3,44 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::BootstrapRhizome do
-  subject(:br) {
-    described_class.new(Strand.new(prog: "BootstrapRhizome"))
+  subject(:br) { described_class.new(st) }
+
+  let(:ssh_key) { SshKey.new(Ed25519::SigningKey.new("\x00" * 32)) }
+  let(:sshable) {
+    Sshable.create(
+      host: "192.168.1.100",
+      raw_private_key_1: ssh_key.keypair
+    )
+  }
+  let(:st) {
+    Strand.create_with_id(sshable, prog: "BootstrapRhizome", label: "start")
   }
 
   it "exits if destroy is set" do
     expect(br.before_run).to be_nil
-    expect(br).to receive(:when_destroy_set?).and_yield
+    br.incr_destroy
     expect { br.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
   end
 
   describe "#start" do
-    before { br.strand.label = "start" }
-
     it "generates a keypair" do
-      sshable = create_mock_sshable(raw_private_key_1: nil)
-      expect(sshable).to receive(:update) do |**args|
-        key = args[:raw_private_key_1]
-        expect(key).to be_instance_of String
-        expect(key.length).to eq 64
-      end
-
-      expect(br).to receive(:sshable).and_return(sshable).twice
-
+      sshable.update(raw_private_key_1: nil)
       expect { br.start }.to hop("setup", "BootstrapRhizome")
+      expect(sshable.reload.raw_private_key_1).to be_instance_of(String)
+      expect(sshable.raw_private_key_1.length).to eq(64)
     end
 
     it "does not generate a keypair if there is already one" do
-      sshable = create_mock_sshable(raw_private_key_1: "bogus")
-      expect(sshable).not_to receive(:update)
-      expect(br).to receive(:sshable).and_return(sshable)
+      original_key = sshable.raw_private_key_1
       expect { br.start }.to hop("setup", "BootstrapRhizome")
+      expect(sshable.reload.raw_private_key_1).to eq(original_key)
     end
   end
 
   describe "#setup" do
-    before { br.strand.label = "setup" }
+    before { st.update(label: "setup") }
 
     it "runs initializing shell with public keys" do
-      sshable = create_mock_sshable(host: "hostname", keys: [instance_double(SshKey, public_key: "test key", private_key: "test private key")])
-      expect(br).to receive(:sshable).and_return(sshable).at_least(:once)
       session = Net::SSH::Connection::Session.allocate
       expect(Net::SSH).to receive(:start).and_yield(session)
       expect(session).to receive(:_exec!).with(<<'FIXTURE').and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
@@ -87,7 +85,7 @@ echo \#\ Supported\ HostKey\ algorithms\ by\ order\ of\ preference.'
 '\#\ Reduce\ the\ time\ allowed\ for\ login.'
 'LoginGraceTime\ 20s'
 ' | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
-echo test\ key | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo ssh-ed25519\ AAAAC3NzaC1lZDI1NTE5AAAAIDtqJ7zOtqQtYqOo0CpvDXNlMhV3HeJDpjrASKGLWdop | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
 FIXTURE
 
@@ -95,7 +93,7 @@ FIXTURE
     end
 
     it "exits once InstallRhizome has returned" do
-      br.strand.retval = {"msg" => "installed rhizome"}
+      st.update(retval: {"msg" => "installed rhizome"})
       expect { br.setup }.to exit({"msg" => "rhizome user bootstrapped and source installed"})
     end
   end
