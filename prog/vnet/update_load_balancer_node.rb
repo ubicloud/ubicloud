@@ -51,10 +51,8 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
 
     balance_mode_ip4, balance_mode_ip6 = if load_balancer.algorithm == "round_robin"
       ["numgen inc", "numgen inc"]
-    elsif load_balancer.algorithm == "hash_based"
+    else # elsif load_balancer.algorithm == "hash_based"
       ["jhash ip saddr . tcp sport . ip daddr . tcp dport", "jhash ip6 saddr . tcp sport . ip6 daddr . tcp dport"]
-    else
-      fail ArgumentError, "Unsupported load balancer algorithm: #{load_balancer.algorithm}"
     end
 
     ipv4_prerouting = if load_balancer.ipv4_enabled?

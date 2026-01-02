@@ -521,11 +521,6 @@ LOAD_BALANCER
 
         expect { nx.update_load_balancer }.to exit({"msg" => "load balancer is updated"})
       end
-
-      it "raises exception if the algorithm is not supported" do
-        expect(lb).to receive(:algorithm).and_return("least_conn").at_least(:once)
-        expect { nx.update_load_balancer }.to raise_error("Unsupported load balancer algorithm: least_conn")
-      end
     end
   end
 
