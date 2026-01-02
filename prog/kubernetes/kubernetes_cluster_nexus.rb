@@ -62,7 +62,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      unless destroying_set?
         kubernetes_cluster.active_billing_records.each(&:finalize)
         hop_destroy
       end
