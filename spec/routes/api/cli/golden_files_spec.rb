@@ -22,7 +22,7 @@ RSpec.describe Clover, "cli" do
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("psfzm9e26xky5m9ggetw4dpqe2"))
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc69z0cda8jt0g5b120hamn4vf"), UBID.parse("nchfcq5bmsae7mc7bm6nx82d2n"))
     expect(Firewall).to receive(:generate_uuid).and_return("24242d92-217b-85fc-b891-7046af3c1150", "f6965763-2e93-8dfc-83fa-abe25e328716")
-    expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "e46b8b76-88e2-89f8-972b-692232699d16", "e0804078-98cf-85f8-bf74-702ec92c91e8", "d62c8465-7f9b-85f8-a548-5a8772352988", "ff48a299-529c-8df8-993a-ddb0450be4a4", "ce327a30-12cb-8df8-86c3-d2db53a4b837")
+    expect(FirewallRule).to receive(:generate_uuid).and_return("51e5bc7d-245b-8df8-bf91-7c5d150cb160", "3b367895-7f18-89f8-a295-ff247e9d5192", "305d838d-a3cd-85f8-aa08-9a66e71a5877", "5aa5b086-37bd-81f8-8d03-dd4b0e09a436", "20c360fa-bc06-8df8-b067-33f4a1ebdbbd", "2b628450-25bd-8df8-8b42-fb5cc5d01ad1", "da42e2ef-b5f1-8df8-966d-1387afb1b2f4", "bc9b093a-0e00-89f8-991a-5e0cd15a7942", "b5e13849-a04f-89f8-b564-ab8ad37298aa", "ff48a299-529c-8df8-993a-ddb0450be4a4", "ce327a30-12cb-8df8-86c3-d2db53a4b837")
     expect(PostgresResource).to receive(:generate_uuid).and_return("dd0375a6-1c66-82d0-a5e8-af1e8527a8a2")
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("45754ea1-c139-8a8d-af18-7b24e0dbc7de")
     SshPublicKey.create_with_id("32092997-2a00-8f33-8129-4c0f18e5153c", project_id: @project.id, name: "spk", public_key: "a a")
@@ -47,6 +47,9 @@ RSpec.describe Clover, "cli" do
 
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64 -t foo=bar -v 16])
     pg = PostgresResource.first(name: "test-pg")
+    cli(%W[fw eu-central-h1/#{pg.ubid}-firewall create])
+    cli(%W[fw eu-central-h1/#{pg.ubid}-firewall attach-subnet #{pg.ubid}-subnet])
+    cli(%W[fw eu-central-h1/#{pg.ubid}-firewall add-rule -d pg-fw-desc -s 5432 0.0.0.0/0])
     pg.pg_firewall_rules.find { it.ubid == "frpqgkgjd09y4pnjaq2pkeacam" }.update(description: "pg-fw-desc")
     pg.update(user_config: {allow_in_place_tablespaces: "on", max_connections: "1000"}, pgbouncer_user_config: {server_round_robin: "1", disable_pqexec: "1"})
     pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
