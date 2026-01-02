@@ -54,10 +54,26 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
       )
 
-      # Customer firewall, will be attached to created customer subnet
-      firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
-      subnet_name = private_subnet_name || "#{postgres_resource.ubid}-subnet"
-      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id).subject
+      private_subnet_args = {
+        name: private_subnet_name || "#{postgres_resource.ubid}-subnet",
+        location_id: location.id
+      }
+
+      if with_firewall_rules
+        # Customer firewall, will be attached to created customer subnet
+        firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
+        firewall.replace_firewall_rules([
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
+        ])
+        private_subnet_args[:firewall_id] = firewall.id
+      else
+        private_subnet_args[:no_firewall] = true
+      end
+
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, **private_subnet_args).subject
       private_subnet_id = private_subnet.id
       postgres_resource.update(private_subnet_id:)
 
@@ -71,15 +87,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
         {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
       ])
-
-      if with_firewall_rules
-        firewall.replace_firewall_rules([
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
-          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
-          {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
-          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
-        ])
-      end
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
 
