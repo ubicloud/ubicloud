@@ -30,7 +30,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
   end
 
   def failed_deliveries(since, max_page = 100)
-    all_deliveries = client.get("/app/hook/deliveries")
+    all_deliveries = client.list_app_hook_deliveries
     page = 1
     while (next_url = client.last_response.rels[:next]&.href) && (since < all_deliveries.last[:delivered_at])
       break if page >= max_page
