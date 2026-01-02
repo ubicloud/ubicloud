@@ -13,7 +13,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {})
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil)
 
     unless Project[project_id]
       fail "No existing project"
@@ -56,7 +56,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       # Customer firewall, will be attached to created customer subnet
       firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
-      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).subject
+      subnet_name = private_subnet_name || "#{postgres_resource.ubid}-subnet"
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id).subject
       private_subnet_id = private_subnet.id
       postgres_resource.update(private_subnet_id:)
 
