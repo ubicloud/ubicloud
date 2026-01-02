@@ -80,22 +80,20 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
 
   describe "#before_run" do
     context "when destroy is set" do
-      before do
-        expect(nexus).to receive(:when_destroy_set?).and_yield
-      end
-
       it "hops to destroy if not already destroying" do
-        expect(nexus.strand).to receive(:label).twice.and_return("active")
+        nexus.incr_destroy
         expect { nexus.before_run }.to hop("destroy")
       end
 
-      it "does not hop if already in destroy state" do
-        expect(nexus.strand).to receive(:label).and_return("destroy")
+      it "does not hop if already destroying" do
+        nexus.incr_destroy
+        nexus.incr_destroying
         expect { nexus.before_run }.not_to hop("destroy")
       end
 
       it "exits if there are operations on the stack" do
-        expect(nexus.strand).to receive(:label).and_return("destroy")
+        nexus.incr_destroy
+        nexus.incr_destroying
         expect(nexus.strand.stack).to receive(:count).and_return(2)
         expect { nexus.before_run }.to exit(
           {"msg" => "operation is cancelled due to the destruction of the inference router target"}
