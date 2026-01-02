@@ -87,16 +87,15 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
         expect { nexus.before_run }.to hop("destroy")
       end
 
-      it "does not hop if already in destroy state" do
-        nexus.strand.update(label: "destroy")
+      it "does not hop if already destroying" do
+        nexus.incr_destroying
         expect { nexus.before_run }.not_to hop("destroy")
       end
 
       it "pops stack and hops to back-link if there are operations on the stack" do
-        original_stack = nexus.strand.stack.dup
         new_frame = {"subject_id" => nexus.inference_router_target.id, "link" => [nexus.strand.prog, "destroy"]}
-        new_stack = [new_frame] + original_stack
-        nexus.strand.update(label: "destroy", stack: new_stack)
+        nexus.strand.update(stack: [new_frame] + nexus.strand.stack)
+        nexus.incr_destroying
         reloaded_nexus = described_class.new(nexus.strand.reload)
         reloaded_nexus.incr_destroy
         expect { reloaded_nexus.before_run }.to hop("destroy")

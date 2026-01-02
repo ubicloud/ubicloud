@@ -5,7 +5,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      unless ["destroy", "cleanup_roles"].include? strand.label
+      unless destroying_set?
         vm.active_billing_records.each(&:finalize)
         register_deadline(nil, 5 * 60)
         hop_destroy
