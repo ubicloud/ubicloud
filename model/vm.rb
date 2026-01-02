@@ -117,7 +117,7 @@ class Vm < Sequel::Model
 
   def display_state
     label = strand&.label
-    return "deleting" if destroy_set? || label == "destroy"
+    return "deleting" if destroy_set? || destroying_set? || label == "destroy"
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
 

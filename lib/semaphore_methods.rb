@@ -5,6 +5,7 @@ module SemaphoreMethods
     model.class_exec do
       one_to_many :semaphores, key: :strand_id
 
+      semaphore_names << :destroying if semaphore_names.include?(:destroy) && !semaphore_names.include?(:destroying)
       @semaphore_names = semaphore_names.freeze
 
       semaphore_names.each do |sym|
