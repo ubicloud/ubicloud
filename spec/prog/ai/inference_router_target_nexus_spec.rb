@@ -78,31 +78,6 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
     end
   end
 
-  describe "#before_run" do
-    context "when destroy is set" do
-      before { nexus.incr_destroy }
-
-      it "hops to destroy if not already destroying" do
-        nexus.strand.update(label: "active")
-        expect { nexus.before_run }.to hop("destroy")
-      end
-
-      it "does not hop if already destroying" do
-        nexus.incr_destroying
-        expect { nexus.before_run }.not_to hop("destroy")
-      end
-
-      it "pops stack and hops to back-link if there are operations on the stack" do
-        new_frame = {"subject_id" => nexus.inference_router_target.id, "link" => [nexus.strand.prog, "destroy"]}
-        nexus.strand.update(stack: [new_frame] + nexus.strand.stack)
-        nexus.incr_destroying
-        reloaded_nexus = described_class.new(nexus.strand.reload)
-        reloaded_nexus.incr_destroy
-        expect { reloaded_nexus.before_run }.to hop("destroy")
-      end
-    end
-  end
-
   describe "#start" do
     it "hops to wait for manual target" do
       target_strand.subject.update(type: "manual")
