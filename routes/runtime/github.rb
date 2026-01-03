@@ -6,15 +6,10 @@ class Clover
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
 
-    begin
-      repository.setup_blob_storage unless repository.access_key
-    rescue Excon::Error::HTTPStatus => ex
-      Clog.emit("Unable to setup blob storage") { {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}} }
-      fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
-    end
-
     # getCacheEntry
     r.get "cache" do
+      next 204 unless repository.access_key
+
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
 
@@ -68,6 +63,13 @@ class Clover
     end
 
     r.on "caches" do
+      begin
+        repository.setup_blob_storage unless repository.access_key
+      rescue Excon::Error::HTTPStatus => ex
+        Clog.emit("Unable to setup blob storage") { {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}} }
+        fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
+      end
+
       r.is do
         # listCache
         r.get do
