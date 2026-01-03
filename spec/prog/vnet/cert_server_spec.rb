@@ -39,8 +39,7 @@ RSpec.describe Prog::Vnet::CertServer do
 
     it "pops if destroy semaphore is set" do
       nx.incr_destroy
-
-      expect { nx.before_run }.to exit({"msg" => "early exit due to destroy semaphore"})
+      expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
     end
 
     it "if vm exists, does nothing" do

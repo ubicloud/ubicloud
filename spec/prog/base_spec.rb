@@ -473,5 +473,13 @@ RSpec.describe Prog::Base do
         st.unsynchronized_run
       }.to raise_error(RuntimeError, "BUG: destroying semaphore not set on destroy label")
     end
+
+    it "pops additional operations from stack" do
+      Semaphore.incr(st.id, :destroy)
+      Semaphore.incr(st.id, :destroying)
+      st.update(stack: [{"link" => ["Test", "napper"]}, {}])
+      expect { st.unsynchronized_run }
+        .to change { st.reload.retval }.from(nil).to({"msg" => "operation is cancelled due to explicitly requested destruction"})
+    end
   end
 end

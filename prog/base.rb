@@ -77,7 +77,7 @@ end
 
   def before_run
     if defined?(destroy_set?)
-      unless destroying_set?
+      if !destroying_set?
         fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
         if destroy_set?
           send(:before_destroy) if respond_to?(:before_destroy)
@@ -87,6 +87,13 @@ end
             pop "exiting early due to destroy semaphore"
           end
         end
+      elsif destroy_set? && @strand.stack.count > 1
+        # When a strand has multiple frames in its stack, and it is destroyed, the top
+        # frame destroys the associated entities and pops. Then next frame continues to
+        # work, but fails because the entities are already destroyed. This is fixed by
+        # first popping all frames but the last one, and then switching to the destroy
+        # label to handle cleanup.
+        pop "operation is cancelled due to explicitly requested destruction"
       end
     end
   end

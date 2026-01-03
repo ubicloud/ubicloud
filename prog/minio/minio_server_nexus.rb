@@ -40,16 +40,6 @@ class Prog::Minio::MinioServerNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if !destroying_set?
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the minio server"
-      end
-    end
-  end
-
   def cluster
     @cluster ||= minio_server.cluster
   end

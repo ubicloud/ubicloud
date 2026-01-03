@@ -82,27 +82,6 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      nx.incr_destroy
-      expect { nx.before_run }.to hop("destroy")
-        .and change { Semaphore[strand_id: st.id, name: "destroying"] }.from(nil).to(be_a(Semaphore))
-    end
-
-    it "does not hop to destroy if already destroying" do
-      nx.incr_destroy
-      nx.incr_destroying
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "pops additional operations from stack" do
-      nx.incr_destroy
-      nx.incr_destroying
-      expect(nx.strand.stack).to receive(:count).and_return(2)
-      expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the inference endpoint replica"})
-    end
-  end
-
   describe "#start" do
     it "naps if vm not ready" do
       vm.strand.update(label: "prep")
