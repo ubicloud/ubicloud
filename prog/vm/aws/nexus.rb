@@ -202,6 +202,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         nap 0
       end
       raise
+    rescue Aws::EC2::Errors::Unsupported => e
+      if (retry_count = frame["retry_count"] || 0) >= 5
+        raise e
+      end
+
+      Clog.emit("unsupported instance type") { {unsupported_instance_type: {vm:, message: e.message, retry_count: retry_count + 1}} }
+      azs_excluded = ((vm.nic.strand.stack.first["exclude_availability_zones"] || []) + [vm.nic.nic_aws_resource.subnet_az]).uniq
+      update_stack({"exclude_availability_zones" => azs_excluded, "private_subnet_id" => vm.nic.private_subnet_id, "retry_count" => retry_count + 1})
+      vm.nic.incr_destroy
+      hop_wait_old_nic_deleted
     end
     instance = instance_response.instances.first
     instance_id = instance.instance_id
@@ -213,6 +223,18 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     AwsInstance.create_with_id(vm, instance_id:, az_id:, ipv4_dns_name:, iam_role: role_name)
 
     hop_wait_instance_created
+  end
+
+  label def wait_old_nic_deleted
+    nap 1 if vm.nic
+    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: vm.name + "-nic", exclude_availability_zones: frame["exclude_availability_zones"]).subject
+    nic.update(vm_id: vm.id)
+    hop_wait_nic_recreated
+  end
+
+  label def wait_nic_recreated
+    nap 1 unless vm.nic.strand.label == "wait"
+    hop_create_instance
   end
 
   label def wait_instance_created
