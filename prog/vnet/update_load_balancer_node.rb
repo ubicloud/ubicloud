@@ -12,10 +12,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   def before_run
-    when_destroy_set? do
-      pop "early exit due to destroy semaphore"
-    end
-
+    super
     pop "VM is destroyed" unless vm
   end
 

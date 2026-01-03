@@ -41,16 +41,6 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if !destroying_set?
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the inference endpoint replica"
-      end
-    end
-  end
-
   label def start
     nap 5 unless vm.strand.label == "wait"
 
