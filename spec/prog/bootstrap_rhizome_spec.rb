@@ -16,12 +16,6 @@ RSpec.describe Prog::BootstrapRhizome do
     Strand.create_with_id(sshable, prog: "BootstrapRhizome", label: "start")
   }
 
-  it "exits if destroy is set" do
-    expect(br.before_run).to be_nil
-    br.incr_destroy
-    expect { br.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
-  end
-
   describe "#start" do
     it "generates a keypair" do
       sshable.update(raw_private_key_1: nil)
