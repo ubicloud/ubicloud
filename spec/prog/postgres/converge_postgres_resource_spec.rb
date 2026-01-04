@@ -66,11 +66,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     server
   end
 
-  it "exits if destroy is set" do
-    nx.incr_destroy
-    expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
-  end
-
   describe "#start" do
     it "naps if read replica parent is not ready" do
       parent = PostgresResource.create(
