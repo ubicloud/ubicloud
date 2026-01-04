@@ -10,12 +10,6 @@ class Prog::BootstrapRhizome < Prog::Base
     @user ||= frame.fetch("user", "root")
   end
 
-  def before_run
-    when_destroy_set? do
-      pop "exiting early due to destroy semaphore"
-    end
-  end
-
   label def start
     sshable.update(raw_private_key_1: SshKey.generate.keypair) if sshable.raw_private_key_1.nil?
     hop_setup

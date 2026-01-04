@@ -451,8 +451,7 @@ RSpec.describe Prog::Base do
       Semaphore.incr(st.id, :destroy)
       allow(Clog).to receive(:emit).and_call_original
       expect(Clog).to receive(:emit).with("before destroy called")
-      expect { st.unsynchronized_run }.to change(st, :label).from("pusher1").to("destroy")
-      expect { st.unsynchronized_run }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+      expect { st.unsynchronized_run }.to change(st, :exitval).from(nil).to({"msg" => "exiting early due to destroy semaphore"})
     end
 
     it "does not hop to destroy if destroy semaphore not incremented" do
