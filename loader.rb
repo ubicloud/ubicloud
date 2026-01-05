@@ -147,6 +147,10 @@ if force_autoload
     end
   end
 
+  if Config.unfrozen_test?
+    Sequel::Model.descendants.each(&:detect_unnecessary_association_options)
+  end
+
   Clover.models_loaded
 end
 
