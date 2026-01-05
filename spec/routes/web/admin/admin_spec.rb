@@ -367,7 +367,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
   end
 
-  it "shows download PDF button for the invoice as extra" do
+  it "shows download PDF button for the invoice" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
       invoice_number: "invoice-number-378",
@@ -381,7 +381,8 @@ RSpec.describe CloverAdmin do
     click_link "Invoice"
     click_link invoice.invoice_number
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_no_content "Download PDF"
+    click_link "Download PDF"
+    expect(page).to have_flash_error("Failed to generate download link for invoice PDF")
 
     # Shows download link if it's generated
     presigner = instance_double(Aws::S3::Presigner)
@@ -391,7 +392,7 @@ RSpec.describe CloverAdmin do
 
     visit "/model/Invoice/#{invoice.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_content "Download PDF"
+    click_link "Download PDF"
   end
 
   it "shows quotas for project as extra" do

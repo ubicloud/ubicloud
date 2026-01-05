@@ -190,6 +190,15 @@ class CloverAdmin < Roda
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", confirmation: false, &:provision_spare_runner)
     },
+    "Invoice" => {
+      "download_pdf" => object_action("Download PDF", nil, confirmation: false) do |obj|
+        if (link = obj.generate_download_link)
+          action_result(message: nil, redirect_path: link)
+        else
+          action_result(success: false, message: "Failed to generate download link for invoice PDF")
+        end
+      end
+    },
     "Page" => {
       "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
     },
