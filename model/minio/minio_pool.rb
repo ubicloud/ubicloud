@@ -4,7 +4,7 @@ require_relative "../../model"
 
 class MinioPool < Sequel::Model
   many_to_one :cluster, class: :MinioCluster, read_only: true
-  one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index, read_only: true
+  one_to_many :servers, class: :MinioServer, order: :index, read_only: true
   one_to_one :strand, key: :id, read_only: true
 
   plugin ResourceMethods
