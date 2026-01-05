@@ -5,10 +5,10 @@ require_relative "../../model"
 class InferenceEndpoint < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :project, read_only: true
-  one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id, read_only: true
+  one_to_many :replicas, class: :InferenceEndpointReplica, read_only: true
   many_to_one :load_balancer, read_only: true
   many_to_one :private_subnet, read_only: true
-  many_to_one :location, key: :location_id, class: :Location
+  many_to_one :location
 
   dataset_module Pagination
   dataset_module do
