@@ -7,7 +7,7 @@ require "aws-sdk-s3"
 class GithubCacheEntry < Sequel::Model
   plugin :instance_filters
 
-  many_to_one :repository, key: :repository_id, class: :GithubRepository, read_only: true
+  many_to_one :repository, class: :GithubRepository, read_only: true
 
   plugin ResourceMethods
   dataset_module Pagination
