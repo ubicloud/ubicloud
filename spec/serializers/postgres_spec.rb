@@ -96,4 +96,11 @@ RSpec.describe Serializers::Postgres do
     expect(data).not_to have_key(:earliest_restore_time)
     expect(data).not_to have_key(:latest_restore_time)
   end
+
+  it "includes created_at in detailed serialization" do
+    create_representative_server(primary: true)
+    data = described_class.serialize(pg)
+    expect(data).to have_key(:created_at)
+    expect(data[:created_at]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z+-]/)
+  end
 end

@@ -2728,6 +2728,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PostgresTag'
+        created_at:
+          description: Creation timestamp of the Postgres database
+          type: string
+          format: date-time
       additionalProperties: false
       required:
         - flavor
@@ -2743,6 +2747,7 @@ components:
         - maintenance_window_start_at
         - read_replica
         - tags
+        - created_at
     PostgresDatabaseMetrics:
       type: object
       properties:
