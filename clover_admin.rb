@@ -264,10 +264,10 @@ class CloverAdmin < Roda
     supported_actions [:browse, :search]
     form_options(wrapper: :div)
 
-    link = lambda do |obj|
+    link = lambda do |obj, label: "name"|
       return "" unless obj
 
-      "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.name)}</a>"
+      "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.send(label))}</a>"
     end
 
     show_html do |obj, column|
