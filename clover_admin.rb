@@ -159,9 +159,9 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :action) do
-    def self.define(label, flash, params = {}, &action)
-      new(label, flash, params.dup.freeze, action)
+  ObjectAction = Data.define(:label, :flash, :params, :confirmation, :action) do
+    def self.define(label, flash, params = {}, confirmation: true, &action)
+      new(label, flash, params.dup.freeze, confirmation, action)
     end
 
     def call(...)
@@ -188,7 +188,7 @@ class CloverAdmin < Roda
       "suspend" => object_action("Suspend", "Account suspended", &:suspend)
     },
     "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", &:provision_spare_runner)
+      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", confirmation: false, &:provision_spare_runner)
     },
     "Page" => {
       "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
@@ -251,7 +251,7 @@ class CloverAdmin < Roda
       end
     },
     "Strand" => {
-      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately") do |obj|
+      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately", confirmation: false) do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
         action_result(message: "Scheduled strand to run at #{obj.reload.schedule}")
       end,
@@ -517,6 +517,18 @@ class CloverAdmin < Roda
     end
   end
 
+  def parse_action_result(r, obj, message, result)
+    flash_key = "notice"
+    redirect_path = "/model/#{obj.class}/#{obj.ubid}"
+    if result.is_a?(ActionResult)
+      flash_key = result.success ? "notice" : "error"
+      message = result.message
+      redirect_path = result.redirect_path if result.redirect_path
+    end
+    flash[flash_key] = message
+    r.redirect(redirect_path)
+  end
+
   route do |r|
     r.public
     check_csrf!
@@ -569,22 +581,18 @@ class CloverAdmin < Roda
             r.get do
               @label = action.label
               @params = action.params
-              view("object_action")
+              if action.confirmation
+                view("object_action")
+              else
+                result = action.call(@obj)
+                parse_action_result(r, @obj, action.flash, result)
+              end
             end
 
             r.post do
               params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
               result = action.call(@obj, *params)
-              flash_key = "notice"
-              message = action.flash
-              redirect_path = "/model/#{@obj.class}/#{ubid}"
-              if result.is_a?(ActionResult)
-                flash_key = result.success ? "notice" : "error"
-                message = result.message
-                redirect_path = result.redirect_path if result.redirect_path
-              end
-              flash[flash_key] = message
-              r.redirect(redirect_path)
+              parse_action_result(r, @obj, action.flash, result)
             end
           end
         end
