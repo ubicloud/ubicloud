@@ -6,8 +6,8 @@ class InferenceEndpoint < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :project, read_only: true
   one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id, read_only: true
-  one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id, read_only: true
-  one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id, read_only: true
+  many_to_one :load_balancer, read_only: true
+  many_to_one :private_subnet, read_only: true
   many_to_one :location, key: :location_id, class: :Location
 
   dataset_module Pagination
