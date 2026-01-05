@@ -97,7 +97,10 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
-        expect(JSON.parse(last_response.body)["name"]).to eq("test-postgres-no-ha")
+        response = JSON.parse(last_response.body)
+        expect(response["name"]).to eq("test-postgres-no-ha")
+        expect(response).to have_key("created_at")
+        expect(response["created_at"]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z+-]/)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-async", {
           size: "standard-2",
