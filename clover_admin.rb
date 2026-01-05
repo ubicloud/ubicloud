@@ -272,10 +272,12 @@ class CloverAdmin < Roda
 
     show_html do |obj, column|
       case column
-      when :name
-        link.call(obj)
+      when :name, :invoice_number
+        link.call(obj, label: column)
       when :project, :location, :vm_host
         link.call(obj.send(column))
+      when :subtotal, :cost
+        "$%0.02f" % (obj.send(column) || 0)
       end
     end
 
@@ -352,6 +354,27 @@ class CloverAdmin < Roda
           column_grep.call(ds, Sequel[:strand][:label], value)
         when :created_at
           column_grep.call(ds, column, value)
+        end
+      end
+    end
+
+    model Invoice do
+      order Sequel.desc(:invoice_number)
+      eager_graph [:project]
+      columns do |type_symbol, request|
+        if type_symbol == :search_form
+          [:invoice_number, :project, :status]
+        else
+          [:invoice_number, :project, :status, :subtotal, :cost]
+        end
+      end
+      column_options status: {type: "select", options: %w[unpaid paid fraud waiting_transfer below_minimum_threshold], add_blank: true},
+        project: {type: "text", placeholder: "Project UBID", maxlength: 26, minlength: 26}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :project
+          column_grep.call(ds, Sequel[:project][:id], UBID.parse(value).to_uuid)
         end
       end
     end
