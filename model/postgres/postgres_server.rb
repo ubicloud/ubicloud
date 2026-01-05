@@ -430,6 +430,7 @@ end
 #  representative_at      | timestamp with time zone |
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
 #  version                | text                     | NOT NULL
+#  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  postgres_server_pkey1             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
