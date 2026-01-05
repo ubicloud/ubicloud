@@ -173,6 +173,16 @@ class CloverAdmin < Roda
     ObjectAction.define(...)
   end
 
+  ActionResult = Data.define(:success, :message, :redirect_path) do
+    def self.define(message:, success: true, redirect_path: nil)
+      new(success, message, redirect_path)
+    end
+  end
+
+  def self.action_result(...)
+    ActionResult.define(...)
+  end
+
   OBJECT_ACTIONS = {
     "Account" => {
       "suspend" => object_action("Suspend", "Account suspended", &:suspend)
@@ -558,9 +568,17 @@ class CloverAdmin < Roda
 
             r.post do
               params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
-              action.call(@obj, *params)
-              flash["notice"] = action.flash
-              r.redirect("/model/#{@obj.class}/#{ubid}")
+              result = action.call(@obj, *params)
+              flash_key = "notice"
+              message = action.flash
+              redirect_path = "/model/#{@obj.class}/#{ubid}"
+              if result.is_a?(ActionResult)
+                flash_key = result.success ? "notice" : "error"
+                message = result.message
+                redirect_path = result.redirect_path if result.redirect_path
+              end
+              flash[flash_key] = message
+              r.redirect(redirect_path)
             end
           end
         end
