@@ -174,7 +174,4 @@ class Prog::Test < Prog::Base
   label def destroy
     pop "destroyed"
   end
-
-  class Test2 < self
-  end
 end
