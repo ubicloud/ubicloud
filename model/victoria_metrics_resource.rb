@@ -5,8 +5,8 @@ require_relative "../model"
 class VictoriaMetricsResource < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project, read_only: true
-  many_to_one :location, key: :location_id, read_only: true
-  one_to_many :servers, class: :VictoriaMetricsServer, key: :victoria_metrics_resource_id, is_used: true
+  many_to_one :location, read_only: true
+  one_to_many :servers, class: :VictoriaMetricsServer, is_used: true
   many_to_one :private_subnet, read_only: true
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],

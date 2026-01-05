@@ -30,7 +30,7 @@ class Vm < Sequel::Model
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
     ],
     class: :Firewall
-  many_to_many :vm_firewalls, class: :Firewall, join_table: :firewalls_vms, right_key: :firewall_id, remover: nil, clearer: nil
+  many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil
 
   plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 

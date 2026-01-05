@@ -10,16 +10,16 @@ class VmHost < Sequel::Model
   one_to_many :vms, read_only: true
   one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address, read_only: true
   one_to_one :provider, key: :id, class: :HostProvider, read_only: true
-  one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress, read_only: true
-  one_to_many :spdk_installations, key: :vm_host_id, remover: nil, clearer: nil
+  one_to_many :assigned_host_addresses, key: :host_id, read_only: true
+  one_to_many :spdk_installations, remover: nil, clearer: nil
   one_to_many :vhost_block_backends, remover: nil, clearer: nil
-  one_to_many :storage_devices, key: :vm_host_id, remover: nil, clearer: nil
-  one_to_many :pci_devices, key: :vm_host_id, read_only: true
-  one_to_many :boot_images, key: :vm_host_id, read_only: true
-  one_to_many :slices, class: :VmHostSlice, key: :vm_host_id, read_only: true
-  one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id, read_only: true
-  many_to_one :location, key: :location_id, class: :Location, read_only: true
-  one_to_many :gpu_partitions, key: :vm_host_id, read_only: true
+  one_to_many :storage_devices, remover: nil, clearer: nil
+  one_to_many :pci_devices, read_only: true
+  one_to_many :boot_images, read_only: true
+  one_to_many :slices, class: :VmHostSlice, read_only: true
+  one_to_many :cpus, class: :VmHostCpu, read_only: true
+  many_to_one :location, read_only: true
+  one_to_many :gpu_partitions, read_only: true
 
   many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
 

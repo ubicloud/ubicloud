@@ -3,8 +3,8 @@
 require_relative "../model"
 
 class IpsecTunnel < Sequel::Model
-  many_to_one :src_nic, key: :src_nic_id, class: :Nic, read_only: true
-  many_to_one :dst_nic, key: :dst_nic_id, class: :Nic, read_only: true
+  many_to_one :src_nic, class: :Nic, read_only: true
+  many_to_one :dst_nic, class: :Nic, read_only: true
 
   plugin ResourceMethods
 

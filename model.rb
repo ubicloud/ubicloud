@@ -31,6 +31,7 @@ Sequel::Model.plugin :pg_auto_validate_enums, message: proc { |valid_values| "is
 Sequel::Model.plugin :pg_eager_any_typed_array
 Sequel::Model.plugin :association_lazy_eager_option
 Sequel::Model.plugin :forbid_lazy_load if Config.unfrozen_test?
+Sequel::Model.plugin :detect_unnecessary_association_options, action: :raise if Config.unfrozen_test? && ENV["FORCE_AUTOLOAD"] == "1"
 
 if ENV["UNUSED_ASSOCIATIONS"]
   Sequel::Model.plugin :unused_associations,

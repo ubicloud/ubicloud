@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Location < Sequel::Model
-  one_to_many :location_aws_azs, key: :location_id, class: :LocationAwsAz, remover: nil, clearer: nil
+  one_to_many :location_aws_azs, remover: nil, clearer: nil
 
   module Aws
     def pg_ami(pg_version, arch)
