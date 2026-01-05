@@ -564,9 +564,9 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
 
     click_button "Schedule Strand to Run Now"
-    expect(page).to have_flash_notice("Scheduled strand to run immediately")
+    expect(page).to have_flash_notice("Scheduled strand to run at #{st.reload.schedule}")
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
-    expect(st.reload.schedule).to be_within(5).of(Time.now)
+    expect(st.schedule).to be_within(5).of(Time.now)
   end
 
   it "supports adding 5 minutes to strand schedule" do
@@ -579,9 +579,9 @@ RSpec.describe CloverAdmin do
     click_link "Extend Schedule"
     fill_in "minutes", with: "5"
     click_button "Extend Schedule"
-    expect(page).to have_flash_notice("Extended schedule")
+    expect(page).to have_flash_notice("Extended strand schedule to run at #{st.reload.schedule}")
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
-    expect(st.reload.schedule).to be_within(5).of(schedule + 300)
+    expect(st.schedule).to be_within(5).of(schedule + 300)
   end
 
   it "supports restarting Vms" do
@@ -735,7 +735,7 @@ RSpec.describe CloverAdmin do
     fill_in "credit", with: "50.0"
     expect { click_button "Add credit" }.to change { p.reload.credit }.from(2).to(52)
 
-    expect(page).to have_flash_notice("Added credit")
+    expect(page).to have_flash_notice("$50.0 credit added. Total: $52.0")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
   end
 
@@ -763,18 +763,15 @@ RSpec.describe CloverAdmin do
       fill_in "value", with: value
       click_button "Set Feature Flag"
       expect(p.reload.send("get_ff_#{name}")).to eq(expected_value)
-      expect(page).to have_flash_notice("Set feature flag")
+      expect(page).to have_flash_notice("Feature flag #{name} set to '#{expected_value}'")
       expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
     end
 
-    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
     visit path
     select "free_runner_upgrade_until", from: "name"
     fill_in "value", with: "invalid_json"
     click_button "Set Feature Flag"
-    expect(page).to have_content "InvalidRequest: invalid JSON for feature flag value"
-  ensure
-    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+    expect(page).to have_content "invalid JSON for feature flag value"
   end
 
   it "supports setting quota of Project" do
@@ -791,7 +788,7 @@ RSpec.describe CloverAdmin do
     select "VmVCpu", from: "resource_type"
     fill_in "value", with: 512
     click_button "Set Quota"
-    expect(page).to have_flash_notice("Set quota")
+    expect(page).to have_flash_notice("Quota VmVCpu set to 512")
     expect(page.title).to eq "Ubicloud Admin - Project #{p.ubid}"
     expect(p.effective_quota_value("VmVCpu")).to eq(512)
 
@@ -800,7 +797,7 @@ RSpec.describe CloverAdmin do
     select "VmVCpu", from: "resource_type"
     fill_in "value", with: 1024
     click_button "Set Quota"
-    expect(page).to have_flash_notice("Set quota")
+    expect(page).to have_flash_notice("Quota VmVCpu set to 1024")
     expect(p.effective_quota_value("VmVCpu")).to eq(1024)
 
     # Set quota to zero
@@ -808,17 +805,17 @@ RSpec.describe CloverAdmin do
     select "VmVCpu", from: "resource_type"
     fill_in "value", with: 0
     click_button "Set Quota"
-    expect(page).to have_flash_notice("Set quota")
+    expect(page).to have_flash_notice("Quota VmVCpu set to 0")
     expect(p.effective_quota_value("VmVCpu")).to eq(0)
 
-    2.times do
+    2.times do |i|
       # Remove quota when value is blank
       # Ensure value being blank doesn't add quota
       visit path
       select "VmVCpu", from: "resource_type"
       fill_in "value", with: ""
       click_button "Set Quota"
-      expect(page).to have_flash_notice("Set quota")
+      expect(page).to have_flash_notice("Quota VmVCpu reset to default") if i == 0
       expect(p.effective_quota_value("VmVCpu")).to eq(32)
     end
   end

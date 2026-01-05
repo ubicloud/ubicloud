@@ -199,6 +199,7 @@ class CloverAdmin < Roda
     "Project" => {
       "add_credit" => object_action("Add credit", "Added credit", {credit: "float!"}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
+        action_result(message: "$#{credit} credit added. Total: $#{obj.reload.credit.to_f}")
       end,
       "set_feature_flag" => object_action("Set Feature Flag", "Set feature flag", {
         name: {
@@ -213,12 +214,11 @@ class CloverAdmin < Roda
           required: nil
         }
       }) do |obj, name, value|
-        begin
-          value = JSON.parse(value) if value
-        rescue JSON::ParserError
-          fail CloverError.new(400, "InvalidRequest", "invalid JSON for feature flag value")
-        end
+        value = JSON.parse(value) if value
         obj.send("set_ff_#{name}", value)
+        action_result(message: "Feature flag #{name} set to '#{value}'")
+      rescue JSON::ParserError
+        action_result(success: false, message: "invalid JSON for feature flag value")
       end,
       "set_quota" => object_action("Set Quota", "Set quota", {
         resource_type: {
@@ -235,23 +235,29 @@ class CloverAdmin < Roda
         }
       }) do |obj, resource_type, value|
         quota_id = ProjectQuota.default_quotas[resource_type]["id"]
-        if (existing_quota = obj.quotas_dataset.first(quota_id:))
+        message = if (existing_quota = obj.quotas_dataset.first(quota_id:))
           if value
             existing_quota.update(value:)
+            "Quota #{resource_type} set to #{value}"
           else
             existing_quota.destroy
+            "Quota #{resource_type} reset to default"
           end
         elsif value
           obj.add_quota(quota_id:, value:)
+          "Quota #{resource_type} set to #{value}"
         end
+        action_result(message:)
       end
     },
     "Strand" => {
       "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately") do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+        action_result(message: "Scheduled strand to run at #{obj.reload.schedule}")
       end,
       "extend" => object_action("Extend Schedule", "Extended schedule", {minutes: :pos_int!}) do |obj, minutes|
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
+        action_result(message: "Extended strand schedule to run at #{obj.reload.schedule}")
       end
     },
     "Vm" => {
