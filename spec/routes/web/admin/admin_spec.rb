@@ -236,6 +236,22 @@ RSpec.describe CloverAdmin do
     fill_in "Created at", with: project.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["Default", "new", "", "0.0", project.created_at.to_s]
+
+    invoice = Invoice.create(
+      project_id: project.id,
+      invoice_number: "2512-f859vb27-01",
+      content: {billing_info: {country: "NL"}, cost: 1.652, subtotal: 2.6530000000000005},
+      begin_time: "2024-11-01 00:00:00",
+      end_time: "2024-12-01 00:00:00"
+    )
+
+    click_link "Ubicloud Admin"
+    click_link "Invoice"
+    click_link "Search"
+    fill_in "Project", with: project.ubid
+    select "unpaid", from: "Status"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [invoice.invoice_number, "Test", "unpaid", "$2.65", "$1.65"]
   end
 
   it "handles basic pagination when browsing by class" do
@@ -314,7 +330,8 @@ RSpec.describe CloverAdmin do
 
     # No download link if download link generation fails
     expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
-    visit "/model/Invoice/#{invoice.ubid}"
+    click_link "Invoice"
+    click_link invoice.invoice_number
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
     expect(page).to have_no_content "Download PDF"
 
