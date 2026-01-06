@@ -109,10 +109,10 @@ module Config
   optional :github_app_client_secret, string, clear: true
   optional :github_app_private_key, string, clear: true
   optional :github_app_webhook_secret, string, clear: true
-  optional :vm_pool_project_id, string
-  optional :github_runner_service_project_id, string
+  optional :vm_pool_project_id, uuid
+  optional :github_runner_service_project_id, uuid
   override :enable_github_workflow_poller, true, bool
-  optional :github_runner_aws_location_id, string
+  optional :github_runner_aws_location_id, uuid
   override :github_runner_aws_spot_instance_enabled, false, bool
   optional :github_runner_aws_spot_instance_max_price_per_vcpu, float
   override :github_runner_aws_spill_threshold_seconds, 30, int
@@ -129,11 +129,11 @@ module Config
 
   # Minio
   override :minio_host_name, "minio.ubicloud.com", string
-  optional :minio_service_project_id, string
+  optional :minio_service_project_id, uuid
   override :minio_version, "minio_20250723155402.0.0_amd64", string
 
   # VictoriaMetrics
-  optional :victoria_metrics_service_project_id, string
+  optional :victoria_metrics_service_project_id, uuid
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
   override :victoria_metrics_version, "v1.113.0", string
   optional :victoria_metrics_endpoint_override, string
@@ -152,7 +152,7 @@ module Config
   optional :pagerduty_log_link, string
 
   # Postgres
-  optional :postgres_service_project_id, string
+  optional :postgres_service_project_id, uuid
   override :postgres_service_hostname, "postgres.ubicloud.com", string
   override :postgres_monitor_database_url, Config.clover_database_url, string
   optional :postgres_monitor_database_root_certs, string
@@ -214,7 +214,7 @@ module Config
   optional :e2e_aws_secret_key, string, clear: true
 
   # Load Balancer
-  optional :load_balancer_service_project_id, string
+  optional :load_balancer_service_project_id, uuid
   optional :load_balancer_service_hostname, string
 
   # ACME
@@ -226,7 +226,7 @@ module Config
   optional :acme_eab_hmac_key, string, clear: true
 
   # AI
-  optional :inference_endpoint_service_project_id, string
+  optional :inference_endpoint_service_project_id, uuid
   optional :runpod_api_key, string, clear: true
   optional :huggingface_token, string, clear: true
   override :inference_dns_zone, "ai.ubicloud.com", string
@@ -234,10 +234,10 @@ module Config
   override :inference_router_release_tag, "v0.1.0", string
 
   # DNS
-  optional :dns_service_project_id, string
+  optional :dns_service_project_id, uuid
 
   # Kubernetes
-  optional :kubernetes_service_project_id, string
+  optional :kubernetes_service_project_id, uuid
   optional :kubernetes_service_hostname, string
 
   # Billing
@@ -250,5 +250,5 @@ module Config
   optional :invoices_blob_storage_secret_key, string, clear: true
 
   # Monitoring
-  optional :monitoring_service_project_id, string
+  optional :monitoring_service_project_id, uuid
 end

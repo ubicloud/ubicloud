@@ -46,6 +46,16 @@ module CastingConfigHelpers
     nil
   end
 
+  def uuid
+    ->(v) do
+      if v.nil? || /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/.match?(v)
+        v
+      else
+        raise "invalid uuid #{v}"
+      end
+    end
+  end
+
   def base64
     ->(v) { v && Base64.decode64(v) }
   end
