@@ -137,8 +137,16 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     register_deadline(nil, 5 * 60)
     hop_destroy_entities unless nic.nic_aws_resource
 
-    ignore_invalid_nic do
-      client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
+    begin
+      ignore_invalid_nic do
+        client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
+      end
+    rescue Aws::EC2::Errors::InvalidParameterValue => e
+      if e.message.include?("Network interface '#{nic.nic_aws_resource.network_interface_id}' is currently in use.")
+        Clog.emit("Network interface is in use") { {network_interface_in_use: {network_interface_id: nic.nic_aws_resource.network_interface_id}} }
+        nap 5
+      end
+      raise e
     end
     hop_release_eip
   end
