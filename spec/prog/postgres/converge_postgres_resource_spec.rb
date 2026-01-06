@@ -171,9 +171,17 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server = create_server(representative: true, vm_host_data_center: "dc1")
       server.incr_recycle
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
-
       expect { nx.provision_servers }.to nap
       expect(PostgresServer.order(:created_at).last.timeline_id).to eq(parent_timeline.id)
+    end
+
+    it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
+      location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
+      server = create_server(representative: true, subnet_az: "a")
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
   end
 

@@ -1048,13 +1048,28 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#unavailable" do
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_recycle)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
       expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(false)
+      expect(postgres_server).to receive(:incr_recycle)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
+    end
+
+    it "buds restart without incrementing recycle when recycle is already set" do
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(true)
+      expect(postgres_server).not_to receive(:incr_recycle)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
     end
 
     it "does not bud restart if there is already one restart going on" do
