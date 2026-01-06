@@ -123,9 +123,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     hop_finish unless private_subnet_aws_resource
 
-    ignore_invalid_id do
-      client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
+    begin
+      ignore_invalid_id do
+        client.delete_security_group({group_id: private_subnet_aws_resource.security_group_id})
+      end
+    rescue Aws::EC2::Errors::DependencyViolation => e
+      if e.message.include?("resource #{private_subnet_aws_resource.security_group_id} has a dependent object")
+        Clog.emit("Security group is in use") { {security_group_in_use: {security_group_id: private_subnet_aws_resource.security_group_id}} }
+        nap 5
+      end
+      raise e
     end
+
     hop_delete_internet_gateway
   end
 
