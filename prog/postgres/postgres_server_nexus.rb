@@ -106,7 +106,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       register_deadline("wait", 120 * 60)
     end
 
-    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi"}
+    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => true}
     hop_wait_bootstrap_rhizome
   end
 

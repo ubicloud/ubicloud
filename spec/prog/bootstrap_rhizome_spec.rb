@@ -13,7 +13,7 @@ RSpec.describe Prog::BootstrapRhizome do
     )
   }
   let(:st) {
-    Strand.create_with_id(sshable, prog: "BootstrapRhizome", label: "start")
+    Strand.create_with_id(sshable, prog: "BootstrapRhizome", stack: [{"target_folder" => "host"}], label: "start")
   }
 
   describe "#start" do
@@ -39,8 +39,10 @@ RSpec.describe Prog::BootstrapRhizome do
       expect(Net::SSH).to receive(:start).and_yield(session)
       expect(session).to receive(:_exec!).with(<<'FIXTURE').and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 set -ueo pipefail
-sudo apt-get update
-sudo apt-get -y install ruby-bundler
+if [ false = false ]; then
+  sudo apt-get update
+  sudo apt-get -y install ruby-bundler
+fi
 sudo which bundle
 sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
