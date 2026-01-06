@@ -207,6 +207,17 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.destroy }.to hop("delete_internet_gateway")
     end
 
+    it "naps if security group is in use" do
+      client.stub_responses(:delete_security_group, Aws::EC2::Errors::DependencyViolation.new(nil, "resource sg-0123456789abcdefg has a dependent object"))
+      expect(Clog).to receive(:emit).with("Security group is in use").and_call_original
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "raises an error if security group could not be deleted" do
+      client.stub_responses(:delete_security_group, Aws::EC2::Errors::DependencyViolation.new(nil, "Unrelated error"))
+      expect { nx.destroy }.to raise_error(Aws::EC2::Errors::DependencyViolation, "Unrelated error")
+    end
+
     it "hops to delete_internet_gateway if security group is not found" do
       client.stub_responses(:delete_security_group, Aws::EC2::Errors::InvalidGroupNotFound.new(nil, nil))
       expect { nx.destroy }.to hop("delete_internet_gateway")
