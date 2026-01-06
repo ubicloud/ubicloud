@@ -358,7 +358,7 @@ CONFIG
       hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
 
       if postgres_server.primary?
-        servers.select { it.standby? && it.synchronization_status == "ready" && it.use_physical_slot_set? }.each do |standby|
+        postgres_server.resource.servers.select { it.standby? && it.synchronization_status == "ready" && it.use_physical_slot_set? }.each do |standby|
           standby.incr_use_physical_slot
           standby.incr_configure
         end
