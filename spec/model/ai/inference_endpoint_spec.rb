@@ -12,34 +12,29 @@ RSpec.describe InferenceEndpoint do
   end
 
   describe "#display_states" do
-    let(:strand) { instance_double(Strand) }
+    let(:strand) { inference_endpoint.strand = Strand.new(prog: "Ai::InferenceEndpointNexus", label: "wait") }
 
     before do
-      allow(inference_endpoint).to receive(:strand).and_return(strand)
+      strand
     end
 
-    context "when state is running" do
-      before { allow(strand).to receive(:label).and_return("wait") }
-
-      it "returns 'running'" do
-        expect(inference_endpoint.display_state).to eq("running")
-      end
+    it "returns 'running' when state is running" do
+      expect(inference_endpoint.display_state).to eq("running")
     end
 
-    context "when state is deleting" do
-      before { allow(strand).to receive(:label).and_return("destroy") }
-
-      it "returns 'deleting'" do
-        expect(inference_endpoint.display_state).to eq("deleting")
-      end
+    it "returns 'deleting' when destroy seamphore is set" do
+      inference_endpoint.incr_destroy
+      expect(inference_endpoint.display_state).to eq("deleting")
     end
 
-    context "when state is creating" do
-      before { allow(strand).to receive(:label).and_return("wait_replicas") }
+    it "returns 'deleting' when destroying seamphore is set" do
+      inference_endpoint.incr_destroying
+      expect(inference_endpoint.display_state).to eq("deleting")
+    end
 
-      it "returns 'creating'" do
-        expect(inference_endpoint.display_state).to eq("creating")
-      end
+    it "returns 'creating' when state is wait_replicas" do
+      strand.label = "wait_replicas"
+      expect(inference_endpoint.display_state).to eq("creating")
     end
   end
 
