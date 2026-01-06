@@ -57,9 +57,9 @@ class Clover
         with_firewall_rules:,
         flavor:,
         user_config:,
-        pgbouncer_user_config:
+        pgbouncer_user_config:,
+        tags:
       ).subject
-      pg.update(tags:)
       audit_log(pg, "create")
     end
     send_notification_mail_to_partners(pg, current_account.email)
