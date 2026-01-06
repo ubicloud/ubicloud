@@ -193,6 +193,11 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   end
 
   describe "#destroy" do
+    it "hops to destroy_entities if the nic_aws_resource is not found" do
+      expect(nic).to receive(:nic_aws_resource).and_return(nil).at_least(:once)
+      expect { nx.destroy }.to hop("destroy_entities")
+    end
+
     it "deletes the network interface" do
       client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
       client.stub_responses(:delete_network_interface)

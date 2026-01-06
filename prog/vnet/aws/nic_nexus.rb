@@ -135,6 +135,8 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   label def destroy
     register_deadline(nil, 5 * 60)
+    hop_destroy_entities unless nic.nic_aws_resource
+
     ignore_invalid_nic do
       client.delete_network_interface({network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
