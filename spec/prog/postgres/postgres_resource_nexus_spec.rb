@@ -14,9 +14,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       location_id: Location::HETZNER_FSN1_ID,
       location: Location[Location::HETZNER_FSN1_ID],
       root_cert_1: "root cert 1",
-      root_cert_key_1: nil,
+      root_cert_key_1: "root cert key 1",
       root_cert_2: "root cert 2",
-      root_cert_key_2: nil,
+      root_cert_key_2: "root cert key 2",
       server_cert: "server cert",
       server_cert_key: nil,
       parent: nil,
@@ -317,6 +317,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").twice.and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 360))
       expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 2").and_return(root_cert_2)
       expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root cert key 1").and_return(nil)
+      expect(OpenSSL::PKey::EC).to receive(:new).with("root cert key 2").and_return(nil)
 
       expect(Util).to receive(:create_certificate).with(hash_including(issuer_cert: root_cert_2)).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "server cert")])
       expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
