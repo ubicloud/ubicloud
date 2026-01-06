@@ -6,7 +6,6 @@ require "aws-sdk-iam"
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:access_key, :secret_key]
-  many_to_one :project
   many_to_one :location, key: :id
 
   def credentials
