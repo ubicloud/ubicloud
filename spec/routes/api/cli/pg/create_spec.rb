@@ -22,7 +22,17 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.flavor).to eq "standard"
     expect(pg.customer_firewall).to be_nil
     expect(pg.tags).to eq([])
-    expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
+    expect(body).to eq <<END
+PostgreSQL database created with id: #{pg.ubid}
+
+No access is allowed to this database by default. To allow access, create a
+firewall, attach it to the database's private subnet, and add firewall rules
+to the firewall:
+
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME create
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME attach-subnet #{pg.ubid}-subnet
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME add-rule -s 5432 CIDR-TO-ALLOW
+END
   end
 
   it "creates PostgreSQL database with all options" do
@@ -42,7 +52,7 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.flavor).to eq "paradedb"
     expect(pg.customer_firewall).to be_nil
     expect(pg.tags).to eq([{"key" => "foo", "value" => "bar"}, {"key" => "baz", "value" => "quux"}])
-    expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
+    expect(body).to include "PostgreSQL database created with id: #{pg.ubid}\n"
   end
 
   it "creates PostgreSQL database with custom private subnet name" do
@@ -54,6 +64,16 @@ RSpec.describe Clover, "cli pg create" do
     expect(pg.name).to eq "test-pg"
     expect(pg.customer_firewall).to be_nil
     expect(pg.private_subnet.name).to eq "my-custom-subnet"
-    expect(body).to eq "PostgreSQL database created with id: #{pg.ubid}\n"
+    expect(body).to eq <<END
+PostgreSQL database created with id: #{pg.ubid}
+
+No access is allowed to this database by default. To allow access, create a
+firewall, attach it to the database's private subnet, and add firewall rules
+to the firewall:
+
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME create
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME attach-subnet my-custom-subnet
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME add-rule -s 5432 CIDR-TO-ALLOW
+END
   end
 end

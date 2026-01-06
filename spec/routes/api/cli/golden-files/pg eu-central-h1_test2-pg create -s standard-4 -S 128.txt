@@ -1,1 +1,9 @@
 PostgreSQL database created with id: pgjzngmxvrd63kq5t8s0pvq2wk
+
+No access is allowed to this database by default. To allow access, create a
+firewall, attach it to the database's private subnet, and add firewall rules
+to the firewall:
+
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME create
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME attach-subnet pgjzngmxvrd63kq5t8s0pvq2wk-subnet
+  ubi fw eu-central-h1/YOUR-FIREWALL-NAME add-rule -s 5432 CIDR-TO-ALLOW
