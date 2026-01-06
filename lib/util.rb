@@ -26,7 +26,7 @@ module Util
 
   def self.parse_key(key_data)
     OpenSSL::PKey::EC.new(key_data)
-  rescue OpenSSL::PKey::ECError, OpenSSL::PKey::DSAError
+  rescue OpenSSL::PKey::PKeyError
     OpenSSL::PKey::RSA.new(key_data)
   end
 
