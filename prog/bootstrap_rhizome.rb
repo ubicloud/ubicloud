@@ -61,9 +61,12 @@ LOGIND
     pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
 
     key_data = sshable.keys.map(&:private_key)
-    Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"))
+    no_apt_update = (strand.stack.first["no_apt_update"] == "true").to_s
+    Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"), no_apt_update:)
 set -ueo pipefail
-sudo apt-get update
+if [ :no_apt_update = false ]; then
+  sudo apt-get update
+fi
 sudo apt-get -y install ruby-bundler
 sudo which bundle
 sudo userdel -rf rhizome || true
