@@ -87,9 +87,8 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
                 <%== part(
                   "components/delete_button",
                   url: "#{ps_path}/disconnect/#{subnet.ubid}",
+                  exact_url: true,
                   confirmation_message: "Are you sure to disconnect?",
-                  redirect: ps_path,
-                  method: "POST",
                   text: "Disconnect"
                 ) %>
               </td>

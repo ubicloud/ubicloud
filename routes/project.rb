@@ -48,46 +48,50 @@ class Clover
 
       @project_permissions = all_permissions(@project.id) if web?
 
-      r.is do
-        r.get do
-          authorize("Project:view", @project)
+      r.get true do
+        authorize("Project:view", @project)
 
-          if api?
-            Serializers::Project.serialize(@project)
-          else
-            view "project/show"
-          end
+        if api?
+          Serializers::Project.serialize(@project)
+        else
+          view "project/show"
+        end
+      end
+
+      r.delete true do
+        authorize("Project:delete", @project)
+        handle_validation_failure("project/show")
+
+        if @project.has_resources?
+          fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
-        r.delete do
-          authorize("Project:delete", @project)
+        DB.transaction do
+          @project.soft_delete
+          audit_log(@project, "destroy")
+        end
 
-          if @project.has_resources?
-            fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
-          end
-
-          DB.transaction do
-            @project.soft_delete
-            audit_log(@project, "destroy")
-          end
-
+        if web?
+          flash["notice"] = "Project deleted"
+          r.redirect "/project"
+        else
           204
         end
+      end
 
-        r.post web? do
-          authorize("Project:edit", @project)
+      r.post web? do
+        authorize("Project:edit", @project)
 
-          handle_validation_failure("project/show")
+        handle_validation_failure("project/show")
 
-          DB.transaction do
-            @project.update(name: typecast_params.nonempty_str!("name"))
-            audit_log(@project, "update")
-          end
-
-          flash["notice"] = "The project name is updated to '#{@project.name}'."
-
-          r.redirect @project
+        DB.transaction do
+          @project.update(name: typecast_params.nonempty_str!("name"))
+          audit_log(@project, "update")
         end
+
+        flash["notice"] = "The project name is updated to '#{@project.name}'."
+
+        r.redirect @project
       end
 
       r.get(web?, "dashboard") do

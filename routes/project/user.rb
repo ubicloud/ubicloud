@@ -287,33 +287,26 @@ class Clover
             # the tag.
             @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
 
-            r.is do
-              r.get do
-                authorize("#{@tag.class}:view", @authorize_id)
-                view "project/tag"
-              end
+            r.get true do
+              authorize("#{@tag.class}:view", @authorize_id)
+              view "project/tag"
+            end
 
-              authorize(tag_perm_map[tag_type], @project)
+            r.post true do
+              check_tag_modification!(tag_perm_map[tag_type])
+              handle_validation_failure("project/tag")
+              @tag.update(name: typecast_params.nonempty_str("name"))
+              audit_log(@tag, "update")
+              flash["notice"] = "#{@display_tag_type} tag name updated successfully"
+              r.redirect @tag
+            end
 
-              if @tag_type == "subject" && @tag.name == "Admin"
-                handle_validation_failure("project/tag-list")
-                raise_web_error("Cannot modify Admin subject tag")
-              end
-
-              r.post do
-                handle_validation_failure("project/tag")
-                @tag.update(name: typecast_params.nonempty_str("name"))
-                audit_log(@tag, "update")
-                flash["notice"] = "#{@display_tag_type} tag name updated successfully"
-                r.redirect @tag
-              end
-
-              r.delete do
-                @tag.destroy
-                audit_log(@tag, "destroy")
-                flash["notice"] = "#{@display_tag_type} tag deleted successfully"
-                204
-              end
+            r.delete true do
+              check_tag_modification!(tag_perm_map[tag_type])
+              @tag.destroy
+              audit_log(@tag, "destroy")
+              flash["notice"] = "#{@display_tag_type} tag deleted successfully"
+              r.redirect @project, "/user/access-control/tag/#{@tag_type}"
             end
 
             r.post "associate" do
@@ -374,16 +367,17 @@ class Clover
 
       r.delete "invitation", String do |email|
         authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
         @project.invitations_dataset.where(email:).destroy
         audit_log(@project, "destroy_invitation")
-        # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
-        204
+        r.redirect @project, "/user"
       end
 
       r.delete :ubid_uuid do |id|
         authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
         next unless (user = @project.accounts_dataset[id:])
 
@@ -395,9 +389,8 @@ class Clover
         user.remove_project(@project)
         audit_log(@project, "remove_account", user)
 
-        # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"
-        204
+        r.redirect @project, "/user"
       end
     end
   end

@@ -791,10 +791,10 @@ RSpec.describe Clover, "vm" do
         visit "#{project.path}#{vm.path}"
         within("#vm-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        btn = find "#vm-delete-#{vm.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#vm-delete-#{vm.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("Virtual machine scheduled for deletion.")
 
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end

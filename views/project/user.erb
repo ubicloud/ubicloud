@@ -50,6 +50,12 @@
   </div>
   <!-- User List -->
   <div>
+    <% @users.each do |user| %>
+      <%== form(action: "#{user_path}/#{user.ubid}/delete", method: :post, id: "delete-#{user.ubid}") %>
+    <% end %>
+    <% @invitations.each do |invitation| %>
+      <%== form(action: "#{user_path}/invitation/#{invitation.email}/delete", method: :post, id: "delete-#{invitation.email}") %>
+    <% end %>
     <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
@@ -95,8 +101,9 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{user_path}/#{user.ubid}",
-                    confirmation: user.email
+                    form_id: "delete-#{user.ubid}",
+                    confirmation: user.email,
+                    attributes: {id: "delete-#{user.ubid}-button"}
                   ) %>
                 </td>
               </tr>
@@ -119,7 +126,7 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{user_path}/invitation/#{invitation.email}",
+                    form_id: "delete-#{invitation.email}",
                     confirmation: invitation.email
                   ) %>
                 </td>
