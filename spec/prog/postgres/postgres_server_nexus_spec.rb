@@ -855,34 +855,46 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_recycle)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
+      expect(resource).to receive(:id).and_return("resource-id").at_least(:once)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(false)
+      expect(postgres_server).to receive(:incr_recycle)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
+    end
+
+    it "buds restart without incrementing recycle when recycle is already set" do
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(true)
+      expect(postgres_server).not_to receive(:incr_recycle)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
     end
 
     it "does not bud restart if there is already one restart going on" do
       Strand.create(parent_id: st.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(true)
       expect { nx.unavailable }.to nap(0)
     end
