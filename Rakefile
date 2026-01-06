@@ -328,6 +328,45 @@ task :respirate_smoke_test do
   sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
 end
 
+desc "Report associations that can be removed and association options that should be added"
+task :unused_associations_check do
+  ENV["UNUSED_ASSOCIATIONS"] = "1"
+  spec.call({})
+
+  ENV["FORCE_AUTOLOAD"] = "1"
+  require "./loader"
+  Sequel::Model.update_unused_associations_data
+
+  # Do not complain about unused project, strand, or semaphore associations or options
+  keep_associations = %w[project strand semaphores]
+  keep = proc { |_, association| keep_associations.include?(association) }
+
+  unused = Sequel::Model.unused_associations
+  unused.reject!(&keep)
+  if unused.empty?
+    puts "All Associations Are Used."
+  else
+    puts "Associations That Can Be Removed:", unused.map! { |klass, association| "#{klass}##{association}" }.sort!
+  end
+  puts
+
+  options_data = Sequel::Model.unused_association_options
+  options_data.reject!(&keep)
+  options_data.each { |_, _, opts| opts.delete(:no_dataset_method) }
+  options_data.reject! { |_, _, opts| opts.empty? }
+  if options_data.empty?
+    puts "No Associations Need Option Changes."
+  else
+    options_data = options_data.map do |klass, association, opts|
+      "#{klass}##{association}: , #{opts.inspect[1...-1]}"
+    end.sort!
+    puts "Associations Option That Can Be Added:", options_data
+  end
+
+  Sequel::Model.delete_unused_associations_files
+  exit(1) unless unused.empty? && options_data.empty?
+end
+
 desc "Run each spec file in a separate process"
 task :spec_separate do
   require "rbconfig"

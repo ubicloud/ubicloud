@@ -3,18 +3,18 @@
 require_relative "../model"
 
 class LoadBalancer < Sequel::Model
-  many_to_one :project
-  many_to_many :vms
+  many_to_one :project, read_only: true
+  many_to_many :vms, read_only: true
   one_to_one :strand, key: :id
-  many_to_one :private_subnet
-  one_to_many :load_balancer_vms
-  one_to_many :ports, class: :LoadBalancerPort
-  many_to_many :certs
-  one_to_many :load_balancer_certs
-  many_to_one :custom_hostname_dns_zone, class: :DnsZone
+  many_to_one :private_subnet, read_only: true
+  one_to_many :load_balancer_vms, read_only: true
+  one_to_many :ports, class: :LoadBalancerPort, remover: nil, clearer: nil
+  many_to_many :certs, remover: nil, clearer: nil
+  one_to_many :load_balancer_certs, read_only: true, no_association_method: true
+  many_to_one :custom_hostname_dns_zone, class: :DnsZone, read_only: true
   many_to_many :vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true
   many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
-  many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"])
+  many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"]), is_used: true
 
   plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, load_balancer_certs: :destroy
 

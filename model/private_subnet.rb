@@ -4,13 +4,13 @@ require_relative "../model"
 
 class PrivateSubnet < Sequel::Model
   many_to_one :project
-  many_to_many :vms, join_table: :nic
-  one_to_many :nics
+  many_to_many :vms, join_table: :nic, read_only: true
+  one_to_many :nics, read_only: true
   one_to_one :strand, key: :id
-  many_to_many :firewalls
-  one_to_many :load_balancers
+  many_to_many :firewalls, remover: nil
+  one_to_many :load_balancers, read_only: true
   many_to_one :location
-  one_to_one :private_subnet_aws_resource, key: :id
+  one_to_one :private_subnet_aws_resource, key: :id, read_only: true
 
   PRIVATE_24_BLOCK_COUNT = 2**16 + 2**12 + 2**8
   PRIVATE_SUBNET_RANGES = [

@@ -3,17 +3,17 @@
 require_relative "../../model"
 
 class PostgresResource < Sequel::Model
-  one_to_one :strand, key: :id
+  one_to_one :strand, key: :id, read_only: true
   many_to_one :project
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id do |ds| ds.active end
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
   many_to_one :parent, key: :parent_id, class: self
-  one_to_many :servers, class: :PostgresServer, key: :resource_id
-  one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil)
-  one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id
-  one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id
-  many_to_one :private_subnet
+  one_to_many :servers, class: :PostgresServer, key: :resource_id, read_only: true
+  one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil), read_only: true
+  one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, right_key: :timeline_id, read_only: true
+  one_to_many :metric_destinations, class: :PostgresMetricDestination, key: :postgres_resource_id, remover: nil, clearer: nil
+  many_to_one :private_subnet, read_only: true
   many_to_one :location, key: :location_id, class: :Location
-  one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}
+  one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
 
   plugin :association_dependencies, metric_destinations: :destroy
   dataset_module Pagination

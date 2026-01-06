@@ -4,17 +4,17 @@ require_relative "../../model"
 require_relative "../../lib/net_ssh"
 
 class KubernetesCluster < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :api_server_lb, class: :LoadBalancer
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :api_server_lb, class: :LoadBalancer, read_only: true
   many_to_one :services_lb, class: :LoadBalancer
-  many_to_one :private_subnet
-  many_to_one :project
-  many_to_many :cp_vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
-  one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}
-  one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil, state: "active"}
-  one_to_many :nodepools, class: :KubernetesNodepool
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
-  many_to_one :location, key: :location_id
+  many_to_one :private_subnet, read_only: true
+  many_to_one :project, read_only: true
+  many_to_many :cp_vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}, read_only: true
+  one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}, read_only: true
+  one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil, state: "active"}, read_only: true
+  one_to_many :nodepools, class: :KubernetesNodepool, read_only: true
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  many_to_one :location, key: :location_id, read_only: true
 
   dataset_module Pagination
 

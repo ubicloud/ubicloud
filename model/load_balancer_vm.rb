@@ -3,8 +3,7 @@
 require_relative "../model"
 
 class LoadBalancerVm < Sequel::Model(:load_balancers_vms)
-  many_to_one :load_balancer
-  many_to_one :vm
+  many_to_one :vm, read_only: true
   plugin ResourceMethods
   include HealthMonitorMethods
 end

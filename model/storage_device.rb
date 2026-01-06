@@ -4,7 +4,7 @@ require_relative "../model"
 require_relative "../lib/system_parser"
 
 class StorageDevice < Sequel::Model
-  many_to_one :vm_host
+  many_to_one :vm_host, read_only: true
 
   plugin ResourceMethods, etc_type: true
 
