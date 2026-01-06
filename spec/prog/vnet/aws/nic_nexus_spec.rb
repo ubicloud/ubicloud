@@ -218,6 +218,21 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
       expect { nx.destroy }.to hop("release_eip")
     end
+
+    it "naps if the network interface is in use" do
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{status: "available"}])
+      client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Network interface 'eni-0123456789abcdefg' is currently in use."))
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect(client).to receive(:delete_network_interface).with({network_interface_id: "eni-0123456789abcdefg"}).and_call_original
+      expect(Clog).to receive(:emit).with("Network interface is in use")
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "raises an error if the network interface could not be deleted" do
+      client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Unrelated error"))
+      expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
+      expect { nx.destroy }.to raise_error(Aws::EC2::Errors::InvalidParameterValue, "Unrelated error")
+    end
   end
 
   describe "#release_eip" do
