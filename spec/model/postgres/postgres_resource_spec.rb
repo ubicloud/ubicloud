@@ -16,6 +16,9 @@ RSpec.describe PostgresResource do
       target_vm_size: "standard-2",
       target_storage_size_gib: 64
     )
+    fw = Firewall.create(name: pr.ubid + "-internal-firewall", project_id: project.id, location_id:)
+    fw.associate_with_private_subnet(private_subnet)
+
     Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
     pr
   }
@@ -58,6 +61,115 @@ RSpec.describe PostgresResource do
   it "returns replication_connection_string" do
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
     expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
+  end
+
+  describe "#provision_new_standby" do
+    before do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+    end
+
+    let(:vm1) { create_hosted_vm(project, private_subnet, "pg-vm-1") }
+    let(:vm2) { create_hosted_vm(project, private_subnet, "pg-vm-2") }
+    let(:ps1) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm1.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+    }
+    let(:ps2) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm2.id,
+        synchronization_status: "ready", timeline_access: "push", version: "16")
+    }
+
+    it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      ps1
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [])).and_call_original
+
+      postgres_resource.provision_new_standby
+      expect(PostgresServer.count).to eq(2)
+      new_server = PostgresServer.exclude(id: ps1.id).first
+      expect(new_server).not_to be_nil
+      expect(new_server.resource_id).to eq(postgres_resource.id)
+      expect(new_server.timeline_access).to eq("fetch")
+      expect(new_server.vm.vm_firewalls).to eq([postgres_resource.internal_firewall])
+      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+    end
+
+    it "provisions a new server but excludes currently used data centers" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(false)
+      ps1
+      ps2
+      vm_host_1 = create_vm_host
+      vm_host_1.update(data_center: "dc1")
+      vm1.update(vm_host_id: vm_host_1.id)
+      vm2.update(vm_host_id: vm_host_1.id)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [vm_host_1.id])).and_call_original
+      postgres_resource.provision_new_standby
+      expect(postgres_resource.reload.servers.count).to eq(3)
+      new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).order(:created_at).last
+      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([vm_host_1.id])
+    end
+
+    it "provisions a new server but excludes currently used az for aws" do
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+      ps1
+      ps2
+      NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a"])).and_call_original
+      expect(postgres_resource).to receive(:use_different_az_set?).and_return(true)
+
+      postgres_resource.provision_new_standby
+      expect(PostgresServer.count).to eq(3)
+      new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
+      expect(new_server.resource_id).to eq(postgres_resource.id)
+      expect(new_server.vm.nic.strand.stack[0]["exclude_availability_zones"]).to eq(["a"])
+    end
+
+    it "provisions a new server in a used az for aws if use_different_az_set? is false" do
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+      ps1
+      ps2
+      NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
+      NicAwsResource.create_with_id(vm2.nic.id, subnet_az: "b")
+
+      expect(postgres_resource).to receive(:representative_server).and_return(ps1)
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(availability_zone: "a")).and_call_original
+      expect(postgres_resource).to receive(:use_different_az_set?).and_return(false)
+
+      postgres_resource.provision_new_standby
+      expect(postgres_resource.reload.servers.count).to eq(3)
+      new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
+      expect(new_server.vm.nic.strand.stack[0]["availability_zone"]).to eq("a")
+    end
+
+    it "provisions a new server with the correct timeline for a regular instance" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      allow(postgres_resource).to receive_messages(read_replica?: false, timeline:)
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: timeline.id)).and_call_original
+
+      new_server = postgres_resource.provision_new_standby.subject
+      expect(new_server).not_to be_nil
+      expect(new_server.timeline_id).to eq(timeline.id)
+      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+    end
+
+    it "provisions a new server with the correct timeline for a read replica" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(true)
+      parent_timeline = PostgresTimeline.create(location_id:)
+      parent_resource = instance_double(described_class, timeline: parent_timeline)
+      allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent_resource)
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent_timeline.id)).and_call_original
+
+      expect { postgres_resource.provision_new_standby }.to change(PostgresServer, :count).by(1)
+      new_server = PostgresServer.order(:created_at).last
+      expect(new_server.timeline_id).to eq(parent_timeline.id)
+      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+    end
   end
 
   it "returns has_enough_fresh_servers correctly" do
