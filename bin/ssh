@@ -1,0 +1,32 @@
+#!/usr/bin/env -S ruby --enable-frozen-string-literal
+# frozen_string_literal: true
+
+require "tempfile"
+require_relative "../loader"
+
+model = UBID.decode(ARGV[0])
+unless model
+  ubid = UBID.from_uuidish(ARGV[0])
+  model = UBID.class_for_ubid(ubid.to_s)[ARGV[0]]
+end
+vm = case model
+when PostgresServer, GithubRunner
+  model.vm
+when Vm
+  model
+end
+
+unless vm
+  puts "could find vm for #{ARGV[0]}", model
+  exit 1
+end
+
+unless vm.sshable
+  puts "cannot ssh into vm"
+  exit 1
+end
+
+file = Tempfile.new("ubissh")
+file.write(vm.sshable.keys.first.private_key)
+file.close
+exec "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-i", file.path, "#{vm.sshable.unix_user}@#{vm.sshable.host}"
