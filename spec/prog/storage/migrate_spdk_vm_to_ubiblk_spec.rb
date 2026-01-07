@@ -196,7 +196,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   describe "#update_prep_json_file" do
     it "update the prep json file for proper cleanup of the vm later" do
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json >/dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
       expect { prog.update_prep_json_file }.to hop("start_vm")
     end
   end

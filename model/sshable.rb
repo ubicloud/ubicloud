@@ -66,6 +66,21 @@ class Sshable < Sequel::Model
 
   MAX_TIMEOUT = Strand::LEASE_EXPIRATION - 39
 
+  def write_file(path, content, user: nil, **)
+    args = {path:, stdin: content, **}
+    cmd_str = case user
+    when nil
+      "sudo tee :path > /dev/null"
+    when :current
+      "tee :path > /dev/null"
+    else
+      args[:user] = user
+      "sudo -u :user tee :path > /dev/null"
+    end
+
+    cmd(cmd_str, **args)
+  end
+
   def cmd(cmd, stdin: nil, log: true, timeout: :default)
     start = Time.now
     stdout = StringIO.new
