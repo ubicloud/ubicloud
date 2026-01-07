@@ -1,6 +1,7 @@
 <%# locals: (obj: nil) %>
-<div>
-  Stripe Data:
-  <br>
-  <pre><code><%= JSON.pretty_generate(obj.stripe_data) %></code></pre>
-</div>
+
+<%== part("components/table",
+  title: "Stripe Data",
+  table_class: "stripe-data-table",
+  data: obj.stripe_data&.map { |k, v| {"Column" => k, "Value" => v} }
+) %>
