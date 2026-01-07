@@ -87,7 +87,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   end
 
   def write_inference_router_service(asset_name, workdir)
-    vm.sshable.cmd("sudo tee /etc/systemd/system/inference-router.service > /dev/null", stdin: <<~SERVICE)
+    vm.sshable.write_file("/etc/systemd/system/inference-router.service", <<~SERVICE)
       [Unit]
       Description=Inference Router
       After=network.target

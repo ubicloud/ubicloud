@@ -184,9 +184,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5 if postgres_server.resource.server_cert.nil?
 
     ca_bundle = [postgres_server.resource.ca_certificates, postgres_server.resource.trusted_ca_certs].compact.join("\n")
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
+    vm.sshable.write_file("/etc/ssl/certs/ca.crt", ca_bundle)
+    vm.sshable.write_file("/etc/ssl/certs/server.crt", postgres_server.resource.server_cert)
+    vm.sshable.write_file("/etc/ssl/certs/server.key", postgres_server.resource.server_cert_key)
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
@@ -211,7 +211,7 @@ tls_server_config:
   cert_file: /etc/ssl/certs/server.crt
   key_file: /etc/ssl/certs/server.key
 CONFIG
-    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
+    vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
     metric_destinations = postgres_server.resource.metric_destinations.map {
       <<METRIC_DESTINATION
@@ -242,12 +242,12 @@ scrape_configs:
       instance: '#{postgres_server.ubid}'
 #{metric_destinations}
 CONFIG
-    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
+    vm.sshable.write_file("/home/prometheus/prometheus.yml", prometheus_config, user: "prometheus")
 
     metrics_config = postgres_server.metrics_config
     metrics_dir = metrics_config[:metrics_dir]
     vm.sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
-    vm.sshable.cmd("tee :metrics_dir/config.json > /dev/null", metrics_dir:, stdin: metrics_config.to_json)
+    vm.sshable.write_file("#{metrics_dir}/config.json", metrics_config.to_json, user: :current)
 
     metrics_service = <<SERVICE
 [Unit]
@@ -261,7 +261,7 @@ ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
 StandardOutput=journal
 StandardError=journal
 SERVICE
-    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: metrics_service)
+    vm.sshable.write_file("/etc/systemd/system/postgres-metrics.service", metrics_service)
 
     metrics_interval = metrics_config[:interval] || "15s"
 
@@ -277,7 +277,7 @@ AccuracySec=1s
 [Install]
 WantedBy=timers.target
 TIMER
-    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: metrics_timer)
+    vm.sshable.write_file("/etc/systemd/system/postgres-metrics.timer", metrics_timer)
 
     vm.sshable.cmd("sudo systemctl daemon-reload")
 
@@ -327,7 +327,7 @@ TIMER
 }
 CONFIG
     vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
-    vm.sshable.cmd("sudo tee :filepath/:filename > /dev/null", filepath:, filename:, stdin: config)
+    vm.sshable.write_file("#{filepath}/#{filename}", config)
     vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
     hop_setup_hugepages
   end

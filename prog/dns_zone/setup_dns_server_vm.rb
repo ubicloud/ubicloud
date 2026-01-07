@@ -140,7 +140,7 @@ zone:
   #{ds.dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
     CONF
 
-    sshable.cmd("sudo tee /etc/knot/knot.conf > /dev/null", stdin: knot_config)
+    sshable.write_file("/etc/knot/knot.conf", knot_config)
 
     hop_sync_zones
   end
@@ -153,7 +153,7 @@ zone:
 #{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
 #{dz.name}.          3600    NS      #{ds.name}.
       CONF
-      sshable.cmd("sudo -u knot tee /var/lib/knot/:name.zone > /dev/null", name: dz.name, stdin: zone_config)
+      sshable.write_file("/var/lib/knot/#{dz.name}.zone", zone_config, user: "knot")
     end
 
     sshable.cmd "sudo systemctl restart knot"

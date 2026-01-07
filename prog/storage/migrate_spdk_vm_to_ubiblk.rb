@@ -140,7 +140,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     prep_json = JSON.parse(vm.vm_host.sshable.cmd("sudo cat /vm/:inhost_name/prep.json", inhost_name:))
     prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
     prep_json["storage_volumes"][0]["spdk_version"] = nil
-    vm.vm_host.sshable.cmd("sudo tee /vm/:inhost_name/prep.json >/dev/null", inhost_name:, stdin: JSON.pretty_generate(prep_json))
+    vm.vm_host.sshable.write_file("/vm/#{inhost_name}/prep.json", JSON.pretty_generate(prep_json))
 
     hop_start_vm
   end
@@ -187,7 +187,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "method" => "aes256-gcm",
       "auth_data" => Base64.strict_encode64(kek.auth_data)
     }
-    vm.vm_host.sshable.cmd("sudo tee :kek_file_path > /dev/null", kek_file_path:, stdin: kek_data.to_yaml, log: false)
+    vm.vm_host.sshable.write_file(kek_file_path, kek_data.to_yaml, log: false)
   end
 
   def base_image_path

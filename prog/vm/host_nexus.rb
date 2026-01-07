@@ -319,7 +319,7 @@ class Prog::Vm::HostNexus < Prog::Base
   label def configure_metrics
     metrics_dir = vm_host.metrics_config[:metrics_dir]
     sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
-    sshable.cmd("tee :metrics_dir/config.json > /dev/null", metrics_dir:, stdin: vm_host.metrics_config.to_json)
+    sshable.write_file("#{metrics_dir}/config.json", vm_host.metrics_config.to_json, user: :current)
 
     metrics_service = <<SERVICE
 [Unit]
@@ -333,7 +333,7 @@ ExecStart=/home/rhizome/common/bin/metrics-collector #{metrics_dir}
 StandardOutput=journal
 StandardError=journal
 SERVICE
-    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: metrics_service)
+    sshable.write_file("/etc/systemd/system/vmhost-metrics.service", metrics_service)
 
     metrics_interval = vm_host.metrics_config[:interval] || "15s"
 
@@ -349,7 +349,7 @@ AccuracySec=1s
 [Install]
 WantedBy=timers.target
 TIMER
-    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: metrics_timer)
+    sshable.write_file("/etc/systemd/system/vmhost-metrics.timer", metrics_timer)
 
     sshable.cmd("sudo systemctl daemon-reload")
     sshable.cmd("sudo systemctl enable --now vmhost-metrics.timer")
