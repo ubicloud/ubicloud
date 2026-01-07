@@ -28,7 +28,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         when PostgresResource::Flavor::STANDARD then ""
         when PostgresResource::Flavor::PARADEDB then "-paradedb"
         when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
+        # :nocov: flavor is a DB enum, unknown values are impossible
         else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
+          # :nocov:
         end
 
         "postgres#{flavor_suffix}-ubuntu-2204"
