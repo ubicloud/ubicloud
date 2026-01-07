@@ -830,6 +830,6 @@ RSpec.describe CloverAdmin do
     fill_in "ips", with: "172.16.0.1, 172.16.1.1,,invalid-ip"
     click_button "Show Virtual Machines"
 
-    expect(page).to have_content("No data available")
+    expect(page).to have_content("No data available for Virtual Machines table")
   end
 end

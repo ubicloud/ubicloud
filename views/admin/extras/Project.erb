@@ -1,25 +1,13 @@
 <%# locals: (obj: nil) %>
 
-<table class="project-quota-table">
-  <caption>Quotas</caption>
-  <thead>
-    <tr>
-      <th>Resource</th>
-      <th>Quota</th>
-      <th>Usage</th>
-    </tr>
-  </thead>
-  <tbody>
-    <% ["VmVCpu", "GithubRunnerVCpu", "PostgresVCpu", "KubernetesVCpu"].each do |type| %>
-      <tr>
-        <td><%= type %></td>
-        <td>
-          <%= obj.effective_quota_value(type) %>
-        </td>
-        <td>
-          <%= obj.current_resource_usage(type) %>
-        </td>
-      </tr>
-    <% end %>
-  </tbody>
-</table>
+<%== part("components/table",
+  title: "Quotas",
+  table_class: "project-quota-table",
+  data: ["VmVCpu", "GithubRunnerVCpu", "PostgresVCpu", "KubernetesVCpu"].map {
+    {
+      "Resource" => it,
+      "Quota" => obj.effective_quota_value(it),
+      "Usage" => obj.current_resource_usage(it),
+    }
+  }
+) %>

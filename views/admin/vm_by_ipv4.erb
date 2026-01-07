@@ -11,5 +11,5 @@
 <% end %>
 
 <% if @vms %>
-  <%== part("components/table", data: @vms) %>
+  <%== part("components/table", title: "Virtual Machines", table_class: "vm-by-ipv4-table", data: @vms, use_admin_label: false) %>
 <% end %>
