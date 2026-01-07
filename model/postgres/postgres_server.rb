@@ -178,7 +178,7 @@ class PostgresServer < Sequel::Model
   end
 
   def current_lsn
-    run_query("SELECT #{lsn_function}").chomp
+    run_query(DB.select(Sequel.function(lsn_function_name)))
   end
 
   def failover_target
@@ -198,14 +198,18 @@ class PostgresServer < Sequel::Model
     target[:server]
   end
 
-  def lsn_function
+  def lsn_function_name
     if primary?
-      "pg_current_wal_lsn()"
+      "pg_current_wal_lsn"
     elsif standby?
-      "pg_last_wal_receive_lsn()"
+      "pg_last_wal_receive_lsn"
     else
-      "pg_last_wal_replay_lsn()"
+      "pg_last_wal_replay_lsn"
     end
+  end
+
+  def lsn_function
+    "#{lsn_function_name}()"
   end
 
   def init_health_monitor_session
@@ -275,6 +279,16 @@ class PostgresServer < Sequel::Model
   end
 
   def run_query(query)
+    if query.is_a?(Sequel::Dataset)
+      query = query.no_auto_parameterize.sql
+    elsif !query.frozen?
+      raise NetSsh::PotentialInsecurity, "Interpolated string passed to PostgresServer#run_query at #{caller(1, 1).first}\nReplace string interpolation with a Sequel dataset."
+    end
+
+    _run_query(query)
+  end
+
+  private def _run_query(query)
     vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 

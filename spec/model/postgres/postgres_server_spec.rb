@@ -319,15 +319,15 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true if the diff is less than 80MB" do
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
     it "returns true if read replica and the parent representative server is nil" do
       postgres_server.resource.representative_server.update(representative_at: nil)
       postgres_server.resource.update(restore_target: Time.now)
-      expect(postgres_server.resource.representative_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
@@ -338,15 +338,15 @@ RSpec.describe PostgresServer do
     end
 
     it "returns false if the diff is more than 80MB" do
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
       expect(postgres_server.lsn_caught_up).to be_falsey
     end
 
     it "returns true if the diff is less than 80MB for not read replica and uses the main representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
       resource.update(restore_target: Time.now)
-      expect(postgres_server.resource.representative_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
-      expect(postgres_server).to receive(:run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
     end
 
@@ -697,6 +697,13 @@ RSpec.describe PostgresServer do
         expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
         postgres_server.attach_s3_policy_if_needed
       end
+    end
+  end
+
+  describe "#run_query" do
+    it "raises if given interpolated string" do
+      string = "string"
+      expect { postgres_server.run_query("interpolated #{string}") }.to raise_error(NetSsh::PotentialInsecurity)
     end
   end
 end

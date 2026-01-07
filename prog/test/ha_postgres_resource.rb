@@ -159,10 +159,10 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   def test_queries_sql
-    File.read("./prog/test/testdata/order_analytics_queries.sql")
+    File.read("./prog/test/testdata/order_analytics_queries.sql").freeze
   end
 
   def read_queries_sql
-    File.read("./prog/test/testdata/order_analytics_read_queries.sql")
+    File.read("./prog/test/testdata/order_analytics_read_queries.sql").freeze
   end
 end
