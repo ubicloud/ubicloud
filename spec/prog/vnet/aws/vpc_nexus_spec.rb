@@ -178,7 +178,10 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#destroy" do
-    before { client.stub_responses(:describe_subnets, subnets: [{state: "available"}]) }
+    before {
+      allow(Clog).to receive(:emit).and_call_original
+      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
+    }
 
     it "extends deadline if a vm prevents destroy" do
       vm = create_hosted_vm(ps.project, ps, "vm1")
