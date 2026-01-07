@@ -274,7 +274,7 @@ class CloverAdmin < Roda
       case column
       when :name, :ubid, :invoice_number
         link.call(obj, label: column)
-      when :project, :location, :vm_host
+      when :project, :location, :vm_host, :billing_info
         link.call(obj.send(column))
       when :subtotal, :cost
         "$%0.02f" % (obj.send(column) || 0)
@@ -396,6 +396,29 @@ class CloverAdmin < Roda
         case column
         when :project
           column_grep.call(ds, Sequel[:project][:id], UBID.parse(value).to_uuid)
+        end
+      end
+    end
+
+    model PaymentMethod do
+      order Sequel.desc(:created_at)
+      eager [:billing_info]
+      columns do |type_symbol, request|
+        if type_symbol == :search_form
+          [:stripe_id, :fraud, :created_at]
+        else
+          [:ubid, :stripe_id, :billing_info, :fraud, :created_at]
+        end
+      end
+      column_options fraud: {type: "boolean", value: nil},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :fraud
+          ds.where(fraud: value == "t")
+        when :created_at
+          column_grep.call(ds, column, value)
         end
       end
     end
