@@ -349,6 +349,24 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content "Stripe Data"
   end
 
+  it "allows browsing and searching PaymentMethod" do
+    billing_info = BillingInfo.create(stripe_id: "cus_payment123")
+    payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_test456", fraud: true)
+
+    click_link "PaymentMethod"
+    click_link "Search"
+    expect(page.title).to eq "Ubicloud Admin - PaymentMethod - Search"
+
+    fill_in "Stripe", with: "pm_test456"
+    select "True", from: "Fraud"
+    fill_in "Created at", with: payment_method.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [payment_method.ubid, "pm_test456", billing_info.ubid, "true", payment_method.created_at.to_s]
+
+    click_link payment_method.ubid
+    expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
+  end
+
   it "shows download PDF button for the invoice as extra" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
