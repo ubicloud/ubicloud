@@ -320,6 +320,25 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content "Stripe Data"
   end
 
+  it "allows browsing and searching BillingInfo" do
+    project = Project.create(name: "BillingTest")
+    billing_info = BillingInfo.create(stripe_id: "cus_billing123")
+    project.update(billing_info_id: billing_info.id)
+
+    click_link "BillingInfo"
+    click_link "Search"
+    expect(page.title).to eq "Ubicloud Admin - BillingInfo - Search"
+
+    fill_in "Project", with: project.ubid
+    fill_in "Stripe", with: "cus_billing123"
+    fill_in "Created at", with: billing_info.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [billing_info.ubid, "cus_billing123", "BillingTest", "", billing_info.created_at.to_s]
+
+    click_link billing_info.ubid
+    expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
+  end
+
   it "shows stripe data for payment method as extra" do
     expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
