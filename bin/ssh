@@ -1,4 +1,4 @@
-#!/usr/bin/env -S ruby --enable-frozen-string-literal
+#!/usr/bin/env ruby
 # frozen_string_literal: true
 
 require "tempfile"
