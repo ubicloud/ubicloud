@@ -187,7 +187,7 @@ module Config
   override :postgres_ubuntu_2204_version, "20251218.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres_paradedb_ubuntu_2204_version, "20250803.1.0", string
+  override :postgres_paradedb_ubuntu_2204_version, "20260107.1.0", string
   override :postgres16_paradedb_ubuntu_2204_version, "20250901.1.0", string
   override :postgres17_paradedb_ubuntu_2204_version, "20250901.1.0", string
   override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
