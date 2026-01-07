@@ -81,8 +81,6 @@ class GithubRunner < Sequel::Model
     GithubCustomLabel.first(name: actual_label, installation_id:)
   end
 
-  alias_method :name, :ubid
-
   def strand_label
     strand&.label
   end
