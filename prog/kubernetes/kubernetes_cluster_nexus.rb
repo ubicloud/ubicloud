@@ -32,23 +32,23 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
       internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
-      internal_cp_vm_firewall.replace_firewall_rules([
-        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-        {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
-        {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
-        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-      ])
+      internal_cp_vm_firewall.replace_firewall_rules(
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
+          {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
+          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+        ]
+      )
 
       # Internal worker node firewall, will be directly attached to kubernetes worker VMs
       internal_worker_vm_firewall = Firewall.create(name: "#{ubid}-worker-vm-firewall", location_id:, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
-      internal_worker_vm_firewall.replace_firewall_rules([
-        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-        {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-        {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-        {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-      ])
+      internal_worker_vm_firewall.replace_firewall_rules(
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+        ]
+      )
 
       # TODO: Validate location
       # TODO: Validate node count

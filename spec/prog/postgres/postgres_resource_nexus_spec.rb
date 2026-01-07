@@ -145,6 +145,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         "#{private_subnet.net6}:6432...6433"
       ]
     end
+
+    it "uses Config.control_plane_outbound_cidrs to limit SSH access" do
+      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
+      expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"]).at_least(:once)
+      pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+
+      internal_firewall = pg.internal_firewall
+      expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
+        "1.2.3.4/32:22...23",
+        "#{pg.private_subnet.net4}:5432...5433",
+        "#{pg.private_subnet.net4}:6432...6433",
+        "#{pg.private_subnet.net6}:5432...5433",
+        "#{pg.private_subnet.net6}:6432...6433"
+      ]
+    end
   end
 
   describe "#before_run" do
