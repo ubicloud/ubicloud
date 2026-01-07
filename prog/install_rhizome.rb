@@ -10,12 +10,6 @@ class Prog::InstallRhizome < Prog::Base
 
   SKIP_VALIDATION = ["Gemfile.lock"]
 
-  def before_run
-    when_destroy_set? do
-      pop "exiting early due to destroy semaphore"
-    end
-  end
-
   label def start
     tar = StringIO.new
     file_hash_map = {} # pun intended

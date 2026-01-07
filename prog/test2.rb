@@ -11,8 +11,4 @@ class Prog::Test2 < Prog::Base
   label def pusher1
     push Prog::Test, {test_level: "2"}, :pusher2
   end
-
-  label def destroy
-    pop "destroyed"
-  end
 end
