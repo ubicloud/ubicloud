@@ -33,16 +33,6 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if !destroying_set?
-        hop_destroy
-      elsif strand.stack.count > 1
-        pop "operation is cancelled due to the destruction of the inference router target"
-      end
-    end
-  end
-
   label def start
     hop_setup if inference_router_target.type == "runpod"
     hop_wait
