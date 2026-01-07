@@ -1,0 +1,25 @@
+<%# locals: (data:, title: nil) %>
+
+<% if data.empty? %>
+  <p>No data available</p>
+<% else %>
+  <table>
+    <caption><%= title %></caption>
+    <thead>
+      <tr>
+        <% data.first.each_key do |k| %>
+          <th><%= k %></th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% data.each do |row| %>
+        <tr>
+          <% row.each_value do |v| %>
+            <td><%== linkify_ubids(v.to_s) %></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
