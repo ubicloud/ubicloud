@@ -77,9 +77,12 @@ class UbiCli
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   rescue Rodish::CommandFailure => e
     status = 400
-    message = e.message_with_usage.dup
+    message = e.message.dup
     message[0] = "! #{message[0].capitalize}"
-    message += "\n" unless message.end_with?("\n")
+    if e.command
+      message << "\n\n" << e.command.context_help(new(env))
+    end
+    message << "\n" unless message.end_with?("\n")
 
     [status, {"content-type" => "text/plain", "content-length" => message.bytesize.to_s}, [message]]
   end
