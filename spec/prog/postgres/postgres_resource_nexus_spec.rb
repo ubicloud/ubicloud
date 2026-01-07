@@ -213,8 +213,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#trigger_pg_current_xact_id_on_parent" do
     it "triggers pg_current_xact_id and pops" do
-      representative_server = instance_double(PostgresServer)
-      expect(representative_server).to receive(:run_query).with("SELECT pg_current_xact_id()")
+      representative_server = PostgresServer.new
+      expect(representative_server).to receive(:_run_query).with("SELECT pg_current_xact_id()")
       expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource, representative_server:))
 
       expect { nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})

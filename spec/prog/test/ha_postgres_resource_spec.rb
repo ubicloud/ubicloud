@@ -86,14 +86,14 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
 
     it "fails if the postgres test fails" do
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
       expect { pgr_test.test_postgres }.to hop("destroy_postgres")
       refresh_frame(pgr_test)
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run test queries")
     end
 
     it "hops to trigger_failover if the postgres test passes" do
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
       expect { pgr_test.test_postgres }.to hop("trigger_failover")
     end
   end
@@ -142,14 +142,14 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
 
     it "fails if the postgres test fails" do
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
     end
 
     it "logs that no primary was found after failover" do
       refresh_frame(pgr_test, new_values: {"primary_ubid" => pgr_test.postgres_resource.representative_server.ubid})
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
       expect(Clog).to receive(:emit).with(/Postgres servers after failover: .*/).once.ordered
@@ -160,13 +160,13 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
 
     it "hops to destroy_postgres if the standby does not exit read-only mode" do
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("4159.90\n415.99\n4.1", "")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run write queries after failover")
     end
 
     it "hops to destroy_postgres if the postgres test succeeds" do
-      allow(pgr_test.representative_server).to receive(:run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
+      allow(pgr_test.representative_server).to receive(:_run_query).and_return("4159.90\n415.99\n4.1", "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to be_nil
     end

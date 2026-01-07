@@ -605,16 +605,16 @@ namespace :linter do
     end
   end
 
-  desc "Check for potentially unsafe overrides of cmd/exec!"
+  desc "Check for potentially unsafe overrides of methods"
   task :cmd_exec do
     failure = false
     Dir.glob("spec/**/*.rb").each do |file|
       number = 0
       File.foreach(file) do |line|
         number += 1
-        if /\(:(cmd|exec!|kubectl|rootish_ssh)/.match?(line)
+        if /\(:(cmd|exec!|kubectl|rootish_ssh|run_query)/.match?(line)
           failure = true
-          warn "Potentially insecure :cmd/:exec! override: #{file}:#{number}: #{line}"
+          warn "Potentially insecure method override: #{file}:#{number}: #{line}"
         end
       end
     end
