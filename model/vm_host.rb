@@ -42,8 +42,6 @@ class VmHost < Sequel::Model
     sshable.host
   end
 
-  alias_method :name, :ubid
-
   # Compute the IPv6 Subnet that can be used to address the host
   # itself, and should not be delegated to any VMs.
   #

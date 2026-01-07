@@ -264,7 +264,7 @@ class CloverAdmin < Roda
     supported_actions [:browse, :search]
     form_options(wrapper: :div)
 
-    link = lambda do |obj, label: "name"|
+    link = lambda do |obj, label: "admin_label"|
       return "" unless obj
 
       "<a href=\"/model/#{obj.class}/#{obj.ubid}\">#{Erubi.h(obj.send(label))}</a>"
@@ -272,7 +272,7 @@ class CloverAdmin < Roda
 
     show_html do |obj, column|
       case column
-      when :name, :invoice_number
+      when :name, :ubid, :invoice_number
         link.call(obj, label: column)
       when :project, :location, :vm_host
         link.call(obj.send(column))
@@ -341,7 +341,7 @@ class CloverAdmin < Roda
       eager_graph [:strand]
       columns do |type_symbol, request|
         cs = [:repository_name, :label, :strand_label, :created_at]
-        cs.prepend(:name) unless type_symbol == :search_form
+        cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
 
@@ -399,7 +399,7 @@ class CloverAdmin < Roda
         if type_symbol == :search_form
           [:prog, :label, :try]
         else
-          [:name, :prog, :label, :schedule, :try]
+          [:ubid, :prog, :label, :schedule, :try]
         end
       end
       column_options try: {type: "number", value: nil}
@@ -428,7 +428,7 @@ class CloverAdmin < Roda
       eager_graph [:sshable]
       columns do |type_symbol, request|
         cs = [:sshable_host, :allocation_state, :arch, :location, :data_center, :family, :total_cores, :total_hugepages_1g]
-        cs.prepend(:name) unless type_symbol == :search_form
+        cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
       column_options sshable_host: {label: "Sshable", type: :text, value: ""},
