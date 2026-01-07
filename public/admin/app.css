@@ -178,3 +178,12 @@ code {
     min-width: 300px;
   }
 }
+
+#vm_by_ipv4_form {
+  display: flex;
+  gap: 10px;
+
+  & textarea {
+    flex-grow: 1;
+  }
+}

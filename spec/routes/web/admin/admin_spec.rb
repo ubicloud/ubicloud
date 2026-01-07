@@ -802,4 +802,34 @@ RSpec.describe CloverAdmin do
     created_at_cell = cells[2]
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
+
+  it "finds both active and archived VMs by IPv4" do
+    host = create_vm_host
+    project = Project.create(name: "test")
+    active_vm = create_vm(project_id: project.id, name: "active-vm")
+    addr1 = Address.create(cidr: "172.16.0.0/24", routed_to_host_id: host.id)
+    AssignedVmAddress.create(ip: "172.16.0.1/32", address_id: addr1.id, dst_vm_id: active_vm.id)
+
+    # Archived VM
+    archived_vm = create_vm(project_id: project.id, name: "archived-vm")
+    addr2 = Address.create(cidr: "172.16.1.0/24", routed_to_host_id: host.id)
+    assigned_addr = AssignedVmAddress.create(ip: "172.16.1.1/32", address_id: addr2.id, dst_vm_id: archived_vm.id)
+    assigned_addr.destroy
+    archived_vm.destroy
+
+    visit "/vm-by-ipv4"
+    fill_in "ips", with: "172.16.0.1, 172.16.1.1,,invalid-ip"
+    click_button "Show Virtual Machines"
+
+    expect(page).to have_content("active-vm")
+    expect(page).to have_content("archived-vm")
+  end
+
+  it "shows a message when no data available" do
+    visit "/vm-by-ipv4"
+    fill_in "ips", with: "172.16.0.1, 172.16.1.1,,invalid-ip"
+    click_button "Show Virtual Machines"
+
+    expect(page).to have_content("No data available")
+  end
 end

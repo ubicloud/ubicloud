@@ -516,6 +516,44 @@ class CloverAdmin < Roda
       autoforme
     end
 
+    r.get "vm-by-ipv4" do
+      if (@ips_param = typecast_params.nonempty_str("ips"))
+        ips = @ips_param.split(",").filter_map {
+          begin
+            NetAddr.parse_net(it.strip).to_s
+          rescue
+            nil
+          end
+        }
+
+        active_vms = Vm.from_ips(ips).map {
+          {
+            ip: it.assigned_vm_address.ip.to_s,
+            created_at: it.created_at,
+            archived_at: nil,
+            vm_id: it.ubid,
+            vm_name: it.name,
+            boot_image: it.boot_image,
+            project_id: it.project.ubid
+          }
+        }
+        archived_vms = ArchivedRecord.vms_by_ips(ips).map {
+          {
+            ip: it[:ip],
+            created_at: it[:created_at],
+            archived_at: it[:archived_at],
+            vm_id: UBID.from_uuidish(it[:vm_id]).to_s,
+            vm_name: it[:vm_name],
+            boot_image: it[:boot_image],
+            project_id: UBID.from_uuidish(it[:project_id]).to_s
+          }
+        }
+        @vms = (active_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }
+      end
+
+      view("vm_by_ipv4")
+    end
+
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")

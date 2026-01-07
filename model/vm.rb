@@ -210,6 +210,10 @@ class Vm < Sequel::Model
     id.to_s[0..7]
   end
 
+  def self.from_ips(ips)
+    eager_graph(:assigned_vm_address, :project).where(Sequel[:assigned_vm_address][:ip] => ips).all
+  end
+
   def inhost_name
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end
