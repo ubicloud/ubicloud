@@ -1,0 +1,7 @@
+<%# locals: (obj: nil) %>
+
+<%== part("components/table",
+  title: "Stripe Data",
+  table_class: "stripe-data-table",
+  data: obj.stripe_data&.map { |k, v| {"Column" => k, "Value" => v} }
+) %>
