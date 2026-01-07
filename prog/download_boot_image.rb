@@ -102,7 +102,7 @@ class Prog::DownloadBootImage < Prog::Base
     ["postgres-ubuntu-2204", "x64", "20251218.1.0"] => "90ceab88e8c4b9965fff41b56e12a5c0f28f54fa26ada2a1c51abd185268aebb",
     ["postgres16-ubuntu-2204", "x64", "20250425.1.1"] => "f59622da276d646ed2a1c03de546b0a7ec3fd48aeb27c0bfe2b8b8be98c062d2",
     ["postgres17-ubuntu-2204", "x64", "20250425.1.1"] => "ccb4bcd8197c2e230be3f485dd33f24a51041a4dc0408257e42b3fe9f1c0bfb3",
-    ["postgres-paradedb-ubuntu-2204", "x64", "20260107.1.0"] => "df73118cb547103eaefb4cfa6dad3c05740e8d88ca2022166df161885a09747d",
+    ["postgres-paradedb-ubuntu-2204", "x64", "20260107.1.0"] => "b60e173766eaf0b3928e69c8037d60943df4fc0314930ad9cd429405bf91b520",
     ["postgres16-paradedb-ubuntu-2204", "x64", "20250901.1.0"] => "5f42467fad1949a16732a860fe37db381f381e25281028935a9d1b4d79058d68",
     ["postgres17-paradedb-ubuntu-2204", "x64", "20250901.1.0"] => "671dd829c0c6682933bfcfbee702b9dde3476ea71d4145035953ad98e6cf24a1",
     ["postgres16-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "bfb56867513045bc88396d529a3cc186dc44ba4d691acb51dbf45fc5a0eeb7e6",
