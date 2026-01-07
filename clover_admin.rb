@@ -312,6 +312,27 @@ class CloverAdmin < Roda
       end
     end
 
+    model BillingInfo do
+      order Sequel.desc(:created_at)
+      eager_graph [:project]
+      columns do |type_symbol, request|
+        cs = [:stripe_id, :project, :valid_vat, :created_at]
+        cs.prepend(:ubid) unless type_symbol == :search_form
+        cs
+      end
+      column_options project: {type: "text", placeholder: "Project UBID", maxlength: 26, minlength: 26},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :project
+          column_grep.call(ds, Sequel[:project][:id], UBID.parse(value).to_uuid)
+        when :created_at
+          column_grep.call(ds, Sequel[:billing_info][:created_at], value)
+        end
+      end
+    end
+
     model GithubInstallation do
       order Sequel.desc(:created_at)
       columns [:name, :installation_id, :type, :cache_enabled, :premium_runner_enabled?, :created_at, :allocator_preferences]
