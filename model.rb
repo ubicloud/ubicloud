@@ -16,8 +16,7 @@ Sequel::Model.plugin :column_encryption do |enc|
   if Config.kms_decrypt_clover_column_encryption_key_with_arn
     require "aws-sdk-kms"
     kms_client = Aws::KMS::Client.new
-    ciphertext_blob = Base64.decode64(key)
-    response = kms_client.decrypt(ciphertext_blob:, key_id: Config.kms_decrypt_clover_column_encryption_key_with_arn)
+    response = kms_client.decrypt(ciphertext_blob: key, key_id: Config.kms_decrypt_clover_column_encryption_key_with_arn)
     key = response.plaintext
   end
   enc.key 0, key
