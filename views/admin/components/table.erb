@@ -1,6 +1,6 @@
 <%# locals: (title:, table_class:, data:, use_admin_label: true) %>
 
-<% if data.empty? %>
+<% if !data || data.empty? %>
   <p>
     No data available for
     <strong><%= title %></strong>

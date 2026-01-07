@@ -312,8 +312,9 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows stripe data for billing info as extra" do
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
-
+    expect(Stripe::Customer).to receive(:retrieve).with("cus_test123").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
     visit "/model/BillingInfo/#{billing_info.ubid}"
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
     expect(page).to have_content "Stripe Data"
