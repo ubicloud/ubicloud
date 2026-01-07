@@ -101,7 +101,7 @@ class PostgresResource < Sequel::Model
       application_name:
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
-    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, path: "/postgres", query: query_parameters).to_s
   end
 
   def version

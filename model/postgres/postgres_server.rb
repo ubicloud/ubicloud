@@ -94,6 +94,7 @@ class PostgresServer < Sequel::Model
           caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
         end
+        configs[:synchronized_standby_slots] = caught_up_standbys&.map { "'#{it.ubid}'" }&.join(",")
       end
 
       if standby?
