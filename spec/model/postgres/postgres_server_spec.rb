@@ -504,6 +504,8 @@ RSpec.describe PostgresServer do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
       expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
       expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl stop wal-g")
+      expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { postgres_server.switch_to_new_timeline }.not_to raise_error
     end
   end
@@ -520,6 +522,7 @@ RSpec.describe PostgresServer do
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
 
@@ -529,6 +532,17 @@ RSpec.describe PostgresServer do
       expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
       expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl restart wal-g")
+      expect { postgres_server.refresh_walg_credentials }.not_to raise_error
+    end
+
+    it "does not restart wal-g if use_old_walg_command_set is true" do
+      expect(postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(true)
+      expect(timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, root_certs: "root_certs")).at_least(:once)
+      expect(timeline).to receive(:generate_walg_config).and_return("walg_config")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: "walg_config")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: "root_certs")
+      expect(postgres_server.vm.sshable).not_to receive(:_cmd).with("sudo systemctl restart wal-g")
       expect { postgres_server.refresh_walg_credentials }.not_to raise_error
     end
   end
