@@ -82,7 +82,7 @@ RSpec.describe PostgresResource do
     it "provisions a new server without excluding hosts when Config.allow_unspread_servers is true for regular instances" do
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
       ps1
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [])).and_call_original
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_data_centers: [])).and_call_original
 
       postgres_resource.provision_new_standby
       expect(PostgresServer.count).to eq(2)
@@ -91,7 +91,7 @@ RSpec.describe PostgresResource do
       expect(new_server.resource_id).to eq(postgres_resource.id)
       expect(new_server.timeline_access).to eq("fetch")
       expect(new_server.vm.vm_firewalls).to eq([postgres_resource.internal_firewall])
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
+      expect(new_server.vm.strand.stack[0]["exclude_data_centers"]).to eq([])
     end
 
     it "provisions a new server but excludes currently used data centers" do
@@ -103,11 +103,11 @@ RSpec.describe PostgresResource do
       vm1.update(vm_host_id: vm_host_1.id)
       vm2.update(vm_host_id: vm_host_1.id)
 
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [vm_host_1.id])).and_call_original
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_data_centers: ["dc1"])).and_call_original
       postgres_resource.provision_new_standby
       expect(postgres_resource.reload.servers.count).to eq(3)
       new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).order(:created_at).last
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([vm_host_1.id])
+      expect(new_server.vm.strand.stack[0]["exclude_data_centers"]).to eq(["dc1"])
     end
 
     it "provisions a new server but excludes currently used az for aws" do

@@ -21,15 +21,15 @@ class PostgresResource < Sequel::Model
     def metal_new_server_exclusion_filters
       return [[], [], nil] if Config.allow_unspread_servers || location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
 
-      exclude_host_ids = VmHost
+      exclude_data_centers = VmHost
         .where(data_center: VmHost
           .join(:vm, vm_host_id: :id)
           .where(Sequel[:vm][:id] => servers_dataset.select(:vm_id))
           .select(:data_center)
           .distinct)
-        .select_map(:id)
+        .select_map(:data_center)
 
-      [exclude_host_ids, [], nil]
+      [exclude_data_centers, [], nil]
     end
   end
 end
