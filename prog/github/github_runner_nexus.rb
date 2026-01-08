@@ -206,7 +206,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if project.reputation == "limited"
-      Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name)} }
+      Clog.emit("not allowed because of limited reputation", {limited_reputation: {label: github_runner.label, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
@@ -233,23 +233,23 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       if should_spill_over
         spilled_vcpus = Vm.where(boot_image: [Config.github_ubuntu_2204_aws_ami_version, Config.github_ubuntu_2404_aws_ami_version]).sum(:vcpus) || 0
         if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name)} }
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 
-        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name)} }
+        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
         github_runner.incr_spill_over
         hop_allocate_vm
       end
 
-      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name)} }
+      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
     if x64? && ((prem_util > 75) || (installation.free_runner_upgrade? && prem_util > 50))
       github_runner.incr_not_upgrade_premium
     end
-    Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name)} }
+    Clog.emit("allowed because of low utilization", {exceeded_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
 
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
@@ -266,7 +266,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       .update(allocated_runner_count: new_allocated_runner_count)
 
     if updated_rows != 1
-      Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name)} }
+      Clog.emit("hit custom label concurrency limit", {custom_label_concurrency_limit: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
     hop_allocate_vm
@@ -348,7 +348,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       # Remove comments and empty lines before sending them to the machine
       vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""))
     rescue Net::SSH::AuthenticationFailed
-      Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner) }
+      Clog.emit("ssh authentication failed", {failed_runner_authentication: github_runner})
       nap 1
     end
     hop_register_runner
@@ -386,14 +386,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # If the runner script is not started yet, we can delete the runner and
     # register it again.
     if vm.sshable.cmd("systemctl show -p SubState --value runner-script").chomp == "dead"
-      Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id:)}] }
+      Clog.emit("Deregistering runner because it already exists", [github_runner, {existing_runner: {runner_id:}}])
       client.delete(runners_path(runner_id))
       nap 5
     end
 
     # The runner script is already started. We persist the runner_id and allow
     # wait label to decide the next step.
-    Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:)}] }
+    Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:}}])
     github_runner.update(runner_id:, ready_at: Time.now)
     hop_wait
   end
@@ -407,7 +407,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         instance_id = vm.aws_instance.instance_id
         instance_response = vm.location.location_credential.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first&.instances&.first
         if instance_response && instance_response.dig(:state, :name) == "terminated" && instance_response.dig(:state_reason, :code) == "Server.SpotInstanceTermination"
-          Clog.emit("Spot instance interrupted", [github_runner, {interrupted_runner: {instance_id:)}] }
+          Clog.emit("Spot instance interrupted", [github_runner, {interrupted_runner: {instance_id:}}])
           github_runner.incr_destroy
           nap 0
         end
@@ -472,12 +472,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         remaining_window: match[4].to_i,
         source: match[5]
       }
-      Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:) }
+      Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
     end
 
     if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
       cache_proxy_log_line_counts = cache_proxy_log.lines.each(&:strip!).reject(&:empty?).tally
-      Clog.emit("Cache proxy log line counts", {cache_proxy_log_line_counts:) }
+      Clog.emit("Cache proxy log line counts", {cache_proxy_log_line_counts:})
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry", github_runner)
@@ -525,7 +525,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         .update(allocated_runner_count: new_runner_count)
 
       if updated_rows != 1
-        Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name)} }
+        Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
       end
     end
     hop_wait_vm_destroy
