@@ -11,18 +11,20 @@ class Clog
     when Hash
       metadata
     when Array
-      metadata.reduce({}) do |hash, item|
+      hash = {}
+      metadata.each do |item|
         case item
         when Hash
-          hash.merge(item)
+          hash.merge!(item)
         when Sequel::Model
-          hash.merge(serialize_model(item))
+          hash[item.class.table_name] = serialize_model(item)
         else
-          hash.merge({invalid_type: item.class.to_s})
+          hash[:invalid_type] = item.class.to_s
         end
       end
+      hash
     when Sequel::Model
-      serialize_model(metadata)
+      {metadata.class.table_name => serialize_model(metadata)}
     else
       {invalid_type: metadata.class.to_s}
     end
@@ -44,6 +46,6 @@ class Clog
   end
 
   private_class_method def self.serialize_model(model)
-    {model.class.table_name => model.values.except(*model.class.redacted_columns)}
+    model.values.except(*model.class.redacted_columns)
   end
 end
