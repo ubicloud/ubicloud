@@ -323,13 +323,16 @@ class PostgresServer < Sequel::Model
   end
 
   def switch_to_new_timeline(parent_id: timeline.id)
+    # We have to stop wal-g before updating the timeline to avoid WAL files
+    # being pushed to the old bucket.
+    vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push"
     )
 
     increment_s3_new_timeline
-    incr_refresh_walg_credentials
+    refresh_walg_credentials
   end
 
   def refresh_walg_credentials
@@ -338,6 +341,7 @@ class PostgresServer < Sequel::Model
     walg_config = timeline.generate_walg_config(version)
     vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
     refresh_walg_blob_storage_credentials
+    vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
   end
 
   def observe_archival_backlog(session)
