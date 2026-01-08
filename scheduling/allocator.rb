@@ -249,7 +249,7 @@ module Scheduling::Allocator
       # diagnostics.
       if request.diagnostics
         Clog.emit("Allocator query for vm", {allocator_query: {vm_id: request.vm_id,
-                           sql: ds.no_auto_parameterize.sql}})
+                                                               sql: ds.no_auto_parameterize.sql}})
       end
 
       ds.all

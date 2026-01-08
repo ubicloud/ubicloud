@@ -56,7 +56,7 @@ class Clover
     end
 
     unless (job = data["workflow_job"])
-      Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action: data["action"])} }
+      Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action: data["action"]}})
       return error("No workflow_job in the payload")
     end
 
@@ -71,7 +71,7 @@ class Clover
 
     repository_name = data["repository"]["full_name"]
     unless label
-      Clog.emit("Unmatched label", {unmatched_label: {repository_name:, labels: job_labels)} } if data["action"] == "queued"
+      Clog.emit("Unmatched label", {unmatched_label: {repository_name:, labels: job_labels}}) if data["action"] == "queued"
       return error("Unmatched label")
     end
 

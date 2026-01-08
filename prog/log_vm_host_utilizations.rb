@@ -21,7 +21,7 @@ class Prog::LogVmHostUtilizations < Prog::Base
       ]
     }.group(:allocation_state, :location_id, :arch, :family).all
 
-    rows.each { |row| Clog.emit("location utilization", {location_utilization: row.values) } }
+    rows.each { |row| Clog.emit("location utilization", {location_utilization: row.values}) }
 
     aggregation_keys = [:host_count, :used_cores, :total_cores, :used_hugepages_1g, :total_hugepages_1g,
       :available_standard_2_count, :available_standard_4_count, :available_standard_8_count, :available_standard_16_count,
@@ -35,7 +35,7 @@ class Prog::LogVmHostUtilizations < Prog::Base
       values[:family] = family
       values[:core_utilization] = (values[:used_cores] * 100.0 / values[:total_cores]).round(2)
       values[:hugepage_utilization] = (values[:used_hugepages_1g] * 100.0 / values[:total_hugepages_1g]).round(2)
-      Clog.emit("arch utilization", {arch_utilization: values) }
+      Clog.emit("arch utilization", {arch_utilization: values})
     end
 
     nap 60

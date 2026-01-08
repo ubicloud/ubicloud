@@ -198,7 +198,7 @@ class Prog::DownloadBootImage < Prog::Base
         update_stack({"restarted" => restarted + 1})
       else
         vm_host.boot_images_dataset.where(name: image_name, version:).destroy
-        Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:)]} }
+        Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
       end
     end
 

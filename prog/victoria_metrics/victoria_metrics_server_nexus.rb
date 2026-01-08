@@ -215,7 +215,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
     victoria_metrics_server.client.health
   rescue => ex
-    Clog.emit("victoria_metrics server is down", {victoria_metrics_server_down: Util.exception_to_hash(ex, into: {ubid: victoria_metrics_server.ubid))} }
+    Clog.emit("victoria_metrics server is down", {victoria_metrics_server_down: Util.exception_to_hash(ex, into: {ubid: victoria_metrics_server.ubid})})
     false
   end
 

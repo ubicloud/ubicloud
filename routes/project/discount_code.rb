@@ -15,7 +15,7 @@ class Clover
       end
 
       unless discount
-        Clog.emit("Invalid discount code attempted", {invalid_discount_code: {project_id: @project.id, code: discount_code)} }
+        Clog.emit("Invalid discount code attempted", {invalid_discount_code: {project_id: @project.id, code: discount_code}})
         raise_web_error("Discount code not found.")
       end
 
