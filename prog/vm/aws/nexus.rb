@@ -191,7 +191,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
           index = families.index(vm.family) || -1
           families[index + 1]
         end
-        Clog.emit("insufficient instance capacity") { {insufficient_instance_capacity: {vm:, next_family:, message: e.message}} }
+        Clog.emit("insufficient instance capacity", {insufficient_instance_capacity: {vm:, next_family:, message: e.message}})
         if next_family
           vm.update(family: next_family)
           nap 0
@@ -207,7 +207,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         raise e
       end
 
-      Clog.emit("unsupported instance type") { {unsupported_instance_type: {vm:, message: e.message, retry_count: retry_count + 1}} }
+      Clog.emit("unsupported instance type", {unsupported_instance_type: {vm:, message: e.message, retry_count: retry_count + 1}})
       azs_excluded = ((nic.strand.stack.first["exclude_availability_zones"] || []) + [nic.nic_aws_resource.subnet_az]).uniq
       update_stack({"exclude_availability_zones" => azs_excluded, "retry_count" => retry_count + 1})
       nic.incr_destroy
@@ -273,7 +273,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   label def create_billing_record
     vm.update(display_state: "running", provisioned_at: Time.now)
 
-    Clog.emit("vm provisioned") { [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}] }
+    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, instance_id: vm.aws_instance.instance_id, duration: (Time.now - vm.allocated_at).round(3)}}])
 
     project = vm.project
     hop_wait unless project.billable
@@ -435,6 +435,6 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     Aws::IAM::Errors::InvalidRoleName,
     Aws::IAM::Errors::NoSuchEntity,
     Aws::IAM::Errors::EntityAlreadyExists => e
-    Clog.emit("ID not found or already exists for aws instance") { {ignored_aws_instance_failure: Util.exception_to_hash(e, backtrace: nil)} }
+    Clog.emit("ID not found or already exists for aws instance", {ignored_aws_instance_failure: Util.exception_to_hash(e, backtrace: nil)})
   end
 end

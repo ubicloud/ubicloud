@@ -312,7 +312,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     update_config
     usage_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
     project_usage = JSON.parse(usage_response)
-    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage:} }
+    Clog.emit("Successfully pinged inference router.", {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage:})
     update_billing_records(project_usage, "prompt_billing_resource", "prompt_token_count")
     update_billing_records(project_usage, "completion_billing_resource", "completion_token_count")
   end
@@ -351,7 +351,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: Util.exception_to_hash(ex, into: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens:})} }
+        Clog.emit("Failed to update billing record", {billing_record_update_error: Util.exception_to_hash(ex, into: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens:})})
       end
     end
   end

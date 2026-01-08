@@ -18,7 +18,7 @@ class MonitorableResource
 
     @session = @resource.reload.init_health_monitor_session
   rescue Sequel::NoExistingObject
-    Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
+    Clog.emit("Resource is deleted.", {resource_deleted: {ubid: @resource.ubid}})
     @session = nil
     @deleted = true
   end
@@ -33,7 +33,7 @@ class MonitorableResource
         @session[:ssh_session].loop(0.01) { run_event_loop }
       rescue => ex
         event_loop_failed = true
-        Clog.emit("SSH event loop has failed.") { {event_loop_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})} }
+        Clog.emit("SSH event loop has failed.", {event_loop_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
         @session[:ssh_session].shutdown!
         begin
           @session[:ssh_session].close
@@ -47,7 +47,7 @@ class MonitorableResource
     begin
       @pulse = @resource.check_pulse(session: @session, previous_pulse: @pulse)
       @session[:last_pulse] = Time.now
-      Clog.emit("Got new pulse.") { {got_pulse: {ubid: @resource.ubid, pulse: @pulse}} } if (rpt = @pulse[:reading_rpt]) && (rpt < 6 || rpt % 5 == 1) || @pulse[:reading] != "up"
+      Clog.emit("Got new pulse.", {got_pulse: {ubid: @resource.ubid, pulse: @pulse}}) if (rpt = @pulse[:reading_rpt]) && (rpt < 6 || rpt % 5 == 1) || @pulse[:reading] != "up"
     rescue => ex
       if !stale_retry &&
           (
@@ -65,7 +65,7 @@ class MonitorableResource
         @session.merge!(@resource.init_health_monitor_session)
         retry
       end
-      Clog.emit("Pulse checking has failed.") { {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})} }
+      Clog.emit("Pulse checking has failed.", {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
       # TODO: Consider raising the exception here, and let the caller handle it.
     end
 

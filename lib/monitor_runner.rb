@@ -48,20 +48,18 @@ class MonitorRunner
   end
 
   def emit_metrics
-    Clog.emit("monitor metrics") do
-      {
-        monitor_metrics: {
-          active_threads_count: Thread.list.count - @internal_threads,
-          threads_waiting_for_db_connection: DB.pool.num_waiting,
-          total_monitor_resources: @monitor_resources.resources.size,
-          total_metric_export_resources: @metric_export_resources.resources.size,
-          monitor_submit_queue_length: @monitor_resources.submit_queue.length,
-          metric_export_submit_queue_length: @metric_export_resources.submit_queue.length,
-          monitor_idle_worker_threads: @monitor_resources.submit_queue.num_waiting,
-          metric_export_idle_worker_threads: @metric_export_resources.submit_queue.num_waiting
-        }
+    Clog.emit("monitor metrics", {
+      monitor_metrics: {
+        active_threads_count: Thread.list.count - @internal_threads,
+        threads_waiting_for_db_connection: DB.pool.num_waiting,
+        total_monitor_resources: @monitor_resources.resources.size,
+        total_metric_export_resources: @metric_export_resources.resources.size,
+        monitor_submit_queue_length: @monitor_resources.submit_queue.length,
+        metric_export_submit_queue_length: @metric_export_resources.submit_queue.length,
+        monitor_idle_worker_threads: @monitor_resources.submit_queue.num_waiting,
+        metric_export_idle_worker_threads: @metric_export_resources.submit_queue.num_waiting
       }
-    end
+    })
   end
 
   def check_stuck_pulses
@@ -145,7 +143,7 @@ class MonitorRunner
     shutdown! unless @shutdown
     nil
   rescue => ex
-    Clog.emit("Pulse checking or resource scanning has failed.") { {pulse_checking_or_resource_scanning_failure: Util.exception_to_hash(ex)} }
+    Clog.emit("Pulse checking or resource scanning has failed.", {pulse_checking_or_resource_scanning_failure: Util.exception_to_hash(ex)})
     ThreadPrinter.run
     Kernel.exit! 2
   end

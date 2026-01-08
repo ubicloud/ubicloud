@@ -81,7 +81,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       raise "SHA256 mismatch for #{path}: expected #{expected_sha256}, got #{actual_sha256}" unless actual_sha256 == expected_sha256
       vm.vm_host.sshable.cmd("chmod +x :path", path:)
     rescue => e
-      Clog.emit("encountered an issue while downloading migration binaries") { {exception: {message: e.message}} }
+      Clog.emit("encountered an issue while downloading migration binaries", {exception: {message: e.message}})
       nap 10
     end
     hop_migrate_from_spdk_to_ubiblk

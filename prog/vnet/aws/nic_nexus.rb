@@ -143,7 +143,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       end
     rescue Aws::EC2::Errors::InvalidParameterValue => e
       if e.message.include?("Network interface '#{nic.nic_aws_resource.network_interface_id}' is currently in use.")
-        Clog.emit("Network interface is in use") { {network_interface_in_use: {network_interface_id: nic.nic_aws_resource.network_interface_id}} }
+        Clog.emit("Network interface is in use", {network_interface_in_use: {network_interface_id: nic.nic_aws_resource.network_interface_id}})
         nap 5
       end
       raise e
@@ -165,7 +165,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     rescue Aws::EC2::Errors::DependencyViolation => e
       raise e if private_subnet.nics.count == 1
 
-      Clog.emit("dependency violation for aws nic") { {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)} }
+      Clog.emit("dependency violation for aws nic", {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)})
     end
 
     hop_destroy_entities
@@ -210,6 +210,6 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     Aws::EC2::Errors::InvalidAllocationIDNotFound,
     Aws::EC2::Errors::InvalidAddressIDNotFound,
     Aws::EC2::Errors::InvalidSubnetIDNotFound => e
-    Clog.emit("ID not found for aws nic") { {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)} }
+    Clog.emit("ID not found for aws nic", {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)})
   end
 end

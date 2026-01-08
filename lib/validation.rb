@@ -286,7 +286,7 @@ module Validation
       expects: 200)
     response_hash = JSON.parse(response.body)
     unless response_hash["success"]
-      Clog.emit("cloudflare turnstile validation failed") { {cf_validation_failed: response_hash["error-codes"]} }
+      Clog.emit("cloudflare turnstile validation failed", {cf_validation_failed: response_hash["error-codes"]})
       fail ValidationFailed.new({cloudflare_turnstile: "Validation failed. Please try again."})
     end
   end

@@ -465,7 +465,7 @@ class Clover
 
               series_query_result
             rescue VictoriaMetrics::ClientError => e
-              Clog.emit("Could not query VictoriaMetrics") { {error: e.message, query:} }
+              Clog.emit("Could not query VictoriaMetrics", {error: e.message, query:) }
 
               if single_query
                 raise CloverError.new(500, "InternalError", "Internal error while querying metrics", {query:})

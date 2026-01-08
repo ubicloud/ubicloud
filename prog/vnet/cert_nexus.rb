@@ -60,7 +60,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
       hop_cert_finalization
     else
-      Clog.emit("DNS validation failed") { {order_status: dns_challenge.status} }
+      Clog.emit("DNS validation failed", {order_status: dns_challenge.status})
       dns_zone.delete_record(record_name: dns_record_name)
       hop_restart
     end
@@ -81,7 +81,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       dns_zone.delete_record(record_name: dns_record_name)
       hop_wait
     else
-      Clog.emit("Certificate finalization failed") { {order_status: acme_order.status} }
+      Clog.emit("Certificate finalization failed", {order_status: acme_order.status})
       dns_zone.delete_record(record_name: dns_record_name)
       hop_restart
     end
@@ -117,12 +117,12 @@ class Prog::Vnet::CertNexus < Prog::Base
     begin
       acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
     rescue Acme::Client::Error::AlreadyRevoked => ex
-      Clog.emit("Certificate is already revoked") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
+      Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::NotFound => ex
-      Clog.emit("Certificate is not found") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
+      Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::Unauthorized => ex
       if ex.message.include?("The certificate has expired and cannot be revoked")
-        Clog.emit("Certificate is expired and cannot be revoked") { {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})} }
+        Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
       else
         raise ex
       end

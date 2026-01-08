@@ -112,7 +112,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     if private_subnet.nics.any? { |n| !n.vm_id.nil? }
       register_deadline(nil, 10 * 60, allow_extension: true) if private_subnet.nics.any? { |n| n.vm&.prevent_destroy_set? }
 
-      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
+      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet)
 
       nap 5
     end
@@ -129,7 +129,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       end
     rescue Aws::EC2::Errors::DependencyViolation => e
       if e.message.include?("resource #{private_subnet_aws_resource.security_group_id} has a dependent object")
-        Clog.emit("Security group is in use") { {security_group_in_use: {security_group_id: private_subnet_aws_resource.security_group_id}} }
+        Clog.emit("Security group is in use", {security_group_in_use: {security_group_id: private_subnet_aws_resource.security_group_id}})
         nap 5
       end
       raise e
@@ -172,7 +172,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     Aws::EC2::Errors::InvalidNetworkInterfaceIDNotFound,
     Aws::EC2::Errors::InvalidInternetGatewayIDNotFound,
     Aws::EC2::Errors::InvalidVpcIDNotFound => e
-    Clog.emit("ID not found for aws vpc") { {ignored_aws_vpc_failure: Util.exception_to_hash(e, backtrace: nil)} }
+    Clog.emit("ID not found for aws vpc", {ignored_aws_vpc_failure: Util.exception_to_hash(e, backtrace: nil)})
   end
 
   def location

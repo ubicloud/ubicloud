@@ -90,7 +90,7 @@ class Repartitioner
       throw :stop if @shutdown
 
       unless (notify_partition_num = Integer(payload, exception: false)) && allowed_partition_range.cover?(notify_partition_num)
-        Clog.emit(emit_str) { {emit_key => payload} }
+        Clog.emit(emit_str, {emit_key => payload})
         next
       end
 
@@ -123,13 +123,13 @@ class Repartitioner
     @num_partitions = np
     calculate_strand_id_range
     @repartitioned = true
-    Clog.emit(@repartition_emit_message) {
-      {@repartition_emit_key => {
+    Clog.emit(@repartition_emit_message, {
+      @repartition_emit_key => {
         partition_number: @partition_number,
         num_partitions: np,
         range: @strand_id_range
-      }}
-    }
+      }
+    })
   end
 
   # Called every second. Used to exit the listen loop on shutdown, and to NOTIFY

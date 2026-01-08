@@ -291,7 +291,7 @@ class VmHost < Sequel::Model
       command << "| jq .smart_status.passed"
       command = NetSsh.combine(*command)
       passed = ssh_session.exec!(command, device_name:).strip == "true"
-      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}") unless passed
+      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}", {}) unless passed
       passed
     end.all?(true)
   end
@@ -299,7 +299,7 @@ class VmHost < Sequel::Model
   def check_storage_nvme(ssh_session, devices)
     devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
       passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
-      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}") unless passed
+      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {}) unless passed
       passed
     end.all?(true)
   end
@@ -332,7 +332,7 @@ class VmHost < Sequel::Model
         failure_reasons << "Hash check failed (expected hash mismatch, output=#{hash_result.strip})" unless hash_status
         failure_reasons << "Delete failed (exitstatus=#{delete_result.exitstatus}, output=#{delete_result.strip})" unless delete_status
 
-        Clog.emit("Failed to perform write/read/delete on mountpoint #{mount_point} on VmHost #{ubid}: #{failure_reasons.join("; ")}")
+        Clog.emit("Failed to perform write/read/delete on mountpoint #{mount_point} on VmHost #{ubid}: #{failure_reasons.join("; ")}", {})
       end
 
       write_status && hash_status && delete_status
@@ -344,7 +344,7 @@ class VmHost < Sequel::Model
     return false unless kernel_logs.exitstatus == 0
 
     error_count = kernel_logs.scan(/Buffer I\/O error on dev (\w+)/).tally
-    Clog.emit("found error on kernel logs. devices with error_count: #{error_count} on VmHost #{ubid}") unless error_count.empty?
+    Clog.emit("found error on kernel logs. devices with error_count: #{error_count} on VmHost #{ubid}", {}) unless error_count.empty?
     error_count.empty?
   end
 
@@ -395,7 +395,7 @@ class VmHost < Sequel::Model
     rescue IOError, Errno::ECONNRESET
       raise
     rescue => e
-      Clog.emit("Exception in VmHost #{ubid}") { Util.exception_to_hash(e) }
+      Clog.emit("Exception in VmHost #{ubid}", Util.exception_to_hash(e))
       "down"
     end
     pulse = aggregate_readings(previous_pulse:, reading:)

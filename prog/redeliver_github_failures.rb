@@ -43,7 +43,7 @@ class Prog::RedeliverGithubFailures < Prog::Base
       .values
       .reject { |group| group.any? { it[:status] == "OK" } }
       .map { |group| group.max_by { it[:delivered_at] } }
-    Clog.emit("fetched github deliveries") { {fetched_github_deliveries: {total: all_deliveries.count, failed: failures.count, status: failures.map { it[:status] }.tally, page:, since:}} }
+    Clog.emit("fetched github deliveries", {fetched_github_deliveries: {total: all_deliveries.count, failed: failures.count, status: failures.map { it[:status]).tally, page:, since:}} }
     failures
   end
 end

@@ -111,7 +111,7 @@ class Clover
           end
         rescue
           # Log and redirect if Stripe card error or our manual raise
-          Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id:}} }
+          Clog.emit("Couldn't pre-authorize card", {card_authorization: {project_id: @project.id, customer_stripe_id:)} }
           raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
         end
 
@@ -180,7 +180,7 @@ class Clover
             begin
               Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
             rescue Aws::S3::Errors::NoSuchKey
-              Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
+              Clog.emit("Could not find the invoice", {not_found_invoice: {invoice_ubid: invoice.ubid)} }
               invoice.generate_pdf
             end
           end
@@ -226,11 +226,11 @@ class Clover
           begin
             checkout_session = Stripe::Checkout::Session.retrieve(session_id)
           rescue Stripe::InvalidRequestError => e
-            Clog.emit("invalid invoice payment") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}} }
+            Clog.emit("invalid invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message)} }
             raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")
           end
           unless checkout_session["customer"] == @project.billing_info.stripe_id && checkout_session["metadata"]["invoice"] == invoice.ubid && checkout_session["payment_status"] == "paid"
-            Clog.emit("unsuccessful invoice payment") { {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:}} }
+            Clog.emit("unsuccessful invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:)} }
             raise_web_error("Invoice payment was not successful")
           end
           invoice.update(status: "paid")

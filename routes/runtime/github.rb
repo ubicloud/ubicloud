@@ -9,7 +9,7 @@ class Clover
     begin
       repository.setup_blob_storage unless repository.access_key
     rescue Excon::Error::HTTPStatus => ex
-      Clog.emit("Unable to setup blob storage") { {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}} }
+      Clog.emit("Unable to setup blob storage", {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body)} }
       fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
     end
 
@@ -100,7 +100,7 @@ class Clover
           size = typecast_params.pos_int("cacheSize")
 
           unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.nonempty_str("runId")))
-            Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
+            Clog.emit("The runner does not have a workflow job", {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid)} }
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
@@ -134,7 +134,7 @@ class Clover
               # :nocov:
               retry
             else
-              Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
+              Clog.emit("Could not authorize multipart upload", {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid))} }
               fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
             end
           end
@@ -180,10 +180,10 @@ class Clover
             multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
-          Clog.emit("could not complete multipart upload") { {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
+          Clog.emit("could not complete multipart upload", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid))} }
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
         rescue Aws::S3::Errors::ServiceUnavailable => ex
-          Clog.emit("s3 service unavailable") { {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})} }
+          Clog.emit("s3 service unavailable", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid))} }
           fail CloverError.new(503, "ServiceUnavailable", "Service unavailable")
         end
 
