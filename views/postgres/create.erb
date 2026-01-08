@@ -1,7 +1,7 @@
 <%
   default_flavor = PostgresResource.default_flavor
   @flavor = typecast_params.nonempty_str("flavor", default_flavor)
-  @flavor = default_flavor unless Option::POSTGRES_FLAVOR_OPTIONS.any? { |k,| k == @flavor }
+  @flavor = default_flavor unless postgres_flavors.any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
   effective_quota = @project.effective_quota_value("PostgresVCpu")
