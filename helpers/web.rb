@@ -69,18 +69,16 @@ class Clover < Roda
     # Emit error if no validation failure template was registered. This will allow
     # detection of errors in production for cases where we don't have specs that cover
     # the error. These errors will be monitored and specs will be added for them.
-    Clog.emit("web error without handle_validation_failure") do
-      {
-        missing_handle_validation_failure: {
-          request_method: request.request_method,
-          path_info: request.path_info,
-          referrer: env["HTTP_REFERER"],
-          error_class: error.class,
-          error_message: error.message,
-          backtrace: error.backtrace
-        }
+    Clog.emit("web error without handle_validation_failure", {
+      missing_handle_validation_failure: {
+        request_method: request.request_method,
+        path_info: request.path_info,
+        referrer: env["HTTP_REFERER"],
+        error_class: error.class,
+        error_message: error.message,
+        backtrace: error.backtrace
       }
-    end
+    })
 
     if Config.test? && !ENV["SHOW_WEB_ERROR_PAGE"]
       # Raise error in the tests if we get here. If this error is raised, the route

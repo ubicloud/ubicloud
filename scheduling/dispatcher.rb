@@ -195,7 +195,7 @@ class Scheduling::Dispatcher
         .prepare(:select, :get_old_strand_cohort)
 
       ds = ds.where(id: strand_id_range)
-      Clog.emit("respirate repartitioning") { {partition: strand_id_range} }
+      Clog.emit("respirate repartitioning", {partition: strand_id_range})
     else
       @old_strand_ps = nil
     end
@@ -215,7 +215,7 @@ class Scheduling::Dispatcher
       array << metric
       if array.size == METRICS_EVERY
         new_t = Time.now
-        Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array, new_t - t)} }
+        Clog.emit("respirate metrics", {respirate_metrics: metrics_hash(array, new_t - t)})
         t = new_t
         array.clear
       end
@@ -471,7 +471,7 @@ class Scheduling::Dispatcher
     start_queue.push(strand_ubid)
     strand.run(STRAND_RUNTIME)
   rescue => ex
-    Clog.emit("exception terminates strand run") { Util.exception_to_hash(ex) }
+    Clog.emit("exception terminates strand run", Util.exception_to_hash(ex))
     ex
   ensure
     Thread.current[:apoptosis_at] = nil

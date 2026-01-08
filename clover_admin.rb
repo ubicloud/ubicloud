@@ -83,7 +83,7 @@ class CloverAdmin < Roda
   plugin :error_handler do |e|
     raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
 
-    Clog.emit("admin route exception") { Util.exception_to_hash(e) }
+    Clog.emit("admin route exception", Util.exception_to_hash(e))
     @page_title = if e.is_a?(CloverError)
       "#{e.type}: #{e.message}"
     else
@@ -107,7 +107,7 @@ class CloverAdmin < Roda
       id = DB[:admin_account].insert(login:)
       DB[:admin_password_hash].insert(id:, password_hash:)
     end
-    Clog.emit("Created admin account") { {admin_account_created: login} }
+    Clog.emit("Created admin account", {admin_account_created: login) }
     password
   end
 

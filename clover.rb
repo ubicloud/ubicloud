@@ -260,11 +260,11 @@ class Clover < Roda
       code = 500
       type = "InternalServerError"
       message = "There was a temporary error attempting to make this change, please try again."
-      Clog.emit("route exception") { Util.exception_to_hash(e) }
+      Clog.emit("route exception", Util.exception_to_hash(e))
     else
       raise e if Config.test? && e.message != "test error"
 
-      Clog.emit("route exception") { Util.exception_to_hash(e) }
+      Clog.emit("route exception", Util.exception_to_hash(e))
 
       code = 500
       type = "UnexceptedError"
@@ -455,7 +455,7 @@ class Clover < Roda
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
       if cf_response&.empty?
-        Clog.emit("cloudflare turnstile parameter not submitted") { {user_agent: scope.env["HTTP_USER_AGENT"]} }
+        Clog.emit("cloudflare turnstile parameter not submitted", {user_agent: scope.env["HTTP_USER_AGENT"]) }
         scope.flash["error"] = "Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again."
         request.redirect("/create-account")
       end
@@ -588,15 +588,13 @@ class Clover < Roda
         .squeeze(" ")
         .slice(0...63)
       unless Validation::ALLOWED_ACCOUNT_NAME.match?(name)
-        Clog.emit("invalid social login account name") do
-          {
+        Clog.emit("invalid social login account name", {
             invalid_social_login_account_name: {
               omniauth_name:,
               email: account[:email],
               name:
             }
-          }
-        end
+          })
         name = "Unknown"
       end
 
@@ -608,7 +606,7 @@ class Clover < Roda
     end
 
     omniauth_on_failure do
-      Clog.emit("omniauth failure") { {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace} }
+      Clog.emit("omniauth failure", {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace) }
       super()
     end
 

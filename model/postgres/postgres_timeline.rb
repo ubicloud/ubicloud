@@ -56,7 +56,7 @@ PGDATA=/dat/#{version}/data
         .select { it.key.end_with?("backup_stop_sentinel.json") }
     rescue => ex
       recoverable_errors = ["The AWS Access Key Id you provided does not exist in our records.", "The specified bucket does not exist", "AccessDenied", "No route to host", "Connection refused"]
-      Clog.emit("Backup fetch exception") { Util.exception_to_hash(ex) }
+      Clog.emit("Backup fetch exception", Util.exception_to_hash(ex))
       return [] if recoverable_errors.any? { ex.message.include?(it) }
 
       raise

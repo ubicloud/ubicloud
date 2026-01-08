@@ -54,7 +54,7 @@ class GithubRunner < Sequel::Model
       values[:instance_id] = vm.aws_instance.instance_id if vm.aws_instance
       values[:vm_pool_ubid] = VmPool[vm.pool_id].ubid if vm.pool_id
     end
-    Clog.emit(message) { {message => values} }
+    Clog.emit(message, {message => values})
   end
 
   def provision_spare_runner

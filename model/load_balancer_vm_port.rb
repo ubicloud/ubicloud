@@ -38,7 +38,7 @@ class LoadBalancerVmPort < Sequel::Model
     rescue IOError, Errno::ECONNRESET
       raise
     rescue => e
-      Clog.emit("Exception in LoadBalancerVmPort #{ubid}") { Util.exception_to_hash(e) }
+      Clog.emit("Exception in LoadBalancerVmPort #{ubid}", Util.exception_to_hash(e))
       "down"
     end
   end

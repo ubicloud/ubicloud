@@ -121,25 +121,23 @@ class Sshable < Sequel::Model
     stderr_str = stderr.string.freeze
 
     if log
-      Clog.emit("ssh cmd execution") do
-        finish = Time.now
-        embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
-                 cmd:, exit_code:, exit_signal:}
+      finish = Time.now
+      embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+               cmd:, exit_code:, exit_signal:}
 
-        # Suppress large outputs to avoid annoyance in duplication
-        # when in the REPL.  In principle, the user of the REPL could
-        # read the Clog output and the feature of printing output in
-        # real time to $stderr could be removed, but when supervising
-        # a tty, I've found it can be useful to see data arrive in
-        # real time from SSH.
-        unless repl?
-          embed[:stderr] = stderr_str
-          embed[:stdout] = stdout_str
-        end
-        embed[:channel_duration] = channel_duration
-        embed[:connect_duration] = @connect_duration if @connect_duration
-        {ssh: embed}
+      # Suppress large outputs to avoid annoyance in duplication
+      # when in the REPL.  In principle, the user of the REPL could
+      # read the Clog output and the feature of printing output in
+      # real time to $stderr could be removed, but when supervising
+      # a tty, I've found it can be useful to see data arrive in
+      # real time from SSH.
+      unless repl?
+        embed[:stderr] = stderr_str
+        embed[:stdout] = stdout_str
       end
+      embed[:channel_duration] = channel_duration
+      embed[:connect_duration] = @connect_duration if @connect_duration
+      Clog.emit("ssh cmd execution", {ssh: embed})
     end
 
     fail (exit_code ? SshError : SshTimeout).new(cmd, stdout_str, stderr_str, exit_code, exit_signal) unless exit_code&.zero?
@@ -209,9 +207,7 @@ LOCK
           "unknown SshError"
         end
 
-        Clog.emit("session lock failure") do
-          {contended_session_lock: {exit_code:, session_fail_msg:, sshable_ubid: ubid.to_s, prog: Prog::Base.current_prog}}
-        end
+        Clog.emit("session lock failure", {contended_session_lock: {exit_code:, session_fail_msg:, sshable_ubid: ubid.to_s, prog: Prog::Base.current_prog}})
       end
     end
 

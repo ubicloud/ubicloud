@@ -44,7 +44,7 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
     nap 10 unless github_installation.repositories_dataset.empty?
 
     github_installation.destroy
-    Clog.emit("GithubInstallation is deleted.") { github_installation }
+    Clog.emit("GithubInstallation is deleted.", github_installation)
 
     pop "github installation destroyed"
   end

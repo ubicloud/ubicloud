@@ -394,7 +394,7 @@ TIMER
     end
 
     unless vm_host.vms.empty?
-      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up") { vm_host }
+      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up", vm_host)
       nap 15
     end
 

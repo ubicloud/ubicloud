@@ -93,7 +93,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
         register_deadline(nil, 10 * 60, allow_extension: true)
       end
 
-      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources") { private_subnet }
+      Clog.emit("Cannot destroy subnet with active nics, first clean up the attached resources", private_subnet)
 
       nap 5
     end

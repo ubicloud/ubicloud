@@ -23,17 +23,17 @@ RSpec.describe Clog do
 
   it "writes an error when an invalid type is yield from the block" do
     expect($stdout).to receive(:write).with('{"invalid_type":"Integer","message":"ngmi","time":"' + now.to_s + '"}' + "\n")
-    described_class.emit("ngmi") { 1 }
+    described_class.emit("ngmi", 1)
   end
 
   it "returns the key with redacted values for Sequel::Model" do
     expect($stdout).to receive(:write).with('{"vm":{"id":"123"},"message":"model","time":"' + now.to_s + '"}' + "\n")
-    described_class.emit("model") { Vm.new(public_key: "redacted_key").tap { it.id = "123" } }
+    described_class.emit("model", Vm.new(public_key: "redacted_key").tap { it.id = "123" })
   end
 
   it "returns a combined hash when the metadata is an array" do
     expect($stdout).to receive(:write).with('{"vm":{"id":"123"},"field1":"custom","invalid_type":"String","message":"model","time":"' + now.to_s + '"}' + "\n")
     vm = Vm.new(public_key: "redacted_key").tap { it.id = "123" }
-    described_class.emit("model") { [vm, {field1: "custom"}, "invalid"] }
+    described_class.emit("model", [vm, {field1: "custom"}, "invalid"])
   end
 end

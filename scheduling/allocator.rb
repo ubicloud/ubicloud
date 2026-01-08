@@ -31,7 +31,7 @@ module Scheduling::Allocator
     fail "#{vm} no space left on any eligible host" unless allocation
 
     allocation.update(vm)
-    Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
+    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
   end
 
   Request = Struct.new(
@@ -248,10 +248,8 @@ module Scheduling::Allocator
       # Emit the allocation query if the project is flagged for
       # diagnostics.
       if request.diagnostics
-        Clog.emit("Allocator query for vm") do
-          {allocator_query: {vm_id: request.vm_id,
-                             sql: ds.no_auto_parameterize.sql}}
-        end
+        Clog.emit("Allocator query for vm", {allocator_query: {vm_id: request.vm_id,
+                           sql: ds.no_auto_parameterize.sql}})
       end
 
       ds.all

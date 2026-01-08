@@ -115,7 +115,7 @@ SQL
       else
         begin
           unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
-            Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
+            Clog.emit("lease violated data", {lease_clear_debug_snapshot: this.all})
             fail "BUG: lease violated"
           end
         ensure
@@ -225,7 +225,7 @@ SQL
       e
     rescue Prog::Base::Hop => hp
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("hopped") { {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}} }
+      Clog.emit("hopped", {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
       top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
@@ -234,7 +234,7 @@ SQL
       hp
     rescue Prog::Base::Exit => ext
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
+      Clog.emit("exited", {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}})
 
       update(exitval: ext.exitval, retval: nil)
       if parent_id
@@ -252,7 +252,7 @@ SQL
     end
   ensure
     duration = Time.now - start_time
-    Clog.emit("finished strand") { [self, {strand_finished: {duration:, prog_label:}}] } if duration > 1
+    Clog.emit("finished strand", [self, {strand_finished: {duration:, prog_label:}}]) if duration > 1
   end
 
   def run(seconds = 0)

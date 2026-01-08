@@ -18,7 +18,7 @@ class MetricsTargetResource
 
     @session = @resource.reload.init_metrics_export_session
   rescue Sequel::NoExistingObject
-    Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
+    Clog.emit("Resource is deleted.", {resource_deleted: {ubid: @resource.ubid}})
     @session = nil
     @deleted = true
   end
@@ -29,12 +29,12 @@ class MetricsTargetResource
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
-      Clog.emit("Metrics export has finished.") { {metrics_export_success: {ubid: @resource.ubid, count:}} }
+      Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:}})
       @last_export_success = true
     rescue => ex
       @last_export_success = false
       close_resource_session
-      Clog.emit("Metrics export has failed.") { {metrics_export_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})} }
+      Clog.emit("Metrics export has failed.", {metrics_export_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
       # TODO: Consider raising the exception here, and let the caller handle it.
     end
   end

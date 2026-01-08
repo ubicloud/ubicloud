@@ -9,7 +9,7 @@ vm = @pg.representative_server.vm
       disk_usage = begin
         tsdb_client.query_range(query:, start_ts: Time.now.to_i - 60 * 60, end_ts: Time.now.to_i)[0]
       rescue Excon::Error::Socket => e
-        Clog.emit("Failed to fetch disk usage for #{@pg.ubid} from VictoriaMetrics") { Util.exception_to_hash(e) }
+        Clog.emit("Failed to fetch disk usage for #{@pg.ubid} from VictoriaMetrics", Util.exception_to_hash(e))
       end
 
       disk_usage_subtext = if disk_usage

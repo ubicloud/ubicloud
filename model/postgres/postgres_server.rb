@@ -130,12 +130,12 @@ class PostgresServer < Sequel::Model
 
   def trigger_failover(mode:)
     unless representative_at
-      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid:} }
+      Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
     end
 
     unless (standby = failover_target)
-      Clog.emit("No suitable standby found for failover") { {ubid:} }
+      Clog.emit("No suitable standby found for failover", {ubid:})
       return false
     end
 
@@ -246,7 +246,7 @@ class PostgresServer < Sequel::Model
               update: {last_known_lsn:}
             ).save_changes
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})} }
+          Clog.emit("Failed to update PostgresLsnMonitor", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
         end
       end
 
@@ -359,9 +359,7 @@ class PostgresServer < Sequel::Model
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
-    Clog.emit("Failed to observe archival backlog") do
-      {postgres_server_id: id, exception: Util.exception_to_hash(ex)}
-    end
+    Clog.emit("Failed to observe archival backlog", {postgres_server_id: id, exception: Util.exception_to_hash(ex)})
   end
 
   def archival_backlog_threshold
