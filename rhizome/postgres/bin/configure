@@ -127,7 +127,7 @@ if configure_hash["physical_slots"]
   else
     r "sudo -u postgres psql -c \"select pg_drop_replication_slot(slot_name) from pg_replication_slots where slot_name like 'pg%' and LENGTH(slot_name) = 26 and slot_type = 'physical' and slot_name not in (#{configure_hash["physical_slots"].map { |x| "'#{x}'" }.join(",")})\""
     configure_hash["physical_slots"].each do |ubid|
-      r "sudo -u postgres psql -c \"pg_create_physical_replication_slot('#{ubid}', false)\""
+      r "sudo -u postgres psql -c \"select pg_create_physical_replication_slot('#{ubid}', false) where not exists (select 1 from pg_replication_slots where slot_type = 'physical' and slot_name = '#{ubid}')\""
     end
   end
 end

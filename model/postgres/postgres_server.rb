@@ -94,7 +94,7 @@ class PostgresServer < Sequel::Model
         if resource.ha_type == PostgresResource::HaType::SYNC
           configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
         end
-        configs[:synchronized_standby_slots] = caught_up_standbys.map { "'#{it.ubid}'" }&.join(",") if caught_up_standbys
+        configs[:synchronized_standby_slots] = "'#{caught_up_standbys.map(&:ubid)&.join(",")}'" if caught_up_standbys
       end
 
       if standby?

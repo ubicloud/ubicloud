@@ -76,7 +76,11 @@ class PostgresResource < Sequel::Model
   end
 
   def identity
-    "#{ubid}.#{hostname_suffix}"
+    if dns_zone
+      "#{ubid}.#{hostname_suffix}"
+    else
+      representative_server&.vm&.ip4_string
+    end
   end
 
   def connection_string
