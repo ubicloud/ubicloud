@@ -83,6 +83,7 @@ host    replication     all             ::1/128                 scram-sha-256
 # Allow replication connection using special replication user for
 # HA standbys
 hostssl replication     ubi_replication all                     cert map=standby2replication
+hostssl postgres        ubi_replication all                     cert map=standby2replication
 
 # Allow certificate authentication for specific users
 #{cert_auth_users}
