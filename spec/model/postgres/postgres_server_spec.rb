@@ -160,14 +160,14 @@ RSpec.describe PostgresServer do
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
       expect(postgres_server).to receive(:representative_at).and_return(nil)
-      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server")
+      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", instance_of(Hash))
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "logs error when no suitable standby found" do
       expect(postgres_server).to receive(:representative_at).and_return(Time.now)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
-      expect(Clog).to receive(:emit).with("No suitable standby found for failover")
+      expect(Clog).to receive(:emit).with("No suitable standby found for failover", instance_of(Hash))
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
@@ -448,7 +448,7 @@ RSpec.describe PostgresServer do
     expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
     expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
-    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor").and_call_original
+    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor", instance_of(Hash)).and_call_original
     expect(postgres_server).to receive(:primary?).and_return(true)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
@@ -629,7 +629,7 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_raise(Net::SSH::Exception.new("SSH error"))
-      expect(Clog).to receive(:emit).with("Failed to observe archival backlog").and_call_original
+      expect(Clog).to receive(:emit).with("Failed to observe archival backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_archival_backlog(session)
     end

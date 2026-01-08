@@ -243,7 +243,7 @@ RSpec.describe MonitorRunner do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(->(_) { exited = true })
-      expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.").and_call_original
+      expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.", instance_of(Hash)).and_call_original
       monitor_runner.define_singleton_method(:scan) { raise }
       monitor_runner.run
       expect(exited).to be true

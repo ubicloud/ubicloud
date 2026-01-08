@@ -403,7 +403,7 @@ usermod -L ubuntu
         GithubRunner.create(label: "ubicloud-standard-2", repository_name: "ubicloud/test", installation_id: installation.id, vm_id: vm.id)
         expect(vm).to receive(:sshable).and_return(create_mock_sshable(keys: [instance_double(SshKey, public_key: "dummy-public-key")]))
         expect(vm.nics.first).to receive(:nic_aws_resource).and_return(instance_double(NicAwsResource, network_interface_id: "eni-0123456789abcdefg"))
-        expect(Clog).to receive(:emit).with("insufficient instance capacity").and_call_original
+        expect(Clog).to receive(:emit).with("insufficient instance capacity", instance_of(Hash)).and_call_original
       end
 
       it "recreates runner when alternative_families is not set" do
@@ -457,7 +457,7 @@ usermod -L ubuntu
       end
 
       it "retries by excluding the failed AZ on first failure" do
-        expect(Clog).to receive(:emit).with("unsupported instance type").and_call_original
+        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
         expect(st.stack.last["retry_count"]).to eq(1)
@@ -467,7 +467,7 @@ usermod -L ubuntu
       it "increments retry count on subsequent failures" do
         refresh_frame(nx, new_values: {"retry_count" => 2})
         nic.strand.stack.first["exclude_availability_zones"] = ["b", "c"]
-        expect(Clog).to receive(:emit).with("unsupported instance type").and_call_original
+        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
           "retry_count" => 3
@@ -490,7 +490,7 @@ usermod -L ubuntu
 
       it "logs retry count in emission" do
         refresh_frame(nx, new_values: {"retry_count" => 3})
-        expect(Clog).to receive(:emit).with("unsupported instance type").and_wrap_original do |m, a, &b|
+        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_wrap_original do |m, a, &b|
           expect(b.call).to eq(unsupported_instance_type: {
             vm:,
             message: "Instance type not supported in availability zone",
@@ -604,7 +604,7 @@ usermod -L ubuntu
     before do
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       vm.update(allocated_at: now - 100)
-      expect(Clog).to receive(:emit).with("vm provisioned").and_yield
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_yield
     end
 
     it "not create billing records when the project is not billable" do
@@ -658,7 +658,7 @@ usermod -L ubuntu
   describe "#destroy" do
     it "prevents destroy if the semaphore set" do
       expect(nx).to receive(:when_prevent_destroy_set?).and_yield
-      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore", instance_of(Hash)).and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 

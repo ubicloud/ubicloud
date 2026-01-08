@@ -164,7 +164,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(PostgresServer).to receive(:[]).and_return(nil)
       expect(postgres_timeline).to receive(:backups).and_return([])
       expect(postgres_timeline).to receive(:created_at).and_return(Time.now - 11 * 24 * 60 * 60)
-      expect(Clog).to receive(:emit).with(/Self-destructing timeline/)
+      expect(Clog).to receive(:emit).with(/Self-destructing timeline/, instance_of(Hash))
       expect { nx.wait }.to hop("destroy")
     end
 

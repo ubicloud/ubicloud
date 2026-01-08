@@ -71,7 +71,7 @@ RSpec.describe GithubRepository do
         }
       ]
       expect(cloudflare_client).to receive(:create_token).with("#{bucket_name}-token", expected_policy).and_return(["test-key", "test-secret"])
-      expect(Clog).to receive(:emit).with("Blob storage setup completed").and_return({blob_storage_setup_completed: {bucket_name:}})
+      expect(Clog).to receive(:emit).with("Blob storage setup completed", instance_of(Hash)).and_return({blob_storage_setup_completed: {bucket_name:}})
       github_repository.setup_blob_storage
       expect(github_repository.reload.access_key).to eq("test-key")
       expect(github_repository.secret_key).to eq(Digest::SHA256.hexdigest("test-secret"))

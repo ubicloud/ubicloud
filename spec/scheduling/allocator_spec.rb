@@ -117,7 +117,7 @@ RSpec.describe Al do
 
     it "prints diagnostics if flagged" do
       expect(req).to receive(:diagnostics).and_return(true)
-      expect(Clog).to receive(:emit).with("Allocator query for vm") do |&blk|
+      expect(Clog).to receive(:emit).with("Allocator query for vm", instance_of(Hash)) do |&blk|
         expect(blk.call[:allocator_query].keys).to eq([:vm_id, :sql])
       end
       Al::Allocation.best_allocation(req)

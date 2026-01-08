@@ -505,7 +505,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 10)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
       expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
-      expect(Clog).to receive(:emit).with("hit custom label concurrency limit").and_call_original
+      expect(Clog).to receive(:emit).with("hit custom label concurrency limit", instance_of(Hash)).and_call_original
       expect { nx.apply_custom_label_quota }.to nap
     end
   end
@@ -514,7 +514,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "picks vm and hops" do
       picked_vm = create_vm(name: "picked-vm")
       expect(nx).to receive(:pick_vm).and_return(picked_vm)
-      expect(Clog).to receive(:emit).with("runner_allocated").and_call_original
+      expect(Clog).to receive(:emit).with("runner_allocated", instance_of(Hash)).and_call_original
       expect { nx.allocate_vm }.to hop("wait_vm")
       expect(runner.vm_id).to eq(picked_vm.id)
       expect(runner.allocated_at).to eq(now)
@@ -613,7 +613,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
       expect(vm.sshable).to receive(:_cmd).and_raise(Net::SSH::AuthenticationFailed.new("Authentication failed for user runneradmin@1.2.3.4"))
-      expect(Clog).to receive(:emit).with("ssh authentication failed").and_call_original
+      expect(Clog).to receive(:emit).with("ssh authentication failed", instance_of(Hash)).and_call_original
 
       expect { nx.setup_environment }.to nap(1)
     end
@@ -640,7 +640,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and_return({runners: [{name: runner.ubid.to_s, id: 123}]})
       expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("dead")
       expect(client).to receive(:delete).with("/repos/#{runner.repository_name}/actions/runners/123")
-      expect(Clog).to receive(:emit).with("Deregistering runner because it already exists").and_call_original
+      expect(Clog).to receive(:emit).with("Deregistering runner because it already exists", instance_of(Hash)).and_call_original
       expect { nx.register_runner }.to nap(5)
     end
 
@@ -700,7 +700,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:get).and_return({busy: false})
       expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
-      expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
+      expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(Hash)).and_call_original
 
       expect { nx.wait }.to nap(0)
       expect(runner.destroy_set?).to be(true)
@@ -711,7 +711,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:get).and_raise(Octokit::NotFound)
       expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
       expect(nx).to receive(:register_deadline).twice
-      expect(Clog).to receive(:emit).with("The runner did not pick a job").and_call_original
+      expect(Clog).to receive(:emit).with("The runner did not pick a job", instance_of(Hash)).and_call_original
 
       expect { nx.wait }.to nap(0)
       expect(runner.destroy_set?).to be(true)
@@ -780,7 +780,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Aws::EC2::Client).to receive(:new).and_return(client)
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "terminated"}, state_reason: {code: "Server.SpotInstanceTermination"}}]}])
       expect(vm.sshable).to receive(:_cmd).and_raise(Errno::ECONNRESET.new("connection failed"))
-      expect(Clog).to receive(:emit).with("Spot instance interrupted").and_call_original
+      expect(Clog).to receive(:emit).with("Spot instance interrupted", instance_of(Hash)).and_call_original
       expect { nx.wait }.to nap
       expect(runner.destroy_set?).to be(true)
     end
@@ -801,7 +801,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
       end
 
@@ -817,7 +817,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
       end
 
@@ -834,7 +834,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
       end
 
@@ -847,12 +847,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1})
       end
 
@@ -865,12 +865,12 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts") do |&blk|
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(cache_proxy_log_line_counts: {})
       end
 
@@ -883,7 +883,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits") do |&blk|
+      expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"})
       end
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(nil)
@@ -894,7 +894,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "doesn't fail if it failed due to Sshable::SshError" do
       runner.update(workflow_job: {"conclusion" => "success"})
       expect(vm.sshable).to receive(:_cmd).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
-      expect(Clog).to receive(:emit).with("Failed to collect final telemetry").and_call_original
+      expect(Clog).to receive(:emit).with("Failed to collect final telemetry", instance_of(Hash)).and_call_original
 
       nx.collect_final_telemetry
     end
@@ -902,7 +902,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "doesn't fail if it failed due to Net::SSH::ConnectionTimeout" do
       runner.update(workflow_job: {"conclusion" => "success"})
       expect(vm.sshable).to receive(:_cmd).and_raise Net::SSH::ConnectionTimeout
-      expect(Clog).to receive(:emit).with("Failed to collect final telemetry").and_call_original
+      expect(Clog).to receive(:emit).with("Failed to collect final telemetry", instance_of(Hash)).and_call_original
 
       nx.collect_final_telemetry
     end
@@ -984,7 +984,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner).to receive(:skip_deregistration_set?).and_return(true)
       expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
       expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
-      expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count").and_call_original
+      expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count", instance_of(Hash)).and_call_original
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
       custom_label.reload

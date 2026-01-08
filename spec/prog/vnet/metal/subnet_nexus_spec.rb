@@ -232,7 +232,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "fails if there are active resources" do
       nic.update(vm_id: vm.id)
-      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources").and_call_original
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", instance_of(Hash)).and_call_original
 
       expect { nx.destroy }.to nap(5)
     end

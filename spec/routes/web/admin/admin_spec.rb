@@ -510,7 +510,7 @@ RSpec.describe CloverAdmin do
 
   it "shows error page for errors if DONT_RAISE_ADMIN_ERRORS environment variable is set" do
     ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
-    expect(Clog).to receive(:emit).with("admin route exception").and_call_original
+    expect(Clog).to receive(:emit).with("admin route exception", instance_of(Hash)).and_call_original
     visit "/error"
     expect(page.title).to eq "Ubicloud Admin - Internal Server Error"
   ensure

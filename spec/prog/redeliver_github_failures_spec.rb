@@ -83,7 +83,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
         {guid: "3", id: "31", status: "Fail", delivered_at: time + 3}
       ])
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
-      expect(Clog).to receive(:emit).with("fetched github deliveries").and_wrap_original do |&blk|
+      expect(Clog).to receive(:emit).with("fetched github deliveries", instance_of(Hash)).and_wrap_original do |&blk|
         expect(blk.call).to eq(fetched_github_deliveries: {total: 2, failed: 1, status: {"Fail" => 1}, page: 1, since: time})
       end
 

@@ -443,7 +443,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(client).to receive(:health).and_raise(StandardError.new("Connection failed"))
       expect(victoria_metrics_server).to receive(:client).and_return(client)
       expect(victoria_metrics_server).to receive(:ubid).and_return(nil)
-      expect(Clog).to receive(:emit).with("victoria_metrics server is down").and_call_original
+      expect(Clog).to receive(:emit).with("victoria_metrics server is down", instance_of(Hash)).and_call_original
       expect(nx.available?).to be false
     end
   end

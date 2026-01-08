@@ -100,7 +100,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     it "hops to restart if dns_challenge validation fails" do
       expect(challenge).to receive(:status).and_return("failed")
-      expect(Clog).to receive(:emit).with("DNS validation failed").and_call_original
+      expect(Clog).to receive(:emit).with("DNS validation failed", instance_of(Hash)).and_call_original
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.wait_dns_validation }.to hop("restart")
@@ -147,7 +147,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, status: "pending", record_name: "test-record-name", record_content: "content")
       expect(nx).to receive(:dns_challenge).and_return(challenge).at_least(:once)
       expect(acme_order).to receive(:status).and_return("failed")
-      expect(Clog).to receive(:emit).with("Certificate finalization failed").and_call_original
+      expect(Clog).to receive(:emit).with("Certificate finalization failed", instance_of(Hash)).and_call_original
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect { nx.wait_cert_finalization }.to hop("restart")
@@ -254,7 +254,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::AlreadyRevoked.new("already revoked"))
 
-      expect(Clog).to receive(:emit).with("Certificate is already revoked").and_call_original
+      expect(Clog).to receive(:emit).with("Certificate is already revoked", instance_of(Hash)).and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
@@ -269,7 +269,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::NotFound.new("not found"))
 
-      expect(Clog).to receive(:emit).with("Certificate is not found").and_call_original
+      expect(Clog).to receive(:emit).with("Certificate is not found", instance_of(Hash)).and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)
@@ -284,7 +284,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(nx).to receive(:acme_client).and_return(client)
       expect(client).to receive(:revoke).and_raise(Acme::Client::Error::Unauthorized.new("The certificate has expired and cannot be revoked"))
 
-      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked").and_call_original
+      expect(Clog).to receive(:emit).with("Certificate is expired and cannot be revoked", instance_of(Hash)).and_call_original
       expect(nx).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: "test-record-name.cert-hostname")
       expect(nx).to receive(:dns_challenge).and_return(instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name")).at_least(:once)

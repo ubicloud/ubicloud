@@ -72,7 +72,7 @@ RSpec.describe Invoice do
 
     it "does not send the invoice if it has no billing information" do
       update_content(billing_info: nil, resources: [], subtotal: 0.0, credit: 0.0, discount: 0.0, cost: 0.0)
-      expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information").and_call_original
+      expect(Clog).to receive(:emit).with("Couldn't send the invoice because it has no billing information", instance_of(Hash)).and_call_original
       invoice.send_success_email
       expect(Mail::TestMailer.deliveries.length).to eq 0
     end
@@ -88,19 +88,19 @@ RSpec.describe Invoice do
   describe ".charge" do
     it "not charge if Stripe not enabled" do
       allow(Config).to receive(:stripe_secret_key).and_return(nil)
-      expect(Clog).to receive(:emit).with("Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.").and_call_original
+      expect(Clog).to receive(:emit).with("Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.", instance_of(Hash)).and_call_original
       expect(invoice.charge).to be true
     end
 
     it "not charge if already charged" do
-      expect(Clog).to receive(:emit).with("Invoice already charged.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice already charged.", instance_of(Hash)).and_call_original
       invoice.update(status: "paid")
       expect(invoice.charge).to be true
     end
 
     it "not charge if less than minimum charge threshold" do
       update_content(billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"}, cost: 0.4)
-      expect(Clog).to receive(:emit).with("Invoice cost is less than minimum charge cost.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice cost is less than minimum charge cost.", instance_of(Hash)).and_call_original
       expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: "2025/03/below_minimum_threshold/Ubicloud-2025-03-2503-4ddfa430e8-0006.pdf"))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("below_minimum_threshold")
@@ -108,13 +108,13 @@ RSpec.describe Invoice do
     end
 
     it "not charge if doesn't have billing info" do
-      expect(Clog).to receive(:emit).with("Invoice doesn't have billing info.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice doesn't have billing info.", instance_of(Hash)).and_call_original
       expect(invoice.charge).to be false
     end
 
     it "not charge and wait for transfer if no payment methods" do
       update_content(bank_transfer_info: {"Beneficiary" => "Ubicloud B.V."}, billing_info: {"id" => billing_info.id, "email" => "customer@example.com", "country" => "NL"})
-      expect(Clog).to receive(:emit).with("Invoice is waiting for transfer.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice is waiting for transfer.", instance_of(Hash)).and_call_original
       expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("waiting_transfer")
@@ -131,8 +131,8 @@ RSpec.describe Invoice do
       expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method2.stripe_id))
         .and_raise(Stripe::CardError.new("Card declined", {}))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original.twice
-      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice couldn't charged.", instance_of(Hash)).and_call_original.twice
+      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.", instance_of(Hash)).and_call_original
       expect(invoice.charge).to be false
       expect(Mail::TestMailer.deliveries.length).to eq 1
     end
@@ -145,8 +145,8 @@ RSpec.describe Invoice do
       expect(Stripe::PaymentIntent).to receive(:create).with(hash_including(amount: 1000, customer: billing_info.stripe_id, payment_method: payment_method.stripe_id))
         .and_return(double(Stripe::PaymentIntent, id: "payment-intent-id", status: "failed"))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(Clog).to receive(:emit).with("BUG: payment intent should succeed here").and_call_original
-      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.").and_call_original
+      expect(Clog).to receive(:emit).with("BUG: payment intent should succeed here", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Invoice couldn't charged with any payment method.", instance_of(Hash)).and_call_original
       expect(invoice.charge).to be false
     end
 
@@ -162,8 +162,8 @@ RSpec.describe Invoice do
         .and_return(double(Stripe::PaymentIntent, status: "succeeded", id: "pi_1234567890"))
       expect(Stripe::PaymentIntent).not_to receive(:create).with(hash_including(payment_method: payment_method3.stripe_id))
       # rubocop:enable RSpec/VerifiedDoubles
-      expect(Clog).to receive(:emit).with("Invoice couldn't charged.").and_call_original
-      expect(Clog).to receive(:emit).with("Invoice charged.").and_call_original
+      expect(Clog).to receive(:emit).with("Invoice couldn't charged.", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Invoice charged.", instance_of(Hash)).and_call_original
       expect(client).to receive(:put_object).with(hash_including(bucket: Config.invoices_bucket_name, key: invoice.blob_key))
       expect(invoice.charge).to be true
       expect(invoice.status).to eq("paid")

@@ -55,7 +55,7 @@ RSpec.describe Strand do
       expect(st).to receive(:unsynchronized_run) do
         st.this.update(lease: Sequel[:lease] + Sequel.cast("1 second", :interval))
       end
-      expect(Clog).to receive(:emit).with("lease violated data").and_call_original
+      expect(Clog).to receive(:emit).with("lease violated data", instance_of(Hash)).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
@@ -99,7 +99,7 @@ RSpec.describe Strand do
     st.save_changes
     expect(Time).to receive(:now).and_return(now - 10)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
-    expect(Clog).to receive(:emit).with("finished strand").and_call_original
+    expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
     st.unsynchronized_run
   end
 end
