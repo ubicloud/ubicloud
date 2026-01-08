@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Scheduling::Allocator
-  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil)
+  def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil, data_center_exclusion_filter: [])
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -18,6 +18,7 @@ module Scheduling::Allocator
       allocation_state_filter,
       host_filter,
       host_exclusion_filter,
+      data_center_exclusion_filter,
       location_filter,
       location_preference,
       vm.family,
@@ -50,6 +51,7 @@ module Scheduling::Allocator
     :allocation_state_filter,
     :host_filter,
     :host_exclusion_filter,
+    :data_center_exclusion_filter,
     :location_filter,
     :location_preference,
     :family,
@@ -228,6 +230,7 @@ module Scheduling::Allocator
       ds = ds.where { available_gpus >= request.gpu_count } if request.gpu_count > 0
       ds = ds.where(Sequel[:vm_host][:id] => request.host_filter) unless request.host_filter.empty?
       ds = ds.exclude(Sequel[:vm_host][:id] => request.host_exclusion_filter) unless request.host_exclusion_filter.empty?
+      ds = ds.exclude(Sequel[:vm_host][:data_center] => request.data_center_exclusion_filter) unless request.data_center_exclusion_filter.empty?
       ds = ds.where(location_id: request.location_filter) unless request.location_filter.empty?
       ds = ds.where(allocation_state: request.allocation_state_filter) unless request.allocation_state_filter.empty?
       ds = ds.where(Sequel[:vm_host][:family] => request.family_filter) unless request.family_filter.empty?
