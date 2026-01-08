@@ -14,12 +14,6 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
-    # The first element is the list of vm_hosts to exclude from the new server,
-    # which is empty for aws servers.
-    # The second element is the list of availability zones to exclude from the new server,
-    # which is the list of all used availability zones.
-    # The third element is the availability zone of the representative server,
-    # which is the availability zone of the new server.
     def aws_new_server_exclusion_filters
       exclude_availability_zones, availability_zone = if use_different_az_set?
         subnet_azs = NicAwsResource
@@ -32,7 +26,7 @@ class PostgresResource < Sequel::Model
       else
         [[], representative_server.vm.nic.nic_aws_resource.subnet_az]
       end
-      [[], exclude_availability_zones, availability_zone]
+      ServerExclusionFilters.new(exclude_data_centers: [], exclude_availability_zones:, availability_zone:)
     end
   end
 end
