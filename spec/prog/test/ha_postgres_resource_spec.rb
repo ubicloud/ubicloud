@@ -152,9 +152,9 @@ RSpec.describe Prog::Test::HaPostgresResource do
       allow(pgr_test.representative_server).to receive(:run_query).and_return("")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
-      expect(Clog).to receive(:emit).with(/Postgres servers after failover: .*/).once.ordered
-      expect(Clog).to receive(:emit).with("No new primary found after failover").once.ordered
-      expect(Clog).to receive(:emit).with("Running read queries after failover").once.ordered
+      expect(Clog).to receive(:emit).with(/Postgres servers after failover: .*/, instance_of(Hash)).once.ordered
+      expect(Clog).to receive(:emit).with("No new primary found after failover", instance_of(Hash)).once.ordered
+      expect(Clog).to receive(:emit).with("Running read queries after failover", instance_of(Hash)).once.ordered
 
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
     end

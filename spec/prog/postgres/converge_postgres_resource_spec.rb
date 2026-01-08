@@ -309,7 +309,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "logs failure, raises a page and destroys candidate server" do
       expect(candidate).to receive(:destroy_set?).and_return(false)
       expect(candidate.vm.sshable).to receive(:_cmd).with("sudo journalctl -u upgrade_postgres").and_return("log line 1\nlog line 2")
-      expect(Clog).to receive(:emit).with("Postgres resource upgrade failed").and_yield.twice
+      expect(Clog).to receive(:emit).with("Postgres resource upgrade failed", instance_of(Hash)).and_yield.twice
       expect(candidate).to receive(:incr_destroy)
       expect(primary).to receive(:incr_unfence)
       expect(postgres_resource).to receive(:id).at_least(:once).and_return("resource_id")

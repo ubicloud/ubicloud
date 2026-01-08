@@ -19,14 +19,14 @@ RSpec.describe Prog::Heartbeat do
     it "naps if it can't send request in expected time" do
       expect(hb).to receive(:fetch_connected).and_return(described_class::EXPECTED)
       stub_request(:get, "http://localhost:3000").and_raise(Excon::Error::Timeout)
-      expect(Clog).to receive(:emit).with("heartbeat request timed out").and_call_original
+      expect(Clog).to receive(:emit).with("heartbeat request timed out", instance_of(Hash)).and_call_original
       expect { hb.wait }.to nap(10)
     end
 
     it "naps if not all expected application types are connected" do
       expect(hb).to receive(:fetch_connected).and_return(%w[monitor puma])
 
-      expect(Clog).to receive(:emit).with("some expected connected clover services are missing") do |&blk|
+      expect(Clog).to receive(:emit).with("some expected connected clover services are missing", instance_of(Hash)) do |&blk|
         expect(blk.call).to eq(heartbeat_missing: {difference: ["respirate"]})
       end
 

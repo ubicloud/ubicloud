@@ -132,7 +132,7 @@ RSpec.describe MetricsTargetResource do
 
     it "marks resource as deleted when Sequel::NoExistingObject is raised" do
       postgres_server.destroy
-      expect(Clog).to receive(:emit).with("Resource is deleted.").and_yield
+      expect(Clog).to receive(:emit).with("Resource is deleted.", instance_of(Hash)).and_yield
 
       resource.open_resource_session
       expect(resource.instance_variable_get(:@deleted)).to be true

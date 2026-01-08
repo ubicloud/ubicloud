@@ -224,7 +224,7 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       client.stub_responses(:delete_network_interface, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Network interface 'eni-0123456789abcdefg' is currently in use."))
       expect(nic.nic_aws_resource).to receive(:network_interface_id).and_return("eni-0123456789abcdefg").at_least(:once)
       expect(client).to receive(:delete_network_interface).with({network_interface_id: "eni-0123456789abcdefg"}).and_call_original
-      expect(Clog).to receive(:emit).with("Network interface is in use")
+      expect(Clog).to receive(:emit).with("Network interface is in use", instance_of(Hash))
       expect { nx.destroy }.to nap(5)
     end
 

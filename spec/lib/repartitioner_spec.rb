@@ -11,14 +11,14 @@ RSpec.describe Repartitioner do
 
   describe ".new" do
     it "repartitions when initializing" do
-      expect(Clog).to receive(:emit).with("#{channel} repartitioning").and_call_original
+      expect(Clog).to receive(:emit).with("#{channel} repartitioning", instance_of(Hash)).and_call_original
       mp = repartitioner
       expect(mp.repartitioned).to be true
       expect(mp.strand_id_range).to eq("00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
 
     it "assumes given partition is last partition" do
-      expect(Clog).to receive(:emit).with("#{channel} repartitioning").and_call_original
+      expect(Clog).to receive(:emit).with("#{channel} repartitioning", instance_of(Hash)).and_call_original
       expect(repartitioner(partition_number: 2).strand_id_range).to eq("80000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
   end

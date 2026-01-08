@@ -59,7 +59,7 @@ RSpec.describe MonitorResourceType do
       vm_host = create_vm_host
       @mr = MonitorableResource.new(vm_host)
       expect(@mr).to receive(:open_resource_session)
-      expect(Clog).to receive(:emit).with("Monitoring job has failed.").and_call_original
+      expect(Clog).to receive(:emit).with("Monitoring job has failed.", instance_of(Hash)).and_call_original
       expect(vm_host).to receive(:incr_checkup)
       @mrt.submit_queue.push(@mr)
     end
@@ -73,7 +73,7 @@ RSpec.describe MonitorResourceType do
 
       @mr = MonitorableResource.new(KubernetesCluster.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" })
       expect(@mr).to receive(:open_resource_session)
-      expect(Clog).to receive(:emit).with("Monitoring job has failed.").and_call_original
+      expect(Clog).to receive(:emit).with("Monitoring job has failed.", instance_of(Hash)).and_call_original
       expect(@mr.resource).to receive(:respond_to?).with(:incr_checkup).and_return(false)
       @mrt.submit_queue.push(@mr)
     end
@@ -107,7 +107,7 @@ RSpec.describe MonitorResourceType do
       mr = MonitorableResource.new(VmHost.new_with_id)
       mr.monitor_job_started_at = Time.now - 10
       @mrt.resources[1] = mr
-      expect(Clog).to receive(:emit).with("stuck").and_call_original
+      expect(Clog).to receive(:emit).with("stuck", instance_of(Hash)).and_call_original
       @mrt.check_stuck_pulses
     end
 

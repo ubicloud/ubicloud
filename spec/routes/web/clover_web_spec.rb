@@ -71,13 +71,13 @@ RSpec.describe Clover do
   end
 
   it "handles missing handle_validation_failure_call" do
-    expect(Clog).to receive(:emit).with("web error without handle_validation_failure").and_call_original
+    expect(Clog).to receive(:emit).with("web error without handle_validation_failure", instance_of(Hash)).and_call_original
     expect { visit "/webhook/test-missing-handle-validation-failure" }.to raise_error(RuntimeError, /Request failure without handle_validation_failure/)
   end
 
   it "handles missing handle_validation_failure_call when using production default of showing error template" do
     ENV["SHOW_WEB_ERROR_PAGE"] = "1"
-    expect(Clog).to receive(:emit).with("web error without handle_validation_failure").and_call_original
+    expect(Clog).to receive(:emit).with("web error without handle_validation_failure", instance_of(Hash)).and_call_original
     visit "/webhook/test-missing-handle-validation-failure"
     expect(page.title).to eq "Ubicloud - InvalidRequest"
     expect(page).to have_content "expected string but received {}"
@@ -86,7 +86,7 @@ RSpec.describe Clover do
   end
 
   it "handles expected errors" do
-    expect(Clog).to receive(:emit).with("route exception").and_call_original
+    expect(Clog).to receive(:emit).with("route exception", instance_of(Hash)).and_call_original
 
     visit "/webhook/test-error"
 

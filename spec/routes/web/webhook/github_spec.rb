@@ -81,7 +81,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "fails if label not matched and logs if queued" do
-      expect(Clog).to receive(:emit).with("Unmatched label").and_call_original
+      expect(Clog).to receive(:emit).with("Unmatched label", instance_of(Hash)).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "other")))
 
       expect(page.status_code).to eq(200)
@@ -130,7 +130,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "updates job details of runner when receive in_progress action" do
-      expect(Clog).to receive(:emit).with("runner_started").and_call_original
+      expect(Clog).to receive(:emit).with("runner_started", instance_of(Hash)).and_call_original
       runner
       send_webhook("workflow_job", workflow_job_payload(action: "in_progress", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 

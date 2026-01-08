@@ -196,7 +196,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vm = create_hosted_vm(ps.project, ps, "vm1")
       create_hosted_vm(ps.project, ps, "vm2")
       vm.nic.update(vm_id: nil)
-      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources").and_call_original
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", instance_of(Hash)).and_call_original
 
       expect { nx.destroy }.to nap(5)
     end
@@ -215,7 +215,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
 
     it "naps if security group is in use" do
       client.stub_responses(:delete_security_group, Aws::EC2::Errors::DependencyViolation.new(nil, "resource sg-0123456789abcdefg has a dependent object"))
-      expect(Clog).to receive(:emit).with("Security group is in use").and_call_original
+      expect(Clog).to receive(:emit).with("Security group is in use", instance_of(Hash)).and_call_original
       expect { nx.destroy }.to nap(5)
     end
 
