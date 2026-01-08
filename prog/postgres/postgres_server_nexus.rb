@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil)
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -54,6 +54,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_host_ids:,
         exclude_availability_zones:,
         availability_zone:,
+        exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
       )
 
