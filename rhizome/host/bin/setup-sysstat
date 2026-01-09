@@ -5,7 +5,7 @@ require_relative "../../common/lib/util"
 require "fileutils"
 
 # install the package
-r "apt update && apt-get install -y sysstat"
+r "apt-get install -y sysstat"
 
 # Increase historical archive length to 60 days
 r "sed -i -E 's/HISTORY=[0-9]+/HISTORY=60/g' /etc/sysstat/sysstat"

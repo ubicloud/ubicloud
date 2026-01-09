@@ -229,7 +229,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#bootstrap_rhizome" do
     it "buds a bootstrap rhizome process" do
       expect(postgres_server).to receive(:primary?).and_return(true)
-      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id, "user" => "ubi"})
+      expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id, "user" => "ubi", "no_apt_update" => "true"})
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
 
