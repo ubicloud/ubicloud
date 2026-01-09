@@ -12,26 +12,31 @@ RSpec.describe Prog::DownloadBootImage do
   let(:sshable) { dbi.sshable }
   let(:vm_host) { dbi.vm_host }
 
-  describe "#start" do
-    it "creates database record and hops" do
-      expect { dbi.start }.to hop("download")
-      expect(vm_host.boot_images_dataset[name: "my-image", version: "20230303"]).to exist
+  describe ".assemble" do
+    let(:vm_host) { create_vm_host }
+
+    it "creates a strand and boot image" do
+      expect { described_class.assemble(vm_host, "ubuntu-noble", version: "20230303") }
+        .to change(Strand, :count).from(0).to(1)
+      expect(vm_host.boot_images_dataset[name: "ubuntu-noble", version: "20230303"]).to exist
     end
 
-    it "exits if image already exists" do
-      BootImage.create_with_id(vm_host, vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
-      expect { dbi.start }.to exit({"msg" => "Image already exists on host"})
+    it "uses default version if version not provided" do
+      expect { described_class.assemble(vm_host, "ubuntu-noble") }
+        .to change(Strand, :count).from(0).to(1)
+        .and change(BootImage, :count).from(0).to(1)
+      expect(vm_host.boot_images_dataset.first.version).to eq(Config.ubuntu_noble_version)
     end
 
     it "fails if image unknown" do
-      refresh_frame(dbi, new_values: {"image_name" => "my-image", "version" => nil})
-      expect { dbi.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
+      expect { described_class.assemble(vm_host, "my-image") }.to raise_error RuntimeError, "Unknown boot image: my-image"
     end
+  end
 
-    it "uses default version if version is nil" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
+  describe "#start" do
+    it "registers deadline and hops" do
+      expect(dbi).to receive(:register_deadline).and_call_original
       expect { dbi.start }.to hop("download")
-      expect(vm_host.boot_images_dataset[name: "ubuntu-noble", version: Config.ubuntu_noble_version]).to exist
     end
   end
 
@@ -98,12 +103,10 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "waits manual intervention if failed more than 10 times" do
-      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
       refresh_frame(dbi, new_values: {"restarted" => 10})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
-      expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
-      expect { dbi.download }.to nap(15)
-        .and change(bi, :exists?).from(true).to(false)
+      expect(Clog).to receive(:emit).with("Failed to download boot image. Use incr_destroy to cleanup.", instance_of(Hash)).and_call_original
+      expect { dbi.download }.to nap(60 * 60)
     end
 
     it "waits for the download to complete" do
@@ -141,6 +144,15 @@ RSpec.describe Prog::DownloadBootImage do
       expect(bi.activated_at).to be_nil
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
       expect(bi.reload.activated_at).to be <= Time.now
+    end
+  end
+
+  describe "#destroy" do
+    it "exits after cleaning resources" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
+      expect { dbi.destroy }.to exit({"msg" => "image download cancelled"})
+        .and change(bi, :exists?).from(true).to(false)
     end
   end
 
@@ -215,18 +227,18 @@ RSpec.describe Prog::DownloadBootImage do
     end
   end
 
-  describe "#default_boot_image_version" do
+  describe ".default_boot_image_version" do
     it "returns the version for the default image" do
-      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
+      expect(described_class.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
     end
 
     it "escapes the image name" do
       expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
-      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
+      expect(described_class.default_boot_image_version("kubernetes-v1_32")).to eq("version")
     end
 
     it "fails for unknown images" do
-      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
+      expect { described_class.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
   end
 end

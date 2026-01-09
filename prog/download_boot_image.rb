@@ -6,27 +6,28 @@ require "aws-sdk-s3"
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
 
+  def self.assemble(vm_host, name, version: default_boot_image_version(name), custom_url: nil, download_r2: true)
+    BootImage.create(vm_host_id: vm_host.id, name:, version:, size_gib: 0)
+
+    Strand.create(
+      prog: "DownloadBootImage",
+      label: "start",
+      stack: [{
+        "subject_id" => vm_host.id,
+        "image_name" => name,
+        "version" => version,
+        "custom_url" => custom_url,
+        "download_r2" => download_r2
+      }.compact]
+    )
+  end
+
   label def start
     register_deadline(nil, 24 * 60 * 60)
-
-    unless version
-      @version = default_boot_image_version(image_name)
-      update_stack("version" => version)
-    end
-    pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
-
-    BootImage.create(
-      vm_host_id: vm_host.id,
-      name: image_name,
-      version:,
-      activated_at: nil,
-      size_gib: 0
-    )
     hop_download
   end
 
   label def download
-    daemon_name = "download_#{image_name}_#{version}"
     case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
@@ -43,8 +44,8 @@ class Prog::DownloadBootImage < Prog::Base
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
         update_stack({"restarted" => restarted + 1})
       else
-        vm_host.boot_images_dataset.where(name: image_name, version:).destroy
-        Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
+        Clog.emit("Failed to download boot image. Use incr_destroy to cleanup.", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
+        nap 60 * 60
       end
     end
 
@@ -52,23 +53,25 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def update_available_storage_space
-    image = BootImage[vm_host_id: vm_host.id, name: image_name, version:]
-    image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
-    image_size_gib = (image_size_bytes / 1024.0**3).ceil
-    StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
-      available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
+    image = boot_image_ds.first
+    size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
+    size_gib = (size_bytes / 1024.0**3).ceil
+    vm_host.storage_devices_dataset.where(name: "DEFAULT").update(
+      available_storage_gib: Sequel[:available_storage_gib] - size_gib
     )
-    image.update(size_gib: image_size_gib)
+    image.update(size_gib:)
     hop_activate_boot_image
   end
 
   label def activate_boot_image
-    BootImage.where(
-      vm_host_id: vm_host.id,
-      name: image_name,
-      version:
-    ).update(activated_at: Time.now)
+    boot_image_ds.update(activated_at: Time.now)
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
+  end
+
+  label def destroy
+    sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+    boot_image_ds.destroy
+    pop "image download cancelled"
   end
 
   BOOT_IMAGE_SHA256 = {
@@ -139,7 +142,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def version
-    @version ||= frame["version"]
+    @version ||= frame.fetch("version")
   end
 
   def url
@@ -181,13 +184,21 @@ class Prog::DownloadBootImage < Prog::Base
       end
   end
 
+  def boot_image_ds
+    vm_host.boot_images_dataset.where(name: image_name, version:)
+  end
+
+  def daemon_name
+    "download_#{image_name}_#{version}"
+  end
+
   def sha256sum
     # YYY: In future all images should be checked for sha256 sum, so the nil
     # default will be removed.
     BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
   end
 
-  def default_boot_image_version(image_name)
+  def self.default_boot_image_version(image_name)
     config_name = image_name.tr("-", "_") + "_version"
     fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
 
