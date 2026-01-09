@@ -251,7 +251,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect {
         described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
-      }.to raise_error NoMethodError, "undefined method 'aws_ami_id' for nil"
+      }.to raise_error RuntimeError, "No AMI found for PostgreSQL 16 (x64) in eu-central-1"
     end
   end
 
