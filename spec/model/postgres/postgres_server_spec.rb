@@ -231,6 +231,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target).to be_nil
     end
 
+    it "returns nil if no lsn_monitor for async replication" do
+      resource.update(ha_type: PostgresResource::HaType::ASYNC)
+      expect(postgres_server.failover_target).to be_nil
+    end
+
     it "returns nil if lsn difference is too hign for async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
       expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "2/0")).twice
