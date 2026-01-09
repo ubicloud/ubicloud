@@ -14,9 +14,7 @@ class BootImage < Sequel::Model
   end
 
   def path
-    version ?
-        "/var/storage/images/#{name}-#{version}.raw" :
-        "/var/storage/images/#{name}.raw"
+    "/var/storage/images/#{name}-#{version}.raw"
   end
 end
 
