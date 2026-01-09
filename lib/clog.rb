@@ -6,7 +6,12 @@ require "sequel/model"
 class Clog
   MUTEX = Mutex.new
 
-  def self.emit(message, metadata = block_given? ? yield : {})
+  def self.emit(message, metadata = {})
+    # :nocov:
+    # Cannot use spec passing block to cover this, or Ruby produces a warning
+    raise "Clog.emit no longer takes a block" if block_given?
+    # :nocov:
+
     out = case metadata
     when Hash
       metadata
