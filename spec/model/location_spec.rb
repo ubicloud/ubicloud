@@ -55,4 +55,10 @@ RSpec.describe Location do
     expect(p1_loc.azs).to eq([LocationAwsAz[location_id: p1_loc.id, az: "a", zone_id: "123"], LocationAwsAz[location_id: p1_loc.id, az: "b", zone_id: "456"]])
     expect(LocationAwsAz.count).to eq(2)
   end
+
+  it "raises descriptive error when AMI not found" do
+    expect {
+      p2_loc.pg_ami("16", "x64")
+    }.to raise_error("No AMI found for PostgreSQL 16 (x64) in l2")
+  end
 end

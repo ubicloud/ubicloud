@@ -5,7 +5,9 @@ class Location < Sequel::Model
 
   module Aws
     def pg_ami(pg_version, arch)
-      PgAwsAmi.find(aws_location_name: name, pg_version:, arch:).aws_ami_id
+      ami = PgAwsAmi.find(aws_location_name: name, pg_version:, arch:)
+      raise "No AMI found for PostgreSQL #{pg_version} (#{arch}) in #{name}" unless ami
+      ami.aws_ami_id
     end
 
     private
