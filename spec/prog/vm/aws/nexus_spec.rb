@@ -490,8 +490,8 @@ usermod -L ubuntu
 
       it "logs retry count in emission" do
         refresh_frame(nx, new_values: {"retry_count" => 3})
-        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_wrap_original do |m, a, &b|
-          expect(b.call).to eq(unsupported_instance_type: {
+        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b).to eq(unsupported_instance_type: {
             vm:,
             message: "Instance type not supported in availability zone",
             retry_count: 4
@@ -604,7 +604,7 @@ usermod -L ubuntu
     before do
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       vm.update(allocated_at: now - 100)
-      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_yield
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
     end
 
     it "not create billing records when the project is not billable" do
@@ -658,7 +658,7 @@ usermod -L ubuntu
   describe "#destroy" do
     it "prevents destroy if the semaphore set" do
       expect(nx).to receive(:when_prevent_destroy_set?).and_yield
-      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 

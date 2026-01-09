@@ -196,7 +196,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vm = create_hosted_vm(ps.project, ps, "vm1")
       create_hosted_vm(ps.project, ps, "vm2")
       vm.nic.update(vm_id: nil)
-      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Cannot destroy subnet with active nics, first clean up the attached resources", instance_of(PrivateSubnet)).and_call_original
 
       expect { nx.destroy }.to nap(5)
     end

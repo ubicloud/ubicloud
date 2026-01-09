@@ -67,10 +67,10 @@ RSpec.describe MonitorRunner do
   describe "#emit_metrics" do
     it "emits metrics" do
       q = Queue.new
-      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, a, &b|
+      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, a, b|
         if a == "monitor metrics"
-          m.call(a, &b)
-          q.push(b.call)
+          m.call(a, b)
+          q.push(b)
         end
       end
 

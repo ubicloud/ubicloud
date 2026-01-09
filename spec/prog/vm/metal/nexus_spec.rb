@@ -658,7 +658,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
-      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_yield
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
       allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("wait")
     end
@@ -669,7 +669,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
       expect(vm).to receive(:update).with(display_state: "running", provisioned_at: now).and_return(true)
-      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Hash)).and_yield
+      expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
       allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("wait")
     end
@@ -897,7 +897,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#destroy" do
     it "prevents destroy if the semaphore set" do
       vm.incr_prevent_destroy
-      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Destroy prevented by the semaphore").and_call_original
       expect { nx.destroy }.to hop("prevent_destroy")
     end
 
