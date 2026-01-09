@@ -10,4 +10,4 @@ end
 
 v = ARGV[0]
 
-PostgresLockout.new(v, Logger.new($stdout)).lockout
+PostgresLockout.new(v, Logger.new($stdout)).write_lockout_pg_hba
