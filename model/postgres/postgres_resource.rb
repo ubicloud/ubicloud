@@ -24,6 +24,8 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
   include ObjectTag::Cleanup
 
+  ServerExclusionFilters = Struct.new(:exclude_data_centers, :exclude_availability_zones, :availability_zone)
+
   def self.available_flavors(include_lantern: false)
     Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !include_lantern }
   end
@@ -106,6 +108,16 @@ class PostgresResource < Sequel::Model
 
   def version
     representative_server&.version || target_version
+  end
+
+  def provision_new_standby
+    timeline_id = read_replica? ? parent.timeline.id : timeline.id
+    Prog::Postgres::PostgresServerNexus.assemble(
+      resource_id: id,
+      timeline_id:,
+      timeline_access: "fetch",
+      **new_server_exclusion_filters.to_h
+    )
   end
 
   def target_standby_count

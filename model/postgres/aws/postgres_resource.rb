@@ -13,5 +13,20 @@ class PostgresResource < Sequel::Model
         .select { |server| PgAwsAmi.where(aws_ami_id: server.vm.boot_image).count > 0 }
         .max_by(&:created_at)
     end
+
+    def aws_new_server_exclusion_filters
+      exclude_availability_zones, availability_zone = if use_different_az_set?
+        subnet_azs = NicAwsResource
+          .join(:nic, id: :id)
+          .where(vm_id: servers_dataset.select(:vm_id))
+          .distinct
+          .select_map(:subnet_az)
+
+        [subnet_azs, nil]
+      else
+        [[], representative_server.vm.nic.nic_aws_resource.subnet_az]
+      end
+      ServerExclusionFilters.new(exclude_data_centers: [], exclude_availability_zones:, availability_zone:)
+    end
   end
 end

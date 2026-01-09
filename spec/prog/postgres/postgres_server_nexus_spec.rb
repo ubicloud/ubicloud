@@ -99,72 +99,76 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(pv.vm.vm_firewalls).to eq [pg.internal_firewall]
     end
 
-    it "picks correct base image for Lantern" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      expect(postgres_resource).to receive(:flavor).and_return(PostgresResource::Flavor::LANTERN).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).with(anything, hash_including(boot_image: "postgres16-lantern-ubuntu-2204")).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
-    end
+    describe "boot image selection" do
+      let(:postgres_project) { Project.create(name: "postgres-service") }
+      let(:aws_location) { Location.find(name: "us-west-2") }
+      let(:postgres_resource) {
+        pr = PostgresResource.create(project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 64, superuser_password: "dummy-password", target_version: "16")
+        Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: postgres_project.id)
+        pr
+      }
+      let(:postgres_timeline) { PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID) }
 
-    it "picks correct base image for AWS-pg16" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: user_project.id
-      )
-      expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:version).and_return("16").at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
-    end
+      before do
+        allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
+      end
 
-    it "picks correct base image for AWS-pg17" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: user_project.id
-      )
-      expect(postgres_resource).to receive(:version).and_return("17").at_least(:once)
-      expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:location_id).and_return(loc.id).at_least(:once)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_return(instance_double(Strand, id: "62c62ddb-5b5a-4e9e-b534-e73c16f86bcb", subject: instance_double(Vm, add_vm_firewall: nil)))
-      expect(PostgresServer).to receive(:create_with_id).and_return(instance_double(PostgresServer, id: "5c13fd6a-25c2-4fa4-be48-2846f127526a"))
-      described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
-    end
+      it "picks correct base image for Lantern" do
+        postgres_resource.update(flavor: PostgresResource::Flavor::LANTERN)
+        st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+        postgres_server = PostgresServer[st.id]
 
-    it "raises error if the version is not supported for AWS" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      loc = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: user_project.id
-      )
-      expect(postgres_resource).to receive(:location).and_return(loc).at_least(:once)
-      expect(postgres_resource).to receive(:version).and_return("19").at_least(:once)
-      expect {
-        described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
-      }.to raise_error NoMethodError, "undefined method 'aws_ami_id' for nil"
-    end
+        expect(postgres_server).not_to be_nil
+        expect(postgres_server.vm).not_to be_nil
+        expect(postgres_server.vm.boot_image).to eq("postgres16-lantern-ubuntu-2204")
+      end
 
-    it "errors out for unknown flavor" do
-      expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
-      expect(postgres_resource).to receive(:flavor).and_return("boring_flavor").at_least(:once)
-      expect {
-        described_class.assemble(resource_id: postgres_resource.id, timeline_id: "91588cda-7122-4d6a-b01c-f33c30cb17d8", timeline_access: "push", representative_at: Time.now)
-      }.to raise_error RuntimeError, "Unknown PostgreSQL flavor: boring_flavor"
+      it "picks correct base image for AWS-pg16" do
+        postgres_resource.update(location_id: aws_location.id)
+        postgres_timeline.update(location_id: aws_location.id)
+        st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+        postgres_server = PostgresServer[st.id]
+
+        expect(postgres_server).not_to be_nil
+        expect(postgres_server.vm).not_to be_nil
+        # Verify the AMI was retrieved (exact ID depends on database state)
+        expect(postgres_server.vm.boot_image).to start_with("ami-")
+      end
+
+      it "picks correct base image for AWS-pg17" do
+        postgres_resource.update(location_id: aws_location.id, target_version: "17", name: "pg-aws-17")
+        postgres_timeline.update(location_id: aws_location.id)
+        st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+        postgres_server = PostgresServer[st.id]
+
+        expect(postgres_server).not_to be_nil
+        expect(postgres_server.vm).not_to be_nil
+        # Verify the AMI was retrieved (exact ID depends on database state)
+        expect(postgres_server.vm.boot_image).to start_with("ami-")
+      end
+
+      it "raises error if the version is not supported for AWS" do
+        # Mock the resource to return an unsupported version
+        expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+        expect(postgres_resource).to receive(:location).and_return(aws_location).at_least(:once)
+        expect(postgres_resource).to receive(:version).and_return("99").at_least(:once)
+
+        postgres_timeline = PostgresTimeline.create(location_id: aws_location.id)
+
+        expect {
+          described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+        }.to raise_error NoMethodError, "undefined method 'aws_ami_id' for nil"
+      end
+
+      it "errors out for unknown flavor" do
+        # Mock the resource to return an unsupported flavor
+        expect(PostgresResource).to receive(:[]).and_return(postgres_resource)
+        expect(postgres_resource).to receive(:flavor).and_return("boring_flavor").at_least(:once)
+
+        expect {
+          described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+        }.to raise_error RuntimeError, "Unknown PostgreSQL flavor: boring_flavor"
+      end
     end
   end
 
@@ -855,34 +859,46 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#unavailable" do
     it "hops to wait if the server is available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_recycle)
       expect { nx.unavailable }.to hop("wait")
     end
 
     it "buds restart if the server is not available" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
+      expect(resource).to receive(:id).and_return("resource-id").at_least(:once)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(false)
+      expect(postgres_server).to receive(:incr_recycle)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
+    end
+
+    it "buds restart without incrementing recycle when recycle is already set" do
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
+      expect(postgres_server).to receive(:trigger_failover).and_return(false)
+      expect(nx).to receive(:available?).and_return(false)
+      expect(postgres_server).to receive(:recycle_set?).and_return(true)
+      expect(postgres_server).not_to receive(:incr_recycle)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
     end
 
     it "does not bud restart if there is already one restart going on" do
       Strand.create(parent_id: st.id, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(false)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do
-      postgres_resource = instance_double(PostgresResource, ongoing_failover?: false)
-      expect(postgres_server).to receive(:resource).and_return(postgres_resource)
+      expect(resource).to receive(:ongoing_failover?).and_return(false)
       expect(postgres_server).to receive(:trigger_failover).and_return(true)
       expect { nx.unavailable }.to nap(0)
     end
