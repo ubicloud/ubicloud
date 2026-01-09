@@ -35,92 +35,6 @@ RSpec.describe Prog::DownloadBootImage do
     end
   end
 
-  describe "#default_boot_image_version" do
-    it "returns the version for the default image" do
-      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
-    end
-
-    it "escapes the image name" do
-      expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
-      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
-    end
-
-    it "fails for unknown images" do
-      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
-    end
-  end
-
-  describe "#url" do
-    it "returns custom_url if it's provided" do
-      expect(dbi.url).to eq("https://example.com/my-image.raw")
-    end
-
-    it "returns presigned URL if custom_url is not provided" do
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
-      expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
-      expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
-    end
-
-    it "returns URL for x64 ubuntu-noble image" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20240523.1", "custom_url" => nil})
-      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-amd64.img")
-    end
-
-    it "returns URL for arm64 ubuntu-noble image" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20240523.1", "custom_url" => nil})
-      vm_host.arch = "arm64"
-      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-arm64.img")
-    end
-
-    it "returns URL for x64 ubuntu-jammy image" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-jammy", "version" => "20240319", "custom_url" => nil})
-      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-amd64.img")
-    end
-
-    it "returns URL for arm64 ubuntu-jammy image" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-jammy", "version" => "20240319", "custom_url" => nil})
-      vm_host.arch = "arm64"
-      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
-    end
-
-    it "returns URL for arm64 debian-12 image" do
-      refresh_frame(dbi, new_values: {"image_name" => "debian-12", "version" => "20241004-1890", "custom_url" => nil})
-      vm_host.arch = "arm64"
-      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-arm64-20241004-1890.raw")
-    end
-
-    it "returns URL for x64 debian-12 image" do
-      refresh_frame(dbi, new_values: {"image_name" => "debian-12", "version" => "20241004-1890", "custom_url" => nil})
-      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-amd64-20241004-1890.raw")
-    end
-
-    it "returns URL for x64 almalinux-9 image" do
-      refresh_frame(dbi, new_values: {"image_name" => "almalinux-9", "version" => "9.5-20241120", "custom_url" => nil})
-      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.5-20241120.x86_64.qcow2")
-    end
-
-    it "returns URL for arm64 almalinux-9 image" do
-      refresh_frame(dbi, new_values: {"image_name" => "almalinux-9", "version" => "9.5-20241120", "custom_url" => nil})
-      vm_host.update(arch: "arm64")
-
-      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.5-20241120.aarch64.qcow2")
-    end
-
-    it "returns URL for ai model image" do
-      refresh_frame(dbi, new_values: {"image_name" => "ai-model-test-model", "version" => "20240924.1.0", "custom_url" => nil})
-
-      mcl = instance_double(Minio::Client)
-      expect(Minio::Client).to receive(:new).and_return(mcl)
-      expect(mcl).to receive(:get_presigned_url).with("GET", Config.ubicloud_images_bucket_name, "ai-model-test-model-20240924.1.0.raw", 60 * 60).and_return("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
-      expect(dbi.url).to eq("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
-    end
-
-    it "fails if image name is unknown" do
-      refresh_frame(dbi, new_values: {"image_name" => "unknown", "version" => "20240924.1.0", "custom_url" => nil})
-      expect { dbi.url }.to raise_error RuntimeError, "Unknown image name: unknown"
-    end
-  end
-
   describe "#download" do
     it "starts to download image if it's not started yet" do
       params_json = {
@@ -227,6 +141,92 @@ RSpec.describe Prog::DownloadBootImage do
       expect(bi.activated_at).to be_nil
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
       expect(bi.reload.activated_at).to be <= Time.now
+    end
+  end
+
+  describe "#url" do
+    it "returns custom_url if it's provided" do
+      expect(dbi.url).to eq("https://example.com/my-image.raw")
+    end
+
+    it "returns presigned URL if custom_url is not provided" do
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
+      expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
+      expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
+    end
+
+    it "returns URL for x64 ubuntu-noble image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20240523.1", "custom_url" => nil})
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-amd64.img")
+    end
+
+    it "returns URL for arm64 ubuntu-noble image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20240523.1", "custom_url" => nil})
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/noble/release-20240523.1/ubuntu-24.04-server-cloudimg-arm64.img")
+    end
+
+    it "returns URL for x64 ubuntu-jammy image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-jammy", "version" => "20240319", "custom_url" => nil})
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-amd64.img")
+    end
+
+    it "returns URL for arm64 ubuntu-jammy image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-jammy", "version" => "20240319", "custom_url" => nil})
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud-images.ubuntu.com/releases/jammy/release-20240319/ubuntu-22.04-server-cloudimg-arm64.img")
+    end
+
+    it "returns URL for arm64 debian-12 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "debian-12", "version" => "20241004-1890", "custom_url" => nil})
+      vm_host.arch = "arm64"
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-arm64-20241004-1890.raw")
+    end
+
+    it "returns URL for x64 debian-12 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "debian-12", "version" => "20241004-1890", "custom_url" => nil})
+      expect(dbi.url).to eq("https://cloud.debian.org/images/cloud/bookworm/20241004-1890/debian-12-genericcloud-amd64-20241004-1890.raw")
+    end
+
+    it "returns URL for x64 almalinux-9 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "almalinux-9", "version" => "9.5-20241120", "custom_url" => nil})
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/x86_64/images/AlmaLinux-9-GenericCloud-9.5-20241120.x86_64.qcow2")
+    end
+
+    it "returns URL for arm64 almalinux-9 image" do
+      refresh_frame(dbi, new_values: {"image_name" => "almalinux-9", "version" => "9.5-20241120", "custom_url" => nil})
+      vm_host.update(arch: "arm64")
+
+      expect(dbi.url).to eq("https://repo.almalinux.org/almalinux/9/cloud/aarch64/images/AlmaLinux-9-GenericCloud-9.5-20241120.aarch64.qcow2")
+    end
+
+    it "returns URL for ai model image" do
+      refresh_frame(dbi, new_values: {"image_name" => "ai-model-test-model", "version" => "20240924.1.0", "custom_url" => nil})
+
+      mcl = instance_double(Minio::Client)
+      expect(Minio::Client).to receive(:new).and_return(mcl)
+      expect(mcl).to receive(:get_presigned_url).with("GET", Config.ubicloud_images_bucket_name, "ai-model-test-model-20240924.1.0.raw", 60 * 60).and_return("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
+      expect(dbi.url).to eq("https://minio.example.com/ubicloud-image/ai-model-test-model-20240924.1.0.raw")
+    end
+
+    it "fails if image name is unknown" do
+      refresh_frame(dbi, new_values: {"image_name" => "unknown", "version" => "20240924.1.0", "custom_url" => nil})
+      expect { dbi.url }.to raise_error RuntimeError, "Unknown image name: unknown"
+    end
+  end
+
+  describe "#default_boot_image_version" do
+    it "returns the version for the default image" do
+      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
+    end
+
+    it "escapes the image name" do
+      expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
+      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
+    end
+
+    it "fails for unknown images" do
+      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
   end
 end
