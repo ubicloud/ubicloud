@@ -227,6 +227,25 @@ RSpec.describe Prog::DownloadBootImage do
     end
   end
 
+  describe ".sha256sum" do
+    it "returns sha256sum" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => Config.ubuntu_noble_version})
+      expect(dbi.sha256sum).not_to be_nil
+    end
+
+    it "allows nil sha256sum in non-production" do
+      expect(Config).to receive(:production?).and_return(false)
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20250101"})
+      expect(dbi.sha256sum).to be_nil
+    end
+
+    it "fails nil sha256sum in production" do
+      expect(Config).to receive(:production?).and_return(true)
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => "20250101"})
+      expect { dbi.sha256sum }.to raise_error RuntimeError, "Downloading a boot image without sha256 is not allowed in production"
+    end
+  end
+
   describe ".default_boot_image_version" do
     it "returns the version for the default image" do
       expect(described_class.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
