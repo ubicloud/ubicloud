@@ -18,8 +18,8 @@ RSpec.describe Prog::LogVmHostUtilizations do
         create_vm_host(location_id: Location[name: location].id, arch:, family:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:)
       end
 
-      expect(Clog).to receive(:emit).with("location utilization", instance_of(Hash)) do |&blk|
-        dat = blk.call[:location_utilization]
+      expect(Clog).to receive(:emit).with("location utilization", instance_of(Hash)) do |_, b|
+        dat = b[:location_utilization]
         if dat[:location_id] == Location::HETZNER_FSN1_ID && dat[:arch] == "x64" && dat[:family] == "standard" && dat[:allocation_state] == "accepting"
           expect(dat[:core_utilization]).to eq(30.0)
           expect(dat[:hugepage_utilization]).to eq(25.0)
@@ -30,8 +30,8 @@ RSpec.describe Prog::LogVmHostUtilizations do
         end
       end.exactly(5)
 
-      expect(Clog).to receive(:emit).with("arch utilization", instance_of(Hash)) do |&blk|
-        dat = blk.call[:arch_utilization]
+      expect(Clog).to receive(:emit).with("arch utilization", instance_of(Hash)) do |_, b|
+        dat = b[:arch_utilization]
         if dat[:arch] == "x64" && dat[:family] == "standard"
           expect(dat[:core_utilization]).to eq(25)
           expect(dat[:hugepage_utilization]).to eq(22.22)

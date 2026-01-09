@@ -94,7 +94,7 @@ RSpec.describe Prog::Test::HetznerServer do
     it "puts the image sizes if the vm host is downloading images" do
       expect(vm_host.strand).to receive(:label).and_return("wait_download_boot_images").at_least(:once)
       expect(vm_host.sshable).to receive(:_cmd).and_return("image_1\nimage_2\n")
-      expect(Clog).to receive(:emit).with("image_1\timage_2", instance_of(Hash))
+      expect(Clog).to receive(:emit).with("image_1\timage_2")
       expect { hs_test.wait_setup_host }.to nap(15)
     end
 

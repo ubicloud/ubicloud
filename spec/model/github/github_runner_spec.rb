@@ -13,9 +13,9 @@ RSpec.describe GithubRunner do
   def clog_emit_hash
     hash = nil
     message = "runner_tested"
-    expect(Clog).to(receive(:emit).with(message).and_wrap_original do |original_method, *args, &block|
-      hash = block.call
-      original_method.call(*args, &block)
+    expect(Clog).to(receive(:emit).with(message, instance_of(Hash)).and_wrap_original do |original_method, *args, b|
+      hash = b
+      original_method.call(*args, hash)
     end)
     github_runner.log_duration(message, 10)
     hash[message]

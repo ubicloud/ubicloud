@@ -16,6 +16,11 @@ RSpec.describe Clog do
     end.join
   end
 
+  it "allows passing metadata in block block" do
+    expect($stdout).to receive(:write).with('{"foo":1,"message":"hello","time":"' + now.to_s + '"}' + "\n")
+    described_class.emit("hello") { {foo: 1} }
+  end
+
   it "doesn't include a thread name if it is not set" do
     expect($stdout).to receive(:write).with('{"message":"hello","time":"' + now.to_s + '"}' + "\n")
     described_class.emit "hello"

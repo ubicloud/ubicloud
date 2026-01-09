@@ -88,7 +88,7 @@ RSpec.describe Invoice do
   describe ".charge" do
     it "not charge if Stripe not enabled" do
       allow(Config).to receive(:stripe_secret_key).and_return(nil)
-      expect(Clog).to receive(:emit).with("Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.").and_call_original
       expect(invoice.charge).to be true
     end
 

@@ -61,7 +61,7 @@ RSpec.describe MetricsTargetMethods do
         stub_scrape_ssh_expectations
         expect(mock_tsdb_client).not_to receive(:import_prometheus)
         expect(mock_ssh_session).not_to receive(:_exec!).with(/xargs.*rm/)
-        expect(Clog).to receive(:emit).with("VictoriaMetrics server is not configured.", instance_of(Hash))
+        expect(Clog).to receive(:emit).with("VictoriaMetrics server is not configured.")
         test_instance.export_metrics(session:, tsdb_client: nil)
       end
 

@@ -99,7 +99,7 @@ RSpec.describe Strand do
     st.save_changes
     expect(Time).to receive(:now).and_return(now - 10)
     expect(Time).to receive(:now).and_return(now).at_least(:once)
-    expect(Clog).to receive(:emit).with("finished strand", instance_of(Hash)).and_call_original
+    expect(Clog).to receive(:emit).with("finished strand", instance_of(Array)).and_call_original
     st.unsynchronized_run
   end
 end
