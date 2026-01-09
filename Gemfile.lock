@@ -72,7 +72,7 @@ GEM
     bcrypt_pbkdf (1.1.1-x86_64-darwin)
     bigdecimal (3.3.1)
     bindata (2.5.1)
-    brakeman (7.1.1)
+    brakeman (7.1.2)
       racc
     by (1.1.0)
     byebug (12.0.0)
