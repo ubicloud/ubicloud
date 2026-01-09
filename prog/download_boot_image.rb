@@ -195,9 +195,9 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def sha256sum
-    # YYY: In future all images should be checked for sha256 sum, so the nil
-    # default will be removed.
-    BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
+    BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version]) do
+      fail "Downloading boot image without sha256 not allowed in production" if Config.production?
+    end
   end
 
   def self.default_boot_image_version(image_name)
