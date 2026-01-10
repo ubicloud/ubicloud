@@ -75,20 +75,8 @@ usermod -L ubuntu
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      nx.incr_destroy
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already destroying" do
-      nx.incr_destroy
-      nx.incr_destroying
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "stops billing before hops to destroy" do
-      nx.incr_destroy
+  describe "#before_destroy" do
+    it "stops billing records" do
       br = BillingRecord.create(
         project_id: vm.project.id,
         resource_id: vm.id,
@@ -99,7 +87,7 @@ usermod -L ubuntu
 
       expect(vm).to receive(:active_billing_records).and_return([br])
       expect(br).to receive(:finalize)
-      expect { nx.before_run }.to hop("destroy")
+      nx.before_destroy
     end
   end
 

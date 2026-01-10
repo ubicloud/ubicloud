@@ -60,13 +60,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      unless destroying_set?
-        kubernetes_cluster.active_billing_records.each(&:finalize)
-        hop_destroy
-      end
-    end
+  def before_destroy
+    kubernetes_cluster.active_billing_records.each(&:finalize)
   end
 
   def billing_rate_for(type, family)

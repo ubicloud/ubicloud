@@ -30,15 +30,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     strand.save_changes
   end
 
-  def before_run
-    when_destroy_set? do
-      unless destroying_set?
-        vm.active_billing_records.each(&:finalize)
-        vm.assigned_vm_address&.active_billing_record&.finalize
-        register_deadline(nil, 5 * 60)
-        hop_destroy
-      end
-    end
+  def before_destroy
+    register_deadline(nil, 5 * 60)
+    vm.active_billing_records.each(&:finalize)
+    vm.assigned_vm_address&.active_billing_record&.finalize
   end
 
   label def start

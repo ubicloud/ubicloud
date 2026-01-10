@@ -277,18 +277,11 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      nx.incr_destroy
+  describe "#before_destroy" do
+    it "finalizes billing records and register deadline" do
       expect(nx).to receive(:register_deadline)
       expect(nx).to receive(:update_billing_record)
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already destroying" do
-      nx.incr_destroy
-      nx.incr_destroying
-      expect { nx.before_run }.not_to hop("destroy")
+      nx.before_destroy
     end
   end
 

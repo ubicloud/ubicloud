@@ -164,14 +164,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
   end
 
-  def before_run
-    when_destroy_set? do
-      unless destroying_set?
-        register_deadline(nil, 15 * 60)
-        update_billing_record
-        hop_destroy
-      end
-    end
+  def before_destroy
+    register_deadline(nil, 15 * 60)
+    update_billing_record
   end
 
   label def start

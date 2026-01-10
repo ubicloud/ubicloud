@@ -79,7 +79,10 @@ end
     if defined?(hop_destroy)
       unless destroying_set?
         fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
-        hop_destroy if destroy_set?
+        if destroy_set?
+          send(:before_destroy) if respond_to?(:before_destroy)
+          hop_destroy
+        end
       end
     end
   end

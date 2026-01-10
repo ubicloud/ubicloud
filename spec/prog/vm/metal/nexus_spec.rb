@@ -719,19 +719,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      nx.incr_destroy
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already destroying" do
-      nx.incr_destroy
-      nx.incr_destroying
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "stops billing before hops to destroy" do
+  describe "#before_destroy" do
+    it "stops billing" do
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
 
@@ -751,27 +740,23 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         amount: 1
       )
 
-      nx.incr_destroy
       vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
       expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
-      expect { nx.before_run }.to hop("destroy")
+      nx.before_destroy
     end
 
-    it "hops to destroy if billing record is not found" do
-      nx.incr_destroy
+    it "skips stopping billing record if not found" do
       expect(vm.active_billing_records).to be_empty
       expect(vm.assigned_vm_address).to be_nil
-      expect { nx.before_run }.to hop("destroy")
+      nx.before_destroy
     end
 
-    it "hops to destroy if billing record is not found for ipv4" do
-      nx.incr_destroy
+    it "skips stopping billing record if not found for ipv4" do
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(vm.assigned_vm_address).not_to be_nil
       expect(vm.assigned_vm_address.active_billing_record).to be_nil
-
-      expect { nx.before_run }.to hop("destroy")
+      nx.before_destroy
     end
   end
 

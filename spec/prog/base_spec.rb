@@ -361,7 +361,7 @@ RSpec.describe Prog::Base do
     end
 
     it "can create pages for progs that are not on the top of the stack" do
-      st = Strand.create(prog: "Test::Test2", label: "pusher1")
+      st = Strand.create(prog: "Test2", label: "pusher1")
       st.stack.first["deadline_target"] = "t1"
       st.stack.first["deadline_at"] = Time.now + 1
       st.unsynchronized_run
@@ -374,7 +374,7 @@ RSpec.describe Prog::Base do
       }.to change { Page.active.count }.from(0).to(2)
 
       expect(Page.all.map(&:summary)).to include(
-        "#{st.ubid} has an expired deadline! Test::Test2.pusher2 did not reach t1 on time",
+        "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
         "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time"
       )
     end
@@ -442,6 +442,17 @@ RSpec.describe Prog::Base do
 
       expect { st.unsynchronized_run }
         .to change(st, :label).from("napper").to("destroy")
+      expect { st.unsynchronized_run }
+        .to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+    end
+
+    it "hops to destroy if destroy semaphore incremented and run before_destroy" do
+      st.update(prog: "Test2", label: "pusher1")
+      Semaphore.incr(st.id, :destroy)
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("before destroy called")
+      expect { st.unsynchronized_run }.to change(st, :label).from("pusher1").to("destroy")
+      expect { st.unsynchronized_run }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
     end
 
     it "does not hop to destroy if destroy semaphore not incremented" do

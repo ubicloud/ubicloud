@@ -146,20 +146,13 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy" do
+  describe "#before_destroy" do
+    it "finalizes billing records" do
       expect { nx.update_billing_records }.to hop("wait")
       kubernetes_cluster.reload
-      expect(nx).to receive(:when_destroy_set?).and_yield
       expect(kubernetes_cluster.active_billing_records).not_to be_empty
       expect(kubernetes_cluster.active_billing_records).to all(receive(:finalize))
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already destroying" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx).to receive(:destroying_set?).and_return(true)
-      expect { nx.before_run }.not_to hop("destroy")
+      nx.before_destroy
     end
   end
 

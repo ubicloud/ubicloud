@@ -3,14 +3,9 @@
 class Prog::Vm::Aws::Nexus < Prog::Base
   subject_is :vm, :aws_instance
 
-  def before_run
-    when_destroy_set? do
-      unless destroying_set?
-        vm.active_billing_records.each(&:finalize)
-        register_deadline(nil, 5 * 60)
-        hop_destroy
-      end
-    end
+  def before_destroy
+    register_deadline(nil, 5 * 60)
+    vm.active_billing_records.each(&:finalize)
   end
 
   label def start
