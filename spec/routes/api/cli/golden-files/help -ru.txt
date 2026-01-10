@@ -75,7 +75,7 @@ ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
 ubi pg (location/pg-name | pg-id) rename new-name
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
-ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
+ubi pg (location/pg-name | pg-id) restore new-db-name restore-time [options]
 ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
 ubi pg (location/pg-name | pg-id) show-config
 ubi pg (location/pg-name | pg-id) show-pgbouncer-config
