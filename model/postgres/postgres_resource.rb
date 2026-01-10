@@ -97,11 +97,12 @@ class PostgresResource < Sequel::Model
       sslrootcert: "/etc/ssl/certs/ca.crt",
       sslcert: "/etc/ssl/certs/server.crt",
       sslkey: "/etc/ssl/certs/server.key",
-      sslmode: "verify-full",
+      sslmode: dns_zone ? "verify-full" : "require",
+      dbname: "postgres",
       application_name:
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
-    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server&.vm&.ip4_string, path: "/replication", query: query_parameters).to_s
   end
 
   def version
