@@ -468,9 +468,10 @@ end
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
 #  vm_host_net6_key | UNIQUE btree (net6)
 # Check constraints:
-#  core_allocation_limit      | (used_cores <= total_cores)
-#  hugepages_allocation_limit | (used_hugepages_1g <= total_hugepages_1g)
-#  used_cores_above_zero      | (used_cores >= 0)
+#  core_allocation_limit       | (used_cores <= total_cores)
+#  hugepages_allocation_limit  | (used_hugepages_1g <= total_hugepages_1g)
+#  used_cores_above_zero       | (used_cores >= 0)
+#  used_hugepages_non_negative | (used_hugepages_1g >= 0)
 # Foreign key constraints:
 #  vm_host_id_fkey          | (id) REFERENCES sshable(id)
 #  vm_host_location_id_fkey | (location_id) REFERENCES location(id)
