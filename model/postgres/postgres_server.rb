@@ -191,7 +191,7 @@ class PostgresServer < Sequel::Model
     return nil if target.nil?
 
     if resource.ha_type == PostgresResource::HaType::ASYNC
-      return nil if lsn_monitor.last_known_lsn.nil?
+      return nil if lsn_monitor&.last_known_lsn.nil?
       return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
