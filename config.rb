@@ -80,6 +80,7 @@ module Config
   override :smtp_tls, true, bool
 
   override :base_url, "http://localhost:9292", string
+  override :csp_connect_src, "[]", array(string)
   override :database_timeout, 10, int
   override :db_pool, 5, int
   override :db_pool_monitor, Config.db_pool, int
