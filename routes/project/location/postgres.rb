@@ -22,81 +22,79 @@ class Clover
       @pg = pg = @project.postgres_resources_dataset.first(filter)
       check_found_object(pg)
 
-      r.is do
-        r.get do
-          authorize("Postgres:view", pg)
+      r.get true do
+        authorize("Postgres:view", pg)
 
-          if api?
-            response.headers["cache-control"] = "no-store"
-            Serializers::Postgres.serialize(pg, {detailed: true})
-          else
-            r.redirect pg, "/overview"
+        if api?
+          response.headers["cache-control"] = "no-store"
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          r.redirect pg, "/overview"
+        end
+      end
+
+      r.delete true do
+        authorize("Postgres:delete", pg)
+        DB.transaction do
+          pg.incr_destroy
+          audit_log(pg, "destroy")
+        end
+        204
+      end
+
+      r.patch true do
+        authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "resize" }
+
+        size = typecast_params.nonempty_str("size", pg.target_vm_size)
+        target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
+        ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
+        tags = typecast_params.array(:Hash, "tags", pg.tags)
+
+        postgres_params = {
+          "flavor" => pg.flavor,
+          "location" => pg.location,
+          "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
+          "size" => size,
+          "storage_size" => target_storage_size_gib,
+          "ha_type" => ha_type,
+          "version" => pg.version
+        }
+
+        validate_postgres_input(pg.name, postgres_params)
+
+        if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
+          begin
+            current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
+          rescue
+            fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
+          end
+
+          if target_storage_size_gib * 0.8 < current_disk_usage
+            fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
           end
         end
 
-        r.delete do
-          authorize("Postgres:delete", pg)
-          DB.transaction do
-            pg.incr_destroy
-            audit_log(pg, "destroy")
-          end
-          204
+        current_parsed_size = Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size]
+        current_postgres_vcpu_count = pg.target_server_count * current_parsed_size.vcpu_count
+
+        requested_parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
+        requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
+        requested_postgres_vcpu_count = (requested_standby_count + 1) * requested_parsed_size.vcpu_count
+
+        Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
+
+        DB.transaction do
+          pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
+          pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
+          audit_log(pg, "update")
         end
 
-        r.patch do
-          authorize("Postgres:edit", pg)
-
-          size = typecast_params.nonempty_str("size", pg.target_vm_size)
-          target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
-          ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
-          tags = typecast_params.array(:Hash, "tags", pg.tags)
-
-          postgres_params = {
-            "flavor" => pg.flavor,
-            "location" => pg.location,
-            "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
-            "size" => size,
-            "storage_size" => target_storage_size_gib,
-            "ha_type" => ha_type,
-            "version" => pg.version
-          }
-
-          validate_postgres_input(pg.name, postgres_params)
-
-          if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
-            begin
-              current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
-            rescue
-              fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
-            end
-
-            if target_storage_size_gib * 0.8 < current_disk_usage
-              fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
-            end
-          end
-
-          current_parsed_size = Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size]
-          current_postgres_vcpu_count = pg.target_server_count * current_parsed_size.vcpu_count
-
-          requested_parsed_size = Option::POSTGRES_SIZE_OPTIONS[postgres_params["size"]]
-          requested_standby_count = Option::POSTGRES_HA_OPTIONS[postgres_params["ha_type"]].standby_count
-          requested_postgres_vcpu_count = (requested_standby_count + 1) * requested_parsed_size.vcpu_count
-
-          Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count - current_postgres_vcpu_count)
-
-          DB.transaction do
-            pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
-            pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
-            audit_log(pg, "update")
-          end
-
-          if api?
-            Serializers::Postgres.serialize(pg, {detailed: true})
-          else
-            flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
-            response["location"] = "#{@project.path}#{pg.path}"
-            200
-          end
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "'#{pg.name}' will be updated according to requested configuration"
+          r.redirect path(@pg)
         end
       end
 
