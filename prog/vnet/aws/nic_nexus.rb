@@ -123,7 +123,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   label def attach_eip_network_interface
     eip_response = client.describe_addresses({filters: [{name: "allocation-id", values: [nic.nic_aws_resource.eip_allocation_id]}]})
-    unless eip_response.addresses.first.network_interface_id
+    unless eip_response.addresses.first&.network_interface_id
       client.associate_address({allocation_id: nic.nic_aws_resource.eip_allocation_id, network_interface_id: nic.nic_aws_resource.network_interface_id})
     end
     hop_wait
