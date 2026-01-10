@@ -178,7 +178,7 @@ xcode-select --install
 brew install openssl@3 readline libyaml gmp autoconf
 
 # Postgres
-brew install gcc readline zlib curl ossp-uuid icu4c pkg-config
+brew install gcc readline zlib curl ossp-uuid icu4c pkg-config bison flex
 ```
 
 Debian/Ubuntu based:
@@ -188,7 +188,7 @@ Debian/Ubuntu based:
 apt-get install autoconf patch build-essential rustc libssl-dev libyaml-dev libreadline6-dev zlib1g-dev libgmp-dev libncurses5-dev libffi-dev libgdbm6 libgdbm-dev libdb-dev uuid-dev
 
 # Postgres
-apt-get install build-essential libssl-dev libreadline-dev zlib1g-dev libcurl4-openssl-dev uuid-dev icu-devtools libicu-dev
+apt-get install build-essential libssl-dev libreadline-dev zlib1g-dev libcurl4-openssl-dev uuid-dev icu-devtools libicu-dev pkg-config
 ```
 
 ### `mise install`
