@@ -12,6 +12,8 @@ UbiCli.on("pg").run_on("create-read-replica") do
   run do |name, opts, cmd|
     params = underscore_keys(opts[:pg_create_read_replica])
     pg_tags_to_hash(params, cmd)
+    params_to_hash(params, :pg_config, "config", cmd)
+    params_to_hash(params, :pgbouncer_config, "pgbouncer config", cmd)
     id = sdk_object.create_read_replica(name, **params).id
     response("Read replica for PostgreSQL database created with id: #{id}")
   end

@@ -108,8 +108,8 @@ module Ubicloud
     end
 
     # Create a read replica of this database, with the given name.
-    def create_read_replica(name, tags: [])
-      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:, tags:))
+    def create_read_replica(name, **params)
+      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:, **params))
     end
 
     # Promote this database from a read replica to a primary.
@@ -136,8 +136,8 @@ module Ubicloud
     # Schedule a restore of the database at the given restore_target time, to a new
     # database with the given name.  Returns a Postgres instance for the restored
     # database.
-    def restore(name:, restore_target:)
-      Postgres.new(adapter, adapter.post(_path("/restore"), name:, restore_target:))
+    def restore(**params)
+      Postgres.new(adapter, adapter.post(_path("/restore"), **params))
     end
 
     # Schedule a major version upgrade of the database.

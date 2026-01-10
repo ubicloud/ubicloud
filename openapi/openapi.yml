@@ -1361,6 +1361,18 @@ paths:
                 name:
                   description: Name for the read replica
                   type: string
+                pg_config:
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                pgbouncer_config:
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
                 tags:
                   description: Tags for the read replica
                   type: array
@@ -1465,6 +1477,23 @@ paths:
                   type: string
                 restore_target:
                   type: string
+                pg_config:
+                  type: object
+                  example:
+                    max_connections: '100'
+                  additionalProperties:
+                    type: string
+                pgbouncer_config:
+                  type: object
+                  example:
+                    max_client_conn: '100'
+                  additionalProperties:
+                    type: string
+                tags:
+                  description: Tags for the Postgres Database
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PostgresTag'
               additionalProperties: false
               required:
                 - name
