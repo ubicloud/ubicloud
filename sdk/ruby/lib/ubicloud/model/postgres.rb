@@ -8,11 +8,15 @@ module Ubicloud
 
     set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
 
-    set_create_param_defaults do |params|
-      params[:size] ||= "standard-2"
+    def self._convert_tags_in_params_from_hash_to_array(params)
       if params[:tags]
         params[:tags] = params[:tags].map { |key, value| {key:, value:} }
       end
+    end
+
+    set_create_param_defaults do |params|
+      params[:size] ||= "standard-2"
+      Postgres._convert_tags_in_params_from_hash_to_array(params)
     end
 
     alias_method :_tags, :tags
@@ -108,8 +112,9 @@ module Ubicloud
     end
 
     # Create a read replica of this database, with the given name.
-    def create_read_replica(name, tags: [])
-      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:, tags:))
+    def create_read_replica(name, **params)
+      Postgres._convert_tags_in_params_from_hash_to_array(params)
+      Postgres.new(adapter, adapter.post(_path("/read-replica"), name:, **params))
     end
 
     # Promote this database from a read replica to a primary.
@@ -136,8 +141,9 @@ module Ubicloud
     # Schedule a restore of the database at the given restore_target time, to a new
     # database with the given name.  Returns a Postgres instance for the restored
     # database.
-    def restore(name:, restore_target:)
-      Postgres.new(adapter, adapter.post(_path("/restore"), name:, restore_target:))
+    def restore(name:, restore_target:, **params)
+      Postgres._convert_tags_in_params_from_hash_to_array(params)
+      Postgres.new(adapter, adapter.post(_path("/restore"), name:, restore_target:, **params))
     end
 
     # Schedule a major version upgrade of the database.

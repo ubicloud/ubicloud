@@ -335,6 +335,18 @@ RSpec.describe Clover, "postgres" do
         expect(created_replica.tags).to eq(tags)
       end
 
+      it "read-replica rejects invalid config values" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-invalid-config",
+          pg_config: {"wal_level" => "invalid"}
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
+      end
+
       it "fails read-replica creation if the parent is not ready" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
@@ -445,6 +457,16 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: restore_target")
+      end
+
+      it "rejects restoring with invalid config" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg-invalid-config",
+          restore_target: Time.now.utc,
+          pg_config: {"wal_level" => "invalid"}
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
       end
 
       it "reset password" do

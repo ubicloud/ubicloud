@@ -239,6 +239,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
+        user_config = typecast_params.Hash("pg_config", {})
+        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
@@ -248,6 +250,8 @@ class Clover
           error_msg = "Parent server is not ready for read replicas. There are no backups, yet."
           fail CloverError.new(400, "InvalidRequest", error_msg)
         end
+
+        validate_postgres_config(pg.version, user_config, pgbouncer_user_config)
 
         replica = nil
         DB.transaction do
@@ -261,6 +265,8 @@ class Clover
             target_version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,
+            user_config:,
+            pgbouncer_user_config:,
             tags:,
             restore_target: nil
           ).subject
@@ -304,10 +310,15 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
+        user_config = typecast_params.Hash("pg_config", {})
+        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
+        tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
 
         Validation.validate_vcpu_quota(@project, "PostgresVCpu", Option::POSTGRES_SIZE_OPTIONS[pg.target_vm_size].vcpu_count)
+
+        validate_postgres_config(pg.version, user_config, pgbouncer_user_config)
 
         restored = nil
         DB.transaction do
@@ -320,6 +331,9 @@ class Clover
             target_version: pg.version,
             flavor: pg.flavor,
             parent_id: pg.id,
+            user_config:,
+            pgbouncer_user_config:,
+            tags:,
             restore_target:
           ).subject
           audit_log(pg, "restore", restored)
@@ -520,18 +534,7 @@ class Clover
             pgbouncer_config = typecast_params.Hash!("pgbouncer_config")
           end
 
-          pg_validator = Validation::PostgresConfigValidator.new(pg.version)
-          pg_errors = pg_validator.validation_errors(pg_config)
-
-          pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
-          pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_config)
-
-          if pg_errors.any? || pgbouncer_errors.any?
-            pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
-            pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
-            raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
-          end
-
+          validate_postgres_config(pg.version, pg_config, pgbouncer_config)
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
           pg.servers.each(&:incr_configure)

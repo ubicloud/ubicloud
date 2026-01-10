@@ -3,4 +3,9 @@
 Restore a PostgreSQL database backup to a new database
 
 Usage:
-    ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
+    ubi pg (location/pg-name | pg-id) restore [options] new-db-name restore-time
+
+Options:
+    -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
+    -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
