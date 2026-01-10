@@ -14,9 +14,7 @@ class BootImage < Sequel::Model
   end
 
   def path
-    version ?
-        "/var/storage/images/#{name}-#{version}.raw" :
-        "/var/storage/images/#{name}.raw"
+    "/var/storage/images/#{name}-#{version}.raw"
   end
 end
 
@@ -25,7 +23,7 @@ end
 #  id           | uuid                     | PRIMARY KEY
 #  vm_host_id   | uuid                     | NOT NULL
 #  name         | text                     | NOT NULL
-#  version      | text                     |
+#  version      | text                     | NOT NULL
 #  created_at   | timestamp with time zone | NOT NULL DEFAULT now()
 #  activated_at | timestamp with time zone |
 #  size_gib     | integer                  | NOT NULL
