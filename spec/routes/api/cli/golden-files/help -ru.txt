@@ -58,7 +58,7 @@ ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
 ubi pg (location/pg-name | pg-id) add-metric-destination username password url
 ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) ca-certificates
-ubi pg (location/pg-name | pg-id) create-read-replica name [options]
+ubi pg (location/pg-name | pg-id) create-read-replica [options] name
 ubi pg location/pg-name create [options]
 ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
 ubi pg (location/pg-name | pg-id) delete-metric-destination md-id
@@ -75,7 +75,7 @@ ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
 ubi pg (location/pg-name | pg-id) rename new-name
 ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
-ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
+ubi pg (location/pg-name | pg-id) restore [options] new-db-name restore-time
 ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
 ubi pg (location/pg-name | pg-id) show-config
 ubi pg (location/pg-name | pg-id) show-pgbouncer-config

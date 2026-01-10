@@ -32,17 +32,7 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
-    pg_validator = Validation::PostgresConfigValidator.new(version)
-    pg_errors = pg_validator.validation_errors(user_config)
-
-    pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
-    pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
-
-    if pg_errors.any? || pgbouncer_errors.any?
-      pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
-      pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
-      raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
-    end
+    validate_postgres_config(version, user_config, pgbouncer_user_config)
 
     pg = nil
     DB.transaction do
@@ -173,6 +163,20 @@ class Clover
 
   def postgres_locations
     Location.postgres_locations + @project.locations
+  end
+
+  def validate_postgres_config(version, user_config, pgbouncer_user_config)
+    pg_validator = Validation::PostgresConfigValidator.new(version)
+    pg_errors = pg_validator.validation_errors(user_config)
+
+    pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
+    pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
+
+    if pg_errors.any? || pgbouncer_errors.any?
+      pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
+      pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
+      raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
+    end
   end
 
   def validate_postgres_input(name, postgres_params)
