@@ -66,9 +66,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       frame["hostname"],
       provider_name: HostProvider::HETZNER_PROVIDER_NAME,
       server_identifier: frame["server_id"],
-      default_boot_images: frame["default_boot_images"],
-      spdk_version: nil,
-      vhost_block_backend_version: Config.vhost_block_backend_version
+      default_boot_images: frame["default_boot_images"]
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 
