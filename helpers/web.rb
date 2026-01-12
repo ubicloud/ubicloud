@@ -8,7 +8,8 @@ class Clover < Roda
   ).freeze
 
   PS_STATE_LABEL_COLOR = Hash.new("bg-yellow-100 text-yellow-80").merge!(
-    "available" => "bg-green-100 text-green-800"
+    "available" => "bg-green-100 text-green-800",
+    "deleting" => "bg-red-100 text-red-800"
   ).freeze
 
   KUBERNETES_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(

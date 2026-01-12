@@ -77,6 +77,7 @@ class PrivateSubnet < Sequel::Model
   end
 
   def display_state
+    return "deleting" if destroying_set? || destroy_set?
     (state == "waiting") ? "available" : state
   end
 

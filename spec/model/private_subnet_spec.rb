@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe PrivateSubnet do
   subject(:private_subnet) {
-    described_class.new(
+    described_class.create(
       net6: NetAddr.parse_net("fd1b:9793:dcef:cd0a::/64"),
       net4: NetAddr.parse_net("10.9.39.0/26"),
       location_id: Location::HETZNER_FSN1_ID,
@@ -65,14 +65,6 @@ RSpec.describe PrivateSubnet do
   end
 
   describe ".[]" do
-    let(:private_subnet) {
-      subnet = super()
-      subnet.net6 = subnet.net6.to_s
-      subnet.net4 = subnet.net4.to_s
-      subnet.id = described_class.generate_ubid.to_uuid.to_s
-      subnet.save_changes
-    }
-
     it "looks up by ubid object" do
       expect(described_class[UBID.parse(private_subnet.ubid)].id).to eq private_subnet.id
     end
@@ -96,13 +88,7 @@ RSpec.describe PrivateSubnet do
 
   describe "#inspect" do
     it "includes ubid if id is available" do
-      ubid = described_class.generate_ubid
-      private_subnet.id = ubid.to_uuid.to_s
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", state: \"waiting\", name: \"ps\", project_id: \"#{private_subnet.project.ubid}\"}>"
-    end
-
-    it "does not includes ubid if id is missing" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", state: \"waiting\", name: \"ps\", project_id: \"#{private_subnet.project.ubid}\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\"}>"
     end
   end
 
@@ -119,6 +105,18 @@ RSpec.describe PrivateSubnet do
   end
 
   describe "display_state" do
+    before { Strand.create_with_id(private_subnet, prog: "Vnet::Metal::SubnetNexus", label: "wait") }
+
+    it "returns 'deleting' when destroy semaphore is set" do
+      private_subnet.incr_destroy
+      expect(private_subnet.display_state).to eq("deleting")
+    end
+
+    it "returns 'deleting' when destroying semaphore is set" do
+      private_subnet.incr_destroying
+      expect(private_subnet.display_state).to eq("deleting")
+    end
+
     it "returns available when waiting" do
       expect(private_subnet.display_state).to eq "available"
     end
