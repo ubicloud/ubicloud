@@ -3,6 +3,8 @@
 require_relative "../../model"
 
 class PostgresMetricDestination < Sequel::Model
+  many_to_one :postgres_resource, no_association_method: true
+
   plugin ResourceMethods, encrypted_columns: :password
 end
 

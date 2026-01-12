@@ -9,7 +9,7 @@ class Vm < Sequel::Model
   many_to_one :project, read_only: true
   one_to_many :nics, read_only: true
   many_to_many :private_subnets, join_table: :nic, read_only: true
-  one_to_one :sshable, key: :id
+  one_to_one :sshable, key: :id, read_only: true
   one_to_one :assigned_vm_address, key: :dst_vm_id
   one_to_many :vm_storage_volumes, order: Sequel.desc(:boot), remover: nil, clearer: nil
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active

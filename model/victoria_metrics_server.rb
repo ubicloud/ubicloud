@@ -4,8 +4,8 @@ require_relative "../model"
 
 class VictoriaMetricsServer < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :vm, read_only: true
-  many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id, read_only: true
+  many_to_one :vm
+  many_to_one :resource, class: :VictoriaMetricsResource, key: :victoria_metrics_resource_id
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key
   plugin SemaphoreMethods, :checkup, :destroy, :initial_provisioning, :restart, :reconfigure

@@ -4,7 +4,7 @@ require_relative "../model"
 
 class VictoriaMetricsResource < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :project, read_only: true
+  many_to_one :project
   many_to_one :location, read_only: true
   one_to_many :servers, class: :VictoriaMetricsServer, is_used: true
   many_to_one :private_subnet, read_only: true

@@ -4,7 +4,7 @@ require_relative "../../model"
 require_relative "../../lib/net_ssh"
 
 class KubernetesCluster < Sequel::Model
-  one_to_one :strand, key: :id, read_only: true
+  one_to_one :strand, key: :id
   many_to_one :api_server_lb, class: :LoadBalancer, read_only: true
   many_to_one :services_lb, class: :LoadBalancer
   many_to_one :private_subnet, read_only: true

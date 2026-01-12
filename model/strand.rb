@@ -12,7 +12,7 @@ class Strand < Sequel::Model
   Strand.default_values[:stack] = proc { [{}] }
 
   LEASE_EXPIRATION = 120
-  many_to_one :parent, class: self, read_only: true
+  many_to_one :parent, class: self
   one_to_many :children, key: :parent_id, class: self, remover: nil, clearer: nil
   one_to_many :semaphores
 
