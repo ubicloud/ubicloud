@@ -318,7 +318,13 @@ class PostgresServer < Sequel::Model
       "match[]": "{__name__!~'#{exclude_pattern}'}"
     }
     query_str = URI.encode_www_form(query_params)
-    additional_labels = resource.tags.to_h { |key, value| ["pg_tags_label_#{key}", value] } # rubocop:disable Style/HashTransformKeys
+    additional_labels = resource.tags.to_h { |tag| ["pg_tags_label_#{tag["key"]}", tag["value"]] }
+    additional_labels.merge!({
+      location_id: UBID.from_uuidish(resource.location_id),
+      location_name: resource.location.name,
+      location_provider: resource.location.provider,
+      location_display_name: resource.location.display_name
+    })
 
     {
       endpoints: [
