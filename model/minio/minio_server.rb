@@ -5,8 +5,8 @@ require_relative "../../lib/net_ssh"
 
 class MinioServer < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
-  many_to_one :vm, read_only: true
-  many_to_one :pool, key: :minio_pool_id, class: :MinioPool, read_only: true
+  many_to_one :vm
+  many_to_one :pool, key: :minio_pool_id, class: :MinioPool
   one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster, read_only: true
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key

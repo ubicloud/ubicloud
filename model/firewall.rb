@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class Firewall < Sequel::Model
-  many_to_one :project, read_only: true
+  many_to_one :project
   one_to_many :firewall_rules, order: :cidr, remover: nil, clearer: nil
   many_to_many :private_subnets
   many_to_one :location
