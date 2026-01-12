@@ -9,7 +9,7 @@ UbiCli.on("pg").run_on("create") do
     on("-s", "--size=size", Option::POSTGRES_SIZE_OPTIONS.keys, "server size")
     on("-S", "--storage-size=size", Option::POSTGRES_STORAGE_SIZE_OPTIONS.map(&:to_s), "storage size GB")
     on("-v", "--version=version", Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], "PostgreSQL version")
-    on("-c", "--pg-config=config", "postgres config (e.g key1=value1,key2=value2)")
+    on("-c", "--pg-config=config", "postgres config (e.g. key1=value1,key2=value2)")
     on("-u", "--pgbouncer-config=config", "pgbouncer config (e.g. key1=value1,key2=value2)")
     on("-t", "--tags=tags", "tags (e.g. key1=value1,key2=value2)")
     on("-R", "--restrict-by-default", "restrict access by default (add firewall rules to allow access)")
