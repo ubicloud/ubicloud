@@ -3,6 +3,7 @@
 require_relative "../model"
 
 class PrivateSubnetAwsResource < Sequel::Model
+  many_to_one :private_subnet, key: :id, read_only: true, is_used: true
   plugin ResourceMethods
 end
 

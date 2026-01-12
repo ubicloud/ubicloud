@@ -3,6 +3,7 @@
 require_relative "../model"
 
 class NicAwsResource < Sequel::Model
+  many_to_one :nic, key: :id, read_only: true, is_used: true
   plugin ResourceMethods
 end
 
