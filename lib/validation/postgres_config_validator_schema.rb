@@ -1521,7 +1521,8 @@ module Validation
       "ssl" => {
         description: "Enables SSL connections.",
         type: :bool,
-        default: "on"
+        default: "on",
+        deny: true
       },
       "ssl_ca_file" => {
         description: "Location of the SSL certificate authority file.",
@@ -2015,23 +2016,28 @@ module Validation
         type: :integer,
         default: 6432,
         min: 1,
-        max: 65535
+        max: 65535,
+        deny: true
       },
       "unix_socket_dir" => {
         description: "Directory to create the Unix socket in.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "unix_socket_mode" => {
         description: "File system permissions for the Unix socket.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "unix_socket_group" => {
         description: "Group ownership for the Unix socket.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "user" => {
         description: "System user to run as.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "pool_mode" => {
         description: "When server connection can be reused by other clients.",
@@ -2159,31 +2165,38 @@ module Validation
         description: "How to authenticate users.",
         type: :enum,
         allowed_values: ["trust", "plain", "md5", "scram-sha-256", "cert", "hba", "pam"],
-        default: "trust"
+        default: "trust",
+        deny: true
       },
       "auth_hba_file" => {
         description: "Path to the HBA configuration file.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "auth_ident_file" => {
         description: "Path to the ident configuration file.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "auth_file" => {
         description: "Path to the authentication file.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "auth_user" => {
         description: "User to use for authentication queries.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "auth_query" => {
         description: "Query to use to fetch user passwords.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "auth_dbname" => {
         description: "Database to connect to for authentication queries.",
-        type: :string
+        type: :string,
+        deny: true
       },
       "syslog" => {
         description: "Log to syslog instead of stderr.",
