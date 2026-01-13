@@ -352,7 +352,10 @@ task :unused_associations_check do
 
   options_data = Sequel::Model.unused_association_options
   options_data.reject!(&keep)
-  options_data.each { |_, _, opts| opts.delete(:no_dataset_method) }
+  options_data.each do |_, _, opts|
+    opts.delete(:no_dataset_method)
+    opts.delete(:no_association_method)
+  end
   options_data.reject! { |_, _, opts| opts.empty? }
   if options_data.empty?
     puts "No Associations Need Option Changes."
