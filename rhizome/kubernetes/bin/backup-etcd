@@ -1,0 +1,92 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "fileutils"
+require "json"
+require "digest"
+require "tempfile"
+
+input = JSON.parse($stdin.read)
+
+MC_PATH = "/usr/local/bin/mc"
+MC_RELEASE_URL = "https://dl.min.io/client/mc/release/linux-amd64/archive/mc.RELEASE.2025-08-13T08-35-41Z"
+EXPECTED_HASH = "01f866e9c5f9b87c2b09116fa5d7c06695b106242d829a8bb32990c00312e891"
+
+unless File.exist?(MC_PATH)
+  puts "Installing mc..."
+  Tempfile.create("mc") do |tmp_mc|
+    r(*%W[curl -sL #{MC_RELEASE_URL} -o #{tmp_mc.path}])
+
+    actual_hash = Digest::SHA256.file(tmp_mc.path).hexdigest
+
+    if actual_hash != EXPECTED_HASH
+      puts "Error: mc binary hash mismatch. Expected #{EXPECTED_HASH}, got #{actual_hash}"
+      exit 1
+    end
+
+    r(*%W[mv #{tmp_mc.path} #{MC_PATH}])
+    r(*%W[chmod +x #{MC_PATH}])
+  end
+end
+
+BACKUP_DIR = "/var/lib/etcd/backups"
+FileUtils.mkdir_p(BACKUP_DIR)
+
+backup_file = "etcd-snapshot-#{Time.now.strftime("%Y%m%d%H%M%S")}.db"
+host_backup_path = File.join(BACKUP_DIR, backup_file)
+
+puts "Finding etcd container..."
+etcd_container_id = r("sudo crictl ps --name etcd --state Running -q").strip
+if etcd_container_id.empty?
+  puts "Error: Etcd container not found or not running."
+  exit 1
+end
+
+puts "Found etcd container: #{etcd_container_id}"
+puts "Taking snapshot..."
+
+cmd = "ETCDCTL_API=3 etcdctl snapshot save /var/lib/etcd/backups/#{backup_file} " \
+      "--cacert=/etc/kubernetes/pki/etcd/ca.crt " \
+      "--cert=/etc/kubernetes/pki/etcd/server.crt " \
+      "--key=/etc/kubernetes/pki/etcd/server.key"
+
+r(*%W[sudo crictl exec #{etcd_container_id} /bin/sh -c #{cmd}])
+
+puts "Changing permission from root to ubi."
+r(*%W[sudo chown ubi:ubi #{host_backup_path}])
+
+if File.exist?(host_backup_path)
+  puts "Backup successfully created at #{host_backup_path}"
+  puts "Uploading backup to MinIO..."
+
+  env_vars = {}
+  root_cert_file = nil
+  if input["root_certs"]
+    root_cert_file = Tempfile.new("minio-root-ca.crt")
+    root_cert_file.write(input["root_certs"])
+    root_cert_file.close
+    env_vars["SSL_CERT_FILE"] = root_cert_file.path
+  end
+
+  begin
+    alias_name = "minio-target"
+    r env_vars, "#{MC_PATH} alias remove #{alias_name} > /dev/null 2>&1 || true"
+    r env_vars, *%W[#{MC_PATH} alias set #{alias_name} #{input["endpoint"]} #{input["access_key"]} #{input["secret_key"]}]
+    r env_vars, *%W[#{MC_PATH} cp #{host_backup_path} #{alias_name}/#{input["bucket"]}/#{backup_file}]
+    puts "Backup uploaded successfully."
+  ensure
+    root_cert_file&.unlink
+  end
+else
+  puts "Error: Backup file not found at #{host_backup_path}"
+  exit 1
+end
+
+puts "Cleaning up old backups."
+backups = Dir.glob(File.join(BACKUP_DIR, "etcd-snapshot-*.db")).sort
+if backups.size >= 7
+  backups.first(backups.size - 7 + 1).each do |f|
+    r(*%W[sudo rm -f #{f}])
+  end
+end
