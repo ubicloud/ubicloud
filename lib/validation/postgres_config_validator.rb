@@ -52,6 +52,11 @@ module Validation
 
     def validate_config(key, value)
       config = @config_schema[key]
+
+      if config[:deny]
+        return ["Modifying this parameter is not allowed"]
+      end
+
       errors = []
 
       begin

@@ -82,6 +82,15 @@ RSpec.describe Validation::PostgresConfigValidator do
       end
     end
 
+    context "with denied configurations" do
+      it "returns error for config parameters that are not allowed to be modified" do
+        config = {"ssl" => "off"}
+        expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed) do |error|
+          expect(error.details["ssl"]).to include("Modifying this parameter is not allowed")
+        end
+      end
+    end
+
     context "with invalid configurations" do
       it "returns error for invalid max_connections" do
         config = {"max_connections" => "abc"}
