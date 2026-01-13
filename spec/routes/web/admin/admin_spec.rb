@@ -410,6 +410,25 @@ RSpec.describe CloverAdmin do
     ]
   end
 
+  it "shows current usage for project as extra" do
+    project = Project.create(name: "test")
+    vm = create_vm(project_id: project.id)
+    BillingRecord.create(
+      project_id: project.id,
+      resource_id: vm.id,
+      resource_name: vm.name,
+      span: Sequel::Postgres::PGRange.new(Time.now - 3600, nil),
+      billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+      amount: vm.vcpus
+    )
+
+    visit "/model/Project/#{project.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+    find("summary", text: "Current Usage").click
+    expect(page.all(".project-usage-table tbody tr").count).to eq 1
+    expect(page.all(".project-usage-table tbody tr").first.all("td").map(&:text)).to eq ["test-vm", "VmVCpu", "standard", "61 minutes", "$0.037"]
+  end
+
   it "converts ubids to link" do
     p = Page.create(summary: "test", tag: "a", details: {"related_resources" => [vm_pool.ubid, "cc489f465gqa5pzq04gch3162h"]})
     fill_in "UBID or UUID", with: p.ubid

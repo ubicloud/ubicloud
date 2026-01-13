@@ -11,3 +11,17 @@
     }
   }
 ) %>
+
+<%== part("components/collapsible_table",
+  title: "Current Usage",
+  table_class: "project-usage-table",
+  data: Serializers::Invoice.serialize(obj.current_invoice).items.map {
+    {
+      name: it.name,
+      resource_type: it.resource_type,
+      resource_family: it.resource_family,
+      usage: it.usage,
+      cost_humanized: it.cost_humanized
+    }
+  }
+) %>
