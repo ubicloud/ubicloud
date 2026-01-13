@@ -5,6 +5,7 @@ require_relative "../../model"
 class InferenceRouterReplica < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   one_to_one :vm, key: :id, primary_key: :vm_id, read_only: true
+  many_to_one :inference_router, read_only: true, is_used: true
   one_through_one :load_balancer_vm_port, left_key: :vm_id, left_primary_key: :vm_id, right_key: :id, right_primary_key: :load_balancer_vm_id, join_table: :load_balancers_vms, read_only: true
 
   plugin ResourceMethods
