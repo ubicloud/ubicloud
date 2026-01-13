@@ -599,6 +599,7 @@ SQL
 
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
+    register_deadline("wait", 10 * 60)
 
     representative_server = postgres_server.resource.representative_server
 
@@ -614,6 +615,7 @@ SQL
 
   label def prepare_for_planned_take_over
     decr_planned_take_over
+    register_deadline("wait", 10 * 60)
 
     postgres_server.resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
