@@ -140,8 +140,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "creates postgres server and vm with sshable" do
       postgres_timeline = PostgresTimeline.create
-      postgres_project = Project.create(name: "default")
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       firewall
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
@@ -155,18 +153,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "attaches internal firewall to underlying VM, if postgres resource has internal firewall" do
-      postgres_project = Project.create(name: "default")
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       pg = Prog::Postgres::PostgresResourceNexus.assemble(project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       pv = pg.servers.first
       expect(pv.vm.vm_firewalls).to eq [pg.internal_firewall]
     end
 
     it "picks correct base image for Lantern" do
-      postgres_project = Project.create(name: "default")
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       lantern_resource = PostgresResource.create(
         project: user_project,
         location_id: Location::HETZNER_FSN1_ID,
@@ -177,7 +169,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_version: "16",
         flavor: PostgresResource::Flavor::LANTERN
       )
-      Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: postgres_project)
+      Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: service_project)
       postgres_timeline = PostgresTimeline.create
 
       st = described_class.assemble(resource_id: lantern_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
@@ -185,9 +177,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for AWS-pg16" do
-      postgres_project = Project.create(name: "default")
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64"]
 
       aws_resource = PostgresResource.create(
@@ -199,7 +188,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         superuser_password: "dummy-password",
         target_version: "16"
       )
-      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: postgres_project)
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
       postgres_timeline = PostgresTimeline.create
 
       st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
@@ -207,9 +196,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for AWS-pg17" do
-      postgres_project = Project.create(name: "default")
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "17", arch: "x64"]
 
       aws_resource = PostgresResource.create(
@@ -221,7 +207,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         superuser_password: "dummy-password",
         target_version: "17"
       )
-      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: postgres_project)
+      Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
       postgres_timeline = PostgresTimeline.create
 
       st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
