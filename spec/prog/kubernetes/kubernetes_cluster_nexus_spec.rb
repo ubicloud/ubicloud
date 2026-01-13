@@ -64,7 +64,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect {
         described_class.assemble(version: "v1.30", project_id: customer_project.id, name: "k8stest", location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)
-      }.to raise_error RuntimeError, "Invalid Kubernetes Version"
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
 
       expect {
         described_class.assemble(name: "Uppercase", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, cp_node_count: 3, private_subnet_id: subnet.id)

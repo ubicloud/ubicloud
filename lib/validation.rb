@@ -304,6 +304,10 @@ module Validation
     fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count must be greater than 0."}) if count <= 0
   end
 
+  def self.validate_kubernetes_version(version)
+    fail ValidationFailed.new({version: "Kubernetes version \"#{version}\" is not supported. Available versions: #{Option.kubernetes_versions.join(", ")}"}) unless Option.kubernetes_versions.include?(version)
+  end
+
   def self.validate_victoria_metrics_username(username)
     msg = "VictoriaMetrics user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also has a max length of 32 and a min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_VICTORIA_METRICS_USERNAME_PATTERN)
