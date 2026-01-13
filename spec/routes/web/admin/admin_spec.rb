@@ -401,6 +401,7 @@ RSpec.describe CloverAdmin do
 
     visit "/model/Project/#{project.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+    find("summary", text: "Quotas").click
     expect(page.all(".project-quota-table tbody tr").map { it.all("td").map(&:text) }).to eq [
       ["VmVCpu", "32", "16"],
       ["GithubRunnerVCpu", "400", "0"],
