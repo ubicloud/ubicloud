@@ -192,6 +192,51 @@ jobs:
         name: e2e-${{ github.run_id }}-logs
         path: foreman.log
 
+    - name: Dump PostgreSQL database
+      if: always()
+      run: |
+        pg_dump "postgres:///clover_test?user=clover" \
+          --table='archived_record*' \
+          --table=vm \
+          --table=vm_host \
+          --table=load_balancer \
+          --table=load_balancer_port \
+          --table=load_balancer_vm_port \
+          --table=load_balancers_vms \
+          --table=kubernetes_cluster \
+          --table=kubernetes_node \
+          --table=kubernetes_nodepool \
+          --table=postgres_server \
+          --table=postgres_resource \
+          --table=postgres_timeline \
+          --table=access_control_entry \
+          --table=access_tag \
+          --table=action_tag \
+          --table=action_type \
+          --table=object_tag \
+          --table=subject_tag \
+          --table='applied_*_tag' \
+          --table=project \
+          --table=billing_record \
+          --table=billing_info \
+          --table=billing_rate \
+          --table=page \
+          --table=semaphore \
+          --table=strand \
+          --table=sshable \
+          --table=github_installation \
+          --table=github_runner \
+          --table=github_cache_entry \
+          --table=github_custom_label \
+          > clover_test_dump.sql
+
+    - name: Upload database dump
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: e2e-${{ github.run_id }}-db-dump
+        path: clover_test_dump.sql
+
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
       uses: slackapi/slack-github-action@v2.1.1
