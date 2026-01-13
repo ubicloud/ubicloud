@@ -28,8 +28,8 @@ class Project < Sequel::Model
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
-  one_to_many :quotas, class: :ProjectQuota, no_association_method: true, remover: nil, clearer: nil
-  one_to_many :invitations, class: :ProjectInvitation, no_association_method: true, remover: nil, clearer: nil
+  one_to_many :quotas, class: :ProjectQuota, remover: nil, clearer: nil
+  one_to_many :invitations, class: :ProjectInvitation, remover: nil, clearer: nil
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "project"}, read_only: true
   one_to_many :locations, read_only: true
   many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true

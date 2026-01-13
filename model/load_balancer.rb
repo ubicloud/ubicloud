@@ -10,7 +10,7 @@ class LoadBalancer < Sequel::Model
   one_to_many :load_balancer_vms, read_only: true
   one_to_many :ports, class: :LoadBalancerPort, remover: nil, clearer: nil
   many_to_many :certs, remover: nil, clearer: nil
-  one_to_many :load_balancer_certs, read_only: true, no_association_method: true
+  one_to_many :load_balancer_certs, read_only: true
   many_to_one :custom_hostname_dns_zone, class: :DnsZone, read_only: true
   many_to_many :vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true
   many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
