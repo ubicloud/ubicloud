@@ -453,6 +453,20 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_kubernetes_version" do
+    it "valid versions" do
+      Option.kubernetes_versions.each do |version|
+        expect(described_class.validate_kubernetes_version(version)).to be_nil
+      end
+    end
+
+    it "invalid versions" do
+      ["v1.30", "v1.25", "invalid", "1.34"].each do |version|
+        expect { described_class.validate_kubernetes_version(version) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
+
   describe "#validate_private_location_name" do
     it "validates aws region names" do
       expect { described_class.validate_provider_location_name("aws", "us-west-2") }.not_to raise_error
