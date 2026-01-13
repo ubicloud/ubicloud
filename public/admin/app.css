@@ -78,9 +78,16 @@ tbody tr {
   }
   td[rowspan] { background-color: white; }
 }
-caption {
+caption, .collapsible-table summary {
   font-size: 1.3em;
   font-weight: bold;
+  text-align: left;
+}
+
+.collapsible-table {
+  & summary { cursor: pointer; }
+  & table { margin-top: 0; }
+  & table caption { display: none; }
 }
 
 code {
