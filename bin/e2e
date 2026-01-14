@@ -54,6 +54,9 @@ def test_metal(options, test_cases)
   if options[:test_cases].include?("postgres_ha")
     tests_to_wait << Prog::Test::HaPostgresResource.assemble
   end
+  if options[:test_cases].include?("postgres_upgrade")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble
+  end
 
   if options[:test_cases].include?("kubernetes")
     tests_to_wait << Prog::Test::Kubernetes.assemble
