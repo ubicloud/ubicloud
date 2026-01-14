@@ -148,11 +148,11 @@ module Authorization
         .select(Sequel.cast(:object_id, String))
         .from_self
         .select {
-        Sequel.join([
-          substr(:object_id, 0, 18),
-          Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
-          substr(:object_id, 19, 18)
-        ]).cast(:uuid).as(:object_id)
+          Sequel.join([
+            substr(:object_id, 0, 18),
+            Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
+            substr(:object_id, 19, 18)
+          ]).cast(:uuid).as(:object_id)
       }
     end
 

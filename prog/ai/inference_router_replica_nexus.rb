@@ -256,13 +256,13 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
       .map do
-      {
-        ubid: it.ubid,
-        api_keys: it.api_keys
-          .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
-          .sort_by { |k| k.id }
-          .map { |k| Digest::SHA2.hexdigest(k.key) }
-      }
+        {
+          ubid: it.ubid,
+          api_keys: it.api_keys
+            .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
+            .sort_by { |k| k.id }
+            .map { |k| Digest::SHA2.hexdigest(k.key) }
+        }
     end
 
     targets = inference_router.targets.group_by(&:inference_router_model)
@@ -279,9 +279,9 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
             targets
               .select { |target| target.enabled }
               .map do |target|
-              target.values.slice(:host, :inflight_limit)
-                .merge(id: target.name, api_key: target.api_key)
-                .merge(target.extra_configs)
+                target.values.slice(:host, :inflight_limit)
+                  .merge(id: target.name, api_key: target.api_key)
+                  .merge(target.extra_configs)
             end
           end
       }

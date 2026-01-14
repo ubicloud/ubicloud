@@ -168,8 +168,8 @@ module Scheduling::Allocator
           .select_append { count.function.*.as(num_gpus) }
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
           .select_append do
-                       gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
-                       Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
+            gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
+            Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
                      end
           .where(device_class: ["0300", "0302"])
           .where { (device =~ request.gpu_device) | request.gpu_device.nil? })

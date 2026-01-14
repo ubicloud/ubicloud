@@ -314,10 +314,10 @@ class Clover < Roda
       .group_by { [it["resource_type"], it["resource_family"], it["location"]] }
       .map { |_, brs| brs.max_by { it["active_from"] } }
       .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
-      hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
-        hourly: br["unit_price"].to_f * 60,
-        monthly: br["unit_price"].to_f * 60 * 672
-      }
+        hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
+          hourly: br["unit_price"].to_f * 60,
+          monthly: br["unit_price"].to_f * 60 * 672
+        }
     end
   end
 
