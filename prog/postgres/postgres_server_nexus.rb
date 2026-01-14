@@ -558,6 +558,11 @@ SQL
   label def unavailable
     nap 0 if postgres_server.resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
 
+    when_configure_set? do
+      decr_configure
+      hop_configure
+    end
+
     reap(fallthrough: true)
     nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty?
 
@@ -694,6 +699,11 @@ SQL
   end
 
   label def restart
+    when_configure_set? do
+      # Pop so that the parent can handle the configure
+      pop "restart deferred due to pending configure"
+    end
+
     decr_restart
 
     register_deadline("wait", 5 * 60)
