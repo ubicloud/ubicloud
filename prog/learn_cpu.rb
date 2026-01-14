@@ -12,8 +12,7 @@ class Prog::LearnCpu < Prog::Base
   end
 
   def get_topology
-    s = sshable.cmd("/usr/bin/lscpu -Jye")
-    parsed = JSON.parse(s).fetch("cpus").map { |cpu|
+    parsed = sshable.cmd_json("/usr/bin/lscpu -Jye").fetch("cpus").map { |cpu|
       [cpu.fetch("socket"), cpu.fetch("core")]
     }
     cpus = parsed.count
