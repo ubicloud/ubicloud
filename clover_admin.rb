@@ -580,7 +580,7 @@ class CloverAdmin < Roda
         fail CloverError.new(400, "InvalidRequest", "Invalid UBID or UUID provided")
       end
       @model_name = typecast_params.nonempty_str("model_name") || UBID.class_for_ubid(@id.to_s)&.name
-      @days = (typecast_params.pos_int("days") || 15).clamp(1, 60)
+      @days = (typecast_params.pos_int("days") || 5).clamp(1, 15)
       @classes = available_classes
       @record = if @id
         fail CloverError.new(400, "InvalidRequest", "Could not determine model name from ID") unless @model_name

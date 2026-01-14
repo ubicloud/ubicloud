@@ -5,7 +5,7 @@ require_relative "../model"
 class ArchivedRecord < Sequel::Model
   no_primary_key
 
-  def self.find_by_id(id, model_name:, days: 15)
+  def self.find_by_id(id, model_name:, days: 5)
     DB[:archived_record]
       .where(model_name:)
       .where(Sequel[:archived_at] > Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{days} days", :interval))
