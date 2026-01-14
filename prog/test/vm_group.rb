@@ -96,7 +96,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     frame["vms"].each do |id|
       vm = Vm[id]
       command = {command: "version"}.to_json
-      response = JSON.parse(vm_host.sshable.cmd("sudo nc -U /var/storage/:inhost_name/0/rpc.sock -q 0", inhost_name: vm.inhost_name, stdin: command))
+      response = vm_host.sshable.cmd_json("sudo nc -U /var/storage/:inhost_name/0/rpc.sock -q 0", inhost_name: vm.inhost_name, stdin: command)
       expected_version = Config.vhost_block_backend_version.delete_prefix("v")
       fail_test "Failed to get vhost-block-backend version for VM #{vm.id} using RPC" unless response["version"] == expected_version
     end

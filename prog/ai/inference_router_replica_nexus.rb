@@ -317,8 +317,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   # pushes latest config to inference router and collects billing and health information
   def ping_inference_router
     update_config
-    stats_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
-    stats = JSON.parse(stats_response)
+    stats = vm.sshable.cmd_json("curl -k -m 10 --no-progress-meter https://localhost:8080/stats")
 
     Clog.emit("Successfully pinged inference router", {ping_inference_router: {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, stats:}})
 

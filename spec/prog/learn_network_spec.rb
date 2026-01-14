@@ -71,25 +71,25 @@ JSON
     end
 
     it "crashes if more than one global unique address prefix is provided" do
-      expect {
-        lm.parse_ip_addr_j(<<JSON)
-[
-  {
-    "ifindex": 2,
-    "addr_info": [
-      {
-        "local": "2a01:4f8:173:1ed3::2",
-        "prefixlen": 64
-      },
-      {
-        "local": "2a01:4f8:173:1ed3::3",
-        "prefixlen": 64
-      }
-    ]
-  }
-]
-JSON
-      }.to raise_error RuntimeError, "only one global unique address prefix supported on interface"
+      json = JSON.parse(<<~JSON)
+        [
+          {
+            "ifindex": 2,
+            "addr_info": [
+              {
+                "local": "2a01:4f8:173:1ed3::2",
+                "prefixlen": 64
+              },
+              {
+                "local": "2a01:4f8:173:1ed3::3",
+                "prefixlen": 64
+              }
+            ]
+          }
+        ]
+      JSON
+      expect { lm.parse_ip_addr_j(json) }
+        .to raise_error RuntimeError, "only one global unique address prefix supported on interface"
     end
   end
 end

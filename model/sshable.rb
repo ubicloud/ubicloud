@@ -81,6 +81,10 @@ class Sshable < Sequel::Model
     cmd(cmd_str, **args)
   end
 
+  def cmd_json(cmd, **args)
+    JSON.parse(cmd(cmd, **args))
+  end
+
   def cmd(cmd, stdin: nil, log: true, timeout: :default)
     start = Time.now
     stdout = StringIO.new
