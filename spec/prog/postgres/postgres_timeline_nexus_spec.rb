@@ -7,13 +7,13 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   let(:project) { Project.create(name: "test-project") }
   let(:postgres_timeline) { create_postgres_timeline }
-  let(:st) { Strand[postgres_timeline.id] }
+  let(:st) { postgres_timeline.strand }
   let(:service_project) { Project.create(name: "postgres-service-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
 
   let(:private_subnet) {
     PrivateSubnet.create(
-      name: "pg-subnet", project_id: project.id, location_id:,
+      name: "pg-subnet", project:, location_id:,
       net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
     )
   }
@@ -49,7 +49,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       ha_type: "none",
       target_version: "16",
       location_id: loc_id,
-      project_id: project.id,
+      project:,
       user_config: {},
       pgbouncer_user_config: {},
       target_vm_size: "standard-2",
@@ -68,11 +68,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: subnet.id,
       location_id: loc_id, unix_user: "ubi"
     ).subject
-    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1)
+    VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
     server_id = PostgresServer.generate_uuid
     server = PostgresServer.create_with_id(server_id,
       timeline:,
-      resource_id: resource.id,
+      resource:,
       vm_id: vm.id,
       representative_at: representative ? Time.now : nil,
       synchronization_status: "ready",
@@ -117,11 +117,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "creates postgres timeline" do
       st = described_class.assemble(location_id: Location::HETZNER_FSN1_ID)
 
-      expect(st.subject).not_to be_nil
+      expect(st.subject.exists?).to be true
     end
 
     it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
-      allow(Config).to receive(:aws_postgres_iam_access).and_return(true)
+      expect(Config).to receive(:aws_postgres_iam_access).and_return(true).twice
 
       tl = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
       expect(tl.access_key).not_to be_nil
@@ -160,7 +160,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         postgres_timeline.update(location_id: aws_location.id)
         resource = create_postgres_resource(loc_id: aws_location.id)
         aws_private_subnet = PrivateSubnet.create(
-          name: "aws-pg-subnet", project_id: project.id, location_id: aws_location.id,
+          name: "aws-pg-subnet", project:, location_id: aws_location.id,
           net4: "172.0.1.0/26", net6: "fdfa:b5aa:14a3:4a3e::/64"
         )
         server = create_postgres_server(resource:, timeline: postgres_timeline, loc_id: aws_location.id, subnet: aws_private_subnet)
@@ -193,7 +193,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "hops to wait_leader if bucket is created" do
       create_minio_cluster
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
       expect(blob_storage_client).to receive(:create_bucket)
       expect(blob_storage_client).to receive(:set_lifecycle_policy)
       expect { nx.setup_bucket }.to hop("wait_leader")
@@ -289,8 +289,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(created_at: Time.now - 11 * 24 * 60 * 60)
 
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
-      allow(blob_storage_client).to receive(:list_objects).and_return([])
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(blob_storage_client).to receive(:list_objects).and_return([])
 
       expect(Clog).to receive(:emit).with(/Self-destructing timeline/, postgres_timeline)
       expect { nx.wait }.to hop("destroy")
@@ -302,10 +302,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
 
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
 
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 3 * 24 * 60 * 60)
-      allow(blob_storage_client).to receive(:list_objects).and_return([backup])
+      expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("NotStarted")
 
@@ -320,10 +320,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
 
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 3 * 24 * 60 * 60)
-      allow(blob_storage_client).to receive(:list_objects).and_return([backup])
+      expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
 
@@ -339,10 +339,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
 
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 1 * 24 * 60 * 60)
-      allow(blob_storage_client).to receive(:list_objects).and_return([backup])
+      expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
 
@@ -362,10 +362,10 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
       blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
+      expect(Minio::Client).to receive(:new).and_return(blob_storage_client)
 
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 1 * 24 * 60 * 60)
-      allow(blob_storage_client).to receive(:list_objects).and_return([backup])
+      expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
 
@@ -387,10 +387,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       # Set latest_backup_started_at to recent so "Succeeded" makes need_backup? return false
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
-      blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
-      allow(blob_storage_client).to receive(:list_objects).and_return([])
-
       # need_backup? calls sshable.cmd once, returns "Succeeded" so need_backup? is false
       expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
 
@@ -398,10 +394,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "takes backup if it is needed" do
-      blob_storage_client = instance_double(Minio::Client)
-      allow(Minio::Client).to receive(:new).and_return(blob_storage_client)
-      allow(blob_storage_client).to receive(:list_objects).and_return([])
-
       # need_backup? is called once (returns true because NotStarted),
       # then cmd is called to run the backup
       sshable = nx.postgres_timeline.leader.vm.sshable
@@ -419,7 +411,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "completes destroy even if dns zone and blob_storage are not configured" do
       # No minio cluster, so blob_storage is nil
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-      expect(PostgresTimeline[postgres_timeline.id]).to be_nil
+      expect(postgres_timeline.exists?).to be false
     end
 
     describe "when blob storage is minio" do
@@ -436,7 +428,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(admin_blob_storage_client).to receive(:admin_policy_remove).with(postgres_timeline.ubid).and_return(200)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-        expect(PostgresTimeline[postgres_timeline.id]).to be_nil
+        expect(postgres_timeline.exists?).to be false
       end
     end
 
@@ -457,7 +449,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-        expect(PostgresTimeline[postgres_timeline.id]).to be_nil
+        expect(postgres_timeline.exists?).to be false
       end
     end
   end
