@@ -401,7 +401,7 @@ RSpec.describe PostgresServer do
       reading_chg: Time.now - 30
     }
 
-    expect(session[:db_connection]).to receive(:[]).and_raise(Sequel::DatabaseConnectionError)
+    expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
     expect(postgres_server).to receive(:incr_checkup)
     expect(postgres_server).to receive(:primary?).and_return(false)
@@ -420,7 +420,7 @@ RSpec.describe PostgresServer do
       reading_chg: Time.now - 30
     }
 
-    expect(session[:db_connection]).to receive(:[]).with("SELECT pg_current_wal_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
+    expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_current_wal_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:primary?).and_return(true)
 
     expect(postgres_server).to receive(:reload).and_return(postgres_server)
@@ -439,7 +439,7 @@ RSpec.describe PostgresServer do
       reading_chg: Time.now - 30
     }
 
-    expect(session[:db_connection]).to receive(:[]).with("SELECT pg_last_wal_replay_lsn() AS lsn").and_raise(Sequel::DatabaseConnectionError)
+    expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
     expect(postgres_server).to receive(:primary?).and_return(false)
     expect(postgres_server).to receive(:standby?).and_return(false)
 
