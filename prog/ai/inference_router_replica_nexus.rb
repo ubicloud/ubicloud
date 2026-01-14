@@ -91,7 +91,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       [Unit]
       Description=Inference Router
       After=network.target
-  
+
       [Service]
       Type=simple
       User=inference-router
@@ -105,16 +105,16 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       RestartSec=5
       StandardOutput=journal
       StandardError=journal
-  
+
       # File system and device restrictions
       ReadOnlyPaths=/
       ReadWritePaths=/ir/workdir
       PrivateTmp=yes
       PrivateMounts=yes
-  
+
       # User management
       SupplementaryGroups=
-  
+
       # Kernel and system protections
       ProtectKernelTunables=yes
       ProtectKernelModules=yes
@@ -122,17 +122,17 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       ProtectClock=yes
       ProtectHostname=yes
       ProtectControlGroups=yes
-  
+
       # Execution environment restrictions
       NoNewPrivileges=yes
       RestrictNamespaces=yes
       RestrictRealtime=yes
       RestrictSUIDSGID=yes
       LockPersonality=yes
-  
+
       # Network restrictions
       PrivateNetwork=no
-  
+
       # Additional hardening
       KeyringMode=private
       ProtectHome=yes
@@ -147,10 +147,10 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       MemoryDenyWriteExecute=true
       RemoveIPC=true
       UMask=0077
-  
+
       # Resource limits
       LimitNOFILE=65536
-  
+
       [Install]
       WantedBy=multi-user.target
     SERVICE
