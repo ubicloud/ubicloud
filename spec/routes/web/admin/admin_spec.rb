@@ -900,4 +900,103 @@ RSpec.describe CloverAdmin do
 
     expect(page).to have_content("No data available for Virtual Machines table")
   end
+
+  describe "archived-record-by-id" do
+    it "finds archived records" do
+      (vm = create_vm(name: "archived-vm")).destroy
+      visit "/"
+      click_link "Find Archived Record by ID"
+
+      within("#archived_record_form") do
+        fill_in "id", with: vm.ubid
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("archived-vm")
+      expect(page).to have_content(vm.id)
+
+      within("#archived_record_form") do
+        fill_in "id", with: vm.id
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("archived-vm")
+      expect(page).to have_content(vm.id)
+    end
+
+    it "uses model_name from select when provided" do
+      (vm = create_vm(name: "archived-vm")).destroy
+      visit "/archived-record-by-id"
+
+      within("#archived_record_form") do
+        fill_in "id", with: vm.ubid
+        select "Vm", from: "model_name"
+        fill_in "days", with: "30"
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("archived-vm")
+
+      within("#archived_record_form") do
+        fill_in "id", with: vm.id
+        select "Vm", from: "model_name"
+        fill_in "days", with: "30"
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("archived-vm")
+    end
+
+    it "fails for invalid UBID" do
+      visit "/archived-record-by-id"
+
+      within("#archived_record_form") do
+        fill_in "id", with: "invalid-ubid"
+      end
+      expect { click_button "Find Archived Record" }.to raise_error CloverError, "Invalid UBID or UUID provided"
+    end
+
+    it "fails when can't determine model" do
+      visit "/archived-record-by-id"
+
+      within("#archived_record_form") do
+        fill_in "id", with: "etcvcrc8s9hj6pgxt426mgq14y"
+      end
+      expect { click_button "Find Archived Record" }.to raise_error CloverError, "Could not determine model name from ID"
+    end
+
+    it "shows message when no archived records found" do
+      visit "/archived-record-by-id"
+
+      within("#archived_record_form") do
+        fill_in "id", with: "vmre9wb1wy0t0kfhbd71ztqx6e"
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("No data available")
+
+      within("#archived_record_form") do
+        fill_in "id", with: "vmvkaj2e36325kgjq88a1994dp"
+        click_button "Find Archived Record"
+      end
+      expect(page).to have_content("No data available")
+    end
+
+    it "respects days parameter limits" do
+      (vm = create_vm(name: "archived-vm")).destroy
+
+      visit "/archived-record-by-id"
+
+      # Test max limit (60)
+      within("#archived_record_form") do
+        fill_in "id", with: vm.ubid
+        fill_in "days", with: "100"
+        click_button "Find Archived Record"
+      end
+      expect(page.find_field("days").value).to eq "60"
+
+      # Test default (15) when no value provided
+      within("#archived_record_form") do
+        fill_in "id", with: vm.ubid
+        fill_in "days", with: nil
+        click_button "Find Archived Record"
+      end
+      expect(page.find_field("days").value).to eq "15"
+    end
+  end
 end

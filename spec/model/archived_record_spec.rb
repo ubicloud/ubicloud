@@ -30,4 +30,13 @@ RSpec.describe ArchivedRecord do
   it "fails to create in the distant future" do
     expect { described_class.create(archived_at: Time.now + 60 * 60 * 24 * 365 * 10, model_name: "Vm", model_values: {"state" => "creating"}) }.to raise_error(Sequel::ConstraintViolation)
   end
+
+  it "finds archived record by id" do
+    (vm = create_vm).destroy
+    record = described_class.find_by_id(vm.id, model_name: "Vm")
+    expect(record).not_to be_nil
+    expect(record[:model_values]["id"]).to eq(vm.id)
+    expect(record[:model_values]["name"]).to eq(vm.name)
+    expect(record[:archived_at]).to be_within(5).of(Time.now)
+  end
 end
