@@ -1,4 +1,4 @@
-<%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", pre_selected_values: {}, mode: "create") %>
+<%# locals: (action:, form_elements:, option_tree:, option_parents:, pre_selected_values: {}, mode: "create") %>
 <% nonce = SecureRandom.hex(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
@@ -10,7 +10,7 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
 
 <div>
   <div class="grid gap-6">
-    <% form(action:, method:, id: "creation-form", class: method) do %>
+    <% form(action:, method: "POST", id: "creation-form") do %>
       <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
       <div class="<%= container_class %>">
         <div class="px-4 py-5 sm:p-6">
