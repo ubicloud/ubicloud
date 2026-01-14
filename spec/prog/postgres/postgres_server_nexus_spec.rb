@@ -1039,6 +1039,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#unavailable" do
+    it "hops to configure if configure is set" do
+      nx.incr_configure
+      expect { nx.unavailable }.to hop("configure")
+    end
+
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
@@ -1274,6 +1279,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#restart" do
+    it "pops if configure is set so parent can handle it" do
+      nx.incr_configure
+      expect { nx.restart }.to exit({"msg" => "restart deferred due to pending configure"})
+      expect(nx.configure_set?).to be true
+    end
+
     it "sets deadline, restarts and exits" do
       expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
       expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
