@@ -929,7 +929,7 @@ RSpec.describe CloverAdmin do
       within("#archived_record_form") do
         fill_in "id", with: vm.ubid
         select "Vm", from: "model_name"
-        fill_in "days", with: "30"
+        fill_in "days", with: "10"
         click_button "Find Archived Record"
       end
       expect(page).to have_content("archived-vm")
@@ -937,7 +937,7 @@ RSpec.describe CloverAdmin do
       within("#archived_record_form") do
         fill_in "id", with: vm.id
         select "Vm", from: "model_name"
-        fill_in "days", with: "30"
+        fill_in "days", with: "10"
         click_button "Find Archived Record"
       end
       expect(page).to have_content("archived-vm")
@@ -982,21 +982,21 @@ RSpec.describe CloverAdmin do
 
       visit "/archived-record-by-id"
 
-      # Test max limit (60)
+      # Test max limit (15)
       within("#archived_record_form") do
         fill_in "id", with: vm.ubid
-        fill_in "days", with: "100"
+        fill_in "days", with: "30"
         click_button "Find Archived Record"
       end
-      expect(page.find_field("days").value).to eq "60"
+      expect(page.find_field("days").value).to eq "15"
 
-      # Test default (15) when no value provided
+      # Test default (5) when no value provided
       within("#archived_record_form") do
         fill_in "id", with: vm.ubid
         fill_in "days", with: nil
         click_button "Find Archived Record"
       end
-      expect(page.find_field("days").value).to eq "15"
+      expect(page.find_field("days").value).to eq "5"
     end
   end
 end
