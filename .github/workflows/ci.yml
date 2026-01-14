@@ -6,8 +6,6 @@ permissions:
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
   pull_request:
 
 jobs:
@@ -34,6 +32,12 @@ jobs:
 
     - name: Install node packages
       run: npm ci
+
+    - name: Set up editorconfig-checker
+      uses: editorconfig-checker/action-editorconfig-checker@v2.1.0
+
+    - name: Run editorconfig-checker
+      run: editorconfig-checker -ignore-defaults -exclude "vendor/"
 
     - name: Run erb-formatter
       run: bundle exec rake linter:erb_formatter
