@@ -77,6 +77,7 @@ ubi pg (location/pg-name | pg-id) reset-superuser-password new-password
 ubi pg (location/pg-name | pg-id) restart
 ubi pg (location/pg-name | pg-id) restore [options] new-db-name restore-time
 ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
+ubi pg (location/pg-name | pg-id) show-computed-config
 ubi pg (location/pg-name | pg-id) show-config
 ubi pg (location/pg-name | pg-id) show-pgbouncer-config
 ubi pg (location/pg-name | pg-id) show-upgrade-status
