@@ -27,10 +27,6 @@ class PostgresResource < Sequel::Model
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
 
-  def self.available_flavors(include_lantern: false)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !include_lantern }
-  end
-
   def display_location
     location.display_name
   end
@@ -238,6 +234,63 @@ class PostgresResource < Sequel::Model
 
   def ready_for_read_replica?
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
+  end
+
+  def self.generate_postgres_options(project, flavor: nil, location: nil)
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "name")
+
+    options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
+
+    options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
+      flavor == PostgresResource.default_flavor || location.provider != "aws"
+    end
+
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
+      if location.aws?
+        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+      else
+        family == "standard" || family == "burstable"
+      end
+    end
+
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
+      Option::POSTGRES_SIZE_OPTIONS[size].family == family
+    end
+
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
+
+      if location.aws?
+        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
+      else
+        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+        min_storage /= 2 if family == "burstable"
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
+      end
+    end
+
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
+      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    end
+
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    if project.get_ff_postgres_init_script
+      options.add_option(name: "init_script")
+    end
+
+    options.serialize
+  end
+
+  def self.postgres_flavors(project)
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !project.get_ff_postgres_lantern }
+  end
+
+  def self.postgres_locations(project)
+    Location.postgres_locations + project.locations
   end
 
   module HaType

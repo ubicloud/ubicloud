@@ -27,7 +27,7 @@ class Clover < Roda
         ::LockedDomain => [:with_pk],
         ::ObjectTag => [:options_for_project],
         ::PaymentMethod => [:fraud?],
-        ::PostgresResource => [:available_flavors, :default_flavor, :default_version, :ha_type_none, :maintenance_hour_options, :partner_notification_flavors],
+        ::PostgresResource => [:default_flavor, :default_version, :ha_type_none, :generate_postgres_options, :maintenance_hour_options, :partner_notification_flavors, :postgres_flavors],
         ::PostgresServer => [:victoria_metrics_client],
         ::SubjectTag => [:admin_tag?, :options_for_project, :subject_id_map_for_project_and_accounts],
         ::Vm => [:from_runtime_jwt_payload]

@@ -1,15 +1,15 @@
 <%
   default_flavor = PostgresResource.default_flavor
   @flavor = typecast_params.nonempty_str("flavor", default_flavor)
-  @flavor = default_flavor unless postgres_flavors.any? { |k,| k == @flavor }
+  @flavor = default_flavor unless PostgresResource.postgres_flavors(@project).any? { |k,| k == @flavor }
   @prices = fetch_location_based_prices("PostgresVCpu", "PostgresStorage")
   @has_valid_payment_method = @project.has_valid_payment_method?
   effective_quota = @project.effective_quota_value("PostgresVCpu")
   current_usage = @project.current_resource_usage("PostgresVCpu")
   @enabled_postgres_sizes = Option::VmSizes.select { effective_quota >= current_usage + it.vcpus }.map(&:name)
-  @option_tree, @option_parents = generate_postgres_options(flavor: @flavor)
+  @option_tree, @option_parents = PostgresResource.generate_postgres_options(@project, flavor: @flavor)
 
-  @page_title, logo = postgres_flavors[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
+  @page_title, logo = PostgresResource.postgres_flavors(@project)[@flavor].yield_self { ["Create #{it.title}", "logo-#{it.brand}.png"] }
   logo = nil if @flavor == default_flavor
 %>
 
