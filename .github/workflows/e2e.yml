@@ -10,7 +10,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,kubernetes'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,kubernetes'
         type: string
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
@@ -26,7 +26,7 @@ jobs:
     if: vars.RUN_E2E == 'true'
     runs-on: ubicloud-standard-4
     environment: E2E-CI
-    timeout-minutes: 70
+    timeout-minutes: 85
     concurrency: e2e_environment
 
     steps:
@@ -129,7 +129,7 @@ jobs:
         VHOST_BLOCK_BACKEND_VERSION: v0.3.1
       run: |
         set -o pipefail
-        timeout 68m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        timeout 83m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()
