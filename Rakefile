@@ -613,7 +613,8 @@ namespace :linter do
       number = 0
       File.foreach(file) do |line|
         number += 1
-        if /\(:(cmd|exec!|kubectl|rootish_ssh|run_query)/.match?(line)
+        cmds = Regexp.union(%w[cmd exec! kubectl rootish_ssh run_query])
+        if /\(:#{cmds}|instance_double\(.*#{cmds}: /.match?(line)
           failure = true
           warn "Potentially insecure method override: #{file}:#{number}: #{line}"
         end
