@@ -2338,6 +2338,13 @@ components:
             max_client_conn: '100'
           additionalProperties:
             type: string
+        default_pg_config:
+          description: System-computed configuration values based on instance size. User overrides in pg_config take precedence.
+          type: object
+          additionalProperties:
+            type: string
+          nullable: true
+          readOnly: true
       additionalProperties: false
       required:
         - pg_config

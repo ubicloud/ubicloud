@@ -518,7 +518,8 @@ class Clover
 
           {
             pg_config: pg.user_config,
-            pgbouncer_config: pg.pgbouncer_user_config
+            pgbouncer_config: pg.pgbouncer_user_config,
+            default_pg_config: pg.representative_server&.configure_hash&.[](:configs)
           }
         end
 

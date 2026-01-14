@@ -101,6 +101,10 @@ module Ubicloud
       adapter.get(_path("/config"))[:pgbouncer_config]
     end
 
+    def default_pg_config
+      adapter.get(_path("/config"))[:default_pg_config]
+    end
+
     # Update configuration hash for the PostgreSQL database.
     def update_config(**values)
       adapter.patch(_path("/config"), pg_config: values)[:pg_config]
