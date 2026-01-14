@@ -94,7 +94,7 @@ RSpec.describe Clover, "auth" do
     expect(Mail::TestMailer.deliveries.length).to eq 3
   end
 
-  it "can create new account, verify it, and visit project which invited" do
+  it "can create new account, verify it, but without force join to invited project" do
     p = Project.create(name: "Invited-project")
     p.add_invitation(email: TEST_USER_EMAIL, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
 
@@ -117,7 +117,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit "#{p.path}/dashboard"
-    expect(page.title).to eq("Ubicloud - Invited-project Dashboard")
+    expect(page.title).to eq("Ubicloud - ResourceNotFound")
   end
 
   it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
@@ -134,7 +134,7 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again.")
   end
 
-  it "can create new account, verify it, and visit project which invited with default policy" do
+  it "can create new account, verify it, but not force join to invited project" do
     p = Project.create(name: "Invited-project")
     subject_id = SubjectTag.create(project_id: p.id, name: "Admin").id
     AccessControlEntry.create(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
@@ -163,7 +163,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit p.path
-    expect(page.title).to eq("Ubicloud - Invited-project")
+    expect(page.title).to eq("Ubicloud - ResourceNotFound")
   end
 
   it "can remember login" do
