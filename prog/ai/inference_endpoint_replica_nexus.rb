@@ -206,12 +206,12 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
       .map do
-      {
-        ubid: it.ubid,
-        api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
-        quota_rps: inference_endpoint.max_project_rps,
-        quota_tps: inference_endpoint.max_project_tps
-      }
+        {
+          ubid: it.ubid,
+          api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
+          quota_rps: inference_endpoint.max_project_rps,
+          quota_tps: inference_endpoint.max_project_tps
+        }
     end
 
     body = {

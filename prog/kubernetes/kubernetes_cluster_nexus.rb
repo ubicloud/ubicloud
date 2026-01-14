@@ -177,7 +177,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
         .reverse(Sequel.function(:lower, :span))
         .limit(surplus)
         .all do |r|
-        r.finalize
+          r.finalize
       end
     end
 
