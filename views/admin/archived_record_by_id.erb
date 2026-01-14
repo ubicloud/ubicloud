@@ -1,0 +1,23 @@
+<% @page_title = "Find Archived Record by ID" %>
+
+<p>
+  This page allows you to find archived records by UBID or UUID. Useful for investigating deleted resources.
+</p>
+
+<% form(id: "archived_record_form", class: "form-vertical") do |f| %>
+  <%== f.input("text", key: "id", label: "ID", placeholder: "Enter UBID or UUID", value: @id) %>
+  <%== f.input("select", key: "model_name", label: "Model Name", add_blank: "From ID", options: @classes.map(&:name), value: @model_name) %>
+  <%== f.input("number", key: "days", label: "Days", placeholder: "1-60", value: @days, min: 1, max: 60) %>
+  Higher day values will increase query duration significantly. Use the smallest value possible.
+  <%== f.button("Find Archived Record") %>
+<% end %>
+
+<% if @id %>
+  <% if @record
+    data = {model_name: @record[:model_name], archived_at: @record[:archived_at]}
+      .merge!(@record[:model_values])
+      .map { |k, v| {"Key" => k, "Value" => v} }
+    end %>
+
+  <%== part("components/table", title: "Archived Record", table_class: "archived-record-table", data:) %>
+<% end %>

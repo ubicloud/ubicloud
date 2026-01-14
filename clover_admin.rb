@@ -121,6 +121,17 @@ class CloverAdmin < Roda
     end
   end
 
+  def available_classes
+    classes = []
+    Sequel::Model.subclasses.each do |c|
+      classes << c if c < ResourceMethods::InstanceMethods
+      c.subclasses.each do |sc|
+        classes << sc if sc < ResourceMethods::InstanceMethods
+      end
+    end
+    classes.sort_by!(&:name)
+  end
+
   plugin :rodauth, route_csrf: true do
     enable :argon2, :login, :logout, :webauthn, :change_password
     accounts_table :admin_account
@@ -560,6 +571,25 @@ class CloverAdmin < Roda
       autoforme
     end
 
+    r.get "archived-record-by-id" do
+      @id = if (uuid = typecast_params.uuid("id"))
+        UBID.from_uuidish(uuid)
+      elsif (ubid = typecast_params.ubid("id"))
+        UBID.parse(ubid)
+      elsif typecast_params.nonempty_str("id")
+        fail CloverError.new(400, "InvalidRequest", "Invalid UBID or UUID provided")
+      end
+      @model_name = typecast_params.nonempty_str("model_name") || UBID.class_for_ubid(@id.to_s)&.name
+      @days = (typecast_params.pos_int("days") || 15).clamp(1, 60)
+      @classes = available_classes
+      @record = if @id
+        fail CloverError.new(400, "InvalidRequest", "Could not determine model name from ID") unless @model_name
+        ArchivedRecord.find_by_id(@id.to_uuid, model_name: @model_name, days: @days)
+      end
+
+      view("archived_record_by_id")
+    end
+
     r.get "vm-by-ipv4" do
       if (@ips_param = typecast_params.nonempty_str("ips"))
         ips = @ips_param.split(",").filter_map {
@@ -608,12 +638,7 @@ class CloverAdmin < Roda
       end
 
       @grouped_pages = Page.active.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
-      @classes = Sequel::Model
-        .subclasses
-        .map { [it, it.subclasses] }
-        .flatten
-        .select { it < ResourceMethods::InstanceMethods }
-        .sort_by(&:name)
+      @classes = available_classes
       @info_pages = Page.where(severity: "info").reverse(:created_at).all
 
       view("index")

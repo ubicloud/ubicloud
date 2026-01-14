@@ -5,6 +5,14 @@ require_relative "../model"
 class ArchivedRecord < Sequel::Model
   no_primary_key
 
+  def self.find_by_id(id, model_name:, days: 15)
+    DB[:archived_record]
+      .where(model_name:)
+      .where(Sequel[:archived_at] > Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{days} days", :interval))
+      .where(Sequel.pg_jsonb_op(:model_values).get_text("id") => id)
+      .first
+  end
+
   def self.vms_by_ips(ips)
     ip_values = Sequel.pg_jsonb_op(Sequel[:ip][:model_values])
     vm_values = Sequel.pg_jsonb_op(Sequel[:vm][:model_values])

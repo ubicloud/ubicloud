@@ -1,6 +1,6 @@
 <% @page_title = "#{@klass.name} #{@obj.ubid}" %>
 
-<% form(method: :post, id: "action-form") do |f| %>
+<% form(method: :post, id: "action-form", class: "form-vertical") do |f| %>
   <% @params.each do |name, value| %>
     <%
       type = "text"
