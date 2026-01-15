@@ -36,7 +36,7 @@ def select_option(msg, options, default = nil)
     option = if option.empty?
       default
     elsif option.to_i < 1
-      puts "Plese enter a number between 1-#{options.count}#{" or leave empty for default" unless default.nil?}"
+      puts "Please enter a number between 1-#{options.count}#{" or leave empty for default" unless default.nil?}"
     else
       option.to_i
     end
