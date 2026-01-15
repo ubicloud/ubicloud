@@ -79,6 +79,7 @@ end
 #  account_active_session_keys       | account_active_session_keys_account_id_fkey       | (account_id) REFERENCES accounts(id)
 #  account_activity_times            | account_activity_times_id_fkey                    | (id) REFERENCES accounts(id)
 #  account_authentication_audit_logs | account_authentication_audit_logs_account_id_fkey | (account_id) REFERENCES accounts(id)
+#  account_default_project           | account_default_project_id_fkey                   | (id) REFERENCES accounts(id) ON DELETE CASCADE
 #  account_email_auth_keys           | account_email_auth_keys_id_fkey                   | (id) REFERENCES accounts(id)
 #  account_identities                | account_identities_account_id_fkey                | (account_id) REFERENCES accounts(id)
 #  account_jwt_refresh_keys          | account_jwt_refresh_keys_account_id_fkey          | (account_id) REFERENCES accounts(id)
