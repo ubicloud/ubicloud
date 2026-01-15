@@ -152,6 +152,7 @@ RSpec.describe Clover, "auth" do
 
     visit verify_link
     expect(page.title).to eq("Ubicloud - Verify Account")
+    expect(Account.first.default_project.name).to eq "Default"
 
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - Projects")
