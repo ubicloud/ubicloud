@@ -880,6 +880,7 @@ class Clover < Roda
       end
 
       r.post "bad" do
+        @project = Account.first.projects.first
         audit_log(@project, "bad_action")
       end
     end
