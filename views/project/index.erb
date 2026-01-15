@@ -1,4 +1,6 @@
-<% @page_title = "Projects" %>
+<% @page_title = "Projects"
+@projects = current_account.projects_dataset.where(:visible).all
+@invitations = current_account.invitations %>
 
 <%== part(
   "components/page_header",
@@ -28,3 +30,26 @@
       }
     ) %>
 </div>
+
+<% unless @invitations.empty? %>
+  <div class="grid gap-6 mt-4">
+    <%== part(
+        "components/table_card",
+        title: "Project Invitations",
+        headers: %w[Name ID Invited\ By Accept Decline],
+        rows: @invitations.map do |inv|
+           project_ubid = inv.project.ubid
+           [
+             [
+               inv.project.name,
+               project_ubid,
+               inv.inviter.email,
+               [part("components/submit_button", action: "/project/invitation/#{project_ubid}/accept", text: "Accept"), {escape: false}],
+               [part("components/delete_button", url: "/project/invitation/#{project_ubid}/decline", text: "Decline", exact_url: true, icon: nil), {escape: false}]
+             ],
+             { id: "invitation-#{project_ubid}" }
+           ]
+        end,
+      ) %>
+  </div>
+<% end %>
