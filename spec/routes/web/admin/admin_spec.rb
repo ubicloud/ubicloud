@@ -953,13 +953,22 @@ RSpec.describe CloverAdmin do
       expect(page).to have_content("archived-vm")
     end
 
-    it "fails for invalid UBID" do
+    it "fails for invalid UBID format" do
       visit "/archived-record-by-id"
 
       within("#archived_record_form") do
         fill_in "id", with: "invalid-ubid"
       end
       expect { click_button "Find Archived Record" }.to raise_error CloverError, "Invalid UBID or UUID provided"
+    end
+
+    it "fails for invalid UBID with valid basic format" do
+      visit "/archived-record-by-id"
+
+      within("#archived_record_form") do
+        fill_in "id", with: "xx345678901234567890123456"
+      end
+      expect { click_button "Find Archived Record" }.to raise_error CloverError, "Invalid UBID provided"
     end
 
     it "fails when can't determine model" do

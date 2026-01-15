@@ -575,7 +575,11 @@ class CloverAdmin < Roda
       @id = if (uuid = typecast_params.uuid("id"))
         UBID.from_uuidish(uuid)
       elsif (ubid = typecast_params.ubid("id"))
-        UBID.parse(ubid)
+        begin
+          UBID.parse(ubid)
+        rescue UBIDParseError
+          fail CloverError.new(400, "InvalidRequest", "Invalid UBID provided")
+        end
       elsif typecast_params.nonempty_str("id")
         fail CloverError.new(400, "InvalidRequest", "Invalid UBID or UUID provided")
       end
