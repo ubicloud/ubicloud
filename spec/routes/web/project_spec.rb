@@ -192,6 +192,33 @@ RSpec.describe Clover, "project" do
         visit "/"
         expect(page.title).to eq "Ubicloud - project-1 Dashboard"
       end
+
+      it "can be updated on project page" do
+        project
+        visit "/"
+        expect(page.title).to eq "Ubicloud - Default Dashboard"
+
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Set As Default" }
+        expect(page).to have_flash_notice("Default project updated")
+
+        visit "/"
+        expect(page.title).to eq "Ubicloud - project-1 Dashboard"
+      end
+
+      it "shows error if attempting to make invalid project the default" do
+        project
+        visit "/"
+        expect(page.title).to eq "Ubicloud - Default Dashboard"
+
+        visit "/project"
+        project.remove_account(user)
+        within("#project-#{project.ubid}") { click_button "Set As Default" }
+        expect(page).to have_flash_error("Invalid default project selected")
+
+        visit "/"
+        expect(page.title).to eq "Ubicloud - Default Dashboard"
+      end
     end
 
     describe "create" do
