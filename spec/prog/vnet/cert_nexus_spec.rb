@@ -46,7 +46,6 @@ RSpec.describe Prog::Vnet::CertNexus do
   def use_add_private(identifiers: [])
     st.stack = [{"restarted" => 0, "add_private" => true}]
     nx.instance_variable_set(:@frame, nil)
-    nx.instance_variable_set(:@acme_order, nil)
     identifiers << "private-#{cert.hostname}"
   end
 
@@ -212,20 +211,9 @@ RSpec.describe Prog::Vnet::CertNexus do
 
   describe "#wait_cert_finalization with add_private" do
     it "deletes both DNS records for both authorizations" do
-      st.stack = [{"restarted" => 0, "add_private" => true}]
-      nx.instance_variable_set(:@frame, nil)
-
-      dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
-      authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge, domain: cert.hostname)
-      private_dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content-private")
-      private_authorization = instance_double(Acme::Client::Resources::Authorization, dns: private_dns_challenge, domain: "private-#{cert.hostname}")
-      order = instance_double(Acme::Client::Resources::Order, authorizations: [authorization, private_authorization], url: "test-order-url")
-
-      fresh_client = instance_double(Acme::Client)
-      expect(Acme::Client).to receive(:new).and_return(fresh_client)
-      expect(fresh_client).to receive(:order).with(url: "test-order-url").and_return(order)
+      use_add_private(identifiers: [])
+      order = setup_order(add_private: true)
       cert.update(order_url: "test-order-url", account_key: account_key.to_der, kid: "x")
-
       expect(order).to receive(:status).and_return("valid")
       expect(order).to receive(:certificate).and_return("test-certificate")
 
