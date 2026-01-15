@@ -5,52 +5,77 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Postgres::PostgresResourceNexus do
   subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
+  let(:project) { Project.create(name: "test-project") }
+  let(:postgres_resource) { create_postgres_resource }
+  let(:postgres_server) { create_postgres_server(resource: postgres_resource) }
+  let(:st) { postgres_resource.strand }
+  let(:postgres_project) { Project.create(name: "postgres-service-project") }
+  let(:location_id) { Location::HETZNER_FSN1_ID }
 
-  let(:postgres_resource) {
-    instance_double(
-      PostgresResource,
-      ubid: "pgnjbsrja7ka4nk7ptcg03szg2",
-      location_id: Location::HETZNER_FSN1_ID,
-      location: Location[Location::HETZNER_FSN1_ID],
-      root_cert_1: "root cert 1",
-      root_cert_key_1: "root cert key 1",
-      root_cert_2: "root cert 2",
-      root_cert_key_2: "root cert key 2",
-      server_cert: "server cert",
-      server_cert_key: nil,
-      parent: nil,
-      servers: [instance_double(
-        PostgresServer,
-        vm_id: Vm.generate_uuid,
-        vm: instance_double(
-          Vm,
-          family: "standard",
-          vcpus: 2,
-          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")],
-          display_state: "running"
-        )
-      )],
-      representative_server: instance_double(
-        PostgresServer,
-        vm: instance_double(
-          Vm,
-          family: "standard",
-          vcpus: 2,
-          private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")]
-        )
-      ),
-      private_subnet: instance_double(PrivateSubnet)
-    ).as_null_object
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "pg-subnet", project:, location_id:,
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+    )
   }
 
+  def create_postgres_timeline(location_id: self.location_id)
+    tl = PostgresTimeline.create(
+      location_id:,
+      access_key: "dummy-access-key",
+      secret_key: "dummy-secret-key"
+    )
+    Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+    tl
+  end
+
+  def create_postgres_resource(location_id: self.location_id, project: self.project, with_strand: true, with_certs: true, private_subnet: self.private_subnet, name: "pg-test-resource")
+    certs = if with_certs
+      cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
+      {root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem}
+    end
+
+    pr = PostgresResource.create(
+      name:,
+      superuser_password: "dummy-password",
+      target_version: "16",
+      location_id:,
+      project:,
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64,
+      private_subnet_id: private_subnet.id,
+      **certs
+    )
+    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "start") if with_strand
+    pr
+  end
+
+  def create_postgres_server(resource:, location_id: self.location_id, timeline: create_postgres_timeline(location_id:), timeline_access: "push", representative: true, version: "16", private_subnet: self.private_subnet, vm_name: "pg-vm-#{resource.name}", server_index: 0)
+    vm = Prog::Vm::Nexus.assemble_with_sshable(
+      project.id, name: vm_name, private_subnet_id: private_subnet.id,
+      location_id:, unix_user: "ubi"
+    ).subject
+    VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.#{server_index + 1}/32")
+    vm.update(ephemeral_net6: "fd10:9b0b:6b4b:#{server_index}::/79")
+    server = PostgresServer.create(
+      timeline:,
+      resource:,
+      vm_id: vm.id,
+      representative_at: representative ? Time.now : nil,
+      timeline_access:,
+      version:
+    )
+    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "start")
+    server
+  end
+
   before do
-    allow(nx).to receive(:postgres_resource).and_return(postgres_resource)
+    allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
   end
 
   describe ".assemble" do
     let(:customer_project) { Project.create(name: "default") }
-    let(:postgres_project) { Project.create(name: "default") }
     let(:private_location) {
       loc = Location.create(
         name: "us-west-2",
@@ -58,7 +83,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project_id: postgres_project.id
+        project: postgres_project
       )
       LocationCredential.create(
         access_key: "access-key-id",
@@ -68,10 +93,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     }
 
     it "validates input" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       expect {
-        described_class.assemble(project_id: "26820e05-562a-4e25-a51b-de5f78bd00af", location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
@@ -83,42 +106,37 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.not_to raise_error
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
+        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "pgd2m9djgryj6nq73jrdddnkrt")
       }.to raise_error RuntimeError, "No existing parent"
 
-      private_location.update(project_id: customer_project.id)
+      private_location.update(project: customer_project)
       described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
 
       expect {
         parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
-        expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
     end
 
     it "does not allow giving different version than parent for restore" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject
-      expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
     end
 
     it "passes timeline of parent resource if parent is passed" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
-
       parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       restore_target = Time.now
-      expect(parent.timeline).to receive(:earliest_restore_time).and_return(restore_target - 10 * 60)
-      expect(PostgresResource).to receive(:[]).with(parent.id).and_return(parent)
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent.timeline.id, timeline_access: "fetch")).and_return(instance_double(Strand, subject: postgres_resource.representative_server))
+      parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
 
-      described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:)
+      child_strand = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:)
+      child = child_strand.subject
+      expect(child.representative_server.timeline_id).to eq(parent.timeline.id)
+      expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
     it "creates internal firewall and customer private subnet and firewall" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       private_subnet = pg.private_subnet
@@ -147,7 +165,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "uses Config.control_plane_outbound_cidrs to limit SSH access" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
       expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"]).at_least(:once)
       pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
@@ -164,354 +181,345 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#before_run" do
     it "hops to destroy and stops billing records when needed" do
-      br = instance_double(BillingRecord)
-      expect(br).to receive(:finalize).twice
-      expect(postgres_resource).to receive(:active_billing_records).and_return([br, br])
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
+      postgres_server
+      # Use a past start time so that finalize results in a non-empty span
+      # (within a transaction, now() returns the same time, so span would be empty otherwise)
+      past_span = Sequel.pg_range((Time.now - 3600)..)
+      br1 = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", "hetzner-fsn1", false)["id"],
+        amount: 2,
+        span: past_span
+      )
+      br2 = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", "hetzner-fsn1", false)["id"],
+        amount: 64,
+        span: past_span
+      )
+      fresh_nx = described_class.new(st)
+      fresh_nx.incr_destroy
+      expect { fresh_nx.before_run }.to hop("destroy")
+      expect(br1.reload.span.end).not_to be_nil
+      expect(br2.reload.span.end).not_to be_nil
     end
 
     it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      postgres_server
+      nx.incr_destroy
+      st.update(label: "destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if already in the wait_children_destroyed state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      postgres_server
+      nx.incr_destroy
+      st.update(label: "wait_children_destroyed")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops if in trigger_pg_current_xact_id_on_parent state and has a parent" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("trigger_pg_current_xact_id_on_parent")
+      postgres_server
+      nx.incr_destroy
+      st.update(label: "trigger_pg_current_xact_id_on_parent")
       expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
     end
   end
 
   describe "#start" do
     it "naps if vm not ready" do
-      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "prep"))
+      postgres_server
       expect { nx.start }.to nap(5)
     end
 
     it "registers deadline and hops" do
-      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx).to receive(:register_deadline)
+      postgres_server.vm.strand.update(label: "wait")
       expect { nx.start }.to hop("refresh_dns_record")
+      expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").first).to exist
     end
 
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
-      expect(postgres_resource.representative_server.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
-      expect(nx).to receive(:register_deadline)
-      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource))
-      expect(nx).to receive(:bud).with(described_class, {}, :trigger_pg_current_xact_id_on_parent)
+      postgres_server.vm.strand.update(label: "wait")
+      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      create_postgres_server(resource: parent, server_index: 1)
+      postgres_resource.update(parent:)
       expect { nx.start }.to hop("refresh_dns_record")
+      expect(st.children.count).to eq(1)
+      expect(st.children.first.label).to eq("trigger_pg_current_xact_id_on_parent")
     end
   end
 
   describe "#trigger_pg_current_xact_id_on_parent" do
     it "triggers pg_current_xact_id and pops" do
-      representative_server = PostgresServer.new
-      expect(representative_server).to receive(:_run_query).with("SELECT pg_current_xact_id()")
-      expect(postgres_resource).to receive(:parent).and_return(instance_double(PostgresResource, representative_server:))
+      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      create_postgres_server(resource: parent, server_index: 1)
+      postgres_resource.update(parent:)
 
-      expect { nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
+      fresh_nx = described_class.new(st)
+      parent_sshable = fresh_nx.postgres_resource.parent.representative_server.vm.sshable
+      expect(parent_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", hash_including(:stdin)).and_return("1234")
+
+      expect { fresh_nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
     end
   end
 
   describe "#refresh_dns_record" do
-    before do
-      allow(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: false))
-    end
-
     it "creates dns records and hops" do
-      expect(postgres_resource.representative_server.vm).to receive(:ip4_string).and_return("1.1.1.1")
-      expect(postgres_resource.representative_server.vm).to receive(:private_ipv4_string).and_return("1.1.1.2")
-      expect(postgres_resource.representative_server.vm).to receive(:ip6_string).and_return("::1")
-      expect(postgres_resource.representative_server.vm).to receive(:private_ipv6_string).and_return("::2")
-      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
-      dns_zone = instance_double(DnsZone)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.1")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "AAAA", ttl: 10, data: "::1")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-pg-name.postgres.ubicloud.com.", type: "A", ttl: 10, data: "1.1.1.2")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-pg-name.postgres.ubicloud.com.", type: "AAAA", ttl: 10, data: "::2")
-      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      postgres_server
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).count).to eq(4)
     end
 
     it "creates CNAME DNS records for AWS instances" do
-      expect(postgres_resource).to receive(:location).and_return(instance_double(Location, aws?: true))
-      expect(postgres_resource.representative_server.vm).to receive(:aws_instance).and_return(instance_double(AwsInstance, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"))
-      expect(postgres_resource).to receive(:hostname).and_return("pg-name.postgres.ubicloud.com.")
-      dns_zone = instance_double(DnsZone)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "pg-name.postgres.ubicloud.com.")
-      expect(dns_zone).to receive(:insert_record).with(record_name: "pg-name.postgres.ubicloud.com.", type: "CNAME", ttl: 10, data: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com.")
-      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
-      expect(nx).to receive(:when_initial_provisioning_set?).and_yield
+      postgres_server
+      AwsInstance.create_with_id(postgres_server.vm, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
+      postgres_resource.location.update(provider: "aws")
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, type: "CNAME").first).to exist
     end
 
     it "hops even if dns zone is not configured" do
-      expect(postgres_resource).to receive(:dns_zone).and_return(nil).at_least(:once)
+      postgres_server
       expect { nx.refresh_dns_record }.to hop("wait")
     end
 
-    it "hops to wait if initial_provisioning is not set" do
-      expect(postgres_resource).to receive(:dns_zone).and_return(nil).at_least(:once)
-      expect(nx).to receive(:when_initial_provisioning_set?)
+    it "hops to wait if initial_provisioning is not set even with dns zone" do
+      postgres_server
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       expect { nx.refresh_dns_record }.to hop("wait")
     end
   end
 
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
-      project = Project.create(name: "default")
-      postgres_resource = PostgresResource.create(
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "pg-name",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 128,
-        superuser_password: "dummy-password",
-        target_version: "16"
-      )
+      pr = create_postgres_resource(with_certs: false)
+      Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project: postgres_project)
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
 
-      expect(nx).to receive(:postgres_resource).and_return(postgres_resource).at_least(:once)
-      expect(postgres_resource).to receive(:dns_zone).and_return("something").at_least(:once)
-
-      expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 5, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
-      expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority").and_call_original
-      expect(nx).to receive(:create_certificate).and_call_original
-
-      expect { nx.initialize_certificates }.to hop("wait_servers")
+      init_nx = described_class.new(pr.strand)
+      expect { init_nx.initialize_certificates }.to hop("wait_servers")
+      pr.reload
+      expect(pr.root_cert_1).not_to be_nil
+      expect(pr.root_cert_2).not_to be_nil
+      expect(pr.server_cert).not_to be_nil
     end
 
     it "naps if there are children" do
-      st.update(prog: "Postgres::PostgresResourceNexus", label: "initialize_certificates", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", stack: [{}], lease: Time.now + 10)
-      expect(Util).to receive(:create_root_certificate).twice
-      expect(nx).to receive(:create_certificate)
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      expect(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com").at_least(:once)
+      st.update(label: "initialize_certificates")
+      Strand.create(parent: st, prog: "Postgres::PostgresResourceNexus", label: "trigger_pg_current_xact_id_on_parent", lease: Time.now + 10)
       expect { nx.initialize_certificates }.to nap(5)
     end
   end
 
   describe "#refresh_certificates" do
     it "rotates root certificate if root_cert_1 is close to expiration" do
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 30 * 4))
-
-      expect(Util).to receive(:create_root_certificate).with(duration: 60 * 60 * 24 * 365 * 10, common_name: "#{postgres_resource.ubid} Root Certificate Authority")
-      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
+      postgres_server
+      short_cert_pem, short_key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 30 * 4)
+      postgres_resource.update(root_cert_1: short_cert_pem, root_cert_key_1: short_key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
+  end
+
+  describe "#refresh_certificates", "with dns_zone" do
+    before do
+      DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
+      allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
     end
 
     it "rotates server certificate if it is close to expiration" do
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
-
-      expect(nx).to receive(:create_certificate)
-      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
+      postgres_server
+      short_cert_pem, short_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+      ).map(&:to_pem)
+      postgres_resource.update(server_cert: short_cert_pem, server_cert_key: short_key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
 
     it "rotates server certificate if refresh_certificate semaphore is set" do
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 365 * 4))
-
-      expect(nx).to receive(:create_certificate)
-      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
-      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
+      postgres_server
+      nx.incr_refresh_certificates
 
       expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
 
     it "rotates server certificate using root_cert_2 if root_cert_1 is close to expiration" do
-      root_cert_2 = instance_double(OpenSSL::X509::Certificate)
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 1").twice.and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 360))
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("root cert 2").and_return(root_cert_2)
-      expect(OpenSSL::X509::Certificate).to receive(:new).with("server cert").and_return(instance_double(OpenSSL::X509::Certificate, not_after: Time.now + 60 * 60 * 24 * 29))
-      expect(OpenSSL::PKey::EC).to receive(:new).with("root cert key 1").and_return(nil)
-      expect(OpenSSL::PKey::EC).to receive(:new).with("root cert key 2").and_return(nil)
-
-      expect(Util).to receive(:create_certificate).with(hash_including(issuer_cert: root_cert_2)).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "server cert")])
-      expect(postgres_resource.servers).to all(receive(:incr_refresh_certificates))
+      postgres_server
+      short_cert_pem, short_key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 360)
+      short_server_cert_pem, short_server_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+      ).map(&:to_pem)
+      postgres_resource.update(root_cert_1: short_cert_pem, root_cert_key_1: short_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
   end
 
   describe "#wait_servers" do
     it "naps if server not ready" do
-      expect(postgres_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "start")))
-
+      postgres_server
       expect { nx.wait_servers }.to nap(5)
     end
 
     it "hops if server is ready" do
-      expect(postgres_resource.servers).to all(receive(:strand).and_return(instance_double(Strand, label: "wait")))
+      postgres_server.strand.update(label: "wait")
       expect { nx.wait_servers }.to hop("update_billing_records")
     end
   end
 
   describe "#update_billing_records" do
     it "skips to wait if project is not billable" do
-      non_billable_project = Project.create(name: "default", billable: false)
-      expect(postgres_resource).to receive(:project).and_return(non_billable_project).at_least(:once)
-      expect(postgres_resource.project.billable).to be false
-      expect(BillingRecord).not_to receive(:create)
+      postgres_server
+      project.update(billable: false)
       expect { nx.update_billing_records }.to hop("wait")
+      expect(BillingRecord.where(resource_id: postgres_resource.id)).to be_empty
     end
 
     it "creates billing record for cores and storage then hops" do
-      billable_project = Project.create(name: "default", billable: true)
-      expect(postgres_resource).to receive(:project).and_return(billable_project).at_least(:once)
-      expect(postgres_resource.project.billable).to be true
-      expect(postgres_resource).to receive(:flavor).and_return("standard")
-      expect(postgres_resource.representative_server).to receive(:storage_size_gib).and_return(128)
-      expect(postgres_resource).to receive(:target_server_count).and_return(2)
-
-      expect(BillingRecord).to receive(:create).with(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
-        amount: postgres_resource.representative_server.vm.vcpus
-      )
-
-      expect(BillingRecord).to receive(:create).with(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyVCpu", "standard-standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
-        amount: postgres_resource.representative_server.vm.vcpus
-      )
-
-      expect(BillingRecord).to receive(:create).with(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
-        amount: 128
-      )
-
-      expect(BillingRecord).to receive(:create).with(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties("PostgresStandbyStorage", "standard", Location[postgres_resource.location_id].name, Location[postgres_resource.location_id].byoc)["id"],
-        amount: 128
-      )
+      postgres_server
+      project.update(billable: true)
 
       expect { nx.update_billing_records }.to hop("wait")
+      expect(BillingRecord.where(resource_id: postgres_resource.id).count).to eq(2)
+    end
+
+    it "creates standby billing records for HA enabled resources" do
+      postgres_server
+      postgres_resource.update(ha_type: "async")
+      project.update(billable: true)
+
+      expect { nx.update_billing_records }.to hop("wait")
+      # 2 primary records (VCpu + Storage) + 2 standby records (StandbyVCpu + StandbyStorage) = 4 total
+      billing_records = BillingRecord.where(resource_id: postgres_resource.id).all
+      expect(billing_records.count).to eq(4)
+      # Check billing rates include standby types
+      resource_types = billing_records.map { it.billing_rate["resource_type"] }
+      expect(resource_types).to include("PostgresStandbyVCpu", "PostgresStandbyStorage")
     end
   end
 
   describe "#wait" do
-    before do
-      allow(postgres_resource).to receive_messages(certificate_last_checked_at: Time.now, target_server_count: 1, needs_convergence?: false)
-    end
-
-    it "buds ConvergePostgresResource prog if needs_convergence? is true" do
-      expect(postgres_resource).to receive(:needs_convergence?).and_return(true)
-      expect(nx).to receive(:bud).with(Prog::Postgres::ConvergePostgresResource, {}, :start)
-      expect { nx.wait }.to nap(30)
-    end
-
     it "hops to update_billing_records when update_billing_records is set" do
-      expect(nx).to receive(:when_update_billing_records_set?).and_yield
+      nx.incr_update_billing_records
       expect { nx.wait }.to hop("update_billing_records")
     end
 
     it "hops to refresh_dns_record when refresh_dns_record is set" do
-      expect(nx).to receive(:when_refresh_dns_record_set?).and_yield
+      nx.incr_refresh_dns_record
       expect { nx.wait }.to hop("refresh_dns_record")
     end
 
     it "hops to refresh_certificates if the certificate is checked more than 1 months ago" do
-      expect(postgres_resource).to receive(:certificate_last_checked_at).and_return(Time.now - 60 * 60 * 24 * 30 - 1)
+      postgres_resource.update(certificate_last_checked_at: Time.now - 60 * 60 * 24 * 30 - 1)
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
     it "hops to refresh_certificates when refresh_certificates is set" do
-      expect(nx).to receive(:when_refresh_certificates_set?).and_yield
+      nx.incr_refresh_certificates
       expect { nx.wait }.to hop("refresh_certificates")
     end
 
     it "calls set_firewall_rules method of the postgres resource when update_firewall_rules is set" do
-      expect(nx).to receive(:when_update_firewall_rules_set?).and_yield
-      expect(nx).to receive(:decr_update_firewall_rules)
+      nx.incr_update_firewall_rules
       expect { nx.wait }.to nap(30)
-    end
-
-    it "if read_replica and promote is set, promotes and naps" do
-      expect(nx).to receive(:when_promote_set?).and_yield
-      expect(postgres_resource).to receive(:read_replica?).and_return(true)
-      expect(postgres_resource).to receive(:servers).and_return([])
-      expect(postgres_resource).to receive(:update).with(parent_id: nil)
-      expect(nx).to receive(:decr_promote)
-      expect { nx.wait }.to nap(30)
+      expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules")).to be_empty
     end
 
     it "if not read_replica and promote is set, just naps" do
-      expect(nx).to receive(:when_promote_set?).and_yield
-      expect(postgres_resource).to receive(:read_replica?).and_return(false)
-      expect(nx).to receive(:decr_promote)
+      nx.incr_promote
       expect { nx.wait }.to nap(30)
+      expect(Semaphore.where(strand_id: st.id, name: "promote")).to be_empty
+    end
+  end
+
+  describe "#wait", "with postgres_server" do
+    before do
+      postgres_server.strand.update(label: "wait")
+    end
+
+    it "buds ConvergePostgresResource prog if needs_convergence? is true" do
+      postgres_server.incr_recycle
+      expect { nx.wait }.to nap(30)
+      expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first).to exist
+    end
+
+    it "if read_replica and promote is set, promotes and naps" do
+      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      create_postgres_server(resource: parent, server_index: 1)
+      postgres_resource.update(parent:)
+      nx.incr_promote
+      expect { nx.wait }.to nap(30)
+      expect(postgres_resource.reload.parent_id).to be_nil
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "promote").first).to exist
     end
   end
 
   describe "#destroy" do
     it "adds destroy semaphore to children and hops to wait_children_destroyed" do
-      nx.strand.update(prog: "Postgres::PostgresResourceNexus", label: "destroy", stack: {})
-      st = Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: nx.strand.id)
-      expect(nx).to receive(:decr_destroy)
-      expect(nx).to receive(:register_deadline).with(nil, 5 * 60)
+      postgres_server
+      st.update(label: "destroy")
+      child_st = Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent: st)
+      nx.incr_destroy
       expect { nx.destroy }.to hop("wait_children_destroyed")
-      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [child_st.id]
     end
   end
 
   describe "#wait_children_destroyed" do
     it "naps if children still exist" do
-      nx.strand.update(prog: "Postgres::PostgresResourceNexus", label: "destroy", stack: {})
-      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: nx.strand.id)
+      postgres_server
+      st.update(label: "wait_children_destroyed")
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent: st)
       expect { nx.wait_children_destroyed }.to nap(5)
     end
 
-    it "triggers server deletion and waits until it is deleted" do
-      dns_zone = instance_double(DnsZone)
-      expect(postgres_resource).to receive(:dns_zone).and_return(dns_zone)
+    context "with internal firewall" do
+      before do
+        Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id:, project: postgres_project)
+      end
 
-      expect(postgres_resource.servers).to all(receive(:incr_destroy))
-      expect(postgres_resource.internal_firewall).to receive(:destroy)
+      it "triggers server deletion and waits until it is deleted" do
+        postgres_server
+        expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+        DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
 
-      expect(postgres_resource).to receive(:hostname)
-      expect(dns_zone).to receive(:delete_record)
-      expect(postgres_resource).to receive(:destroy)
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+        expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "destroy").first).to exist
+        expect(postgres_resource).not_to exist
+      end
 
-      expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
-        ubid: postgres_resource.ubid,
-        vm_ids: [postgres_resource.servers.first.vm_id]
-      )
-
-      expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
-    end
-
-    it "completes destroy even if dns zone is not configured" do
-      expect(postgres_resource).to receive(:dns_zone).and_return(nil)
-      expect(postgres_resource).to receive(:servers).and_return([]).at_least(:once)
-      expect(postgres_resource.private_subnet).to receive(:incr_destroy_if_only_used_internally).with(
-        ubid: postgres_resource.ubid,
-        vm_ids: []
-      )
-
-      expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+      it "completes destroy even if dns zone is not configured" do
+        postgres_server
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+        expect(postgres_resource).not_to exist
+      end
     end
   end
 end
