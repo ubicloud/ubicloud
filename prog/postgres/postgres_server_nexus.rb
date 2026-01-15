@@ -569,7 +569,10 @@ SQL
 
     unless postgres_server.recycle_set?
       postgres_server.incr_recycle
-      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", stack: [{subject_id: postgres_server.resource.id}])
+      resource = postgres_server.resource
+      if resource.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").empty?
+        Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", stack: [{subject_id: resource.id}], parent_id: resource.strand.id)
+      end
     end
 
     bud self.class, {}, :restart
