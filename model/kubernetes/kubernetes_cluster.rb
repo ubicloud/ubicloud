@@ -15,6 +15,7 @@ class KubernetesCluster < Sequel::Model
   one_to_many :nodepools, class: :KubernetesNodepool, read_only: true
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
   many_to_one :location, read_only: true
+  one_to_one :kubernetes_etcd_backup
 
   dataset_module Pagination
 
