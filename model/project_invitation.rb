@@ -6,6 +6,7 @@ class ProjectInvitation < Sequel::Model
   unrestrict_primary_key
 
   many_to_one :project, read_only: true
+  many_to_one :inviter, class: :Account, read_only: true
 end
 
 # Table: project_invitation
