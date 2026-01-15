@@ -115,9 +115,14 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def mount_data_disk
+    storage_device_paths = postgres_server.storage_device_paths
     case vm.sshable.d_check("format_disk")
     when "Succeeded"
-      storage_device_paths = postgres_server.storage_device_paths
+      # ext4 defaults to reserving 5% of disk for root, on 1TiB this is 50GiB. Cap this to 50GiB
+      reserved_blocks_per_gb = 13107 # ~5% of 262144 (number of 4KiB blocks per GB)
+      reserve_blocks = [postgres_server.storage_size_gib * reserved_blocks_per_gb, 13107200].min
+      vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: storage_device_paths.first, reserve_blocks:)
+
       device_path = if storage_device_paths.count > 1
         vm.sshable.cmd("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
         vm.sshable.cmd("sudo update-initramfs -u")
@@ -132,7 +137,6 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      storage_device_paths = postgres_server.storage_device_paths
       if storage_device_paths.count == 1
         vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", storage_device_paths.first)
       else
