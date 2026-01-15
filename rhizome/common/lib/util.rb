@@ -24,9 +24,9 @@ class FsyncFail < Exception
 end
 # rubocop:enable Lint/InheritException
 
-def r(commandline, stdin: "", expect: [0])
-  stdout, stderr, status = Open3.capture3(commandline, stdin_data: stdin)
-  fail CommandFail.new("command failed: " + commandline, stdout, stderr) unless expect.include?(status.exitstatus)
+def r(*command, stdin: "", expect: [0])
+  stdout, stderr, status = Open3.capture3(*command, stdin_data: stdin)
+  fail CommandFail.new("command failed: " + command.join(" "), stdout, stderr) unless expect.include?(status.exitstatus)
 
   stdout
 end
