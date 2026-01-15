@@ -12,11 +12,20 @@
 <div class="grid gap-6">
   <%== part(
       "components/table_card",
-      headers: ["Name"],
+      headers: %w[Name Remove\ Access],
       rows: @projects.map do |p|
          [
            [
-             [p.name, {link: "#{p.path}/dashboard"}]
+             [p.name, {link: "#{p.path}/dashboard"}],
+             [
+               part("components/delete_button",
+                 url: "/project/#{p.ubid}/user/#{current_account.ubid}",
+                 text: "Remove Access",
+                 icon: nil,
+                 hidden_inputs: {"project_list" => true},
+                 confirmation_message: "Are you sure you want to remove your access to this project?"),
+               {escape: false}
+             ],
            ],
            { id: "project-#{p.ubid}" }
          ]

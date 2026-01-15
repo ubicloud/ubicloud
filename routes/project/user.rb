@@ -360,8 +360,14 @@ class Clover
       end
 
       r.delete :ubid_uuid do |id|
-        authorize("Project:user", @project)
-        handle_validation_failure("project/user")
+        if id == current_account.id
+          no_authorization_needed
+        else
+          authorize("Project:user", @project)
+        end
+
+        project_list = typecast_params.bool("project_list")
+        handle_validation_failure(project_list ? "project/index" : "project/user")
 
         next unless (user = @project.accounts_dataset[id:])
 
@@ -373,8 +379,13 @@ class Clover
         user.remove_project(@project)
         audit_log(@project, "remove_account", user)
 
-        flash["notice"] = "Removed #{user.email} from #{@project.name}"
-        r.redirect @project, "/user"
+        if project_list
+          flash["notice"] = "Removed your access to the project"
+          r.redirect "/project"
+        else
+          flash["notice"] = "Removed #{user.email} from #{@project.name}"
+          r.redirect @project, "/user"
+        end
       end
     end
   end
