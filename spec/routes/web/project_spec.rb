@@ -54,6 +54,86 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content project.name
         expect(page).to have_no_content new_project.name
       end
+
+      it "can accept invitations to projects and join given subject tag" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member", expires_at: Time.now + 1000)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Accept"
+        expect(page).to have_flash_notice("Accepted invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(new_project.subject_tags_dataset.first(name: "Member").member_ids).to include user.id
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "can accept invitations to projects and not join invalid subject tag" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member2", expires_at: Time.now + 1000)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Accept"
+        expect(page).to have_flash_notice("Accepted invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(new_project.subject_tags_dataset.first(name: "Member").member_ids).not_to include user.id
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "shows error if accepting an invitation to a project where account is already a member" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, expires_at: Time.now + 1000)
+        new_project.add_account(user)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Accept"
+        expect(page).to have_flash_error("You are already a member of the project, ignoring invitation")
+        expect(user.invitations.count).to eq 0
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "can decline invitations to projects" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, expires_at: Time.now + 1000)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Decline"
+        expect(page).to have_flash_notice("Declined invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_no_content new_project.name
+      end
     end
 
     describe "create" do

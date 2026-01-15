@@ -102,6 +102,7 @@ class Clover < Roda
 
   AUDIT_LOG_DS = DB[:audit_log].returning(nil)
   SUPPORTED_ACTIONS = Set.new(<<~ACTIONS.split.each(&:freeze)).freeze
+    accept_invitation
     add_account
     add_invitation
     add_member
@@ -110,6 +111,7 @@ class Clover < Roda
     connect
     create
     create_replica
+    decline_invitation
     delete_all_cache_entries
     destroy
     destroy_invitation
