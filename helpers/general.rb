@@ -189,7 +189,7 @@ class Clover < Roda
 
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
-    account.create_project_with_default_policy("Default")
+    account.default_project = account.create_project_with_default_policy("Default")
   end
 
   def current_account_id
