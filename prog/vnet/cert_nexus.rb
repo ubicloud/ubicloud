@@ -38,34 +38,34 @@ class Prog::Vnet::CertNexus < Prog::Base
     cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
     order.authorizations.each do |authorization|
       dns_challenge = authorization.dns
-      # With multiple authorizations for separate DNS challenge records, there doesn't
-      # seem to be a way to tie an authorization to a specific DNS name. So add all
-      # authorizations to all names we are requesting.
-      each_dns_record_name(dns_challenge) do |record_name|
-        dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
-      end
+      # Each authorization contains an identifier field (RFC 8555 Section 7.1.4)
+      # specifying which domain it authorizes. The acme-client gem exposes this
+      # as authorization.domain.
+      record_name = dns_challenge.record_name + "." + authorization.domain
+      dns_zone.insert_record(record_name:, type: dns_challenge.record_type, ttl: 600, data: dns_challenge.record_content)
     end
 
     hop_wait_dns_update
   end
 
   label def wait_dns_update
-    each_dns_challenge do |dns_challenge|
-      each_dns_record_name(dns_challenge) do |name|
-        dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
-        if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
-          nap 10
-        end
+    each_authorization do |authorization|
+      dns_challenge = authorization.dns
+      name = dns_challenge.record_name + "." + authorization.domain
+      dns_record = DnsRecord[dns_zone_id: dns_zone.id, name: name + ".", tombstoned: false, data: dns_challenge.record_content]
+      if DB[:seen_dns_records_by_dns_servers].where(dns_record_id: dns_record.id).empty?
+        nap 10
       end
     end
 
-    each_dns_challenge(&:request_validation)
+    each_authorization { it.dns.request_validation }
 
     hop_wait_dns_validation
   end
 
   label def wait_dns_validation
-    each_dns_challenge do |dns_challenge|
+    each_authorization do |authorization|
+      dns_challenge = authorization.dns
       case (order_status = dns_challenge.status)
       when "pending", "processing"
         # do nothing
@@ -166,21 +166,15 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
   end
 
-  def each_dns_challenge
-    acme_order&.authorizations&.each { yield it.dns }
-  end
-
-  def each_dns_record_name(dns_challenge)
-    name = dns_challenge.record_name
-    yield(name + "." + cert.hostname)
-    yield(name + ".private-" + cert.hostname) if frame["add_private"]
+  def each_authorization
+    acme_order&.authorizations&.each { yield it }
   end
 
   def cleanup_dns_challenge_records
-    each_dns_challenge do |dns_challenge|
-      each_dns_record_name(dns_challenge) do |record_name|
-        dns_zone.delete_record(record_name:)
-      end
+    each_authorization do |authorization|
+      dns_challenge = authorization.dns
+      record_name = dns_challenge.record_name + "." + authorization.domain
+      dns_zone.delete_record(record_name:)
     end
   end
 

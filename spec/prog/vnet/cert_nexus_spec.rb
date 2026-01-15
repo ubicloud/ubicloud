@@ -16,10 +16,19 @@ RSpec.describe Prog::Vnet::CertNexus do
   let(:client) { instance_double(Acme::Client) }
   let(:account_key) { Clec::Cert.ec_key }
 
-  def setup_order(new_order: false, with_order: true)
+  def setup_order(new_order: false, with_order: true, add_private: false)
     dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
-    authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge)
-    order = instance_double(Acme::Client::Resources::Order, authorizations: [authorization], url: "test-order-url") if with_order
+    # Each authorization includes a domain attribute per RFC 8555 Section 7.1.4
+    authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge, domain: cert.hostname)
+    authorizations = [authorization]
+
+    if add_private
+      private_dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content-private")
+      private_authorization = instance_double(Acme::Client::Resources::Authorization, dns: private_dns_challenge, domain: "private-#{cert.hostname}")
+      authorizations << private_authorization
+    end
+
+    order = instance_double(Acme::Client::Resources::Order, authorizations:, url: "test-order-url") if with_order
 
     unless new_order
       expect(Acme::Client).to receive(:new).and_return(client)
@@ -37,6 +46,7 @@ RSpec.describe Prog::Vnet::CertNexus do
   def use_add_private(identifiers: [])
     st.stack = [{"restarted" => 0, "add_private" => true}]
     nx.instance_variable_set(:@frame, nil)
+    nx.instance_variable_set(:@acme_order, nil)
     identifiers << "private-#{cert.hostname}"
   end
 
@@ -63,21 +73,36 @@ RSpec.describe Prog::Vnet::CertNexus do
   end
 
   describe "#start" do
-    [true, false].each do |use_add_private|
-      it "registers a deadline and starts the certificate creation process#{" when adding private DNS name" if use_add_private}" do
-        identifiers = [cert.hostname]
-        use_add_private(identifiers:) if use_add_private
-        order = setup_order(new_order: true)
-        expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
-        expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
-        expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
-        expect(client).to receive(:new_order).with(identifiers:).and_return(order)
+    it "registers a deadline and starts the certificate creation process" do
+      identifiers = [cert.hostname]
+      order = setup_order(new_order: true)
+      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
+      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      expect(client).to receive(:new_order).with(identifiers:).and_return(order)
 
-        expect { nx.start }.to hop("wait_dns_update")
-        expect(cert.reload.kid).to eq("test-kid")
-        expect(cert.order_url).to eq("test-order-url")
-        expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
-      end
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.kid).to eq("test-kid")
+      expect(cert.order_url).to eq("test-order-url")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
+    end
+
+    it "registers a deadline and starts the certificate creation process when adding private DNS name" do
+      identifiers = [cert.hostname]
+      use_add_private(identifiers:)
+      # With add_private, ACME returns two authorizations (one per domain)
+      order = setup_order(new_order: true, add_private: true)
+      expect(OpenSSL::PKey::EC).to receive(:generate).with("prime256v1").and_return(account_key)
+      expect(Acme::Client).to receive(:new).with(private_key: account_key, directory: Config.acme_directory).and_return(client)
+      expect(client).to receive(:new_account).with(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key}).and_return(instance_double(Acme::Client::Resources::Account, kid: "test-kid"))
+      expect(client).to receive(:new_order).with(identifiers:).and_return(order)
+
+      expect { nx.start }.to hop("wait_dns_update")
+      expect(cert.reload.kid).to eq("test-kid")
+      expect(cert.order_url).to eq("test-order-url")
+      # Each authorization creates ONE DNS record for its own domain
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.").count).to eq(1)
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -183,13 +208,29 @@ RSpec.describe Prog::Vnet::CertNexus do
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
       expect(cert.reload.cert).to eq("test-certificate")
     end
+  end
 
-    it "deletes private DNS record if add_private is set" do
-      use_add_private(identifiers: [])
-      expect(@acme_order).to receive(:status).and_return("valid")
-      expect(@acme_order).to receive(:certificate).and_return("test-certificate")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.", type: "TXT", ttl: 600, data: "content")
+  describe "#wait_cert_finalization with add_private" do
+    it "deletes both DNS records for both authorizations" do
+      st.stack = [{"restarted" => 0, "add_private" => true}]
+      nx.instance_variable_set(:@frame, nil)
+
+      dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content")
+      authorization = instance_double(Acme::Client::Resources::Authorization, dns: dns_challenge, domain: cert.hostname)
+      private_dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content-private")
+      private_authorization = instance_double(Acme::Client::Resources::Authorization, dns: private_dns_challenge, domain: "private-#{cert.hostname}")
+      order = instance_double(Acme::Client::Resources::Order, authorizations: [authorization, private_authorization], url: "test-order-url")
+
+      fresh_client = instance_double(Acme::Client)
+      expect(Acme::Client).to receive(:new).and_return(fresh_client)
+      expect(fresh_client).to receive(:order).with(url: "test-order-url").and_return(order)
+      cert.update(order_url: "test-order-url", account_key: account_key.to_der, kid: "x")
+
+      expect(order).to receive(:status).and_return("valid")
+      expect(order).to receive(:certificate).and_return("test-certificate")
+
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content-private")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(2)
       expect(cert.reload.cert).to eq("test-certificate")
