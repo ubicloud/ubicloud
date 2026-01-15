@@ -8,6 +8,7 @@ class Account < Sequel::Model(:accounts)
   one_to_many :identities, class: :AccountIdentity, remover: nil, clearer: nil
   one_to_many :invitations, class: :ProjectInvitation, primary_key: :email, key: :email, read_only: true
   many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id
+  one_through_one :default_project, class: :Project, join_table: :account_default_project, left_key: :id, right_key: :project_id
 
   plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
