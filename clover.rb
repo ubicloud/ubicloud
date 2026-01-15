@@ -21,6 +21,9 @@ class Clover < Roda
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
 
+  @ips_v4 = Util.calculate_ips_v4
+  singleton_class.attr_reader :ips_v4
+
   opts[:check_dynamic_arity] = false
   opts[:check_arity] = :warn
 
@@ -28,7 +31,7 @@ class Clover < Roda
   Unreloader.record_split_class(__FILE__, "helpers")
 
   # :nocov:
-  default_fixed_locals = if Config.production? || ENV["CLOVER_FREEZE"] == "1"
+  default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
   # :nocov:
   else
@@ -39,6 +42,7 @@ class Clover < Roda
   plugin :assets, js: "app.js", css: "app.css", css_opts: {style: :compressed, cache: false}, timestamp_paths: true
   plugin :disallow_file_uploads
   plugin :flash
+  plugin :forme_route_csrf
   plugin :h
   plugin :hash_branches
   plugin :hooks
@@ -51,12 +55,13 @@ class Clover < Roda
   plugin :part
   plugin :request_headers
   plugin :plain_hash_response_headers
+  plugin :redirect_path
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
     invalid_value_message(:pos_int64, "Value must be an integer greater than 0 for parameter")
 
     handle_type(:ubid_uuid, invalid_value_message: "Value provided not a valid id for parameter") do
-      if it.is_a?(String) && it.bytesize == 26
+      if it.is_a?(String) && /\A([a-tv-z0-9]{26})\z/.match?(it)
         UBID.to_uuid(it)
       end
     end
@@ -66,6 +71,62 @@ class Clover < Roda
   symbol_matcher(:ubid_uuid, /([a-tv-z0-9]{26})/) do |s|
     UBID.to_uuid(s)
   end
+  [
+    Firewall,
+    [GithubInstallation, /([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/],
+    [GithubRepository, /([A-Za-z0-9\-_.]{1,100})/],
+    KubernetesCluster,
+    KubernetesNodepool,
+    LoadBalancer,
+    PostgresResource,
+    PrivateSubnet,
+    SshPublicKey,
+    Vm
+  ].each do |model, regexp|
+    sym = :"#{model.table_name}_ubid_uuid"
+    symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
+      if (uuid = UBID.to_uuid(ubid))
+        # yield nil as first element to differentiate case where name matches
+        [nil, uuid]
+      end
+    end
+    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", [sym, regexp || /([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)/])
+  end
+
+  plugin :response_content_type,
+    mime_types: {
+      json: "application/json",
+      pdf: "application/pdf",
+      pem: "application/x-pem-file",
+      text: "text/plain"
+    }
+
+  plugin :path
+
+  path(:billing) { "#{@project.path}/billing" }
+  path(:user) { "#{@project.path}/user" }
+
+  under_project_path = -> { "#{@project.path}#{it.path}" }
+  %w[
+    ActionTag
+    ApiKey
+    Firewall
+    KubernetesCluster
+    KubernetesNodepool
+    LoadBalancer
+    Location
+    ObjectTag
+    PaymentMethod
+    PostgresResource
+    PrivateSubnet
+    SshPublicKey
+    SubjectTag
+    Vm
+  ].each { path(it, class_name: true, &under_project_path) }
+
+  path("Project", class_name: true, &:path)
+  path("GithubInstallation", class_name: true) { "#{it.project.path}/github/#{it.ubid}" }
+  path("Invoice", class_name: true) { "#{it.project.path}/billing#{it.path}" }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)
@@ -74,10 +135,12 @@ class Clover < Roda
   # :nocov:
 
   plugin :host_routing, scope_predicates: true do |hosts|
-    hosts.register :api, :web, :runtime
+    hosts.register :api, :web, :runtime, :admin
     hosts.default :web do |host|
       if host.start_with?("api.")
         :api
+      elsif host.start_with?("admin.")
+        :admin
       elsif request.path_info.start_with?("/runtime")
         :runtime
       end
@@ -139,7 +202,7 @@ class Clover < Roda
     if api? || request.accepts_json?
       {error: @error}.to_json
     else
-      view "/error"
+      view "error"
     end
   end
 
@@ -157,7 +220,7 @@ class Clover < Roda
   end
 
   plugin :error_handler do |e|
-    if Config.test? && ENV["SHOW_ERRORS"]
+    if Config.test? && (ENV["SHOW_ERRORS"] || request.admin?)
       raise e
     end
 
@@ -197,10 +260,11 @@ class Clover < Roda
       code = 500
       type = "InternalServerError"
       message = "There was a temporary error attempting to make this change, please try again."
-      Clog.emit("route exception") { Util.exception_to_hash(e) }
+      Clog.emit("route exception", Util.exception_to_hash(e))
     else
       raise e if Config.test? && e.message != "test error"
-      Clog.emit("route exception") { Util.exception_to_hash(e) }
+
+      Clog.emit("route exception", Util.exception_to_hash(e))
 
       code = 500
       type = "UnexceptedError"
@@ -221,23 +285,27 @@ class Clover < Roda
     else
       @error = error
 
-      if e.is_a?(Sequel::ValidationFailed) || e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
+      if e.is_a?(Sequel::ValidationFailed)
         flash["error"] = message
-        redirect_back_with_inputs
+        flash["errors"] = (flash["errors"] || {}).merge(e.errors).transform_keys(&:to_s) if e.errors
+        redirect_back_with_inputs(e)
+      elsif e.is_a?(DependencyError) || e.is_a?(Roda::RodaPlugins::TypecastParams::Error)
+        flash["error"] = message
+        redirect_back_with_inputs(e)
       elsif e.is_a?(Sequel::SerializationFailure)
         flash["error"] = "There was a temporary error attempting to make this change, please try again."
-        redirect_back_with_inputs
+        redirect_back_with_inputs(e)
       elsif e.is_a?(CloverError) && !e.is_a?(Authorization::Unauthorized)
         flash["error"] = message
         flash["errors"] = (flash["errors"] || {}).merge(details || {}).transform_keys(&:to_s)
-        redirect_back_with_inputs
+        redirect_back_with_inputs(e)
       end
 
       # :nocov:
       next exception_page(e, assets: true) if Config.development? && code == 500
       # :nocov:
 
-      view "/error"
+      view "error"
     end
   end
 
@@ -260,7 +328,12 @@ class Clover < Roda
     # is when the provided personal access token is invalid.  Generate the JSON
     # error body up front and serve it, so it doesn't need to be generated per-request.
     json_response_body do |_|
-      invalid_auth_error_body
+      if request.env["PATH_INFO"] == "/cli"
+        response.content_type = :text
+        "! Invalid personal access token provided\n"
+      else
+        invalid_auth_error_body
+      end
     end
 
     require_bcrypt? false
@@ -275,6 +348,7 @@ class Clover < Roda
 
     title_instance_variable :@page_title
     check_csrf? false
+    base_url Config.base_url
 
     # :nocov:
     unless Config.development?
@@ -315,10 +389,10 @@ class Clover < Roda
       password_minimum_length 8
       password_maximum_bytes 72
       password_meets_requirements? do |password|
-        password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
+        DB.ignore_duplicate_queries { super(password) } && password.match?(/[a-z]/) && password.match?(/[A-Z]/) && password.match?(/[0-9]/)
       end
 
-      invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit."
+      invalid_password_message = "Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit. Password cannot be the same as a previous password."
       password_does_not_meet_requirements_message invalid_password_message
       password_too_short_message invalid_password_message
     end
@@ -381,7 +455,7 @@ class Clover < Roda
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
       if cf_response&.empty?
-        Clog.emit("cloudflare turnstile parameter not submitted") { {user_agent: scope.env["HTTP_USER_AGENT"]} }
+        Clog.emit("cloudflare turnstile parameter not submitted", {user_agent: scope.env["HTTP_USER_AGENT"]})
         scope.flash["error"] = "Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again."
         request.redirect("/create-account")
       end
@@ -507,7 +581,24 @@ class Clover < Roda
         redirect "/login"
       end
 
-      scope.before_rodauth_create_account(account, omniauth_name || account[:email].split("@", 2)[0].gsub(/[^A-Za-z]+/, " ").capitalize)
+      name = (omniauth_name || account[:email].split("@", 2)[0])
+        .gsub(/[^\p{L}0-9\- ]+/, " ")
+        .gsub(/\A[^\p{L}]+/, "")
+        .strip
+        .squeeze(" ")
+        .slice(0...63)
+      unless Validation::ALLOWED_ACCOUNT_NAME.match?(name)
+        Clog.emit("invalid social login account name", {
+          invalid_social_login_account_name: {
+            omniauth_name:,
+            email: account[:email],
+            name:
+          }
+        })
+        name = "Unknown"
+      end
+
+      scope.before_rodauth_create_account(account, name)
     end
 
     after_omniauth_create_account do
@@ -515,7 +606,7 @@ class Clover < Roda
     end
 
     omniauth_on_failure do
-      Clog.emit("omniauth failure") { {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace} }
+      Clog.emit("omniauth failure", {omniauth_error:, omniauth_error_type:, omniauth_error_strategy:, backtrace: omniauth_error.backtrace})
       super()
     end
 
@@ -624,16 +715,9 @@ class Clover < Roda
           close_account_view
         end
       end
-      account = Account[account_id]
-      # Do not allow to close account if the project has resources and
+      # Do not allow closing account if the project has resources and
       # the account is the only user
-      projects_dataset = Project
-        .where(id: DB[:access_tag]
-          .select_group(:project_id)
-          .where(project_id: account.projects_dataset.select(Sequel[:project][:id]))
-          .having(Sequel.function(:count).* => 1))
-
-      if (project = projects_dataset.first_project_with_resources)
+      if (project = Account[account_id].first_sole_project_with_resources)
         fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end
@@ -756,6 +840,7 @@ class Clover < Roda
     recovery_codes_route "account/multifactor/recovery-codes"
     recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
     recovery_codes_link_text "View"
+    add_recovery_code { DB.ignore_duplicate_queries { super() } }
     add_recovery_codes_view { view "account/multifactor/recovery_codes", "My Account" }
     auto_add_recovery_codes? true
     auto_remove_recovery_codes? true
@@ -780,6 +865,11 @@ class Clover < Roda
     hash_branch(:webhook_prefix, "test-typecast-error-during-validation-failure") do |r|
       r.POST["a"] = {}
       handle_validation_failure(inline: "<%= typecast_body_params.str('a') %>")
+      typecast_body_params.str("a")
+    end
+
+    hash_branch(:webhook_prefix, "test-missing-handle-validation-failure") do |r|
+      r.POST["a"] = {}
       typecast_body_params.str("a")
     end
 
@@ -828,6 +918,14 @@ class Clover < Roda
       session.delete("last_password_entry")
       ""
     end
+
+    hash_branch("set_github_installation_project_id") do |r|
+      r.get :ubid_uuid do |id|
+        no_authorization_needed
+        session["github_installation_project_id"] = id
+        ""
+      end
+    end
   end
 
   if Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
@@ -855,22 +953,33 @@ class Clover < Roda
     if api?
       unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
-          response["content-type"] = "text/plain"
+          response.content_type = :text
           response.status = 400
           next "! Invalid request: No valid personal access token provided\n"
-        else
+        elsif (session_id = env["clover.web_cli_session_id"])
+          rodauth.instance_variable_set(:@session, rodauth.session_key.to_s => session_id)
+        elsif r.path_info != "/ips-v4"
           response.json = true
           fail CloverError.new(401, "MissingCredentials", "must include personal access token in Authorization header")
         end
       end
+
       response.json = true
       response.skip_content_security_policy!
+
+      r.get "ips-v4" do
+        response.content_type = :text
+        response.cache_control public: true, max_age: 86400
+        self.class.ips_v4
+      end
+    elsif r.admin?
+      r.run(CloverAdmin.app)
     else
       r.on "runtime" do
         response.json = true
         response.skip_content_security_policy!
 
-        unless (jwt_payload = get_runtime_jwt_payload) && (@vm = Vm[id: UBID.to_uuid(jwt_payload["sub"])])
+        unless (@vm = Vm.from_runtime_jwt_payload(get_runtime_jwt_payload))
           fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
         end
 
@@ -905,7 +1014,7 @@ class Clover < Roda
         if current_account
           redirect_default_project_dashboard
         else
-          r.redirect rodauth.login_route
+          r.redirect rodauth.login_path
         end
       end
     end
@@ -920,7 +1029,13 @@ class Clover < Roda
         @schema_validator = SCHEMA_ROUTER.build_schema_validator(r)
         @schema_validator.request_validate(r)
 
-        next unless @schema_validator.link_exist?
+        unless @schema_validator.link_exist?
+          if Config.test? && !ENV["IGNORE_INVALID_API_PATHS"]
+            raise "request not found in openapi schema: #{r.request_method} #{r.path_info}"
+          end
+
+          next
+        end
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
       end
@@ -934,6 +1049,7 @@ class Clover < Roda
   after do |res|
     status, headers, body = res
     next unless api? && status && headers && body
+
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
     @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
   rescue JSON::ParserError => e
@@ -941,7 +1057,7 @@ class Clover < Roda
   end
 
   # :nocov:
-  if Config.test? && ENV["CLOVER_FREEZE"] != "1"
+  if Config.unfrozen_test?
     # :nocov:
 
     # This section is included when running non-frozen specs, and ensures that all routes
@@ -1021,6 +1137,7 @@ class Clover < Roda
 
       def no_authorization_needed
         raise "called no_authorization_needed when authorization already not needed: #{request.inspect}" unless @still_need_authorization
+
         @still_need_authorization = false
         super
       end

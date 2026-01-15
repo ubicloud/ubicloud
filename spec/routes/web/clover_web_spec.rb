@@ -25,7 +25,7 @@ RSpec.describe Clover do
     expect(page.title).to end_with("Dashboard")
   end
 
-  if ENV["CLOVER_FREEZE"] != "1"
+  if Config.unfrozen_test?
     it "raises error if no_authorization_needed called when not needed or already authorized" do
       create_account.create_project_with_default_policy("project-1")
       login
@@ -70,8 +70,23 @@ RSpec.describe Clover do
     expect(page.status_code).to eq(400)
   end
 
+  it "handles missing handle_validation_failure_call" do
+    expect(Clog).to receive(:emit).with("web error without handle_validation_failure", instance_of(Hash)).and_call_original
+    expect { visit "/webhook/test-missing-handle-validation-failure" }.to raise_error(RuntimeError, /Request failure without handle_validation_failure/)
+  end
+
+  it "handles missing handle_validation_failure_call when using production default of showing error template" do
+    ENV["SHOW_WEB_ERROR_PAGE"] = "1"
+    expect(Clog).to receive(:emit).with("web error without handle_validation_failure", instance_of(Hash)).and_call_original
+    visit "/webhook/test-missing-handle-validation-failure"
+    expect(page.title).to eq "Ubicloud - InvalidRequest"
+    expect(page).to have_content "expected string but received {}"
+  ensure
+    ENV.delete("SHOW_WEB_ERROR_PAGE")
+  end
+
   it "handles expected errors" do
-    expect(Clog).to receive(:emit).with("route exception").and_call_original
+    expect(Clog).to receive(:emit).with("route exception", instance_of(Hash)).and_call_original
 
     visit "/webhook/test-error"
 
@@ -102,6 +117,7 @@ RSpec.describe Clover do
       from, path = tuple
 
       next if visited[path]
+
       visited[path] = true
       visit path
 

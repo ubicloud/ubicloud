@@ -11,7 +11,7 @@ RSpec.describe Clover, "vm" do
 
   let(:vm) do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "dummy-vm-1").subject
-    vm.update(ephemeral_net6: "2a01:4f8:173:1ed3:aa7c::/79")
+    vm.update(ephemeral_net6: NetAddr::IPv6Net.parse("2a01:4f8:173:1ed3:aa7c::/79"))
     vm.reload # without reload ephemeral_net6 is string and can't call .network
   end
 
@@ -121,7 +121,7 @@ RSpec.describe Clover, "vm" do
       end
 
       it "shows vm create page with burstable and location_latitude_fra" do
-        project.set_ff_location_latitude_fra true
+        project.set_ff_visible_locations ["latitude-fra"]
         visit "#{project.path}/vm/create"
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
       end
@@ -191,12 +191,59 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content "You don't have permission to create virtual machines."
       end
 
+      it "can create new virtual machine using registered SSH public key" do
+        project.add_ssh_public_key(name: "my-spk", public_key: "a a")
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content("Registered SSH Public Key")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        select "my-spk"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.id).not_to be_nil
+        expect(Vm.first.public_key).to eq "a a"
+      end
+
+      it "can create new virtual machine using init script" do
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        fill_in "Init Script", with: "foo bar"
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.id).not_to be_nil
+        expect(Vm.first.init_script.init_script).to eq "foo bar"
+      end
+
       it "can create new virtual machine with public ipv4" do
         project
 
         visit "#{project.path}/vm/create"
 
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_no_content("Registered SSH Public Key")
         name = "dummy-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
@@ -213,6 +260,36 @@ RSpec.describe Clover, "vm" do
         expect(Vm.first.project_id).to eq(project.id)
         expect(Vm.first.private_subnets.first.id).not_to be_nil
         expect(Vm.first.ip4_enabled).to be_truthy
+      end
+
+      it "can create new virtual machine in a new private subnet" do
+        project
+
+        visit "#{project.path}/vm/create"
+
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        name = "dummy-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        find("option[value=new-#{Location::HETZNER_FSN1_UBID}]").select_option
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "ubuntu-jammy"
+        choose option: "standard-2"
+        click_button "Create"
+        expect(page).to have_flash_error("empty string provided for parameter new_private_subnet_name")
+
+        fill_in "Private Subnet Name", with: "bad ps name"
+        click_button "Create"
+        expect(page).to have_flash_error("Validation failed for following fields: new_private_subnet_name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        fill_in "Private Subnet Name", with: "test-ps-name"
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+        expect(Vm.first.project_id).to eq(project.id)
+        expect(Vm.first.private_subnets.first.name).to eq "test-ps-name"
       end
 
       it "can create a virtual machine with gpu" do
@@ -261,6 +338,15 @@ RSpec.describe Clover, "vm" do
         pci.update(vm_id: Vm.first.id)
         page.refresh
         expect(page).to have_content "1x NVIDIA A100 80GB PCIe"
+      end
+
+      it "handles case where gpu vms are not enabled for the project" do
+        project
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "GPU virtual machines are not enabled for this project. Email support@ubicloud.com to enable GPU VMs."
       end
 
       it "handles case where no gpus are available on create gpu virtual machine page by redirecting" do
@@ -364,6 +450,31 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_no_content "GPU"
         expect(page).to have_content "Finland"
         expect(page).to have_content "Burstable"
+      end
+
+      it "shows invisible locations if feature flag is enabled" do
+        project
+        project.set_ff_gpu_vm(true)
+        project.set_ff_visible_locations(["latitude-ai"])
+        vmh = Prog::Vm::HostNexus.assemble("::1", location_id: Location[name: "latitude-ai"].id).subject
+        pci = PciDevice.new_with_id(
+          vm_host_id: vmh.id,
+          slot: "01:00.0",
+          device_class: "0300",
+          vendor: "10de",
+          device: "20b5",
+          numa_node: nil,
+          iommu_group: 0
+        )
+        vmh.save_changes
+        pci.save_changes
+
+        visit "#{project.path}/vm"
+        click_link "Create GPU Virtual Machine"
+
+        expect(page.title).to eq("Ubicloud - Create GPU Virtual Machine")
+        expect(page).to have_content "GPU"
+        expect(page).to have_content "latitude-ai"
       end
 
       it "cannot create a virtual machine with gpu if feature switch is disabled" do
@@ -628,14 +739,62 @@ RSpec.describe Clover, "vm" do
       end
     end
 
+    describe "networking" do
+      it "shows firewall rules" do
+        visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Networking" }
+        expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535"
+        ]
+        page.all("#vm-firewall-rules td a").first.click
+        expect(page.title).to eq "Ubicloud - default-eu-central-h1-default"
+      end
+
+      it "does not link to firewalls that are not viewable" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/networking"
+        expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
+          "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
+          "default-eu-central-h1-default", "::/0", "0..65535"
+        ]
+        expect(page.all("#vm-firewall-rules td a").to_a).to eq []
+      end
+    end
+
+    describe "rename" do
+      it "can rename virtual machine" do
+        old_name = vm.name
+        visit "#{project.path}#{vm.path}/settings"
+        fill_in "name", with: "new-name%"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(vm.reload.name).to eq old_name
+
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(vm.reload.name).to eq "new-name"
+        expect(page).to have_content("new-name")
+      end
+
+      it "does not show rename option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
+        expect(page).to have_no_content("Rename")
+      end
+    end
+
     describe "delete" do
       it "can delete virtual machine" do
         visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        btn = find "#vm-delete-#{vm.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#vm-delete-#{vm.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("Virtual machine scheduled for deletion.")
 
         expect(SemSnap.new(vm.id).set?("destroy")).to be true
       end
@@ -644,7 +803,7 @@ RSpec.describe Clover, "vm" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
 
-        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-vm-2"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
@@ -654,11 +813,21 @@ RSpec.describe Clover, "vm" do
     describe "restart" do
       it "can restart vm" do
         visit "#{project.path}#{vm.path}"
+        within("#vm-submenu") { click_link "Settings" }
         expect(page).to have_content "Restart"
         click_button "Restart"
 
         expect(page.status_code).to eq(200)
         expect(vm.restart_set?).to be true
+      end
+
+      it "can not restart virtual machine without edit permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
+        expect(page.title).to eq "Ubicloud - dummy-vm-2"
+
+        expect(page).to have_no_content "Restart"
       end
     end
   end

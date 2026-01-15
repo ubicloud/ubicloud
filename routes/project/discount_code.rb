@@ -3,9 +3,8 @@
 class Clover
   hash_branch(:project_prefix, "discount-code") do |r|
     r.post r.web? do
-      authorize("Project:billing", @project.id)
+      authorize("Project:billing", @project)
       handle_validation_failure("project/billing")
-      billing_path = "#{@project.path}/billing"
 
       if (discount_code = typecast_params.nonempty_str("discount_code"))
         discount_code = discount_code.strip.downcase
@@ -16,19 +15,14 @@ class Clover
       end
 
       unless discount
-        Clog.emit("Invalid discount code attempted") { {invalid_discount_code: {project_id: @project.id, code: discount_code}} }
+        Clog.emit("Invalid discount code attempted", {invalid_discount_code: {project_id: @project.id, code: discount_code}})
         raise_web_error("Discount code not found.")
       end
 
       begin
         DB.transaction do
-          hash = ProjectDiscountCode.dataset.returning.insert(
-            id: ProjectDiscountCode.generate_uuid,
-            project_id: @project.id,
-            discount_code_id: discount.id
-          ).first
           @project.this.update(credit: Sequel[:credit] + discount.credit_amount.to_f)
-          audit_log(ProjectDiscountCode.call(hash), "create")
+          audit_log(@project.insert_project_discount_code(discount), "create")
         end
       rescue Sequel::UniqueConstraintViolation
         raise_web_error("Discount code has already been applied to this project.")

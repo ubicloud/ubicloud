@@ -21,10 +21,12 @@ class Prog::LearnNetwork < Prog::Base
     # Maybe we can improve support for inet in a fork later, NetAddr
     # is not a fast moving project, there is room to improve it, but
     # some would be backwards-incompatible.
-    vm_host.update(
-      ip6: ip6.addr,
-      net6: NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s
-    )
+    if ip6
+      vm_host.update(
+        ip6: ip6.addr,
+        net6: NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s
+      )
+    end
     pop "learned network information"
   end
 
@@ -43,8 +45,10 @@ class Prog::LearnNetwork < Prog::Base
       else
         fail "only one global unique address prefix supported on interface"
       end
+    in []
+      nil
     else
-      fail "only one one interface supported"
+      fail "only one interface supported"
     end
   end
 end

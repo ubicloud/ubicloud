@@ -8,9 +8,10 @@ class Prog::LearnPci < Prog::Base
     def self.parse_all(lspci_str)
       out = []
       lspci_str.strip.split(/^\n+/).each do |dev_str|
-        dev_h = dev_str.split("\n").map { |e| e.split(":\t") }.to_h
+        dev_h = dev_str.split("\n").to_h { |e| e.split(":\t") }
         fail "BUG: lspci parse failed" unless REQUIRED_KEYS.all? { |s| dev_h.key? s }
         next unless dev_h.key? "IOMMUGroup"
+
         out << PciDeviceRecord.new(dev_h["Slot"], dev_h["Class"], dev_h["Vendor"], dev_h["Device"], dev_h["NUMANode"], dev_h["IOMMUGroup"])
       end
       out.freeze

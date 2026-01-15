@@ -6,60 +6,80 @@ require_relative "../model"
 class Vm < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  many_to_one :project
-  one_to_many :nics
-  many_to_many :private_subnets, join_table: :nic
-  one_to_one :sshable, key: :id
+  many_to_one :project, read_only: true
+  one_to_many :nics, read_only: true
+  many_to_many :private_subnets, join_table: :nic, read_only: true
+  one_to_one :sshable, key: :id, read_only: true
   one_to_one :assigned_vm_address, key: :dst_vm_id
-  one_to_many :vm_storage_volumes, order: Sequel.desc(:boot)
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
-  one_to_many :pci_devices
-  one_through_one :load_balancer
-  one_to_one :load_balancer_vm
+  one_to_many :vm_storage_volumes, order: Sequel.desc(:boot), remover: nil, clearer: nil
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  one_to_many :pci_devices, read_only: true
+  one_to_one :gpu_partition, read_only: true
+  one_through_one :load_balancer, read_only: true
+  one_to_one :load_balancer_vm, read_only: true
   many_to_many :load_balancer_vm_ports, join_table: :load_balancers_vms, right_key: :id, right_primary_key: :load_balancer_vm_id, read_only: true
-  many_to_one :vm_host_slice
+  many_to_one :vm_host_slice, read_only: true
   many_to_one :location
-  one_to_one :aws_instance, key: :id
+  one_to_one :aws_instance, key: :id, read_only: true
+  one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
+  one_to_one :github_runner, read_only: true
 
-  many_through_many :firewalls,
+  many_through_many :private_subnet_firewalls,
     [
       [:nic, :vm_id, :private_subnet_id],
       [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
-    ]
+    ],
+    class: :Firewall
+  many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
 
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: :public_key
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop, :migrate_to_separate_progs
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
+
+  def self.from_runtime_jwt_payload(jwt_payload)
+    jwt_payload && first(id: UBID.to_uuid(jwt_payload["sub"]))
+  end
 
   def display_location
     location.display_name
   end
 
+  def display_gpu
+    gpu_devices = pci_devices.select { |d| ["0300", "0302"].include?(d.device_class) }
+    "#{gpu_devices.count}x #{PciDevice.device_name(gpu_devices.first.device)}" if gpu_devices.any?
+  end
+
   def load_balancer_state
-    load_balancer_vm_ports.first&.state
+    return nil unless load_balancer
+    if load_balancer.stack == "dual"
+      %w[ipv4 ipv6].map! { |stack| load_balancer_vm_ports.find { it.stack == stack }.state }
+    else
+      [load_balancer_vm_ports.first.state]
+    end
   end
 
   def path
     "/location/#{display_location}/vm/#{name}"
   end
 
-  def ephemeral_net4
-    assigned_vm_address&.ip&.network
-  end
-
   def ip4
-    assigned_vm_address&.ip
+    ephemeral_net4&.nth(0)
   end
 
-  def ip6
-    location.aws? ? ephemeral_net6&.nth(0) : ephemeral_net6&.nth(2)
+  def ip4_string
+    ip4&.to_s
+  end
+
+  def ip6_string
+    ip6&.to_s
   end
 
   def nic
@@ -71,8 +91,24 @@ class Vm < Sequel::Model
     (ipv4.netmask.prefix_len == 32) ? ipv4.network : ipv4.nth(1)
   end
 
+  def private_ipv4_string
+    private_ipv4.to_s
+  end
+
   def private_ipv6
     nic.private_ipv6.nth(2)
+  end
+
+  def private_ipv6_string
+    private_ipv6.to_s
+  end
+
+  def firewalls(opts = {})
+    private_subnet_firewalls(opts) + vm_firewalls(opts)
+  end
+
+  def firewall_rules
+    firewalls(eager: :firewall_rules).flat_map(&:firewall_rules)
   end
 
   def runtime_token
@@ -81,11 +117,13 @@ class Vm < Sequel::Model
 
   def display_state
     label = strand&.label
-    return "deleting" if destroy_set? || label == "destroy"
+    return "deleting" if destroying_set? || destroy_set?
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
+
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
+
       return "waiting for capacity"
     end
     super
@@ -139,6 +177,7 @@ class Vm < Sequel::Model
       # :nocov:
       fail "BUG: non-integer in topology array" unless num.denominator == 1
       # :nocov:
+
       Integer(num)
     }
 
@@ -171,6 +210,10 @@ class Vm < Sequel::Model
     id.to_s[0..7]
   end
 
+  def self.from_ips(ips)
+    eager_graph(:assigned_vm_address, :project).where(Sequel[:assigned_vm_address][:ip] => ips).all
+  end
+
   def inhost_name
     self.class.ubid_to_name(UBID.from_uuidish(id))
   end
@@ -187,11 +230,11 @@ class Vm < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:ssh_session].exec!("systemctl is-active #{inhost_name} #{inhost_name}-dnsmasq").split("\n").all?("active") ? "up" : "down"
+      session[:ssh_session].exec!("systemctl is-active :inhost_name :inhost_name-dnsmasq", inhost_name:).split("\n").all?("active") ? "up" : "down"
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -201,24 +244,28 @@ class Vm < Sequel::Model
   end
 
   def update_spdk_version(version)
-    spdk_installation = vm_host.spdk_installations_dataset[version: version]
+    spdk_installation = vm_host.spdk_installations_dataset[version:]
     fail "SPDK version #{version} not found on host" unless spdk_installation
+
     vm_storage_volumes_dataset.update(spdk_installation_id: spdk_installation.id)
     incr_update_spdk_dependency
   end
 
-  def params_json(swap_size_bytes: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
+  def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
     topo = cloud_hypervisor_cpu_topology
 
     project_public_keys = project.get_ff_vm_public_ssh_keys || []
+
+    # B200 GPUs require QEMU
+    hypervisor ||= (pci_devices.any? { |pci| pci.device == "2901" }) ? "qemu" : "ch"
 
     # we don't write secrets to params_json, because it
     # shouldn't be stored in the host for security reasons.
     JSON.pretty_generate(
       vm_name: name,
-      public_ipv6: ephemeral_net6.to_s,
-      public_ipv4: ip4.to_s || "",
-      local_ipv4: local_vetho_ip.to_s.shellescape || "",
+      public_ipv6: project.get_ff_ipv6_disabled ? nic.private_subnet.random_private_ipv6.to_s : ephemeral_net6.to_s,
+      public_ipv4: ip4.to_s,
+      local_ipv4: local_vetho_ip.to_s,
       dns_ipv4: nic.private_subnet.net4.nth(2).to_s,
       unix_user:,
       ssh_public_keys: [public_key] + project_public_keys,
@@ -231,17 +278,27 @@ class Vm < Sequel::Model
       storage_volumes:,
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
+      gpu_partition_id: gpu_partition&.partition_id,
       slice_name: vm_host_slice&.inhost_name || "system.slice",
       cpu_percent_limit: cpu_percent_limit || 0,
       cpu_burst_percent_limit: cpu_burst_percent_limit || 0,
+      hypervisor:,
       ch_version:,
       firmware_version:,
-      hugepages:
+      hugepages:,
+      init_script: init_script&.init_script || "",
+      ipv6_disabled: project.get_ff_ipv6_disabled || false
     )
   end
 
   def storage_volumes
+    add_cpus = vm_host.spdk_installations.empty? && !vm_host.accepts_slices
+
     vm_storage_volumes.map { |s|
+      if add_cpus
+        spdk_cpus = vm_host.cpus.filter(&:spdk).map(&:cpu_number)
+        cpus = spdk_cpus.shuffle.take(s.num_queues)
+      end
       {
         "boot" => s.boot,
         "image" => s.boot_image&.name,
@@ -262,7 +319,7 @@ class Vm < Sequel::Model
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
         "copy_on_read" => false
-      }
+      }.tap { |v| v["cpus"] = cpus if add_cpus }
     }
   end
 
@@ -274,18 +331,23 @@ class Vm < Sequel::Model
     }.to_h
   end
 
-  ssh_public_key_line = /(([^# \r\n]|"[^"\r\n]+")+ +)? *[^# \r\n]+ +[A-Za-z0-9+\/]+=*( +[^\r\n]*)?/
-  VALID_SSH_PUBLIC_KEY_LINE = /^#{ssh_public_key_line}\r?$/
-  VALID_SSH_AUTHORIZED_KEYS = /\A(([ \t]*|(#[^\r\n]*)?|#{ssh_public_key_line})(\r?\n|\z))+\z/
-
-  def validate
-    super
-    if new?
-      validates_format(VALID_SSH_AUTHORIZED_KEYS, :public_key, message: "invalid SSH public key format")
-      unless errors.on(:public_key)
-        validates_format(VALID_SSH_PUBLIC_KEY_LINE, :public_key, message: "must contain at least one valid SSH public key")
-      end
+  def save_with_ephemeral_net6_error_retrying(vm_host, max_retries: 2)
+    save_changes
+  rescue Sequel::ValidationFailed
+    if errors.keys == [:ephemeral_net6] && max_retries > 0
+      max_retries -= 1
+      self.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
+      retry
     end
+    raise
+  end
+
+  include Validation::PublicKeyValidation
+
+  private
+
+  def ephemeral_net4
+    assigned_vm_address&.ip
   end
 end
 
@@ -299,7 +361,7 @@ end
 #  display_state           | vm_display_state         | NOT NULL DEFAULT 'creating'::vm_display_state
 #  name                    | text                     | NOT NULL
 #  boot_image              | text                     | NOT NULL
-#  local_vetho_ip          | text                     |
+#  local_vetho_ip          | cidr                     |
 #  ip4_enabled             | boolean                  | NOT NULL DEFAULT false
 #  family                  | text                     | NOT NULL
 #  cores                   | integer                  | NOT NULL
@@ -327,16 +389,18 @@ end
 #  vm_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
 #  vm_vm_host_slice_id_fkey | (vm_host_slice_id) REFERENCES vm_host_slice(id)
 # Referenced By:
-#  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey       | (dst_vm_id) REFERENCES vm(id)
-#  dns_servers_vms            | dns_servers_vms_vm_id_fkey               | (vm_id) REFERENCES vm(id)
-#  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey    | (vm_id) REFERENCES vm(id)
-#  inference_router_replica   | inference_router_replica_vm_id_fkey      | (vm_id) REFERENCES vm(id)
-#  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_cp_vm_id_fkey | (cp_vm_id) REFERENCES vm(id)
-#  kubernetes_nodepools_vms   | kubernetes_nodepools_vms_vm_id_fkey      | (vm_id) REFERENCES vm(id)
-#  load_balancers_vms         | load_balancers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
-#  minio_server               | minio_server_vm_id_fkey                  | (vm_id) REFERENCES vm(id)
-#  nic                        | nic_vm_id_fkey                           | (vm_id) REFERENCES vm(id)
-#  pci_device                 | pci_device_vm_id_fkey                    | (vm_id) REFERENCES vm(id)
-#  postgres_server            | postgres_server_vm_id_fkey               | (vm_id) REFERENCES vm(id)
-#  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)
-#  vm_storage_volume          | vm_storage_volume_vm_id_fkey             | (vm_id) REFERENCES vm(id)
+#  assigned_vm_address        | assigned_vm_address_dst_vm_id_fkey    | (dst_vm_id) REFERENCES vm(id)
+#  dns_servers_vms            | dns_servers_vms_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+#  firewalls_vms              | firewalls_vms_vm_id_fkey              | (vm_id) REFERENCES vm(id) ON DELETE CASCADE
+#  gpu_partition              | gpu_partition_vm_id_fkey              | (vm_id) REFERENCES vm(id)
+#  inference_endpoint_replica | inference_endpoint_replica_vm_id_fkey | (vm_id) REFERENCES vm(id)
+#  inference_router_replica   | inference_router_replica_vm_id_fkey   | (vm_id) REFERENCES vm(id)
+#  kubernetes_node            | kubernetes_node_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+#  load_balancers_vms         | load_balancers_vms_vm_id_fkey         | (vm_id) REFERENCES vm(id)
+#  minio_server               | minio_server_vm_id_fkey               | (vm_id) REFERENCES vm(id)
+#  nic                        | nic_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
+#  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
+#  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
+#  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
+#  vm_init_script             | vm_init_script_id_fkey                | (id) REFERENCES vm(id)
+#  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)

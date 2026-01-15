@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
 
   let(:st) {
     cert = Prog::Vnet::CertNexus.assemble("test-host-name", dns_zone.id).subject
-    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
+    lb = described_class.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https", cert_enabled: true).subject
     lb.add_cert(cert)
     lb.strand
   }
@@ -17,7 +17,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
   }
   let(:dns_zone) {
     dz = DnsZone.create(project_id: ps.project_id, name: "lb.ubicloud.com")
-    Strand.create_with_id(dz.id, prog: "DnsZone::DnsZoneNexus", label: "wait")
+    Strand.create_with_id(dz, prog: "DnsZone::DnsZoneNexus", label: "wait")
     dz
   }
 
@@ -49,25 +49,6 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_destroy state" do
-      expect(nx.strand).to receive(:label).and_return("wait_destroy").at_least(:once)
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#wait" do
     it "naps for 5 seconds if nothing to do" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
@@ -75,11 +56,13 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "hops to update vm load balancers" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx).to receive(:when_update_load_balancer_set?).and_yield
       expect { nx.wait }.to hop("update_vm_load_balancers")
     end
 
     it "rewrites dns records" do
+      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx).to receive(:when_rewrite_dns_records_set?).and_yield
       expect { nx.wait }.to hop("rewrite_dns_records")
     end
@@ -125,7 +108,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       nx.load_balancer.incr_refresh_cert
-      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
+      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait_cert_broadcast")
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 1
@@ -134,7 +117,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "hops to wait need_certificates? and refresh_cert are false" do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
-      expect(Strand.where(prog: "Vnet::CertServer", label: "put_certificate").count).to eq 1
+      expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 0
@@ -145,12 +128,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     it "naps for 1 second if not all children are done" do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
-      expect(nx).to receive(:reap)
       expect { nx.wait_cert_broadcast }.to nap(1)
     end
 
     it "hops to wait if all children are done and no certs to remove" do
-      expect(nx).to receive(:reap)
+      expect(nx).to receive(:reap).and_yield
       active_cert = Prog::Vnet::CertNexus.assemble("active-cert", dns_zone.id).subject
       expect(nx.load_balancer).to receive(:active_cert).and_return(active_cert)
       expect { nx.wait_cert_broadcast }.to hop("wait")
@@ -164,7 +146,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       nx.load_balancer.add_cert(cert_to_remove)
       nx.load_balancer.add_cert(active_cert)
 
-      expect(nx).to receive(:reap)
+      expect(nx).to receive(:reap).and_yield
 
       expect { nx.wait_cert_broadcast }.to hop("wait")
       expect(Semaphore[name: "destroy", strand_id: cert_to_remove.id]).not_to be_nil
@@ -206,135 +188,156 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
       vms.each { st.subject.add_vm(it) }
       expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
-      st.children.map(&:destroy)
     end
 
-    it "decrements destroy and destroys all children" do
+    it "adds destroy semaphore to all children and hops to wait_destroy children" do
       expect(nx).to receive(:decr_destroy)
-      expect(st.children).to all(receive(:destroy))
-      expect { nx.destroy }.to hop("wait_destroy")
+      expect { nx.destroy }.to hop("wait_destroy_children")
 
-      expect(Strand.where(prog: "Vnet::UpdateLoadBalancerNode").count).to eq 3
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq st.children.map(&:id).sort
+    end
+  end
+
+  describe "#wait_destroy_children" do
+    before do
+      vms = Array.new(3) { Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "test-vm#{it}", private_subnet_id: ps.id).subject }
+      vms.each { st.subject.add_vm(it) }
+      expect { nx.update_vm_load_balancers }.to hop("wait_update_vm_load_balancers")
     end
 
-    it "deletes the dns record" do
-      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
-      expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(nx).to receive(:decr_destroy)
-      expect(st.children).to all(receive(:destroy))
-      expect { nx.destroy }.to hop("wait_destroy")
+    it "naps 5 if reap is not a success" do
+      expect { nx.wait_destroy_children }.to nap(5)
+    end
+
+    it "creates LoadBalancerRemoveVm children and hops wait_all_vms_removed" do
+      st.children_dataset.destroy
+      expect { nx.wait_destroy_children }.to hop("wait_all_vms_removed")
+      expect(Strand.where(prog: "Vnet::LoadBalancerRemoveVm", parent_id: nx.strand.id).count).to eq 3
+    end
+  end
+
+  describe "#wait_all_vms_removed" do
+    it "naps 5 if reap is not a success" do
+      Strand.create(parent_id: st.id, prog: "Vnet::LoadBalancerRemoveVm", label: "mark_vm_ports_as_evacuating", stack: [{}], lease: Time.now + 10)
+      expect { nx.wait_all_vms_removed }.to nap(5)
+    end
+
+    it "hops to wait if reap is a success" do
+      expect(nx).to receive(:reap).and_yield
+      expect(nx.load_balancer.private_subnet).to receive(:incr_update_firewall_rules)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
+      expect(dns_zone).to receive(:delete_record).with(record_name: nx.load_balancer.hostname)
+      expect(nx.load_balancer).to receive(:destroy)
+      expect { nx.wait_all_vms_removed }.to exit({"msg" => "load balancer deleted"})
+    end
+
+    it "hops to wait without updating dns if no dns zone" do
+      expect(nx).to receive(:reap).and_yield
+      expect(nx.load_balancer.private_subnet).to receive(:incr_update_firewall_rules)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(nil)
+      expect(nx.load_balancer).to receive(:destroy)
+      expect { nx.wait_all_vms_removed }.to exit({"msg" => "load balancer deleted"})
     end
   end
 
   describe "#rewrite_dns_records" do
     it "rewrites the dns records" do
-      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", ip6_string: "fd10:9b0b:6b4b:8fb0::2", private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not rewrite dns records if no vms" do
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return([])
       expect(nx.load_balancer).not_to receive(:dns_zone)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
-    it "does not rewrite dns records if no dns zone" do
-      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
-      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+    it "does not check vms to dns if no dns zone" do
+      expect(nx.load_balancer).not_to receive(:vms_to_dns)
       expect(DnsRecord).not_to receive(:create)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
-    it "does not create dns record if ephemeral_net4 doesn't exist" do
-      vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+    it "does not create public IPv4 or IPv6 dns records if the public IP addresses don't exist" do
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: nil, private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not create ipv4 dns record if stack is ipv6" do
       nx.load_balancer.update(stack: "ipv6")
-      vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+      vms = [instance_double(Vm, ip6_string: "fd10:9b0b:6b4b:8fb0::2", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not create ipv6 dns record if stack is ipv4" do
       nx.load_balancer.update(stack: "ipv4")
-      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: nil)]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0", private_ipv4_string: "1.2.3.4")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0/32", ttl: 10)
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
-    end
-  end
-
-  describe "#wait_destroy" do
-    it "naps for 5 seconds if not all children are done" do
-      Strand.create(parent_id: st.id, prog: "UpdateLoadBalancerNode", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.wait_destroy }.to nap(5)
-    end
-
-    it "deletes the load balancer and pops" do
-      expect(nx.load_balancer).to receive(:destroy)
-      expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
-      expect(LoadBalancerVm.count).to eq 0
-    end
-
-    it "destroys the certificate if it exists" do
-      cert = Prog::Vnet::CertNexus.assemble(st.subject.hostname, dns_zone.id).subject
-      lb = st.subject
-      lb.add_cert(cert)
-      expect(lb.certs.count).to eq 2
-      expect { nx.wait_destroy }.to exit({"msg" => "load balancer deleted"})
-      expect(LoadBalancerCert.count).to eq 0
-      expect(cert.destroy_set?).to be true
     end
   end
 
   describe ".need_to_rewrite_dns_records?" do
     it "returns true if dns record is missing for ipv4" do
-      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: nil)]
+      vms = [instance_double(Vm, ip4_string: "192.168.1.0")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.need_to_rewrite_dns_records?).to be true
     end
 
     it "returns true if dns record is missing for ipv6" do
-      vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.need_to_rewrite_dns_records?).to be true
     end
 
     it "returns false if dns record is present for ipv4 and lb is not ipv6 enabled" do
-      vms = [instance_double(Vm, ephemeral_net4: NetAddr::IPv4Net.parse("192.168.1.0"), ephemeral_net6: nil)]
+      vms = [instance_double(Vm, ip4: "192.168.1.0", ip4_string: "192.168.1.0", ip6: nil, ip6_string: nil)]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv6_enabled?).and_return(false)
-      dr = DnsRecord.create(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "A", ttl: 10, data: "192.168.1.0/32")
+      dr = DnsRecord.create(dns_zone_id: dns_zone.id, name: nx.load_balancer.hostname + ".", type: "A", ttl: 10, data: "192.168.1.0")
       expect(dns_zone).to receive(:records_dataset).and_return(DnsRecord.where(id: dr.id))
       expect(nx.need_to_rewrite_dns_records?).to be false
     end
 
     it "returns false if dns record is present for ipv6 and lb is not ipv4 enabled" do
-      vms = [instance_double(Vm, ephemeral_net4: nil, ephemeral_net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fb0::"))]
+      vms = [instance_double(Vm, ip4: nil, ip6_string: "fd10:9b0b:6b4b:8fb0::2")]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(nx.load_balancer).to receive(:ipv4_enabled?).and_return(false)

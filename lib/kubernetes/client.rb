@@ -30,8 +30,11 @@ class Kubernetes::Client
     svc.dig("status", "loadBalancer", "ingress")&.first&.dig("hostname").to_s.empty?
   end
 
-  def kubectl(cmd)
-    @session.exec!("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{cmd}")
+  def kubectl(cmd, **)
+    output = @session.exec!(NetSsh.combine("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf", cmd), **)
+    raise output if output.exitstatus != 0
+
+    output
   end
 
   def version
@@ -39,7 +42,7 @@ class Kubernetes::Client
   end
 
   def delete_node(node_name)
-    kubectl("delete node #{node_name.shellescape}")
+    kubectl("delete node :node_name", node_name:)
   end
 
   def set_load_balancer_hostname(svc, hostname)
@@ -50,7 +53,10 @@ class Kubernetes::Client
         }
       }
     })
-    kubectl("-n #{svc.dig("metadata", "namespace")} patch service #{svc.dig("metadata", "name")} --type=merge -p '#{patch_data}' --subresource=status")
+    kubectl("-n :namespace patch service :service --type=merge -p :patch_data --subresource=status",
+      namespace: svc.dig("metadata", "namespace"),
+      service: svc.dig("metadata", "name"),
+      patch_data:)
   end
 
   def sync_kubernetes_services
@@ -70,12 +76,15 @@ class Kubernetes::Client
     missing_ports.each { |port| @load_balancer.add_port(port[0], port[1]) }
 
     return unless @load_balancer.strand.label == "wait"
+
     svc_list.each { |svc| set_load_balancer_hostname(svc, @load_balancer.hostname) }
   end
 
   def any_lb_services_modified?
     k8s_svc_raw = kubectl("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson")
     svc_list = JSON.parse(k8s_svc_raw)["items"]
+    @load_balancer.reload
+    @kubernetes_cluster.reload
 
     return true if svc_list.empty? && !@load_balancer.ports.empty?
 

@@ -10,6 +10,10 @@ RSpec.describe Scheduling::Dispatcher do
     Thread.current.name = nil
   end
 
+  def new_dispatcher(**)
+    described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, **)
+  end
+
   describe "#shutdown" do
     it "sets shutting_down flag" do
       expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
@@ -35,7 +39,7 @@ RSpec.describe Scheduling::Dispatcher do
           DB.listen(:respirate) { |_, _, pl| payload = pl }
           payload
         end
-        @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+        @di = new_dispatcher
 
         # Wait until dispatcher has started listening and notified
         t.join(5)
@@ -52,62 +56,61 @@ RSpec.describe Scheduling::Dispatcher do
     end
 
     it "repartitions for new processes and stale processes" do
-      q = Queue.new
+      # Return last respirate notify payload
       t = Thread.new do
         payload = nil
         DB.listen(:respirate) { |_, _, pl| payload = pl }
         payload
       end
 
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(recheck_seconds: 0.02)
 
       # Wait until dispatcher has started listening and notified
       t.join(5)
       expect(t.value).to eq "1"
 
+      partition_setup_q = Queue.new
       args = []
       expect(di).to receive(:setup_prepared_statements).twice.and_wrap_original do |m, **kw|
         args << kw
-        q.push true if args.length == 2
         m.call(**kw)
+        partition_setup_q.push true if args.length == 2
       end
 
-      q2 = Queue.new
+      partition_order_q = Queue.new
       # separate threads so they are not inside a transaction
       Thread.new do
         DB.notify(:respirate, payload: "2")
-        q2.push(true)
+        partition_order_q.push(true)
       end.join(5)
       Thread.new do
         # Ensure payload 3 notify is after payload 2 notify
-        q2.pop(timeout: 5)
+        partition_order_q.pop(timeout: 5)
         DB.notify(:respirate, payload: "3")
       end.join(5)
 
-      expect(q.pop(timeout: 5)).to be true
+      # Ensure we do not check strand id ranges until after both repartitions have happened
+      expect(partition_setup_q.pop(timeout: 5)).to be true
       expect(args).to eq([
         {strand_id_range: "00000000-0000-0000-0000-000000000000"..."80000000-0000-0000-0000-000000000000"},
         {strand_id_range: "00000000-0000-0000-0000-000000000000"..."55555555-0000-0000-0000-000000000000"}
       ])
       args.clear
-      q3 = Queue.new
+      partition_removed_q = Queue.new
+      partition_times = di.instance_variable_get(:@repartitioner).instance_variable_get(:@partition_times)
+      # Manually modify the partition information so that the partitions are treated as stale
+      partition_times[3] = partition_times[2] = Time.now - 60
 
       expect(di).to receive(:setup_prepared_statements).at_least(:once).and_wrap_original do |m, **kw|
         args << kw
-        if kw == {strand_id_range: "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"}
-          q.push true
-          q3.push true
-        end
         m.call(**kw)
-      end
-      t = Thread.new do
-        until q.pop(timeout: 0.1)
-          DB.notify(:respirate, payload: "1")
-          sleep(0.005)
+        if kw == {strand_id_range: "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"}
+          partition_removed_q.push true
         end
       end
-      expect(q3.pop(timeout: 5)).to be true
+      expect(partition_removed_q.pop(timeout: 5)).to be true
       t.join(5)
+      # Check that after the removal of stale 2 and 3 partitions, we go back to a single partition
       expect(args.last).to eq(strand_id_range: "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff")
     end
   end
@@ -129,7 +132,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "does not include strands outside of partition" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(partition_number: 2)
       di.setup_prepared_statements(strand_id_range: "10000000-0000-0000-0000-000000000000"..."20000000-0000-0000-0000-000000000000")
       st.update(schedule: Time.now - 10)
       expect(di.scan.map(&:id)).to eq([])
@@ -137,7 +140,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "includes strands inside of partition" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       di.setup_prepared_statements(strand_id_range: "00000000-0000-0000-0000-000000000000"..."10000000-0000-0000-0000-000000000000")
       st.update(schedule: Time.now - 10)
       strands = di.scan
@@ -149,7 +152,7 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "uses lease time instead of schedule time as scheduled if lease has expired" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000", lease: Time.now - 1)
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       st.update(schedule: Time.now - 10)
       strands = di.scan
       expect(strands.length).to eq 1
@@ -171,14 +174,14 @@ RSpec.describe Scheduling::Dispatcher do
 
     it "returns empty array when shutting down" do
       Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher
       di.shutdown
       expect(di.scan_old).to eq([])
     end
 
     it "includes strands outside of partition, if they are older than old_strand_delay" do
       st = Strand.create(prog: "Test", label: "wait_exit", id: "00000000-0000-0000-0000-000000000000")
-      di = @di = described_class.new(partition_number: 2, listen_timeout: 0.01, pool_size: 1)
+      di = @di = new_dispatcher(partition_number: 2)
       st.update(schedule: Time.now - 3)
       expect(di.scan_old.map(&:id)).to eq([])
       st.update(schedule: Time.now - 7)
@@ -215,6 +218,7 @@ RSpec.describe Scheduling::Dispatcher do
       t = Time.now
       until exited
         raise "no apoptosis within 1 second" if Time.now - t > 1
+
         sleep 0.1
       end
       expect(exited).to be true
@@ -233,6 +237,7 @@ RSpec.describe Scheduling::Dispatcher do
       t = Time.now
       until exited
         raise "no apoptosis within 1 second" if Time.now - t > 1
+
         sleep 0.1
       end
       expect(exited).to be true
@@ -383,7 +388,7 @@ RSpec.describe Scheduling::Dispatcher do
       finish_queue = Queue.new
       current_strands = di.instance_variable_get(:@current_strands)
       current_strands[st.id] = true
-      session = instance_double(Net::SSH::Connection::Session)
+      session = Net::SSH::Connection::Session.allocate
       expect(session).to receive(:close).and_raise(RuntimeError)
       Thread.current[:clover_ssh_cache] = {nil => session}
       strand_queue.push(st)
@@ -417,9 +422,8 @@ RSpec.describe Scheduling::Dispatcher do
 
       # Go to the trouble of emitting those exceptions to provoke
       # plausible crashes in serialization.
-      expect(Config).to receive(:test?).and_return(false).twice
-      expect($stdout).to receive(:write).with(a_string_matching(/outer test error/))
-      expect($stdout).to receive(:write).with(a_string_matching(/nested test error/))
+      expect(Config).to receive(:test?).and_return(false)
+      expect($stdout).to receive(:write).with(a_string_matching(/outer test error.*nested test error/))
 
       start_queue = Queue.new
       finish_queue = Queue.new

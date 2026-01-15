@@ -41,8 +41,10 @@ require "logger"
 require "sequel/core"
 require "webmock/rspec"
 
+RSpec::Matchers.define_negated_matcher :not_change, :change
+
 def Object.method_added(method)
-  if self == Object && method != :Nokogiri
+  if self == Object && method != :Nokogiri && method != :CSV
     raise "unexpected Object##{method} defined\n#{caller(1, 3).join("\n")}"
   end
 end
@@ -52,11 +54,24 @@ RSpec.configure do |config|
     clover_freeze
   end
 
+  leaked_threads = ObjectSpace::WeakMap.new
+  leaked_threads[Thread.current] = true
+
   config.around do |example|
     DB.transaction(rollback: :always, auto_savepoint: true) do
       example.run
     end
+    Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
+
+    unless @skip_leaked_thread_check
+      Thread.list.each do
+        next if leaked_threads[it]
+
+        p [:leaked_thread, it]
+        leaked_threads[it] = true
+      end
+    end
   end
 
   # rspec-expectations config goes here. You can use an alternate
@@ -85,6 +100,8 @@ RSpec.configure do |config|
     # a real object. This is generally recommended, and will default to
     # `true` in RSpec 4.
     mocks.verify_partial_doubles = true
+    # Prevents expect(nil).to receive(...) which is only a warning by default
+    mocks.allow_message_expectations_on_nil = false
   end
 
   # This option will default to `:apply_to_host_groups` in RSpec 4 (and will
@@ -225,7 +242,7 @@ RSpec.configure do |config|
     end
   end
 
-  if ENV["CLOVER_FREEZE"] == "1"
+  if Config.frozen_test?
     require_relative "thawed_mock"
 
     require "diff/lcs"
@@ -243,7 +260,7 @@ RSpec.configure do |config|
     end
 
     def create_vm_host(**args)
-      args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", family: "standard", total_cores: 48, used_cores: 2}.merge(args)
+      args = {location_id: Location::HETZNER_FSN1_ID, allocation_state: "accepting", arch: "x64", family: "standard", total_cores: 48, used_cores: 2, total_hugepages_1g: 375, used_hugepages_1g: 16}.merge(args)
       ubid = VmHost.generate_ubid
       id = ubid.to_uuid
       Sshable.create_with_id(id)
@@ -257,6 +274,13 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
+    def create_hosted_vm(project, private_subnet, name)
+      Prog::Vm::Nexus.assemble_with_sshable(
+        project.id, name:, private_subnet_id: private_subnet.id,
+        location_id: location.id, unix_user: "ubi"
+      ).subject
+    end
+
     def create_vm_from_size(size, arch, **args)
       vm_size = Validation.validate_vm_size(size, arch)
       args_from_size = {
@@ -265,11 +289,20 @@ RSpec.configure do |config|
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
-        arch: arch
+        arch:
       }
 
       args = args_from_size.merge(args)
       create_vm(**args)
+    end
+
+    def create_mock_sshable(**kw)
+      sshable = Sshable.new
+      kw.each do |k, v|
+        raise "Cannot mock Sshable#cmd as it would avoid security checks, mock #_cmd if you must" if k == :cmd
+        sshable.define_singleton_method(k) { v }
+      end
+      sshable
     end
 
     def add_ipv4_to_vm(vm, ipv4)
@@ -278,6 +311,21 @@ RSpec.configure do |config|
       cidr.prefix = 24
       addr = Address.create(cidr: cidr.to_s, routed_to_host_id: host.id)
       AssignedVmAddress.create(ip: ipv4, address_id: addr.id, dst_vm_id: vm.id)
+    end
+
+    def refresh_frame(prog, new_frame: nil, new_values: nil)
+      st = prog.strand
+      fail "cannot pass both new_frame and new_values" if new_frame && new_values
+      st.stack.first.merge!(new_values) if new_values
+      st.stack[0] = new_frame if new_frame
+      st.modified!(:stack)
+      st.save_changes
+      prog.instance_variable_set(:@frame, nil)
+    end
+
+    def frame_value(prog, key)
+      prog.strand.reload
+      prog.strand.stack.first[key]
     end
   end)
 end

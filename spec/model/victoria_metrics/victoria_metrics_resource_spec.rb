@@ -30,6 +30,13 @@ RSpec.describe VictoriaMetricsResource do
     )
   }
 
+  it "can have endpoint overridden by Config.victoria_metrics_endpoint_override" do
+    allow(Config).to receive(:victoria_metrics_endpoint_override).and_return("http://victoria.endpoint")
+    client = instance_double(VictoriaMetrics::Client)
+    expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: Config.victoria_metrics_endpoint_override).and_return(client)
+    expect(described_class.client_for_project(victoria_metrics_project.id)).to be(client)
+  end
+
   it "returns hostname properly" do
     allow(Config).to receive(:victoria_metrics_host_name).and_return("victoria.ubicloud.com")
     expect(vmr.hostname).to eq("victoria-metrics-name.victoria.ubicloud.com")

@@ -8,11 +8,15 @@ module Ubicloud
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
   # +firewall+ :: Ubicloud::Firewall
+  # +github_cache_entry+ :: Ubicloud::GithubCacheEntry
+  # +github_installation+ :: Ubicloud::GithubInstallation
+  # +github_repository+ :: Ubicloud::GithubRepository
   # +inference_api_key+ :: Ubicloud::InferenceApiKey
   # +kubernetes_cluster+ :: Ubicloud::KubernetesCluster
   # +load_balancer+ :: Ubicloud::LoadBalancer
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
+  # +ssh_public_key+ :: Ubicloud::SshPublicKey
   # +vm+ :: Ubicloud::Vm
   class Context
     def initialize(adapter)
@@ -26,8 +30,12 @@ module Ubicloud
       firewall: Firewall,
       private_subnet: PrivateSubnet,
       load_balancer: LoadBalancer,
+      github_cache_entry: GithubCacheEntry,
+      github_installation: GithubInstallation,
+      github_repository: GithubRepository,
       inference_api_key: InferenceApiKey,
-      kubernetes_cluster: KubernetesCluster
+      kubernetes_cluster: KubernetesCluster,
+      ssh_public_key: SshPublicKey
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
     end
@@ -38,8 +46,12 @@ module Ubicloud
       "fw" => Firewall,
       "ps" => PrivateSubnet,
       "1b" => LoadBalancer,
+      "ge" => GithubCacheEntry,
+      "g1" => GithubInstallation,
+      "gp" => GithubRepository,
       "ak" => InferenceApiKey,
-      "kc" => KubernetesCluster
+      "kc" => KubernetesCluster,
+      "sk" => SshPublicKey
     }.freeze
 
     # Return a new model instance for the given id, assuming the id is properly

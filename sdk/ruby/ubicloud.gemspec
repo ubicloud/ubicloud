@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
   s.email = ["ruby-gem-owner@ubicloud.com"]
   s.homepage = "https://github.com/ubicloud/ubicloud/tree/main/sdk/ruby"
   s.license = "MIT"
-  s.required_ruby_version = ">= 3.1"
+  s.required_ruby_version = ">= 3.4"
 
   s.metadata = {
     "bug_tracker_uri" => "https://github.com/ubicloud/ubicloud/issues",

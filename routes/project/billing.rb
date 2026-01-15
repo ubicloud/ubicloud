@@ -8,11 +8,11 @@ class Clover
     r.web do
       unless (Stripe.api_key = Config.stripe_secret_key)
         response.status = 501
-        response["content-type"] = "text/plain"
+        response.content_type = :text
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
       end
 
-      authorize("Project:billing", @project.id)
+      authorize("Project:billing", @project)
 
       r.get true do
         view "project/billing"
@@ -21,31 +21,31 @@ class Clover
       r.post true do
         if (billing_info = @project.billing_info)
           handle_validation_failure("project/billing")
-          current_tax_id = billing_info.stripe_data["tax_id"]
+          current_tax_id = billing_info.stripe_data["tax_id"].to_s
           tp = typecast_params
-          new_tax_id = tp.str!("tax_id").gsub(/[^a-zA-Z0-9]/, "")
-
+          new_tax_id = tp.str("tax_id").gsub(/[^a-zA-Z0-9]/, "")
           begin
             Stripe::Customer.update(billing_info.stripe_id, {
               name: tp.str!("name"),
               email: tp.str!("email").strip,
               address: {
                 country: tp.str!("country"),
-                state: tp.str!("state"),
-                city: tp.str!("city"),
-                postal_code: tp.str!("postal_code"),
+                state: tp.nonempty_str("state"),
+                city: tp.nonempty_str("city"),
+                postal_code: tp.nonempty_str("postal_code"),
                 line1: tp.str!("address"),
                 line2: nil
               },
               metadata: {
                 tax_id: new_tax_id,
-                company_name: tp.str!("company_name")
+                company_name: tp.str("company_name"),
+                note: tp.str("note")
               }
             })
             if new_tax_id != current_tax_id
               DB.transaction do
                 billing_info.update(valid_vat: nil)
-                if new_tax_id && billing_info.country&.in_eu_vat?
+                if !new_tax_id.empty? && billing_info.country&.in_eu_vat?
                   Strand.create(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
                 end
               end
@@ -56,7 +56,7 @@ class Clover
           end
 
           flash["notice"] = "Billing info updated"
-          r.redirect @project.path + "/billing"
+          r.redirect billing_path
         else
           no_audit_log
         end
@@ -81,7 +81,7 @@ class Clover
         stripe_id = setup_intent["payment_method"]
         stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
-        unless PaymentMethod.where(fraud: true, card_fingerprint:).empty?
+        if PaymentMethod.fraud?(card_fingerprint)
           raise_web_error("Payment method you added is labeled as fraud. Please contact support.")
         end
 
@@ -111,7 +111,7 @@ class Clover
           end
         rescue
           # Log and redirect if Stripe card error or our manual raise
-          Clog.emit("Couldn't pre-authorize card") { {card_authorization: {project_id: @project.id, customer_stripe_id: customer_stripe_id}} }
+          Clog.emit("Couldn't pre-authorize card", {card_authorization: {project_id: @project.id, customer_stripe_id:}})
           raise_web_error("We couldn't pre-authorize your card for verification. Please make sure it can be pre-authorized up to $5 or contact our support team at support@ubicloud.com.")
         end
 
@@ -121,7 +121,7 @@ class Clover
             @project.update(billing_info_id: billing_info.id)
           end
 
-          PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: stripe_id, card_fingerprint: card_fingerprint, preauth_intent_id: payment_intent.id, preauth_amount: preauth_amount)
+          PaymentMethod.create(billing_info_id: billing_info.id, stripe_id:, card_fingerprint:, preauth_intent_id: payment_intent.id, preauth_amount:)
         end
 
         unless @project.billing_info.has_address?
@@ -130,8 +130,8 @@ class Clover
           })
         end
 
-        flash["notice"] = "Billing info updated"
-        r.redirect @project.path + "/billing"
+        flash["notice"] = "Payment method added successfully. $#{preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money."
+        r.redirect billing_path
       end
 
       r.on "payment-method" do
@@ -151,7 +151,7 @@ class Clover
         end
 
         r.delete :ubid_uuid do |id|
-          next unless (payment_method = PaymentMethod[id:, billing_info_id: @project.billing_info_id])
+          next unless (payment_method = @project.payment_methods_dataset.with_pk(id))
 
           unless payment_method.billing_info.payment_methods_dataset.count > 1
             response.status = 400
@@ -163,26 +163,82 @@ class Clover
             audit_log(payment_method, "destroy")
           end
 
-          204
+          flash["notice"] = "Payment method deleted"
+          r.redirect @project, "/billing"
         end
       end
 
-      r.get "invoice", ["current", :ubid_uuid] do |id|
-        next unless (invoice = (id == "current") ? @project.current_invoice : Invoice[id:, project_id: @project.id])
+      r.on "invoice", ["current", :ubid_uuid] do |id|
+        next unless (invoice = (id == "current") ? @project.current_invoice : @project.invoices_dataset.with_pk(:id))
 
-        @invoice_data = Serializers::Invoice.serialize(invoice, {detailed: true})
-
-        if invoice.status == "current"
-          view "project/invoice"
-        else
-          response["content-type"] = "application/pdf"
-          response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
-          begin
-            Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
-          rescue Aws::S3::Errors::NoSuchKey
-            Clog.emit("Could not find the invoice") { {not_found_invoice: {invoice_ubid: invoice.ubid}} }
-            invoice.generate_pdf(@invoice_data)
+        r.get true do
+          if invoice.status == "current"
+            @invoice_data = Serializers::Invoice.serialize(invoice)
+            view "project/invoice"
+          else
+            response.content_type = :pdf
+            response["content-disposition"] = "inline; filename=\"#{invoice.filename}\""
+            begin
+              Invoice.blob_storage_client.get_object(bucket: Config.invoices_bucket_name, key: invoice.blob_key).body.read
+            rescue Aws::S3::Errors::NoSuchKey
+              Clog.emit("Could not find the invoice", {not_found_invoice: {invoice_ubid: invoice.ubid}})
+              invoice.generate_pdf
+            end
           end
+        end
+
+        r.post "pay" do
+          no_audit_log
+          handle_validation_failure("project/billing")
+          raise_web_error("Invoice is not payable") unless invoice.payable?
+          bi = invoice.project.billing_info
+          checkout = Stripe::Checkout::Session.create(
+            payment_method_types: ["card"],
+            mode: "payment",
+            line_items: [{
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: "Invoice Payment",
+                  description: invoice.invoice_number
+                },
+                unit_amount: (invoice.cost.to_f * 100).to_i  # Stripe expects amount in cents
+              },
+              quantity: 1
+            }],
+            payment_intent_data: {
+              capture_method: "automatic"
+            },
+            customer: bi.stripe_id,
+            metadata: {
+              invoice: invoice.ubid
+            },
+            billing_address_collection: "auto",
+            success_url: "#{Config.base_url}#{path(invoice)}/success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url: "#{Config.base_url}#{billing_path}"
+          )
+
+          r.redirect checkout.url, 303
+        end
+
+        r.get "success" do
+          handle_validation_failure("project/billing")
+          session_id = typecast_params.str!("session_id")
+          begin
+            checkout_session = Stripe::Checkout::Session.retrieve(session_id)
+          rescue Stripe::InvalidRequestError => e
+            Clog.emit("invalid invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}})
+            raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")
+          end
+          unless checkout_session["customer"] == @project.billing_info.stripe_id && checkout_session["metadata"]["invoice"] == invoice.ubid && checkout_session["payment_status"] == "paid"
+            Clog.emit("unsuccessful invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:}})
+            raise_web_error("Invoice payment was not successful")
+          end
+          invoice.update(status: "paid")
+          invoice.send_success_email
+          flash["notice"] = "Invoice #{invoice.invoice_number} paid successfully"
+
+          r.redirect billing_path
         end
       end
     end

@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env -S ruby --enable-frozen-string-literal
 # frozen_string_literal: true
 
 REPL = true
@@ -26,6 +26,7 @@ end
 
 def dev_project
   return unless Config.development?
+
   ac = Account[email: "dev@ubicloud.com"] || Account.create(email: "dev@ubicloud.com")
   ac.projects.first || ac.create_project_with_default_policy("default")
 end
@@ -35,7 +36,9 @@ def udec(*)
 end
 
 opts = Pry::CLI.parse_options
-Pry.config.prompt_name = if Config.production?
+Pry.config.prompt_name = if Config.staging
+  "clover-staging"
+elsif Config.production?
   "\e[41m⚠️ %s\e[0m" % "clover-#{Config.rack_env}"
 else
   "clover-#{Config.rack_env}"

@@ -8,25 +8,32 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   subject_is :postgres_server
 
   extend Forwardable
+
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
-      arch = Option::VmSizes.find { |it| it.name == postgres_resource.target_vm_size }.arch
+      # For read replicas, we upgrade by replacing servers instead of in-place
+      # upgrade.
+      server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
+
+      arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size }.arch
       boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(postgres_resource.version, arch)
+        postgres_resource.location.pg_ami(server_version, arch)
       else
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD then ""
         when PostgresResource::Flavor::PARADEDB then "-paradedb"
-        when PostgresResource::Flavor::LANTERN then "-lantern"
+        when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
+        # :nocov: flavor is a DB enum, unknown values are impossible
         else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
+          # :nocov:
         end
 
-        "postgres#{postgres_resource.version}#{flavor_suffix}-ubuntu-2204"
+        "postgres#{flavor_suffix}-ubuntu-2204"
       end
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -36,27 +43,35 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         name: ubid.to_s,
         size: postgres_resource.target_vm_size,
         storage_volumes: [
-          {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib}
+          {encrypted: true, size_gib: 16, vring_workers: 1},
+          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
         ],
-        boot_image: boot_image,
+        boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
         enable_ip4: true,
-        arch: arch,
-        exclude_host_ids: exclude_host_ids
+        arch:,
+        allow_private_subnet_in_other_project: true,
+        exclude_host_ids:,
+        exclude_availability_zones:,
+        availability_zone:,
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
-      postgres_server = PostgresServer.create(
-        resource_id: resource_id,
-        timeline_id: timeline_id,
-        timeline_access: timeline_access,
-        representative_at: representative_at,
-        synchronization_status: synchronization_status,
-        vm_id: vm_st.id
-      ) { it.id = ubid.to_uuid }
+      postgres_server = PostgresServer.create_with_id(
+        ubid.to_uuid,
+        resource_id:,
+        timeline_id:,
+        timeline_access:,
+        representative_at:,
+        synchronization_status:,
+        vm_id: vm_st.id,
+        version: server_version
+      )
 
-      Strand.create_with_id(postgres_server.id, prog: "Postgres::PostgresServerNexus", label: "start")
+      vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
+
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
     end
   end
 
@@ -65,7 +80,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
 
       if is_destroying || !postgres_server.taking_over?
-        if strand.label != "destroy"
+        if !%w[destroy wait_children_destroy destroy_vm_and_pg].include?(strand.label)
           hop_destroy
         elsif strand.stack.count > 1
           pop "operation is cancelled due to the destruction of the postgres server"
@@ -100,7 +115,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def mount_data_disk
-    case vm.sshable.cmd("common/bin/daemonizer --check format_disk")
+    case vm.sshable.d_check("format_disk")
     when "Succeeded"
       storage_device_paths = postgres_server.storage_device_paths
       device_path = if storage_device_paths.count > 1
@@ -112,17 +127,19 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       vm.sshable.cmd("sudo mkdir -p /dat")
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{device_path} /dat")
+      vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat ext4 defaults 0 0", device_path:)
+      vm.sshable.cmd("sudo mount :device_path /dat", device_path:)
 
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
       storage_device_paths = postgres_server.storage_device_paths
       if storage_device_paths.count == 1
-        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 #{storage_device_paths.first}' format_disk")
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", storage_device_paths.first)
       else
-        vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=#{storage_device_paths.count} #{storage_device_paths.join(" ")}")
-        vm.sshable.cmd("common/bin/daemonizer 'sudo mkfs --type ext4 /dev/md0' format_disk")
+        vm.sshable.cmd("sudo mdadm --create --verbose /dev/md0 --level=0 --raid-devices=:count :shelljoin_storage_device_paths",
+          count: storage_device_paths.count,
+          shelljoin_storage_device_paths: storage_device_paths)
+        vm.sshable.d_run("format_disk", "sudo", "mkfs", "--type", "ext4", "/dev/md0")
       end
     end
 
@@ -130,24 +147,25 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def configure_walg_credentials
-    refresh_walg_credentials
+    postgres_server.attach_s3_policy_if_needed
+    postgres_server.refresh_walg_credentials
     hop_initialize_empty_database if postgres_server.primary?
     hop_initialize_database_from_backup
   end
 
   label def initialize_empty_database
-    case vm.sshable.cmd("common/bin/daemonizer --check initialize_empty_database")
+    case vm.sshable.d_check("initialize_empty_database")
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-empty-database #{postgres_server.resource.version}' initialize_empty_database")
+      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version)
     end
 
     nap 5
   end
 
   label def initialize_database_from_backup
-    case vm.sshable.cmd("common/bin/daemonizer --check initialize_database_from_backup")
+    case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
@@ -156,7 +174,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
       end
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/initialize-database-from-backup #{postgres_server.resource.version} #{backup_label}' initialize_database_from_backup")
+      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label)
     end
 
     nap 5
@@ -167,10 +185,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
     nap 5 if postgres_server.resource.server_cert.nil?
 
-    ca_bundle = postgres_server.resource.ca_certificates
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: ca_bundle)
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: postgres_server.resource.server_cert)
-    vm.sshable.cmd("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: postgres_server.resource.server_cert_key)
+    ca_bundle = [postgres_server.resource.ca_certificates, postgres_server.resource.trusted_ca_certs].compact.join("\n")
+    vm.sshable.write_file("/etc/ssl/certs/ca.crt", ca_bundle)
+    vm.sshable.write_file("/etc/ssl/certs/server.crt", postgres_server.resource.server_cert)
+    vm.sshable.write_file("/etc/ssl/certs/server.key", postgres_server.resource.server_cert_key)
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
@@ -178,13 +196,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     # MinIO cluster certificate rotation timelines are similar to postgres
     # servers' timelines. So we refresh the wal-g credentials which uses MinIO
     # certificates when we refresh the certificates of the postgres server.
-    refresh_walg_credentials
+    postgres_server.refresh_walg_credentials
 
     when_initial_provisioning_set? do
       hop_configure_metrics
     end
 
-    vm.sshable.cmd("sudo -u postgres pg_ctlcluster #{postgres_server.resource.version} main reload")
+    vm.sshable.cmd("sudo -u postgres pg_ctlcluster :version main reload", version:)
     vm.sshable.cmd("sudo systemctl reload pgbouncer@*.service")
     hop_wait
   end
@@ -195,7 +213,7 @@ tls_server_config:
   cert_file: /etc/ssl/certs/server.crt
   key_file: /etc/ssl/certs/server.key
 CONFIG
-    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: web_config)
+    vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
     metric_destinations = postgres_server.resource.metric_destinations.map {
       <<METRIC_DESTINATION
@@ -226,12 +244,12 @@ scrape_configs:
       instance: '#{postgres_server.ubid}'
 #{metric_destinations}
 CONFIG
-    vm.sshable.cmd("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: prometheus_config)
+    vm.sshable.write_file("/home/prometheus/prometheus.yml", prometheus_config, user: "prometheus")
 
     metrics_config = postgres_server.metrics_config
     metrics_dir = metrics_config[:metrics_dir]
-    vm.sshable.cmd("mkdir -p #{metrics_dir}")
-    vm.sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: metrics_config.to_json)
+    vm.sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    vm.sshable.write_file("#{metrics_dir}/config.json", metrics_config.to_json, user: :current)
 
     metrics_service = <<SERVICE
 [Unit]
@@ -245,7 +263,7 @@ ExecStart=/home/ubi/common/bin/metrics-collector #{metrics_dir}
 StandardOutput=journal
 StandardError=journal
 SERVICE
-    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: metrics_service)
+    vm.sshable.write_file("/etc/systemd/system/postgres-metrics.service", metrics_service)
 
     metrics_interval = metrics_config[:interval] || "15s"
 
@@ -261,7 +279,7 @@ AccuracySec=1s
 [Install]
 WantedBy=timers.target
 TIMER
-    vm.sshable.cmd("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: metrics_timer)
+    vm.sshable.write_file("/etc/systemd/system/postgres-metrics.timer", metrics_timer)
 
     vm.sshable.cmd("sudo systemctl daemon-reload")
 
@@ -270,6 +288,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now node_exporter")
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
+      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !postgres_server.resource.use_old_walg_command_set?
 
       hop_setup_cloudwatch if postgres_server.timeline.aws? && postgres_server.resource.project.get_ff_aws_cloudwatch_logs
       hop_setup_hugepages
@@ -292,7 +311,7 @@ TIMER
       "files": {
         "collect_list": [
           {
-            "file_path": "/dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log",
+            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql.log",
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
@@ -309,9 +328,9 @@ TIMER
   }
 }
 CONFIG
-    vm.sshable.cmd("sudo mkdir -p #{filepath}")
-    vm.sshable.cmd("sudo tee #{filepath}/#{filename} > /dev/null", stdin: config)
-    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:#{filepath}/#{filename} -s")
+    vm.sshable.cmd("sudo mkdir -p :filepath", filepath:)
+    vm.sshable.write_file("#{filepath}/#{filename}", config)
+    vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
     hop_setup_hugepages
   end
 
@@ -328,9 +347,9 @@ CONFIG
   end
 
   label def configure
-    case vm.sshable.cmd("common/bin/daemonizer --check configure_postgres")
+    case vm.sshable.d_check("configure_postgres")
     when "Succeeded"
-      vm.sshable.cmd("common/bin/daemonizer --clean configure_postgres")
+      vm.sshable.d_clean("configure_postgres")
 
       when_initial_provisioning_set? do
         hop_update_superuser_password if postgres_server.primary?
@@ -342,7 +361,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       configure_hash = postgres_server.configure_hash
-      vm.sshable.cmd("common/bin/daemonizer 'sudo postgres/bin/configure #{postgres_server.resource.version}' configure_postgres", stdin: JSON.generate(configure_hash))
+      vm.sshable.d_run("configure_postgres", "sudo", "postgres/bin/configure", postgres_server.version, stdin: JSON.generate(configure_hash))
     end
 
     nap 5
@@ -414,6 +433,7 @@ SQL
       postgres_server.run_query("SELECT pg_is_in_recovery()").chomp == "t"
     rescue => ex
       raise ex unless ex.stderr.include?("Consistent recovery state has not been yet reached.")
+
       nap 5
     end
 
@@ -426,21 +446,11 @@ SQL
     end
 
     if !is_in_recovery
-      switch_to_new_timeline
-
+      postgres_server.switch_to_new_timeline
       hop_configure
     end
 
     nap 5
-  end
-
-  def switch_to_new_timeline
-    timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(location_id: postgres_server.resource.location_id, parent_id: postgres_server.timeline.id).id
-    postgres_server.timeline_id = timeline_id
-    postgres_server.timeline_access = "push"
-    postgres_server.save_changes
-
-    refresh_walg_credentials
   end
 
   label def wait
@@ -486,14 +496,19 @@ SQL
     end
 
     when_promote_set? do
-      switch_to_new_timeline
+      postgres_server.switch_to_new_timeline
       decr_promote
       hop_taking_over
     end
 
     when_refresh_walg_credentials_set? do
       decr_refresh_walg_credentials
-      refresh_walg_credentials
+      postgres_server.refresh_walg_credentials
+    end
+
+    when_configure_s3_new_timeline_set? do
+      decr_configure_s3_new_timeline
+      postgres_server.attach_s3_policy_if_needed
     end
 
     if postgres_server.read_replica? && postgres_server.resource.parent
@@ -538,27 +553,58 @@ SQL
       hop_wait
     end
 
-    bud self.class, frame, :restart
+    bud self.class, {}, :restart
     nap 5
   end
 
   label def fence
     decr_fence
 
+    # Use multiple checkpoints so the final shutdown checkpoint is
+    # brief.
+    #
+    # The mechanism is to progressively reduce dirty buffers. The
+    # first `CHECKPOINT` may take a long time, during which more
+    # buffers become dirty. The next CHECKPOINT runs faster: even with
+    # a "long" first CHECKPOINT, the number of dirty buffers generated
+    # in the interim will be far fewer.
+    #
+    # By the third checkpoint, runtime is usually 1-2
+    # seconds. Shutdown then proceeds with only a short final
+    # checkpoint.
+    #
+    # Closely spaced checkpoints make UPDATEs more expensive due to
+    # full-page write amplification. After each checkpoint, the first
+    # change to a page requires writing a full 8KB copy instead of a
+    # smaller incremental WAL record. This short-term slowdown (a few
+    # minutes at worst) and increased WAL volume are accepted in order
+    # to avoid stopping all workloads for a long shutdown checkpoint.
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
-    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout #{postgres_server.resource.version}")
-    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m smart")
+    postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout :version", version:)
+    postgres_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m smart", version:)
 
-    nap 6 * 60 * 60
+    hop_wait_in_fence
+  end
+
+  label def wait_in_fence
+    when_unfence_set? do
+      decr_unfence
+      postgres_server.incr_configure
+      postgres_server.incr_restart
+      hop_wait
+    end
+
+    nap 60
   end
 
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
+    register_deadline("wait", 10 * 60)
 
     representative_server = postgres_server.resource.representative_server
 
     begin
-      representative_server.vm.sshable.cmd("sudo pg_ctlcluster #{postgres_server.resource.version} main stop -m immediate")
+      representative_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m immediate", version:)
     rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     end
 
@@ -569,13 +615,14 @@ SQL
 
   label def prepare_for_planned_take_over
     decr_planned_take_over
+    register_deadline("wait", 10 * 60)
 
     postgres_server.resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
   end
 
   label def wait_fencing_of_old_primary
-    nap 0 if postgres_server.resource.representative_server.fence_set?
+    nap 0 if postgres_server.resource.representative_server.strand.label != "wait_in_fence"
 
     postgres_server.resource.representative_server.incr_destroy
     hop_taking_over
@@ -589,8 +636,9 @@ SQL
       hop_configure
     end
 
-    case vm.sshable.cmd("common/bin/daemonizer --check promote_postgres")
+    case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
+      Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
       postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
@@ -598,8 +646,13 @@ SQL
       postgres_server.resource.servers.each(&:incr_restart)
       postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
-    when "Failed", "NotStarted"
-      vm.sshable.cmd("common/bin/daemonizer 'sudo pg_ctlcluster #{postgres_server.resource.version} main promote' promote_postgres")
+    when "Failed"
+      Prog::PageNexus.assemble("#{postgres_server.ubid} promotion failed",
+        ["PGPromotionFailed", postgres_server.id], postgres_server.ubid)
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
+      nap 0
+    when "NotStarted"
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     end
 
@@ -608,8 +661,15 @@ SQL
 
   label def destroy
     decr_destroy
+    Semaphore.incr(strand.children_dataset.exclude(prog: "Postgres::PostgresServerNexus").select(:id), "destroy")
+    hop_wait_children_destroy
+  end
 
-    strand.children.each { it.destroy }
+  label def wait_children_destroy
+    reap(:destroy_vm_and_pg, nap: 30)
+  end
+
+  label def destroy_vm_and_pg
     vm.incr_destroy
     postgres_server.destroy
 
@@ -618,21 +678,19 @@ SQL
 
   label def restart
     decr_restart
-    vm.sshable.cmd("sudo postgres/bin/restart #{postgres_server.resource.version}")
+
+    register_deadline("wait", 10 * 60)
+
+    vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
     pop "postgres server is restarted"
   end
 
-  def refresh_walg_credentials
-    return if postgres_server.timeline.blob_storage.nil?
-
-    walg_config = postgres_server.timeline.generate_walg_config
-    vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
-    vm.sshable.cmd("sudo tee /usr/lib/ssl/certs/blob_storage_ca.crt > /dev/null", stdin: postgres_server.timeline.blob_storage.root_certs) unless postgres_server.timeline.aws?
-  end
-
   def available?
     vm.sshable.invalidate_cache_entry
+
+    # Don't declare unavailability if we are upgrading.
+    return true if postgres_server.resource.version != postgres_server.resource.target_version && postgres_server == postgres_server.resource.upgrade_candidate_server
 
     begin
       postgres_server.run_query("SELECT 1")
@@ -642,7 +700,7 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/#{postgres_server.resource.version}/data/pg_log/postgresql.log").include?("redo in progress")
+      return true if vm.sshable.cmd("sudo tail -n 5 /dat/:version/data/pg_log/postgresql.log", version:).include?("redo in progress")
     rescue
     end
 
@@ -650,9 +708,10 @@ SQL
   end
 
   def update_stack_lsn(lsn)
-    current_frame = strand.stack.first
-    current_frame["lsn"] = lsn
-    strand.modified!(:stack)
-    strand.save_changes
+    update_stack({"lsn" => lsn})
+  end
+
+  def version
+    postgres_server.version
   end
 end

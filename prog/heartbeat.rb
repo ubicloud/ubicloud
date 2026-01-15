@@ -19,16 +19,14 @@ SQL
 
   label def wait
     if (connected = fetch_connected) != EXPECTED
-      Clog.emit("some expected connected clover services are missing") {
-        {heartbeat_missing: {difference: EXPECTED.difference(connected)}}
-      }
+      Clog.emit("some expected connected clover services are missing", {heartbeat_missing: {difference: EXPECTED.difference(connected)}})
       nap 10
     end
 
     Excon.get(Config.heartbeat_url, read_timeout: 2, write_timeout: 2, connect_timeout: 2)
     nap 10
   rescue Excon::Error::Timeout => e
-    Clog.emit("heartbeat request timed out") { {exception: {message: e.message}} }
+    Clog.emit("heartbeat request timed out", {exception: {message: e.message}})
     nap 10
   end
 end

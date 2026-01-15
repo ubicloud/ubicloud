@@ -81,26 +81,8 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       }.not_to raise_error
 
       private_location.update(project_id: victoria_metrics_project.id)
+      expect(Config).to receive(:victoria_metrics_service_project_id).and_return(victoria_metrics_project.id).at_least(:once)
       described_class.assemble(victoria_metrics_project.id, "vm-name", private_location.id, "admin", "standard-2", 128)
-    end
-  end
-
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the wait_servers_destroyed state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("wait_servers_destroyed")
-      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 

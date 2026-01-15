@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe LoadBalancer do
   subject(:lb) {
-    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https").subject
+    Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "https", cert_enabled: true).subject
   }
 
   let(:project) { Project.create(name: "test-prj") }
@@ -18,6 +18,18 @@ RSpec.describe LoadBalancer do
     ps = described_class.new(name: described_class.generate_ubid.to_s)
     ps.validate
     expect(ps.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with 1b to avoid overlap with id format"]
+  end
+
+  it "disallows private- name prefix" do
+    ps = described_class.new(name: "private-a")
+    ps.validate
+    expect(ps.errors[:name]).to eq ["cannot start with 'private-'"]
+  end
+
+  it "only includes single error if name is nil" do
+    ps = described_class.new(name: nil)
+    ps.validate
+    expect(ps.errors[:name]).to eq ["is not present"]
   end
 
   it "allows inference endpoint ubid format as name" do
@@ -46,12 +58,23 @@ RSpec.describe LoadBalancer do
     end
 
     it "adds the new port and increments update_load_balancer" do
-      expect(lb).to receive(:incr_update_load_balancer)
-      expect(lb.vm_ports.count).to eq(1)
-      lb.add_port(443, 8443)
-      lb.reload
-      expect(lb.vm_ports.count).to eq(2)
-      expect(lb.ports.count).to eq(2)
+      expect {
+        lb.add_port(443, 8443)
+      }.to change { lb.reload.vm_ports.count }.from(2).to(4)
+        .and change { lb.ports.count }.from(1).to(2)
+        .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+    end
+
+    it "adds the new port and increments update_load_balancer for ipv6 load balancer" do
+      lb.update(stack: "ipv6")
+      expect {
+        lb.add_port(443, 8443)
+      }.to change { lb.reload.vm_ports.count }.from(2).to(3)
+        .and change { lb.ports.count }.from(1).to(2)
+        .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv4" }).to eq(1)
+      expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv6" }).to eq(2)
     end
   end
 
@@ -65,27 +88,27 @@ RSpec.describe LoadBalancer do
     end
 
     it "removes the new port and increments update_load_balancer" do
-      expect(lb).to receive(:incr_update_load_balancer).twice
       lb.add_port(443, 8443)
       lb.reload
-      expect(lb.vm_ports.count).to eq(2)
-      expect(lb.ports.count).to eq(2)
 
-      lb.remove_port(lb.ports[1])
-      lb.reload
-      expect(lb.ports.count).to eq(1)
-      expect(lb.vm_ports.count).to eq(1)
+      expect {
+        lb.remove_port(lb.ports[1])
+      }.to change { lb.reload.ports.count }.from(2).to(1)
+        .and change { lb.vm_ports.count }.from(4).to(2)
+        .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(1).to(2)
     end
   end
 
   describe "add_vm" do
-    it "increments update_load_balancer and rewrite_dns_records" do
-      expect(lb).to receive(:incr_rewrite_dns_records)
+    it "increments rewrite_dns_records" do
       dz = DnsZone.create(name: "test-dns-zone", project_id: lb.project_id)
       cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
       lb.add_cert(cert)
-      lb.add_vm(vm1)
-      expect(lb.load_balancer_vms.count).to eq(1)
+
+      expect {
+        lb.add_vm(vm1)
+      }.to change { LoadBalancerVm.where(load_balancer_id: lb.id).count }.from(0).to(1)
+        .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(0).to(1)
     end
   end
 
@@ -101,9 +124,9 @@ RSpec.describe LoadBalancer do
     end
 
     it "increments update_load_balancer and rewrite_dns_records" do
-      expect(lb).to receive(:incr_update_load_balancer)
-      expect(lb).to receive(:incr_rewrite_dns_records)
-      lb.evacuate_vm(vm1)
+      expect { lb.evacuate_vm(vm1) }
+        .to change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+        .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(1).to(2)
       expect(lb.vm_ports.first[:state]).to eq("evacuating")
     end
   end
@@ -120,24 +143,17 @@ RSpec.describe LoadBalancer do
     end
 
     it "increments update_load_balancer and tries to remove_cert_server" do
-      expect(lb).to receive(:incr_update_load_balancer)
-      expect(Strand).to receive(:create) do |args|
-        expect(args[:prog]).to eq("Vnet::CertServer")
-        expect(args[:label]).to eq("remove_cert_server")
-      end
-      lb.detach_vm(vm1)
+      expect { lb.detach_vm(vm1) }
+        .to change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+        .and change { Strand.where(prog: "Vnet::CertServer", label: "remove_cert_server").count }.from(0).to(1)
       expect(lb.vm_ports.first[:state]).to eq("detaching")
     end
 
     it "increments update_load_balancer and does not create a strand for removing cert server" do
-      expect(lb).to receive(:incr_update_load_balancer)
-      expect(lb).to receive(:cert_enabled_lb?).and_return(false)
-      expect(Strand).not_to receive(:create) do |args|
-        expect(args[:prog]).to eq("Vnet::CertServer")
-        expect(args[:label]).to eq("remove_cert_server")
-      end
-
-      lb.detach_vm(vm1)
+      lb.update(cert_enabled: false)
+      expect { lb.detach_vm(vm1) }
+        .to change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+        .and not_change { Strand.where(prog: "Vnet::CertServer", label: "remove_cert_server").count }
       expect(lb.vm_ports.first[:state]).to eq("detaching")
     end
   end
@@ -172,27 +188,21 @@ RSpec.describe LoadBalancer do
 
     it "deletes the load_balancer_vm_port" do
       new_port = LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
-      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id)
+      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id, stack: "ipv4")
+      LoadBalancerVmPort.create(load_balancer_port_id: new_port.id, load_balancer_vm_id: lb.load_balancer_vms.first.id, stack: "ipv6")
       lb.reload
-      expect(lb.vm_ports.count).to eq(2)
+      expect(lb.vm_ports.count).to eq(4)
       lb.remove_vm_port(lb.vm_ports.first)
       lb.reload
-      expect(lb.vm_ports.count).to eq(1)
+      expect(lb.vm_ports.count).to eq(3)
       expect(lb.load_balancer_vms.count).to eq(1)
     end
 
     it "deletes the load_balancer_vm_port also deletes load_balancer_vms if the deleted vm_port was the last one" do
-      lb.remove_vm_port(lb.vm_ports.first)
+      lb.vm_ports.each { lb.remove_vm_port(it) }
       lb.reload
       expect(lb.vm_ports.count).to eq(0)
       expect(lb.load_balancer_vms.count).to eq(0)
-    end
-  end
-
-  describe "cert_enabled_lb?" do
-    it "returns false when healthcheck protocol is not https" do
-      lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "test-lb", src_port: 80, dst_port: 8080, health_check_protocol: "http").subject
-      expect(lb.cert_enabled_lb?).to equal(false)
     end
   end
 
@@ -226,10 +236,8 @@ RSpec.describe LoadBalancer do
       expect(lb.need_certificates?).to be(true)
     end
 
-    it "returns false if health_check_protocol is not https" do
-      lb.update(health_check_protocol: "http")
-      expect(lb.need_certificates?).to be(false)
-      lb.update(health_check_protocol: "tcp")
+    it "returns false if cert_enabled is false" do
+      lb.update(cert_enabled: false)
       expect(lb.need_certificates?).to be(false)
     end
   end

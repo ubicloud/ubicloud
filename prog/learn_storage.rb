@@ -6,8 +6,8 @@ class Prog::LearnStorage < Prog::Base
   subject_is :sshable, :vm_host
 
   def make_model_instances
-    devices = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command))
-    rec = SystemParser.extract_disk_info_from_df(sshable.cmd(SystemParser.df_command("/var/storage"))).first
+    devices = SystemParser.extract_disk_info_from_df(sshable.cmd("df -B1 --output=source,target,size,avail"))
+    rec = SystemParser.extract_disk_info_from_df(sshable.cmd("df -B1 --output=source,target,size,avail /var/storage")).first
     sds = [StorageDevice.new(
       vm_host_id: vm_host.id, name: "DEFAULT",
       # reserve 5G the host.
@@ -18,8 +18,9 @@ class Prog::LearnStorage < Prog::Base
 
     devices.each do |rec|
       next unless (name = rec.optional_name)
+
       sds << StorageDevice.new(
-        vm_host_id: vm_host.id, name: name,
+        vm_host_id: vm_host.id, name:,
         available_storage_gib: rec.avail_gib,
         total_storage_gib: rec.size_gib,
         unix_device_list: find_underlying_unix_device_ids(rec.unix_device)
@@ -36,6 +37,7 @@ class Prog::LearnStorage < Prog::Base
 
   def find_underlying_unix_device_names(unix_device)
     return [unix_device.delete_prefix("/dev/")] unless unix_device.start_with?("/dev/md")
+
     SystemParser.extract_underlying_raid_devices_from_mdstat(sshable.cmd("cat /proc/mdstat"), unix_device)
   end
 

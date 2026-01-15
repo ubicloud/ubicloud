@@ -6,7 +6,7 @@ class Hosting::HetznerApis
     @host = hetzner_host
   end
 
-  def reimage(server_id, hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 22.04.2 LTS base")
+  def reimage(server_id, hetzner_ssh_public_key: Config.hetzner_ssh_public_key, dist: "Ubuntu 24.04 LTS base")
     unless hetzner_ssh_public_key
       raise "hetzner_ssh_public_key is not set"
     end
@@ -17,7 +17,7 @@ class Hosting::HetznerApis
     formatted_fingerprint = fingerprint.scan(/../).join(":")
     connection = create_connection
     connection.post(path: "/boot/#{server_id}/linux",
-      body: URI.encode_www_form(dist: dist, lang: "en", authorized_key: formatted_fingerprint),
+      body: URI.encode_www_form(dist:, lang: "en", authorized_key: formatted_fingerprint),
       expects: 200)
 
     connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
@@ -28,14 +28,14 @@ class Hosting::HetznerApis
   # without giving the Server operating system time to gracefully stop. This
   # may lead to data loss, it’s equivalent to pulling the power cord and
   # plugging it in again. Reset should only be used when reboot does not work.
-  def reset(server_id, dist: "Ubuntu 22.04.2 LTS base")
+  def reset(server_id)
     create_connection.post(path: "/reset/#{server_id}", body: "type=hw", expects: 200)
     nil
   end
 
   def add_key(name, key)
     create_connection.post(path: "/key",
-      body: URI.encode_www_form(name: name, data: key),
+      body: URI.encode_www_form(name:, data: key),
       expects: 201)
     nil
   end
@@ -114,6 +114,7 @@ class Hosting::HetznerApis
       # Aggregate single-ip addresses.
       result[:ips].filter_map do |ip|
         next unless ip["active_server_ip"] == host_address
+
         IpInfo.new(
           ip_address: "#{ip["ip"]}/32",
           source_host_ip: ip["server_ip"],

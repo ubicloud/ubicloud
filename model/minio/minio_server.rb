@@ -1,15 +1,13 @@
 # frozen_string_literal: true
 
-require "net/ssh"
 require_relative "../../model"
+require_relative "../../lib/net_ssh"
 
 class MinioServer < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :project
+  one_to_one :strand, key: :id, read_only: true
   many_to_one :vm
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, conditions: {Sequel.function(:upper, :span) => nil}
   many_to_one :pool, key: :minio_pool_id, class: :MinioPool
-  one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster
+  one_through_one :cluster, join_table: :minio_pool, left_primary_key: :minio_pool_id, left_key: :id, class: :MinioCluster, read_only: true
 
   plugin ResourceMethods, redacted_columns: :cert, encrypted_columns: :cert_key
   plugin SemaphoreMethods, :checkup, :destroy, :restart, :reconfigure, :refresh_certificates, :initial_provisioning
@@ -32,7 +30,7 @@ class MinioServer < Sequel::Model
   end
 
   def public_ipv4_address
-    vm.ephemeral_net4.to_s
+    vm.ip4_string
   end
 
   def minio_volumes
@@ -57,19 +55,28 @@ class MinioServer < Sequel::Model
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 9000)
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       minio_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
     }
   end
 
+  def server_data(client = self.client)
+    server_data = JSON.parse(client.admin_info.body)["servers"]
+    if cluster.server_count == 1
+      server_data.first
+    else
+      server_data.find { it["endpoint"] == endpoint }
+    end
+  end
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      server_data = JSON.parse(session[:minio_client].admin_info.body)["servers"].find { it["endpoint"] == endpoint }
+      server_data = self.server_data(session[:minio_client])
       (server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }) ? "up" : "down"
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -91,8 +98,8 @@ class MinioServer < Sequel::Model
       endpoint: server_url,
       access_key: cluster.admin_user,
       secret_key: cluster.admin_password,
-      ssl_ca_data: cluster.root_certs + cert,
-      socket: socket
+      ssl_ca_data: cluster.root_certs,
+      socket:
     )
   end
 end

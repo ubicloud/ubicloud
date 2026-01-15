@@ -11,7 +11,8 @@ require "rack/mock_request"
 # rubocop:disable RSpec/SpecFilePathFormat
 RSpec.describe Ubicloud do
   # rubocop:enable RSpec/SpecFilePathFormat
-  let(:ubi) { described_class.new(:rack, app: Clover, env: {}, project_id: nil) }
+  let(:ubi) { described_class.new(:rack, app: Clover, env: {}, project_id:) }
+  let(:project_id) { Project.generate_ubid.to_s }
 
   it "ModelAdapter#respond_to? works as expected" do
     expect(ubi.vm).to respond_to(:create)
@@ -44,6 +45,21 @@ RSpec.describe Ubicloud do
     expect(ubi.vm.new({name: "foo", location: "foo"})).to be_a(Ubicloud::Vm)
   end
 
+  it "Model.new raises for invalid object" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.vm.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::Vm: []")
+  end
+
+  it "Model.new does not convert association key that isn't in expected format" do
+    expect(Clover).not_to receive(:call)
+    object = Object.new
+    expect(ubi.vm.new(location: "eu-central-h1", name: "test-vm", firewalls: object).firewalls).to eq object
+  end
+
+  it "Model.list raises for location including /" do
+    expect { ubi.vm.list(location: "foo/bar") }.to raise_error(Ubicloud::Error, "invalid location: \"foo/bar\"")
+  end
+
   it "Model.[] raises for invalid id or location/name format" do
     expect(Clover).not_to receive(:call)
     expect { ubi.vm["test-vm"] }.to raise_error(Ubicloud::Error, "invalid vm location/name: \"test-vm\"")
@@ -57,6 +73,53 @@ RSpec.describe Ubicloud do
   it "Model.[] returns nil for valid id format but missing object" do
     expect(Clover).to receive(:call).and_return([404, {}, []])
     expect(ubi.vm["vm345678901234567890123456"]).to be_nil
+  end
+
+  it "Model#id works for values with existing id" do
+    id = "vm345678901234567890123456"
+    expect(ubi.vm.new(id:).id).to eq id
+  end
+
+  it "Model#id retrieves id if id is not known" do
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/location/eu-central-h1/vm/test-vm"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{id:}.to_json]]
+    end)
+    expect(ubi.vm.new(location: "eu-central-h1", name: "test-vm").id).to eq id
+  end
+
+  it "Model#location works for values with existing location" do
+    location = "eu-central-h1"
+    expect(ubi.vm.new(location:, name: "test-vm").location).to eq location
+  end
+
+  it "Model#location retrieves location if location is not known" do
+    location = "eu-central-h1"
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/object-info/#{id}"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{location:}.to_json]]
+    end)
+    expect(ubi.vm.new(id:).location).to eq location
+  end
+
+  it "Model#name works for values with existing name" do
+    name = "test-vm"
+    expect(ubi.vm.new(location: "eu-central-h1", name:).name).to eq name
+  end
+
+  it "Model#name retrieves name if name is not known" do
+    name = "test-vm"
+    id = "vm345678901234567890123456"
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/object-info/#{id}"
+      expect(env["REQUEST_METHOD"]).to eq "GET"
+      [200, {"content-type" => "application/json"}, [{name:}.to_json]]
+    end)
+    expect(ubi.vm.new(id:).name).to eq name
   end
 
   it "Context#[] returns nil for invalid format" do
@@ -93,6 +156,121 @@ RSpec.describe Ubicloud do
     expect(ubi.new("vm345678901234567890123456")).to be_a(Ubicloud::Vm)
   end
 
+  it "GithubInstallation.new supports id strings and performs appropriate lookups" do
+    ubid = GithubInstallation.generate_ubid.to_s
+    gi = ubi.github_installation.new(ubid)
+    expect(gi[:id]).to eq ubid
+
+    expected_segment = ubid
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/#{expected_segment}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, name: "foo"}.to_json]]
+    end)
+
+    expect(gi.name).to eq "foo"
+
+    expected_segment = "foo"
+    gi.values.delete(:id)
+    expect(gi.check_exists).to eq gi
+    expect(gi.id).to eq ubid
+  end
+
+  it "GithubInstallation#repositories caches lookups unless reload keyword argument is given" do
+    ubid = GithubInstallation.generate_ubid.to_s
+    gi = ubi.github_installation.new(ubid)
+    repo_ubid = GithubRepository.generate_ubid.to_s
+
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/#{ubid}/repository"
+      [200, {"content-type" => "application/json"}, [{items: [{id: repo_ubid, installation_name: "bar", name: "bar/foo"}], count: 1}.to_json]]
+    end)
+
+    repos = gi.repositories
+    expect(repos.length).to eq 1
+    repo = repos[0]
+    expect(repo.id).to eq repo_ubid
+    expect(repo.installation_name).to eq "bar"
+    expect(repo.name).to eq "bar/foo"
+    expect(gi.repositories).to be repos
+    expect(gi.repositories(reload: true)).not_to be repos
+  end
+
+  it "GithubInstallation.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_installation.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubInstallation: []")
+    expect { ubi.github_installation.new(foo: 1) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+  end
+
+  it "GithubRepository performs appropriate lookups" do
+    ubid = GithubRepository.generate_ubid.to_s
+    gp = ubi.github_repository.new(installation_name: "foo", id: ubid)
+    expect(gp[:id]).to eq ubid
+
+    expected_segment = ubid
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/#{expected_segment}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, installation_name: "foo", name: "bar"}.to_json]]
+    end)
+
+    expect(gp.name).to eq "bar"
+
+    expected_segment = "bar"
+    gp.values.delete(:id)
+    expect(gp.check_exists).to eq gp
+    expect(gp.id).to eq ubid
+  end
+
+  it "GithubRepository.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_repository.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubRepository: []")
+    expect { ubi.github_repository.new(installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :installation_name key and either :id or :name keys")
+    expect { ubi.github_repository.new(name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :installation_name key and either :id or :name keys")
+  end
+
+  it "GithubRepository#cache_entries caches lookups unless reload keyword argument is given" do
+    ubid = GithubRepository.generate_ubid.to_s
+    gp = ubi.github_repository.new(installation_name: "foo", id: ubid)
+    ce_ubid = GithubCacheEntry.generate_ubid.to_s
+
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/#{ubid}/cache"
+      [200, {"content-type" => "application/json"}, [{items: [{id: ce_ubid, installation_name: "bar", repository_name: "bar/foo", key: "baz", size: "10 MB"}], count: 1}.to_json]]
+    end)
+
+    entries = gp.cache_entries
+    expect(entries.length).to eq 1
+    entry = entries[0]
+    expect(entry.id).to eq ce_ubid
+    expect(entry.installation_name).to eq "bar"
+    expect(entry.repository_name).to eq "bar/foo"
+    expect(entry.key).to eq "baz"
+    expect(entry.size).to eq "10 MB"
+    expect(gp.cache_entries).to be entries
+    expect(gp.cache_entries(reload: true)).not_to be entries
+  end
+
+  it "GithubCache#check_exists checks whether the cache key exists" do
+    ubid = GithubRepository.generate_ubid.to_s
+    ge = ubi.github_cache_entry.new(installation_name: "foo", repository_name: "bar", id: ubid)
+    expect(ge[:id]).to eq ubid
+
+    expect(Clover).to receive(:call).and_invoke(proc do |env|
+      expect(env["PATH_INFO"]).to eq "/project/#{project_id}/github/foo/repository/bar/cache/#{ubid}"
+      [200, {"content-type" => "application/json"}, [{id: ubid, installation_name: "foo", repository_name: "bar", key: "baz"}.to_json]]
+    end)
+
+    expect(ge.check_exists).to eq ge
+    expect(ge.key).to eq "baz"
+  end
+
+  it "GithubCacheEntry.new raises for invalid arguments" do
+    expect(Clover).not_to receive(:call)
+    expect { ubi.github_cache_entry.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::GithubCacheEntry: []")
+    expect { ubi.github_cache_entry.new(id: GithubCacheEntry.generate_ubid.to_s, installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+    expect { ubi.github_cache_entry.new(id: GithubCacheEntry.generate_ubid.to_s, repository_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+    expect { ubi.github_cache_entry.new(repository_name: "bar", installation_name: "foo") }.to raise_error(Ubicloud::Error, "hash must have :id, :repository_name, and :installation_name keys")
+  end
+
   it "Firewall#attach/detach_subnet supports PrivateSubnet instances" do
     fw = ubi.firewall.new("eu-central-h1/test-fw")
     ps = ubi.private_subnet.new("ps345678901234567890123456")
@@ -104,12 +282,29 @@ RSpec.describe Ubicloud do
     end)
 
     fw.attach_subnet(ps)
-    expect(path).to eq "/project//location/eu-central-h1/firewall/test-fw/attach-subnet"
+    expect(path).to eq "/project/#{project_id}/location/eu-central-h1/firewall/test-fw/attach-subnet"
     expect(params).to eq({private_subnet_id: "ps345678901234567890123456"})
 
     fw.detach_subnet(ps)
-    expect(path).to eq "/project//location/eu-central-h1/firewall/test-fw/detach-subnet"
+    expect(path).to eq "/project/#{project_id}/location/eu-central-h1/firewall/test-fw/detach-subnet"
     expect(params).to eq({private_subnet_id: "ps345678901234567890123456"})
+  end
+
+  it "Firewall#detach_subnet raises if private subnet id includes a slash" do
+    ps = ubi.private_subnet.new("eu-central-h1/test-ps")
+    expect { ps.disconnect("foo/bar") }.to raise_error(Ubicloud::Error, "invalid private subnet id format")
+  end
+
+  it "SshPublicKey.new raises if given bad values" do
+    expect { ubi.ssh_public_key.new("a/b") }.to raise_error(Ubicloud::Error, "invalid SSH public key id format")
+    expect { ubi.ssh_public_key.new({}) }.to raise_error(Ubicloud::Error, "hash must have :id or :name key")
+    expect { ubi.ssh_public_key.new([]) }.to raise_error(Ubicloud::Error, "unsupported value initializing Ubicloud::SshPublicKey: []")
+  end
+
+  it "SshPublicKey#check_exists" do
+    spk = ubi.ssh_public_key.new("spk")
+    expect(Clover).to receive(:call).and_return([404, {"content-type" => "application/json"}, ["{}"]])
+    expect(spk.check_exists).to be_nil
   end
 
   it "Vm.create converts LF to CRLF in public_keys" do
@@ -126,8 +321,8 @@ RSpec.describe Ubicloud do
     expect(public_key).to be_nil
   end
 
-  it "Firewall#add_rule and #delete_rule work without firewall rules loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+  it "Firewall#add_rule, #modify_rule, and #delete_rule work without firewall rules loaded" do
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
       [200, {"content-type" => "application/json"}, ["{}"]]
     end)
 
@@ -135,8 +330,30 @@ RSpec.describe Ubicloud do
     expect(fw.values[:firewall_rules]).to be_nil
     fw.add_rule("1.2.3.0/24")
     expect(fw.values[:firewall_rules]).to be_nil
+    fw.modify_rule("fr345678901234567890123456", cidr: "1.2.4.0/24")
+    expect(fw.values[:firewall_rules]).to be_nil
     fw.delete_rule("fr345678901234567890123456")
     expect(fw.values[:firewall_rules]).to be_nil
+  end
+
+  it "Firewall##modify_rule raises if no options are given" do
+    fw = ubi.firewall.new("foo/bar")
+    expect { fw.modify_rule("fr345678901234567890123456") }.to raise_error(Ubicloud::Error, "must provide at least one keyword argument")
+  end
+
+  it "Postgres\#{add,delete,modify}_firewall_rule work without firewall rules loaded" do
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{}"]]
+    end)
+
+    pg = ubi.postgres.new("foo/bar")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.add_firewall_rule("1.2.3.0/24")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.delete_firewall_rule("fr345678901234567890123456")
+    expect(pg.values[:firewall_rules]).to be_nil
+    pg.modify_firewall_rule("fr345678901234567890123456", cidr: "1.2.3.0/24")
+    expect(pg.values[:firewall_rules]).to be_nil
   end
 
   it "Postgres#add_firewall_rule and #delete_firewall_rule work without firewall rules loaded" do
@@ -165,28 +382,40 @@ RSpec.describe Ubicloud do
     expect(pg.values[:metric_destinations]).to be_nil
   end
 
-  it "Firewall#add_rule and #delete_rule modify firewall rules if loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+  it "Firewall#add_rule, #modify_rule, and #delete_rule modify firewall rules if loaded" do
+    id = "fr345678901234567890123456"
+    hash = {id:}
+    body = hash.to_json
+    expect(Clover).to receive(:call).thrice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, [body]]
     end)
 
     fw = ubi.firewall.new(location: "foo", name: "bar", firewall_rules: [])
     expect(fw.values[:firewall_rules]).to eq([])
     fw.add_rule("1.2.3.0/24")
-    expect(fw.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456"}])
-    fw.delete_rule("fr345678901234567890123456")
+    expect(fw.values[:firewall_rules]).to eq([hash])
+    fw.modify_rule(id, cidr: "1.2.4.0/24")
+    expect(fw.values[:firewall_rules]).to eq([hash])
+    fw.delete_rule(id)
     expect(fw.values[:firewall_rules]).to eq([])
   end
 
-  it "Postgres#add_firewall_rule and #delete_firewall_rule modify firewall rules if loaded" do
-    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
-      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\"}"]]
+  it "Postgres\#{add,delete,modify}_firewall_rule modify firewall rules if loaded" do
+    v = "1.2.3.0/24"
+    expect(Clover).to receive(:call).exactly(4).and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"fr345678901234567890123456\", \"cidr\": \"#{v}\"}"]]
     end)
 
     pg = ubi.postgres.new(location: "foo", name: "bar", firewall_rules: [])
     expect(pg.values[:firewall_rules]).to eq([])
-    pg.add_firewall_rule("1.2.3.0/24")
-    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456"}])
+    pg.add_firewall_rule(v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: v}])
+    v = "1.2.4.0/24"
+    pg.modify_firewall_rule("fr345678901234567890123456", cidr: v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: v}])
+    v = "1.2.5.0/24"
+    pg.modify_firewall_rule("fr345678901234567890123457", cidr: v)
+    expect(pg.values[:firewall_rules]).to eq([{id: "fr345678901234567890123456", cidr: "1.2.4.0/24"}])
     pg.delete_firewall_rule("fr345678901234567890123456")
     expect(pg.values[:firewall_rules]).to eq([])
   end

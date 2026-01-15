@@ -14,23 +14,51 @@ RSpec.describe Location do
   it ".for_project filters dataset to given project and non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02"]
-    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02"]
+    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
+    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
   end
 
   it ".visible_or_for_project filters dataset to given project and visible non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.visible_or_for_project(p1_id).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
-    expect(described_class.visible_or_for_project(p2_id).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l2", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p2_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l2", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, []).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "leaseweb-wdc02"]
+    expect(described_class.visible_or_for_project(p1_id, ["latitude-ai"]).select_order_map(:name)).to eq ["hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "leaseweb-wdc02"]
   end
 
   it "#visible_or_for_project? returns whether the location is visible or related to the given project" do
-    expect(p1_loc.visible_or_for_project?(p1_id)).to be true
-    expect(p1_loc.visible_or_for_project?(p2_id)).to be false
-    expect(p2_loc.visible_or_for_project?(p2_id)).to be true
-    expect(p2_loc.visible_or_for_project?(p1_id)).to be false
-    expect(described_class[name: "hetzner-fsn1"].visible_or_for_project?(p1_id)).to be true
-    expect(described_class[name: "github-runners"].visible_or_for_project?(p1_id)).to be false
+    expect(p1_loc.visible_or_for_project?(p1_id, [])).to be true
+    expect(p1_loc.visible_or_for_project?(p2_id, [])).to be false
+    expect(p2_loc.visible_or_for_project?(p2_id, [])).to be true
+    expect(p2_loc.visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "hetzner-fsn1"].visible_or_for_project?(p1_id, [])).to be true
+    expect(described_class[name: "github-runners"].visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, [])).to be false
+    expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, ["latitude-ai"])).to be true
+  end
+
+  it "#azs raises if not aws location" do
+    p1_loc.update(provider: "hetzner")
+    expect { p1_loc.azs }.to raise_error("azs is only valid for aws locations")
+    expect(LocationAwsAz.count).to eq(0)
+  end
+
+  it "returns the aws azs for an aws location" do
+    p1_loc.add_location_aws_az(az: "a", zone_id: "123")
+    p1_loc.add_location_aws_az(az: "b", zone_id: "456")
+    expect(p1_loc.azs).to eq([LocationAwsAz[az: "a"], LocationAwsAz[az: "b"]])
+  end
+
+  it "fetches aws azs from aws if not present" do
+    expect(p1_loc).to receive(:get_azs_from_aws).and_return([instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1a", zone_id: "123"), instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1b", zone_id: "456")])
+    expect(p1_loc.azs).to eq([LocationAwsAz[location_id: p1_loc.id, az: "a", zone_id: "123"], LocationAwsAz[location_id: p1_loc.id, az: "b", zone_id: "456"]])
+    expect(LocationAwsAz.count).to eq(2)
+  end
+
+  it "raises descriptive error when AMI not found" do
+    expect {
+      p2_loc.pg_ami("16", "x64")
+    }.to raise_error("No AMI found for PostgreSQL 16 (x64) in l2")
   end
 end

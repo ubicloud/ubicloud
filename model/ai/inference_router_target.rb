@@ -3,9 +3,9 @@
 require_relative "../../model"
 
 class InferenceRouterTarget < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :inference_router
-  many_to_one :inference_router_model
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :inference_router, read_only: true
+  many_to_one :inference_router_model, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :api_key
   plugin SemaphoreMethods, :destroy
@@ -15,7 +15,6 @@ end
 # Columns:
 #  id                        | uuid                     | PRIMARY KEY
 #  created_at                | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  updated_at                | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  name                      | text                     | NOT NULL
 #  host                      | text                     | NOT NULL
 #  api_key                   | text                     | NOT NULL

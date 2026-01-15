@@ -1,1 +1,1 @@
--dpostgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/foo?sslmode=require
+-dpostgres://postgres:bar456FOO123@test-pg.pgvm1qb9gwct1mqmay7m54yma5.pg.example.com:5432/foo?channel_binding=require

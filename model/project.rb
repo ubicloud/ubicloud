@@ -3,33 +3,36 @@
 require_relative "../model"
 
 class Project < Sequel::Model
-  one_to_many :access_control_entries
-  one_to_many :subject_tags, order: :name
-  one_to_many :action_tags, order: :name
-  one_to_many :object_tags, order: :name
+  one_to_many :access_control_entries, read_only: true
+  one_to_many :subject_tags, order: :name, read_only: true
+  one_to_many :action_tags, order: :name, read_only: true
+  one_to_many :object_tags, order: :name, read_only: true
   many_to_one :billing_info
-  one_to_many :usage_alerts
-  one_to_many :github_installations
-  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id
+  one_to_many :usage_alerts, read_only: true
+  one_to_many :github_installations, read_only: true
+  many_to_many :github_runners, join_table: :github_installation, right_key: :id, right_primary_key: :installation_id, read_only: true
 
   many_to_many :accounts, join_table: :access_tag, right_key: :hyper_tag_id
-  one_to_many :vms
-  one_to_many :minio_clusters
-  one_to_many :private_subnets
-  one_to_many :postgres_resources
-  one_to_many :firewalls
-  one_to_many :load_balancers
-  one_to_many :inference_endpoints
-  one_to_many :kubernetes_clusters
+  many_to_many :nics, join_table: :private_subnet, right_key: :id, right_primary_key: :private_subnet_id, read_only: true
+  one_to_many :vms, read_only: true
+  one_to_many :minio_clusters, read_only: true
+  one_to_many :private_subnets, read_only: true
+  one_to_many :postgres_resources, read_only: true
+  one_to_many :firewalls, read_only: true
+  one_to_many :load_balancers, read_only: true
+  one_to_many :inference_endpoints, read_only: true
+  one_to_many :kubernetes_clusters, read_only: true
+  one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
-  one_to_many :invoices, order: Sequel.desc(:created_at)
-  one_to_many :quotas, class: :ProjectQuota
-  one_to_many :invitations, class: :ProjectInvitation
-  one_to_many :api_keys, key: :owner_id, class: :ApiKey, conditions: {owner_table: "project"}
-  one_to_many :locations
+  one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
+  one_to_many :quotas, class: :ProjectQuota, remover: nil, clearer: nil
+  one_to_many :invitations, class: :ProjectInvitation, remover: nil, clearer: nil
+  one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "project"}, read_only: true
+  one_to_many :locations, read_only: true
+  many_to_many :payment_methods, join_table: :billing_info, left_primary_key: :billing_info_id, left_key: :id, right_key: :id, right_primary_key: :billing_info_id, read_only: true
 
   dataset_module Pagination
 
@@ -46,13 +49,24 @@ class Project < Sequel::Model
     end
   end
 
-  plugin :association_dependencies, accounts: :nullify, billing_info: :destroy, github_installations: :destroy, api_keys: :destroy, access_control_entries: :destroy, subject_tags: :destroy, action_tags: :destroy, object_tags: :destroy,
-    locations: :destroy
+  plugin :association_dependencies,
+    access_control_entries: :destroy,
+    accounts: :nullify,
+    action_tags: :destroy,
+    api_keys: :destroy,
+    billing_info: :destroy,
+    github_installations: :destroy,
+    locations: :destroy,
+    object_tags: :destroy,
+    ssh_public_keys: :destroy,
+    subject_tags: :destroy
 
   plugin ResourceMethods
 
   def has_valid_payment_method?
     return true unless Config.stripe_secret_key
+    return true if discount == 100
+
     !!billing_info&.payment_methods&.any? || (!!billing_info && credit > 0)
   end
 
@@ -81,6 +95,15 @@ class Project < Sequel::Model
     RESOURCE_ASSOCIATION_DATASET_METHODS.any? { !send(it).empty? }
   end
 
+  def insert_project_discount_code(discount)
+    hash = ProjectDiscountCode.dataset.returning.insert(
+      id: ProjectDiscountCode.generate_uuid,
+      project_id: id,
+      discount_code_id: discount.id
+    ).first
+    ProjectDiscountCode.call(hash)
+  end
+
   def soft_delete
     DB.transaction do
       DB[:access_tag].where(project_id: id).delete
@@ -90,7 +113,9 @@ class Project < Sequel::Model
         DB[:"applied_#{tag_type}_tag"].where(tag_id: dataset.select(:id)).delete
         dataset.destroy
       end
-      github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
+      DB.ignore_duplicate_queries do
+        github_installations.each { Prog::Github::DestroyGithubInstallation.assemble(it) }
+      end
 
       # We still keep the project object for billing purposes.
       # These need to be cleaned up manually once in a while.
@@ -104,7 +129,7 @@ class Project < Sequel::Model
   end
 
   def current_invoice
-    begin_time = invoices.first&.end_time || Time.new(Time.now.year, Time.now.month, 1)
+    begin_time = invoices_dataset.get(:end_time) || Time.new(Time.now.year, Time.now.month, 1)
     end_time = Time.now
 
     if (invoice = InvoiceGenerator.new(begin_time, end_time, project_ids: [id]).run.first)
@@ -119,7 +144,7 @@ class Project < Sequel::Model
       "cost" => 0.0
     }
 
-    Invoice.new(project_id: id, content: content, begin_time: begin_time, end_time: end_time, created_at: Time.now, status: "current")
+    Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: Time.now, status: "current")
   end
 
   def current_resource_usage(resource_type)
@@ -127,15 +152,20 @@ class Project < Sequel::Model
     when "VmVCpu" then vms_dataset.sum(:vcpus) || 0
     when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).total_active_runner_vcpus
     when "PostgresVCpu" then postgres_resources_dataset.association_join(servers: :vm).sum(:vcpus) || 0
+    when "KubernetesVCpu" then kubernetes_clusters_dataset.select(Sequel[:kubernetes_cluster][:cp_node_count].as(:node_count), Sequel[:kubernetes_cluster][:target_node_size])
+      .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)
+      .all.sum { it[:node_count] * Validation.validate_vm_size(it[:target_node_size], "x64").vcpus } || 0
     else
       raise "Unknown resource type: #{resource_type}"
     end
   end
 
   def effective_quota_value(resource_type)
-    default_quota = ProjectQuota.default_quotas[resource_type]
-    override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
-    override_quota_value || default_quota["#{reputation}_value"]
+    DB.ignore_duplicate_queries do
+      default_quota = ProjectQuota.default_quotas[resource_type]
+      override_quota_value = quotas_dataset.first(quota_id: default_quota["id"])&.value
+      override_quota_value || default_quota["#{reputation}_value"]
+    end
   end
 
   def quota_available?(resource_type, requested_additional_usage)
@@ -145,7 +175,7 @@ class Project < Sequel::Model
   def validate
     super
     if new? || changed_columns.include?(:name)
-      validates_format(%r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}i, :name, message: "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+      validates_format(%r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}i, :name, message: "must be less than 64 characters and only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
     end
   end
 
@@ -170,9 +200,26 @@ class Project < Sequel::Model
     end
   end
 
-  feature_flag :vm_public_ssh_keys, :location_latitude_fra, :access_all_cache_scopes, :allocator_diagnostics
-  feature_flag :private_locations, :enable_c6gd, :enable_m6gd, :enable_m8gd
-  feature_flag :free_runner_upgrade_until, :gpu_vm, :postgres_lantern, :aws_cloudwatch_logs
+  feature_flag(
+    :access_all_cache_scopes,
+    :allocator_diagnostics,
+    :aws_alien_runners_ratio,
+    :aws_cloudwatch_logs,
+    :enable_c6gd,
+    :enable_m6id,
+    :enable_m6gd,
+    :free_runner_upgrade_until,
+    :gpu_runner,
+    :gpu_vm,
+    :ipv6_disabled,
+    :postgres_hostname_override,
+    :postgres_lantern,
+    :private_locations,
+    :skip_runner_pool,
+    :spill_to_alien_runners,
+    :visible_locations,
+    :vm_public_ssh_keys
+  )
 end
 
 # Table: project
@@ -186,13 +233,14 @@ end
 #  created_at      | timestamp with time zone | NOT NULL DEFAULT now()
 #  feature_flags   | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  billable        | boolean                  | NOT NULL DEFAULT true
-#  reputation      | project_reputation       | NOT NULL DEFAULT 'new'::project_reputation
+#  reputation      | text                     | NOT NULL DEFAULT 'new'::text
 # Indexes:
 #  project_pkey                      | PRIMARY KEY btree (id)
 #  project_right(id::text, 10)_index | UNIQUE btree ("right"(id::text, 10))
 # Check constraints:
 #  max_discount_amount | (discount <= 100)
 #  min_credit_amount   | (credit >= 0::numeric)
+#  reputation_check    | (reputation = ANY (ARRAY['new'::text, 'verified'::text, 'limited'::text]))
 # Foreign key constraints:
 #  project_billing_info_id_fkey | (billing_info_id) REFERENCES billing_info(id)
 # Referenced By:
@@ -211,6 +259,7 @@ end
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
+#  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)

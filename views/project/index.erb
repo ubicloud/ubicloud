@@ -14,9 +14,9 @@
       rows: @projects.map do |p|
          [
            [
-             [p[:name], {link: p[:path] + "/dashboard"}]
+             [p.name, {link: "#{p.path}/dashboard"}]
            ],
-           { id: "project-#{p[:id]}" }
+           { id: "project-#{p.ubid}" }
          ]
       end,
       empty_state: {

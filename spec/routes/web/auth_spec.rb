@@ -41,6 +41,20 @@ RSpec.describe Clover, "auth" do
     expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
   end
 
+  it "can not create new account with invalid email" do
+    visit "/create-account"
+    fill_in "Email Address", with: "\u1234@something.com"
+    fill_in "Full Name", with: "test"
+    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password Confirmation", with: TEST_USER_PASSWORD
+    expect(EmailRenderer).to receive(:sendmail).and_raise(Net::SMTPSyntaxError, "501 5.1.3 Bad recipient address syntax")
+    click_button "Create Account"
+
+    expect(page.title).to eq("Ubicloud - Create Account")
+    expect(Mail::TestMailer.deliveries.length).to eq 0
+    expect(page).to have_flash_error("Invalid email address used")
+  end
+
   it "can send email verification email again after 300 seconds" do
     visit "/create-account"
     fill_in "Full Name", with: "John Doe"
@@ -103,7 +117,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit "#{p.path}/dashboard"
-    expect(page.title).to eq("Ubicloud - #{p.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Invited-project Dashboard")
   end
 
   it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
@@ -149,7 +163,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     visit p.path
-    expect(page.title).to eq("Ubicloud - #{p.name}")
+    expect(page.title).to eq("Ubicloud - Invited-project")
   end
 
   it "can remember login" do
@@ -162,12 +176,12 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
   end
 
   it "has correct current user when logged in via remember token" do
-    account = create_account
+    create_account
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
@@ -176,10 +190,10 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     page.refresh
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
   end
 
   it "can reset password" do
@@ -264,7 +278,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
     fill_in "Password", with: TEST_USER_PASSWORD
     click_button "Sign in"
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
 
     account.suspend
 
@@ -288,7 +302,7 @@ RSpec.describe Clover, "auth" do
     check "Remember me"
     click_button "Sign in"
 
-    expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     account.suspend
     page.refresh
@@ -427,18 +441,60 @@ RSpec.describe Clover, "auth" do
       click_button "Sign in"
     end
 
+    it "does not allow duplicate passwords" do
+      # Update account_previous_password_hashes, which isn't done by default in the specs
+      password_hash = Argon2::Password.new({
+        t_cost: 1,
+        m_cost: 5,
+        secret: Config.clover_session_secret
+      }).create(TEST_USER_PASSWORD)
+      DB[:account_previous_password_hashes].insert(account_id: Account.get(:id), password_hash:)
+
+      visit "/account/change-password"
+      passwords = [TEST_USER_PASSWORD]
+      3.times do
+        passwords.each do |password|
+          fill_in "New Password", with: password
+          fill_in "New Password Confirmation", with: password
+
+          click_button "Change Password"
+          expect(page.title).to eq("Ubicloud - Change Password")
+          expect(page).to have_flash_error("There was an error changing your password")
+          expect(page).to have_text(/invalid password, same as current password|Password cannot be the same as a previous password/)
+        end
+
+        new_password = passwords.last + "_new"
+        passwords << new_password
+        fill_in "New Password", with: new_password
+        fill_in "New Password Confirmation", with: new_password
+        click_button "Change Password"
+        expect(page.title).to eq("Ubicloud - Change Password")
+        expect(page).to have_flash_notice("Your password has been changed")
+      end
+    end
+
     [true, false].each do |clear_last_password_entry|
       it "can change password when password entry is #{"not " unless clear_last_password_entry}required" do
         visit "/clear-last-password-entry" if clear_last_password_entry
         visit "/account/change-password"
 
         fill_in "Current Password", with: TEST_USER_PASSWORD if clear_last_password_entry
-        fill_in "New Password", with: "#{TEST_USER_PASSWORD}_new"
-        fill_in "New Password Confirmation", with: "#{TEST_USER_PASSWORD}_new"
+        bad_pass = "aA0"
+        fill_in "New Password", with: bad_pass
+        fill_in "New Password Confirmation", with: bad_pass
 
         click_button "Change Password"
 
         expect(page.title).to eq("Ubicloud - Change Password")
+        expect(page).to have_flash_error("There was an error changing your password")
+        expect(page).to have_content("Password must have 8 characters minimum and contain at least one lowercase letter, one uppercase letter, and one digit.")
+
+        new_pass = TEST_USER_EMAIL + "New0"
+        fill_in "New Password", with: new_pass
+        fill_in "New Password Confirmation", with: new_pass
+
+        click_button "Change Password"
+        expect(page).to have_flash_notice("Your password has been changed")
 
         click_button "Log out"
 
@@ -446,9 +502,10 @@ RSpec.describe Clover, "auth" do
 
         fill_in "Email Address", with: TEST_USER_EMAIL
         click_button "Sign in"
-        fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
+        fill_in "Password", with: new_pass
 
         click_button "Sign in"
+        expect(page).to have_flash_notice("You have been logged in")
       end
 
       it "can close account when password entry is #{"not " unless clear_last_password_entry}required" do
@@ -479,7 +536,7 @@ RSpec.describe Clover, "auth" do
       click_button "Close Account"
 
       expect(page.title).to eq("Ubicloud - Close Account")
-      expect(page).to have_flash_error("'#{project.name}' project has some resources. Delete all related resources first.")
+      expect(page).to have_flash_error("'Default' project has some resources. Delete all related resources first.")
     end
   end
 
@@ -487,11 +544,11 @@ RSpec.describe Clover, "auth" do
     def mock_provider(provider, email = TEST_USER_EMAIL, name: "John Doe", mock_config: true)
       expect(Config).to receive("omniauth_#{provider}_id").and_return("12345").at_least(:once) if mock_config
       OmniAuth.config.add_mock(provider, {
-        provider: provider,
+        provider:,
         uid: "123456790",
         info: {
           name:,
-          email: email
+          email:
         }
       })
     end
@@ -741,7 +798,35 @@ RSpec.describe Clover, "auth" do
       visit "/login"
       click_button "GitHub"
 
-      expect(Account[email: TEST_USER_EMAIL].name).to eq "User"
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "user"
+    end
+
+    it "can create new account even if social account has a name that isn't a valid Ubicloud name" do
+      mock_provider(:github, name: "123Foo..\u1234Bar")
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq "Foo \u1234Bar"
+    end
+
+    it "can create new account even if social account has a name is too long" do
+      mock_provider(:github, name: "F" * 100)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email: TEST_USER_EMAIL].name).to eq("F" * 63)
+    end
+
+    it "can create new account even if name for social login cannot be determined" do
+      email = ".@example.com"
+      mock_provider(:github, email, name: nil)
+
+      visit "/login"
+      click_button "GitHub"
+
+      expect(Account[email:].name).to eq "Unknown"
     end
 
     it "can create new account" do
@@ -754,7 +839,7 @@ RSpec.describe Clover, "auth" do
       expect(account).not_to be_nil
       expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
     end
 
     it "can login existing account" do
@@ -768,7 +853,7 @@ RSpec.describe Clover, "auth" do
       expect(Account.count).to eq(1)
       expect(AccountIdentity.count).to eq(1)
       expect(page.status_code).to eq(200)
-      expect(page.title).to eq("Ubicloud - #{account.projects.first.name} Dashboard")
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
     end
 
     it "can not login existing account before linking it" do

@@ -1,3 +1,5 @@
+<% delete_perm = has_permission?("Postgres:delete", @pg) %>
+
 <% if @edit_perm %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
@@ -9,8 +11,7 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}#{@pg.path}/set-maintenance-window" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/set-maintenance-window") %>
+        <% form(action: "#{path(@pg)}/set-maintenance-window", method: :post) do %>
           <div class="space-y-4">
             <div class="grid grid-cols-12 gap-6">
               <div class="col-span-12 sm:col-span-7">
@@ -18,10 +19,7 @@
                     "components/form/select",
                     name: "maintenance_window_start_at",
                     placeholder: "No Maintenance Window",
-                    options:
-                      (0..23).map do
-                        [it, "#{"%02d" % it}:00 - #{"%02d" % ((it + PostgresResource::MAINTENANCE_DURATION_IN_HOURS) % 24)}:00 (UTC)"]
-                      end,
+                    options: PostgresResource.maintenance_hour_options,
                     label: "Maintenance Window:",
                     selected: @pg.maintenance_window_start_at
                   ) %>
@@ -31,13 +29,13 @@
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
       </div>
     </div>
   </div>
 <% end %>
 <!-- Danger Zone -->
-<% if @edit_perm || @delete_perm %>
+<% if @edit_perm || delete_perm %>
   <div class="p-6">
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
@@ -50,8 +48,7 @@
       <!-- Promote -->
       <% if @edit_perm && @pg.read_replica? %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/promote" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/promote") %>
+          <% form(action: "#{path(@pg)}/promote", method: :post) do %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Promote PostgreSQL read replica database</h3>
@@ -66,14 +63,13 @@
                 </div>
               </div>
             </div>
-          </form>
+          <% end %>
         </div>
       <% end %>
       <!-- Reset password -->
       <% if @edit_perm && !@pg.read_replica? %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/reset-superuser-password" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/reset-superuser-password") %>
+          <% form(action: "#{path(@pg)}/reset-superuser-password", method: :post) do %>
             <div class="space-y-4">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Reset superuser password</h3>
@@ -108,14 +104,13 @@
                 </div>
               </div>
             </div>
-          </form>
+          <% end %>
         </div>
       <% end %>
       <!-- Restart Card -->
       <% if @edit_perm %>
         <div class="px-4 py-5 sm:p-6">
-          <form action="<%= "#{@project_data[:path]}#{@pg.path}/restart" %>" role="form" method="POST">
-            <%== csrf_tag("#{@project_data[:path]}#{@pg.path}/restart") %>
+          <% form(action: "#{path(@pg)}/restart", method: :post) do %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Restart PostgreSQL database</h3>
@@ -130,11 +125,16 @@
                 </div>
               </div>
             </div>
-          </form>
+          <% end %>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <% form(action: "#{path(@pg)}/rename", method: :post) do %>
+            <%== part("components/rename_object_input", object: @pg, type: "PostgreSQL database", text: "Renaming a PostgreSQL database changes the connection info, so doing so requires updating your applications.") %>
+          <% end %>
         </div>
       <% end %>
       <!-- Delete Card -->
-      <% if @delete_perm %>
+      <% if delete_perm %>
         <div class="px-4 py-5 sm:p-6">
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
@@ -144,7 +144,7 @@
               </div>
             </div>
             <div id="postgres-delete-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <%== part("components/delete_button", url: "#{@project_data[:path]}#{@pg.path}", confirmation: @pg.name, redirect: "#{@project_data[:path]}/postgres") %>
+              <%== part("components/delete_button", url: path(@pg), confirmation: @pg.name) %>
             </div>
           </div>
         </div>

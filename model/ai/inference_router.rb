@@ -3,11 +3,12 @@
 require_relative "../../model"
 
 class InferenceRouter < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :project
-  one_to_many :replicas, class: :InferenceRouterReplica, key: :inference_router_id
-  many_to_one :load_balancer
-  many_to_one :private_subnet
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :project, read_only: true
+  one_to_many :replicas, class: :InferenceRouterReplica, read_only: true
+  one_to_many :targets, class: :InferenceRouterTarget, read_only: true
+  many_to_one :load_balancer, read_only: true
+  many_to_one :private_subnet, read_only: true
   many_to_one :location
 
   plugin ResourceMethods
@@ -18,7 +19,6 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  updated_at        | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  name              | text                     | NOT NULL
 #  vm_size           | text                     | NOT NULL
 #  replica_count     | integer                  | NOT NULL

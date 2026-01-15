@@ -166,7 +166,7 @@ RSpec.describe Clover, "vm" do
           enable_ip4: true
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: boot_image", {"boot_image" => "\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"ubuntu-noble\", \"ubuntu-jammy\", \"debian-12\", \"almalinux-9\"]"})
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: boot_image", {"boot_image" => "\"invalid-boot-image\" is not a valid boot image name. Available boot image names are: [\"gpu-ubuntu-noble\", \"ubuntu-noble\", \"ubuntu-jammy\", \"debian-12\", \"almalinux-9\"]"})
       end
 
       it "invalid vm size" do

@@ -23,6 +23,84 @@ RSpec.describe Sshable do
     expect(sa.raw_private_key_1).to eq(key)
   end
 
+  describe "#maybe_ssh_session_lock_name" do
+    it "does not yield if SSH_SESSION_LOCK_NAME is not defined" do
+      expect(sa.maybe_ssh_session_lock_name).to be_nil
+    end
+
+    if Config.unfrozen_test?
+      it "yields if SSH_SESSION_LOCK_NAME is defined" do
+        stub_const("SSH_SESSION_LOCK_NAME", "testlockname")
+        expect(sa.maybe_ssh_session_lock_name).to eq("testlockname")
+      end
+    end
+  end
+
+  describe "session locking" do
+    lock_script = <<LOCK
+exec 999>/dev/shm/session-lock-testlockname || exit 92
+flock -xn 999 || { echo "Another session active: " testlockname; exit 124; }
+sleep infinity </dev/null >/dev/null 2>&1 &
+disown
+LOCK
+
+    if File.directory?("/dev/shm")
+      it "interlocks" do
+        portable_pkill = lambda { system("fuser -k /dev/shm/session-lock-testlockname >/dev/null 2>&1") }
+        portable_pkill.call
+        q_lock_script = NetSsh.command(":lock_script", lock_script:)
+        expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["", 0])
+        expect([`bash -c #{q_lock_script}`, $?.exitstatus]).to eq(["Another session active:  testlockname\n", 124])
+        expect(portable_pkill.call).to be true
+      end
+    end
+
+    describe "exit code handling" do
+      before do
+        expect(sa).to receive(:maybe_ssh_session_lock_name).and_return("testlockname")
+        sa.invalidate_cache_entry
+        expect(Net::SSH).to receive(:start) do
+          instance_double(Net::SSH::Connection::Session, close: nil)
+        end
+      end
+
+      it "runs the session lock script if SSH_SESSION_LOCK_NAME is set" do
+        expect(sa).to receive(:_cmd).with(lock_script, log: false)
+        sa.connect
+      end
+
+      it "reports a failure to obtain a file descriptor with an obscure exit code" do
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 92, nil))
+        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b.dig(:contended_session_lock, :session_fail_msg)).to eq("could not create session lock file for testlockname")
+        end
+        sa.connect
+      end
+
+      it "reports lock conflicts when an obscure exit code is raised" do
+        sa.id = "624ec0d1-95d9-8f31-bbaa-bcccb76fe98b"
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 124, nil))
+        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b).to eq(contended_session_lock: {
+            exit_code: 124,
+            session_fail_msg: "session lock conflict for testlockname",
+            sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp",
+            prog: nil
+          })
+        end
+        sa.connect
+      end
+
+      it "has a generic message for unrecognized errors" do
+        expect(sa).to receive(:_cmd).with(lock_script, log: false).and_raise(Sshable::SshError.new(lock_script, "", "", 1, nil))
+        expect(Clog).to receive(:emit).with("session lock failure", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b.dig(:contended_session_lock, :session_fail_msg)).to eq("unknown SshError")
+        end
+        sa.connect
+      end
+    end
+  end
+
   describe "caching" do
     # The cache is thread local, so re-set the thread state by boxing
     # each test in a new thread.
@@ -76,7 +154,7 @@ RSpec.describe Sshable do
     end
 
     it "can reset caches even if session fails while closing" do
-      sess = instance_double(Net::SSH::Connection::Session)
+      sess = Net::SSH::Connection::Session.allocate
       expect(sess).to receive(:close).and_raise Sshable::SshError.new("bogus", "", "", nil, nil)
       expect(Net::SSH).to receive(:start).and_return sess
       sa.connect
@@ -87,15 +165,17 @@ RSpec.describe Sshable do
   end
 
   describe "#cmd" do
-    let(:session) { instance_double(Net::SSH::Connection::Session) }
+    let(:session) { Net::SSH::Connection::Session.allocate }
 
     before do
       expect(sa).to receive(:connect).and_return(session).at_least(:once)
     end
 
     def simulate(cmd:, exit_status:, exit_signal:, stdout:, stderr:)
+      allow(session).to receive(:loop).and_yield
       expect(session).to receive(:open_channel) do |&blk|
         chan = instance_spy(Net::SSH::Connection::Channel)
+        allow(chan).to receive(:connection).and_return(session)
         expect(chan).to receive(:exec).with(cmd) do |&blk|
           chan2 = instance_spy(Net::SSH::Connection::Channel)
           expect(chan2).to receive(:on_request).with("exit-status") do |&blk|
@@ -111,6 +191,7 @@ RSpec.describe Sshable do
           end
           expect(chan2).to receive(:on_data).and_yield(instance_double(Net::SSH::Connection::Channel), stdout)
           expect(chan2).to receive(:on_extended_data).and_yield(nil, 1, stderr)
+          allow(chan2).to receive(:connection).and_return(session)
 
           blk.call(chan2, true)
         end
@@ -132,8 +213,7 @@ RSpec.describe Sshable do
 
           if log_value
             sa.instance_variable_set(:@connect_duration, 1.1)
-            expect(Clog).to receive(:emit).with("ssh cmd execution") do |&blk|
-              dat = blk.call
+            expect(Clog).to receive(:emit).with("ssh cmd execution", instance_of(Hash)) do |_, dat|
               if repl_value
                 expect(dat[:ssh].slice(:stdout, :stderr)).to be_empty
               else
@@ -142,21 +222,44 @@ RSpec.describe Sshable do
             end
           end
           simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
-          expect(sa.cmd("echo hello", log: log_value)).to eq("hello")
+          expect(sa.cmd("echo hello", log: log_value, timeout: nil, _skip_command_checking: true)).to eq("hello")
         end
       end
     end
 
-    it "raises an error with a non-zero exit status" do
+    it "raises an SshError with a non-zero exit status" do
       simulate(cmd: "exit 1", exit_status: 1, exit_signal: 127, stderr: "", stdout: "")
-      expect { sa.cmd("exit 1") }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshError, "command exited with an error: exit 1"
+    end
+
+    it "raises an SshError with a nil exit status" do
+      simulate(cmd: "exit 1", exit_status: nil, exit_signal: nil, stderr: "", stdout: "")
+      expect { sa.cmd("exit 1", timeout: nil, _skip_command_checking: true) }.to raise_error Sshable::SshTimeout, "command timed out: exit 1"
+    end
+
+    it "supports custom timeout" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false, timeout: 2, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "suports default timeout" do
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
+    end
+
+    it "supports default timeout based on thread apoptosis_at variable if no explicit timeout is given if variable is available" do
+      Thread.current[:apoptosis_at] = Time.now + 60
+      simulate(cmd: "echo hello", exit_status: 0, exit_signal: nil, stdout: "hello", stderr: "world")
+      expect(sa.cmd("echo hello", log: false, _skip_command_checking: true)).to eq("hello")
+    ensure
+      Thread.current[:apoptosis_at] = nil
     end
 
     it "invalidates the cache if the session raises an error" do
       err = IOError.new("the party is over")
       expect(session).to receive(:open_channel).and_raise err
       expect(sa).to receive(:invalidate_cache_entry)
-      expect { sa.cmd("irrelevant") }.to raise_error err
+      expect { sa.cmd("irrelevant", _skip_command_checking: true) }.to raise_error err
     end
   end
 
@@ -166,27 +269,27 @@ RSpec.describe Sshable do
     let(:stdin_data) { "secret_data" }
 
     it "calls cmd with the correct check command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 check test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 check test_unit")
       sa.d_check(unit_name)
     end
 
     it "calls cmd with the correct clean command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 clean test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 clean test_unit")
       sa.d_clean(unit_name)
     end
 
     it "calls cmd with the correct restart command" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 restart test_unit")
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 restart test_unit")
       sa.d_restart(unit_name)
     end
 
     it "calls cmd with the correct run command and no stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: nil, log: true)
       sa.d_run(unit_name, run_command)
     end
 
     it "calls cmd with the correct run command and passes stdin" do
-      expect(sa).to receive(:cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
+      expect(sa).to receive(:_cmd).with("common/bin/daemonizer2 run test_unit sudo\\ host/bin/setup-vm\\ prep\\ test_unit", stdin: stdin_data, log: true)
       sa.d_run(unit_name, run_command, stdin: stdin_data)
     end
   end

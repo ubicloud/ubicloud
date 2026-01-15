@@ -3,19 +3,13 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::SetupHugepages do
-  subject(:sh) {
-    described_class.new(Strand.new(prog: "SetupHugepages"))
-  }
-
   describe "#start" do
     it "pops after installing hugepages" do
-      vm_host = instance_double(VmHost)
-      allow(vm_host).to receive(:total_mem_gib).and_return(64)
-      sshable = instance_double(Sshable)
-      expect(sshable).to receive(:cmd).with(/sudo sed.*default_hugepagesz=1G.*hugepagesz=1G.*hugepages=59.*grub/)
-      expect(sshable).to receive(:cmd).with("sudo update-grub")
-      expect(sh).to receive(:sshable).and_return(sshable).at_least(:once)
-      expect(sh).to receive(:vm_host).and_return(vm_host).at_least(:once)
+      vm_host = Prog::Vm::HostNexus.assemble("::1").subject
+      vm_host.update(total_mem_gib: 64)
+      sh = described_class.new(Strand.new(stack: [{"subject_id" => vm_host.id}], prog: "SetupHugepages"))
+      expect(sh.sshable).to receive(:_cmd).with("sudo sed -i '/^GRUB_CMDLINE_LINUX=\"/ s/\"$/ hugetlb_free_vmemmap=on default_hugepagesz='1G' hugepagesz='1G' hugepages='59'&/' /etc/default/grub")
+      expect(sh.sshable).to receive(:_cmd).with("sudo update-grub")
       expect { sh.start }.to exit({"msg" => "hugepages installed"})
     end
   end

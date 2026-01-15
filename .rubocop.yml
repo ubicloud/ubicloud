@@ -34,6 +34,12 @@ Rake:
 Sequel:
   Enabled: true
 
+Style/HashSyntax:
+  EnforcedShorthandSyntax: always
+
+Style/HashTransformKeys:
+  Enabled: true
+
 # Seems to be buggy and flags non-redundant line continuations as redundant
 Style/RedundantLineContinuation:
   Enabled: false
@@ -81,6 +87,9 @@ RSpec/SubjectStub:
 RSpec/ExpectInHook:
   Enabled: false
 
+RSpec/ExpectInLet:
+  Enabled: false
+
 RSpec/InstanceVariable:
   Enabled: false
 
@@ -107,4 +116,7 @@ RSpec/IndexedLet:
   Enabled: false
 
 RSpec/NestedGroups:
+  Enabled: false
+
+RSpec/LeakyLocalVariable:
   Enabled: false

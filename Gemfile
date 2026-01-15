@@ -3,11 +3,12 @@
 source "https://rubygems.org"
 
 # Update ruby version in Dockerfile and .tool_versions when updating this
-ruby "3.4.5"
+ruby "3.4.8"
 
 gem "acme-client"
 gem "argon2"
 gem "argon2-kdf"
+gem "autoforme", ">= 1.14"
 gem "aws-sdk-ec2", "~> 1.512"
 gem "aws-sdk-iam"
 gem "aws-sdk-s3"
@@ -17,6 +18,7 @@ gem "countries"
 gem "ed25519"
 gem "erubi", ">= 1.5"
 gem "excon"
+gem "forme"
 gem "jwt"
 gem "mail"
 gem "net-ssh"
@@ -34,13 +36,13 @@ gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "refrigerator", ">= 1"
 gem "reline" # Remove it when pry adds it as a dependency
-gem "roda", github: "jeremyevans/roda", ref: "f4317ebfe15de8126267d33023ffb9f320dc9020"
-gem "rodauth", github: "jeremyevans/rodauth", ref: "a1780cd64e947d4531771e272ed97eb4f33058b9"
-gem "rodauth-omniauth", github: "janko/rodauth-omniauth", ref: "477810179ba0cab8d459be1a0d87dca5b57ec94b"
+gem "roda", ">= 3.96"
+gem "rodauth", ">= 2.41"
+gem "rodauth-omniauth", ">= 0.6.2"
 gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
-gem "sequel", ">= 5.95"
+gem "sequel", github: "jeremyevans/sequel", ref: "5ebcb7ab31f544867b20ec6a373969dc1ae01932"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "shellwords"
 gem "stripe"
@@ -48,13 +50,20 @@ gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
 
+group :aws_kms do
+  gem "aws-sdk-kms"
+end
+
+group :aws_rds_iam do
+  gem "pg-aws_rds_iam", github: "haines/pg-aws_rds_iam", ref: "fb91b9232837e350aa9c8440b7340346adae845e"
+end
+
 group :development do
   gem "awesome_print"
   gem "by", ">= 1.1.0"
   gem "cuprite"
   gem "foreman"
   gem "pry-byebug"
-  gem "rackup"
 end
 
 group :rubocop do

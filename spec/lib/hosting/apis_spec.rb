@@ -9,7 +9,6 @@ RSpec.describe Hosting::Apis do
       provider_name: HostProvider::HETZNER_PROVIDER_NAME
     )
   }
-  let(:connection) { instance_double(Excon::Connection) }
   let(:hetzner_apis) { instance_double(Hosting::HetznerApis, pull_ips: []) }
   let(:hetzner_host) {
     instance_double(

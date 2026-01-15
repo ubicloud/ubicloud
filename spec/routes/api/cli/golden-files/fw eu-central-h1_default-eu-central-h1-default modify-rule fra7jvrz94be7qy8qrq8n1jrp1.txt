@@ -1,0 +1,12 @@
+! Must provide at least one option (-c, -s, -e, or -d)
+
+Modify a firewall rule
+
+Usage:
+    ubi fw (location/fw-name | fw-id) modify-rule options rule-id
+
+Options:
+    -c, --cidr=ip-range              IPv4 or IPv6 range to allow
+    -s, --start-port=port            starting (or only) port to allow (default: 0)
+    -e, --end-port=port              ending port to allow (default: 65535)
+    -d, --description=desc           description of rule

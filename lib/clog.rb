@@ -6,32 +6,36 @@ require "sequel/model"
 class Clog
   MUTEX = Mutex.new
 
-  def self.emit(message)
-    out = if block_given?
-      case metadata = yield
-      when Hash
-        metadata
-      when Array
-        metadata.reduce({}) do |hash, item|
-          case item
-          when Hash
-            hash.merge(item)
-          when Sequel::Model
-            hash.merge(serialize_model(item))
-          else
-            hash.merge({invalid_type: item.class.to_s})
-          end
+  def self.emit(message, metadata = {})
+    # :nocov:
+    # Cannot use spec passing block to cover this, or Ruby produces a warning
+    raise "Clog.emit no longer takes a block" if block_given?
+    # :nocov:
+
+    out = case metadata
+    when Hash
+      metadata
+    when Array
+      hash = {}
+      metadata.each do |item|
+        case item
+        when Hash
+          hash.merge!(item)
+        when Sequel::Model
+          hash[item.class.table_name] = serialize_model(item)
+        else
+          hash[:invalid_type] = item.class.to_s
         end
-      when Sequel::Model
-        serialize_model(metadata)
-      else
-        {invalid_type: metadata.class.to_s}
       end
+      hash
+    when Sequel::Model
+      {metadata.class.table_name => serialize_model(metadata)}
     else
-      {}
+      {invalid_type: metadata.class.to_s}
     end
 
     return if Config.test?
+
     out[:message] = message
     out[:time] = Time.now
 
@@ -47,6 +51,6 @@ class Clog
   end
 
   private_class_method def self.serialize_model(model)
-    {model.class.table_name => model.values.except(*model.class.redacted_columns)}
+    model.values.except(*model.class.redacted_columns)
   end
 end

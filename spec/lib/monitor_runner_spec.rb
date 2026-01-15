@@ -10,7 +10,7 @@ RSpec.describe MonitorRunner do
   end
   let(:monitor_resources) { MonitorResourceType.create(MonitorableResource, stuck_info, 2, [VmHost]) {} }
   let(:metric_export_resources) { MonitorResourceType.create(MetricsTargetResource, stuck_info, 2, [VmHost]) {} }
-  let(:repartitioner) { MonitorRepartitioner.new(2) }
+  let(:repartitioner) { Repartitioner.new(partition_number: 2, channel: :monitor, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, max_partition: 8) }
   let(:monitor_runner_args) do
     {
       scan_every: 0.01,
@@ -67,10 +67,10 @@ RSpec.describe MonitorRunner do
   describe "#emit_metrics" do
     it "emits metrics" do
       q = Queue.new
-      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, a, &b|
+      expect(Clog).to receive(:emit).at_least(:once).and_wrap_original do |m, a, b|
         if a == "monitor metrics"
-          m.call(a, &b)
-          q.push(b.call)
+          m.call(a, b)
+          q.push(b)
         end
       end
 
@@ -243,7 +243,7 @@ RSpec.describe MonitorRunner do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).and_invoke(->(_) { exited = true })
-      expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.").and_call_original
+      expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.", instance_of(Hash)).and_call_original
       monitor_runner.define_singleton_method(:scan) { raise }
       monitor_runner.run
       expect(exited).to be true

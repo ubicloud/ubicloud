@@ -1,37 +1,37 @@
 <% @page_title = "Project Billing"
 
 if @project.billing_info
-  @invoices = Serializers::Invoice.serialize(@project.invoices.prepend(@project.current_invoice))
+  @invoices = @project.invoices.prepend(@project.current_invoice)
 end
 
-@usage_alerts = Serializers::UsageAlert.serialize(@project.usage_alerts_dataset.eager(:user)) %>
+@usage_alerts = @project.usage_alerts_dataset.eager(:user).all %>
 
 <% if billing_info = @project.billing_info %>
   <%== part(
     "components/page_header",
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Billing #]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Billing #]]
   ) %>
 
   <div class="grid gap-6">
     <!-- Summary -->
     <div>
-      <dl class="grid grid-cols-2 gap-5 <%= (@project_data[:discount] > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
+      <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Current Usage</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @invoices.first[:subtotal] %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@invoices.first.subtotal) %></dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Last Month</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? @invoices[1][:subtotal] : "-" %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= (@invoices.count > 1) ? money(@invoices[1].subtotal) : "-" %></dd>
         </div>
         <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
           <dt class="truncate text-sm font-medium text-gray-500">Remaining Credit</dt>
-          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= "$%0.02f" % @project_data[:credit] %></dd>
+          <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= money(@project.credit.to_f) %></dd>
         </div>
-        <% if @project_data[:discount] > 0 %>
+        <% if @project.discount > 0 %>
           <div class="overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:p-6">
             <dt class="truncate text-sm font-medium text-gray-500">Discount</dt>
-            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project_data[:discount] %>%</dd>
+            <dd class="mt-1 text-3xl font-semibold tracking-tight text-gray-900"><%= @project.discount %>%</dd>
           </div>
         <% end %>
       </dl>
@@ -46,8 +46,7 @@ end
       </div>
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-        <%== csrf_tag("#{@project_data[:path]}/billing") %>
+      <% form(action: billing_path, method: :post) do %>
         <div class="px-4 py-5 sm:p-6">
           <div class="space-y-12">
             <div>
@@ -86,9 +85,7 @@ end
                         .all
                         .reject { Config.sanctioned_countries.include?(it.alpha2) }
                         .sort_by(&:common_name)
-                        .map { |c| [c.alpha2, c.common_name] }
-                        .to_h
-                        .to_a,
+                        .map { |c| [c.alpha2, c.common_name] },
                     attributes: {
                       required: true
                     }
@@ -136,6 +133,17 @@ end
                 <div class="sm:col-span-4">
                   <%== part("components/form/text", name: "company_name", label: "Company Name", value: stripe_data["company_name"]) %>
                 </div>
+                <div class="col-span-full">
+                  <%== part(
+                    "components/form/textarea",
+                    name: "note",
+                    label: "Invoice Note",
+                    value: stripe_data["note"],
+                    attributes: {
+                      placeholder: "Enter details for your invoices, such as a PO number, tax information, or special instructions"
+                    }
+                  ) %>
+                </div>
               </div>
             </div>
           </div>
@@ -146,14 +154,14 @@ end
             <%== part("components/form/submit_button", text: "Update") %>
           </div>
         </div>
-      </form>
+      <% end %>
     </div>
     <!-- Payment Methods Card -->
     <%== part(
       "components/table_card",
       title: "Payment Methods",
       right_items: [
-        part("components/button", text: "Add Payment Method", link: "#{@project_data[:path]}/billing/payment-method/create")
+        part("components/button", text: "Add Payment Method", link: "#{billing_path}/payment-method/create")
       ],
       rows:
         billing_info.payment_methods.map do |pm|
@@ -166,8 +174,8 @@ end
                 "delete_button",
                 {
                   component: {
-                    url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}?project_id=#{@project.ubid}",
-                    csrf_url: "#{@project_data[:path]}/billing/payment-method/#{pm.ubid}",
+                    url: path(pm),
+                    hidden_inputs: { project_id: @project.ubid },
                     confirmation: pm.stripe_data["last4"]
                   },
                   extra_class: "flex justify-end"
@@ -200,31 +208,32 @@ end
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @invoices.each do |inv| %>
-              <tr id="invoice-<%= inv[:ubid]%>">
+              <tr id="invoice-<%= inv.path_id %>">
                 <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a
-                    href="<%= @project_data[:path] + "/billing" + inv[:path] %>"
-                    target="_blank"
-                    class="text-orange-600 hover:text-orange-700"
-                  >
-                    <%= inv[:name] %>
+                  <a href="<%= path(inv) %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                    <%= inv.name %>
                   </a>
                   <span class="text-xs text-gray-400 italic">
-                    <% if inv[:invoice_number] %>
-                      #<%= inv[:invoice_number] %>
+                    <% if inv.invoice_number %>
+                      #<%= inv.invoice_number %>
                     <% else %>
                       (not finalized)
                     <% end %>
                   </span>
                 </td>
                 <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= inv[:total] %>
-                  <% if inv[:total] != inv[:subtotal] %>
-                    <span class="text-xs italic">(<%= inv[:subtotal] %>)</span>
+                  <%= money(inv.cost) %>
+                  <% if inv.cost != inv.subtotal %>
+                    <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
                   <% end %>
                 </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= inv[:status] %>
+                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
+                  <%= inv.status %>
+                  <% if inv.payable? %>
+                    <% form(action: "#{path(inv)}/pay", method: :post) do %>
+                      <%== part("components/form/submit_button", text: "Pay Now") %>
+                    <% end %>
+                  <% end %>
                 </td>
               </tr>
             <% end %>
@@ -242,9 +251,7 @@ end
     </div>
   </div>
 <% else %>
-  <form action="<%= "#{@project_data[:path]}/billing" %>" method="POST">
-    <%== csrf_tag("#{@project_data[:path]}/billing") %>
-
+  <% form(action: billing_path, method: :post) do %>
     <%== part(
       "components/empty_state",
       icon: "hero-banknotes",
@@ -252,7 +259,7 @@ end
       description: "Get started by adding new billing information.",
       button_title: "Add new billing information"
     ) %>
-  </form>
+  <% end %>
   <br/>
   <%== part("components/discount_code") %>
 <% end %>
@@ -270,8 +277,7 @@ end
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <!-- Add usage alert -->
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}/usage-alert" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/usage-alert") %>
+        <% form(action: "#{@project.path}/usage-alert", method: :post) do %>
           <div class="space-y-4">
             <div>
               <h2 class="text-lg font-medium leading-6 text-gray-900">Add new usage alert</h2>
@@ -314,7 +320,7 @@ end
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
 
       </div>
       <!-- List alerts -->
@@ -332,16 +338,16 @@ end
           </thead>
           <tbody class="divide-y divide-gray-200 bg-white">
             <% @usage_alerts.each do |alert| %>
-              <tr id="alert-<%= alert[:ubid]%>" class="whitespace-nowrap text-sm font-medium">
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:name] %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:limit] %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert[:email] %></td>
+              <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
+                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
                 <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/usage-alert/#{alert[:ubid]}",
-                    confirmation: alert[:name]
+                    url: "#{@project.path}/usage-alert/#{alert.ubid}",
+                    confirmation: alert.name
                   ) %>
                 </td>
               </tr>

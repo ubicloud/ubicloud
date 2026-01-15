@@ -5,8 +5,8 @@ require_relative "../model"
 class VmHostSlice < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :vm_host
-  one_to_many :vms
-  one_to_many :cpus, class: :VmHostCpu, key: :vm_host_slice_id
+  one_to_many :vms, read_only: true, is_used: true
+  one_to_many :cpus, class: :VmHostCpu, adder: nil, remover: nil, is_used: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :checkup
@@ -55,9 +55,9 @@ class VmHostSlice < Sequel::Model
 
   def up?(session)
     # We let callers handle exceptions, as each calling method may have opt to handle them differently
-    session.exec!("systemctl is-active #{inhost_name}").split("\n").all?("active") &&
-      (session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.effective").chomp == allowed_cpus_cgroup) &&
-      (session.exec!("cat /sys/fs/cgroup/#{inhost_name}/cpuset.cpus.partition").chomp == "root")
+    session.exec!("systemctl is-active :inhost_name", inhost_name:).split("\n").all?("active") &&
+      (session.exec!("cat /sys/fs/cgroup/:inhost_name/cpuset.cpus.effective", inhost_name:).chomp == allowed_cpus_cgroup) &&
+      ["root", "member"].include?(session.exec!("cat /sys/fs/cgroup/:inhost_name/cpuset.cpus.partition", inhost_name:).chomp)
   end
 
   def check_pulse(session:, previous_pulse:)
@@ -66,7 +66,7 @@ class VmHostSlice < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup

@@ -5,13 +5,26 @@ require_relative "../model"
 class VictoriaMetricsResource < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
-  many_to_one :location, key: :location_id
-  one_to_many :servers, class: :VictoriaMetricsServer, key: :victoria_metrics_resource_id
-  many_to_one :private_subnet
+  many_to_one :location, read_only: true
+  one_to_many :servers, class: :VictoriaMetricsServer, is_used: true
+  many_to_one :private_subnet, read_only: true
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2],
     encrypted_columns: [:admin_password, :root_cert_key_1, :root_cert_key_2]
   plugin SemaphoreMethods, :destroy, :reconfigure
+
+  def self.client_for_project(prj_id)
+    if Config.victoria_metrics_endpoint_override
+      return VictoriaMetrics::Client.new(endpoint: Config.victoria_metrics_endpoint_override)
+    end
+    vmr = nil
+    [prj_id, Config.victoria_metrics_service_project_id].each do |project_id|
+      next unless project_id
+      break if (vmr = VictoriaMetricsResource.first(project_id:))
+    end
+
+    vmr&.servers&.first&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
+  end
 
   def hostname
     "#{name}.#{Config.victoria_metrics_host_name}"
@@ -22,12 +35,12 @@ class VictoriaMetricsResource < Sequel::Model
   end
 
   def set_firewall_rules
-    private_subnet.firewalls.first.replace_firewall_rules([
-      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22..22)},
-      {cidr: "::/0", port_range: Sequel.pg_range(22..22)},
-      {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)},
-      {cidr: "::/0", port_range: Sequel.pg_range(8427..8427)}
-    ])
+    private_subnet.firewalls.first.replace_firewall_rules(
+      Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+        {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(8427..8427)},
+        {cidr: "::/0", port_range: Sequel.pg_range(8427..8427)}
+      ]
+    )
   end
 end
 

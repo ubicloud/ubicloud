@@ -1,14 +1,21 @@
 # frozen_string_literal: true
 
+require_relative "../../lib/net_ssh"
+
 class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   subject_is :kubernetes_cluster
 
-  def vm
-    @vm ||= Vm[frame["vm_id"]]
+  def node
+    @node ||= KubernetesNode[frame["node_id"]]
   end
 
   def kubernetes_nodepool
-    @kubernetes_nodepool ||= KubernetesNodepool[frame["nodepool_id"]]
+    return @kubernetes_nodepool if defined?(@kubernetes_nodepool)
+    @kubernetes_nodepool = KubernetesNodepool[frame["nodepool_id"]]
+  end
+
+  def vm
+    @vm ||= node.vm
   end
 
   # We need to create a random ula cidr for the cluster services subnet with
@@ -49,26 +56,24 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
 
     boot_image = "kubernetes-#{kubernetes_cluster.version.tr(".", "_")}"
 
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
+    node = Prog::Kubernetes::KubernetesNodeNexus.assemble(
       Config.kubernetes_service_project_id,
       sshable_unix_user: "ubi",
-      name: name,
+      name:,
       location_id: kubernetes_cluster.location.id,
       size: vm_size,
-      storage_volumes: storage_volumes,
-      boot_image: boot_image,
+      storage_volumes:,
+      boot_image:,
       private_subnet_id: kubernetes_cluster.private_subnet_id,
-      enable_ip4: true
+      enable_ip4: true,
+      kubernetes_cluster_id: kubernetes_cluster.id,
+      kubernetes_nodepool_id: kubernetes_nodepool&.id
     ).subject
+    vm = node.vm
 
-    current_frame = strand.stack.first
-    current_frame["vm_id"] = vm.id
-    strand.modified!(:stack)
+    update_stack({"node_id" => node.id})
 
-    if kubernetes_nodepool
-      kubernetes_nodepool.add_vm(vm)
-    else
-      kubernetes_cluster.add_cp_vm(vm)
+    unless kubernetes_nodepool
       kubernetes_cluster.api_server_lb.add_vm(vm)
     end
 
@@ -78,7 +83,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   label def bootstrap_rhizome
     nap 5 unless vm.strand.label == "wait"
 
-    vm.sshable.cmd "sudo iptables-nft -t nat -A POSTROUTING -s #{vm.nics.first.private_ipv4} -o ens3 -j MASQUERADE"
+    vm.sshable.cmd("sudo iptables-nft -t nat -A POSTROUTING -s :private_ipv4 -o ens3 -j MASQUERADE", private_ipv4: vm.nics.first.private_ipv4)
     vm.sshable.cmd("sudo nft --file -", stdin: <<TEMPLATE)
 table ip6 pod_access;
 delete table ip6 pod_access;
@@ -86,8 +91,8 @@ table ip6 pod_access {
   chain ingress_egress_control {
     type filter hook forward priority filter; policy drop;
     # allow access to the vm itself in order to not break the normal functionality of Clover and SSH
-    ip6 daddr #{vm.ephemeral_net6.nth(2)} ct state established,related,new counter accept
-    ip6 saddr #{vm.ephemeral_net6.nth(2)} ct state established,related,new counter accept
+    ip6 daddr #{vm.ip6} ct state established,related,new counter accept
+    ip6 saddr #{vm.ip6} ct state established,related,new counter accept
 
     # not allow new connections from internet but allow new connections from inside
     ip6 daddr #{vm.ephemeral_net6} ct state established,related counter accept
@@ -99,7 +104,6 @@ table ip6 pod_access {
   }
 }
 TEMPLATE
-    vm.ephemeral_net6
     vm.sshable.cmd "sudo systemctl enable --now kubelet"
 
     bud Prog::BootstrapRhizome, {"target_folder" => "kubernetes", "subject_id" => vm.id, "user" => "ubi"}
@@ -114,7 +118,7 @@ TEMPLATE
   label def assign_role
     hop_join_worker if kubernetes_nodepool
 
-    hop_init_cluster if kubernetes_cluster.cp_vms.count == 1
+    hop_init_cluster if kubernetes_cluster.nodes.count == 1
 
     hop_join_control_plane
   end
@@ -132,7 +136,7 @@ TEMPLATE
         private_subnet_cidr4: kubernetes_cluster.private_subnet.net4,
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2),
+        node_ipv6: vm.ip6,
         service_subnet_cidr6: random_ula_cidr
       }
       vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
@@ -162,7 +166,7 @@ TEMPLATE
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2)
+        node_ipv6: vm.ip6
       }
       vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
@@ -190,7 +194,7 @@ TEMPLATE
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ephemeral_net6.nth(2)
+        node_ipv6: vm.ip6
       }
       vm.sshable.d_run("join_worker", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
@@ -219,6 +223,13 @@ TEMPLATE
 }
 CONFIG
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
-    pop vm_id: vm.id
+    hop_approve_new_csr
+  end
+
+  label def approve_new_csr
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /':name'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve", name: node.name)
+    kubernetes_cluster.incr_sync_internal_dns_config
+    kubernetes_cluster.incr_sync_worker_mesh
+    pop({node_id: node.id})
   end
 end

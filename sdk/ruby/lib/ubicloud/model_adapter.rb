@@ -11,6 +11,11 @@ module Ubicloud
       @adapter = adapter
     end
 
+    # Return the id regexp for the model.
+    def id_regexp
+      @model.id_regexp
+    end
+
     # Forward methods to the model class, but include the
     # adapter as the first argument.
     def method_missing(meth, ...)

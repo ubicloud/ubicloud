@@ -1,6 +1,7 @@
 #!/bin/env ruby
 # frozen_string_literal: true
 
+require_relative "../../common/lib/arch"
 require_relative "../../common/lib/util"
 require_relative "../lib/cloud_hypervisor"
 require_relative "../lib/spdk_setup"
@@ -72,6 +73,7 @@ File.write("/etc/sysctl.d/72-clover-forward-packets.conf", <<CONF)
 net.ipv6.conf.all.forwarding=1
 net.ipv6.conf.all.proxy_ndp=1
 net.ipv4.conf.all.forwarding=1
+net.ipv4.conf.all.proxy_arp=1
 net.ipv4.ip_forward=1
 CONF
 r "sysctl --system"
@@ -91,6 +93,10 @@ r "apt-get -y install nvme-cli systemd-coredump" if is_prod_env
 
 # We need smartmontools, nvme-cli and jq in order to probe the disk status of VmHosts
 r "apt-get -y install smartmontools nvme-cli jq"
+
+# htcat is able to download a file from signed URLs concurrently
+r "wget https://github.com/ubicloud/htcat/releases/download/v2.0.0-ubi1/htcat_2.0.0-ubi1_linux_#{Arch.render(x64: "amd64", arm64: "arm64")}.tar.gz -O htcat.tar.gz"
+r "tar xvf htcat.tar.gz -C /usr/local/bin/"
 
 SpdkSetup.prep
 

@@ -1,7 +1,9 @@
 <% @prices = fetch_location_based_prices("VmVCpu", "VmStorage", "IPAddress")
 @has_valid_payment_method = @project.has_valid_payment_method?
 @default_location = @project.default_location
-@enabled_vm_sizes = Option::VmSizes.select { it.visible && @project.quota_available?("VmVCpu", it.vcpus) }.map(&:name)
+effective_quota = @project.effective_quota_value("VmVCpu")
+current_usage = @project.current_resource_usage("VmVCpu")
+@enabled_vm_sizes = Option::VmSizes.select { it.visible && effective_quota >= current_usage + it.vcpus }.map(&:name)
 @option_tree, @option_parents = generate_vm_options
 @page_title = "Create #{"GPU " if @show_gpu}Virtual Machine" %>
 
@@ -12,8 +14,8 @@
   "components/page_header",
   breadcrumbs: [
     %w[Projects /project],
-    [@project_data[:name], @project_data[:path]],
-    ["Virtual Machines", "#{@project_data[:path]}/vm"],
+    [@project.name, @project.path],
+    ["Virtual Machines", "#{@project.path}/vm"],
     %w[Create #]
   ]
 ) %>
@@ -25,6 +27,7 @@
     {name: "name", type: "text", label: "Name", placeholder: "Enter name", required: "required", opening_tag: "<div class='sm:col-span-3'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
     {name: "private_subnet_id", type: "select", label: "Private Subnet", placeholder: "Default", description_html: ps_description, content_generator: ContentGenerator::Vm.method(:private_subnet), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "new_private_subnet_name", type: "text", label: "Private Subnet Name", placeholder: "Private Subnet Name", opening_tag: "<div class='sm:col-span-3' id='new-private-subnet-name'>", value: typecast_body_params.str("new_private_subnet_name")},
     {name: "enable_ip4", type: "checkbox", label: "Public IPv4 Support", description: "Needed for inbound and outbound public IPv4 connections. Websites that do not support IPv6 will be inaccessible without an IPv4 address.", content_generator: ContentGenerator::Vm.method(:enable_ipv4)},
     {name: "family", type: "radio_small_cards", label: "Server family", required: "required", content_generator: ContentGenerator::Vm.method(:family)}
   ]
@@ -47,15 +50,30 @@
 
   form_elements.push(
     {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
-    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "public_key", type: "textarea", label: "SSH Public Key", required: "required", placeholder: "ssh-ed25519 AAAA...", description: "SSH keys are a more secure method of logging into a server."}
+    {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )
+
+  public_key_params = {name: "public_key", type: "textarea", label: "SSH Public Key", placeholder: "ssh-ed25519 AAAA...", opening_tag: "<div id='public-key-wrapper' class='col-span-full'>"}
+
+  if @project.ssh_public_keys.empty?
+    public_key_params[:required] = "required"
+    public_key_params[:description] = "SSH keys are a more secure method of logging into a server."
+    if has_project_permission("Project:edit")
+      public_key_params[:description] += " You can <a class='text-orange-600 hover:text-orange-700' href='#{h @project.path}/ssh-public-key'>register SSH keys for this project</a> to avoid having to reenter the same key multiple times."
+      public_key_params[:escape_description] = false
+    end
+  else
+    form_elements.push({name: "ssh_public_key", type: "select", label: "Registered SSH Public Key", placeholder: "New", content_generator: ContentGenerator::Vm.method(:ssh_public_key), opening_tag: "<div class='sm:col-span-3'>"})
+  end
+
+  form_elements.push(public_key_params)
+  form_elements.push({name: "init_script", type: "textarea", label: "Init Script", placeholder: "(optional)", opening_tag: "<div id='init-script-wrapper' class='col-span-full'>", attributes: {maxlength: 2000}})
 
   if @project.get_ff_gpu_vm
     form_elements << {name: "show_gpu", type: "hidden", value: @show_gpu}
   end
 
-  action = "#{@project_data[:path]}/vm"
+  action = "#{@project.path}/vm"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents) %>

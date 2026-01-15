@@ -15,7 +15,7 @@ class Clover
 
         filter = {Sequel[:private_subnet][:name] => ps_name}
       else
-        filter = {Sequel[:private_subnet][:id] => UBID.to_uuid(ps_id)}
+        filter = {Sequel[:private_subnet][:id] => ps_id}
       end
 
       filter[:location_id] = @location.id
@@ -23,80 +23,46 @@ class Clover
       check_found_object(ps)
 
       r.post "connect" do
-        authorize("PrivateSubnet:connect", ps.id)
-        handle_validation_failure("networking/private_subnet/show")
-        unless (subnet = authorized_private_subnet(key: "connected-subnet-id", perm: "PrivateSubnet:connect"))
-          raise CloverError.new(400, "InvalidRequest", "Subnet to be connected not found")
-        end
-
-        DB.transaction do
-          ps.connect_subnet(subnet)
-          audit_log(ps, "connect", subnet)
-        end
-
-        if api?
-          Serializers::PrivateSubnet.serialize(ps)
-        else
-          flash["notice"] = "#{subnet.name} will be connected in a few seconds"
-          r.redirect "#{@project.path}#{ps.path}"
-        end
+        private_subnet_connection_action("connect", typecast_params.ubid_uuid!("connected-subnet-id"))
       end
 
       r.post "disconnect", :ubid_uuid do |id|
-        authorize("PrivateSubnet:disconnect", ps.id)
-        handle_validation_failure("networking/private_subnet/show")
-        unless (subnet = authorized_private_subnet(id:, perm: "PrivateSubnet:disconnect"))
-          raise CloverError.new(400, "InvalidRequest", "Subnet to be disconnected not found")
-        end
+        private_subnet_connection_action("disconnect", id)
+      end
 
-        DB.transaction do
-          ps.disconnect_subnet(subnet)
-          audit_log(ps, "disconnect", subnet)
-        end
-
+      r.get true do
+        authorize("PrivateSubnet:view", ps)
         if api?
           Serializers::PrivateSubnet.serialize(ps)
         else
-          flash["notice"] = "#{subnet.name} will be disconnected in a few seconds"
-          r.redirect "#{@project.path}#{ps.path}"
+          r.redirect ps, "/overview"
         end
       end
 
-      r.is do
-        r.get do
-          authorize("PrivateSubnet:view", ps.id)
-          if api?
-            Serializers::PrivateSubnet.serialize(ps)
-          else
-            view "networking/private_subnet/show"
-          end
+      r.delete true do
+        authorize("PrivateSubnet:delete", ps)
+        handle_validation_failure("networking/private_subnet/settings")
+
+        unless ps.attached_vms.empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
-        r.delete do
-          authorize("PrivateSubnet:delete", ps.id)
+        DB.transaction do
+          ps.incr_destroy
+          audit_log(ps, "destroy")
+        end
 
-          vms_dataset = ps.vms_dataset
-            .association_join(:strand)
-            .exclude(label: "destroy")
-            .exclude(Sequel[:vm][:id] => Semaphore
-              .where(
-                strand_id: ps.nics_dataset.select(:vm_id),
-                name: "destroy"
-              )
-              .select(:strand_id))
-
-          unless vms_dataset.empty?
-            fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
-          end
-
-          DB.transaction do
-            ps.incr_destroy
-            audit_log(ps, "destroy")
-          end
-
+        if web?
+          flash["notice"] = "Private subnet scheduled for deletion."
+          r.redirect @project, "/private-subnet"
+        else
           204
         end
       end
+
+      r.rename ps, perm: "PrivateSubnet:edit", serializer: Serializers::PrivateSubnet, template_prefix: "networking/private_subnet"
+
+      r.show_object(ps, actions: %w[overview vms networking settings], perm: "PrivateSubnet:view", template: "networking/private_subnet/show")
     end
   end
 end

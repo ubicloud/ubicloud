@@ -12,10 +12,16 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc) do
     cluster = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "myk8s",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       project_id: project.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
       location_id: Location::HETZNER_FSN1_ID
+    ).subject
+
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+      name: "kn",
+      node_count: 2,
+      kubernetes_cluster_id: cluster.id
     ).subject
 
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
@@ -39,9 +45,9 @@ RSpec.describe Clover, "Kubernetes" do
   let(:kc_no_perm) do
     Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "not-my-k8s",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       project_id: project_wo_permissions.id,
-      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id).id,
+      private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID
     ).subject
   end
@@ -230,24 +236,14 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_content kc.display_location
         expect(page).to have_content kc.version
 
-        kc.add_cp_vm(create_vm(name: "cp1"))
-        kc.add_cp_vm(create_vm(name: "cp2"))
+        KubernetesNode.create(vm_id: create_vm(name: "cp1").id, kubernetes_cluster_id: kc.id)
+        KubernetesNode.create(vm_id: create_vm(name: "cp2").id, kubernetes_cluster_id: kc.id)
 
-        kn = Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-          name: "kn",
-          node_count: 2,
-          kubernetes_cluster_id: kc.id
-        ).subject
+        kn = kc.nodepools.first
 
-        kn.add_vm(create_vm(name: "node1"))
+        KubernetesNode.create(vm_id: create_vm(name: "node1").id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
         kc.reload
-        page.refresh
-
-        expect(page).to have_content "cp1"
-        expect(page).to have_content "cp2"
-        expect(page).to have_content "node1"
-
         expect(kc.display_state).to eq("creating")
         expect(page.body).to include "auto-refresh hidden"
         expect(page.body).to include "creating"
@@ -262,13 +258,28 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page).to have_no_content "Waiting for cluster to be ready..."
         expect(page).to have_content "Download"
 
+        within("#kubernetes-cluster-submenu") { click_link "Nodes" }
+
+        expect(page).to have_content "cp1"
+        expect(page).to have_content "cp2"
+        expect(page).to have_content "node1"
+
         kc.incr_destroy
         kc.reload
 
         expect(kc.display_state).to eq("deleting")
-        page.refresh
+        within("#kubernetes-cluster-submenu") { click_link "Overview" }
         expect(page.body).to include "deleting"
         expect(page.body).to include "auto-refresh hidden"
+      end
+
+      it "shows up on customer private subnet vms page" do
+        visit "#{project.path}/location/#{kc.display_location}/private-subnet/#{kc.private_subnet.ubid}/vms"
+        expect(page.title).to eq "Ubicloud - mysubnet"
+        expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
+        expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "Kubernetes Cluster", kc.name, kc.ubid]
+        click_link kc.name
+        expect(page.title).to eq "Ubicloud - #{kc.name}"
       end
 
       it "works with ubid" do
@@ -357,14 +368,57 @@ RSpec.describe Clover, "Kubernetes" do
       end
     end
 
+    describe "rename" do
+      it "can rename kubernetes cluster" do
+        old_name = kc.name
+        visit "#{project.path}#{kc.path}/settings"
+        fill_in "name", with: "new-name%"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(page).to have_content("Kubernetes cluster name must only contain lowercase letters, numbers, spaces, and hyphens and have max length 40.")
+        expect(kc.reload.name).to eq old_name
+
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(kc.reload.name).to eq "new-name"
+        expect(page).to have_content("new-name")
+      end
+
+      it "does not show rename option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
+        expect(page).to have_no_content("Rename")
+      end
+    end
+
+    describe "resize" do
+      it "can resize kubernetes cluster" do
+        visit "#{project.path}#{kc.path}/settings"
+        expect(kc.nodepools.first.reload.node_count).not_to eq(4)
+        find('select#node_count option[value="4"]:not([disabled])').select_option
+        click_button "Resize"
+
+        expect(page).to have_flash_notice("myk8s node pool kn will be resized")
+        expect(kc.nodepools.first.reload.node_count).to eq(4)
+      end
+
+      it "does not show resize option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
+        expect(page).to have_no_content("Resize")
+      end
+    end
+
     describe "delete" do
       it "can delete kubernetes cluster" do
         visit "#{project.path}#{kc.path}"
+        within("#kubernetes-cluster-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#kc-delete-#{kc.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#kc-delete-#{kc.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("Kubernetes cluster scheduled for deletion.")
 
         expect(SemSnap.new(kc.id).set?("destroy")).to be true
       end
@@ -373,7 +427,7 @@ RSpec.describe Clover, "Kubernetes" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
 
-        visit "#{project_wo_permissions.path}#{kc_no_perm.path}"
+        visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
         expect(page.title).to eq "Ubicloud - not-my-k8s"
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound

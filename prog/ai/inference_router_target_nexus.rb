@@ -10,6 +10,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
   subject_is :inference_router_target
 
   extend Forwardable
+
   def_delegators :inference_router_target, :inference_router, :inference_router_model
 
   def self.assemble(inference_router_id:, inference_router_model_id:, name:, priority:, inflight_limit:, type: "manual", host: "", enabled: false, config: {}, extra_configs: {}, api_key: SecureRandom.alphanumeric(32))
@@ -28,13 +29,13 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
         enabled:
       )
 
-      Strand.create_with_id(target.id, prog: "Ai::InferenceRouterTargetNexus", label: "start")
+      Strand.create_with_id(target, prog: "Ai::InferenceRouterTargetNexus", label: "start")
     end
   end
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !destroying_set?
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference router target"

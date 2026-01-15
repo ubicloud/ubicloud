@@ -8,11 +8,11 @@
     rows: @pss.map do |ps|
       [
         [
-          [ps[:name], {link: @project_data[:path] + ps[:path]}],
-          ps[:location],
-          ["ps_state_label", {component: { state: ps[:state] }}]
+          [ps.name, {link: path(ps)}],
+          ps.display_location,
+          ["ps_state_label", {component: { state: ps.display_state }}]
         ],
-        {id: "ps-#{ps[:id]}"}
+        {id: "ps-#{ps.ubid}"}
       ]
     end,
     empty_state: {
@@ -21,7 +21,7 @@
       description: "You don't have permission to create Private Subnets."
     }.merge(has_project_permission("PrivateSubnet:create") ? {
       description: "Get started by creating a new Private Subnet.",
-      button_link: "#{@project_data[:path]}/private-subnet/create",
+      button_link: "#{@project.path}/private-subnet/create",
       button_title: "Create Private Subnet"
     } : {})
   ) %>

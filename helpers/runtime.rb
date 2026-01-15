@@ -3,6 +3,7 @@
 class Clover < Roda
   def get_runtime_jwt_payload
     return unless (v = request.env["HTTP_AUTHORIZATION"])
+
     jwt_token = v.sub(%r{\ABearer:?\s+}, "")
     begin
       JWT.decode(jwt_token, Config.clover_runtime_token_secret, true, {algorithm: "HS256"})[0]
@@ -11,25 +12,25 @@ class Clover < Roda
   end
 
   def get_scope_from_github(runner, run_id)
-    log_context = {runner_ubid: runner.ubid, repository_ubid: runner.repository.ubid, run_id: run_id}
+    log_context = {runner_ubid: runner.ubid, repository_ubid: runner.repository.ubid, run_id:}
     if run_id.nil? || run_id.empty?
-      Clog.emit("The run_id is blank") { {runner_scope_failure: log_context} }
+      Clog.emit("The run_id is blank", {runner_scope_failure: log_context})
       return
     end
 
-    Clog.emit("Get runner scope from GitHub API") { {get_runner_scope: log_context} }
+    Clog.emit("Get runner scope from GitHub API", {get_runner_scope: log_context})
     begin
-      client = Github.installation_client(runner.installation.installation_id)
-      jobs = client.workflow_run_jobs(runner.repository_name, run_id)[:jobs]
+      jobs = runner.installation.client.workflow_run_jobs(runner.repository_name, run_id)[:jobs]
     rescue Octokit::ClientError, Octokit::ServerError, Faraday::ConnectionFailed, Faraday::TimeoutError => ex
-      log_context[:expection] = Util.exception_to_hash(ex)
-      Clog.emit("Could not list the jobs of the workflow run ") { {runner_scope_failure: log_context} }
+      Util.exception_to_hash(ex, into: log_context)
+      Clog.emit("Could not list the jobs of the workflow run ", {runner_scope_failure: log_context})
       return
     end
     if (job = jobs.find { it[:runner_name] == runner.ubid })
+      runner.this.update(workflow_job: Sequel.pg_jsonb(job.to_h.except(:steps)))
       job[:head_branch]
     else
-      Clog.emit("The workflow run does not have given runner") { {runner_scope_failure: log_context} }
+      Clog.emit("The workflow run does not have given runner", {runner_scope_failure: log_context})
       nil
     end
   end

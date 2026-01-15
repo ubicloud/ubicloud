@@ -17,9 +17,7 @@ RSpec.describe Authorization do
     end.map(&:subject)
   }
   let(:pg) {
-    Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: projects[0].id, location_id: Location::HETZNER_FSN1_ID, name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128
-    ).subject
+    Prog::Postgres::PostgresResourceNexus.assemble(project_id: projects[0].id, location_id: Location::HETZNER_FSN1_ID, name: "pg0", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
   }
 
   after do
@@ -192,6 +190,10 @@ RSpec.describe Authorization do
   describe "#has_permission?" do
     it "returns true when has matched policies" do
       expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(true)
+    end
+
+    it "works when arguments are model objects" do
+      expect(described_class.has_permission?(projects[0], users[0], "Vm:view", vms[0])).to be(true)
     end
 
     it "returns false when has no matched policies" do

@@ -3,7 +3,7 @@
 UbiCli.on("lb").run_on("show") do
   desc "Show details for a load balancer"
 
-  fields = %w[id name state location hostname algorithm stack health-check-endpoint health-check-protocol src-port dst-port subnet vms].freeze.each(&:freeze)
+  fields = %w[id name state location hostname algorithm stack health-check-endpoint health-check-protocol src-port dst-port subnet vms cert-enabled].freeze.each(&:freeze)
 
   options("ubi lb (location/lb-name | lb-id) show [options]", key: :lb_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
@@ -16,7 +16,7 @@ UbiCli.on("lb").run_on("show") do
 
     body = []
 
-    keys.each do |key|
+    each_with_dashed(keys) do |key, display_key|
       case key
       when :vms
         body << "vms:\n"
@@ -24,9 +24,9 @@ UbiCli.on("lb").run_on("show") do
           body << "  " << vm.id << "\n"
         end
       when :subnet
-        body << key.to_s << ": " << data.subnet.name << "\n"
+        body << display_key << ": " << data.subnet.name << "\n"
       else
-        body << key.to_s << ": " << data[key].to_s << "\n"
+        body << display_key << ": " << data[key].to_s << "\n"
       end
     end
 

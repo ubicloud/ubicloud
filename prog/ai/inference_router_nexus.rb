@@ -8,6 +8,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
   subject_is :inference_router
 
   extend Forwardable
+
   def_delegators :inference_router, :replicas, :load_balancer, :private_subnet, :project
 
   def self.assemble(project_id:, location_id:, name: "api", vm_size: "standard-2", replica_count: 1)
@@ -16,13 +17,16 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
     Validation.validate_name(name)
     fail "Invalid replica count" unless replica_count.is_a?(Integer) && (1..9).cover?(replica_count)
+
     ubid = InferenceRouter.generate_ubid
 
     DB.transaction do
       internal_project = Project[Config.inference_endpoint_service_project_id]
       fail "No project configured for inference routers" unless internal_project
+
       firewall = internal_project.firewalls_dataset.where(location_id:).where(Sequel[:firewall][:name] => "inference-router-firewall").first
       fail "No firewall named 'inference-router-firewall' configured for inference routers in #{Location[location_id].name}" unless firewall
+
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location_id:, firewall_id: firewall.id)
 
       custom_dns_zone = DnsZone.where(
@@ -33,7 +37,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
       lb_s = Prog::Vnet::LoadBalancerNexus.assemble(
         subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up",
         health_check_protocol: "https", health_check_down_threshold: 3,
-        health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix,
+        health_check_up_threshold: 1, custom_hostname_prefix:,
         custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: LoadBalancer::Stack::DUAL
       )
 
@@ -41,15 +45,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
         project_id:, location_id:, name:, vm_size:, replica_count:, load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceRouterReplicaNexus.assemble(inference_router.id)
-      Strand.create_with_id(inference_router.id, prog: "Ai::InferenceRouterNexus", label: "start")
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
+      Strand.create_with_id(inference_router, prog: "Ai::InferenceRouterNexus", label: "start")
     end
   end
 
@@ -102,7 +98,7 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
                   !(it.destroy_set? || it.strand.label == "destroy")
                 }
         .sort_by { |r|
-        [(r.strand.label == "wait") ? 1 : 0, r.created_at]
+          [(r.strand.label == "wait") ? 1 : 0, r.created_at]
       }.take(actual_replica_count - desired_replica_count)
       victims.each(&:incr_destroy)
     end

@@ -3,17 +3,18 @@
 require_relative "../model"
 
 class Nic < Sequel::Model
-  many_to_one :private_subnet
-  many_to_one :vm
-  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel
-  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel
+  many_to_one :private_subnet, read_only: true
+  many_to_one :vm, read_only: true
+  one_to_many :src_ipsec_tunnels, key: :src_nic_id, class: :IpsecTunnel, read_only: true
+  one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel, read_only: true
   one_to_one :strand, key: :id
-  one_to_one :nic_aws_resource, key: :id
+  one_to_one :nic_aws_resource, key: :id, read_only: true
   plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated
+    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated,
+    :migrate_to_separate_prog
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
@@ -44,7 +45,7 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  | NOT NULL
+#  mac               | macaddr                  |
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  private_ipv4      | cidr                     | NOT NULL
 #  private_ipv6      | cidr                     | NOT NULL
@@ -52,8 +53,11 @@ end
 #  encryption_key    | text                     |
 #  name              | text                     | NOT NULL
 #  rekey_payload     | jsonb                    |
+#  state             | text                     | NOT NULL
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  state | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
 # Foreign key constraints:
 #  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)

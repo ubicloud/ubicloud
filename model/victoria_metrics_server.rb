@@ -12,7 +12,7 @@ class VictoriaMetricsServer < Sequel::Model
   include HealthMonitorMethods
 
   def public_ipv6_address
-    vm.ip6.to_s
+    vm.ip6_string
   end
 
   def private_ipv4_address
@@ -28,14 +28,14 @@ class VictoriaMetricsServer < Sequel::Model
   end
 
   def init_health_monitor_session
-    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ephemeral_net6.nth(2)}")
+    socket_path = File.join(Dir.pwd, "var", "health_monitor_sockets", "vn_#{vm.ip6}")
     FileUtils.rm_rf(socket_path)
     FileUtils.mkdir_p(socket_path)
 
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 8427)
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       victoria_metrics_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
     }
   end
@@ -46,7 +46,7 @@ class VictoriaMetricsServer < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -61,9 +61,9 @@ class VictoriaMetricsServer < Sequel::Model
 
   def client(socket: nil)
     VictoriaMetrics::Client.new(
-      endpoint: endpoint,
-      ssl_ca_data: resource.root_certs + cert,
-      socket: socket,
+      endpoint:,
+      ssl_ca_data: resource.root_certs,
+      socket:,
       username: resource.admin_user,
       password: resource.admin_password
     )

@@ -20,10 +20,40 @@ module Ubicloud
     # * If neither +start_port+ and +end_port+ are given, all ports are allowed.
     #
     # Returns a hash for the firewall rule.
-    def add_rule(cidr, start_port: nil, end_port: nil)
-      rule = adapter.post(_path("/firewall-rule"), cidr:, port_range: "#{start_port || 0}..#{end_port || start_port || 65535}")
+    def add_rule(cidr, start_port: nil, end_port: nil, description: nil)
+      hash = {cidr:, port_range: "#{start_port || 0}..#{end_port || start_port || 65535}"}
+      hash[:description] = description if description
+      rule = adapter.post(_path("/firewall-rule"), **hash)
 
       self[:firewall_rules]&.<<(rule)
+
+      rule
+    end
+
+    # Modify the firewall rule with the given id. At least one keyword argument is required.
+    #
+    # * If +start_port+ and +end_port+ are both given, they specify the updated port range.
+    # * If only +start_port+ is given, the rule is updated to allow only that single port.
+    # * If only +end_port+ is given, the rule is updated to allow all ports up to that port.
+    # * If neither +start_port+ and +end_port+ are given, the port range is left unchanged.
+    #
+    # Returns a hash for the updated firewall rule.
+    def modify_rule(rule_id, cidr: nil, start_port: nil, end_port: nil, description: nil)
+      check_no_slash(rule_id, "invalid rule id format")
+
+      hash = {cidr:, description:}
+      hash.compact!
+      if start_port || end_port
+        hash[:port_range] = "#{start_port || 0}..#{end_port || start_port}"
+      end
+
+      if hash.empty?
+        raise Error, "must provide at least one keyword argument"
+      end
+
+      rule = adapter.patch(_path("/firewall-rule/#{rule_id}"), **hash)
+
+      self[:firewall_rules]&.find { it[:id] == rule_id }&.merge!(rule)
 
       rule
     end
@@ -36,6 +66,12 @@ module Ubicloud
       self[:firewall_rules]&.delete_if { it[:id] == rule_id }
 
       nil
+    end
+
+    # Update the firewall description to the given description. Returns the
+    # updated Firewall model instance.
+    def update_description(description)
+      merge_into_values(adapter.patch(_path, description:))
     end
 
     # Attach the given private subnet to the firewall. Accepts either a PrivateSubnet instance

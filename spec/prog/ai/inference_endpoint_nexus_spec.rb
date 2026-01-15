@@ -11,7 +11,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
   let(:replicas) { Array.new(2) { instance_double(InferenceEndpointReplica, strand: instance_double(Strand, label: "wait")) } }
 
   before do
-    allow(nx).to receive_messages(inference_endpoint: inference_endpoint, replicas: replicas)
+    allow(nx).to receive_messages(inference_endpoint:, replicas:)
     allow(inference_endpoint).to receive(:replicas).and_return(replicas)
   end
 
@@ -128,19 +128,6 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {}, max_requests: 500, max_project_rps: 100, max_project_tps: 10000)
       }.not_to raise_error
-    end
-  end
-
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
     end
   end
 

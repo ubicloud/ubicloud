@@ -70,7 +70,8 @@ RSpec.describe BillingRate do
       ui_name: "aws-us-west-2",
       display_name: "aws-us-west-2",
       visible: false,
-      project_id: project.id
+      project_id: project.id,
+      byoc: true
     )
 
     LocationCredential.create(
@@ -78,7 +79,7 @@ RSpec.describe BillingRate do
       secret_key: "test"
     ) { it.id = loc.id }
 
-    expect(described_class.from_resource_properties("VmVCpu", "standard", loc.name, Time.now)).not_to be_nil
-    expect(described_class.from_resource_properties("PostgresVCpu", "standard-standard", loc.name, Time.now)).not_to be_nil
+    expect(described_class.from_resource_properties("VmVCpu", "i8g", loc.name, loc.byoc, Time.now)).not_to be_nil
+    expect(described_class.from_resource_properties("PostgresVCpu", "standard-i8g", loc.name, loc.byoc, Time.now)).not_to be_nil
   end
 end

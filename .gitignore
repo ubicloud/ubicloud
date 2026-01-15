@@ -10,6 +10,7 @@
 /sql.log
 /sql_query_parameterization_analysis.txt
 /spec/routes/api/cli/spec-output-files
+/spec/monitor-smoke-test-output-*
 /cli-golden-files.diff
 /cache-text-*
 

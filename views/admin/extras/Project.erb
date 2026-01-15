@@ -1,0 +1,27 @@
+<%# locals: (obj: nil) %>
+
+<%== part("components/collapsible_table",
+  title: "Quotas",
+  table_class: "project-quota-table",
+  data: ["VmVCpu", "GithubRunnerVCpu", "PostgresVCpu", "KubernetesVCpu"].map {
+    {
+      "Resource" => it,
+      "Quota" => obj.effective_quota_value(it),
+      "Usage" => obj.current_resource_usage(it),
+    }
+  }
+) %>
+
+<%== part("components/collapsible_table",
+  title: "Current Usage",
+  table_class: "project-usage-table",
+  data: Serializers::Invoice.serialize(obj.current_invoice).items.map {
+    {
+      name: it.name,
+      resource_type: it.resource_type,
+      resource_family: it.resource_family,
+      usage: it.usage,
+      cost_humanized: it.cost_humanized
+    }
+  }
+) %>

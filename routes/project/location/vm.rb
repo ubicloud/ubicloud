@@ -6,7 +6,7 @@ class Clover
       vm_list_api_response(vm_list_dataset)
     end
 
-    r.on VM_NAME_OR_UBID do |vm_name, vm_ubid|
+    r.on VM_NAME_OR_UBID do |vm_name, vm_id|
       if vm_name
         r.post api? do
           check_visible_location
@@ -15,32 +15,45 @@ class Clover
 
         filter = {Sequel[:vm][:name] => vm_name}
       else
-        filter = {Sequel[:vm][:id] => UBID.to_uuid(vm_ubid)}
+        filter = {Sequel[:vm][:id] => vm_id}
       end
 
       filter[:location_id] = @location.id
-      vm = @project.vms_dataset.first(filter)
+      vm = @vm = @project.vms_dataset.first(filter)
       check_found_object(vm)
 
       r.get true do
-        authorize("Vm:view", vm.id)
-        @vm = Serializers::Vm.serialize(vm, {detailed: true, include_path: web?})
-        api? ? @vm : view("vm/show")
+        authorize("Vm:view", vm)
+
+        if api?
+          Serializers::Vm.serialize(vm, {detailed: true})
+        else
+          r.redirect vm, "/overview"
+        end
       end
 
       r.delete true do
-        authorize("Vm:delete", vm.id)
+        authorize("Vm:delete", vm)
 
         DB.transaction do
           vm.incr_destroy
           audit_log(vm, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Virtual machine scheduled for deletion."
+          r.redirect @project, "/vm"
+        else
+          204
+        end
       end
 
+      r.rename vm, perm: "Vm:edit", serializer: Serializers::Vm, template_prefix: "vm"
+
+      r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
+
       r.post "restart" do
-        authorize("Vm:edit", vm.id)
+        authorize("Vm:edit", vm)
 
         DB.transaction do
           vm.incr_restart
@@ -51,7 +64,7 @@ class Clover
           Serializers::Vm.serialize(vm, {detailed: true})
         else
           flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
-          r.redirect "#{@project.path}#{vm.path}"
+          r.redirect vm, "/settings"
         end
       end
     end

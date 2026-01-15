@@ -3,8 +3,7 @@
 require_relative "../model"
 
 class PrivateSubnetAwsResource < Sequel::Model
-  many_to_one :private_subnet, key: :id
-
+  many_to_one :private_subnet, key: :id, read_only: true, is_used: true
   plugin ResourceMethods
 end
 
@@ -12,7 +11,6 @@ end
 # Columns:
 #  id                  | uuid | PRIMARY KEY
 #  vpc_id              | text |
-#  subnet_id           | text |
 #  internet_gateway_id | text |
 #  route_table_id      | text |
 #  security_group_id   | text |

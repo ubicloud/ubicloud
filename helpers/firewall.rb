@@ -11,11 +11,11 @@ class Clover
 
   def firewall_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset.eager(:firewall_rules), Serializers::Firewall)
+    paginated_result(dataset.eager(:firewall_rules, :location), Serializers::Firewall)
   end
 
   def firewall_post(firewall_name)
-    authorize("Firewall:create", @project.id)
+    authorize("Firewall:create", @project)
     Validation.validate_name(firewall_name)
 
     description = typecast_params.str("description") || ""
@@ -39,7 +39,7 @@ class Clover
       end
 
       flash["notice"] = "'#{firewall_name}' is created"
-      request.redirect "#{@project.path}#{firewall.path}"
+      request.redirect firewall
     end
   end
 

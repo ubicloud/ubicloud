@@ -8,14 +8,14 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   let(:st) { Strand.create(prog: "Prog::Ai::InferenceRouterReplicaNexus", label: "start") }
   let(:project) { Project.create(name: "test") }
-  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_HEL1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
+  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::LEASEWEB_WDC02_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:load_balancer) { Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: "test", src_port: 443, dst_port: 8443).subject }
   let(:dns_zone) { DnsZone.create(name: "test-dns-zone", project_id: project.id) }
   let(:cert) { Prog::Vnet::CertNexus.assemble(load_balancer.hostname, dns_zone.id).subject }
   let(:inference_router) {
     InferenceRouter.create(
       name: "ir-name",
-      location: Location[name: "hetzner-ai"],
+      location: Location[Location::LEASEWEB_WDC02_ID],
       vm_size: "standard-2",
       replica_count: 2,
       project_id: project.id,
@@ -48,10 +48,10 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
+  let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
-    allow(nx).to receive_messages(vm: vm, inference_router: inference_router, inference_router_replica: replica)
+    allow(nx).to receive_messages(vm:, inference_router:, inference_router_replica: replica)
     allow(vm).to receive(:sshable).and_return(sshable)
     load_balancer.add_vm(vm)
     cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
@@ -85,19 +85,20 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe "#before_run" do
     it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.incr_destroy
       expect { nx.before_run }.to hop("destroy")
+        .and change { Semaphore[strand_id: st.id, name: "destroying"] }.from(nil).to(be_a(Semaphore))
     end
 
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+    it "does not hop to destroy if already destroying" do
+      nx.incr_destroy
+      nx.incr_destroying
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      nx.incr_destroy
+      nx.incr_destroying
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the inference router replica"})
     end
@@ -138,38 +139,38 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(nx).to receive(:update_config)
       expect(Config).to receive(:inference_router_access_token).and_return("dummy_access_token")
       expect(Config).to receive(:inference_router_release_tag).and_return("v0.1.0")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo wget -O /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64"
       )
-      expect(sshable).to receive(:cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
-      expect(sshable).to receive(:cmd).with(
-        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=\"dummy_access_token\" --repo=\"https://github.com/ubicloud/inference-router\" --tag=\"v0.1.0\" --release-asset=\"inference-router-*\" /ir/workdir/"
+      expect(sshable).to receive(:_cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
+      expect(sshable).to receive(:_cmd).with(
+        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=dummy_access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=v0.1.0 --release-asset=\"inference-router-*\" /ir/workdir/"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo tar -xzf /ir/workdir/inference-router-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /ir/workdir"
       )
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo chown -R inference-router:inference-router /ir/workdir"
       )
-      expect(sshable).to receive(:cmd)
-        .with(/sudo tee \/etc\/systemd\/system\/inference-router\.service > \/dev\/null << 'EOF'/)
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now inference-router")
+      expect(sshable).to receive(:_cmd)
+        .with("sudo tee /etc/systemd/system/inference-router.service > /dev/null", stdin: /\A\[Unit\].*WantedBy=multi-user.target\n\z/m)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now inference-router")
       expect { nx.setup }.to hop("wait_router_up")
     end
   end
 
   describe "#wait_router_up" do
     it "naps if vm is not up" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect { nx.wait_router_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      LoadBalancerVmPort.first.update(state: "up")
+      LoadBalancerVmPort.dataset.update(state: "up")
       expect { nx.wait_router_up }.to hop("wait")
     end
   end
@@ -189,14 +190,14 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_router).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_router).to receive(:maintenance_set?).and_return(true)
       expect { nx.unavailable }.to nap(30)
@@ -218,6 +219,19 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   end
 
   describe "#destroy" do
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
     it "deletes resources and exits" do
       lb = instance_double(LoadBalancer)
       expect(inference_router).to receive(:load_balancer).and_return(lb).twice
@@ -227,7 +241,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(vm).to receive(:incr_destroy)
       expect(replica).to receive(:destroy)
 
-      expect { nx.destroy }.to exit({"msg" => "inference router replica is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "inference router replica is deleted"})
     end
   end
 
@@ -286,10 +300,10 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
           "api_keys" => [Digest::SHA2.hexdigest(p.api_keys.first.key)]
         }
       end.sort_by { |p| p["ubid"] }
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
       ).and_return("dummy_md5sum")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       ) do |command, options|
@@ -350,7 +364,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)
       end
-      expect(sshable).to receive(:cmd).with("sudo pkill -f -HUP inference-router")
+      expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
 
       usage = [{
         "ubid" => replica.ubid,
@@ -363,7 +377,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         "prompt_token_count" => 0,
         "completion_token_count" => 0
       }]
-      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
+      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return(usage.to_json)
 
       expect(nx).to receive(:update_billing_records).with(
         usage, "prompt_billing_resource", "prompt_token_count"
@@ -375,17 +389,59 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       nx.ping_inference_router
     end
 
+    it "for private routers (non-visible location) only includes projects with matching visible_locations" do
+      inference_router.update(location_id: Location[name: "tr-ist-u1-tom"].id)
+
+      p_allowed = Project.create(name: "allowed")
+      p_blocked = Project.create(name: "blocked")
+      ApiKey.create_inference_api_key(p_allowed)
+      ApiKey.create_inference_api_key(p_blocked)
+
+      p_allowed.set_ff_visible_locations ["tr-ist-u1-tom"]
+
+      expect(sshable).to receive(:_cmd).with(
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+      ).and_return("dummy_md5sum")
+
+      expect(sshable).to receive(:_cmd).with(
+        "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
+        hash_including(stdin: a_string_matching(/"projects":/))
+      ) do |_, options|
+        json_sent = JSON.parse(options[:stdin])
+
+        # Collect sent project UBIDs for comparison
+        sent_projects = json_sent["projects"]
+        expect(sent_projects.size).to eq(1)
+
+        expect(sent_projects.first["ubid"]).to eq(p_allowed.ubid)
+        expect(sent_projects.first["api_keys"]).to eq(
+          [Digest::SHA2.hexdigest(p_allowed.api_keys.first.key)]
+        )
+
+        ubids = sent_projects.map { |pr| pr["ubid"] }
+        expect(ubids).not_to include(p_blocked.ubid)
+      end
+
+      expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
+
+      expect(sshable).to receive(:_cmd)
+        .with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
+        .and_return("[]")
+
+      nx.ping_inference_router
+    end
+
     it "skips config update when unchanged" do
       expect(inference_router).to receive(:ubid).and_return("irubid")
-      expect(sshable).to receive(:cmd).with(
+      expect(sshable).to receive(:_cmd).with(
         "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
       ).and_return("dd8a549def177e5a6cbedeb511b55208") # md5sum of the test config.
-      expect(sshable).not_to receive(:cmd).with(
+      expect(sshable).not_to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
         hash_including(stdin: a_string_matching(/"projects":/))
       )
-      expect(sshable).not_to receive(:cmd).with("sudo pkill -f -HUP inference-router")
-      expect(sshable).to receive(:cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
+      expect(sshable).not_to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
+      expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/usage").and_return("[]")
       nx.ping_inference_router
     end
   end
@@ -434,21 +490,6 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
-        "completion_billing_resource", "completion_token_count"
-      )
-      expect(BillingRecord.count).to eq(0)
-    end
-
-    it "does not update if price is zero" do
-      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "test-model-input", "global").and_return({"unit_price" => 0.0000000000})
-      expect(BillingRate).to receive(:from_resource_properties).with("InferenceTokens", "test-model-output", "global").and_return({"unit_price" => 0.0000000000})
-      expect(BillingRecord.count).to eq(0)
-      nx.update_billing_records(
-        [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "prompt_billing_resource", "prompt_token_count"
-      )
-      nx.update_billing_records(
-        [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
         "completion_billing_resource", "completion_token_count"
       )
       expect(BillingRecord.count).to eq(0)

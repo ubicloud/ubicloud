@@ -3,7 +3,6 @@ $(function () {
   setupDatePicker();
   setupFormOptionUpdates();
   setupPlayground();
-  setupFormsWithPatchMethod();
   setupMetricsCharts();
   setupPgConfigCard();
 });
@@ -69,106 +68,21 @@ $("#new-ace-btn").on("click", function (event) {
 });
 
 $(".delete-btn").on("click", function (event) {
-  let url = $(this).data("url");
-  let csrf = $(this).data("csrf");
   let confirmation = $(this).data("confirmation");
-  let confirmationMessage = $(this).data("confirmation-message");
-  let redirect = $(this).data("redirect");
-  let method = $(this).data("method");
+  let confirmationMessage = $(this).data("confirmation-message") || "Are you sure to delete?";
 
   if (confirmation) {
-    if (prompt(`Please type "${confirmation}" to confirm deletion`, "") != confirmation) {
+    if (prompt(`${confirmationMessage}\nPlease type "${confirmation}" to confirm deletion`, "") != confirmation) {
       alert("Could not confirm resource name");
       event.preventDefault();
       return;
     }
-  } else if (!confirm(confirmationMessage || "Are you sure to delete?")) {
+  } else if (!confirm(confirmationMessage)) {
     event.preventDefault();
     return;
   }
 
-  if (method === "POST") {
-    // Use normal form submission for POST requests
-    return true;
-  }
-
-  event.preventDefault();
-
-  $.ajax({
-    url: url,
-    type: method || "DELETE",
-    data: { "_csrf": csrf },
-    dataType: "json",
-    headers: { "Accept": "application/json" },
-    success: function (result) {
-      window.location.href = redirect;
-    },
-    error: function (xhr, ajaxOptions, thrownError) {
-      if (xhr.status == 404) {
-        window.location.href = redirect;
-        return;
-      }
-
-      let message = thrownError;
-      try {
-        response = JSON.parse(xhr.responseText);
-        message = response.error?.message
-      } catch { };
-      alert(`Error: ${message}`);
-    }
-  });
-});
-
-$(".edit-inline-btn").on("click", function (event) {
-  let inline_editable_group = $(this).closest(".group\\/inline-editable");
-  inline_editable_group.find(".inline-editable").each(function () {
-    let value = $(this).find(".inline-editable-text").text();
-    $(this).find(".inline-editable-input").val(value);
-  });
-
-  inline_editable_group.addClass("active");
-});
-
-$(".cancel-inline-btn").on("click", function (event) {
-  $(this).closest(".group\\/inline-editable").removeClass("active");
-});
-
-$(".save-inline-btn").on("click", function (event) {
-  let inline_editable_group = $(this).closest(".group\\/inline-editable");
-  let data = {};
-  inline_editable_group.find(".inline-editable-input").each(function () {
-    data[$(this).attr("name")] = $(this).val();
-  });
-
-  let url = $(this).data("url");
-  let csrf = $(this).data("csrf");
-  let confirmation_message = $(this).data("confirmation-message");
-
-  $.ajax({
-    url: url,
-    type: "PATCH",
-    data: { "_csrf": csrf, ...data },
-    dataType: "json",
-    headers: { "Accept": "application/json" },
-    success: function (result) {
-      inline_editable_group.find(".inline-editable").each(function () {
-        let value = $(this).find(".inline-editable-input").val();
-        $(this).find(".inline-editable-text").text(value);
-      });
-
-      inline_editable_group.removeClass("active");
-
-      alert(confirmation_message);
-    },
-    error: function (xhr, ajaxOptions, thrownError) {
-      let message = thrownError;
-      try {
-        response = JSON.parse(xhr.responseText);
-        message = response.error?.message
-      } catch { };
-      alert(`Error: ${message}`);
-    }
-  });
+  return true;
 });
 
 $(".restart-btn").on("click", function (event) {
@@ -280,7 +194,7 @@ $(".connection-info-format-selector select, .connection-info-format-selector inp
 function setupFormOptionUpdates() {
   $('#creation-form').on('change', 'input', function () {
     let name = $(this).attr('name');
-    option_dirty[name] = $(this).val();
+    option_dirty[name] = $(this).val().replace(/\./g, '-');
 
     if ($(this).attr('type') !== 'radio') {
       return;
@@ -291,7 +205,7 @@ function setupFormOptionUpdates() {
 
 function redrawChildOptions(name) {
   if (option_children[name]) {
-    let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');;
+    let value = $("input[name=" + name + "]:checked").val().replace(/\./g, '-');
     let classes = $("input[name=" + name + "]:checked").parent().attr('class');
     classes = classes ? classes.split(" ") : [];
     classes = "." + classes.concat("form_" + name, "form_" + name + "_" + value).join('.');
@@ -677,35 +591,6 @@ function setupPlayground() {
   });
 }
 
-function setupFormsWithPatchMethod() {
-  $("#creation-form.PATCH").on("submit", function (event) {
-    event.preventDefault();
-
-    var form = $(this);
-    var jsonData = {};
-    form.serializeArray().forEach(function (item) {
-      jsonData[item.name] = item.value;
-    });
-
-    $.ajax({
-      url: form.attr('action'),
-      type: 'PATCH',
-      dataType: "html",
-      data: jsonData,
-      success: function (response, status, xhr) {
-        var redirectUrl = xhr.getResponseHeader('Location');
-        if (redirectUrl) {
-          window.location.href = redirectUrl;
-        }
-      },
-      error: function (xhr, ajaxOptions, thrownError) {
-        let message = thrownError;
-        alert(`Error: ${message}`);
-      }
-    });
-  });
-}
-
 const metricsCharts = [];
 const colorPalette = [
   {
@@ -1021,7 +906,7 @@ function setupPgConfigCard() {
     const keyInput = createConfigGroup.find("input").eq(0);
     const valueInput = createConfigGroup.find("input").eq(1);
     if (!keyInput[0].reportValidity()) return;
-    
+
     const placeHolderGroup = $(addBtn).closest(".group").siblings(".config-placeholder-group");
     const configId = placeHolderGroup.data("config-id");
 

@@ -7,6 +7,7 @@ class Prog::LearnCpu < Prog::Base
   def get_arch
     arch = sshable.cmd("common/bin/arch").strip
     fail "BUG: unexpected CPU architecture" unless ["arm64", "x64"].include?(arch)
+
     arch
   end
 
@@ -34,7 +35,7 @@ class Prog::LearnCpu < Prog::Base
   label def start
     arch = get_arch
     topo = get_topology
-    topo.total_dies = count_dies(total_sockets: topo.total_sockets, arch: arch)
-    pop(arch: arch, **topo.to_h)
+    topo.total_dies = count_dies(total_sockets: topo.total_sockets, arch:)
+    pop(arch:, **topo.to_h)
   end
 end

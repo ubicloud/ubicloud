@@ -8,7 +8,7 @@ RSpec.describe Clover, "github" do
   let(:project) { user.create_project_with_default_policy("project-1") }
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
   let(:installation) { GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project_id: project.id, created_at: Time.now - 10 * 24 * 60 * 60) }
-  let(:repository) { GithubRepository.create(name: "test-repo", installation_id: installation.id) }
+  let(:repository) { GithubRepository.create(name: "test-user/test-repo", installation_id: installation.id) }
 
   before do
     login(user.email)
@@ -59,7 +59,6 @@ RSpec.describe Clover, "github" do
     end
 
     it "can not connect GitHub account if project has no valid payment method" do
-      expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
 
       visit "#{project.path}/github/create"
@@ -70,7 +69,6 @@ RSpec.describe Clover, "github" do
     end
 
     it "shows new billing info button instead of connect account if project has no valid payment method" do
-      expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project).thrice
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
       # rubocop:disable RSpec/VerifiedDoubles
       expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
@@ -200,8 +198,8 @@ RSpec.describe Clover, "github" do
     it "can list active runners" do
       now = Time.now
       expect(Time).to receive(:now).and_return(now).at_least(:once)
-      runner_deleted = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
-      runner_with_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-standard-4-ubuntu-2404", repository_name: "my-repo").subject.update(
+      runner_deleted = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").update(label: "wait_vm_destroy")
+      runner_with_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4-ubuntu-2404", repository_name: "my-repo").subject.update(
         created_at: now + 20,
         ready_at: now - 50,
         runner_id: 2,
@@ -215,9 +213,9 @@ RSpec.describe Clover, "github" do
           "started_at" => (now - 40).iso8601
         }
       )
-      runner_waiting_job = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
-      runner_not_created = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(created_at: now - 38)
-      runner_concurrency_limit = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud-gpu", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
+      runner_waiting_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
+      runner_not_created = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(created_at: now - 38)
+      runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-gpu", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
 
@@ -227,36 +225,31 @@ RSpec.describe Clover, "github" do
       displayed_runner_rows = page.all("table.min-w-full tbody tr").map { |row| row.all("td").map(&:text) }
       expect(displayed_runner_rows).to eq [
         ["my-repo", "#{runner_with_job.ubid}\n4 vCPU\npremium\nx64\nubuntu-24", "test-workflow\ntest-job", "Running for 40s\nStarted in 20s", ""],
-        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-22", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
-        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-22", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
+        ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
+        ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
         ["my-repo", "#{runner_concurrency_limit.ubid}\n6 vCPU\nstandard-gpu\nx64\nubuntu-22", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""]
       ]
     end
 
     it "can terminate runner" do
-      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
 
       visit "#{project.path}/github/#{installation.ubid}/runner"
 
       expect(page.status_code).to eq(200)
       expect(page).to have_content runner.ubid
 
-      btn = find "#runner-#{runner.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
-
-      visit "#{project.path}/github/#{installation.ubid}/runner"
+      find("#runner-#{runner.ubid} .delete-btn").click
       expect(page).to have_flash_notice("Runner '#{runner.ubid}' forcibly terminated")
     end
 
     it "raises not found when runner not exists" do
-      runner = Prog::Vm::GithubRunner.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
+      runner = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject
       visit "#{project.path}/github/#{installation.ubid}/runner"
+      runner_ubid = runner.ubid
       runner.destroy
 
-      btn = find "#runner-#{runner.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+      find("#runner-#{runner_ubid} .delete-btn").click
       expect(page.status_code).to eq(404)
     end
 
@@ -270,6 +263,17 @@ RSpec.describe Clover, "github" do
       find("a", text: /^You’re eligible/).click
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - GitHub Runner Settings")
+    end
+
+    it "shows concurrency warning for limited access accounts" do
+      installation.project.update(reputation: "limited")
+      Array.new(3).each {
+        runner = GithubRunner.create(installation_id: installation.id, repository_name: repository.name, label: "ubicloud-standard-60")
+        Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+      }
+      visit "#{project.path}/github/#{installation.ubid}/runner"
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "You've reached your vCPU concurrency limit"
     end
   end
 
@@ -309,11 +313,7 @@ RSpec.describe Clover, "github" do
       expect(page.status_code).to eq(200)
       expect(page).to have_content entry.key
 
-      btn = find "#entry-#{entry.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(204)
-
-      visit "#{project.path}/github/#{installation.ubid}/cache"
+      find("#entry-#{entry.ubid} .delete-btn").click
       expect(page).to have_flash_notice("Cache '#{entry.key}' deleted.")
     end
 
@@ -324,11 +324,33 @@ RSpec.describe Clover, "github" do
       expect(client).to receive(:delete_object).with(bucket: repository.bucket_name, key: entry.blob_key)
 
       visit "#{project.path}/github/#{installation.ubid}/cache"
+      entry_ubid = entry.ubid
       entry.destroy
 
-      btn = find "#entry-#{entry.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-      expect(page.status_code).to eq(404)
+      find("#entry-#{entry_ubid} .delete-btn").click
+      expect(page.status_code).to eq 404
+    end
+
+    it "can delete all cache entries for a repository" do
+      entry = create_cache_entry(key: "cache-1")
+      visit "#{project.path}/github/#{installation.ubid}/cache"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "1 cache entries"
+
+      find("#delete-all-#{repository.ubid}").click
+      expect(page).to have_flash_notice("Scheduled deletion of existing cache entries")
+
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st.label).to eq "delete_entries"
+      st.destroy
+
+      entry.this.delete(force: true)
+      find("#delete-all-#{repository.ubid}").click
+      expect(page).to have_flash_notice("No existing cache entries to delete")
+
+      st = Strand.first(prog: "Github::DeleteCacheEntries")
+      expect(st).to be_nil
     end
   end
 end

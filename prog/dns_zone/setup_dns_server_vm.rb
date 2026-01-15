@@ -3,7 +3,7 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
-  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID)
+  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy")
     unless (dns_server = DnsServer[dns_server_id])
       fail "No existing Dns Server"
     end
@@ -27,16 +27,16 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         Config.dns_service_project_id,
         sshable_unix_user: "ubi",
         location_id:,
-        name: name,
+        name:,
         size: vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: storage_size_gib}
         ],
-        boot_image: "ubuntu-jammy",
+        boot_image:,
         enable_ip4: true
       )
 
-      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server_id}])
+      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id:}])
     end
   end
 
@@ -68,13 +68,26 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   label def start
     nap 5 unless vm.strand.label == "wait"
     register_deadline(nil, 15 * 60)
+    if vm.location.aws?
+      # Open UDP & TCP port 53 for DNS queries on AWS
+      fw = Firewall[name: "dns", project_id: Config.dns_service_project_id]
+      unless fw
+        fw = Firewall.create(name: "dns", location: vm.location, project_id: Config.dns_service_project_id)
+        fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "udp")
+        fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "udp")
+        fw.add_firewall_rule(cidr: "0.0.0.0/0", port_range: 53..53, protocol: "tcp")
+        fw.add_firewall_rule(cidr: "::/0", port_range: 53..53, protocol: "tcp")
+      end
+      vm.add_vm_firewall(fw)
+      vm.incr_update_firewall_rules
+    end
     hop_prepare
   end
 
   label def prepare
-    sshable.cmd <<~SH
+    sshable.cmd(<<~SH, inhost_name: vm.inhost_name)
 sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/' /etc/systemd/resolved.conf
-sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 #{vm.inhost_name}\\n\\n#/' /etc/hosts
+sudo sed -i ':a;N;$!ba;s/127.0.0.1 localhost\\n\\n#/127.0.0.1 localhost\\n127.0.0.1 ':inhost_name'\\n\\n#/' /etc/hosts
 sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo apt-get update
 sudo apt-get -y install apt-transport-https ca-certificates wget
@@ -127,7 +140,7 @@ zone:
   #{ds.dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
     CONF
 
-    sshable.cmd("sudo tee /etc/knot/knot.conf > /dev/null", stdin: knot_config)
+    sshable.write_file("/etc/knot/knot.conf", knot_config)
 
     hop_sync_zones
   end
@@ -140,7 +153,7 @@ zone:
 #{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
 #{dz.name}.          3600    NS      #{ds.name}.
       CONF
-      sshable.cmd("sudo -u knot tee /var/lib/knot/#{dz.name}.zone > /dev/null", stdin: zone_config)
+      sshable.write_file("/var/lib/knot/#{dz.name}.zone", zone_config, user: "knot")
     end
 
     sshable.cmd "sudo systemctl restart knot"

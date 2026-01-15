@@ -37,6 +37,7 @@ module Ubicloud
       def list(adapter, location: nil)
         path = if location
           raise Error, "invalid location: #{location.inspect}" if location.include?("/")
+
           "location/#{location}/#{fragment}"
         else
           fragment
@@ -80,9 +81,12 @@ module Ubicloud
       def set_columns(*columns)
         columns.each do |column|
           next if method_defined?(column)
+
           define_method(column) do
-            info unless @values.has_key?(column)
-            @values[column]
+            @values.fetch(column) do
+              info
+              @values[column]
+            end
           end
         end
       end
@@ -121,12 +125,14 @@ module Ubicloud
         else
           location, name, extra = values.split("/", 3)
           raise Error, "invalid #{self.class.fragment} location/name: #{values.inspect}" if extra || !name
+
           {location:, name:}
         end
       when Hash
         if !values[:id] && !(values[:location] && values[:name])
           raise Error, "hash must have :id key or :location and :name keys"
         end
+
         @values = {}
         merge_into_values(values)
       else
@@ -142,6 +148,11 @@ module Ubicloud
     # Return the value of a specific key for the model instance.
     def [](key)
       @values[key]
+    end
+
+    # Rename the object to the given name.
+    def rename_to(name)
+      merge_into_values(adapter.post(_path("/rename"), name:))
     end
 
     # Destroy the given model instance in Ubicloud.  It is not possible to restore
@@ -283,11 +294,7 @@ end
 
 # Require each model subclass, and then resolve associations after
 # all subclasses have been loaded.
-Dir.open(File.join(__dir__, "model")) do |dir|
-  dir.each_child do |file|
-    if file.end_with?(".rb")
-      require_relative "model/#{file}"
-    end
-  end
+Dir.glob("model/*.rb", base: __dir__) do |file|
+  require_relative file
 end
 Ubicloud::Model.subclasses.each(&:resolve_associations)

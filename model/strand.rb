@@ -12,14 +12,15 @@ class Strand < Sequel::Model
   Strand.default_values[:stack] = proc { [{}] }
 
   LEASE_EXPIRATION = 120
-  many_to_one :parent, key: :parent_id, class: self
-  one_to_many :children, key: :parent_id, class: self
+  many_to_one :parent, class: self
+  one_to_many :children, key: :parent_id, class: self, remover: nil, clearer: nil
   one_to_many :semaphores
 
   plugin ResourceMethods
 
   def subject
     return @subject if defined?(@subject) && @subject != :reload
+
     @subject = UBID.decode(ubid)
   end
 
@@ -96,6 +97,7 @@ SQL
     affected = TAKE_LEASE_PS.call(id:)
     lease_checked!(affected)
     return false unless affected
+
     lease_time = affected.fetch(:lease)
 
     # Also operate as reload query
@@ -113,7 +115,7 @@ SQL
       else
         begin
           unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
-            Clog.emit("lease violated data") { {lease_clear_debug_snapshot: this.all} }
+            Clog.emit("lease violated data", {lease_clear_debug_snapshot: this.all})
             fail "BUG: lease violated"
           end
         ensure
@@ -176,7 +178,7 @@ SQL
           sbj = subject
           extra_data = case sbj
           when Vm
-            {vm_host: sbj.vm_host&.ubid, data_center: sbj.vm_host&.data_center, boot_image: sbj.boot_image, location: sbj.location.display_name, arch: sbj.arch, vcpus: sbj.vcpus, ipv4: sbj.ephemeral_net4.to_s}
+            {vm_host: sbj.vm_host&.ubid, data_center: sbj.vm_host&.data_center, boot_image: sbj.boot_image, location: sbj.location.display_name, arch: sbj.arch, vcpus: sbj.vcpus, ipv4: sbj.ip4_string}
           when VmHost
             {data_center: sbj.data_center, location: sbj.location.display_name, arch: sbj.arch, ipv4: sbj.sshable.host, total_cores: sbj.total_cores, allocation_state: sbj.allocation_state, os_version: sbj.os_version, vm_count: sbj.vms_dataset.count}
           when GithubRunner
@@ -203,7 +205,7 @@ SQL
     DB.transaction do
       SemSnap.use(id) do |snap|
         prg = load(snap)
-        prg.public_send(:before_run) if prg.respond_to?(:before_run)
+        prg.public_send(:before_run)
         prg.public_send(label)
       end
     rescue Prog::Base::Nap => e
@@ -223,7 +225,7 @@ SQL
       e
     rescue Prog::Base::Hop => hp
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("hopped") { {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}} }
+      Clog.emit("hopped", {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
       top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
@@ -232,7 +234,7 @@ SQL
       hp
     rescue Prog::Base::Exit => ext
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("exited") { {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}} }
+      Clog.emit("exited", {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}})
 
       update(exitval: ext.exitval, retval: nil)
       if parent_id
@@ -250,11 +252,12 @@ SQL
     end
   ensure
     duration = Time.now - start_time
-    Clog.emit("finished strand") { [self, {strand_finished: {duration:, prog_label:}}] } if duration > 1
+    Clog.emit("finished strand", [self, {strand_finished: {duration:, prog_label:}}]) if duration > 1
   end
 
   def run(seconds = 0)
     fail "already deleted" if @deleted
+
     deadline = Time.now + seconds
     take_lease_and_reload do
       loop do

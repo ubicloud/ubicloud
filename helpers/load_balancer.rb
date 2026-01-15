@@ -2,21 +2,23 @@
 
 class Clover
   def load_balancer_list
-    dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view").eager(:private_subnet)
+    dataset = dataset_authorize(@project.load_balancers_dataset, "LoadBalancer:view").eager(private_subnet: :location)
     dataset = dataset.join(:private_subnet, id: Sequel[:load_balancer][:private_subnet_id]).where(location_id: @location.id).select_all(:load_balancer) if @location
     if api?
-      paginated_result(dataset, Serializers::LoadBalancer)
+      paginated_result(dataset.eager(:ports), Serializers::LoadBalancer)
     else
-      @lbs = Serializers::LoadBalancer.serialize(dataset.all, {include_path: true})
+      @lbs = dataset.all
       view "networking/load_balancer/index"
     end
   end
 
   def load_balancer_post(name)
-    authorize("LoadBalancer:create", @project.id)
+    authorize("LoadBalancer:create", @project)
 
     algorithm, health_check_protocol, stack = typecast_params.nonempty_str!(%w[algorithm health_check_protocol stack])
     src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+    cert_enabled_param = typecast_params.bool("cert_enabled")
+    cert_enabled = cert_enabled_param.nil? ? health_check_protocol == "https" : cert_enabled_param
     health_check_endpoint = typecast_params.nonempty_str("health_check_endpoint") || Prog::Vnet::LoadBalancerNexus::DEFAULT_HEALTH_CHECK_ENDPOINT
 
     unless (ps = authorized_private_subnet)
@@ -33,7 +35,8 @@ class Clover
         src_port: Validation.validate_port(:src_port, src_port),
         dst_port: Validation.validate_port(:dst_port, dst_port),
         health_check_endpoint:,
-        health_check_protocol:
+        health_check_protocol:,
+        cert_enabled:
       ).subject
       audit_log(lb, "create")
     end
@@ -42,7 +45,7 @@ class Clover
       Serializers::LoadBalancer.serialize(lb, {detailed: true})
     else
       flash["notice"] = "'#{name}' is created"
-      request.redirect "#{@project.path}#{lb.path}"
+      request.redirect lb
     end
   end
 
@@ -52,11 +55,12 @@ class Clover
     options.add_option(name: "description")
     options.add_option(name: "private_subnet_id", values: dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view").map { {value: it.ubid, display_name: it.name} })
     options.add_option(name: "algorithm", values: ["Round Robin", "Hash Based"].map { {value: it.downcase.tr(" ", "_"), display_name: it} })
-    options.add_option(name: "stack", values: [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
+    options.add_option(name: "stack", values: LoadBalancer.stack_options.map { {value: it.downcase, display_name: it.gsub("ip", "IP")} })
     options.add_option(name: "src_port")
     options.add_option(name: "dst_port")
     options.add_option(name: "health_check_endpoint")
     options.add_option(name: "health_check_protocol", values: ["http", "https", "tcp"].map { {value: it, display_name: it.upcase} })
+    options.add_option(name: "cert_enabled", values: ["1"])
     options.serialize
   end
 end

@@ -14,7 +14,7 @@
     rows: @kcs.map do |kc|
       [
         [
-          [kc.name, {link: @project_data[:path] + kc.path}],
+          [kc.name, {link: path(kc)}],
           kc.display_location,
           kc.version,
           ["kubernetes_state_label", {component: { state: kc.display_state }}]
@@ -28,7 +28,7 @@
       description: "You don't have permission to create kubernetes clusters."
     }.merge(has_project_permission("KubernetesCluster:create") ? {
       description: "Get started by creating a new kubernetes cluster.",
-      button_link: "#{@project_data[:path]}/kubernetes-cluster/create",
+      button_link: "#{@project.path}/kubernetes-cluster/create",
       button_title: "Create Kubernetes Cluster"
     } : {})
   ) %>

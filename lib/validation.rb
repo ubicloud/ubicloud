@@ -11,13 +11,33 @@ module Validation
     end
   end
 
+  module PublicKeyValidation
+    ssh_public_key_line = /(([^# \r\n]|"[^"\r\n]+")+ +)? *[^# \r\n]+ +[A-Za-z0-9+\/]+=*( +[^\r\n]*)?/
+    VALID_SSH_PUBLIC_KEY_LINE = /^#{ssh_public_key_line}\r?$/
+    VALID_SSH_AUTHORIZED_KEYS = /\A(([ \t]*|(#[^\r\n]*)?|#{ssh_public_key_line})(\r?\n|\z))+\z/
+
+    def validate
+      super
+      if validate_ssh_public_key?
+        validates_format(VALID_SSH_AUTHORIZED_KEYS, :public_key, message: "invalid SSH public key format")
+        unless errors.on(:public_key)
+          validates_format(VALID_SSH_PUBLIC_KEY_LINE, :public_key, message: "must contain at least one valid SSH public key")
+        end
+      end
+    end
+
+    def validate_ssh_public_key?
+      new?
+    end
+  end
+
   # Allow DNS compatible names
   # - Max length 63
   # - Only lowercase letters, numbers, and hyphens
   # - Not start or end with a hyphen
   # Adapted from https://stackoverflow.com/a/7933253
   # Do not allow uppercase letters to not deal with case sensitivity
-  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}
+  ALLOWED_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}
 
   # Different operating systems have different conventions.
   # Below are reasonable restrictions that works for most (all?) systems.
@@ -36,7 +56,7 @@ module Validation
 
   # - Max length 63
   # - Alphanumeric, hyphen, underscore, space, parantheses, exclamation, question mark, star
-  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?\*\(\) ]{1,63}\z}
+  ALLOWED_SHORT_TEXT_PATTERN = %r{\A[a-zA-Z0-9_\-!?*() ]{1,63}\z}
 
   # - Max length 63
   # - Unicode letters, numbers, hyphen, space
@@ -44,7 +64,7 @@ module Validation
 
   # Allow Kubernetes Names
   # - Same with regular name pattern, but shorter (40 chars)
-  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9\-]{0,38}[a-z0-9])?\z}
+  ALLOWED_KUBERNETES_NAME_PATTERN = %r{\A[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?\z}
 
   def self.validate_name(name)
     msg = "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."
@@ -56,11 +76,23 @@ module Validation
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_MINIO_USERNAME_PATTERN)
   end
 
+  def self.validate_minio_setup(storage_size_gib:, pool_count:, server_count:, drive_count:)
+    per_pool_server_count = server_count / pool_count
+    per_pool_drive_count = drive_count / pool_count
+    per_pool_storage_size = storage_size_gib / pool_count
+    fail ValidationFailed.new({server_count: "Minio per pool server count < 1"}) if per_pool_server_count < 1
+    fail ValidationFailed.new({drive_count: "Minio per pool drive count < 1"}) if per_pool_drive_count < 1
+    fail ValidationFailed.new({storage_size_gib: "Minio per pool storage size < 1"}) if per_pool_storage_size < 1
+
+    [per_pool_server_count, per_pool_drive_count, per_pool_storage_size]
+  end
+
   def self.validate_vm_size(size, arch, only_visible: false)
     available_vm_sizes = Option::VmSizes.select { !only_visible || it.visible }
     unless (vm_size = available_vm_sizes.find { it.name == size && it.arch == arch })
       fail ValidationFailed.new({size: "\"#{size}\" is not a valid virtual machine size. Available sizes: #{available_vm_sizes.map(&:name)}"})
     end
+
     vm_size
   end
 
@@ -68,6 +100,7 @@ module Validation
     storage_size = storage_size.to_i
     vm_size = validate_vm_size(size, arch)
     fail ValidationFailed.new({storage_size: "Storage size must be one of the following: #{vm_size.storage_size_options.join(", ")}"}) unless vm_size.storage_size_options.include?(storage_size)
+
     storage_size
   end
 
@@ -100,6 +133,7 @@ module Validation
     unless [LoadBalancer::Stack::IPV4, LoadBalancer::Stack::IPV6, LoadBalancer::Stack::DUAL].include?(stack)
       fail ValidationFailed.new({stack: "\"#{stack}\" is not a valid load balancer stack option. Available options: #{LoadBalancer::Stack::IPV4}, #{LoadBalancer::Stack::IPV6}, #{LoadBalancer::Stack::DUAL}"})
     end
+
     stack
   end
 
@@ -111,12 +145,14 @@ module Validation
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [
       :encrypted, :size_gib, :boot, :skip_sync, :read_only, :image,
-      :max_read_mbytes_per_sec, :max_write_mbytes_per_sec
+      :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
+      :vring_workers
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
       fail ValidationFailed.new({boot_disk_index: "Boot disk index must be between 0 and #{storage_volumes.length - 1}"})
     end
+
     storage_volumes.each { |volume|
       volume.each_key { |key|
         fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
@@ -171,6 +207,7 @@ module Validation
     return [0, 65535] if port_range.nil?
 
     fail ValidationFailed.new({port_range: "Invalid port range"}) unless (match = port_range.match(ALLOWED_PORT_RANGE_PATTERN))
+
     start_port = match[1].to_i
 
     if match[2]
@@ -188,6 +225,7 @@ module Validation
   def self.validate_port(port_name, port)
     fail ValidationFailed.new({port_name => "Port must be an integer"}) unless port.to_i.to_s == port.to_s
     fail ValidationFailed.new({port_name => "Port must be between 0 to 65535"}) unless (0..65535).cover?(port.to_i)
+
     port.to_i
   end
 
@@ -202,6 +240,7 @@ module Validation
         if seen_ports.include?(port)
           fail ValidationFailed.new({port: "Port conflict detected: #{port} is already in use"})
         end
+
         seen_ports << port
       end
     end
@@ -223,12 +262,12 @@ module Validation
     fail ValidationFailed.new({url: "Invalid URL"})
   end
 
-  def self.validate_vcpu_quota(project, resource_type, requested_vcpu_count)
+  def self.validate_vcpu_quota(project, resource_type, requested_vcpu_count, name: :size)
     if !project.quota_available?(resource_type, requested_vcpu_count)
       current_used_vcpu_count = project.current_resource_usage(resource_type)
       effective_quota_value = project.effective_quota_value(resource_type)
 
-      fail ValidationFailed.new({size: "Insufficient quota for requested size. Requested vCPU count: #{requested_vcpu_count}, currently used vCPU count: #{current_used_vcpu_count}, maximum allowed vCPU count: #{effective_quota_value}, remaining vCPU count: #{effective_quota_value - current_used_vcpu_count}"})
+      fail ValidationFailed.new({name => "Insufficient quota for requested size. Requested vCPU count: #{requested_vcpu_count}, currently used vCPU count: #{current_used_vcpu_count}, maximum allowed vCPU count: #{effective_quota_value}, remaining vCPU count: #{effective_quota_value - current_used_vcpu_count}"})
     end
   end
 
@@ -247,7 +286,7 @@ module Validation
       expects: 200)
     response_hash = JSON.parse(response.body)
     unless response_hash["success"]
-      Clog.emit("cloudflare turnstile validation failed") { {cf_validation_failed: response_hash["error-codes"]} }
+      Clog.emit("cloudflare turnstile validation failed", {cf_validation_failed: response_hash["error-codes"]})
       fail ValidationFailed.new({cloudflare_turnstile: "Validation failed. Please try again."})
     end
   end
@@ -265,6 +304,10 @@ module Validation
     fail ValidationFailed.new({worker_node_count: "Kubernetes worker node count must be greater than 0."}) if count <= 0
   end
 
+  def self.validate_kubernetes_version(version)
+    fail ValidationFailed.new({version: "Kubernetes version \"#{version}\" is not supported. Available versions: #{Option.kubernetes_versions.join(", ")}"}) unless Option.kubernetes_versions.include?(version)
+  end
+
   def self.validate_victoria_metrics_username(username)
     msg = "VictoriaMetrics user must only contain lowercase letters, numbers, hyphens and underscore and cannot start with a number or hyphen. It also has a max length of 32 and a min length of 3."
     fail ValidationFailed.new({username: msg}) unless username&.match(ALLOWED_VICTORIA_METRICS_USERNAME_PATTERN)
@@ -275,6 +318,7 @@ module Validation
     storage_size = storage_size.to_i
 
     fail ValidationFailed.new({storage_size: "VictoriaMetrics storage must be between #{min_storage_size}GiB and #{max_storage_size}GiB"}) unless storage_size.between?(min_storage_size, max_storage_size)
+
     storage_size
   end
 
@@ -302,5 +346,16 @@ module Validation
         fail ValidationFailed.new({key.to_sym => "Invalid #{display_key}. Available options: #{available_options}"})
       end
     end
+  end
+
+  def self.validate_postgres_upgrade(postgres_resource)
+    fail ValidationFailed.new({needs_convergence: "Database cluster is waiting for convergence, please wait for it to complete"}) if postgres_resource.needs_convergence?
+    fail ValidationFailed.new({read_replica: "Read replicas cannot be upgraded"}) if postgres_resource.read_replica?
+    fail ValidationFailed.new({flavor: "Lantern Postgres instances cannot be upgraded"}) if postgres_resource.flavor == PostgresResource::Flavor::LANTERN
+    fail ValidationFailed.new({version: "Database is already at the latest version"}) unless postgres_resource.can_upgrade?
+  end
+
+  def self.validate_postgres_version(version, flavor)
+    fail ValidationFailed.new({version: "Version #{version} is not supported for #{flavor} flavor"}) unless Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
   end
 end

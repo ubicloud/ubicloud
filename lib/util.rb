@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "net_ssh"
 require "openssl"
 require "erubi"
 require "tilt"
@@ -13,19 +13,20 @@ module Util
   # which typically includes the "root" account reflexively.  The
   # ssh-agent is employed by default here, since personnel are thought
   # to be involved with preparing new VmHosts.
-  def self.rootish_ssh(host, user, keys, cmd)
+  def self.rootish_ssh(host, user, keys, cmd, **)
     Net::SSH.start(host, user,
       Sshable::COMMON_SSH_ARGS.merge(key_data: keys,
         use_agent: Config.development?)) do |ssh|
-      ret = ssh.exec!(cmd)
+      ret = ssh.exec!(cmd, **)
       fail "Ssh command failed: #{ret}" unless ret.exitstatus.zero?
+
       ret
     end
   end
 
   def self.parse_key(key_data)
     OpenSSL::PKey::EC.new(key_data)
-  rescue OpenSSL::PKey::ECError, OpenSSL::PKey::DSAError
+  rescue OpenSSL::PKey::PKeyError
     OpenSSL::PKey::RSA.new(key_data)
   end
 
@@ -33,7 +34,7 @@ module Util
     create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{common_name}",
       extensions: ["basicConstraints=CA:TRUE", "keyUsage=cRLSign,keyCertSign", "subjectKeyIdentifier=hash"],
-      duration: duration
+      duration:
     ).map(&:to_pem)
   end
 
@@ -70,8 +71,18 @@ module Util
     [cert, key]
   end
 
-  def self.exception_to_hash(ex)
-    {exception: {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace, cause: ex.cause.inspect}}
+  def self.exception_to_hash(ex, backtrace: ex.backtrace, into: {})
+    into[:exception] = {message: ex.message, class: ex.class.to_s, backtrace:}
+    # Don't log causes if we aren't logging backtraces
+    if backtrace && (cause = ex.cause)
+      array = into[:causes] = []
+      while cause && (cause != ex)
+        ex = cause
+        cause = ex.cause
+        array << {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace}
+      end
+    end
+    into
   end
 
   def self.safe_write_to_file(filename, content)
@@ -86,6 +97,8 @@ module Util
 
   def self.send_email(...)
     EmailRenderer.sendmail("/", ...)
+  rescue Net::SMTPSyntaxError
+    raise CloverError.new(400, "InvalidRequest", "Invalid email address used")
   end
 
   def self.aws_tag_specifications(resource_type, name, additional_tags = {})
@@ -95,5 +108,13 @@ module Util
 
   def self.monitor_process?
     ENV["MONITOR_PROCESS"] == "1"
+  end
+
+  def self.calculate_ips_v4
+    Address
+      .where { (family(:cidr) =~ 4) & (masklen(:cidr) !~ 32) }
+      .distinct
+      .select_order_map { set_masklen(:cidr, 16).as(:masked) }
+      .join("\n")
   end
 end

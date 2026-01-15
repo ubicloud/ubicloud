@@ -1,4 +1,4 @@
-<% @page_title = "#{@project_data[:name]} - Users"
+<% @page_title = "#{@project.name} - Users"
 @users = @project.accounts_dataset.order_by(:email).all
 @subject_tag_map = SubjectTag.subject_id_map_for_project_and_accounts(@project.id, @users.map(&:id))
 @allowed_view_tag_names = dataset_authorize(@project.subject_tags_dataset, "SubjectTag:view").map(:name)
@@ -10,7 +10,7 @@
 <%== part(
   "components/page_header",
   title: "User Management",
-  breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], %w[Users #]]
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Users #]]
 ) %>
 
 <div class="grid gap-6">
@@ -25,8 +25,7 @@
     </div>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= "#{@project_data[:path]}/user" %>" role="form" method="POST">
-          <%== csrf_tag("#{@project_data[:path]}/user") %>
+        <% form(action: user_path, method: :post) do %>
           <div class="space-y-4">
             <div>
               <p class="mt-1 text-sm text-gray-500">
@@ -45,14 +44,19 @@
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
       </div>
     </div>
   </div>
   <!-- User List -->
   <div>
-    <form id="managed-policy" action="<%= "#{@project_data[:path]}/user/policy/managed" %>" role="form" method="POST">
-      <%== csrf_tag("#{@project_data[:path]}/user/policy/managed") %>
+    <% @users.each do |user| %>
+      <%== form(action: "#{user_path}/#{user.ubid}/delete", method: :post, id: "delete-#{user.ubid}") %>
+    <% end %>
+    <% @invitations.each do |invitation| %>
+      <%== form(action: "#{user_path}/invitation/#{invitation.email}/delete", method: :post, id: "delete-#{invitation.email}") %>
+    <% end %>
+    <% form(action: "#{user_path}/policy/managed", method: :post, id: "managed-policy") do %>
       <div class="md:flex md:items-center md:justify-between pb-1 lg:pb-2">
         <div class="min-w-0 flex-1">
           <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
@@ -97,8 +101,9 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/user/#{user.ubid}",
-                    confirmation: user.email
+                    form_id: "delete-#{user.ubid}",
+                    confirmation: user.email,
+                    attributes: {id: "delete-#{user.ubid}-button"}
                   ) %>
                 </td>
               </tr>
@@ -121,7 +126,7 @@
                   <%== part(
                     "components/delete_button",
                     text: "Remove",
-                    url: "#{@project_data[:path]}/user/invitation/#{invitation.email}",
+                    form_id: "delete-#{invitation.email}",
                     confirmation: invitation.email
                   ) %>
                 </td>
@@ -133,6 +138,6 @@
           <%== part("components/form/submit_button", text: "Update") %>
         </div>
       </div>
-    </form>
+    <% end %>
   </div>
 </div>

@@ -360,14 +360,29 @@ RSpec.describe Validation do
   end
 
   describe "#validate_vcpu_quota" do
-    it "sufficient cpu quota" do
-      p = instance_double(Project, current_resource_usage: 5, effective_quota_value: 10, quota_available?: true)
-      expect { described_class.validate_vcpu_quota(p, "VmVCpu", 2) }.not_to raise_error
+    let(:project) { Project.create(name: "test-quota-project") }
+
+    before do
+      project.add_quota(quota_id: ProjectQuota.default_quotas["VmVCpu"]["id"], value: 10)
     end
 
-    it "insufficient cpu quota" do
-      p = instance_double(Project, current_resource_usage: 10, effective_quota_value: 10, quota_available?: false)
-      expect { described_class.validate_vcpu_quota(p, "VmVCpu", 2) }.to raise_error described_class::ValidationFailed
+    it "raises error on quota violation" do
+      create_five_vcpu = ->(name) do
+        Vm.create(
+          unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE", name:, family: "standard", cores: 1,
+          vcpus: 5, cpu_percent_limit: 100, cpu_burst_percent_limit: 100, memory_gib: 4,
+          arch: "x64", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: true,
+          created_at: Time.now, location_id: Location::HETZNER_FSN1_ID, project_id: project.id
+        )
+      end
+      create_five_vcpu["first"]
+
+      # Not hitting quota limit yet.
+      described_class.validate_vcpu_quota(project, "VmVCpu", 2)
+      create_five_vcpu["second"]
+
+      # Now it's full, so it hits the quota limit.
+      expect { described_class.validate_vcpu_quota(project, "VmVCpu", 2) }.to raise_error described_class::ValidationFailed
     end
   end
 
@@ -438,10 +453,24 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_kubernetes_version" do
+    it "valid versions" do
+      Option.kubernetes_versions.each do |version|
+        expect(described_class.validate_kubernetes_version(version)).to be_nil
+      end
+    end
+
+    it "invalid versions" do
+      ["v1.30", "v1.25", "invalid", "1.34"].each do |version|
+        expect { described_class.validate_kubernetes_version(version) }.to raise_error described_class::ValidationFailed
+      end
+    end
+  end
+
   describe "#validate_private_location_name" do
     it "validates aws region names" do
       expect { described_class.validate_provider_location_name("aws", "us-west-2") }.not_to raise_error
-      expect { described_class.validate_provider_location_name("aws", "eu-central-1") }.to raise_error described_class::ValidationFailed
+      expect { described_class.validate_provider_location_name("aws", "eu-central-2") }.to raise_error described_class::ValidationFailed
       expect { described_class.validate_provider_location_name("azure", "us-east-1") }.to raise_error described_class::ValidationFailed
     end
   end
@@ -510,6 +539,98 @@ RSpec.describe Validation do
 
     it "converts string input to Time" do
       expect(described_class.validate_rfc3339_datetime_str("2025-05-12T11:57:24+00:00")).to be_a(Time)
+    end
+  end
+
+  describe "#validate_postgres_upgrade" do
+    it "validates postgres upgrade" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            can_upgrade?: true,
+            needs_convergence?: false,
+            ongoing_failover?: false,
+            read_replica?: false,
+            flavor: PostgresResource::Flavor::STANDARD
+          )
+        )
+      }.not_to raise_error
+    end
+
+    it "invalidates postgres upgrade when needs_convergence is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            version: "16",
+            target_version: "16",
+            needs_convergence?: true,
+            ongoing_failover?: false,
+            read_replica?: false
+          )
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when read_replica is true" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            version: "16",
+            target_version: "16",
+            needs_convergence?: false,
+            ongoing_failover?: false,
+            read_replica?: true
+          )
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when flavor is lantern" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            version: "16",
+            target_version: "16",
+            needs_convergence?: false,
+            ongoing_failover?: false,
+            read_replica?: false,
+            flavor: PostgresResource::Flavor::LANTERN
+          )
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+
+    it "invalidates postgres upgrade when it cannot be upgraded" do
+      expect {
+        described_class.validate_postgres_upgrade(
+          instance_double(
+            PostgresResource,
+            can_upgrade?: false,
+            needs_convergence?: false,
+            ongoing_failover?: false,
+            read_replica?: false,
+            flavor: PostgresResource::Flavor::STANDARD
+          )
+        )
+      }.to raise_error described_class::ValidationFailed
+    end
+  end
+
+  describe "#validate_postgres_version" do
+    it "validates postgres version" do
+      expect {
+        described_class.validate_postgres_version("16", PostgresResource::Flavor::STANDARD)
+      }.not_to raise_error
+    end
+
+    it "invalidates postgres version" do
+      expect {
+        described_class.validate_postgres_version("18", PostgresResource::Flavor::LANTERN)
+      }.to raise_error described_class::ValidationFailed
     end
   end
 end

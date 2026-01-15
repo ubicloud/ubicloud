@@ -11,4 +11,4 @@ Options:
 Allowed Option Values:
     Fields: id name state location hostname algorithm stack
             health-check-endpoint health-check-protocol src-port dst-port subnet
-            vms
+            vms cert-enabled

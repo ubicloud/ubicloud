@@ -3,31 +3,108 @@
 require "spec_helper"
 
 RSpec.describe MetricsTargetResource do
-  let(:postgres_server) { PostgresServer.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
-  let(:resource) { described_class.new(postgres_server) }
+  subject(:resource) {
+    described_class.new(postgres_server)
+  }
+
+  let(:postgres_server) {
+    PostgresServer.create(
+      timeline:, resource: postgres_resource, vm_id: vm.id, representative_at: Time.now,
+      synchronization_status: "ready", timeline_access: "push", version: "16"
+    )
+  }
+
+  let(:project) { Project.create(name: "postgres-server") }
+  let(:project_service) { Project.create(name: "postgres-service") }
+
+  let(:timeline) { PostgresTimeline.create(location:) }
+
+  let(:postgres_resource) {
+    PostgresResource.create(
+      name: "postgres-resource",
+      project:,
+      location:,
+      ha_type: PostgresResource::HaType::NONE,
+      user_config: {},
+      pgbouncer_user_config: {},
+      target_version: "16",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64,
+      superuser_password: "super"
+    )
+  }
+
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "postgres-subnet", project:, location:,
+      net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
+      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+    )
+  }
+
+  let(:vm) { create_hosted_vm(project, private_subnet, "dummy-vm") }
+
+  let(:location) {
+    Location.create(
+      name: "us-west-2",
+      project:,
+      display_name: "us-west-2",
+      ui_name: "us-west-2",
+      provider: "ubicloud",
+      visible: true
+    )
+  }
+
+  def create_victoria_metrics_setup(project)
+    ps = PrivateSubnet.create(name: "test-ps", project:, location_id: Location::HETZNER_FSN1_ID,
+      net4: "10.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64")
+    vm = Prog::Vm::Nexus.assemble_with_sshable(project.id, name: "test-vm", private_subnet_id: ps.id,
+      location_id: Location::HETZNER_FSN1_ID).subject
+    vmr = VictoriaMetricsResource.create(project:, location_id: Location::HETZNER_FSN1_ID,
+      name: "test-vmr", admin_user: "admin", admin_password: "pass", target_vm_size: "standard-2",
+      target_storage_size_gib: 100, root_cert_1: "cert")
+    VictoriaMetricsServer.create(resource: vmr, vm:, cert: "cert", cert_key: "key")
+    vmr
+  end
 
   describe "#initialize" do
+    before do
+      allow(Config).to receive(:victoria_metrics_service_project_id).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
+    end
+
     it "initializes with a resource and nil tsdb client when VictoriaMetrics is not found" do
       expect(Config).to receive(:postgres_service_project_id).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to be_nil
     end
 
-    it "initializes with a resource and a tsdb client when VictoriaMetrics is found" do
-      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
-      prj = Project.create_with_id(Config.postgres_service_project_id, name: "pg-project")
-      vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
-      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
-      expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
+    it "initializes with a resource and a tsdb client when VictoriaMetrics is found using postgres_service_project_id" do
+      prj = Project.create(name: "pg-project")
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(prj.id)
+      create_victoria_metrics_setup(prj)
+      expect(VictoriaMetrics::Client).to receive(:new).and_return("tsdb_client")
+
+      expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
+      expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
+    end
+
+    it "initializes with a resource and a tsdb client when VictoriaMetrics is found using victoria_metrics_service_project_id" do
+      prj = Project.create(name: "vm-project")
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(nil)
+      expect(Config).to receive(:victoria_metrics_service_project_id).at_least(:once).and_return(prj.id)
+      create_victoria_metrics_setup(prj)
+      expect(VictoriaMetrics::Client).to receive(:new).and_return("tsdb_client")
 
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
       expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
     end
 
     it "initializes with a resource and a tsdb client when VictoriaMetrics is not found in development" do
+      pg_prj = Project.create(name: "pg-project")
+      vm_prj = Project.create(name: "vm-project")
       expect(Config).to receive(:development?).and_return(true)
-      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return("4d8f9896-26a3-4784-8f52-2ed5d5e55c0e")
-      prj = Project.create_with_id(Config.postgres_service_project_id, name: "pg-project")
-      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(nil)
+      expect(Config).to receive(:postgres_service_project_id).at_least(:once).and_return(pg_prj.id)
+      expect(Config).to receive(:victoria_metrics_service_project_id).at_least(:once).and_return(vm_prj.id)
       expect(VictoriaMetrics::Client).to receive(:new).with(endpoint: "http://localhost:8428").and_return("tsdb_client")
       expect(resource.instance_variable_get(:@resource)).to eq(postgres_server)
       expect(resource.instance_variable_get(:@tsdb_client)).to eq("tsdb_client")
@@ -37,7 +114,6 @@ RSpec.describe MetricsTargetResource do
 
   describe "#open_resource_session" do
     it "opens a resource session if not already open" do
-      expect(postgres_server).to receive(:reload).and_return(postgres_server)
       expect(postgres_server).to receive(:init_metrics_export_session).and_return("session")
       resource.open_resource_session
       expect(resource.instance_variable_get(:@session)).to eq("session")
@@ -48,7 +124,6 @@ RSpec.describe MetricsTargetResource do
       resource.instance_variable_set(:@last_export_success, true)
 
       # Ensure postgres_server doesn't receive init_metrics_export_session again
-      expect(postgres_server).not_to receive(:reload)
       expect(postgres_server).not_to receive(:init_metrics_export_session)
 
       resource.open_resource_session
@@ -56,18 +131,17 @@ RSpec.describe MetricsTargetResource do
     end
 
     it "marks resource as deleted when Sequel::NoExistingObject is raised" do
-      expect(postgres_server).to receive(:reload).and_raise(Sequel::NoExistingObject)
-
-      expect(Clog).to receive(:emit).with("Resource is deleted.").and_yield
+      postgres_server.destroy
+      expect(Clog).to receive(:emit).with("Resource is deleted.", instance_of(Hash)).and_call_original
 
       resource.open_resource_session
-      expect(resource.deleted).to be true
+      expect(resource.instance_variable_get(:@deleted)).to be true
       expect(resource.instance_variable_get(:@session)).to be_nil
     end
 
-    it "ignores other exceptions" do
+    it "raises the exception if it is not Sequel::NoExistingObject" do
       expect(postgres_server).to receive(:reload).and_raise(StandardError)
-      expect { resource.open_resource_session }.not_to raise_error
+      expect { resource.open_resource_session }.to raise_error(StandardError)
     end
   end
 
@@ -75,9 +149,8 @@ RSpec.describe MetricsTargetResource do
     before do
       prj = Project.create(name: "vm-project")
       expect(Config).to receive(:postgres_service_project_id).and_return(prj.id)
-      vmr = instance_double(VictoriaMetricsResource, project_id: prj.id)
-      expect(VictoriaMetricsResource).to receive(:first).with(project_id: prj.id).and_return(vmr)
-      expect(vmr).to receive(:servers).and_return([instance_double(VictoriaMetricsServer, client: "tsdb_client")])
+      create_victoria_metrics_setup(prj)
+      expect(VictoriaMetrics::Client).to receive(:new).and_return("tsdb_client")
     end
 
     it "calls export_metrics on the resource and updates last_export_success" do
@@ -106,7 +179,7 @@ RSpec.describe MetricsTargetResource do
     end
 
     it "closes the session and sets it to nil" do
-      session = instance_double(Net::SSH::Connection::Session)
+      session = Net::SSH::Connection::Session.allocate
       resource.instance_variable_set(:@session, {ssh_session: session})
       expect(session).to receive(:shutdown!)
       expect(session).to receive(:close)

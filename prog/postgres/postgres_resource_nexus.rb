@@ -8,11 +8,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   subject_is :postgres_resource
 
   extend Forwardable
+
   def_delegators :postgres_resource, :servers, :representative_server
 
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
-    version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
-    ha_type: PostgresResource::HaType::NONE, parent_id: nil, restore_target: nil)
+    target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
+    ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil)
 
     unless Project[project_id]
       fail "No existing project"
@@ -23,14 +24,14 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
 
     DB.transaction do
-      superuser_password, timeline_id, timeline_access, version = if parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", version]
+      superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
         end
 
-        if version && version != parent.version
+        if target_version && target_version != parent.version
           fail Validation::ValidationFailed.new({version: "Version must be the same as the parent"})
         end
 
@@ -48,29 +49,54 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       end
 
       postgres_resource = PostgresResource.create(
-        project_id: project_id, location_id: location.id, name: name,
-        target_vm_size: target_vm_size, target_storage_size_gib: target_storage_size_gib,
-        superuser_password: superuser_password, ha_type: ha_type, version: version, flavor: flavor,
-        parent_id: parent_id, restore_target: restore_target, hostname_version: "v2"
+        project_id:, location_id: location.id, name:,
+        target_vm_size:, target_storage_size_gib:,
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
       )
 
-      firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
+      # Customer firewall, will be attached to created customer subnet
+      firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
+      subnet_name = private_subnet_name || "#{postgres_resource.ubid}-subnet"
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id).subject
+      private_subnet_id = private_subnet.id
+      postgres_resource.update(private_subnet_id:)
 
-      private_subnet_id = Prog::Vnet::SubnetNexus.assemble(Config.postgres_service_project_id, name: "#{postgres_resource.ubid}-subnet", location_id: location.id, firewall_id: firewall.id).id
-      postgres_resource.update(private_subnet_id: private_subnet_id)
+      # Internal firewall, will be directly attached to postgres server VMs
+      internal_firewall = Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: location.id, description: "Postgres default firewall", project_id: Config.postgres_service_project_id)
+      internal_firewall.replace_firewall_rules(
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
+          {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
+          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
+          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
+        ]
+      )
 
-      PostgresFirewallRule.create(postgres_resource_id: postgres_resource.id, cidr: "0.0.0.0/0")
-      postgres_resource.set_firewall_rules
+      if with_firewall_rules
+        firewall.replace_firewall_rules([
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
+          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
+        ])
+      end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id: timeline_id, timeline_access: timeline_access, representative_at: Time.now)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
 
-      Strand.create_with_id(postgres_resource.id, prog: "Postgres::PostgresResourceNexus", label: "start")
+      Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
     end
   end
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      case strand.label
+      when "trigger_pg_current_xact_id_on_parent"
+        # child strand budded from parent strand #start, exit to
+        # avoid two strands in #destroy
+        pop "exiting early due to destroy semaphore"
+      when "destroy", "wait_children_destroyed"
+        # nothing
+      else
         postgres_resource.active_billing_records.each(&:finalize)
         hop_destroy
       end
@@ -98,10 +124,22 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def refresh_dns_record
     decr_refresh_dns_record
 
-    type, data = postgres_resource.location.aws? ? ["CNAME", representative_server.vm.aws_instance.ipv4_dns_name + "."] : ["A", representative_server.vm.ephemeral_net4.to_s]
+    if (dns_zone = postgres_resource.dns_zone)
+      aws = postgres_resource.location.aws?
+      vm = representative_server.vm
+      record_name = postgres_resource.hostname
+      dns_zone.delete_record(record_name:)
 
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.insert_record(record_name: postgres_resource.hostname, type:, ttl: 10, data:)
+      if aws
+        dns_zone.insert_record(record_name:, type: "CNAME", ttl: 10, data: vm.aws_instance.ipv4_dns_name + ".")
+      else
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.ip4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
+        record_name = "private-#{record_name}"
+        dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
+      end
+    end
 
     when_initial_provisioning_set? do
       hop_initialize_certificates
@@ -137,13 +175,21 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       servers.each(&:incr_refresh_certificates)
     end
 
+    refresh = false
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
+      refresh = true
+    end
+    when_refresh_certificates_set? do
+      refresh = true
+    end
+    if refresh
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
       servers.each(&:incr_refresh_certificates)
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
     postgres_resource.save_changes
+    decr_refresh_certificates
 
     hop_wait
   end
@@ -156,27 +202,29 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   label def update_billing_records
     decr_update_billing_records
 
-    postgres_resource.active_billing_records.each(&:finalize)
+    if postgres_resource.project.billable
+      postgres_resource.active_billing_records.each(&:finalize)
 
-    flavor = postgres_resource.flavor
-    vm_family = representative_server.vm.family
-    vcpu_count = representative_server.vm.vcpus
-    storage_size_gib = representative_server.storage_size_gib
+      flavor = postgres_resource.flavor
+      vm_family = representative_server.vm.family
+      vcpu_count = representative_server.vm.vcpus
+      storage_size_gib = representative_server.storage_size_gib
 
-    billing_record_parts = []
-    postgres_resource.target_server_count.times do |index|
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
-      billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
-    end
+      billing_record_parts = []
+      postgres_resource.target_server_count.times do |index|
+        billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
+        billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
+      end
 
-    billing_record_parts.each do |brp|
-      BillingRecord.create(
-        project_id: postgres_resource.project_id,
-        resource_id: postgres_resource.id,
-        resource_name: postgres_resource.name,
-        billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], Location[postgres_resource.location_id].name)["id"],
-        amount: brp[:amount]
-      )
+      billing_record_parts.each do |brp|
+        BillingRecord.create(
+          project_id: postgres_resource.project_id,
+          resource_id: postgres_resource.id,
+          resource_name: postgres_resource.name,
+          billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], postgres_resource.location.name, postgres_resource.location.byoc)["id"],
+          amount: brp[:amount]
+        )
+      end
     end
 
     decr_initial_provisioning
@@ -198,13 +246,19 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       hop_refresh_dns_record
     end
 
+    refresh = false
     if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
+      refresh = true
+    end
+    when_refresh_certificates_set? do
+      refresh = true
+    end
+    if refresh
       hop_refresh_certificates
     end
 
     when_update_firewall_rules_set? do
       decr_update_firewall_rules
-      postgres_resource.set_firewall_rules
     end
 
     when_promote_set? do
@@ -223,15 +277,26 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     decr_destroy
 
-    strand.children.each { it.destroy }
-    postgres_resource.private_subnet.firewalls.each(&:destroy)
-    postgres_resource.private_subnet.incr_destroy
-    servers.each(&:incr_destroy)
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    Prog::Postgres::PostgresResourceNexus.dns_zone&.delete_record(record_name: postgres_resource.hostname)
-    postgres_resource.destroy
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
+        ubid: postgres_resource.ubid,
+        vm_ids: servers.map(&:vm_id)
+      )
 
-    pop "postgres resource is deleted"
+      postgres_resource.internal_firewall.destroy
+
+      servers.each(&:incr_destroy)
+
+      postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
+      postgres_resource.destroy
+
+      pop "postgres resource is deleted"
+    end
   end
 
   def create_certificate
@@ -249,17 +314,5 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       issuer_cert: root_cert,
       issuer_key: root_cert_key
     ).map(&:to_pem)
-  end
-
-  # :nocov:
-  def self.freeze
-    dns_zone
-    super
-  end
-  # :nocov:
-
-  def self.dns_zone
-    return @dns_zone if defined?(@dns_zone)
-    @dns_zone = DnsZone[project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname]
   end
 end

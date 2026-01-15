@@ -8,7 +8,8 @@ class Clover < Roda
   ).freeze
 
   PS_STATE_LABEL_COLOR = Hash.new("bg-yellow-100 text-yellow-80").merge!(
-    "available" => "bg-green-100 text-green-800"
+    "available" => "bg-green-100 text-green-800",
+    "deleting" => "bg-red-100 text-red-800"
   ).freeze
 
   KUBERNETES_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
@@ -41,25 +42,21 @@ class Clover < Roda
     PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)"
   }.freeze
 
-  def csrf_tag(*)
-    part("components/form/hidden", name: csrf_field, value: csrf_token(*))
-  end
-
   def raise_web_error(message)
     raise CloverError.new(400, nil, message)
   end
 
   def handle_validation_failure(template, &block)
     return unless web?
+
     @validation_failure_template = template
     @validation_failure_block = block
   end
 
-  def redirect_back_with_inputs
-    # :nocov:
+  def redirect_back_with_inputs(error)
+    flash.sweep
+
     if (template = @validation_failure_template)
-      # :nocov:
-      flash.sweep
       @validation_failure_block&.call
 
       request.on do
@@ -70,63 +67,34 @@ class Clover < Roda
       end
     end
 
-    # :nocov:
-    # This code path is deprecated and will be removed after all routes have been updated
-    # to use handle_validation_failure.
+    # Emit error if no validation failure template was registered. This will allow
+    # detection of errors in production for cases where we don't have specs that cover
+    # the error. These errors will be monitored and specs will be added for them.
+    Clog.emit("web error without handle_validation_failure", {
+      missing_handle_validation_failure: {
+        request_method: request.request_method,
+        path_info: request.path_info,
+        referrer: env["HTTP_REFERER"],
+        error_class: error.class,
+        error_message: error.message,
+        backtrace: error.backtrace
+      }
+    })
 
-    if Config.test?
+    if Config.test? && !ENV["SHOW_WEB_ERROR_PAGE"]
       # Raise error in the tests if we get here. If this error is raised, the route
       # should be fixed to call handle_validation_failure.
       raise "Request failure without handle_validation_failure: #{request.request_method} #{request.path_info}"
-    else
-      # Emit error messages in other environments. This will allow detection of errors in production
-      # for cases where we don't have specs that cover the error. These errors will be
-      # monitored and specs will be added for them.
-      Clog.emit("web error without handle_validation_failure") do
-        {
-          missing_handle_validation_failure: {
-            request_method: request.request_method,
-            path_info: request.path_info,
-            referrer: env["HTTP_REFERER"]
-          }
-        }
-      end
     end
 
-    referrer = flash["referrer"] || env["HTTP_REFERER"]
-    uri = begin
-      Kernel.URI(referrer)
-    rescue URI::InvalidURIError, ArgumentError
-      nil
-    end
-
-    request.redirect "/" unless uri
-
-    flash["old"] = redirect_back_with_inputs_params
-
-    if uri && env["REQUEST_METHOD"] != "GET"
-      # Force flash rotation, so flash works correctly for internal redirects
-      _roda_after_40__flash(nil)
-
-      rack_response = Clover.call(env.merge("REQUEST_METHOD" => "GET", "PATH_INFO" => uri.path, "rack.input" => StringIO.new("".b), "rack.request.form_input" => nil, "rack.request.form_hash" => nil))
-      flash.discard
-      flash["referrer"] = referrer
-      env.delete("roda.session.serialized")
-      rack_response[0] = response.status || 400
-      request.halt rack_response
-    else
-      request.redirect referrer
+    request.on do
+      view "error"
     end
   end
-
-  def redirect_back_with_inputs_params
-    request.params
-  end
-  # :nocov:
 
   def redirect_default_project_dashboard
     if (project = current_account.projects_dataset.order(:created_at, :name).first)
-      request.redirect "#{project.path}/dashboard"
+      request.redirect project, "/dashboard"
     else
       request.redirect "/project"
     end
@@ -154,6 +122,7 @@ class Clover < Roda
       next -1 unless a.last
       next 1 unless b.last
       # :nocov:
+
       # Label sorting by subject, action, object for remaining ACEs
       a_tags = a[1]
       b_tags = b[1]
@@ -163,6 +132,7 @@ class Clover < Roda
         break unless x.nil? || x.zero?
       end
       next x unless x.nil? || x.zero?
+
       # Tie break using ubid
       a[0] <=> b[0]
     end
@@ -190,7 +160,7 @@ class Clover < Roda
   def html_attrs(attributes)
     attributes.map do |key, value|
       case key
-      when :required, :checked, :readonly
+      when :required, :checked, :readonly, :autofocus
         case value
         when true
           key.name
@@ -223,8 +193,17 @@ class Clover < Roda
     # Do not allow modifiction or addition of an ace entry with the Admin subject,
     # which is reserved for full access.
     if UBID.uuid_class_match?(subject, ApiKey) ||
-        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag[subject].name == "Admin"
+        UBID.uuid_class_match?(subject, SubjectTag) && SubjectTag.admin_tag?(subject)
       raise Authorization::Unauthorized
+    end
+  end
+
+  def check_tag_modification!(perm)
+    authorize(perm, @project)
+
+    if @tag_type == "subject" && @tag.name == "Admin"
+      handle_validation_failure("project/tag-list")
+      raise_web_error("Cannot modify Admin subject tag")
     end
   end
 
@@ -232,5 +211,48 @@ class Clover < Roda
     hash = keys.map(&:strip).zip(values.map(&:strip)).to_h.compact
     hash.delete_if { |key, value| key.empty? && value.empty? }
     hash
+  end
+
+  def self.humanize_size(bytes)
+    return nil if bytes.nil? || bytes.zero?
+
+    units = %w[B KB MB GB]
+    exp = (Math.log(bytes) / Math.log(1024)).to_i
+    exp = [exp, units.size - 1].min
+
+    return "%d %s" % [bytes.to_f / 1024**exp, units[exp]] if exp == 0
+
+    "%.1f %s" % [bytes.to_f / 1024**exp, units[exp]]
+  end
+
+  def humanize_size(bytes)
+    Clover.humanize_size(bytes)
+  end
+
+  def humanize_time(time)
+    seconds = Time.now - time
+    return "just now" if seconds < 60
+    return "#{(seconds / 60).to_i} minutes ago" if seconds < 3600
+    return "#{(seconds / 3600).to_i} hours ago" if seconds < 86400
+
+    "#{(seconds / 86400).to_i} days ago"
+  end
+
+  def million_token_price(resource)
+    (BillingRate.from_resource_properties("InferenceTokens", resource, "global")["unit_price"] * 1_000_000).round(2)
+  end
+
+  def money(amount)
+    "$%0.02f" % amount
+  end
+
+  def hidden_inputs(hash)
+    hash.map { |name, value| "<input #{html_attrs(type: "hidden", name:, value:)} />" }.join("\n")
+  end
+
+  # Returns object. This is a separate method so the XSS scanning lint task
+  # will not flag the usage inside <%== tags.
+  def allow_unescaped(html)
+    html
   end
 end

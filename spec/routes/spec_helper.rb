@@ -20,6 +20,7 @@ RSpec.configure do |config|
 
       match do |response|
         return false if response.body.empty?
+
         parsed_body = JSON.parse(response.body)
 
         message_match = case expected_message
@@ -54,9 +55,20 @@ RSpec.configure do |config|
     error_response_matcher(expected_state, expected_message, expected_details, false)
   end
 
+  RACK_TEST_APP = if Config.frozen_test?
+    Clover.app
+  else
+    backtrace_filter = %r{\A#{Regexp.escape(Dir.pwd)}/(?!spec/)}
+    lambda do |env|
+      DB.detect_duplicate_queries(backtrace_filter:) do
+        Clover.app.call(env)
+      end
+    end
+  end
+
   config.include(Module.new do
     def app
-      Clover.app
+      RACK_TEST_APP
     end
 
     def last_response
@@ -81,7 +93,7 @@ RSpec.configure do |config|
         secret: Config.clover_session_secret
       }).create(password)
 
-      account = Account.create(email: email, status_id: 2)
+      account = Account.create(email:, status_id: 2)
       DB[:account_password_hashes].insert(id: account.id, password_hash: hash)
       if enable_otp
         DB[:account_otp_keys].insert(id: account.id, key: "oth555fnbrrfbi3nu2gksjxh63n2xofh")

@@ -61,9 +61,9 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_vms" do
     it "runs tests for the first vm" do
-      expect(vg_test).to receive(:frame).and_return({"vms" => ["111", "222"]})
-      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "111"})
-      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "222"})
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["111", "222"], "first_boot" => true}).at_least(:once)
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "111", first_boot: true})
+      expect(vg_test).to receive(:bud).with(Prog::Test::Vm, {subject_id: "222", first_boot: true})
       expect { vg_test.verify_vms }.to hop("wait_verify_vms")
     end
   end
@@ -98,14 +98,14 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
-      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "skips if verify_host_capacity is not set" do
       expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false})
       expect(vg_test).not_to receive(:vm_host)
-      expect { vg_test.verify_host_capacity }.to hop("verify_storage_backends")
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "fails if used cores do not match allocated VMs" do
@@ -116,45 +116,13 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host, frame: {"verify_host_capacity" => true})
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
 
       strand = instance_double(Strand)
-      allow(vg_test).to receive_messages(strand: strand)
-      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, spdk_cores=0, used_cores=5)"})
+      allow(vg_test).to receive_messages(strand:)
+      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
 
       expect { vg_test.verify_host_capacity }.to hop("failed")
-    end
-  end
-
-  describe "#verify_storage_backends" do
-    it "fails if no vhost block backends" do
-      vm_host = instance_double(VmHost, vhost_block_backends: [])
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect { vg_test.verify_storage_backends }.to hop("failed")
-    end
-
-    it "checks that no SPDK volumes are present if vhost block backends exist" do
-      sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost,
-        vhost_block_backends: [instance_double(VhostBlockBackend)],
-        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
-        sshable: sshable)
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return("[]\n")
-
-      expect { vg_test.verify_storage_backends }.to hop("verify_vm_host_slices")
-    end
-
-    it "fails if SPDK volumes are present while vhost block backends exist" do
-      sshable = instance_double(Sshable)
-      vm_host = instance_double(VmHost,
-        vhost_block_backends: [instance_double(VhostBlockBackend)],
-        spdk_installations: [instance_double(SpdkInstallation, version: "23.09")],
-        sshable: sshable)
-      expect(vg_test).to receive_messages(vm_host: vm_host)
-      expect(sshable).to receive(:cmd).with("sudo /opt/spdk-23.09/scripts/rpc.py -s /home/spdk/spdk-23.09.sock bdev_get_bdevs").and_return('[{"name": "spdk_volume"}]')
-
-      expect { vg_test.verify_storage_backends }.to hop("failed")
     end
   end
 
@@ -173,7 +141,41 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to verify_firewall_rules if tests are done" do
       expect(vg_test).to receive(:frame).and_return({"test_slices" => true})
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM Host Slices!"})
-      expect { vg_test.verify_vm_host_slices }.to hop("verify_firewall_rules")
+      expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
+    end
+  end
+
+  describe "#verify_storage_rpc" do
+    it "verifies vhost-block-backend version for each vm using RPC" do
+      command = {command: "version"}.to_json
+      expected_response = {version: Config.vhost_block_backend_version.delete_prefix("v")}.to_json + "\n"
+      vm_host = instance_double(VmHost, sshable: Sshable.create)
+      allow(vg_test).to receive(:vm_host).and_return(vm_host)
+      vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
+      vm2 = instance_double(Vm, id: "vm2", inhost_name: "vm234567")
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1", "vm2"]}).at_least(:once)
+      expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
+      expect(Vm).to receive(:[]).with("vm2").and_return(vm2)
+
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm234567/0/rpc.sock -q 0", stdin: command).and_return(expected_response)
+
+      expect { vg_test.verify_storage_rpc }.to hop("verify_firewall_rules")
+    end
+
+    it "fails if unable to get vhost-block-backend version using RPC" do
+      command = {command: "version"}.to_json
+      sshable = Sshable.create
+      vm_host = instance_double(VmHost, sshable:)
+      allow(vg_test).to receive(:vm_host).and_return(vm_host)
+      vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
+      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1"]}).at_least(:once)
+      expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
+
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return("{\"error\": \"some error\"}\n")
+
+      expect(vg_test.strand).to receive(:update).with(exitval: {msg: "Failed to get vhost-block-backend version for VM vm1 using RPC"})
+      expect { vg_test.verify_storage_rpc }.to hop("failed")
     end
   end
 

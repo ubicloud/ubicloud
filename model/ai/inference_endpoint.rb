@@ -3,14 +3,17 @@
 require_relative "../../model"
 
 class InferenceEndpoint < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :project
-  one_to_many :replicas, class: :InferenceEndpointReplica, key: :inference_endpoint_id
-  one_to_one :load_balancer, key: :id, primary_key: :load_balancer_id
-  one_to_one :private_subnet, key: :id, primary_key: :private_subnet_id
-  many_to_one :location, key: :location_id, class: :Location
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :project, read_only: true
+  one_to_many :replicas, class: :InferenceEndpointReplica, read_only: true
+  many_to_one :load_balancer, read_only: true
+  many_to_one :private_subnet, read_only: true
+  many_to_one :location
 
   dataset_module Pagination
+  dataset_module do
+    where :is_public, :is_public
+  end
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :maintenance
@@ -26,8 +29,9 @@ class InferenceEndpoint < Sequel::Model
 
   def display_state
     label = strand.label
+    return "deleting" if destroying_set? || destroy_set?
     return "running" if label == "wait"
-    return "deleting" if destroy_set? || label == "destroy"
+
     "creating"
   end
 
@@ -39,8 +43,16 @@ class InferenceEndpoint < Sequel::Model
     http.verify_mode = OpenSSL::SSL::VERIFY_NONE if Config.development?
     http.use_ssl = (uri.scheme == "https")
     req = Net::HTTP::Post.new(uri.request_uri, header)
-    req.body = {model: model_name, messages: [{role: "user", content: content}]}.to_json
+    req.body = {model: model_name, messages: [{role: "user", content:}]}.to_json
     http.request(req)
+  end
+
+  def prompt_billing_resource
+    "#{model_name}-input"
+  end
+
+  def completion_billing_resource
+    "#{model_name}-output"
   end
 end
 
@@ -48,7 +60,6 @@ end
 # Columns:
 #  id                | uuid                     | PRIMARY KEY
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at        | timestamp with time zone | NOT NULL DEFAULT now()
 #  is_public         | boolean                  | NOT NULL DEFAULT false
 #  visible           | boolean                  | NOT NULL DEFAULT true
 #  boot_image        | text                     | NOT NULL

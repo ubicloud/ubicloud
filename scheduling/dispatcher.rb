@@ -10,10 +10,10 @@ class Scheduling::Dispatcher
   STRAND_RUNTIME = Strand::LEASE_EXPIRATION / 4
   APOPTOSIS_MUTEX = Mutex.new
 
-  class Repartitioner < MonitorRepartitioner
-    def initialize(*, dispatcher:, **)
+  class Repartitioner < ::Repartitioner
+    def initialize(dispatcher:, **)
       @dispatcher = dispatcher
-      super(*, **)
+      super(**)
     end
 
     # Update the dispatcher prepared statement when repartitioning.
@@ -33,7 +33,7 @@ class Scheduling::Dispatcher
   # pool_size :: The number of threads in the thread pool.
   # partition_number :: The partition number of the current respirate process. A nil
   #                     value means the process does not use partitioning.
-  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition_number: nil, listen_timeout: 1)
+  def initialize(apoptosis_timeout: Strand::LEASE_EXPIRATION - 29, pool_size: Config.dispatcher_max_threads, partition_number: nil, listen_timeout: 1, recheck_seconds: listen_timeout * 2, stale_seconds: listen_timeout * 4)
     @shutting_down = false
 
     # How long to wait in seconds from the start of strand run
@@ -112,9 +112,9 @@ class Scheduling::Dispatcher
     if partition_number
       # Handles repartitioning when new partitions show up or old partitions
       # go stale.
-      @repartitioner = Repartitioner.new(partition_number, channel: :respirate,
+      @repartitioner = Repartitioner.new(partition_number:, channel: :respirate,
         max_partition: 256, dispatcher: self, listen_timeout:,
-        recheck_seconds: listen_timeout * 2, stale_seconds: listen_timeout * 4)
+        recheck_seconds:, stale_seconds:)
 
       # The thread that listens for changes in the number of respirate processes
       # and adjusts the partition range accordingly.
@@ -195,7 +195,7 @@ class Scheduling::Dispatcher
         .prepare(:select, :get_old_strand_cohort)
 
       ds = ds.where(id: strand_id_range)
-      Clog.emit("respirate repartitioning") { {partition: strand_id_range} }
+      Clog.emit("respirate repartitioning", {partition: strand_id_range})
     else
       @old_strand_ps = nil
     end
@@ -215,7 +215,7 @@ class Scheduling::Dispatcher
       array << metric
       if array.size == METRICS_EVERY
         new_t = Time.now
-        Clog.emit("respirate metrics") { {respirate_metrics: metrics_hash(array, new_t - t)} }
+        Clog.emit("respirate metrics", {respirate_metrics: metrics_hash(array, new_t - t)})
         t = new_t
         array.clear
       end
@@ -420,6 +420,7 @@ class Scheduling::Dispatcher
   # the process if the pop times out.
   def apoptosis_run(timeout, start_queue, finish_queue)
     return unless (strand_ubid = start_queue.pop)
+
     Thread.current.name = "apoptosis:#{strand_ubid}"
     unless finish_queue.pop(timeout:)
       apoptosis_failure
@@ -461,18 +462,20 @@ class Scheduling::Dispatcher
   def run_strand(strand, start_queue, finish_queue)
     strand_ubid = strand.ubid.freeze
     Thread.current.name = strand_ubid
+
+    # Provide information for the apoptosis deadline to other timeout
+    # code that takes places during consecutive strand invocations
+    # within `STRAND_RUNTIME`.
+    Thread.current[:apoptosis_at] = Time.now + @apoptosis_timeout
+
     start_queue.push(strand_ubid)
     strand.run(STRAND_RUNTIME)
   rescue => ex
-    Clog.emit("exception terminates strand run") { Util.exception_to_hash(ex) }
-
-    cause = ex
-    loop do
-      break unless (cause = cause.cause)
-      Clog.emit("nested exception") { Util.exception_to_hash(cause) }
-    end
+    Clog.emit("exception terminates strand run", Util.exception_to_hash(ex))
     ex
   ensure
+    Thread.current[:apoptosis_at] = nil
+
     # Always signal apoptosis thread that the strand has finished,
     # even for non-StandardError exits
     finish_queue.push(true)
@@ -502,6 +505,7 @@ class Scheduling::Dispatcher
     current_strands = @current_strands
     strands.each do |strand|
       break if @shutting_down
+
       @mutex.synchronize { current_strands[strand.id] = true }
       strand_queue.push(strand)
     rescue ClosedQueueError

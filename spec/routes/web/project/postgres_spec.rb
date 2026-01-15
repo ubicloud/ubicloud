@@ -14,7 +14,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-with-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      target_version: "16"
     ).subject
   end
 
@@ -24,7 +25,8 @@ RSpec.describe Clover, "postgres" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "pg-without-permission",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 128
+      target_storage_size_gib: 128,
+      target_version: "16"
     ).subject
   end
 
@@ -43,8 +45,22 @@ RSpec.describe Clover, "postgres" do
   end
 
   describe "authenticated" do
+    let(:postgres_project) { Project.create(name: "default") }
+
+    def create_minio_cluster_for_blob_storage
+      allow(Config).to receive(:minio_host_name).and_return("minio.test")
+      DnsZone.create(project_id: postgres_project.id, name: "minio.test")
+      MinioCluster.create(
+        project_id: postgres_project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "walg-minio",
+        admin_user: "admin",
+        admin_password: "password",
+        root_cert_1: "dummy-certs"
+      )
+    end
+
     before do
-      postgres_project = Project.create(name: "default")
       allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
       login(user.email)
 
@@ -52,9 +68,7 @@ RSpec.describe Clover, "postgres" do
       allow(Minio::Client).to receive(:new).and_return(client)
 
       vmc = instance_double(VictoriaMetrics::Client, query_range: [nil])
-      vms = instance_double(VictoriaMetricsServer, client: vmc)
-      vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-      allow(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+      allow(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
     end
 
     describe "list" do
@@ -108,9 +122,18 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create new PostgreSQL database in a custom AWS region" do
-        project
-        private_location = create_private_location(project: project)
-        Location.where(id: [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]).destroy
+        project.set_ff_private_locations(true)
+        private_location = create_private_location(project:)
+        # Delete public locations that would show in the form
+        loc_ids = [Location::HETZNER_FSN1_ID, Location::LEASEWEB_WDC02_ID]
+        ps_ids = PrivateSubnet.where(location_id: loc_ids).select_map(:id)
+        LoadBalancer.where(private_subnet_id: ps_ids).destroy
+        PrivateSubnet.where(id: ps_ids).destroy
+        Firewall.where(location_id: loc_ids).destroy
+        PostgresTimeline.where(location_id: loc_ids).destroy
+        Location.where(id: loc_ids).destroy
+        # Delete seeded aws-us-west-2 location to avoid display_name conflict
+        Location.where(display_name: "aws-us-west-2", project_id: nil).destroy
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::STANDARD}"
 
@@ -118,7 +141,7 @@ RSpec.describe Clover, "postgres" do
         name = "new-pg-db"
         fill_in "Name", with: name
         choose option: private_location.ubid
-        choose option: "m6id.large"
+        choose option: "m8gd.large"
         choose option: PostgresResource::HaType::NONE
         choose option: "118"
 
@@ -158,12 +181,17 @@ RSpec.describe Clover, "postgres" do
         choose option: Location::HETZNER_FSN1_UBID
         choose option: "standard-60"
         choose option: PostgresResource::HaType::NONE
-        Location[Location::HETZNER_FSN1_ID].destroy
+        loc_id = Location::HETZNER_FSN1_ID
+        ps_ids = PrivateSubnet.where(location_id: loc_id).select_map(:id)
+        LoadBalancer.where(private_subnet_id: ps_ids).destroy
+        PrivateSubnet.where(id: ps_ids).destroy
+        Firewall.where(location_id: loc_id).destroy
+        PostgresTimeline.where(location_id: loc_id).destroy
+        Location[loc_id].destroy
 
         click_button "Create"
-        expect(page.title).to eq("Ubicloud - ResourceNotFound")
-        expect(page.status_code).to eq(404)
-        expect(page).to have_content "ResourceNotFound"
+        expect(page.title).to eq("Ubicloud - Create PostgreSQL Database")
+        expect(page).to have_flash_error("Validation failed for following fields: location")
       end
 
       it "can create new ParadeDB PostgreSQL database" do
@@ -208,7 +236,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can not create new ParadeDB PostgreSQL database in a customer specific location" do
         project
-        private_location = create_private_location(project: project)
+        private_location = create_private_location(project:)
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
 
@@ -282,6 +310,15 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content pg.name
       end
 
+      it "shows up on customer private subnet vms page" do
+        visit "#{project.path}/location/#{pg.display_location}/private-subnet/#{pg.private_subnet.ubid}/vms"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-subnet"
+        expect(page.all("#private-subnet-nics h3").map(&:text)).to eq ["Attached VMs", "Other Attached Resources"]
+        expect(page.all("#private-subnet-nics td").map(&:text)).to eq ["No VM attached", "PostgreSQL Database", pg.name, pg.ubid]
+        click_link pg.name
+        expect(page.title).to eq "Ubicloud - #{pg.name}"
+      end
+
       it "can show PostgreSQL database details even when no subpage is specified" do
         pg
         visit "#{project.path}#{pg.path}"
@@ -295,9 +332,7 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "64.0 GB is used (50.0%)"
@@ -308,9 +343,7 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "90"]]}])
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_css("span.text-red-600", text: "115.2 GB is used (90.0%)")
@@ -320,14 +353,14 @@ RSpec.describe Clover, "postgres" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        expect(VictoriaMetricsResource).to receive(:first).and_return(nil)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).at_least(:once).and_return(nil)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "128 GB"
       end
 
       it "shows AZ id for AWS PostgreSQL instance" do
-        AwsInstance.create_with_id(pg.representative_server.vm.id, instance_id: "i-0123456789abcdefg", az_id: "usw2-az2")
+        AwsInstance.create_with_id(pg.representative_server.vm, instance_id: "i-0123456789abcdefg", az_id: "usw2-az2")
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "usw2-az2 (AWS)"
@@ -339,9 +372,7 @@ RSpec.describe Clover, "postgres" do
 
         vmc = instance_double(VictoriaMetrics::Client)
         expect(vmc).to receive(:query_range).and_raise(Excon::Error::Socket)
-        vms = instance_double(VictoriaMetricsServer, client: vmc)
-        vmr = instance_double(VictoriaMetricsResource, servers: [vms])
-        expect(VictoriaMetricsResource).to receive(:first).and_return(vmr)
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
 
         visit "#{project.path}#{pg.path}/overview"
         expect(page).to have_content "128 GB"
@@ -378,9 +409,6 @@ RSpec.describe Clover, "postgres" do
         pg
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
 
-        visit "#{project.path}#{pg.path}/networking"
-        expect(page).to have_css(".firewall-rule-create-button")
-
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_css(".pg-read-replica-create-btn")
 
@@ -389,9 +417,6 @@ RSpec.describe Clover, "postgres" do
 
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project.path}#{pg.path}/networking"
-        expect(page).to have_no_css(".firewall-rule-create-button")
 
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_no_css(".pg-read-replica-create-btn")
@@ -422,47 +447,35 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
-        choose option: 256
+        choose option: 64
+        click_button "Update"
+        expect(page).to have_flash_error("Validation failed for following fields: storage_size")
 
-        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        form = find_by_id "creation-form"
-        _csrf = form.find("input[name='_csrf']", visible: false).value
-        size = form.find(:radio_button, "size", checked: true).value
-        storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
+        choose option: 256
+        click_button "Update"
 
         pg.reload
         expect(pg.target_vm_size).to eq("standard-8")
         expect(pg.target_storage_size_gib).to eq(256)
       end
 
-      it "handles errors during scale up/down" do
-        visit "#{project.path}#{pg.path}/resize"
+      it "can update PostgreSQL high availability" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
-        choose option: "standard-8"
-        choose option: 64
+        visit "#{project.path}#{pg.path}"
+        click_link "High Availability"
 
-        # We send PATCH request manually instead of just clicking to button because PATCH action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        form = find_by_id "creation-form"
-        _csrf = form.find("input[name='_csrf']", visible: false).value
-        size = form.find(:radio_button, "size", checked: true).value
-        storage_size = form.find(:radio_button, "storage_size", checked: true).value
-        page.driver.submit :patch, form["action"], {size:, storage_size:, _csrf:}
-
-        # Error messages are displayed to the user via javascript, using the error.message entry
-        expect(JSON.parse(page.driver.browser.last_response.body).dig("error", "message")).to eq "Validation failed for following fields: storage_size"
+        choose option: "sync"
+        click_button "Update"
 
         pg.reload
-        expect(pg.target_vm_size).to eq("standard-2")
-        expect(pg.target_storage_size_gib).to eq(128)
+        expect(pg.ha_type).to eq("sync")
       end
 
       it "can restore PostgreSQL database" do
+        create_minio_cluster_for_blob_storage
         backup = Struct.new(:key, :last_modified)
         restore_target = Time.now.utc
-        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
 
         visit "#{project.path}#{pg.path}/backup-restore"
@@ -480,7 +493,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows proper message when there is no backups to restore" do
-        expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        create_minio_cluster_for_blob_storage
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [])).at_least(:once)
 
         visit "#{project.path}#{pg.path}/backup-restore"
@@ -489,6 +502,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can create a read replica of a PostgreSQL database" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -517,6 +531,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can promote a read replica" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -534,6 +549,7 @@ RSpec.describe Clover, "postgres" do
 
       it "fails to promote if not a read replica" do
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"
 
@@ -609,119 +625,29 @@ RSpec.describe Clover, "postgres" do
     end
 
     describe "firewall" do
-      it "can show default firewall rules" do
-        pg
+      it "shows link to firewall networking page if customer firewall exists" do
         visit "#{project.path}#{pg.path}/networking"
 
         expect(page).to have_content "Firewall Rules"
-        expect(page).to have_content "0.0.0.0/0"
-        expect(page).to have_content "5432"
+        expect(page).to have_no_content "0.0.0.0/0"
+        expect(page).to have_no_content "5432"
+        expect(page).to have_content "You can manage firewall rules using the firewall for this PostgreSQL database"
+        click_link "manage firewall rules using the firewall for this PostgreSQL database"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-firewall"
       end
 
-      it "can delete firewall rules" do
-        pg
+      it "shows link to private subnet networking page if customer firewall was destroyed" do
+        fw = pg.customer_firewall
+        fw.remove_all_private_subnets
+        fw.destroy
         visit "#{project.path}#{pg.path}/networking"
 
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can not delete firewall rules when does not have permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
-        expect(page.title).to eq "Ubicloud - pg-without-permission"
-
-        expect { find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .delete-btn" }.to raise_error Capybara::ElementNotFound
-      end
-
-      it "does not show create firewall rule when does not have permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
-
-        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/networking"
-        expect(page.title).to eq "Ubicloud - pg-without-permission"
-
-        expect { find_by_id "fwr-create" }.to raise_error Capybara::ElementNotFound
-      end
-
-      it "can create firewall rule" do
-        visit "#{project.path}#{pg.path}/networking"
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_error "empty string provided for parameter cidr"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("1.1.1.2")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-        expect(page).to have_content "1.1.1.2/32"
-        expect(page).to have_content "5432"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("12.12.12.0/26")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-
-        find('input[name="cidr"][form="form-pg-fwr-create"]').set("fd00::/64")
-        find('input[name="description"][form="form-pg-fwr-create"]').set("test description - new firewall rule")
-        find(".firewall-rule-create-button").click
-        expect(page).to have_flash_notice "Firewall rule is created"
-        expect(page.status_code).to eq(200)
-        expect(page).to have_content "fd00::/64"
-        expect(page).to have_content "test description - new firewall rule"
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can update firewall rule" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: "dummy-description", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "can set nil description for firewall rule" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/1", description: nil, _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be true
-      end
-
-      it "doesn't increment update_firewall_rules semaphore if cidr is same" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/0", description: "test", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).to be false
-      end
-
-      it "cannot delete firewall rule if it doesn't exist" do
-        pg
-        visit "#{project.path}#{pg.path}/networking"
-
-        btn = find "#fwr-buttons-#{pg.firewall_rules.first.ubid} .save-inline-btn"
-        url = btn["data-url"]
-        _csrf = btn["data-csrf"]
-
-        fwr = pg.firewall_rules.first
-        fwr.update(cidr: "0.0.0.0/1", postgres_resource_id: pg_wo_permission.id)
-
-        page.driver.submit :patch, url, {cidr: "0.0.0.0/2", description: "dummy-description", _csrf:}
-
-        expect(SemSnap.new(pg.id).set?("update_firewall_rules")).not_to be true
+        expect(page).to have_content "Firewall Rules"
+        expect(page).to have_no_content "0.0.0.0/0"
+        expect(page).to have_no_content "5432"
+        expect(page).to have_content "The firewall related to this PostgreSQL database was deleted or detached from the related private subnet"
+        click_link "private subnet"
+        expect(page.title).to eq "Ubicloud - #{pg.ubid}-subnet"
       end
     end
 
@@ -750,9 +676,8 @@ RSpec.describe Clover, "postgres" do
         )
         visit "#{project.path}#{pg.path}/charts"
 
-        btn = find "#md-delete-#{md.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        find("#md-delete-#{md.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL metric destination deleted.")
         expect(pg.reload.metric_destinations.count).to eq(0)
       end
 
@@ -767,9 +692,8 @@ RSpec.describe Clover, "postgres" do
         visit "#{project.path}#{pg.path}/charts"
         md.this.update(id: PostgresMetricDestination.generate_uuid)
 
-        btn = find "#md-delete-#{md.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
+        find("#md-delete-#{md.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL metric destination deleted.")
         expect(pg.reload.metric_destinations.count).to eq(1)
       end
     end
@@ -794,14 +718,42 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "rename" do
+      it "can rename PostgreSQL database" do
+        old_name = pg.name
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content("Renaming a PostgreSQL database changes the connection info")
+
+        fill_in "name", with: "new-name%"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(pg.reload.name).to eq old_name
+
+        expect(pg.semaphores_dataset.all).to eq []
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(pg.reload.name).to eq "new-name"
+        expect(page).to have_content("new-name")
+        expect(pg.semaphores_dataset.select_order_map(:name)).to eq %w[refresh_certificates refresh_dns_record]
+      end
+
+      it "does not show rename option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Firewall:view"])
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
+        expect(page).to have_no_content("Rename")
+      end
+    end
+
     describe "delete" do
       it "can delete PostgreSQL database" do
         visit "#{project.path}#{pg.path}/settings"
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#postgres-delete-#{pg.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#postgres-delete-#{pg.ubid}") do
+          click_button "Delete"
+        end
+        expect(page).to have_flash_notice("PostgreSQL database scheduled for deletion.")
 
         expect(SemSnap.new(pg.id).set?("destroy")).to be true
       end
@@ -890,8 +842,93 @@ RSpec.describe Clover, "postgres" do
         click_button "Save"
 
         expect(page).to have_flash_error "Validation failed for following fields: pg_config.work_mem"
-        expect(page).to have_content "must match pattern: ^[0-9]+(kB|MB|GB|TB)?$"
+        expect(page).to have_content "must match pattern: [0-9]+(kB|MB|GB|TB)?"
         expect(pg.reload.user_config).to eq({"max_connections" => "120"})
+      end
+    end
+
+    describe "upgrade" do
+      it "does not show upgrade button when upgrade is not available" do
+        pg.strand.update(label: "wait_servers")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_no_button "Start Upgrade"
+      end
+
+      it "does not show upgrade button when user has read only permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+        pg_wo_permission.strand.update(label: "wait")
+        visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/upgrade"
+        expect(page).to have_no_button "Start Upgrade"
+      end
+
+      it "shows upgrade button when user has edit permissions" do
+        AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:edit"])
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_button "Start Upgrade"
+      end
+
+      it "starts the upgrade when user clicks on start upgrade button" do
+        old_version_int = pg.version.to_i
+        pg.strand.update(label: "wait")
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        visit "#{project.path}#{pg.path}/upgrade"
+        click_button "Start Upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+        expect(page).to have_flash_notice "Database upgrade started successfully"
+        expect(pg.reload.target_version.to_i).to eq(old_version_int + 1)
+      end
+
+      it "shows upgrade progress when upgrade is in progress" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "wait_for_maintenance_window")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+      end
+
+      it "shows database unavailability when upgrade is in progress" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_standby")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade is in progress"
+      end
+
+      it "shows failed upgrade indication when upgrade fails" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: "17")
+        pg.strand.run
+
+        pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "upgrade_failed")
+
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Database upgrade failed"
+      end
+
+      it "shows latest version message if the database is already on the latest version" do
+        pg.strand.update(label: "wait")
+        pg.update(target_version: PostgresResource::LATEST_VERSION)
+        pg.representative_server.update(version: PostgresResource::LATEST_VERSION)
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page).to have_content "Your database is already on the latest version."
+      end
+
+      it "shows correct error page if upgrade validation fails" do
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/upgrade"
+        expect(page.title).to eq "Ubicloud - pg-with-permission"
+
+        pg.update(target_version: "18")
+        click_button "Start Upgrade"
+        expect(page).to have_flash_error "Validation failed for following fields: needs_convergence"
+        expect(page).to have_text "Database cluster is waiting for convergence, please wait for it to complete"
+        expect(page).to have_current_path "#{project.path}#{pg.path}/upgrade", ignore_query: true
       end
     end
   end

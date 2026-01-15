@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "aws-sdk-s3"
 
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
@@ -14,13 +15,18 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def download_from_blob_storage?
-    image_name.start_with?("github", "postgres", "ai-", "kubernetes") || Config.production?
+    image_name.start_with?("github", "postgres", "ai-", "kubernetes", "gpu") || Config.production?
   end
 
   def default_boot_image_version(image_name)
     config_name = image_name.tr("-", "_") + "_version"
     fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
+
     Config.send(config_name)
+  end
+
+  def download_from_r2?
+    frame["download_r2"] || Config.production?
   end
 
   def url
@@ -30,18 +36,21 @@ class Prog::DownloadBootImage < Prog::Base
       elsif download_from_blob_storage?
         suffixes = {
           "github" => "raw",
+          "postgres" => "raw",
           "postgres16" => "raw",
           "postgres17" => "raw",
           "ubuntu" => "img",
           "almalinux" => "qcow2",
           "debian" => "raw",
           "ai" => "raw",
-          "kubernetes" => "raw"
+          "kubernetes" => "raw",
+          "gpu" => "raw"
         }
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
         arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
-        blob_storage_client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, "#{image_name}#{arch}#{version}.#{suffix}", 60 * 60).to_s
+        key = "#{image_name}#{arch}#{version}.#{suffix}"
+        download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
       elsif image_name == "ubuntu-noble"
         arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
         "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
@@ -80,20 +89,22 @@ class Prog::DownloadBootImage < Prog::Base
     ["almalinux-9", "arm64", "9.5-20241120"] => "5ede4affaad0a997a2b642f1628b6268bd8eba775f281346b75be3ed20ec369e",
     ["almalinux-9", "x64", "9.6-20250522"] => "b08cd5db79bf32860412f5837e8c7b8df9447e032376e3c622840b31aaf26bc6",
     ["almalinux-9", "arm64", "9.6-20250522"] => "47e6801d066c311c44a5ce8100bed16b5976bde610e599dd384d1dca73b31ac5",
-    ["github-ubuntu-2404", "x64", "20250622.1.0"] => "5889046ddc20823708806a29c85cbb214b27a6533f2a9004bba4092c8095cade",
-    ["github-ubuntu-2404", "x64", "20250724.1.0"] => "e6b1d8be4b7484155cb9148d53382a14c1ef3256dfc13766d303dbf9bbfd6f43",
-    ["github-ubuntu-2404", "arm64", "20250622.1.0"] => "e46991872af956689dda42c65ece3034006a3b5df5d7b2def281f9d4c2444477",
-    ["github-ubuntu-2404", "arm64", "20250724.1.0"] => "fbdcccfd024e56b868c2345ed0a9f926a6cd9ed13987eb960442b72846ecc947",
-    ["github-ubuntu-2204", "x64", "20250622.1.0"] => "ad08a4b0ecbf6e04fb17b4fbdc1d7b664e84a650ea08f45f94f1bc64c5f7a726",
-    ["github-ubuntu-2204", "x64", "20250724.1.0"] => "2e467016d86cc7d73174558295e1235c60c795a765bb95bc6564ecbd287a04ca",
-    ["github-ubuntu-2204", "arm64", "20250622.1.0"] => "87698f9f169705be37ff69495ccbc5b80861824b7a14fca4b02603819a2de1f1",
-    ["github-ubuntu-2204", "arm64", "20250724.1.0"] => "7c46f1738392eb928b78fbb56b3daa85a711681d3098544d3f993f6ce704cf08",
-    ["github-gpu-ubuntu-2204", "x64", "20250622.1.0"] => "73fa4578ff1b907a16e464465f43f2646680774b40a2d52c1e7226dd7fc4ae92",
-    ["github-gpu-ubuntu-2204", "x64", "20250724.1.0"] => "b091b99107682d3f8143dc2d75a50fe9e6e74140107dfdd552e29d2f73105db8",
+    ["github-ubuntu-2404", "x64", "20251105.1.0"] => "b543468514b72d3e7732472f28007bdb795a1ea37f92ddaed79740ac18bd53b7",
+    ["github-ubuntu-2404", "x64", "20251208.1.0"] => "7551f942daba70bd4bcd67bf851833664edc9de3b1dd1b1b2964d88dcb744235",
+    ["github-ubuntu-2404", "arm64", "20251105.1.0"] => "b5d0be0c611e0a09c500ed7d4d6d6447cd203dd7f7c09b4ee9b51df878dc30f5",
+    ["github-ubuntu-2404", "arm64", "20251208.1.0"] => "d558b429b0503706d2c03f1d24a776153a0592dd71e2ef2adf3c7db1ea435b4f",
+    ["github-ubuntu-2204", "x64", "20251105.1.0"] => "8017c7bcda3d347e0ed06a9681966f75201aeb15e4cd455dc4f25895821b0a1a",
+    ["github-ubuntu-2204", "x64", "20251208.1.0"] => "2f7f4e38de98255d5a2793b420b0b9ee2a1169d68b98ee7e319f339bbee1295f",
+    ["github-ubuntu-2204", "arm64", "20251105.1.0"] => "7abf09e6f0439692c79619ad810275b44a441746cdb939accb42a0b6ab13c692",
+    ["github-ubuntu-2204", "arm64", "20251208.1.0"] => "4586386b5244ab727cfccfb058d1d9ac7f97875bfc5de47baa5c06ef50a274fd",
+    ["github-gpu-ubuntu-2204", "x64", "20251017.1.0"] => "a27a6a5f169093cc7ecb761833e256a22b0bf42ef914542cf013490db0ab8ba5",
+    ["github-gpu-ubuntu-2204", "x64", "20251208.1.0"] => "644fa94ead16baefc3f8efda27199ad60312201b042d9eb5d545c53455733f00",
+    ["postgres-ubuntu-2204", "x64", "20251218.1.0"] => "90ceab88e8c4b9965fff41b56e12a5c0f28f54fa26ada2a1c51abd185268aebb",
     ["postgres16-ubuntu-2204", "x64", "20250425.1.1"] => "f59622da276d646ed2a1c03de546b0a7ec3fd48aeb27c0bfe2b8b8be98c062d2",
     ["postgres17-ubuntu-2204", "x64", "20250425.1.1"] => "ccb4bcd8197c2e230be3f485dd33f24a51041a4dc0408257e42b3fe9f1c0bfb3",
-    ["postgres16-paradedb-ubuntu-2204", "x64", "20250425.1.1"] => "598ab8070959c5d8836000b574a5ec5d3a9926ab2abb6e651bd231b4044c55be",
-    ["postgres17-paradedb-ubuntu-2204", "x64", "20250425.1.1"] => "83f8e70b8ad97e781f47d2b8675afeebdcded124a3dc547559635ea7a89b38d9",
+    ["postgres-paradedb-ubuntu-2204", "x64", "20260107.1.0"] => "b60e173766eaf0b3928e69c8037d60943df4fc0314930ad9cd429405bf91b520",
+    ["postgres16-paradedb-ubuntu-2204", "x64", "20250901.1.0"] => "5f42467fad1949a16732a860fe37db381f381e25281028935a9d1b4d79058d68",
+    ["postgres17-paradedb-ubuntu-2204", "x64", "20250901.1.0"] => "671dd829c0c6682933bfcfbee702b9dde3476ea71d4145035953ad98e6cf24a1",
     ["postgres16-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "bfb56867513045bc88396d529a3cc186dc44ba4d691acb51dbf45fc5a0eeb7e6",
     ["postgres17-lantern-ubuntu-2204", "x64", "20250103.1.0"] => "a95b2e5d03291783dc1753228d7a87949257a06c7b1eca2c94502ab21ffdecdb",
     ["ai-ubuntu-2404-nvidia", "x64", "20250505.1.0"] => "8d438d372238d46739ace4337634f3489dc4f18496a970fda6b6e60226307eaa",
@@ -114,37 +125,54 @@ class Prog::DownloadBootImage < Prog::Base
     ["ai-model-ms-phi-4", "x64", "20250213.1.0"] => "0e998c4916c837c0992c4546404ecb51d0c5d5923f998f7cff0a9cddc5bf1689",
     ["ai-model-mistral-small-3", "x64", "20250217.1.0"] => "01ce8d1d0b7b0f717c51c26590234f4cb7971a9a5276de92b6cb4dc2c7a085e5",
     ["kubernetes-v1_32", "x64", "20250320.1.0"] => "369c7c869bba690771a1dcbbae52159defaa3fd3540f008ba6feea291e7a220a",
-    ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4"
+    ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4",
+    ["kubernetes-v1_34", "x64", "20250828.1.0"] => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c",
+    ["gpu-ubuntu-noble", "x64", "20251017.1.0"] => "b87829c6bc71718ff0dffe2948d2586ca7ff95a02dbb03f68d18ec8c223b312c"
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
-  def sha256_sum
+  def sha256sum
     # YYY: In future all images should be checked for sha256 sum, so the nil
     # default will be removed.
     BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
   end
 
-  def blob_storage_client
-    @blob_storage_client ||= Minio::Client.new(
+  def r2_signed_url(key)
+    client = Aws::S3::Client.new(
+      endpoint: Config.ubicloud_images_r2_endpoint,
+      access_key_id: Config.ubicloud_images_r2_access_key,
+      secret_access_key: Config.ubicloud_images_r2_secret_key,
+      region: "auto",
+      request_checksum_calculation: "when_required",
+      response_checksum_validation: "when_required"
+    )
+    Aws::S3::Presigner.new(client:).presigned_url(:get_object, bucket: Config.ubicloud_images_r2_bucket_name, key:, expires_in: 60 * 60)
+  end
+
+  def minio_signed_url(key)
+    client = Minio::Client.new(
       endpoint: Config.ubicloud_images_blob_storage_endpoint,
       access_key: Config.ubicloud_images_blob_storage_access_key,
       secret_key: Config.ubicloud_images_blob_storage_secret_key,
       ssl_ca_data: Config.ubicloud_images_blob_storage_certs
     )
+    client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, key, 60 * 60).to_s
   end
 
   label def start
+    register_deadline(nil, 24 * 60 * 60)
+
     # YYY: we can remove this once we enforce it in the database layer.
     # Although the default version is used if version is not passed, adding
     # a sanity check here to make sure version is not passed as nil.
     fail "Version can not be passed as nil" if version.nil?
 
-    fail "Image already exists on host" if vm_host.boot_images_dataset.where(name: image_name, version: version).count > 0
+    pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
 
     BootImage.create(
       vm_host_id: vm_host.id,
       name: image_name,
-      version: version,
+      version:,
       activated_at: nil,
       size_gib: 0
     )
@@ -152,35 +180,34 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def download
-    q_daemon_name = "download_#{image_name}_#{version}".shellescape
-    case sshable.cmd("common/bin/daemonizer --check #{q_daemon_name}")
+    daemon_name = "download_#{image_name}_#{version}"
+    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
-      sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       hop_update_available_storage_space
     when "NotStarted"
-      params_json = {
-        image_name: image_name,
-        url: url,
-        version: version,
-        sha256sum: sha256_sum,
-        certs: download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
-      }.to_json
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' #{q_daemon_name}", stdin: params_json)
+      certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
+      params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
     when "Failed"
-      if Config.production?
-        BootImage.where(vm_host_id: vm_host.id, name: image_name, version: version).destroy
+      restarted = frame["restarted"] || 0
+      if restarted < 10
+        sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
+        sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
+        sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+        update_stack({"restarted" => restarted + 1})
       else
-        sshable.cmd("common/bin/daemonizer --clean #{q_daemon_name}")
+        vm_host.boot_images_dataset.where(name: image_name, version:).destroy
+        Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
       end
-      fail "Failed to download '#{image_name}' image on #{vm_host}"
     end
 
     nap 15
   end
 
   label def update_available_storage_space
-    image = BootImage[vm_host_id: vm_host.id, name: image_name, version: version]
-    image_size_bytes = sshable.cmd("stat -c %s #{image.path.shellescape}").to_i
+    image = BootImage[vm_host_id: vm_host.id, name: image_name, version:]
+    image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
       available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
@@ -193,7 +220,7 @@ class Prog::DownloadBootImage < Prog::Base
     BootImage.where(
       vm_host_id: vm_host.id,
       name: image_name,
-      version: version
+      version:
     ).update(activated_at: Time.now)
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end

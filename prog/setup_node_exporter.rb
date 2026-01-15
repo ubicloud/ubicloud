@@ -4,8 +4,7 @@ class Prog::SetupNodeExporter < Prog::Base
   subject_is :sshable
 
   label def start
-    version = "1.9.1"
-    sshable.cmd("sudo host/bin/setup-node-exporter #{version}")
+    sshable.cmd("sudo host/bin/setup-node-exporter 1.9.1")
     pop "node exporter was setup"
   end
 end

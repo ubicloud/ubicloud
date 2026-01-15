@@ -4,16 +4,16 @@
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = "#{@project_data[:path]}/token/#{@token.ubid}/access-control"
+  form_action = path(@token)
   table_headers = %w[Action Object]
   edit_perm = true
 
   unrestricted = @token.unrestricted_token_for_project?(@project.id)
   restriction_title, restriction_path =
     if unrestricted
-      ["Restrict", "#{@project_data[:path]}/token/#{@token.ubid}/restrict-access"]
+      ["Restrict", "#{@project.path}/token/#{@token.ubid}/restrict-access"]
     else
-      ["Unrestrict", "#{@project_data[:path]}/token/#{@token.ubid}/unrestrict-access"]
+      ["Unrestrict", "#{@project.path}/token/#{@token.ubid}/unrestrict-access"]
     end
 else
   page_header = "Access Control"
@@ -22,11 +22,11 @@ else
     ["aces[][action]", @action_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] }.sort_by! { _2 } : v] }],
     ["aces[][object]", @object_options.to_h { |k, v| [k, k ? v.map { [_1.ubid, _1.name] } : v] }]
   ]
-  form_action = "#{@project_data[:path]}/user/access-control"
+  form_action = "#{user_path}/access-control"
   table_headers = %w[Subject Action Object]
   edit_perm = has_project_permission("Project:editaccess")
 end
-@page_title = "#{@project_data[:name]} - #{page_header}" %>
+@page_title = "#{@project.name} - #{page_header}" %>
 
 <%== render("project/user-tabbar") unless @token %>
 
@@ -34,7 +34,7 @@ end
   <%== part(
     "components/page_header",
     title: page_header,
-    breadcrumbs: [%w[Projects /project], [@project_data[:name], @project_data[:path]], [page_header, "#"]]
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], [page_header, "#"]]
   ) %>
 </div>
 
@@ -52,8 +52,7 @@ end
       </div>
     <% end %>
 
-    <form id="access-control-form" action="<%= form_action %>" role="form" method="POST">
-      <%== csrf_tag(form_action) %>
+    <% form(action: form_action, method: :post, id: "access-control-form") do %>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
         <table id="access-control-entries" class="min-w-full divide-y divide-gray-300 group">
           <thead class="bg-gray-50 <% if @token %> hidden group-[&:has(tr:nth-child(n+3))]:table-header-group <% end %>">
@@ -64,7 +63,7 @@ end
                   <% unless @token %>
                     <a
                       id="<%= type.downcase %>-tags-link"
-                      href="<%= "#{@project_data[:path]}/user/access-control/tag/#{type.downcase}" %>"
+                      href="<%= "#{@project.path}/user/access-control/tag/#{type.downcase}" %>"
                       class="text-orange-600 hover:text-orange-700 text-xs"
                     >
                       (Tags)
@@ -97,7 +96,7 @@ end
                     </td>
                   <% end %>
                   <td class="py-4 px-3 text-right">
-                    <%== part("components/form/hidden", name: "aces[][ubid]", value: ubid) %>
+                    <%== hidden_inputs("aces[][ubid]" => ubid) %>
                     <%== part("components/form/checkbox", id_prefix: "ace-#{ubid}-", name: "aces[][deleted]", options: [%w[true Delete]]) %>
                   </td>
                 <% else %>
@@ -133,13 +132,12 @@ end
           </div>
         <% end %>
       </div>
-    </form>
+    <% end %>
   <% end %>
   <% if @token %>
     <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
       <div class="px-4 py-5 sm:p-6">
-        <form action="<%= restriction_path %>" role="form" method="POST">
-          <%== csrf_tag(restriction_path) %>
+        <% form(action: restriction_path, method: :post) do %>
           <div class="sm:flex sm:items-center sm:justify-between">
             <div>
               <h3 class="text-base font-semibold leading-6 text-gray-900"><%= restriction_title %>
@@ -166,7 +164,7 @@ end
               </div>
             </div>
           </div>
-        </form>
+        <% end %>
       </div>
     </div>
   <% end %>

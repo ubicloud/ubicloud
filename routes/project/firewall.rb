@@ -8,16 +8,14 @@ class Clover
       if api?
         firewall_list_api_response(dataset)
       else
-        authorized_firewalls = dataset.eager(:location).all
-        @firewalls = Serializers::Firewall.serialize(authorized_firewalls, {include_path: true})
-
+        @firewalls = dataset.eager(:location).all
         view "networking/firewall/index"
       end
     end
 
     r.web do
       r.get "create" do
-        authorize("Firewall:create", @project.id)
+        authorize("Firewall:create", @project)
         view "networking/firewall/create"
       end
 

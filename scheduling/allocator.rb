@@ -31,7 +31,7 @@ module Scheduling::Allocator
     fail "#{vm} no space left on any eligible host" unless allocation
 
     allocation.update(vm)
-    Clog.emit("vm allocated") { {allocation: allocation.to_s, duration: Time.now - vm.created_at} }
+    Clog.emit("vm allocated", {allocation: allocation.to_s, duration: Time.now - vm.created_at})
   end
 
   Request = Struct.new(
@@ -124,6 +124,7 @@ module Scheduling::Allocator
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
         .join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
+        .left_join(:gpu_partitions, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
         .select(
           Sequel[:vm_host][:id].as(:vm_host_id),
@@ -140,6 +141,7 @@ module Scheduling::Allocator
           :ipv4_available,
           Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
+          Sequel.function(:coalesce, :use_gpu_partition, false).as(:use_gpu_partition),
           :available_iommu_groups,
           Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
           :accepts_slices,
@@ -165,9 +167,15 @@ module Scheduling::Allocator
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(num_gpus) }
           .select_append { sum(Sequel.case({{vm_id: nil} => 1}, 0)).as(available_gpus) }
-          .select_append { array_remove(array_agg(Sequel.case({{vm_id: nil} => :iommu_group}, nil)), nil).as(available_iommu_groups) }
+          .select_append do
+            gpu = Sequel.function(:jsonb_build_object, Sequel.lit("'iommu_group'"), :iommu_group, Sequel.lit("'numa_node'"), :numa_node)
+            Sequel.function(:array_agg, gpu).filter(vm_id: nil).as(:available_iommu_groups)
+                     end
           .where(device_class: ["0300", "0302"])
           .where { (device =~ request.gpu_device) | request.gpu_device.nil? })
+        .with(:gpu_partitions, DB[:gpu_partition]
+          .select_group(:vm_host_id)
+          .select_append { Sequel.function(:bool_or, enabled).as(:use_gpu_partition) })
         .with(:vm_provisioning, DB[:vm]
           .select_group(:vm_host_id)
           .select_append { count.function.*.as(vm_provisioning_count) }
@@ -240,10 +248,8 @@ module Scheduling::Allocator
       # Emit the allocation query if the project is flagged for
       # diagnostics.
       if request.diagnostics
-        Clog.emit("Allocator query for vm") do
-          {allocator_query: {vm_id: request.vm_id,
-                             sql: ds.no_auto_parameterize.sql}}
-        end
+        Clog.emit("Allocator query for vm", {allocator_query: {vm_id: request.vm_id,
+                                                               sql: ds.no_auto_parameterize.sql}})
       end
 
       ds.all
@@ -252,16 +258,18 @@ module Scheduling::Allocator
     def self.update_vm(vm_host, vm)
       ip4, address = vm_host.ip4_random_vm_network if vm.ip4_enabled
       fail "no ip4 addresses left" if vm.ip4_enabled && !ip4
+
       update_args = {
         vm_host_id: vm_host.id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
-        local_vetho_ip: vm_host.veth_pair_random_ip4_addr.to_s,
+        local_vetho_ip: vm_host.veth_pair_random_ip4_addr,
         allocated_at: Time.now
       }
       update_args[:family] = vm_host.family if vm.family != "burstable"
-      vm.update(**update_args)
+      vm.set(**update_args)
+      vm.save_with_ephemeral_net6_error_retrying(vm_host)
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: ip4.to_s, address_id: address.id) if ip4
-      vm.sshable&.update(host: vm.ephemeral_net4 || NetAddr.parse_net(vm.ephemeral_net6).nth(2))
+      vm.sshable&.update(host: vm.ip4_string || vm.ip6_string)
     end
 
     def initialize(candidate_host, request)
@@ -338,6 +346,7 @@ module Scheduling::Allocator
     attr_reader :total, :used, :requested
     def initialize(column, total, used, requested)
       fail "resource '#{column}' uses more than is available: #{used} > #{total}" if used > total
+
       @column = column
       @total = total
       @used = used
@@ -478,7 +487,7 @@ module Scheduling::Allocator
     def select_cpuset(vm_host_id, n)
       # select the cpuset for the new slice
       cpus = VmHostCpu
-        .where(vm_host_id: vm_host_id, spdk: false, vm_host_slice_id: nil)
+        .where(vm_host_id:, spdk: false, vm_host_slice_id: nil)
         .order_by(Sequel.asc(:cpu_number))
         .limit(n)
         .map(&:cpu_number)
@@ -510,11 +519,18 @@ module Scheduling::Allocator
       @used = candidate_host[:num_gpus] - candidate_host[:available_gpus]
       @total = candidate_host[:num_gpus]
       @requested = request.gpu_count
-      @iommu_groups = candidate_host[:available_iommu_groups].take(@requested)
+      @use_partition = candidate_host[:use_gpu_partition]
+
+      if @use_partition
+        @partition = select_partition(candidate_host[:vm_host_id], @requested)
+        @iommu_groups = pci_iommu_groups_for_partition(@partition)
+      else
+        @iommu_groups = select_iommu_groups(candidate_host[:available_iommu_groups], @requested)
+      end
     end
 
     def is_valid
-      @used < @total
+      @used < @total && (!@use_partition || @partition)
     end
 
     def utilization
@@ -528,6 +544,57 @@ module Scheduling::Allocator
         .where(vm_id: nil)
         .where(iommu_group: @iommu_groups)
         .update(vm_id: vm.id) < @requested
+
+      if @partition
+        fail "concurrent GPU partition allocation" if
+        GpuPartition
+          .where(id: @partition, vm_host_id: vm_host.id, vm_id: nil)
+          .update(vm_id: vm.id) != 1
+      end
+    end
+
+    def select_iommu_groups(gpus, n)
+      by_numa = gpus.group_by { |h| h["numa_node"] }
+      chosen_group = by_numa.values.select { |arr| arr.size >= n }.min_by(&:size)
+      (chosen_group || gpus).take(n).map { |h| h["iommu_group"] }
+    end
+
+    def select_partition(vm_host_id, gpu_count)
+      used_pci_device_ids =
+        DB[:gpu_partitions_pci_devices]
+          .where(
+            gpu_partition_id: GpuPartition
+              .where(vm_host_id:)
+              .exclude(vm_id: nil)
+              .select(:id)
+          )
+          .select(:pci_device_id)
+
+      blocked_partitions =
+        DB[:gpu_partitions_pci_devices]
+          .where(pci_device_id: used_pci_device_ids)
+          .join(:gpu_partition, id: :gpu_partition_id)
+          .where(vm_host_id:)
+          .select(:partition_id)
+
+      GpuPartition
+        .where(
+          vm_host_id:,
+          enabled: true,
+          vm_id: nil,
+          gpu_count:
+        )
+        .exclude(partition_id: blocked_partitions)
+        .order(:partition_id)
+        .select_map(:id)
+        .first
+    end
+
+    def pci_iommu_groups_for_partition(id)
+      PciDevice
+        .join(:gpu_partitions_pci_devices, pci_device_id: :id)
+        .where(gpu_partition_id: id)
+        .select_map(:iommu_group)
     end
   end
 
@@ -587,12 +654,14 @@ module Scheduling::Allocator
 
     def map_volumes_to_devices
       return false if @candidate_host[:available_storage_gib] < @request.storage_gib
+
       @storage_device_allocations = @candidate_host[:storage_devices].map { StorageDeviceAllocation.new(it["id"], it["available_storage_gib"]) }
 
       @volume_to_device_map = {}
       @request.storage_volumes.each do |vol_id, vol|
         dev = @storage_device_allocations.detect { |dev| dev.available_storage_gib >= vol["size_gib"] && !(@request.distinct_storage_devices && dev.allocated_storage_gib > 0) }
         return false if dev.nil?
+
         @volume_to_device_map[vol_id] = dev.id
         dev.allocate(vol["size_gib"])
       end
@@ -636,13 +705,14 @@ module Scheduling::Allocator
           use_bdev_ubi:,
           boot_image_id: image_id,
           skip_sync: volume["skip_sync"],
-          disk_index: disk_index,
+          disk_index:,
           key_encryption_key_1_id: key_encryption_key&.id,
-          spdk_installation_id: spdk_installation_id,
+          spdk_installation_id:,
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
-          max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"]
+          max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"],
+          vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil
         )
       end
     end
@@ -662,7 +732,7 @@ module Scheduling::Allocator
       end
 
       def update
-        StorageDevice.dataset.where(id: id).update(available_storage_gib: Sequel[:available_storage_gib] - @allocated_storage_gib) if @allocated_storage_gib > 0
+        StorageDevice.dataset.where(id:).update(available_storage_gib: Sequel[:available_storage_gib] - @allocated_storage_gib) if @allocated_storage_gib > 0
       end
     end
   end

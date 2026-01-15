@@ -8,6 +8,8 @@ module Validation
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA
       when "16"
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA
+      when "18"
+        @config_schema = Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA
       when "pgbouncer"
         @config_schema = Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA
       else
@@ -86,26 +88,56 @@ module Validation
 
     def validate_integer_range(value, min, max)
       return nil if value.between?(min, max)
+
       "must be between #{min} and #{max}"
     end
 
     def validate_float_range(value, min, max)
       return nil if value.between?(min, max)
+
       "must be between #{min} and #{max}"
     end
 
     def validate_enum(value, allowed_values)
       return nil if allowed_values.include?(value)
+
       "must be one of: #{allowed_values.join(", ")}"
     end
 
     def validate_string(value, pattern)
-      return nil if pattern.nil? || value.match?(Regexp.new(pattern))
-      "must match pattern: #{pattern}"
+      # Check pattern validation first if pattern is specified
+      if pattern && !pattern.match?(value)
+        return "must match pattern: #{pattern.source.gsub(/[\\Az]/, "")}"
+      end
+
+      # Check if string value needs quoting and is properly quoted
+      quoting_error = validate_string_quoting(value)
+      return quoting_error if quoting_error
+
+      nil
+    end
+
+    def validate_string_quoting(value)
+      # Ref: https://www.postgresql.org/docs/9.3/config-setting.html#CONFIG-SETTING-CONFIGURATION-FILE
+      is_quoted = value.start_with?("'") && value.end_with?("'")
+
+      if is_quoted
+        inner_value = value[1...-1]
+
+        # Single quotes inside should be escaped as '' or '\
+        escaped_quotes_removed = inner_value.gsub("''", "").gsub("\\'", "")
+
+        if escaped_quotes_removed.include?("'")
+          "contains unescaped single quotes - single quotes must be doubled ('') inside quoted strings"
+        end
+      elsif !value.match?(/\A[a-zA-Z0-9_]+\z/)
+        "must be wrapped in single quotes (e.g., '#{value.gsub("'", "''")}') because it contains special characters"
+      end
     end
 
     def validate_bool(value)
       return nil if ["on", "of", "off", "t", "tr", "tru", "true", "f", "fa", "fal", "fals", "false", "1", "0"].include?(value.downcase)
+
       "must be 'on' or 'off' or 'true' or 'false' or '1' or '0' or any unambiguous prefix of these values (case-insensitive)"
     end
   end

@@ -8,11 +8,11 @@
     rows: @firewalls.map do |fw|
       [
         [
-          [fw[:name], {link: @project_data[:path] + fw[:path]}],
-          fw[:location],
-          fw[:description]
+          [fw.name, {link: path(fw)}],
+          fw.display_location,
+          fw.description
         ],
-        {id: "fw-#{fw[:id]}"}
+        {id: "fw-#{fw.ubid}"}
       ]
     end,
     empty_state: {
@@ -21,7 +21,7 @@
       description: "You don't have permission to create firewalls."
     }.merge(has_project_permission("Firewall:create") ? {
       description: "Get started by creating a new firewall.",
-      button_link: "#{@project_data[:path]}/firewall/create",
+      button_link: "#{@project.path}/firewall/create",
       button_title: "Create Firewall"
     } : {})
   ) %>

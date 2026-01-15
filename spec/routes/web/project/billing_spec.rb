@@ -39,12 +39,6 @@ RSpec.describe Clover, "billing" do
     expect(page.body).to eq "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
   end
 
-  it "tag payment method fraud after account suspension" do
-    expect(payment_method.reload.fraud).to be(false)
-    user.suspend
-    expect(payment_method.reload.fraud).to be(true)
-  end
-
   context "when Stripe enabled" do
     before do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
@@ -79,7 +73,7 @@ RSpec.describe Clover, "billing" do
       click_button "Add new billing information"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
-      expect(page).to have_flash_notice("Billing info updated")
+      expect(page).to have_flash_notice("Payment method added successfully. $#{PaymentMethod[stripe_id: "pm_1234567890"].preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money.")
 
       billing_info = project.reload.billing_info
       expect(page.status_code).to eq(200)
@@ -163,7 +157,6 @@ RSpec.describe Clover, "billing" do
         {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}}
       ).at_least(:once)
       expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
-      expect(Strand).to receive(:create).with(prog: "ValidateVat", label: "start", stack: [{subject_id: billing_info.id}])
       visit "#{project.path}/billing"
 
       expect(page.title).to eq("Ubicloud - Project Billing")
@@ -176,8 +169,26 @@ RSpec.describe Clover, "billing" do
       expect(page).to have_field("Billing Name", with: "New Inc.")
       expect(page).to have_field("Country", with: "US")
       expect(page).to have_field("Tax ID", with: "DE456789")
+      expect(Strand.where(prog: "ValidateVat").count).to eq(1)
+      expect(Strand.where(prog: "ValidateVat").first.stack.first["subject_id"]).to eq(billing_info.id)
+    end
 
-      fill_in "Tax ID", with: nil
+    it "can remove tax id" do
+      expect(Stripe::Customer).to receive(:retrieve).with(billing_info.stripe_id).and_return(
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
+        {"name" => "Old Inc.", "address" => {"country" => nil}, "metadata" => {"tax_id" => nil}}
+      ).at_least(:once)
+      expect(Stripe::Customer).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
+
+      visit "#{project.path}/billing"
+
+      expect(page.title).to eq("Ubicloud - Project Billing")
+      fill_in "VAT ID", with: nil
+
+      click_button "Update"
+
+      fill_in "Tax ID", with: "TR123123"
 
       click_button "Update"
     end
@@ -221,6 +232,7 @@ RSpec.describe Clover, "billing" do
       expect(billing_info.payment_methods.count).to eq(2)
       expect(page).to have_content "Visa"
       expect(page).to have_content "Mastercard"
+      expect(page).to have_flash_notice "Payment method added successfully. $#{PaymentMethod[stripe_id: "pm_222222222"].preauth_amount / 100} is authorized on your card for verification purposes. It's canceled already and depending on your bank, it may take up to two weeks to refund the money."
     end
 
     it "can copy billing address from new payment method when missing" do
@@ -298,10 +310,9 @@ RSpec.describe Clover, "billing" do
 
       visit "#{project.path}/billing"
 
-      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript engine.
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
 
       expect(page.status_code).to eq(400)
       expect(page.body).to eq({error: {message: "You can't delete the last payment method of a project."}}.to_json)
@@ -310,20 +321,17 @@ RSpec.describe Clover, "billing" do
 
     it "can delete payment method" do
       payment_method_2 = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_2222222222")
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}})
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
-      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"}))
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "NL"}, "metadata" => {"company_name" => "ACME Inc."}}).at_least(:once)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).at_least(:once)
+      expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method_2.stripe_id).and_return(stripe_object("card" => {"brand" => "mastercard"})).at_least(:once)
       expect(Stripe::PaymentMethod).to receive(:detach).with(payment_method.stripe_id)
 
       visit "#{project.path}/billing"
 
-      # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-      # UI tests run without a JavaScript enginer.
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-      expect(page.status_code).to eq(204)
-      expect(page.body).to be_empty
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
+      expect(page).to have_flash_notice("Payment method deleted")
       expect(billing_info.reload.payment_methods.count).to eq(1)
     end
 
@@ -333,8 +341,9 @@ RSpec.describe Clover, "billing" do
       visit "#{project.path}/billing"
       payment_method.this.delete(force: true)
 
-      btn = find "#payment-method-#{payment_method.ubid} .delete-btn"
-      page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+      within("#payment-method-#{payment_method.ubid}") do
+        click_button "Delete"
+      end
       expect(page.status_code).to eq(404)
     end
 
@@ -489,13 +498,17 @@ RSpec.describe Clover, "billing" do
         end
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         invoice.update(status: "current")
-        expect(InvoiceGenerator).to receive(:new).and_return(instance_double(InvoiceGenerator, run: [invoice])).at_least(:once)
+        generator = InvoiceGenerator.new(bi.span.begin, bi.span.end, project_ids: [billing_info.project.id])
+        allow(generator).to receive(:run).and_return([invoice])
+        expect(InvoiceGenerator).to receive(:new).and_return(generator).at_least(:once)
 
         visit "#{project.path}/billing/invoice/current"
 
         expect(page.status_code).to eq(200)
         expect(page.title).to eq("Ubicloud - Current Usage Summary")
         expect(page).to have_content "Aggregated"
+        expect(page).to have_content "40420 minutes"
+        expect(page).to have_content "$24.700"
         expect(page.has_css?("#invoice-discount")).to be false
         expect(page.has_css?("#invoice-credit")).to be false
 
@@ -549,7 +562,7 @@ RSpec.describe Clover, "billing" do
       end
 
       it "show finalized invoice as PDF from US issuer without VAT" do
-        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Acme Inc.", "tax_id" => "123123123", "note" => "PO123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
 
@@ -563,6 +576,7 @@ RSpec.describe Clover, "billing" do
         expect(text).not_to include("John Doe")
         expect(text).to include("test-vm")
         expect(text).not_to include("VAT")
+        expect(text).to include("PO123123")
       end
 
       it "show finalized invoice as PDF from EU issuer with 21% VAT" do
@@ -598,6 +612,40 @@ RSpec.describe Clover, "billing" do
         expect(text).to include("VAT subject to reverse charge")
       end
 
+      it "show finalized invoice as PDF without bank transfer info" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        expect(Stripe::PaymentMethod).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"}))
+
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+        click_link invoice.name
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).not_to include("We kindly request you to remit the amount to")
+        expect(text).not_to include("Beneficiary Ubicloud B.V.")
+        expect(text).to include("Invoice date: #{invoice.created_at.strftime("%B %d, %Y")}")
+        expect(text).to include("Due date: #{invoice.created_at.strftime("%B %d, %Y")}")
+      end
+
+      it "show finalized invoice as PDF with bank transfer info" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+        click_link invoice.name
+
+        expect(page.status_code).to eq(200)
+        text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
+        expect(text).to include("We kindly request you to remit the amount to")
+        expect(text).to include("Beneficiary Ubicloud B.V.")
+        expect(text).to include(/Invoice date:\s+#{invoice.created_at.strftime("%B %d, %Y")}/)
+        expect(text).to include(/Due date:\s+#{(invoice.created_at + 30 * 24 * 60 * 60).strftime("%B %d, %Y")}/)
+      end
+
       it "show finalized invoice as PDF with old issuer info" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
@@ -619,9 +667,8 @@ RSpec.describe Clover, "billing" do
         expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"country" => "US"}, "metadata" => {"company_name" => "ACME Inc.", "tax_id" => "123123123"}}).at_least(:once)
         bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
-        pdf = invoice.generate_pdf(Serializers::Invoice.serialize(invoice, {detailed: true}))
-        response = instance_double(Aws::S3::Types::GetObjectOutput, body: instance_double(StringIO, read: pdf))
-        expect(blob_storage_client).to receive(:get_object).with(bucket: "ubicloud-invoices", key: invoice.blob_key).and_return(response)
+        pdf = invoice.generate_pdf
+        blob_storage_client.stub_responses(:get_object, body: pdf)
 
         visit "#{project.path}/billing"
         click_link invoice.name
@@ -630,6 +677,83 @@ RSpec.describe Clover, "billing" do
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud Inc.")
         expect(text).to include("ACME Inc.")
+      end
+
+      it "can pay unpaid invoice" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        # rubocop:disable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:create).with(
+          hash_including(billing_address_collection: "auto")
+        ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
+        # rubocop:enable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(200)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_flash_notice "Invoice #{invoice.invoice_number} paid successfully"
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "paid"
+          expect(page).to have_no_content "Pay Now"
+        end
+      end
+
+      it "fails if the invoice id doesn’t match the invoice id in the checkout session" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+        # rubocop:disable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:create).with(
+          hash_including(billing_address_collection: "auto")
+        ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123")).at_least(:once)
+        # rubocop:enable RSpec/VerifiedDoubles
+        expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_return(stripe_object("metadata" => {"invoice" => "1vvc31wac0za4gx65xd6mt2a42"}, "payment_status" => "paid"))
+
+        visit "#{project.path}/billing"
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(400)
+        expect(page.title).to eq("Ubicloud - Project Billing")
+        expect(page).to have_flash_error "Invoice payment was not successful"
+
+        expect(Stripe::Checkout::Session).to receive(:retrieve).with("session_123").and_raise(Stripe::InvalidRequestError.new("No such checkout session", "id"))
+
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(400)
+        expect(page).to have_flash_error "We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud"
+      end
+
+      it "fails if invoice already paid" do
+        expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "address" => {"line1" => "Some Rd", "country" => "NL"}, "metadata" => {"company_name" => "Foo Company Name"}}).at_least(:once)
+        bi = billing_record(Time.utc(2023, 6), Time.utc(2023, 7))
+        invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
+
+        visit "#{project.path}/billing"
+
+        invoice.update(status: "paid")
+        within("#invoice-#{invoice.ubid}") do
+          expect(page).to have_content "unpaid"
+          click_button "Pay Now"
+        end
+
+        expect(page.status_code).to eq(400)
+        expect(page).to have_flash_error "Invoice is not payable"
       end
 
       it "raises not found when invoice not exists" do
@@ -643,7 +767,7 @@ RSpec.describe Clover, "billing" do
 
     describe "usage alerts" do
       before do
-        UsageAlert.create(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
+        @alert1 = UsageAlert.create(project_id: project.id, user_id: user.id, name: "alert-1", limit: 101)
         UsageAlert.create(project_id: project_wo_permissions.id, user_id: user.id, name: "alert-2", limit: 100)
       end
 
@@ -677,26 +801,23 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing"
         expect(page).to have_content "alert-1"
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript engine.
-        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        visit "#{project.path}/billing"
+        within("#alert-#{project.usage_alerts.first.ubid}") do
+          click_button "Remove"
+        end
         expect(page).to have_flash_notice "Usage alert alert-1 is deleted."
-
-        visit "#{project.path}/billing"
-        expect(page).to have_no_content "alert-1"
+        expect(@alert1.exists?).to be false
       end
 
       it "returns 404 if usage alert not found" do
         visit project.path + "/billing"
         expect(page).to have_content "alert-1"
 
-        btn = find "#alert-#{project.usage_alerts.first.ubid} .delete-btn"
-
+        alert_ubid = project.usage_alerts.first.ubid
         project.usage_alerts.first.destroy
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+
+        within("#alert-#{alert_ubid}") do
+          click_button "Remove"
+        end
 
         expect(page.status_code).to eq(404)
       end

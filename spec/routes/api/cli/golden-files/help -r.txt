@@ -10,11 +10,13 @@ Examples:
 Commands:
     ai         Manage AI features
     fw         Manage firewalls
+    gh         Manage GitHub integration
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
+    sk         Manage SSH public keys
     version    Display CLI program version
     vm         Manage virtual machines
 
@@ -80,16 +82,19 @@ Usage:
     ubi fw (location/fw-name | fw-id) post-command [...]
 
 Commands:
-    list             List firewalls
+    list                  List firewalls
 
 Post Commands:
-    add-rule         Add a firewall rule
-    attach-subnet    Attach a private subnet to a firewall
-    create           Create a firewall
-    delete-rule      Remove a firewall rule
-    destroy          Destroy a firewall
-    detach-subnet    Detch a private subnet from a firewall
-    show             Show details for a firewall
+    add-rule              Add a firewall rule
+    attach-subnet         Attach a private subnet to a firewall
+    create                Create a firewall
+    delete-rule           Remove a firewall rule
+    destroy               Destroy a firewall
+    detach-subnet         Detach a private subnet from a firewall
+    modify-rule           Modify a firewall rule
+    rename                Rename a firewall
+    show                  Show details for a firewall
+    update-description    Update the description for a firewall
 
 
 List firewalls
@@ -109,17 +114,18 @@ Allowed Option Values:
 Add a firewall rule
 
 Usage:
-    ubi fw (location/fw-name | fw-id) add-rule cidr
+    ubi fw (location/fw-name | fw-id) add-rule [options] (cidr | ps-id | ps-name)
 
 Options:
     -s, --start-port=port            starting (or only) port to allow (default: 0)
     -e, --end-port=port              ending port to allow (default: 65535)
+    -d, --description=desc           description of rule
 
 
 Attach a private subnet to a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) attach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) attach-subnet (ps-name | ps-id)
 
 
 Create a firewall
@@ -146,10 +152,28 @@ Options:
     -f, --force                      do not require confirmation
 
 
-Detch a private subnet from a firewall
+Detach a private subnet from a firewall
 
 Usage:
-    ubi fw (location/fw-name | fw-id) detach-subnet ps-id
+    ubi fw (location/fw-name | fw-id) detach-subnet (ps-name | ps-id)
+
+
+Modify a firewall rule
+
+Usage:
+    ubi fw (location/fw-name | fw-id) modify-rule options rule-id
+
+Options:
+    -c, --cidr=ip-range              IPv4 or IPv6 range to allow
+    -s, --start-port=port            starting (or only) port to allow (default: 0)
+    -e, --end-port=port              ending port to allow (default: 65535)
+    -d, --description=desc           description of rule
+
+
+Rename a firewall
+
+Usage:
+    ubi fw (location/fw-name | fw-id) rename new-name
 
 
 Show details for a firewall
@@ -170,6 +194,79 @@ Allowed Option Values:
     Firewall Rule Fields: id cidr port-range
 
 
+Update the description for a firewall
+
+Usage:
+    ubi fw (location/fw-name | fw-id) update-description new-description
+
+
+Manage GitHub integration
+
+Usage:
+    ubi gh command [...]
+    ubi gh (installation-name/repository-name) post-command [...]
+
+Commands:
+    installation                Manage GitHub installations
+
+Post Commands:
+    list-cache-entries          List cache entries for a GitHub repository
+    remove-all-cache-entries    Remove all cache entries for a GitHub repository
+    remove-cache-entry          Remove cache entry for a GitHub repository
+
+
+Manage GitHub installations
+
+Usage:
+    ubi gh installation command [...]
+    ubi gh installation installation-name post-command [...]
+
+Commands:
+    list                 List GitHub installations
+
+Post Commands:
+    list-repositories    List GitHub repositories for an installation
+
+
+List GitHub installations
+
+Usage:
+    ubi gh installation list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List GitHub repositories for an installation
+
+Usage:
+    ubi gh installation installation-name list-repositories [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List cache entries for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name list-cache-entries [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Remove all cache entries for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name remove-all-cache-entries
+
+
+Remove cache entry for a GitHub repository
+
+Usage:
+    ubi gh installation-name/repository-name remove-cache-entry cache-entry-id
+
+
 Get command help
 
 Usage:
@@ -187,13 +284,15 @@ Usage:
     ubi kc (location/kc-name | kc-id) post-command [...]
 
 Commands:
-    list          List Kubernetes clusters
+    list               List Kubernetes clusters
 
 Post Commands:
-    create        Create a Kubernetes cluster
-    destroy       Destroy a Kubernetes cluster
-    kubeconfig    Print kubeconfig.yaml for a Kubernetes cluster
-    show          Show details for a Kubernetes cluster
+    create             Create a Kubernetes cluster
+    destroy            Destroy a Kubernetes cluster
+    kubeconfig         Print kubeconfig.yaml for a Kubernetes cluster
+    rename             Rename a Kubernetes cluster
+    resize-nodepool    Resize a Kubernetes cluster nodepool
+    show               Show details for a Kubernetes cluster
 
 
 List Kubernetes clusters
@@ -222,7 +321,7 @@ Options:
     -z, --worker-size=size           Worker size
 
 Allowed Option Values:
-    Version: v1.33 v1.32
+    Version: v1.34 v1.33
     Control Plane Node Count: 1 3
 
 
@@ -239,6 +338,18 @@ Print kubeconfig.yaml for a Kubernetes cluster
 
 Usage:
     ubi kc (location/kc-name | kc-id) kubeconfig
+
+
+Rename a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) rename new-name
+
+
+Resize a Kubernetes cluster nodepool
+
+Usage:
+    ubi kc (location/kc-name | kc-id) resize-nodepool (np-name | np-id) node-count
 
 
 Show details for a Kubernetes cluster
@@ -266,15 +377,18 @@ Usage:
     ubi lb (location/lb-name | lb-id) post-command [...]
 
 Commands:
-    list         List load balancers
+    list                       List load balancers
 
 Post Commands:
-    attach-vm    Attach a virtual machine to a load balancer
-    create       Create a load balancer
-    destroy      Destroy a load balancer
-    detach-vm    Detach a virtual machine from a load balancer
-    show         Show details for a load balancer
-    update       Update a load balancer
+    attach-vm                  Attach a virtual machine to a load balancer
+    create                     Create a load balancer
+    destroy                    Destroy a load balancer
+    detach-vm                  Detach a virtual machine from a load balancer
+    disable-ssl-certificate    Disable the SSL certificate for a load balancer
+    enable-ssl-certificate     Enable the SSL certificate for a load balancer
+    rename                     Rename a load balancer
+    show                       Show details for a load balancer
+    update                     Update a load balancer
 
 
 List load balancers
@@ -294,19 +408,20 @@ Allowed Option Values:
 Attach a virtual machine to a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) attach-vm vm-id
+    ubi lb (location/lb-name | lb-id) attach-vm (vm-name | vm-id)
 
 
 Create a load balancer
 
 Usage:
-    ubi lb location/lb-name create [options] ps-id src-port dst-port
+    ubi lb location/lb-name create [options] (ps-name | ps-id) src-port dst-port
 
 Options:
     -a, --algorithm=alg              set the algorithm to use
     -e, --check-endpoint=path        set the health check endpoint (default: /up)
     -p, --check-protocol=proto       set the health check protocol
     -s, --stack=stack                set the stack
+    -c, --cert-enabled=bool          SSL certificate enabled
 
 Allowed Option Values:
     Algorithm: round_robin hash_based
@@ -326,7 +441,25 @@ Options:
 Detach a virtual machine from a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) detach-vm vm-id
+    ubi lb (location/lb-name | lb-id) detach-vm (vm-name | vm-id)
+
+
+Disable the SSL certificate for a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) disable-ssl-certificate
+
+
+Enable the SSL certificate for a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) enable-ssl-certificate
+
+
+Rename a load balancer
+
+Usage:
+    ubi lb (location/lb-name | lb-id) rename new-name
 
 
 Show details for a load balancer
@@ -340,13 +473,13 @@ Options:
 Allowed Option Values:
     Fields: id name state location hostname algorithm stack
             health-check-endpoint health-check-protocol src-port dst-port subnet
-            vms
+            vms cert-enabled
 
 
 Update a load balancer
 
 Usage:
-    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint [vm-id [...]]
+    ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint cert-enabled [(vm-name | vm-id) [...]]
 
 
 Manage PostgreSQL databases
@@ -356,22 +489,38 @@ Usage:
     ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 
 Commands:
-    list                         List PostgreSQL databases
+    list                               List PostgreSQL databases
 
 Post Commands:
-    add-firewall-rule            Add a PostgreSQL firewall rule
-    add-metric-destination       Add a PostgreSQL metric destination
-    create                       Create a PostgreSQL database
-    delete-firewall-rule         Delete a PostgreSQL firewall rule
-    delete-metric-destination    Delete a PostgreSQL metric destination
-    destroy                      Destroy a PostgreSQL database
-    pg_dump                      Dump a single PostgreSQL database using `pg_dump`
-    pg_dumpall                   Dump a entire PostgreSQL database cluster using `pg_dumpall`
-    psql                         Connect to a PostgreSQL database using `psql`
-    reset-superuser-password     Reset the superuser password for a PostgreSQL database
-    restart                      Restart a PostgreSQL database cluster
-    restore                      Restore a PostgreSQL database backup to a new database
-    show                         Show details for a PostgreSQL database
+    add-config-entries                 Add configuration entries to a PostgreSQL database
+    add-firewall-rule                  Add a PostgreSQL firewall rule
+    add-metric-destination             Add a PostgreSQL metric destination
+    add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
+    ca-certificates                    Print CA certificates for a PostgreSQL database
+    create                             Create a PostgreSQL database
+    create-read-replica                Create a read replica for a PostgreSQL database
+    delete-firewall-rule               Delete a PostgreSQL firewall rule
+    delete-metric-destination          Delete a PostgreSQL metric destination
+    destroy                            Destroy a PostgreSQL database
+    list-backups                       List backups for a PostgreSQL database
+    modify                             Modify a PostgreSQL database cluster
+    modify-firewall-rule               Modify a PostgreSQL firewall rule
+    pg_dump                            Dump a single PostgreSQL database using `pg_dump`
+    pg_dumpall                         Dump a entire PostgreSQL database cluster using `pg_dumpall`
+    promote-read-replica               Promote a read replica PostgreSQL database to a primary
+    psql                               Connect to a PostgreSQL database using `psql`
+    remove-config-entries              Remove configuration entries from a PostgreSQL database
+    remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
+    rename                             Rename a PostgreSQL database
+    reset-superuser-password           Reset the superuser password for a PostgreSQL database
+    restart                            Restart a PostgreSQL database cluster
+    restore                            Restore a PostgreSQL database backup to a new database
+    set-maintenance-window             Set the maintenance window for a PostgreSQL database
+    show                               Show details for a PostgreSQL database
+    show-config                        Show configuration for a PostgreSQL database
+    show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database
+    show-upgrade-status                Show the status of a major version upgrade of the PostgreSQL database
+    upgrade                            Schedule a major version upgrade of the PostgreSQL database
 
 Post Options:
     -d, --dbname=name                override database name
@@ -392,16 +541,48 @@ Allowed Option Values:
     Fields: location name id version flavor
 
 
+Add configuration entries to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
+
+
 Add a PostgreSQL firewall rule
 
 Usage:
-    ubi pg (location/pg-name | pg-id) add-firewall-rule cidr
+    ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
+
+Options:
+    -d, --description=desc           description of rule
 
 
 Add a PostgreSQL metric destination
 
 Usage:
     ubi pg (location/pg-name | pg-id) add-metric-destination username password url
+
+
+Add pgbouncer configuration entries to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]
+
+
+Print CA certificates for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) ca-certificates
+
+
+Create a read replica for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) create-read-replica [options] name
+
+Options:
+    -c, --pg-config=config           postgres config (e.g key1=value1,key2=value2)
+    -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
 
 
 Create a PostgreSQL database
@@ -415,6 +596,11 @@ Options:
     -s, --size=size                  server size
     -S, --storage-size=size          storage size GB
     -v, --version=version            PostgreSQL version
+    -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
+    -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+    -R, --restrict-by-default        restrict access by default (add firewall rules to allow access)
+    -P, --private-subnet-name=name   override name of created private subnet
 
 Allowed Option Values:
     Flavor: standard paradedb lantern
@@ -425,9 +611,10 @@ Allowed Option Values:
           m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
           m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
           m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
-          m8gd.16xlarge
+          m8gd.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
+          i8g.16xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
-    Version: 17 16
+    Version: 18 17 16
 
 
 Delete a PostgreSQL firewall rule
@@ -451,6 +638,49 @@ Options:
     -f, --force                      do not require confirmation
 
 
+List backups for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) list-backups [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Modify a PostgreSQL firewall rule
+
+Usage:
+    ubi pg (location/pg-name | pg-id) modify-firewall-rule [options] rule-id
+
+Options:
+    -c, --cidr=cidr                  ip range to allow in cidr format (e.g. 1.2.3.0/24)
+    -d, --description=desc           description of rule
+
+
+Modify a PostgreSQL database cluster
+
+Usage:
+    ubi pg (location/pg-name | pg-id) modify [options]
+
+Options:
+    -h, --ha-type=type               replication type
+    -s, --size=size                  server size
+    -S, --storage-size=size          storage size GB
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+
+Allowed Option Values:
+    Replication Type: none async sync
+    Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
+          burstable-1 burstable-2 c6gd.large c6gd.xlarge c6gd.2xlarge
+          c6gd.4xlarge c6gd.8xlarge c6gd.16xlarge m6id.large m6id.xlarge
+          m6id.2xlarge m6id.4xlarge m6id.8xlarge m6id.16xlarge m6gd.large
+          m6gd.xlarge m6gd.2xlarge m6gd.4xlarge m6gd.8xlarge m6gd.16xlarge
+          m8gd.large m8gd.xlarge m8gd.2xlarge m8gd.4xlarge m8gd.8xlarge
+          m8gd.16xlarge i8g.large i8g.xlarge i8g.2xlarge i8g.4xlarge i8g.8xlarge
+          i8g.16xlarge
+    Storage Size: 16 32 64 128 256 512 1024 2048 4096
+
+
 Dump a single PostgreSQL database using `pg_dump`
 
 Usage:
@@ -463,10 +693,34 @@ Usage:
     ubi pg (location/pg-name | pg-id) [options] pg_dumpall [pg_dumpall-options]
 
 
+Promote a read replica PostgreSQL database to a primary
+
+Usage:
+    ubi pg (location/pg-name | pg-id) promote-read-replica
+
+
 Connect to a PostgreSQL database using `psql`
 
 Usage:
     ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
+
+
+Remove configuration entries from a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
+
+
+Remove pgbouncer configuration entries from a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
+
+
+Rename a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) rename new-name
 
 
 Reset the superuser password for a PostgreSQL database
@@ -484,7 +738,41 @@ Usage:
 Restore a PostgreSQL database backup to a new database
 
 Usage:
-    ubi pg (location/pg-name | pg-id) restore new-db-name restore-time
+    ubi pg (location/pg-name | pg-id) restore [options] new-db-name restore-time
+
+Options:
+    -c, --pg-config=config           postgres config (e.g. key1=value1,key2=value2)
+    -u, --pgbouncer-config=config    pgbouncer config (e.g. key1=value1,key2=value2)
+    -t, --tags=tags                  tags (e.g. key1=value1,key2=value2)
+
+
+Set the maintenance window for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) set-maintenance-window start-hour
+
+Examples:
+    ubi pg pg-id set-maintenance-window 3   #  3 am
+    ubi pg pg-id set-maintenance-window 23  # 11 pm
+    ubi pg pg-id set-maintenance-window ""  # unset
+
+
+Show configuration for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) show-config
+
+
+Show pgbouncer configuration for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) show-pgbouncer-config
+
+
+Show the status of a major version upgrade of the PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) show-upgrade-status
 
 
 Show details for a PostgreSQL database
@@ -497,9 +785,16 @@ Options:
 
 Allowed Option Values:
     Fields: id name state location vm-size target-vm-size storage-size-gib
-            target-storage-size-gib version ha-type flavor connection-string
-            primary earliest-restore-time firewall-rules metric-destinations
-            ca-certificates
+            target-storage-size-gib version target-version ha-type flavor
+            connection-string primary earliest-restore-time
+            maintenance-window-start-at read-replica parent tags firewall-rules
+            metric-destinations read-replicas ca-certificates
+
+
+Schedule a major version upgrade of the PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) upgrade
 
 
 Manage private subnets
@@ -516,6 +811,7 @@ Post Commands:
     create        Create a private subnet
     destroy       Destroy a private subnet
     disconnect    Disconnect a private subnet from another private subnet
+    rename        Rename a private subnet
     show          Show details for a private subnet
 
 
@@ -536,7 +832,7 @@ Allowed Option Values:
 Connect a private subnet to another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) connect ps-id
+    ubi ps (location/ps-name | ps-id) connect (ps-name | ps-id)
 
 
 Create a private subnet
@@ -545,7 +841,7 @@ Usage:
     ubi ps location/ps-name create [options]
 
 Options:
-    -f, --firewall-id=id             add to given firewall
+    -f, --firewall-id=fw-id-or-name  add to given firewall
 
 
 Destroy a private subnet
@@ -560,7 +856,13 @@ Options:
 Disconnect a private subnet from another private subnet
 
 Usage:
-    ubi ps (location/ps-name | ps-id) disconnect ps-id
+    ubi ps (location/ps-name | ps-id) disconnect (ps-name | ps-id)
+
+
+Rename a private subnet
+
+Usage:
+    ubi ps (location/ps-name | ps-id) rename new-name
 
 
 Show details for a private subnet
@@ -581,6 +883,72 @@ Allowed Option Values:
     Firewall Fields: id name description location path firewall-rules
 
 
+Manage SSH public keys
+
+Usage:
+    ubi sk command [...]
+    ubi sk (sk-name | sk-id) post-command [...]
+
+Commands:
+    list       List SSH public keys
+
+Post Commands:
+    create     Register an SSH public key
+    destroy    Destroy an SSH public key
+    rename     Rename an SSH public key
+    show       Show details for an SSH public key
+    update     Update an SSH public key
+
+
+List SSH public keys
+
+Usage:
+    ubi sk list [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+Register an SSH public key
+
+Usage:
+    ubi sk sk-name create public-key
+
+Examples:
+    ubi sk my-sk-name create "$(cat ~/.ssh/id_ed25519.pub)"
+    ubi sk my-sk-name create "$(cat ~/.ssh/authorized_keys)"
+
+
+Destroy an SSH public key
+
+Usage:
+    ubi sk (sk-name | sk-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Rename an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) rename new-name
+
+
+Show details for an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) show
+
+
+Update an SSH public key
+
+Usage:
+    ubi sk (sk-id | sk-name) update public-key
+
+Examples:
+    ubi sk my-sk-name update "$(cat ~/.ssh/id_ed25519.pub)"
+
+
 Display CLI program version
 
 Usage:
@@ -599,6 +967,7 @@ Commands:
 Post Commands:
     create     Create a virtual machine
     destroy    Destroy a virtual machine
+    rename     Rename a virtual machine
     restart    Restart a virtual machine
     scp        Copy files to or from virtual machine using `scp`
     sftp       Copy files to or from virtual machine using `sftp`
@@ -628,22 +997,25 @@ Allowed Option Values:
 Create a virtual machine
 
 Usage:
-    ubi vm location/vm-name create [options] public_key
+    ubi vm location/vm-name create [options] public-key
 
 Examples:
     ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"
     ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"
+    ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name
+    ubi vm eu-central-h1/my-vm-name create -i "$(cat /path/to/init/script)" registered-ssh-public-key-name
 
 Options:
     -6, --ipv6-only                  do not enable IPv4
     -b, --boot-image=image_name      boot image
-    -p, --private-subnet-id=id       place VM into specific private subnet
+    -i, --init-script=script         use given init script
+    -p, --private-subnet-id=ps-id    place VM into specific private subnet (also accepts ps-name)
     -s, --size=size                  server size
     -S, --storage-size=size          storage size
     -u, --unix-user=username         username (default: ubi)
 
 Allowed Option Values:
-    Boot Image: ubuntu-noble ubuntu-jammy debian-12 almalinux-9
+    Boot Image: gpu-ubuntu-noble ubuntu-noble ubuntu-jammy debian-12 almalinux-9
     Size: standard-2 standard-4 standard-8 standard-16 standard-30 standard-60
           burstable-1 burstable-2
     Storage Size: 10 20 40 80 160 320 600 640 1200 2400
@@ -656,6 +1028,12 @@ Usage:
 
 Options:
     -f, --force                      do not require confirmation
+
+
+Rename a virtual machine
+
+Usage:
+    ubi vm (location/vm-name | vm-id) rename new-name
 
 
 Restart a virtual machine

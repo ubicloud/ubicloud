@@ -10,7 +10,7 @@ end
 
 RSpec.describe MetricsTargetMethods do
   let(:test_instance) { TestClass.new }
-  let(:mock_ssh_session) { instance_double(Net::SSH::Connection::Session) }
+  let(:mock_ssh_session) { Net::SSH::Connection::Session.allocate }
   let(:session) { {ssh_session: mock_ssh_session} }
   let(:mock_tsdb_client) { instance_double(VictoriaMetrics::Client) }
   let(:metrics_dir) { "/home/ubi/metrics" }
@@ -30,42 +30,56 @@ RSpec.describe MetricsTargetMethods do
   describe "#export_metrics" do
     context "when scrape results are empty" do
       before do
-        allow(test_instance).to receive(:scrape_endpoints).and_return([])
-        allow(Clog).to receive(:emit).and_call_original
+        expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return("")
       end
 
       it "does not call import_prometheus or mark_pending_scrapes_as_done" do
         expect(mock_tsdb_client).not_to receive(:import_prometheus)
-        expect(test_instance).not_to receive(:mark_pending_scrapes_as_done)
+        expect(mock_ssh_session).not_to receive(:_exec!).with(/xargs.*rm/)
 
-        test_instance.export_metrics(session: session, tsdb_client: mock_tsdb_client)
+        test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
       end
     end
 
     context "when scrape results exist" do
-      let(:time) { Time.now }
-      let(:scrape_result_a) { VictoriaMetrics::Client::Scrape.new(time: time - 10, samples: "metric1{} 1") }
-      let(:scrape_result_b) { VictoriaMetrics::Client::Scrape.new(time: time, samples: "metric2{} 2") }
-      let(:scrape_results) { [scrape_result_a, scrape_result_b] }
+      let(:time_a) { Time.new(2023, 1, 1, 12, 0, 0) }
+      let(:time_b) { Time.new(2023, 1, 1, 12, 15, 0) }
 
-      before do
-        allow(test_instance).to receive(:scrape_endpoints).and_return(scrape_results)
-        allow(Clog).to receive(:emit).and_call_original
-        allow(test_instance).to receive(:mark_pending_scrapes_as_done)
+      def stub_scrape_ssh_expectations
+        expect(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return("2023-01-01T12-00-00-000000000.prom\n2023-01-01T12-15-00-000000000.prom")
+        expect(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
+          options[:status][:exit_code] = 0
+          "metric1{} 1"
+        end
+        expect(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
+          options[:status][:exit_code] = 0
+          "metric2{} 2"
+        end
       end
 
-      it "does not call import_prometheus or mark_pending_scrapes_as_done if tsdb_client is nil" do
+      it "does not call import_prometheus if tsdb_client is nil" do
+        stub_scrape_ssh_expectations
         expect(mock_tsdb_client).not_to receive(:import_prometheus)
-        expect(test_instance).not_to receive(:mark_pending_scrapes_as_done)
-        test_instance.export_metrics(session: session, tsdb_client: nil)
+        expect(mock_ssh_session).not_to receive(:_exec!).with(/xargs.*rm/)
+        expect(Clog).to receive(:emit).with("VictoriaMetrics server is not configured.")
+        test_instance.export_metrics(session:, tsdb_client: nil)
       end
 
       it "imports all scrapes and marks them as done" do
-        expect(mock_tsdb_client).to receive(:import_prometheus).with(scrape_result_a, {foo: "bar"})
-        expect(mock_tsdb_client).to receive(:import_prometheus).with(scrape_result_b, {foo: "bar"})
-        expect(test_instance).to receive(:mark_pending_scrapes_as_done).with(session, time)
+        stub_scrape_ssh_expectations
+        expect(mock_tsdb_client).to receive(:import_prometheus) do |scrape, labels|
+          expect(scrape.time).to eq(time_a)
+          expect(scrape.samples).to eq("metric1{} 1")
+          expect(labels).to eq({foo: "bar"})
+        end
+        expect(mock_tsdb_client).to receive(:import_prometheus) do |scrape, labels|
+          expect(scrape.time).to eq(time_b)
+          expect(scrape.samples).to eq("metric2{} 2")
+          expect(labels).to eq({foo: "bar"})
+        end
+        expect(mock_ssh_session).to receive(:_exec!).with(/xargs.*rm/)
 
-        test_instance.export_metrics(session: session, tsdb_client: mock_tsdb_client)
+        test_instance.export_metrics(session:, tsdb_client: mock_tsdb_client)
       end
     end
   end
@@ -76,8 +90,8 @@ RSpec.describe MetricsTargetMethods do
     let(:status_hash) { {exit_code: 0} }
 
     before do
-      allow(mock_ssh_session).to receive(:exec!).with(/ls.*done/).and_return(file_list)
-      allow(mock_ssh_session).to receive(:exec!).with(/cat.*done/, status: anything) do |_, options|
+      allow(mock_ssh_session).to receive(:_exec!).with(/ls.*done/).and_return(file_list)
+      allow(mock_ssh_session).to receive(:_exec!).with(/cat.*done/, status: anything) do |_, options|
         options[:status][:exit_code] = status_hash[:exit_code]
         file_content
       end
@@ -110,17 +124,22 @@ RSpec.describe MetricsTargetMethods do
     let(:time_marker) { "2023-01-01T12-00-00-000000000" }
 
     it "executes the correct command to move files" do
-      expected_command = "ls #{metrics_dir}/done | sort | awk '$0 <= \"#{time_marker}\"' | xargs -I{} rm #{metrics_dir}/done/{}"
-      expect(mock_ssh_session).to receive(:exec!).with(expected_command)
+      expect(mock_ssh_session).to receive(:_exec!).with("ls /home/ubi/metrics/done | sort | awk \\$0\\ \\<\\=\\ \\\"2023-01-01T12-00-00-000000000\\\" | xargs -I{} rm /home/ubi/metrics/done/{}")
 
       test_instance.mark_pending_scrapes_as_done(session, time)
     end
   end
 
   describe "#metrics_dir" do
-    it "returns the escaped metrics directory path" do
-      allow(test_instance).to receive(:metrics_config).and_return({metrics_dir: "/path with spaces"})
-      expect(test_instance.metrics_dir).to eq("/path\\ with\\ spaces")
+    it "returns the unescaped metrics directory path" do
+      test_with_custom_config = Class.new {
+        include MetricsTargetMethods
+
+        def metrics_config
+          {metrics_dir: "/path with spaces"}
+        end
+      }.new
+      expect(test_with_custom_config.send(:metrics_dir)).to eq("/path with spaces")
     end
   end
 end

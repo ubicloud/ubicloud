@@ -22,6 +22,10 @@ RSpec.describe Strand do
       expect(did_it).to be :did_it
     end
 
+    it "create_with_id raises if given a nil id" do
+      expect { described_class.create_with_id(nil, prog: "Prog::Base", label: "start") }.to raise_error(RuntimeError)
+    end
+
     it "clears cached instance state" do
       st.save_changes
       st.set(label: "smoke_test_0")
@@ -51,7 +55,7 @@ RSpec.describe Strand do
       expect(st).to receive(:unsynchronized_run) do
         st.this.update(lease: Sequel[:lease] + Sequel.cast("1 second", :interval))
       end
-      expect(Clog).to receive(:emit).with("lease violated data").and_call_original
+      expect(Clog).to receive(:emit).with("lease violated data", instance_of(Hash)).and_call_original
       expect { st.run }.to raise_error RuntimeError, "BUG: lease violated"
     end
   end
@@ -90,10 +94,12 @@ RSpec.describe Strand do
   end
 
   it "logs end of strand if it took long" do
+    now = Time.now
     st.label = "napper"
     st.save_changes
-    expect(Time).to receive(:now).and_return(Time.now - 10, Time.now, Time.now)
-    expect(Clog).to receive(:emit).with("finished strand").and_call_original
+    expect(Time).to receive(:now).and_return(now - 10)
+    expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(Clog).to receive(:emit).with("finished strand", instance_of(Array)).and_call_original
     st.unsynchronized_run
   end
 end

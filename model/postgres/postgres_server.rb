@@ -1,24 +1,33 @@
 # frozen_string_literal: true
 
-require "net/ssh"
 require "uri"
 require_relative "../../model"
+require_relative "../../lib/net_ssh"
 
 class PostgresServer < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :resource, class: :PostgresResource, key: :resource_id
-  many_to_one :timeline, class: :PostgresTimeline, key: :timeline_id
-  one_to_one :vm, key: :id, primary_key: :vm_id
-  one_to_one :lsn_monitor, class: :PostgresLsnMonitor, key: :postgres_server_id
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :resource, class: :PostgresResource
+  many_to_one :timeline, class: :PostgresTimeline
+  one_to_one :vm, key: :id, primary_key: :vm_id, read_only: true
+  one_to_one :lsn_monitor, class: :PostgresLsnMonitor, read_only: true, is_used: true
 
   plugin :association_dependencies, lsn_monitor: :destroy
 
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
-    :restart, :configure, :fence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials
+    :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
+    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline
   include HealthMonitorMethods
   include MetricsTargetMethods
+
+  def self.victoria_metrics_client
+    VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
+  end
+
+  def aws?
+    (vm || timeline).location.aws?
+  end
 
   def configure_hash
     configs = {
@@ -73,7 +82,11 @@ class PostgresServer < Sequel::Model
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
-      configs[:archive_command] = "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      configs[:archive_command] = if resource.use_old_walg_command_set?
+        "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'"
+      else
+        "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'"
+      end
 
       if primary?
         if resource.ha_type == PostgresResource::HaType::SYNC
@@ -94,15 +107,11 @@ class PostgresServer < Sequel::Model
         configs[:restore_command] = "'/usr/bin/wal-g wal-fetch %f %p --config /etc/postgresql/wal-g.env'"
       end
 
-      if timeline.aws?
-        configs[:log_line_prefix] = "'%m [%p:%l] (%x,%v): host=%r,db=%d,user=%u,app=%a,client=%h '"
-        configs[:log_connections] = "on"
-        configs[:log_disconnections] = "on"
-      end
+      add_provider_configs(configs)
     end
 
     {
-      configs: configs,
+      configs:,
       user_config: resource.user_config,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       private_subnets: vm.private_subnets.map {
@@ -111,21 +120,22 @@ class PostgresServer < Sequel::Model
           net6: it.net6.to_s
         }
       },
+      cert_auth_users: resource.cert_auth_users,
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
-      metrics_config: metrics_config
+      metrics_config:
     }
   end
 
   def trigger_failover(mode:)
     unless representative_at
-      Clog.emit("Cannot trigger failover on a non-representative server") { {ubid: ubid} }
+      Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
     end
 
     unless (standby = failover_target)
-      Clog.emit("No suitable standby found for failover") { {ubid: ubid} }
+      Clog.emit("No suitable standby found for failover", {ubid:})
       return false
     end
 
@@ -150,11 +160,11 @@ class PostgresServer < Sequel::Model
   end
 
   def storage_size_gib
-    vm.vm_storage_volumes_dataset.reject(&:boot).sum(&:size_gib)
+    vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
 
   def needs_recycling?
-    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
   end
 
   def lsn_caught_up
@@ -164,7 +174,7 @@ class PostgresServer < Sequel::Model
       resource.representative_server
     end
 
-    lsn_diff(parent_server&.current_lsn || current_lsn, current_lsn) < 80 * 1024 * 1024
+    !parent_server || lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
   end
 
   def current_lsn
@@ -181,7 +191,7 @@ class PostgresServer < Sequel::Model
     return nil if target.nil?
 
     if resource.ha_type == PostgresResource::HaType::ASYNC
-      return nil if lsn_monitor.last_known_lsn.nil?
+      return nil if lsn_monitor&.last_known_lsn.nil?
       return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
@@ -205,7 +215,7 @@ class PostgresServer < Sequel::Model
     ssh_session = vm.sshable.start_fresh_session
     ssh_session.forward.local_socket(File.join(health_monitor_socket_path, ".s.PGSQL.5432"), "/var/run/postgresql/.s.PGSQL.5432")
     {
-      ssh_session: ssh_session,
+      ssh_session:,
       db_connection: nil
     }
   end
@@ -213,7 +223,7 @@ class PostgresServer < Sequel::Model
   def init_metrics_export_session
     ssh_session = vm.sshable.start_fresh_session
     {
-      ssh_session: ssh_session
+      ssh_session:
     }
   end
 
@@ -225,18 +235,18 @@ class PostgresServer < Sequel::Model
     rescue
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading, data: {last_known_lsn: last_known_lsn})
+    pulse = aggregate_readings(previous_pulse:, reading:, data: {last_known_lsn:})
 
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
         begin
-          PostgresLsnMonitor.new(last_known_lsn: last_known_lsn) { it.postgres_server_id = id }
+          PostgresLsnMonitor.new(last_known_lsn:) { it.postgres_server_id = id }
             .insert_conflict(
               target: :postgres_server_id,
-              update: {last_known_lsn: last_known_lsn}
+              update: {last_known_lsn:}
             ).save_changes
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor") { {lsn_update_error: {ubid: ubid, last_known_lsn: last_known_lsn, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("Failed to update PostgresLsnMonitor", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
         end
       end
 
@@ -268,6 +278,22 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 
+  def export_metrics(session:, tsdb_client:)
+    session[:export_count] ||= 0
+    session[:export_count] += 1
+
+    # Check archival backlog every 12 exports (similar to pulse check frequency)
+    # We do this in metrics export rather than pulse check because the metrics
+    # export session does not use an event loop. Calling exec! on an SSH session
+    # with an active event loop is not thread-safe and leads to stuck sessions.
+    if session[:export_count] % 12 == 1
+      observe_archival_backlog(session)
+    end
+
+    # Call parent implementation to export actual metrics
+    super
+  end
+
   def metrics_config
     ignored_timeseries_patterns = [
       "pg_stat_user_tables_.*",
@@ -278,6 +304,7 @@ class PostgresServer < Sequel::Model
       "match[]": "{__name__!~'#{exclude_pattern}'}"
     }
     query_str = URI.encode_www_form(query_params)
+    additional_labels = resource.tags.to_h { |key, value| ["pg_tags_label_#{key}", value] } # rubocop:disable Style/HashTransformKeys
 
     {
       endpoints: [
@@ -285,26 +312,63 @@ class PostgresServer < Sequel::Model
       ],
       max_file_retention: 120,
       interval: "15s",
-      additional_labels: {},
+      additional_labels:,
       metrics_dir: "/home/ubi/postgres/metrics",
       project_id: Config.postgres_service_project_id
     }
   end
 
-  def storage_device_paths
-    if vm.location.aws?
-      # On AWS, pick the largest block device to use as the data disk,
-      # since the device path detected by the VmStorageVolume is not always
-      # correct.
-      storage_device_count = vm.vm_storage_volumes.count { it.boot == false }
-      vm.sshable.cmd("lsblk -b -d -o NAME,SIZE | sort -n -k2 | tail -n#{storage_device_count} |  awk '{print \"/dev/\"$1}'").strip.split
-    else
-      [vm.vm_storage_volumes.find { it.boot == false }.device_path.shellescape]
-    end
-  end
-
   def taking_over?
     unplanned_take_over_set? || planned_take_over_set? || FAILOVER_LABELS.include?(strand.label)
+  end
+
+  def switch_to_new_timeline(parent_id: timeline.id)
+    # We have to stop wal-g before updating the timeline to avoid WAL files
+    # being pushed to the old bucket.
+    vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
+    update(
+      timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
+      timeline_access: "push"
+    )
+
+    increment_s3_new_timeline
+    refresh_walg_credentials
+  end
+
+  def refresh_walg_credentials
+    return if timeline.blob_storage.nil?
+
+    walg_config = timeline.generate_walg_config(version)
+    vm.sshable.cmd("sudo -u postgres tee /etc/postgresql/wal-g.env > /dev/null", stdin: walg_config)
+    refresh_walg_blob_storage_credentials
+    vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
+  end
+
+  def observe_archival_backlog(session)
+    result = session[:ssh_session].exec!(
+      "sudo find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
+      version:
+    )
+    archival_backlog = Integer(result.strip, 10)
+
+    if archival_backlog > archival_backlog_threshold
+      Prog::PageNexus.assemble("#{ubid} archival backlog high",
+        ["PGArchivalBacklogHigh", id], ubid,
+        severity: "warning", extra_data: {archival_backlog:})
+    else
+      Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe archival backlog", {postgres_server_id: id, exception: Util.exception_to_hash(ex)})
+  end
+
+  def archival_backlog_threshold
+    # To make the threshold adaptive to storage size, we set it as percent of
+    # the storage size as WAL file count based on the allocated storage size,
+    # capped to 1000 to avoid high thresholds on large storage sizes.
+    archival_backlog_threshold_percent = 5
+    archival_backlog_threshold_count = 1000
+    [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
@@ -314,16 +378,18 @@ end
 # Columns:
 #  id                     | uuid                     | PRIMARY KEY
 #  created_at             | timestamp with time zone | NOT NULL DEFAULT now()
-#  updated_at             | timestamp with time zone | NOT NULL DEFAULT now()
 #  resource_id            | uuid                     | NOT NULL
 #  vm_id                  | uuid                     |
 #  timeline_id            | uuid                     | NOT NULL
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  representative_at      | timestamp with time zone |
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
+#  version                | text                     | NOT NULL
 # Indexes:
 #  postgres_server_pkey1             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
+# Check constraints:
+#  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 # Foreign key constraints:
 #  postgres_server_timeline_id_fkey | (timeline_id) REFERENCES postgres_timeline(id)
 #  postgres_server_vm_id_fkey       | (vm_id) REFERENCES vm(id)

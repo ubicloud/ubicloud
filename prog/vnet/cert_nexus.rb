@@ -14,15 +14,9 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     DB.transaction do
-      cert = Cert.create(hostname: hostname, dns_zone_id: dns_zone_id)
+      cert = Cert.create(hostname:, dns_zone_id:)
 
-      Strand.create_with_id(cert.id, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      hop_destroy unless %w[destroy].include?(strand.label)
+      Strand.create_with_id(cert, prog: "Vnet::CertNexus", label: "start", stack: [{"restarted" => 0}])
     end
   end
 
@@ -66,7 +60,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
       hop_cert_finalization
     else
-      Clog.emit("DNS validation failed") { {order_status: dns_challenge.status} }
+      Clog.emit("DNS validation failed", {order_status: dns_challenge.status})
       dns_zone.delete_record(record_name: dns_record_name)
       hop_restart
     end
@@ -87,7 +81,7 @@ class Prog::Vnet::CertNexus < Prog::Base
       dns_zone.delete_record(record_name: dns_record_name)
       hop_wait
     else
-      Clog.emit("Certificate finalization failed") { {order_status: acme_order.status} }
+      Clog.emit("Certificate finalization failed", {order_status: acme_order.status})
       dns_zone.delete_record(record_name: dns_record_name)
       hop_restart
     end
@@ -105,7 +99,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   label def restart
     when_restarted_set? do
       decr_restarted
-      update_stack_restart_counter
+      update_stack({"restarted" => strand.stack.first["restarted"] + 1})
       hop_start
     end
 
@@ -123,12 +117,12 @@ class Prog::Vnet::CertNexus < Prog::Base
     begin
       acme_client.revoke(certificate: cert.cert, reason: REVOKE_REASON) if cert.cert
     rescue Acme::Client::Error::AlreadyRevoked => ex
-      Clog.emit("Certificate is already revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Certificate is already revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::NotFound => ex
-      Clog.emit("Certificate is not found") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Certificate is not found", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
     rescue Acme::Client::Error::Unauthorized => ex
       if ex.message.include?("The certificate has expired and cannot be revoked")
-        Clog.emit("Certificate is expired and cannot be revoked") { {cert_revoke_failure: {ubid: cert.ubid, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Certificate is expired and cannot be revoked", {cert_revoke_failure: Util.exception_to_hash(ex, into: {ubid: cert.ubid})})
       else
         raise ex
       end
@@ -137,13 +131,6 @@ class Prog::Vnet::CertNexus < Prog::Base
     dns_zone.delete_record(record_name: dns_record_name) if dns_challenge
     cert.destroy
     pop "certificate revoked and destroyed"
-  end
-
-  def update_stack_restart_counter
-    current_frame = strand.stack.first
-    current_frame["restarted"] += 1
-    strand.modified!(:stack)
-    strand.save_changes
   end
 
   def acme_client

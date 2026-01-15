@@ -2,14 +2,14 @@
 
 class Clover
   hash_branch(:runtime_prefix, "github") do |r|
-    if (runner = GithubRunner[vm_id: @vm.id]).nil? || (repository = runner.repository).nil?
+    if (runner = @vm.github_runner).nil? || (repository = runner.repository).nil?
       fail CloverError.new(400, "InvalidRequest", "invalid JWT format or claim in Authorization header")
     end
 
     begin
       repository.setup_blob_storage unless repository.access_key
     rescue Excon::Error::HTTPStatus => ex
-      Clog.emit("Unable to setup blob storage") { {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}} }
+      Clog.emit("Unable to setup blob storage", {failed_blob_storage_setup: {ubid: runner.ubid, repository_ubid: repository.ubid, response: ex.response.body}})
       fail CloverError.new(400, "InvalidRequest", "unable to setup blob storage")
     end
 
@@ -18,7 +18,7 @@ class Clover
       keys, version = typecast_params.nonempty_str!(%w[keys version])
       keys = keys.split(",")
 
-      dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version: version)
+      dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version:)
 
       unless repository.installation.project.get_ff_access_all_cache_scopes
         # Clients can send multiple keys, and we look for caches in multiple scopes.
@@ -78,7 +78,7 @@ class Clover
           scopes = [runner.workflow_job&.dig("head_branch"), repository.default_branch].compact
           entries = repository.cache_entries_dataset
             .exclude(committed_at: nil)
-            .where(key: key, scope: scopes)
+            .where(key:, scope: scopes)
             .order(:version).all
 
           {
@@ -100,15 +100,15 @@ class Clover
           size = typecast_params.pos_int("cacheSize")
 
           unless (scope = runner.workflow_job&.dig("head_branch") || get_scope_from_github(runner, typecast_params.nonempty_str("runId")))
-            Clog.emit("The runner does not have a workflow job") { {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}} }
+            Clog.emit("The runner does not have a workflow job", {no_workflow_job: {ubid: runner.ubid, repository_ubid: repository.ubid}})
             fail CloverError.new(400, "InvalidRequest", "No workflow job data available")
           end
 
-          if size && size > GithubRepository::CACHE_SIZE_LIMIT
+          if size && size > GithubRepository.cache_size_limit
             fail CloverError.new(400, "InvalidRequest", "The cache size is over the 10GB limit")
           end
 
-          unless GithubCacheEntry.where(repository_id: runner.repository.id, scope:, key:, version:).empty?
+          unless repository.cache_entries_dataset.where(scope:, key:, version:).empty?
             fail CloverError.new(409, "AlreadyExists", "A cache entry for #{scope} scope already exists with #{key} key and #{version} version.")
           end
 
@@ -134,7 +134,7 @@ class Clover
               # :nocov:
               retry
             else
-              Clog.emit("Could not authorize multipart upload") { {could_not_authorize_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+              Clog.emit("Could not authorize multipart upload", {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
               fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
             end
           end
@@ -147,12 +147,12 @@ class Clover
 
           # If size is not provided, it means that the client doesn't
           # let us know the size of the cache. In this case, we use the
-          # GithubRepository::CACHE_SIZE_LIMIT as the size.
-          size ||= GithubRepository::CACHE_SIZE_LIMIT
+          # GithubRepository.cache_size_limit as the size.
+          size ||= GithubRepository.cache_size_limit
 
           max_chunk_size = 32 * 1024 * 1024 # 32MB
           presigned_urls = (1..size.fdiv(max_chunk_size).ceil).map do
-            repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id: upload_id, part_number: it, expires_in: 900)
+            repository.url_presigner.presigned_url(:upload_part, bucket: repository.bucket_name, key: entry.blob_key, upload_id:, part_number: it, expires_in: 900)
           end
 
           {
@@ -169,21 +169,21 @@ class Clover
         upload_id = typecast_params.nonempty_str!("uploadId")
         size = typecast_params.pos_int!("size")
 
-        entry = GithubCacheEntry[repository_id: repository.id, upload_id: upload_id, committed_at: nil]
+        entry = repository.cache_entries_dataset.first(upload_id:, committed_at: nil)
         fail CloverError.new(204, "NotFound", "No cache entry") if entry.nil? || (entry.size && entry.size != size)
 
         begin
           repository.blob_storage_client.complete_multipart_upload({
             bucket: repository.bucket_name,
             key: entry.blob_key,
-            upload_id: upload_id,
+            upload_id:,
             multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
-          Clog.emit("could not complete multipart upload") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("could not complete multipart upload", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
         rescue Aws::S3::Errors::ServiceUnavailable => ex
-          Clog.emit("s3 service unavailable") { {failed_multipart_upload: {ubid: runner.ubid, repository_ubid: repository.ubid, exception: Util.exception_to_hash(ex)}} }
+          Clog.emit("s3 service unavailable", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
           fail CloverError.new(503, "ServiceUnavailable", "Service unavailable")
         end
 

@@ -10,22 +10,17 @@ class MetricsTargetResource
     @last_export_success = false
     @export_started_at = Time.now
     @deleted = false
-
-    vmr = VictoriaMetricsResource.first(project_id: resource.metrics_config[:project_id])
-    vms = vmr&.servers&.first
-    @tsdb_client = vms&.client || (VictoriaMetrics::Client.new(endpoint: "http://localhost:8428") if Config.development?)
+    @tsdb_client = VictoriaMetricsResource.client_for_project(resource.metrics_config[:project_id])
   end
 
   def open_resource_session
     return if @session && @last_export_success
 
     @session = @resource.reload.init_metrics_export_session
-  rescue => ex
-    if ex.is_a?(Sequel::NoExistingObject)
-      Clog.emit("Resource is deleted.") { {resource_deleted: {ubid: @resource.ubid}} }
-      @session = nil
-      @deleted = true
-    end
+  rescue Sequel::NoExistingObject
+    Clog.emit("Resource is deleted.", {resource_deleted: {ubid: @resource.ubid}})
+    @session = nil
+    @deleted = true
   end
 
   def export_metrics
@@ -34,12 +29,13 @@ class MetricsTargetResource
     @export_started_at = Time.now
     begin
       count = @resource.export_metrics(session: @session, tsdb_client: @tsdb_client)
-      Clog.emit("Metrics export has finished.") { {metrics_export_success: {ubid: @resource.ubid, count: count}} }
+      Clog.emit("Metrics export has finished.", {metrics_export_success: {ubid: @resource.ubid, count:}})
       @last_export_success = true
     rescue => ex
       @last_export_success = false
       close_resource_session
-      Clog.emit("Metrics export has failed.") { {metrics_export_failure: {ubid: @resource.ubid, exception: Util.exception_to_hash(ex)}} }
+      Clog.emit("Metrics export has failed.", {metrics_export_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
+      # TODO: Consider raising the exception here, and let the caller handle it.
     end
   end
 

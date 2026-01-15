@@ -38,6 +38,7 @@ RSpec.configure do |config|
 
   config.before do |example|
     next unless example.metadata[:clover_cli]
+
     header "Accept", "text/plain"
     @account = create_account
     @use_pat = true

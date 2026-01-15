@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "../../lib/net_ssh"
 
 class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool
@@ -18,15 +18,7 @@ class Prog::Vm::VmPool < Prog::Base
         storage_skip_sync:,
         arch:
       )
-      Strand.create_with_id(vm_pool.id, prog: "Vm::VmPool", label: "create_new_vm")
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_vms_destroy"].include?(strand.label)
-        hop_destroy
-      end
+      Strand.create_with_id(vm_pool, prog: "Vm::VmPool", label: "create_new_vm")
     end
   end
 

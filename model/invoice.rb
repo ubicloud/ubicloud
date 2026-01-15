@@ -14,12 +14,27 @@ class Invoice < Sequel::Model
 
   plugin ResourceMethods
 
+  alias_method :admin_label, :invoice_number
+
+  def path_id
+    id ? ubid : "current"
+  end
+
   def path
-    "/invoice/#{id ? ubid : "current"}"
+    "/invoice/#{path_id}"
   end
 
   def filename
-    "Ubicloud-#{begin_time.strftime("%Y-%m")}-#{invoice_number}.pdf"
+    "Ubicloud-#{begin_time.utc.strftime("%Y-%m")}-#{invoice_number}.pdf"
+  end
+
+  %i[subtotal cost].each do |meth|
+    str = meth.to_s
+    define_method(meth) { content[str] }
+  end
+
+  def payable?
+    cost > 0 && status == "unpaid" && ubid != "current"
   end
 
   def blob_key
@@ -37,7 +52,7 @@ class Invoice < Sequel::Model
         "non_eu"
       end
     end
-    "#{begin_time.strftime("%Y/%m")}/#{group}/#{filename}"
+    "#{begin_time.utc.strftime("%Y/%m")}/#{group}/#{filename}"
   end
 
   def after_destroy
@@ -49,7 +64,7 @@ class Invoice < Sequel::Model
   end
 
   def name
-    begin_time.strftime("%B %Y")
+    begin_time.utc.strftime("%B %Y")
   end
 
   def charge
@@ -60,21 +75,28 @@ class Invoice < Sequel::Model
     end
 
     if status != "unpaid"
-      Clog.emit("Invoice already charged.") { {invoice_already_charged: {ubid: ubid, status: status}} }
+      Clog.emit("Invoice already charged.", {invoice_already_charged: {ubid:, status:}})
       return true
     end
 
     amount = content["cost"].to_f.round(2)
     if amount < Config.minimum_invoice_charge_threshold
       update(status: "below_minimum_threshold")
-      Clog.emit("Invoice cost is less than minimum charge cost.") { {invoice_below_threshold: {ubid: ubid, cost: amount}} }
-      send_success_email(below_threshold: true)
+      Clog.emit("Invoice cost is less than minimum charge cost.", {invoice_below_threshold: {ubid:, cost: amount}})
+      send_success_email
       return true
     end
 
-    if (billing_info = BillingInfo[content.dig("billing_info", "id")]).nil? || billing_info.payment_methods.empty?
-      Clog.emit("Invoice doesn't have billing info.") { {invoice_no_billing: {ubid: ubid}} }
+    unless (billing_info = BillingInfo[content.dig("billing_info", "id")])
+      Clog.emit("Invoice doesn't have billing info.", {invoice_no_billing: {ubid:}})
       return false
+    end
+
+    if content["bank_transfer_info"]
+      update(status: "waiting_transfer")
+      Clog.emit("Invoice is waiting for transfer.", {invoice_waiting_transfer: {ubid:, cost: amount}})
+      send_success_email
+      return true
     end
 
     errors = []
@@ -89,17 +111,17 @@ class Invoice < Sequel::Model
           payment_method: pm.stripe_id
         })
       rescue Stripe::CardError => e
-        Clog.emit("Invoice couldn't charged.") { {invoice_not_charged: {ubid: ubid, payment_method: pm.ubid, error: e.message}} }
+        Clog.emit("Invoice couldn't charged.", {invoice_not_charged: {ubid:, payment_method: pm.ubid, error: e.message}})
         errors << e.message
         next
       end
 
       unless payment_intent.status == "succeeded"
-        Clog.emit("BUG: payment intent should succeed here") { {invoice_not_charged: {ubid: ubid, payment_method: pm.ubid, intent_id: payment_intent.id, error: payment_intent.status}} }
+        Clog.emit("BUG: payment intent should succeed here", {invoice_not_charged: {ubid:, payment_method: pm.ubid, intent_id: payment_intent.id, error: payment_intent.status}})
         next
       end
 
-      Clog.emit("Invoice charged.") { {invoice_charged: {ubid: ubid, payment_method: pm.ubid, cost: amount}} }
+      Clog.emit("Invoice charged.", {invoice_charged: {ubid:, payment_method: pm.ubid, cost: amount}})
       self.status = "paid"
       content.merge!({
         "payment_method" => {
@@ -115,58 +137,63 @@ class Invoice < Sequel::Model
       return true
     end
 
-    Clog.emit("Invoice couldn't charged with any payment method.") { {invoice_not_charged: {ubid: ubid}} }
+    Clog.emit("Invoice couldn't charged with any payment method.", {invoice_not_charged: {ubid:}})
     send_failure_email(errors)
     false
   end
 
-  def send_success_email(below_threshold: false)
-    ser = Serializers::Invoice.serialize(self, {detailed: true})
-    pdf = generate_pdf(ser)
-    unless ser[:billing_email]
-      Clog.emit("Couldn't send the invoice because it has no billing information") { {invoice_no_billing_info: {ubid:}} }
+  def send_success_email
+    data = Serializers::Invoice.serialize(self)
+    pdf = generate_pdf(data)
+    unless data.billing_email
+      Clog.emit("Couldn't send the invoice because it has no billing information", {invoice_no_billing_info: {ubid:}})
       return
     end
     persist(pdf)
-    messages = if below_threshold
-      ["Since the invoice total of #{ser[:total]} is below our minimum charge threshold, there will be no charges for this month."]
+    messages = case status
+    when "below_minimum_threshold"
+      ["Since the invoice total of #{data.total} is below our minimum charge threshold, there will be no charges for this month."]
+    when "waiting_transfer"
+      ["The invoice amount of #{data.total} is pending payment via bank transfer. Please follow the bank transfer instructions at the bottom of the invoice to complete the payment."]
+    when "paid"
+      ["The invoice amount of #{data.total} will be debited from your credit card on file."]
     else
-      ["The invoice amount of #{ser[:total]} will be debited from your credit card on file."]
+      fail "BUG: unexpected invoice status #{status}"
     end
-    github_usage = ser[:items].select { it[:description].include?("GitHub Runner") }.sum { it[:cost] }
+    github_usage = data.items.select { it.description.include?("GitHub Runner") }.sum(&:cost)
     saved_amount = 9 * github_usage
     if saved_amount > 1
       messages << "You saved $#{saved_amount.to_i} this month using managed Ubicloud runners instead of GitHub hosted runners!"
     end
 
-    Util.send_email(ser[:billing_email], "Ubicloud #{ser[:name]} Invoice ##{ser[:invoice_number]}",
-      greeting: "Dear #{ser[:billing_name]},",
-      body: ["Please find your current invoice ##{ser[:invoice_number]} below.",
+    Util.send_email(data.billing_email, "Ubicloud #{data.name} Invoice ##{data.invoice_number}",
+      greeting: "Dear #{data.billing_name},",
+      body: ["Please find your current invoice ##{data.invoice_number} below.",
         *messages,
         "If you have any questions, please send us a support request via support@ubicloud.com, and include your invoice number."],
       button_title: "View Invoice",
-      button_link: "#{Config.base_url}#{project.path}/billing#{ser[:path]}",
+      button_link: "#{Config.base_url}#{project.path}/billing#{data.path}",
       attachments: [[filename, pdf]])
   end
 
   def send_failure_email(errors)
-    ser = Serializers::Invoice.serialize(self, {detailed: true})
-    receivers = [ser[:billing_email]]
-    receivers += project.accounts.select { Authorization.has_permission?(project.id, it.id, "Project:billing", project.id) }.map(&:email)
+    data = Serializers::Invoice.serialize(self)
+    receivers = [data.billing_email]
+    receivers += project.accounts.select { Authorization.has_permission?(project, it, "Project:billing", project) }.map(&:email)
     Util.send_email(receivers.uniq, "Urgent: Action Required to Prevent Service Disruption",
       cc: Config.mail_from,
-      greeting: "Dear #{ser[:billing_name]},",
+      greeting: "Dear #{data.billing_name},",
       body: ["We hope this message finds you well.",
         "We've noticed that your credit card on file has been declined with the following errors:",
         *errors.map { "- #{it}" },
-        "The invoice amount of #{ser[:total]} tried be debited from your credit card on file.",
+        "The invoice amount of #{data.total} tried be debited from your credit card on file.",
         "To prevent service disruption, please update your payment information within the next two days.",
         "If you have any questions, please send us a support request via support@ubicloud.com."],
       button_title: "Update Payment Method",
       button_link: "#{Config.base_url}#{project.path}/billing")
   end
 
-  def generate_pdf(data)
+  def generate_pdf(data = Serializers::Invoice.serialize(self))
     pdf = Prawn::Document.new(
       page_size: "A4",
       page_layout: :portrait,
@@ -194,41 +221,42 @@ class Invoice < Sequel::Model
       path = "public/logo-primary.png"
       pdf.image path, height: 25, position: :left
       pdf.move_down 10
-      pdf.text data[:issuer_name], style: :semibold, color: dark_gray if data[:issuer_name]
-      pdf.text "#{data[:issuer_address]},"
-      pdf.text "#{data[:issuer_city]}, #{data[:issuer_state]} #{data[:issuer_postal_code]},"
-      pdf.text data[:issuer_country]
-      pdf.text "#{data[:issuer_in_eu_vat] ? "VAT" : "Tax"} ID: #{data[:issuer_tax_id]}" if data[:issuer_tax_id]
-      pdf.text "CCI/KVK ID: #{data[:issuer_trade_id]}" if data[:issuer_trade_id]
+      pdf.text data.issuer_name, style: :semibold, color: dark_gray if data.issuer_name
+      pdf.text "#{data.issuer_address},"
+      pdf.text "#{data.issuer_city}, #{data.issuer_state} #{data.issuer_postal_code},"
+      pdf.text data.issuer_country
+      pdf.text "#{data.issuer_in_eu_vat ? "VAT" : "Tax"} ID: #{data.issuer_tax_id}" if data.issuer_tax_id
+      pdf.text "CCI/KVK ID: #{data.issuer_trade_id}" if data.issuer_trade_id
     end
 
     # Row 1, Right Column: Invoice name and number
     pdf.bounding_box([right_column_x, row_y], width: column_width) do
-      pdf.text "Invoice for #{data[:name]}", align: :right, style: :semibold, color: dark_gray, size: 18
-      pdf.text "##{data[:invoice_number]}", align: :right
+      pdf.text "Invoice for #{data.name}", align: :right, style: :semibold, color: dark_gray, size: 18
+      pdf.text "##{data.invoice_number}", align: :right
     end
     pdf.move_down row.height.to_i - 20
 
     # Row 2, Left Column: Billing information
     row_y = pdf.cursor
     row = pdf.bounding_box([0, row_y], width: column_width) do
-      if data[:billing_name]
+      if data.billing_name
         pdf.text "Bill to:", style: :semibold, color: dark_gray, size: 14
-        pdf.text data[:company_name].to_s.strip.empty? ? data[:billing_name] : data[:company_name], style: :semibold, color: dark_gray, size: 14
+        pdf.text data.company_name.to_s.strip.empty? ? data.billing_name : data.company_name, style: :semibold, color: dark_gray, size: 14
         pdf.move_down 5
-        pdf.text "#{data[:billing_address]},"
-        pdf.text "#{data[:billing_city]}, #{data[:billing_state]} #{data[:billing_postal_code]},"
-        pdf.text data[:billing_country]
-        pdf.text "#{data[:billing_in_eu_vat] ? "VAT" : "Tax"} ID: #{data[:tax_id]}" if data[:tax_id]
+        pdf.text "#{data.billing_address},"
+        pdf.text "#{data.billing_city}, #{data.billing_state} #{data.billing_postal_code},"
+        pdf.text data.billing_country
+        pdf.text "#{data.billing_in_eu_vat ? "VAT" : "Tax"} ID: #{data.tax_id}" if data.tax_id
       end
     end
 
-    # Row 2, Right Column: Invoice dates
+    # Row 2, Right Column: Invoice dates and note
     pdf.bounding_box([right_column_x, row_y], width: column_width) do
-      dates = [["Invoice date:", data[:date]], ["Due date:", data[:date]]]
-      pdf.table(dates, position: :right) do
-        style(row(0..1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
-        style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+      right_data = [["Invoice date:", data.date], ["Due date:", data.due_date]]
+      right_data << ["Note:", data.note] if data.note
+      pdf.table(right_data, position: :right) do
+        style(row(0..2).columns(0..2), padding: [2, 5, 2, 5], borders: [])
+        style(column(0), align: :right, width: 90, text_wrap: :right, font_style: :semibold, text_color: dark_gray)
         style(column(1), align: :right)
       end
     end
@@ -236,10 +264,10 @@ class Invoice < Sequel::Model
 
     # Row 3: Invoice items
     items = [["RESOURCE", "DESCRIPTION", "USAGE", "AMOUNT"]]
-    items += if data[:items].empty?
+    items += if data.items.empty?
       [[{content: "No resources", colspan: 4, align: :center, font_style: :semibold}]]
     else
-      data[:items].map { [it[:name], it[:description], it[:usage], it[:cost_humanized]] }
+      data.items.map { [it.name, it.description, it.usage, it.cost_humanized] }
     end
     pdf.table items, header: true, width: pdf.bounds.width, cell_style: {size: 9, border_color: "E5E7EB", borders: [], padding: [5, 6, 12, 6], valign: :center} do
       style(row(0), size: 12, font_style: :semibold, text_color: dark_gray, background_color: "F9FAFB")
@@ -253,21 +281,35 @@ class Invoice < Sequel::Model
 
     # Row 4: Totals
     totals = [
-      ["Subtotal:", data[:subtotal]],
+      ["Subtotal:", data.subtotal],
       # :nocov:
-      (data[:discount] != "$0.00") ? ["Discount:", "-#{data[:discount]}"] : nil,
-      (data[:credit] != "$0.00") ? ["Credit:", "-#{data[:credit]}"] : nil,
-      (data[:free_inference_tokens_credit] != "$0.00") ? ["Free Inference Tokens:", "-#{data[:free_inference_tokens_credit]}"] : nil,
+      (data.discount != "$0.00") ? ["Discount:", "-#{data.discount}"] : nil,
+      (data.credit != "$0.00") ? ["Credit:", "-#{data.credit}"] : nil,
+      (data.free_inference_tokens_credit != "$0.00") ? ["Free Inference Tokens:", "-#{data.free_inference_tokens_credit}"] : nil,
       # :nocov:
-      if data[:vat_amount] != "$0.00"
-        ["VAT (#{data[:vat_rate]}%):", "(#{data[:vat_amount_eur]}) #{data[:vat_amount]}"]
+      if data.vat_amount != "$0.00"
+        ["VAT (#{data.vat_rate}%):", "(#{data.vat_amount_eur}) #{data.vat_amount}"]
       end,
-      (data[:total] != "$0.00" && data[:vat_reversed]) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
-      ["Total:", data[:total]]
+      (data.total != "$0.00" && data.vat_reversed) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
+      ["Total:", data.total]
     ].compact
     pdf.table(totals, position: :right, cell_style: {padding: [2, 5, 2, 5], borders: []}) do
       style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
       style(column(1), align: :right)
+    end
+
+    if data.bank_transfer_info
+      pdf.move_down 60
+      bank_transfer_info = [
+        [{content: "We kindly request you to remit the amount to:", colspan: 2, font_style: :semibold}],
+        *data.bank_transfer_info.to_a
+      ]
+      pdf.table(bank_transfer_info, position: :left) do
+        style(row(0..-1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
+        style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
+        style(column(1), align: :left)
+        style(row(0), align: :left)
+      end
     end
 
     pdf.render
@@ -281,6 +323,15 @@ class Invoice < Sequel::Model
       content_type: "application/pdf",
       if_none_match: "*"
     )
+  end
+
+  def generate_download_link
+    Aws::S3::Presigner.new(client: Invoice.blob_storage_client).presigned_url(:get_object,
+      bucket: Config.invoices_bucket_name,
+      key: blob_key,
+      expires_in: 60 * 60)
+  rescue
+    nil
   end
 
   def self.blob_storage_client

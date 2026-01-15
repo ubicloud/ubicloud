@@ -1,0 +1,2 @@
+Destroying this SSH public key is not recoverable.
+Enter the following to confirm destruction of the SSH public key: spk

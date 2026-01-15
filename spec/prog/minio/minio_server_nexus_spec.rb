@@ -115,7 +115,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(OpenSSL::PKey::EC).to receive(:new).with("root_cert_key_1").and_return(key_1)
 
       expect(Config).to receive(:development?).and_return(true)
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(vm).to receive(:ip4).and_return("1.1.1.1")
       create_certificate_payload[:extensions] = ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com,IP:1.1.1.1", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"]
       expect(Util).to receive(:create_certificate).with(create_certificate_payload).and_return([instance_double(OpenSSL::X509::Certificate, to_pem: "cert"), instance_double(OpenSSL::PKey::EC, to_pem: "cert_key")])
 
@@ -132,7 +132,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.cluster).to receive(:dns_zone).and_return(dz).at_least(:once)
       vm = nx.minio_server.vm
       vm.strand.update(label: "wait")
-      expect(vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(vm).to receive(:ip4).and_return("1.1.1.1")
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(nx.minio_server.cluster.dns_zone).to receive(:insert_record).with(record_name: nx.cluster.hostname, type: "A", ttl: 10, data: "1.1.1.1")
       expect(nx).to receive(:register_deadline)
@@ -168,20 +168,20 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#create_minio_user" do
     it "creates minio user and hops to setup" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user")
       expect { nx.create_minio_user }.to hop("setup")
     end
 
     it "does not raise an exception if the user already exists" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "useradd: user 'minio-user' already exists")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "useradd: user 'minio-user' already exists")
       expect { nx.create_minio_user }.to hop("setup")
     end
 
     it "raises an exception if the useradd command fails with a different error" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo groupadd -f --system minio-user")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "Error!")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system minio-user")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g minio-user minio-user").and_raise(RuntimeError, "Error!")
 
       expect { nx.create_minio_user }.to raise_error(RuntimeError, "Error!")
     end
@@ -209,25 +209,25 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#minio_restart" do
     it "hops to wait if succeeded" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --clean restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Succeeded")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --clean restart_minio")
       expect { nx.minio_restart }.to exit({"msg" => "minio server is restarted"})
     end
 
     it "naps if minio is not started" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("NotStarted")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("NotStarted")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
       expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if minio is failed" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Failed")
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Failed")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer 'systemctl restart minio' restart_minio")
       expect { nx.minio_restart }.to nap(1)
     end
 
     it "naps if the status is unknown" do
-      expect(nx.minio_server.vm.sshable).to receive(:cmd).with("common/bin/daemonizer --check restart_minio").and_return("Unknown")
+      expect(nx.minio_server.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check restart_minio").and_return("Unknown")
       expect { nx.minio_restart }.to nap(1)
     end
   end
@@ -377,7 +377,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect(nx.minio_server.vm.sshable).to receive(:destroy)
       expect(nx.minio_server.vm.nics.first).to receive(:incr_destroy)
       expect(nx.minio_server.vm).to receive(:incr_destroy)
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("10.10.10.10")
       expect(nx.minio_server).to receive(:destroy)
       expect(nx.minio_server.cluster.dns_zone).to receive(:delete_record).with(record_name: nx.cluster.hostname, type: "A", data: "10.10.10.10")
       expect { nx.destroy }.to exit({"msg" => "minio server destroyed"})
@@ -386,29 +386,23 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   describe "#before_run" do
     it "hops to destroy if strand is not destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.incr_destroy
       expect { nx.before_run }.to hop("destroy")
     end
 
-    it "does not hop to destroy if strand is destroy" do
-      nx.strand.update(label: "destroy")
+    it "does not hop to destroy if already destroying" do
+      nx.incr_destroy
+      nx.incr_destroying
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "does not hop to destroy if destroy is not set" do
-      expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand label is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      nx.incr_destroy
+      nx.incr_destroying
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the minio server"})
     end
@@ -425,13 +419,13 @@ RSpec.describe Prog::Minio::MinioServerNexus do
     end
 
     it "returns true if health check is successful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
       expect(nx.available?).to be(true)
     end
 
     it "returns false if health check is unsuccessful" do
-      expect(nx.minio_server.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").twice
+      expect(nx.minio_server.vm).to receive(:ip4).and_return("1.2.3.4")
       stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
       expect(nx.available?).to be(false)
     end

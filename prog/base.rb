@@ -9,6 +9,13 @@ class Prog::Base
     @subject_id = frame.dig("subject_id") || @strand.id
   end
 
+  # Searches the stack for the Prog that caused execution of the code,
+  # which can be useful in logging from nested method calls.
+  def self.current_prog
+    caller_locations.reverse_each { return it.label if it.label.start_with?("Prog::") }
+    nil
+  end
+
   def self.subject_is(*names)
     names.each do |name|
       class_eval %(
@@ -25,6 +32,7 @@ end
 
   def self.semaphore(*names)
     names.map!(&:intern)
+    names << :destroying if names.include?(:destroy) && !names.include?(:destroying)
     names.each do |name|
       define_method :"incr_#{name}" do
         @snap.incr(name)
@@ -32,6 +40,10 @@ end
 
       define_method :"decr_#{name}" do
         @snap.decr(name)
+      end
+
+      define_method :"#{name}_set?" do
+        @snap.set?(name)
       end
 
       class_eval %{
@@ -51,8 +63,27 @@ end
   def self.label(label)
     (@labels ||= []) << label
 
-    define_method :"hop_#{label}" do
-      dynamic_hop label
+    if label == :destroy
+      define_method :"hop_#{label}" do
+        incr_destroying
+        dynamic_hop label
+      end
+    else
+      define_method :"hop_#{label}" do
+        dynamic_hop label
+      end
+    end
+  end
+
+  def before_run
+    if defined?(hop_destroy)
+      unless destroying_set?
+        fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
+        if destroy_set?
+          send(:before_destroy) if respond_to?(:before_destroy)
+          hop_destroy
+        end
+      end
     end
   end
 
@@ -86,7 +117,7 @@ end
       fail Hop.new(old_prog, old_label,
         {retval: outval,
          stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
-         prog: prog, label: label})
+         prog:, label:})
     else
       fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
@@ -168,7 +199,7 @@ end
     new_frame = {"subject_id" => @subject_id, "link" => [strand.prog, old_label]}.merge(new_frame)
 
     fail Hop.new(old_prog, old_label,
-      {prog: Strand.prog_verify(prog), label: label,
+      {prog: Strand.prog_verify(prog), label:,
        stack: [new_frame] + strand.stack, retval: nil})
   end
 
@@ -177,7 +208,7 @@ end
     strand.add_child(
       id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
-      label: label,
+      label:,
       stack: Sequel.pg_jsonb_wrap([new_frame])
     )
   end
@@ -198,15 +229,21 @@ end
   # * If fallthrough is given: returns nil
   # * If nap is given: naps for given time
   # * Otherwise, donates to run a child process
-  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false)
+  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand)
     children = strand
       .children_dataset
+      .order(:schedule)
       .select_append(Sequel.lit("lease < now() AND exitval IS NOT NULL").as(:reapable))
       .all
 
     reapable_children, active_children = children.partition { it.values.delete(:reapable) }
 
     reapable_children.each do |child|
+      # In case the child strand has its own child strand that needs to be
+      # reaped, it should be reaped here, otherwise the child.destroy
+      # later results in a foreign key violation.
+      reap(fallthrough: true, strand: child)
+
       # Clear any semaphores that get added to a exited Strand prog,
       # since incr is entitled to be run at *any time* (including
       # after exitval is set, though it doesn't do anything) and any
@@ -233,7 +270,34 @@ end
         nap(nap)
       else
         active_children.each do |child|
-          nap 0 if child.run
+          if (result = child.run)
+            if result.is_a?(Nap)
+              seconds = if active_children.length == 1
+                # For a single active child napping, parent can nap for as long as the child naps,
+                # since the expectation is there will not be anything to do until then.
+                result.seconds
+              else
+                # For multiple active children, if a single child is napping, it's possible the
+                # other children are immediately runnable. However, you don't want to busy
+                # wait on multiple children. Nap until the time of the earliest scheduled child
+                # that isn't currently running. If all children are running, nap for 120 seconds
+                strand.children_dataset
+                  .where(Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+                  .min(Sequel.extract(:epoch, Sequel[:schedule] - Sequel::CURRENT_TIMESTAMP)) || 121
+              end
+
+              # Remove a 10th of a second so it is likely the parent will run the child.
+              seconds -= 0.1
+
+              # Nap for a minimum of 0.1 seconds and a maximum of 120 seconds in any case.
+              # The 0.1 seconds is to avoid busy waiting.
+              nap(seconds.clamp(0.1, 120))
+            else
+              # A non-nap (e.g. Exit or Hop) happened, so the state changed, and
+              # it makes sense to rerun the strand immediately.
+              nap 0
+            end
+          end
         end
 
         schedule = strand.schedule
@@ -256,12 +320,19 @@ end
     end
   end
 
+  def update_stack(new_frame)
+    strand.stack.first.merge!(new_frame)
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
     fail "BUG: not valid hop target" unless self.class.labels.include? label
+
     label = label.to_s
-    fail Hop.new(@strand.prog, @strand.label, {label: label, retval: nil})
+    fail Hop.new(@strand.prog, @strand.label, {label:, retval: nil})
   end
 
   def register_deadline(deadline_target, deadline_in, allow_extension: false)

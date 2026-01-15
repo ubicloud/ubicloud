@@ -35,6 +35,18 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect {
         described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "mu", 100, 1, 1, 1, "standard-2")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: username"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 2, 1, 1, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: server_count"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 2, 2, 1, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: drive_count"
+
+      expect {
+        described_class.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 1, 2, 2, 4, "standard-2")
+      }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: storage_size_gib"
     end
 
     it "creates a minio cluster" do
@@ -56,17 +68,14 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   end
 
   describe "#wait_pools" do
-    before do
-      st = instance_double(Strand, label: "wait")
-      instance_double(MinioPool, strand: st).tap { |mp| allow(nx.minio_cluster).to receive(:pools).and_return([mp]) }
-    end
-
     it "hops to wait if all pools are waiting" do
+      # Pool strands start at "wait_servers", so need to set them to "wait"
+      nx.minio_cluster.pools.each { it.strand.update(label: "wait") }
       expect { nx.wait_pools }.to hop("wait")
     end
 
     it "naps if not all pools are waiting" do
-      allow(nx.minio_cluster.pools.first.strand).to receive(:label).and_return("start")
+      # Pool strands start at "wait_servers", not "wait" - so it naps
       expect { nx.wait_pools }.to nap(5)
     end
   end
@@ -88,22 +97,14 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   end
 
   describe "#refresh_certificates" do
-    let(:ms) do
-      instance_double(MinioServer, cert: "server_cert")
-    end
-
-    before do
-      allow(nx.minio_cluster).to receive(:servers).and_return([ms])
-    end
-
     it "moves root_cert_2 to root_cert_1 and creates new root_cert_2 if root_cert_1 is about to expire, also updates server_cert" do
       rc2 = nx.minio_cluster.root_cert_2
       rck2 = nx.minio_cluster.root_cert_key_2
       certificate_last_checked_at = nx.minio_cluster.certificate_last_checked_at
+      server_ids = nx.minio_cluster.servers.map(&:id)
       expect(OpenSSL::X509::Certificate).to receive(:new).with(nx.minio_cluster.root_cert_1).and_call_original
       expect(Time).to receive(:now).and_return(Time.now + 60 * 60 * 24 * 335 * 5 + 1).at_least(:once)
       expect(Util).to receive(:create_root_certificate).with(common_name: "#{nx.minio_cluster.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10).and_return(["cert", "key"])
-      expect(ms).to receive(:incr_reconfigure).once
 
       expect { nx.refresh_certificates }.to hop("wait")
       expect(nx.minio_cluster.root_cert_1).to eq rc2
@@ -111,6 +112,7 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
       expect(nx.minio_cluster.root_cert_2).to eq "cert"
       expect(nx.minio_cluster.root_cert_key_2).to eq "key"
       expect(nx.minio_cluster.certificate_last_checked_at).to be > certificate_last_checked_at
+      server_ids.each { expect(Semaphore.where(strand_id: it, name: "reconfigure").count).to eq(1) }
     end
 
     it "doesn't update root_certs if they are not close to expire" do
@@ -134,57 +136,41 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
   describe "#reconfigure" do
     it "increments reconfigure semaphore of all minio servers and hops to wait" do
       expect(nx).to receive(:decr_reconfigure)
-      ms = instance_double(MinioServer)
-      expect(ms).to receive(:incr_reconfigure)
-      expect(nx.minio_cluster).to receive(:servers).and_return([ms]).at_least(:once)
-      expect(ms).to receive(:incr_restart)
+      server_ids = nx.minio_cluster.servers.map(&:id)
       expect { nx.reconfigure }.to hop("wait")
+      server_ids.each do |id|
+        expect(Semaphore.where(strand_id: id, name: "reconfigure").count).to eq(1)
+        expect(Semaphore.where(strand_id: id, name: "restart").count).to eq(1)
+      end
     end
   end
 
   describe "#destroy" do
     it "increments destroy semaphore of minio pools and hops to wait_pools_destroy" do
       expect(nx).to receive(:decr_destroy)
-      mp = instance_double(MinioPool, incr_destroy: nil)
-      expect(mp).to receive(:incr_destroy)
-      expect(nx.minio_cluster).to receive(:pools).and_return([mp])
+      pool_ids = nx.minio_cluster.pools.map(&:id)
       expect { nx.destroy }.to hop("wait_pools_destroyed")
+      pool_ids.each { expect(Semaphore.where(strand_id: it, name: "destroy").count).to eq(1) }
     end
   end
 
   describe "#wait_pools_destroyed" do
     it "naps if there are still minio pools" do
-      expect(nx.minio_cluster).to receive(:pools).and_return([true])
+      # Pool already exists from assemble
       expect { nx.wait_pools_destroyed }.to nap(10)
     end
 
     it "increments private subnet destroy and destroys minio cluster" do
-      expect(nx.minio_cluster).to receive(:pools).and_return([])
-      fw = instance_double(Firewall)
-      ps = instance_double(PrivateSubnet, firewalls: [fw])
-      expect(ps).to receive(:incr_destroy)
-      expect(fw).to receive(:destroy)
-      expect(nx.minio_cluster).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(nx.minio_cluster).to receive(:destroy)
+      cluster_id = nx.minio_cluster.id
+      # Capture references before deleting to avoid loading association into cache
+      private_subnet = nx.minio_cluster.private_subnet
+      private_subnet_id = private_subnet.id
+      # Destroy servers first (FK constraint), then pools
+      MinioServer.where(minio_pool_id: MinioPool.where(cluster_id:).select(:id)).destroy
+      MinioPool.where(cluster_id:).destroy
       expect { nx.wait_pools_destroyed }.to exit({"msg" => "destroyed"})
-    end
-  end
-
-  describe "#before_run" do
-    it "hops to destroy if destroy is set" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if destroy is not set" do
-      expect(nx).to receive(:when_destroy_set?).and_return(false)
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-
-    it "does not hop to destroy if strand label is destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
+      expect(private_subnet.firewalls_dataset.count).to eq 0
+      expect(Semaphore.where(strand_id: private_subnet_id, name: "destroy").count).to eq(1)
     end
   end
 end

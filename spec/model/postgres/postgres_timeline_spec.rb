@@ -17,24 +17,44 @@ WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
 AWS_ENDPOINT=https://blob-endpoint
 AWS_ACCESS_KEY_ID=dummy-access-key
 AWS_SECRET_ACCESS_KEY=dummy-secret-key
-AWS_REGION: us-east-1
+
+AWS_REGION=us-east-1
 AWS_S3_FORCE_PATH_STYLE=true
 PGHOST=/var/run/postgresql
+PGDATA=/dat/16/data
     WALG_CONF
 
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config)
-    expect(postgres_timeline).to receive(:aws?).and_return(true)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2"))
-    expect(postgres_timeline.generate_walg_config).to eq(walg_config.sub("us-east-1", "us-east-2"))
+    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
+    expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config.sub("us-east-1", "us-east-2"))
+  end
+
+  it "returns walg config without keys when vm has iam_role" do
+    postgres_timeline.update(access_key: nil, secret_key: nil)
+    expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+
+    walg_config = <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{postgres_timeline.ubid}
+AWS_ENDPOINT=https://blob-endpoint
+
+AWS_REGION=us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/17/data
+    WALG_CONF
+
+    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
+    expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
   describe "#need_backup?" do
-    let(:sshable) { instance_double(Sshable) }
+    let(:sshable) { Sshable.new }
     let(:leader) {
       instance_double(
         PostgresServer,
         strand: instance_double(Strand, label: "wait"),
-        vm: instance_double(Vm, sshable: sshable)
+        vm: instance_double(Vm, sshable:)
       )
     }
 
@@ -55,7 +75,7 @@ PGHOST=/var/run/postgresql
 
     it "returns true as backup needed if there is no backup process or the last backup failed" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage").twice
-      expect(sshable).to receive(:cmd).and_return("NotStarted", "Failed")
+      expect(sshable).to receive(:_cmd).and_return("NotStarted", "Failed")
       expect(postgres_timeline.need_backup?).to be(true)
       expect(postgres_timeline.need_backup?).to be(true)
     end
@@ -63,20 +83,20 @@ PGHOST=/var/run/postgresql
     it "returns true as backup needed if previous backup started more than a day ago and is succeeded" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
       expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
-      expect(sshable).to receive(:cmd).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(true)
     end
 
     it "returns false as backup needed if previous backup started less than a day ago" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
       expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
-      expect(sshable).to receive(:cmd).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).and_return("Succeeded")
       expect(postgres_timeline.need_backup?).to be(false)
     end
 
     it "returns false as backup needed if previous backup started is in progress" do
       expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(sshable).to receive(:cmd).and_return("InProgress")
+      expect(sshable).to receive(:_cmd).and_return("InProgress")
       expect(postgres_timeline.need_backup?).to be(false)
     end
   end
@@ -127,36 +147,46 @@ PGHOST=/var/run/postgresql
     expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
 
     minio_client = Minio::Client.new(endpoint: "https://blob-endpoint", access_key: "access_key", secret_key: "secret_key", ssl_ca_data: "data")
-    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
+    expect(minio_client).to receive(:list_objects).with(postgres_timeline.ubid, "basebackups_005/", delimiter: "/").and_return([instance_double(Minio::Client::Blob, key: "backup_stop_sentinel.json"), instance_double(Minio::Client::Blob, key: "unrelated_file.txt")])
     expect(Minio::Client).to receive(:new).and_return(minio_client)
 
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
 
   it "returns list of backups for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
-    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/").and_call_original
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", delimiter: "/").and_call_original
     expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json"])
   end
 
   it "returns list of backups with enumeration for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2")).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: true, next_continuation_token: "token"}, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
-    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/").and_call_original
-    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", continuation_token: "token").and_call_original
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", delimiter: "/").and_call_original
+    expect(s3_client).to receive(:list_objects_v2).with(bucket: postgres_timeline.ubid, prefix: "basebackups_005/", delimiter: "/", continuation_token: "token").and_call_original
     expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
     expect(postgres_timeline.backups.map(&:key)).to eq(["backup_stop_sentinel.json", "backup_stop_sentinel.json"])
   end
 
   it "returns blob storage endpoint" do
-    expect(MinioCluster).to receive(:[]).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
+    expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "https://blob-endpoint"))
     expect(postgres_timeline.blob_storage_endpoint).to eq("https://blob-endpoint")
+  end
+
+  it "works correctly with MinioCluster in Minio project" do
+    minio_project = Project.create(name: "mc-project")
+    pg_project = Project.create(name: "mc-project")
+    expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
+    expect(Config).to receive(:postgres_service_project_id).and_return(pg_project.id)
+    mc = Prog::Minio::MinioClusterNexus.assemble(minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2").subject
+
+    expect(postgres_timeline.blob_storage.id).to eq(mc.id)
   end
 
   it "returns blob storage client from cache" do
@@ -195,20 +225,21 @@ PGHOST=/var/run/postgresql
     end
 
     it "creates bucket" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2")).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-east-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {location_constraint: "us-east-2"}}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
     it "creates bucket in us-east-1" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-1")).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-east-1", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: nil}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
     it "sets lifecycle policy" do
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:put_bucket_lifecycle_configuration)
       expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", expiration: {days: 8}, filter: {}}]}}).and_return(true)
       expect(postgres_timeline.set_lifecycle_policy).to be(true)

@@ -10,6 +10,7 @@ module AccessControlModelTag
       define_method(:applied_table) { table }
       define_method(:applied_column) { column }
       define_method(:"add_#{base}") { add_member(it) }
+      define_method(:path) { "/user/access-control/tag/#{base}/#{ubid}" }
     end
   end
 
@@ -101,7 +102,7 @@ module AccessControlModelTag
   end
 
   def validate
-    validates_format(%r{\A[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?\z}i, :name, message: "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
+    validates_format(%r{\A[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\z}i, :name, message: "must only include ASCII letters, numbers, and dashes, and must start and end with an ASCII letter or number")
     super
   end
 end

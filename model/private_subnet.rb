@@ -4,25 +4,32 @@ require_relative "../model"
 
 class PrivateSubnet < Sequel::Model
   many_to_one :project
-  many_to_many :vms, join_table: :nic
-  one_to_many :nics
+  many_to_many :vms, join_table: :nic, read_only: true
+  one_to_many :nics, read_only: true
   one_to_one :strand, key: :id
-  many_to_many :firewalls
-  one_to_many :load_balancers
+  many_to_many :firewalls, remover: nil
+  one_to_many :load_balancers, read_only: true
   many_to_one :location
-  one_to_one :private_subnet_aws_resource, key: :id
+  one_to_one :private_subnet_aws_resource, key: :id, read_only: true
 
+  PRIVATE_24_BLOCK_COUNT = 2**16 + 2**12 + 2**8
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
     "172.16.0.0/12",
     "192.168.0.0/16"
-  ].freeze
+  ].to_h {
+    prefix = Integer(it.split("/").last, 10)
+    [it, [prefix, PRIVATE_24_BLOCK_COUNT - 2**prefix].freeze]
+  }.freeze
 
   BANNED_IPV4_SUBNETS = [
     NetAddr::IPv4Net.parse("172.16.0.0/16"),
     NetAddr::IPv4Net.parse("172.17.0.0/16"),
     NetAddr::IPv4Net.parse("172.18.0.0/16")
   ].freeze
+
+  DEFAULT_AWS_SUBNET_PREFIX_LEN = 16
+  DEFAULT_SUBNET_PREFIX_LEN = 26
 
   dataset_module Pagination
   include ObjectTag::Cleanup
@@ -31,6 +38,18 @@ class PrivateSubnet < Sequel::Model
     PrivateSubnet
       .where(id: DB[:connected_subnet].where(id => [:subnet_id_1, :subnet_id_2]).select(Sequel.case({id => :subnet_id_2}, :subnet_id_1, :subnet_id_1)))
       .all
+  end
+
+  def attached_vms
+    vms_dataset
+      .association_join(:strand)
+      .exclude(label: "destroy")
+      .exclude(Sequel[:vm][:id] => Semaphore
+        .where(
+          strand_id: nics_dataset.select(:vm_id),
+          name: "destroy"
+        )
+        .select(:strand_id))
   end
 
   def all_nics
@@ -51,23 +70,27 @@ class PrivateSubnet < Sequel::Model
   end
 
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
 
   def self.ubid_to_name(ubid)
     ubid.to_s[0..7]
   end
 
   def display_state
+    return "deleting" if destroying_set? || destroy_set?
     (state == "waiting") ? "available" : state
   end
 
-  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules
+  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate
 
-  def self.random_subnet
-    subnet_dict = PRIVATE_SUBNET_RANGES.each_with_object({}) do |subnet, hash|
-      prefix_length = Integer(subnet.split("/").last, 10)
-      hash[subnet] = (2**16 + 2**12 + 2**8 - 2**prefix_length)
-    end
-    subnet_dict.max_by { |_, weight| rand**(1.0 / weight) }.first
+  def self.random_subnet(cidr_size)
+    subnets = PRIVATE_SUBNET_RANGES.select { |_, (prefix, _)|
+      prefix < cidr_size
+    }
+
+    raise "No subnet found for cidr size #{cidr_size}" if subnets.empty?
+
+    subnets.max_by { |_, (_, weight)| rand**(1.0 / weight) }.first
   end
 
   # Here we are blocking the bottom 4 and top 1 addresses of each subnet
@@ -86,6 +109,10 @@ class PrivateSubnet < Sequel::Model
   #   - A maximum of 256 IPs (/24) for the largest parent subnet (/16).
   #   - A minimum of 1 IP (/32) for the smallest parent subnet (/26).
   def random_private_ipv4
+    Prog::Vnet::SubnetNexus.until_random_ip("Could not find random IPv4 after 1000 iterations") { _random_private_ipv4 }
+  end
+
+  private def _random_private_ipv4
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
 
     # If the subnet size is /24 or higher like /26, exclude the first 4 and last 1 IPs
@@ -100,7 +127,7 @@ class PrivateSubnet < Sequel::Model
     end
 
     addr = net4.nth_subnet(cidr_size, random_offset)
-    return random_private_ipv4 if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
+    return if nics.any? { |nic| nic.private_ipv4.to_s == addr.to_s }
 
     addr
   end
@@ -112,42 +139,20 @@ class PrivateSubnet < Sequel::Model
     addr
   end
 
-  def connect_subnet(subnet)
-    ConnectedSubnet.create(subnet_hash(subnet))
-    nics.each do |nic|
-      create_tunnels(subnet.nics, nic)
-    end
-    subnet.incr_refresh_keys
-  end
+  def incr_destroy_if_only_used_internally(ubid:, vm_ids:)
+    firewalls_dataset = self.firewalls_dataset
 
-  def disconnect_subnet(subnet)
-    nics(eager: {src_ipsec_tunnels: [:src_nic, :dst_nic]}, dst_ipsec_tunnels: [:src_nic, :dst_nic]).each do |nic|
-      (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
-        tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
-      end
-    end
-    ConnectedSubnet.where(subnet_hash(subnet)).destroy
-    subnet.incr_refresh_keys
-    incr_refresh_keys
-  end
+    # Destroy customer firewall if it isn't used in other private subnets
+    # and hasn't been renamed.
+    firewalls_dataset
+      .where(name: "#{ubid}-firewall")
+      .exclude(id: DB[:firewalls_private_subnets].select(:firewall_id).exclude(private_subnet_id: id))
+      .destroy
 
-  def create_tunnels(nics, src_nic)
-    nics.each do |dst_nic|
-      next if src_nic == dst_nic
-      IpsecTunnel.create(src_nic_id: src_nic.id, dst_nic_id: dst_nic.id) unless IpsecTunnel[src_nic_id: src_nic.id, dst_nic_id: dst_nic.id]
-      IpsecTunnel.create(src_nic_id: dst_nic.id, dst_nic_id: src_nic.id) unless IpsecTunnel[src_nic_id: dst_nic.id, dst_nic_id: src_nic.id]
+    # Destroy private subnet if it hasn't been renamed and it has no other VMs or firewalls
+    if name == "#{ubid}-subnet" && nics_dataset.exclude(vm_id: vm_ids).exclude(vm_id: nil).empty? && firewalls_dataset.empty?
+      incr_destroy
     end
-  end
-
-  def find_all_connected_nics
-    Nic
-      .where(private_subnet_id: DB[:subnet].exclude(:is_cycle).select(:id))
-      .with_recursive(:subnet,
-        this.select(:id),
-        DB[:connected_subnet]
-          .join(:subnet, {id: [:subnet_id_1, :subnet_id_2]})
-          .select(Sequel.case({subnet_id_1: :subnet_id_2}, :subnet_id_1, Sequel[:subnet][:id])),
-        cycle: {columns: :id})
   end
 
   private

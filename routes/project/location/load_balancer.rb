@@ -15,20 +15,20 @@ class Clover
 
         filter = {Sequel[:load_balancer][:name] => lb_name}
       else
-        filter = {Sequel[:load_balancer][:id] => UBID.to_uuid(lb_id)}
+        filter = {Sequel[:load_balancer][:id] => lb_id}
       end
 
       filter[:private_subnet_id] = @project.private_subnets_dataset.where(location_id: @location.id).select(Sequel[:private_subnet][:id])
-      @lb = lb = LoadBalancer.first(filter)
+      @lb = lb = @project.load_balancers_dataset.first(filter)
 
       check_found_object(lb)
 
       r.post %w[attach-vm detach-vm] do |action|
-        authorize("LoadBalancer:edit", lb.id)
-        handle_validation_failure("networking/load_balancer/show")
+        authorize("LoadBalancer:edit", lb)
+        handle_validation_failure("networking/load_balancer/show") { @page = "vms" }
 
-        unless (vm = authorized_vm)
-          fail Validation::ValidationFailed.new("vm_id" => "VM not found")
+        unless (vm = authorized_vm(location_id: lb.private_subnet.location_id))
+          fail Validation::ValidationFailed.new("vm_id" => "No matching VM found in #{lb.display_location}")
         end
 
         actioned = nil
@@ -38,6 +38,7 @@ class Clover
             if vm.load_balancer
               fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
             end
+
             lb.add_vm(vm)
             audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
@@ -52,66 +53,105 @@ class Clover
           Serializers::LoadBalancer.serialize(lb, {detailed: true})
         else
           flash["notice"] = "VM is #{actioned} the load balancer"
-          r.redirect "#{@project.path}#{lb.path}"
+          r.redirect lb, "/vms"
         end
       end
 
-      r.is do
-        r.get do
-          authorize("LoadBalancer:view", lb.id)
-          if api?
-            Serializers::LoadBalancer.serialize(lb, {detailed: true})
-          else
-            view "networking/load_balancer/show"
-          end
+      r.get true do
+        authorize("LoadBalancer:view", lb)
+        if api?
+          Serializers::LoadBalancer.serialize(lb, {detailed: true})
+        else
+          r.redirect lb, "/overview"
+        end
+      end
+
+      r.delete true do
+        authorize("LoadBalancer:delete", lb)
+        DB.transaction do
+          lb.incr_destroy
+          audit_log(lb, "destroy")
         end
 
-        r.delete do
-          authorize("LoadBalancer:delete", lb.id)
-          DB.transaction do
-            lb.incr_destroy
-            audit_log(lb, "destroy")
-          end
+        if web?
+          flash["notice"] = "Load balancer scheduled for deletion."
+          r.redirect @project, "/load-balancer"
+        else
           204
         end
+      end
 
-        r.patch api? do
-          authorize("LoadBalancer:edit", lb.id)
-          algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
-          src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
-          vm_ids = typecast_params.array(:ubid_uuid, "vms")
+      r.patch api? do
+        authorize("LoadBalancer:edit", lb)
+        algorithm, health_check_endpoint = typecast_params.nonempty_str!(%w[algorithm health_check_endpoint])
+        src_port, dst_port = typecast_params.pos_int!(%w[src_port dst_port])
+        vm_ids = typecast_params.array(:ubid_uuid, "vms")
+        cert_enabled = typecast_params.bool!("cert_enabled")
+        cert_enablement_changed = lb.cert_enabled != cert_enabled
 
+        DB.transaction do
+          lb.update(algorithm:, health_check_endpoint:)
+          lb.ports_dataset.update(src_port: Validation.validate_port(:src_port, src_port), dst_port: Validation.validate_port(:dst_port, dst_port))
+
+          new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
+
+          unless vm_ids.length == new_vms.length
+            fail Validation::ValidationFailed.new("vms" => "VM not found")
+          end
+
+          new_vms.each do |vm|
+            if (lb_id = vm.load_balancer&.id)
+              next if lb_id == lb.id
+
+              fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
+            end
+            lb.add_vm(vm)
+          end
+
+          lb.vms.each do |vm|
+            next if new_vms.any? { it.id == vm.id }
+
+            lb.evacuate_vm(vm)
+            lb.remove_vm(vm)
+          end
+
+          lb.incr_update_load_balancer
+          if cert_enablement_changed
+            cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
+          end
+          audit_log(lb, "update")
+        end
+        Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
+      end
+
+      r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
+        lb.incr_rewrite_dns_records
+        lb.incr_refresh_cert
+      end
+
+      r.post "toggle-ssl-certificate" do
+        authorize("LoadBalancer:edit", lb)
+        cert_enabled = typecast_params.bool("cert_enabled")
+
+        # check if certificates are getting enabled or they were already enabled
+        if lb.cert_enabled != cert_enabled
           DB.transaction do
-            lb.update(algorithm:, health_check_endpoint:)
-            lb.ports.first.update(src_port: Validation.validate_port(:src_port, src_port),
-              dst_port: Validation.validate_port(:dst_port, dst_port))
-
-            new_vms = dataset_authorize(@project.vms_dataset, "Vm:view").eager(:load_balancer).where(id: vm_ids).all
-
-            unless vm_ids.length == new_vms.length
-              fail Validation::ValidationFailed.new("vms" => "VM not found")
-            end
-
-            new_vms.each do |vm|
-              if (lb_id = vm.load_balancer&.id)
-                next if lb_id == lb.id
-                fail Validation::ValidationFailed.new("vms" => "VM is already attached to a load balancer")
-              end
-              lb.add_vm(vm)
-            end
-
-            lb.vms.each do |vm|
-              next if new_vms.any? { it.id == vm.id }
-              lb.evacuate_vm(vm)
-              lb.remove_vm(vm)
-            end
-
-            lb.incr_update_load_balancer
+            cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
             audit_log(lb, "update")
           end
-          Serializers::LoadBalancer.serialize(lb.reload, {detailed: true})
+        else
+          no_audit_log
+        end
+
+        if api?
+          Serializers::LoadBalancer.serialize(lb, {detailed: true})
+        else
+          flash["notice"] = "SSL certificates #{cert_enabled ? "enabled" : "disabled"}"
+          r.redirect lb, "/settings"
         end
       end
+
+      r.show_object(lb, actions: %w[overview vms settings], perm: "LoadBalancer:view", template: "networking/load_balancer/show")
     end
   end
 end

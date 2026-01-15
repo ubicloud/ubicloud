@@ -2,9 +2,7 @@
 
 <% @page_message = "Resend account verification" %>
 
-<form action="<%= rodauth.verify_account_resend_path %>" class="rodauth space-y-6" role="form" method="POST">
-  <%== rodauth.verify_account_resend_additional_form_tags %>
-  <%== rodauth.csrf_tag(rodauth.verify_account_resend_path) %>
+<% form(action: rodauth.verify_account_resend_path, method: :post, class: "rodauth space-y-6") do %>
   <% recently_sent = rodauth.verify_account_email_recently_sent? if rodauth.account %>
 
   <% if !rodauth.account || recently_sent %>
@@ -12,7 +10,7 @@
   <% end %>
 
   <% if rodauth.param_or_nil(rodauth.login_param) %>
-    <%== part("components/form/hidden", name: rodauth.login_param, value: rodauth.param(rodauth.login_param)) %>
+    <%== hidden_inputs(rodauth.login_param => rodauth.param(rodauth.login_param)) %>
   <% else %>
     <%== render("components/rodauth/login_field") %>
   <% end %>
@@ -25,4 +23,4 @@
     ) %>
     <a href="/login" class="mt-2 text-sm font-semibold leading-6 text-gray-900">Sign in to another account</a>
   </div>
-</form>
+<% end %>

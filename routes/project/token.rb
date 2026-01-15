@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "token") do |r|
     r.web do
-      authorize("Project:token", @project.id)
+      authorize("Project:token", @project)
       token_ds = current_account
         .api_keys_dataset
         .where(project_id: @project.id)
@@ -19,11 +19,11 @@ class Clover
           pat = nil
           DB.transaction do
             pat = ApiKey.create_personal_access_token(current_account, project: @project)
-            SubjectTag[project_id: @project.id, name: "Admin"].add_subject(pat.id)
+            @project.subject_tags_dataset.first(name: "Admin").add_subject(pat.id)
             audit_log(pat, "create")
           end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
-          r.redirect "#{@project.path}/token"
+          r.redirect @project, "/token"
         end
       end
 
@@ -38,7 +38,7 @@ class Clover
             audit_log(token, "destroy")
           end
           flash["notice"] = "Personal access token deleted successfully"
-          204
+          r.redirect @project, "/token"
         end
 
         r.post %w[unrestrict-access restrict-access] do |action|
@@ -54,7 +54,7 @@ class Clover
             end
           end
 
-          r.redirect "#{@project.path}/token/#{token.ubid}/access-control"
+          r.redirect token
         end
 
         r.is "access-control" do
@@ -79,33 +79,35 @@ class Clover
 
           r.post do
             DB.transaction do
-              typecast_params.array!(:Hash, "aces").each do
-                ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
-                action_id = nil if action_id == ""
-                object_id = nil if object_id == ""
+              DB.ignore_duplicate_queries do
+                typecast_params.array!(:Hash, "aces").each do
+                  ubid, deleted, action_id, object_id = it.values_at("ubid", "deleted", "action", "object")
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
 
-                if ubid == "template"
-                  next if deleted == "true" || (action_id.nil? && object_id.nil?)
-                  ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
-                  audit_action = "create"
-                else
-                  next unless (ace = AccessControlEntry[project_id: @project.id, subject_id: token.id, id: UBID.to_uuid(ubid)])
-                  if deleted == "true"
-                    ace.destroy
-                    audit_log(ace, "destroy")
-                    next
+                  if ubid == "template"
+                    next if deleted == "true" || (action_id.nil? && object_id.nil?)
+                    ace = AccessControlEntry.new(project_id: @project.id, subject_id: token.id)
+                    audit_action = "create"
+                  else
+                    next unless (ace = @project.access_control_entries_dataset.first(subject_id: token.id, id: UBID.to_uuid(ubid)))
+                    if deleted == "true"
+                      ace.destroy
+                      audit_log(ace, "destroy")
+                      next
+                    end
+                    audit_action = "update"
                   end
-                  audit_action = "update"
+                  ace.update_from_ubids(action_id:, object_id:)
+                  audit_log(ace, audit_action, [token, action_id, object_id])
                 end
-                ace.update_from_ubids(action_id:, object_id:)
-                audit_log(ace, audit_action, [token, action_id, object_id])
               end
             end
 
             no_audit_log # Possibly no changes
             flash["notice"] = "Token access control entries saved successfully"
 
-            r.redirect "#{@project_data[:path]}/token/#{token.ubid}/access-control"
+            r.redirect token
           end
         end
       end

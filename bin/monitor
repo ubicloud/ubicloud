@@ -12,8 +12,10 @@ end
 # process, in which case, the partition is the entire id space.
 partition_number ||= "1"
 
+max_partition = 8
+
 partition_number = Integer(partition_number)
-raise "invalid partition_number: #{partition_number}" if partition_number < 1 || partition_number > 8
+raise "invalid partition_number: #{partition_number}" if partition_number < 1 || partition_number > max_partition
 
 require_relative "../loader"
 clover_freeze
@@ -43,7 +45,7 @@ else
     PostgresServer,
     Vm.where(~Sshable.where(id: Sequel[:vm][:id]).exists),
     MinioServer,
-    GithubRunner,
+    GithubRunner.exclude(ready_at: nil),
     VmHostSlice,
     LoadBalancerVmPort,
     KubernetesCluster,
@@ -61,12 +63,9 @@ monitor_resources = MonitorResourceType.create(
   MonitorableResource,
   monitor_pulse_info,
   Config.max_health_monitor_threads,
-  monitor_models
-) do
-  it.process_event_loop
-  it.check_pulse
-end
-
+  monitor_models,
+  &:check_pulse
+)
 metric_export_resources = MonitorResourceType.create(
   MetricsTargetResource,
   metric_export_pulse_info,
@@ -75,7 +74,7 @@ metric_export_resources = MonitorResourceType.create(
   &:export_metrics
 )
 
-repartitioner = MonitorRepartitioner.new(partition_number)
+repartitioner = Repartitioner.new(partition_number:, channel: :monitor, listen_timeout: 1, recheck_seconds: 18, stale_seconds: 40, max_partition:)
 
 runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, **runner_args)
 

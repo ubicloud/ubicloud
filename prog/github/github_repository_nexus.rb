@@ -7,7 +7,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
   def self.assemble(installation, name, default_branch)
     DB.transaction do
-      repository = GithubRepository.new(installation_id: installation.id, name: name)
+      repository = GithubRepository.new(installation_id: installation.id, name:)
       repository.skip_auto_validations(:unique) do
         updates = {last_job_at: Time.now}
         updates[:default_branch] = default_branch if default_branch
@@ -16,10 +16,6 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       Strand.new(prog: "Github::GithubRepositoryNexus", label: "wait") { it.id = repository.id }
         .insert_conflict(target: :id).save_changes
     end
-  end
-
-  def client
-    @client ||= Github.installation_client(github_repository.installation.installation_id).tap { it.auto_paginate = true }
   end
 
   # We dynamically adjust the polling interval based on the remaining rate
@@ -34,16 +30,18 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       @polling_interval = 24 * 60 * 60
       return
     end
+    client = github_repository.installation.client(auto_paginate: true)
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued"})[:workflow_runs]
-    Clog.emit("polled queued runs") { {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}} }
+    Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}})
 
     # We check the rate limit after the first API call to avoid unnecessary API
     # calls to fetch only the rate limit. Every response includes the rate limit
     # information in the headers.
-    remaining_quota = client.rate_limit.remaining / client.rate_limit.limit.to_f
+    rate_limit = client.rate_limit
+    remaining_quota = rate_limit.remaining / rate_limit.limit.to_f
     if remaining_quota < 0.1
-      Clog.emit("low remaining quota") { {low_remaining_quota: {repository_name: github_repository.name, limit: client.rate_limit.limit, remaining: client.rate_limit.remaining}} }
-      @polling_interval = (client.rate_limit.resets_at - Time.now).to_i
+      Clog.emit("low remaining quota", {low_remaining_quota: {repository_name: github_repository.name, limit: rate_limit.limit, remaining: rate_limit.remaining}})
+      @polling_interval = (rate_limit.resets_at - Time.now).to_i
       return
     end
 
@@ -53,13 +51,16 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
       jobs.each do |job|
         next if job[:status] != "queued"
-        next unless (label = job[:labels].find { Github.runner_labels.key?(it) })
-        queued_labels[label] += 1
+        if (label = job[:labels].find { Github.runner_labels.key?(it) })
+          queued_labels[[label, label]] += 1 # Actual label is the same as the label for predefined labels
+        elsif (custom_label = GithubCustomLabel.first(installation_id: github_repository.installation.id, name: job[:labels]))
+          queued_labels[[custom_label.name, custom_label.alias_for]] += 1
+        end
       end
     end
 
-    queued_labels.each do |label, count|
-      idle_runner_count = github_repository.runners_dataset.where(label: label, workflow_job: nil).count
+    queued_labels.each do |(actual_label, label), count|
+      idle_runner_count = github_repository.runners_dataset.where(actual_label:, workflow_job: nil).count
       # The calculation of the required_runner_count isn't atomic because it
       # requires multiple API calls and database queries. However, it will
       # eventually settle on the correct value. If we create more runners than
@@ -68,13 +69,14 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
       # will generate more in the next cycle.
       next if (required_runner_count = count - idle_runner_count) && required_runner_count <= 0
 
-      Clog.emit("extra runner needed") { {needed_extra_runner: {repository_name: github_repository.name, label: label, count: required_runner_count}} }
+      Clog.emit("extra runner needed", {needed_extra_runner: {repository_name: github_repository.name, label:, actual_label:, count: required_runner_count}})
 
       required_runner_count.times do
-        Prog::Vm::GithubRunner.assemble(
+        Prog::Github::GithubRunnerNexus.assemble(
           github_repository.installation,
           repository_name: github_repository.name,
-          label: label
+          label:,
+          actual_label:
         )
       end
     end
@@ -117,17 +119,8 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
 
     if github_repository.cache_entries.empty?
-      Clog.emit("Deleting empty bucket and tokens") { {deleting_empty_bucket: {repository_name: github_repository.name}} }
+      Clog.emit("Deleting empty bucket and tokens", {deleting_empty_bucket: {repository_name: github_repository.name}})
       github_repository.destroy_blob_storage
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        register_deadline(nil, 5 * 60)
-        hop_destroy
-      end
     end
   end
 
@@ -138,7 +131,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     begin
       check_queued_jobs if Config.enable_github_workflow_poller
     rescue Octokit::NotFound
-      Clog.emit("not found repository") { {not_found_repository: {repository_name: github_repository.name}} }
+      Clog.emit("not found repository", {not_found_repository: {repository_name: github_repository.name}})
       if github_repository.runners.count == 0
         github_repository.incr_destroy
         nap 0
@@ -153,8 +146,9 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
   label def destroy
     decr_destroy
 
+    register_deadline(nil, 5 * 60)
     unless github_repository.runners.empty?
-      Clog.emit("Cannot destroy repository with active runners") { {not_destroyed_repository: {repository_name: github_repository.name}} }
+      Clog.emit("Cannot destroy repository with active runners", {not_destroyed_repository: {repository_name: github_repository.name}})
       nap 5 * 60
     end
 

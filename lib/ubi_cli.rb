@@ -32,7 +32,8 @@ class UbiCli
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-tv-z0-9]{24})/
+  EXACT_OBJECT_INFO_REGEXP = /\A#{OBJECT_INFO_REGEXP}\z/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 
   Rodish.processor(self)
@@ -111,7 +112,7 @@ class UbiCli
 
         @location, @name, extra = ref.split("/", 3)
 
-        if !@name && OBJECT_INFO_REGEXP.match?(@location)
+        if !@name && EXACT_OBJECT_INFO_REGEXP.match?(@location)
           unless (object = sdk[@location])
             raise Rodish::CommandFailure.new("no #{label} with id #{@location} exists", command)
           end
@@ -155,6 +156,21 @@ class UbiCli
         items = sdk.send(sdk_method).list(location:)
         keys = underscore_keys(check_fields(opts[:fields], fields, "#{cmd} list -f option", command))
         response(format_rows(keys, items, headers: opts[:"no-headers"] != false))
+      end
+    end
+  end
+
+  def self.rename(cmd)
+    on(cmd).run_on("rename") do
+      desc "Rename a #{LOWERCASE_LABELS[cmd]}"
+
+      banner "ubi #{cmd} (location/#{cmd}-name | #{cmd}-id) rename new-name"
+
+      args 1
+
+      run do |name|
+        sdk_object.rename_to(name)
+        response("#{CAPITALIZED_LABELS[cmd]} renamed to #{name}")
       end
     end
   end
@@ -228,6 +244,39 @@ class UbiCli
     @project_ubid ||= @env["clover.project_ubid"]
   end
 
+  def config_entries_response(entries, body: [])
+    entries.sort.each do |k, v|
+      body << k.to_s << "=" << v.to_s << "\n"
+    end
+    response(body)
+  end
+
+  def params_to_hash(params, key, singular, cmd)
+    if params[key]
+      params[key] = params[key].split(",").to_h do
+        if it.include?("=")
+          it.split("=", 2)
+        else
+          raise Rodish::CommandFailure.new("invalid #{singular}, does not include `=`: #{it.inspect}", cmd)
+        end
+      end
+    end
+  end
+
+  def pg_tags_to_hash(params, cmd)
+    params_to_hash(params, :tags, "tag", cmd)
+  end
+
+  def config_entries_to_hash(args, cmd)
+    args.to_h do
+      if it.include?("=")
+        it.split("=", 2)
+      else
+        raise Rodish::CommandFailure.new("invalid argument, does not include `=`: #{it.inspect}", cmd)
+      end
+    end
+  end
+
   def handle_ssh(opts)
     vm = sdk_object.info
     opts = opts[:vm_ssh]
@@ -256,7 +305,14 @@ class UbiCli
 
   def need_integer_arg(v, arg_name, cmd)
     raise Rodish::CommandFailure.new("invalid #{arg_name} argument: #{v.inspect}", cmd) unless (i = Integer(v, exception: false))
+
     i
+  end
+
+  def need_boolean_arg(v, arg_name, cmd)
+    raise Rodish::CommandFailure.new("invalid #{arg_name} argument: #{v.inspect}", cmd) unless v == "true" || v == "false"
+
+    v == "true"
   end
 
   def execute_argv(argv, **headers)
@@ -290,7 +346,7 @@ class UbiCli
     results = []
 
     sizes = Hash.new(0)
-    keys.each do |key|
+    keys.each_with_index do |key, idx|
       sizes[key] = headers ? key.size : 0
     end
     rows = rows.map do |row|
@@ -308,13 +364,13 @@ class UbiCli
 
     if headers
       sep = false
-      keys.each do |key|
+      each_with_dashed(keys) do |key, display_key|
         if sep
           results << col_sep
         else
           sep = true
         end
-        results << (sizes[key] % key)
+        results << (sizes[key] % display_key)
       end
       results << "\n"
     end
@@ -344,6 +400,12 @@ class UbiCli
       keys.transform_keys { it.to_s.tr("-", "_").to_sym }
     else # when Array
       keys.map { it.tr("-", "_").to_sym }
+    end
+  end
+
+  def each_with_dashed(keys)
+    keys.each do
+      yield it, it.to_s.tr("_", "-")
     end
   end
 
@@ -379,6 +441,21 @@ class UbiCli
     sdk.send(@sdk_method).new("#{@location}/#{@name}")
   end
 
+  def convert_name_to_id(model_adapter, name)
+    unless model_adapter.id_regexp.match?(name)
+      id_for_loc_name(model_adapter, "#{@location}/#{name}")
+    end || name
+  end
+
+  def id_for_loc_name(model_adapter, loc_name)
+    _, name, extra = loc_name.split("/", 3)
+    if name && !extra
+      obj = model_adapter.new(loc_name)
+      obj.info
+      obj.id
+    end
+  end
+
   def finalize_response(res)
     headers = res[1]
     body = res[2]
@@ -395,7 +472,7 @@ class UbiCli
   end
 
   # :nocov:
-  if Config.test? && ENV["CLOVER_FREEZE"] == "1"
+  if Config.frozen_test?
     singleton_class.prepend(Module.new do
       def process(argv, env)
         DB.block_queries do

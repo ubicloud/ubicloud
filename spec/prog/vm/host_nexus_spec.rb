@@ -18,13 +18,13 @@ RSpec.describe Prog::Vm::HostNexus do
 
   let(:vms) { [instance_double(Vm, memory_gib: 1), instance_double(Vm, memory_gib: 2)] }
   let(:spdk_installations) { [instance_double(SpdkInstallation, cpu_count: 4, hugepages: 4)] }
-  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1"), instance_double(VmHostSlice, name: "standard2")] }
-  let(:vm_host) { instance_double(VmHost, spdk_installations: spdk_installations, vms: vms, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
-  let(:sshable) { instance_double(Sshable, raw_private_key_1: "bogus") }
+  let(:vm_host_slices) { [instance_double(VmHostSlice, name: "standard1", total_memory_gib: 2), instance_double(VmHostSlice, name: "standard2", total_memory_gib: 3)] }
+  let(:vm_host) { instance_double(VmHost, spdk_installations:, vms:, slices: vm_host_slices, id: "1d422893-2955-4c2c-b41c-f2ec70bcd60d", spdk_cpu_count: 2) }
+  let(:sshable) { create_mock_sshable(raw_private_key_1: "bogus") }
 
   before do
-    allow(nx).to receive_messages(vm_host: vm_host, sshable: sshable)
-    allow(sshable).to receive(:start_fresh_session).and_return(instance_double(Net::SSH::Connection::Session))
+    allow(nx).to receive_messages(vm_host:, sshable:)
+    allow(sshable).to receive(:start_fresh_session).and_return(Net::SSH::Connection::Session.allocate)
   end
 
   describe ".assemble" do
@@ -70,18 +70,19 @@ RSpec.describe Prog::Vm::HostNexus do
 
       described_class.assemble("127.0.0.1", provider_name: HostProvider::HETZNER_PROVIDER_NAME, server_identifier: "1")
     end
-  end
 
-  describe "#before_run" do
-    it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
+    it "checks whether both spdk and vhost_block_backend version is set" do
+      expect { described_class.assemble("127.0.0.1", spdk_version: "someversion") }.to raise_error("SPDK and VhostBlockBackend cannot be set simultaneously")
     end
 
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
+    it "checks that both spdk and vhost_block_backend version is set although one is nil" do
+      st = described_class.assemble("127.0.0.1", spdk_version: "someversion", vhost_block_backend_version: nil)
+      expect(st.stack.first["spdk_version"]).to eq("someversion")
+      expect(st.stack.first["vhost_block_backend_version"]).to be_nil
+
+      st = described_class.assemble("1.2.3.4")
+      expect(st.stack.first["spdk_version"]).to be_nil
+      expect(st.stack.first["vhost_block_backend_version"]).to eq(Config.vhost_block_backend_version)
     end
   end
 
@@ -113,7 +114,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "skips if private key is not set" do
       expect(Config).to receive(:hetzner_ssh_private_key).and_return(nil)
-      expect(Util).not_to receive(:rootish_ssh)
+      expect(Net::SSH).not_to receive(:start)
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
@@ -127,7 +128,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Config).to receive(:operator_ssh_public_keys).and_return(nil)
       expect(sshable).to receive(:keys).and_return([vmhost_key])
       expect(sshable).to receive(:host).and_return("127.0.0.1")
-      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo #{test_public_keys.gsub(" ", "\\ ")} > ~/.ssh/authorized_keys").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
@@ -143,7 +146,9 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(Config).to receive(:operator_ssh_public_keys).exactly(2).and_return("#{operational_key_1.public_key}\n#{operational_key_2.public_key}")
       expect(sshable).to receive(:keys).and_return([vmhost_key])
       expect(sshable).to receive(:host).and_return("127.0.0.1")
-      expect(Util).to receive(:rootish_ssh).with("127.0.0.1", "root", anything, "echo '#{test_public_keys}' > ~/.ssh/authorized_keys")
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo #{test_public_keys.gsub(" ", "\\ ").gsub("\n", "'\n'")} > ~/.ssh/authorized_keys").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
 
       expect { nx.setup_ssh_keys }.to hop("bootstrap_rhizome")
     end
@@ -208,7 +213,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#wait_prep" do
     it "updates the vm_host record from the finished programs" do
       Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {"mem_gib" => 1})
-      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-22.04"})
+      Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-24.04"})
       Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
       Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
@@ -219,7 +224,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
       vm_host.reload
       expect(vm_host.total_mem_gib).to eq 1
-      expect(vm_host.os_version).to eq "ubuntu-22.04"
+      expect(vm_host.os_version).to eq "ubuntu-24.04"
       expect(vm_host.arch).to eq "arm64"
       expect(vm_host.total_cores).to eq 4
       expect(vm_host.total_cpus).to eq 5
@@ -251,19 +256,29 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "hops once SetupHugepages has returned" do
       nx.strand.retval = {"msg" => "hugepages installed"}
-      expect { nx.setup_hugepages }.to hop("setup_spdk")
+      expect { nx.setup_hugepages }.to hop("setup_storage_backend")
     end
   end
 
-  describe "#setup_spdk" do
-    it "pushes the spdk program" do
-      expect(nx).to receive(:push).with(Prog::Storage::SetupSpdk,
+  describe "#setup_storage_backend" do
+    it "pushes the vhost_block_backend program by default" do
+      expect(nx).to receive(:push).with(Prog::Storage::SetupVhostBlockBackend,
         {
-          "version" => Config.spdk_version,
-          "start_service" => false,
+          "version" => Config.vhost_block_backend_version,
           "allocation_weight" => 100
         }).and_call_original
-      expect { nx.setup_spdk }.to hop("start", "Storage::SetupSpdk")
+      expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
+    end
+
+    it "pushes the SetupSpdk program when spdk is set and vhost_block_backend is not set" do
+      nx = described_class.new(described_class.assemble("1.2.3.4", spdk_version: "someversion", vhost_block_backend_version: nil))
+      expect(nx).to receive(:push).with(Prog::Storage::SetupSpdk,
+        {
+          "version" => "someversion",
+          "allocation_weight" => 100,
+          "start_service" => false
+        }).and_call_original
+      expect { nx.setup_storage_backend }.to hop("start", "Storage::SetupSpdk")
     end
 
     it "hops once SetupSpdk has returned" do
@@ -277,7 +292,12 @@ RSpec.describe Prog::Vm::HostNexus do
       )
       allow(nx).to receive(:vm_host).and_return(vmh)
       expect(vmh).to receive(:update).with({used_cores: 2})
-      expect { nx.setup_spdk }.to hop("download_boot_images")
+      expect { nx.setup_storage_backend }.to hop("download_boot_images")
+    end
+
+    it "hops once SetupVhostBlockBackend has returned" do
+      nx.strand.retval = {"msg" => "VhostBlockBackend was setup"}
+      expect { nx.setup_storage_backend }.to hop("download_boot_images")
     end
   end
 
@@ -338,8 +358,23 @@ RSpec.describe Prog::Vm::HostNexus do
   end
 
   describe "#unavailable" do
-    it "registers an immediate deadline if host is unavailable" do
-      expect(nx).to receive(:register_deadline).with("wait", 0)
+    it "hops to prep_graceful_reboot when needed" do
+      expect(nx).to receive(:when_graceful_reboot_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_graceful_reboot")
+    end
+
+    it "hops to prep_reboot when needed" do
+      expect(nx).to receive(:when_reboot_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_reboot")
+    end
+
+    it "hops to prep_hardware_reset when needed" do
+      expect(nx).to receive(:when_hardware_reset_set?).and_yield
+      expect { nx.unavailable }.to hop("prep_hardware_reset")
+    end
+
+    it "registers a short deadline if host is unavailable" do
+      expect(nx).to receive(:register_deadline).with("wait", 90)
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
@@ -359,7 +394,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
     it "waits draining" do
       expect(vm_host).to receive(:allocation_state).and_return("draining")
-      expect(Clog).to receive(:emit).with("Cannot destroy the vm host with active virtual machines, first clean them up").and_call_original
+      expect(Clog).to receive(:emit).with("Cannot destroy the vm host with active virtual machines, first clean them up", vm_host).and_call_original
       expect { nx.destroy }.to nap(15)
     end
 
@@ -413,12 +448,12 @@ RSpec.describe Prog::Vm::HostNexus do
         metrics_dir: "/home/rhizome/host/metrics"
       }
       allow(vm_host).to receive(:metrics_config).and_return(metrics_config)
-      expect(sshable).to receive(:cmd).with("mkdir -p /home/rhizome/host/metrics")
-      expect(sshable).to receive(:cmd).with("tee /home/rhizome/host/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: "[Unit]\nDescription=VmHost Metrics Collection\nAfter=network-online.target\n\n[Service]\nType=oneshot\nUser=rhizome\nExecStart=/home/rhizome/common/bin/metrics-collector /home/rhizome/host/metrics\nStandardOutput=journal\nStandardError=journal\n")
-      expect(sshable).to receive(:cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: "[Unit]\nDescription=Run VmHost Metrics Collection Periodically\n\n[Timer]\nOnBootSec=30s\nOnUnitActiveSec=15s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n")
-      expect(sshable).to receive(:cmd).with("sudo systemctl daemon-reload")
-      expect(sshable).to receive(:cmd).with("sudo systemctl enable --now vmhost-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/rhizome/host/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/rhizome/host/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: "[Unit]\nDescription=VmHost Metrics Collection\nAfter=network-online.target\n\n[Service]\nType=oneshot\nUser=rhizome\nExecStart=/home/rhizome/common/bin/metrics-collector /home/rhizome/host/metrics\nStandardOutput=journal\nStandardError=journal\n")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: "[Unit]\nDescription=Run VmHost Metrics Collection Periodically\n\n[Timer]\nOnBootSec=30s\nOnUnitActiveSec=15s\nAccuracySec=1s\n\n[Install]\nWantedBy=timers.target\n")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now vmhost-metrics.timer")
       expect { nx.configure_metrics }.to hop("wait")
     end
   end
@@ -432,6 +467,11 @@ RSpec.describe Prog::Vm::HostNexus do
       expect { nx.prep_reboot }.to hop("reboot")
     end
 
+    it "hops to prep_hardware_reset when needed, before checking other semaphores" do
+      expect(nx).to receive(:when_hardware_reset_set?).and_yield
+      expect { nx.reboot }.to hop("prep_hardware_reset")
+    end
+
     it "reboot naps if host sshable is not available" do
       expect(sshable).to receive(:available?).and_return(false)
 
@@ -441,18 +481,28 @@ RSpec.describe Prog::Vm::HostNexus do
     it "reboot naps if reboot-host returns empty string" do
       expect(sshable).to receive(:available?).and_return(true)
       expect(vm_host).to receive(:last_boot_id).and_return("xyz")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return ""
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return ""
 
       expect { nx.reboot }.to nap(30)
     end
 
-    it "reboot updates last_boot_id and hops to verify_spdk" do
+    it "reboot updates last_boot_id and hops to verify_spdk when spdk is installed" do
+      expect(nx).to receive(:frame).and_return({"spdk_version" => "version", "vhost_block_backend_version" => nil}).at_least(:once)
       expect(sshable).to receive(:available?).and_return(true)
       expect(vm_host).to receive(:last_boot_id).and_return("xyz")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
       expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
 
       expect { nx.reboot }.to hop("verify_spdk")
+    end
+
+    it "reboot updates last_boot_id and hops to verify_hugepages when spdk is not installed" do
+      expect(sshable).to receive(:available?).and_return(true)
+      expect(vm_host).to receive(:last_boot_id).and_return("xyz")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/reboot-host xyz").and_return "pqr\n"
+      expect(vm_host).to receive(:update).with(last_boot_id: "pqr")
+
+      expect { nx.reboot }.to hop("verify_hugepages")
     end
 
     it "verify_spdk hops to verify_hugepages if spdk started" do
@@ -460,8 +510,8 @@ RSpec.describe Prog::Vm::HostNexus do
         SpdkInstallation.new(version: "v1.0"),
         SpdkInstallation.new(version: "v3.0")
       ])
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify v1.0")
-      expect(sshable).to receive(:cmd).with("sudo host/bin/setup-spdk verify v3.0")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify v1.0")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-spdk verify v3.0")
       expect { nx.verify_spdk }.to hop("verify_hugepages")
     end
 
@@ -509,7 +559,7 @@ RSpec.describe Prog::Vm::HostNexus do
     end
 
     it "can get boot id" do
-      expect(sshable).to receive(:cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("xyz\n")
+      expect(sshable).to receive(:_cmd).with("cat /proc/sys/kernel/random/boot_id").and_return("xyz\n")
       expect(nx.get_boot_id).to eq("xyz")
     end
   end
@@ -549,38 +599,49 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#verify_hugepages" do
     it "fails if hugepagesize!=1G" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 2048 kB\n")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 2048 kB\n")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't set hugepage size to 1G"
     end
 
     it "fails if total hugepages couldn't be extracted" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 1048576 kB\n")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo").and_return("Hugepagesize: 1048576 kB\n")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract total hugepage count"
     end
 
     it "fails if free hugepages couldn't be extracted" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Couldn't extract free hugepage count"
     end
 
     it "fails if not enough hugepages for VMs" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 5\nHugePages_Free: 2")
+      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Not enough hugepages for VMs"
     end
 
     it "fails if used hugepages exceed spdk hugepages" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 5")
       expect { nx.verify_hugepages }.to raise_error RuntimeError, "Used hugepages exceed SPDK hugepages"
     end
 
+    it "calculates used memory for slices and hops" do
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
+        .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
+      expect(vm_host).to receive(:update)
+        .with(total_hugepages_1g: 10, used_hugepages_1g: 9)
+      expect(vm_host).to receive(:accepts_slices).and_return(true)
+      expect { nx.verify_hugepages }.to hop("start_slices")
+    end
+
     it "updates vm_host with hugepage stats and hops" do
-      expect(sshable).to receive(:cmd).with("cat /proc/meminfo")
+      expect(sshable).to receive(:_cmd).with("cat /proc/meminfo")
         .and_return("Hugepagesize: 1048576 kB\nHugePages_Total: 10\nHugePages_Free: 8")
       expect(vm_host).to receive(:update)
         .with(total_hugepages_1g: 10, used_hugepages_1g: 7)
+      expect(vm_host).to receive(:accepts_slices).and_return(false)
       expect { nx.verify_hugepages }.to hop("start_slices")
     end
   end
@@ -588,12 +649,14 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#available?" do
     it "returns the available status when disks are healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:check_last_boot_id)
       expect(vm_host).to receive(:perform_health_checks).and_return(true)
       expect(nx.available?).to be true
     end
 
     it "returns the available status when disks are not healthy" do
       expect(sshable).to receive(:connect).and_return(nil)
+      expect(vm_host).to receive(:check_last_boot_id)
       allow(vm_host).to receive(:perform_health_checks).and_return(false)
       expect(nx.available?).to be false
     end

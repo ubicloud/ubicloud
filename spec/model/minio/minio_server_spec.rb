@@ -32,7 +32,7 @@ RSpec.describe MinioServer do
   }
 
   before do
-    allow(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4")
+    allow(ms.vm).to receive(:ip4).and_return("1.2.3.4")
   end
 
   it "returns hostname properly" do
@@ -40,9 +40,24 @@ RSpec.describe MinioServer do
   end
 
   it "returns private ipv4 address properly" do
-    nic = instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("192.168.0.0/32"))
-    expect(ms.vm).to receive(:nics).and_return([nic]).at_least(:once)
-    expect(ms.private_ipv4_address).to eq("192.168.0.0")
+    ps = PrivateSubnet.create(
+      name: "test-ps",
+      location_id: Location::HETZNER_FSN1_ID,
+      net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "10.0.0.0/26",
+      state: "waiting",
+      project_id: ms.vm.project_id
+    )
+    Nic.create(
+      private_subnet_id: ps.id,
+      private_ipv4: "192.168.0.5/32",
+      private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+      mac: "00:00:00:00:00:01",
+      name: "test-nic",
+      vm_id: ms.vm.id,
+      state: "active"
+    )
+    expect(ms.private_ipv4_address).to eq("192.168.0.5")
   end
 
   it "returns public ipv4 address properly" do
@@ -72,9 +87,9 @@ RSpec.describe MinioServer do
   it "initiates a new health monitor session" do
     forward = instance_double(Net::SSH::Service::Forward)
     expect(forward).to receive(:local)
-    session = instance_double(Net::SSH::Connection::Session)
+    session = Net::SSH::Connection::Session.allocate
     expect(session).to receive(:forward).and_return(forward)
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(sshable).to receive(:start_fresh_session).and_return(session)
     expect(ms.vm).to receive(:sshable).and_return(sshable)
     expect(UNIXServer).to receive(:new)
@@ -83,38 +98,61 @@ RSpec.describe MinioServer do
     ms.init_health_monitor_session
   end
 
-  it "checks pulse" do
+  it "checks pulse using endpoint for multiple servers" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
     }
 
-    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.2.3.4").at_least(:once)
+    expect(ms.vm).to receive(:ip4).and_return("1.2.3.4").at_least(:once)
+    expect(ms).not_to receive(:incr_checkup)
+    ms.pool.update(server_count: 2)
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [
+      {state: "online", endpoint: "1.2.3.5:9000", drives: [{state: "ok"}]},
+      {state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}
+    ]}))
+    ms.check_pulse(session:, previous_pulse: {})
+
+    stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
+    ms.check_pulse(session:, previous_pulse: {})
+  end
+
+  it "checks pulse without endpoint for single server" do
+    session = {
+      ssh_session: Net::SSH::Connection::Session.allocate,
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
+    }
+
+    expect(ms.vm).not_to receive(:ip4)
     expect(ms).not_to receive(:incr_checkup)
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "ok"}]}]}))
-    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [{state: "offline", endpoint: "1.2.3.4:9000"}]}))
-    ms.check_pulse(session: session, previous_pulse: {})
+    ms.check_pulse(session:, previous_pulse: {})
   end
 
   it "increments checkup semaphore if pulse is down for a while" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session),
+      ssh_session: Net::SSH::Connection::Session.allocate,
       minio_client: instance_double(Minio::Client)
     }
 
     expect(session[:minio_client]).to receive(:admin_info).and_raise(RuntimeError)
     expect(ms).to receive(:incr_checkup)
-    ms.check_pulse(session: session, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
+    ms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30})
   end
 
   it "returns endpoint properly" do
-    expect(ms.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+    expect(ms.vm).to receive(:ip4).and_return("1.1.1.1")
     expect(ms.endpoint).to eq("1.1.1.1:9000")
 
     expect(ms.cluster).to receive(:dns_zone).and_return("something")
@@ -126,11 +164,16 @@ RSpec.describe MinioServer do
   end
 
   it "generates /etc/hosts entries properly when there are multiple servers" do
-    servers = [instance_double(described_class, id: ms.id, public_ipv4_address: "1.1.1.1", hostname: "minio-cluster-name1.minio.ubicloud.com"),
-      instance_double(described_class, id: 2, public_ipv4_address: "1.1.1.2", hostname: "minio-cluster-name2.minio.ubicloud.com")]
-    mc = instance_double(MinioCluster, name: "minio-cluster-name", servers: servers)
-    expect(ms).to receive(:cluster).and_return(mc).at_least(:once)
-    expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name2.minio.ubicloud.com")
+    vm2 = create_vm(project_id: ms.cluster.project_id, name: "test-vm-2")
+    AssignedVmAddress.create(dst_vm_id: vm2.id, ip: "1.1.1.2/32")
+    described_class.create(
+      minio_pool_id: ms.pool.id,
+      vm_id: vm2.id,
+      index: 1,
+      cert: "cert2"
+    )
+
+    expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name1.minio.ubicloud.com")
   end
 
   describe "#url" do
@@ -145,7 +188,7 @@ RSpec.describe MinioServer do
     end
 
     it "returns ip address when dns zone is not found" do
-      expect(ms.vm).to receive(:ephemeral_net4).and_return("10.10.10.10")
+      expect(ms.vm).to receive(:ip4).and_return("10.10.10.10")
       expect(ms.server_url).to eq("https://10.10.10.10:9000")
     end
   end

@@ -69,7 +69,6 @@ class UBID
   TYPE_DNS_SERVER = "ds"
   TYPE_FIREWALL_RULE = "fr"
   TYPE_FIREWALL = "fw"
-  TYPE_POSTGRES_FIREWALL_RULE = "pf"
   TYPE_GITHUB_REPOSITORY = "gp"
   TYPE_LOAD_BALANCER = "1b"
   TYPE_LOAD_BALANCER_PORT = "1p"
@@ -92,6 +91,7 @@ class UBID
   TYPE_VM_HOST_SLICE = "vs"
   TYPE_KUBERNETES_CLUSTER = "kc"
   TYPE_KUBERNETES_NODEPOOL = "kn"
+  TYPE_KUBERNETES_NODE = "kd"
   TYPE_LOCATION = "10"
   TYPE_API_KEY = "ak"
   TYPE_USAGE_ALERT = "va"
@@ -102,6 +102,9 @@ class UBID
   TYPE_NIC_AWS_RESOURCE = "na"
   TYPE_VICTORIA_METRICS_RESOURCE = "vr"
   TYPE_VICTORIA_METRICS_SERVER = "vn"
+  TYPE_SSH_PUBLIC_KEY = "sk"
+  TYPE_GITHUB_CUSTOM_LABEL = "gc"
+  TYPE_LOCATION_AWS_AZ = "1a"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
@@ -130,7 +133,7 @@ class UBID
   end
 
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
-  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").map! { it.split(": ") }.to_h.freeze
+  ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").to_h { it.split(": ") }.freeze
     Project: pj
     Vm: vm
     PrivateSubnet: ps
@@ -166,6 +169,7 @@ class UBID
   def self.generate_vanity(type, prefix, suffix)
     raise "prefix over length 2" if prefix && prefix.length != 2
     raise "suffix over length 7" unless suffix.length <= 7
+
     full = "#{"0" if prefix}#{prefix}0#{suffix}".rjust(11, "z")
     from_parts(UBID.to_base32_n("zzzzzzzz") * 256, type, 0, UBID.to_base32_n(full) * 16)
   end
@@ -177,7 +181,7 @@ class UBID
   # Map of prefixes to class name symbols, to avoid autoloading
   # classes until they are referenced by class_for_ubid
   TYPE2CLASSNAME = constants.select { it.start_with?("TYPE_") }.reject { it.to_s == "TYPE_ETC" }
-    .map { [const_get(it), camelize(it.to_s).to_sym] }.to_h.freeze
+    .to_h { [const_get(it), camelize(it.to_s).to_sym] }.freeze
   private_constant :TYPE2CLASSNAME
 
   def self.class_for_ubid(str)
@@ -189,14 +193,16 @@ class UBID
     # :nocov:
   end
 
-  def self.resolve_map(uuids)
+  def self.resolve_map(uuids, assume_et_is_api_key: true)
     uuids.keys.group_by do
       ubid = from_uuidish(it).to_s
       # Bad hack, needed because ApiKey does not use a fixed ubid type
-      ubid.start_with?("et") ? ApiKey : class_for_ubid(ubid)
+      (ubid.start_with?("et") && assume_et_is_api_key) ? ApiKey : class_for_ubid(ubid)
     end.each do |model, model_uuids|
       next unless model
-      model.where(id: model_uuids).each do
+
+      ds = model.where(id: model_uuids)
+      (block_given? ? yield(ds).all : ds).each do
         uuids[it.id] = it
       end
     end
@@ -205,11 +211,9 @@ class UBID
 
   def self.decode(ubid)
     ubid_str = ubid.to_s
-    uuid = UBID.parse(ubid_str).to_uuid
-    klass = class_for_ubid(ubid)
-    fail UBIDParseError.new("Couldn't decode ubid: #{ubid_str}") if klass.nil?
-
-    klass[uuid]
+    if (uuid = UBID.to_uuid(ubid_str)) && (klass = class_for_ubid(ubid))
+      klass[uuid]
+    end
   end
 
   def self.from_uuidish(uuidish)
@@ -263,6 +267,7 @@ class UBID
 
     top_bits_with_parity = to_base32_n(s[2..12])
     fail UBIDParseError.new("Invalid top bits parity") unless parity(top_bits_with_parity) == 0
+
     top_bits = (top_bits_with_parity >> 1)
     unix_ts_ms = get_bits(top_bits, 6, 53)
     version = get_bits(top_bits, 2, 5)
@@ -270,11 +275,12 @@ class UBID
 
     bottom_bits_with_parity = to_base32_n(s[13..])
     fail UBIDParseError.new("Invalid bottom bits parity") unless parity(bottom_bits_with_parity) == 0
+
     bottom_bits = (bottom_bits_with_parity >> 1)
     variant = get_bits(bottom_bits, 62, 63)
     rand_b = get_bits(bottom_bits, 0, 61)
 
-    from_parts(unix_ts_ms, type, rand_a, rand_b, version: version, variant: variant)
+    from_parts(unix_ts_ms, type, rand_a, rand_b, version:, variant:)
   end
 
   def self.from_parts(unix_ts_ms, type, rand_a, rand_b, version: 0b1000, variant: 0b10)
@@ -380,6 +386,7 @@ class UBID
 
   def self.from_base32(num)
     fail UBIDParseError.new("Invalid base32 number: #{num}") if num < 0 || num >= 32
+
     BASE32_DATA[num][0].downcase
   end
 

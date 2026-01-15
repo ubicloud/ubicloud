@@ -6,6 +6,10 @@ module ContentGenerator
       location.ui_name
     end
 
+    def self.ssh_public_key(ssh_public_key)
+      ssh_public_key.name
+    end
+
     def self.private_subnet(location, private_subnet)
       private_subnet[:display_name]
     end
@@ -83,7 +87,7 @@ module ContentGenerator
 
     def self.size(flavor, location, family, size)
       size = Option::POSTGRES_SIZE_OPTIONS[size]
-      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
+      unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)
 
       [
         size.name,
@@ -94,7 +98,7 @@ module ContentGenerator
     end
 
     def self.storage_size(flavor, location, family, vm_size, storage_size)
-      unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
+      unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name, location.byoc)
 
       [
         "#{storage_size}GB",
@@ -104,15 +108,15 @@ module ContentGenerator
       ]
     end
 
-    def self.version(version)
+    def self.version(flavor, version)
       "Postgres #{version}"
     end
 
     def self.ha_type(flavor, location, family, vm_size, storage_size, ha_type)
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[vm_size].vcpu_count
       ha_type = Option::POSTGRES_HA_OPTIONS[ha_type]
-      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name)
-      storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name)
+      compute_unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)
+      storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name, location.byoc)
       standby_count = ha_type.standby_count
 
       [
@@ -146,6 +150,10 @@ module ContentGenerator
   module LoadBalancer
     def self.select_option(select_option)
       select_option[:display_name]
+    end
+
+    def self.enable_ssl_certificate(ssl_certificate)
+      "Enable SSL Certificate"
     end
   end
 

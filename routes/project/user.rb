@@ -10,7 +10,7 @@ class Clover
   hash_branch(:project_prefix, "user") do |r|
     r.web do
       r.is do
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
 
         r.get do
           view "project/user"
@@ -20,7 +20,7 @@ class Clover
           email = typecast_params.nonempty_str!("email")
           handle_validation_failure("project/user")
 
-          if ProjectInvitation[project_id: @project.id, email: email]
+          if @project.invitations_dataset.first(email:)
             raise_web_error("'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
             raise_web_error("You can't have more than 50 pending invitations.")
@@ -32,7 +32,7 @@ class Clover
             end
           end
 
-          user = Account.exclude(status_id: 3)[email: email]
+          user = Account.exclude(status_id: 3)[email:]
 
           DB.transaction do
             if user
@@ -59,7 +59,7 @@ class Clover
                 button_title: "Join Project",
                 button_link: "#{Config.base_url}#{@project.path}/dashboard")
             else
-              @project.add_invitation(email: email, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+              @project.add_invitation(email:, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
               audit_log(@project, "add_invitation")
 
               Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
@@ -74,12 +74,12 @@ class Clover
 
           flash["notice"] = "Invitation sent successfully to '#{email}'."
 
-          r.redirect "#{@project.path}/user"
+          r.redirect user_path
         end
       end
 
       r.post "policy/managed" do
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
         handle_validation_failure("project/user")
         user_policies = typecast_params.Hash("user_policies") || {}
         invitation_policies = typecast_params.Hash("invitation_policies") || {}
@@ -112,6 +112,7 @@ class Clover
             end
             policy = nil if policy == ""
             next if existing_tags.include?(policy)
+
             unless (added_tag = allowed_add_tags[policy]) || !policy
               issues << "You don't have permission to add members to '#{policy}' tag"
               next
@@ -149,8 +150,10 @@ class Clover
           invitation_policies.each do |email, policy|
             policy = nil if policy == ""
             next unless (inv = invitatation_map[email])
+
             old_policy = inv.policy
             next if policy == old_policy
+
             if policy && !allowed_add_tags[policy]
               issues << "You don't have permission to add invitation to '#{policy}' tag"
               next
@@ -181,13 +184,13 @@ class Clover
           flash["error"] = issues.uniq.join(", ") unless issues.empty?
         end
 
-        r.redirect "#{@project.path}/user"
+        r.redirect user_path
       end
 
       r.on "access-control" do
         r.is do
           r.get do
-            authorize("Project:viewaccess", @project.id)
+            authorize("Project:viewaccess", @project)
 
             uuids = {}
             @project.access_control_entries.each do |ace|
@@ -199,6 +202,7 @@ class Clover
             UBID.resolve_map(uuids)
             @aces = @project.access_control_entries.map do |ace|
               next unless (subject = uuids[ace.subject_id])
+
               editable = !(subject.is_a?(SubjectTag) && subject.name == "Admin")
               [ace.ubid, [subject, uuids[ace.action_id], uuids[ace.object_id]], editable]
             end
@@ -213,40 +217,42 @@ class Clover
           end
 
           r.post do
-            authorize("Project:editaccess", @project.id)
+            authorize("Project:editaccess", @project)
 
             DB.transaction do
-              typecast_params.array!(:Hash, "aces").each do
-                ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
-                subject_id = nil if subject_id == ""
-                action_id = nil if action_id == ""
-                object_id = nil if object_id == ""
+              DB.ignore_duplicate_queries do
+                typecast_params.array!(:Hash, "aces").each do
+                  ubid, deleted, subject_id, action_id, object_id = it.values_at("ubid", "deleted", "subject", "action", "object")
+                  subject_id = nil if subject_id == ""
+                  action_id = nil if action_id == ""
+                  object_id = nil if object_id == ""
 
-                next unless subject_id
-                check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
+                  next unless subject_id
+                  check_ace_subject(UBID.to_uuid(subject_id)) unless deleted
 
-                if ubid == "template"
-                  next if deleted == "true"
-                  ace = AccessControlEntry.new(project_id: @project.id)
-                  audit_action = "create"
-                else
-                  next unless (ace = AccessControlEntry[project_id: @project.id, id: UBID.to_uuid(ubid)])
-                  check_ace_subject(ace.subject_id)
-                  if deleted == "true"
-                    ace.destroy
-                    audit_log(ace, "destroy")
-                    next
+                  if ubid == "template"
+                    next if deleted == "true"
+                    ace = AccessControlEntry.new(project_id: @project.id)
+                    audit_action = "create"
+                  else
+                    next unless (ace = @project.access_control_entries_dataset.with_pk(UBID.to_uuid(ubid)))
+                    check_ace_subject(ace.subject_id)
+                    if deleted == "true"
+                      ace.destroy
+                      audit_log(ace, "destroy")
+                      next
+                    end
+                    audit_action = "update"
                   end
-                  audit_action = "update"
+                  ace.update_from_ubids(subject_id:, action_id:, object_id:)
+                  audit_log(ace, audit_action, [subject_id, action_id, object_id])
                 end
-                ace.update_from_ubids(subject_id:, action_id:, object_id:)
-                audit_log(ace, audit_action, [subject_id, action_id, object_id])
               end
             end
 
             flash["notice"] = "Access control entries saved successfully"
 
-            r.redirect "#{@project_data[:path]}/user/access-control"
+            r.redirect "#{user_path}/access-control"
           end
         end
 
@@ -257,56 +263,50 @@ class Clover
 
           r.is do
             r.get do
-              authorize("Project:viewaccess", @project.id)
+              authorize("Project:viewaccess", @project)
               view "project/tag-list"
             end
 
             r.post do
-              authorize(tag_perm_map[tag_type], @project.id)
+              authorize(tag_perm_map[tag_type], @project)
               handle_validation_failure("project/tag-list")
               DB.transaction do
                 tag = @tag_model.create(project_id: @project.id, name: typecast_params.nonempty_str("name"))
                 audit_log(tag, "create")
               end
               flash["notice"] = "#{@display_tag_type} tag created successfully"
-              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}"
+              r.redirect @project, "/user/access-control/tag/#{@tag_type}"
             end
           end
 
           r.on :ubid_uuid do |id|
             next unless (@tag = @tag_model[project_id: @project.id, id:])
+
             # Metatag uuid is used to differentiate being allowed to manage
             # tag itself, compared to being able to manage things contained in
             # the tag.
             @authorize_id = (tag_type == "object") ? @tag.metatag_uuid : @tag.id
 
-            r.is do
-              r.get do
-                authorize("#{@tag.class}:view", @authorize_id)
-                view "project/tag"
-              end
+            r.get true do
+              authorize("#{@tag.class}:view", @authorize_id)
+              view "project/tag"
+            end
 
-              authorize(tag_perm_map[tag_type], @project.id)
+            r.post true do
+              check_tag_modification!(tag_perm_map[tag_type])
+              handle_validation_failure("project/tag")
+              @tag.update(name: typecast_params.nonempty_str("name"))
+              audit_log(@tag, "update")
+              flash["notice"] = "#{@display_tag_type} tag name updated successfully"
+              r.redirect @tag
+            end
 
-              if @tag_type == "subject" && @tag.name == "Admin"
-                handle_validation_failure("project/tag-list")
-                raise_web_error("Cannot modify Admin subject tag")
-              end
-
-              r.post do
-                handle_validation_failure("project/tag")
-                @tag.update(name: typecast_params.nonempty_str("name"))
-                audit_log(@tag, "update")
-                flash["notice"] = "#{@display_tag_type} tag name updated successfully"
-                r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
-              end
-
-              r.delete do
-                @tag.destroy
-                audit_log(@tag, "destroy")
-                flash["notice"] = "#{@display_tag_type} tag deleted successfully"
-                204
-              end
+            r.delete true do
+              check_tag_modification!(tag_perm_map[tag_type])
+              @tag.destroy
+              audit_log(@tag, "destroy")
+              flash["notice"] = "#{@display_tag_type} tag deleted successfully"
+              r.redirect @project, "/user/access-control/tag/#{@tag_type}"
             end
 
             r.post "associate" do
@@ -335,7 +335,7 @@ class Clover
                 flash["error"] = "No change in membership#{issues}"
               end
 
-              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              r.redirect @tag
             end
 
             r.post "disassociate" do
@@ -359,24 +359,25 @@ class Clover
               end
 
               flash["notice"] = "#{num_removed} members removed from #{@tag_type} tag"
-              r.redirect "#{@project_data[:path]}/user/access-control/tag/#{@tag_type}/#{@tag.ubid}"
+              r.redirect @tag
             end
           end
         end
       end
 
       r.delete "invitation", String do |email|
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
-        @project.invitations_dataset.where(email: email).destroy
+        @project.invitations_dataset.where(email:).destroy
         audit_log(@project, "destroy_invitation")
-        # Javascript handles redirect
         flash["notice"] = "Invitation for '#{email}' is removed successfully."
-        204
+        r.redirect @project, "/user"
       end
 
       r.delete :ubid_uuid do |id|
-        authorize("Project:user", @project.id)
+        authorize("Project:user", @project)
+        handle_validation_failure("project/user")
 
         next unless (user = @project.accounts_dataset[id:])
 
@@ -388,9 +389,8 @@ class Clover
         user.remove_project(@project)
         audit_log(@project, "remove_account", user)
 
-        # Javascript refreshes page
         flash["notice"] = "Removed #{user.email} from #{@project.name}"
-        204
+        r.redirect @project, "/user"
       end
     end
   end

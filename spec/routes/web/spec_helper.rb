@@ -9,7 +9,7 @@ File.write(css_file, "") unless File.file?(css_file)
 require "capybara"
 require "capybara/rspec"
 
-if ENV["CLOVER_FREEZE"] == "1"
+if Config.frozen_test?
   require "capybara/validate_html5"
 
   Capybara.custom_html_validation do |doc, &block|
@@ -20,16 +20,8 @@ end
 
 Gem.suffix_pattern
 
-Capybara.app = Clover.app
+Capybara.app = RACK_TEST_APP
 Capybara.exact = true
-
-module RackTestPlus
-  include Rack::Test::Methods
-
-  def app
-    Capybara.app
-  end
-end
 
 # Work around Middleware should not call #each error.
 # Fix bugs with cookies, because the default behavior
@@ -42,17 +34,19 @@ class Capybara::RackTest::Browser
 end
 
 RSpec.configure do |config|
-  config.include RackTestPlus
+  config.include Rack::Test::Methods
   config.include Capybara::DSL
   config.after do
     Capybara.reset_sessions!
     Capybara.use_default_driver
+    Capybara.default_host = "http://www.example.com"
   end
 
   class RSpec::Matchers::DSL::Matcher
     def self.flash_message_matcher(expected_type, expected_message)
       match do |page|
         next false unless page.has_css?("#flash-#{expected_type}")
+
         actual_message = page.find_by_id("flash-#{expected_type}").text
         if expected_message.is_a?(String)
           actual_message == expected_message

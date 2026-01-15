@@ -4,7 +4,7 @@ require_relative "../model"
 require "excon"
 
 class OidcProvider < Sequel::Model
-  one_to_many :locked_domains
+  one_to_many :locked_domains, remover: nil, clearer: nil
 
   def self.name_for_ubid(ubid)
     OidcProvider[UBID.to_uuid(ubid)]&.display_name
@@ -45,6 +45,7 @@ class OidcProvider < Sequel::Model
 
       registration_info = JSON.parse(response.body)
       raise "Unable to register with oidc provider: #{response.status} #{registration_info.inspect}" unless response.status == 201
+
       client_id = registration_info.fetch("client_id")
       client_secret = registration_info.fetch("client_secret")
       registration_client_uri = registration_info["registration_client_uri"]

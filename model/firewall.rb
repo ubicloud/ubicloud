@@ -4,7 +4,7 @@ require_relative "../model"
 
 class Firewall < Sequel::Model
   many_to_one :project
-  one_to_many :firewall_rules, key: :firewall_id
+  one_to_many :firewall_rules, order: :cidr, remover: nil, clearer: nil
   many_to_many :private_subnets
   many_to_one :location
   plugin :association_dependencies, firewall_rules: :destroy
@@ -27,16 +27,18 @@ class Firewall < Sequel::Model
     update_private_subnet_firewall_rules
   end
 
-  def insert_firewall_rule(cidr, port_range)
-    fwr = add_firewall_rule(cidr:, port_range:)
+  def insert_firewall_rule(cidr, port_range, description: nil)
+    fwr = add_firewall_rule(cidr:, port_range:, description:)
     update_private_subnet_firewall_rules
     fwr
   end
 
   def replace_firewall_rules(new_firewall_rules)
     firewall_rules.each(&:destroy)
-    new_firewall_rules.each do
-      add_firewall_rule(it)
+    DB.ignore_duplicate_queries do
+      new_firewall_rules.each do
+        add_firewall_rule(it)
+      end
     end
 
     update_private_subnet_firewall_rules
@@ -57,8 +59,6 @@ class Firewall < Sequel::Model
     remove_private_subnet(private_subnet)
     private_subnet.incr_update_firewall_rules if apply_firewalls
   end
-
-  private
 
   def update_private_subnet_firewall_rules
     private_subnets.each(&:incr_update_firewall_rules)
@@ -82,3 +82,4 @@ end
 # Referenced By:
 #  firewall_rule             | firewall_rule_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id)
 #  firewalls_private_subnets | firewalls_private_subnets_firewall_id_fkey | (firewall_id) REFERENCES firewall(id)
+#  firewalls_vms             | firewalls_vms_firewall_id_fkey             | (firewall_id) REFERENCES firewall(id) ON DELETE CASCADE

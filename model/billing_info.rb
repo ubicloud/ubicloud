@@ -6,16 +6,17 @@ require "countries"
 require "excon"
 
 class BillingInfo < Sequel::Model
-  one_to_many :payment_methods, order: Sequel.desc(:created_at)
-  one_to_one :project
+  one_to_many :payment_methods, order: Sequel.desc(:created_at), remover: nil, clearer: nil
+  one_to_one :project, read_only: true
 
-  plugin ResourceMethods, etc_type: true
+  plugin ResourceMethods
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
       @stripe_data ||= begin
         data = Stripe::Customer.retrieve(stripe_id)
         return nil unless data
+
         address = data["address"] || {}
         metadata = data["metadata"] || {}
         {
@@ -27,7 +28,8 @@ class BillingInfo < Sequel::Model
           "state" => address["state"],
           "postal_code" => address["postal_code"],
           "tax_id" => metadata["tax_id"],
-          "company_name" => metadata["company_name"]
+          "company_name" => metadata["company_name"],
+          "note" => metadata["note"]
         }
       end
     end

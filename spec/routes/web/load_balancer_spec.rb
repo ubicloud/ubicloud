@@ -164,7 +164,7 @@ RSpec.describe Clover, "load balancer" do
 
     describe "show" do
       it "can show load balancer details" do
-        lb
+        lb.update(health_check_protocol: "http")
         visit "#{project.path}/load-balancer"
 
         expect(page.title).to eq("Ubicloud - Load Balancers")
@@ -176,6 +176,48 @@ RSpec.describe Clover, "load balancer" do
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(page).to have_content lb.name
         expect(page).to have_content "Round Robin"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-1",
+          "Connection String", lb.hostname,
+          "Private Subnet", lb.private_subnet.name,
+          "Algorithm", "Round Robin",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8080",
+          "Health Check Protocol", "HTTP",
+          "HTTP Health Check Endpoint", "/up"
+        ]
+        expect(page).to have_no_content "How to fetch the SSL certificate?"
+      end
+
+      it "can show load balancer details for an HTTPS enabled load balancer without a certificate, yet" do
+        lb
+        visit "#{project.path}/load-balancer"
+
+        expect(page.title).to eq("Ubicloud - Load Balancers")
+        expect(page).to have_content lb.name
+        expect(page).to have_content lb.hostname
+        lb.update(health_check_protocol: "https", cert_enabled: true)
+        click_link lb.name, href: "#{project.path}#{lb.path}"
+
+        expect(page.title).to eq("Ubicloud - #{lb.name}")
+        expect(page).to have_content lb.name
+        expect(page).to have_content "Round Robin"
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-1",
+          "Connection String", lb.hostname,
+          "Private Subnet", lb.private_subnet.name,
+          "Algorithm", "Round Robin",
+          "Stack", "dual",
+          "Load Balancer Port", "80",
+          "Application Port", "8080",
+          "Health Check Protocol", "HTTPS",
+          "HTTPS Health Check Endpoint", "/up",
+          "SSL Certificate Status", "Creating"
+        ]
+        expect(page).to have_content "How to fetch the SSL certificate?"
       end
 
       it "raises forbidden when does not have permissions" do
@@ -208,14 +250,14 @@ RSpec.describe Clover, "load balancer" do
 
       it "can attach vm" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based").subject
+        lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000, algorithm: "hash_based", health_check_protocol: "https").subject
         dz = DnsZone.create(name: "test-dns-zone", project_id: project.id)
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
         click_button "Attach"
 
@@ -223,7 +265,7 @@ RSpec.describe Clover, "load balancer" do
         expect(page).to have_flash_notice("VM is attached to the load balancer")
         expect(lb.vms.count).to eq(1)
 
-        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com")
+        expect(Config).to receive(:load_balancer_service_hostname).and_return("lb.ubicloud.com").at_least(:once)
         visit "#{project.path}#{lb.path}"
         expect(page.all("dt,dd").map(&:text)).to eq [
           "ID", lb.ubid,
@@ -234,13 +276,33 @@ RSpec.describe Clover, "load balancer" do
           "Stack", "dual",
           "Load Balancer Port", "80",
           "Application Port", "8000",
-          "HTTP Health Check Endpoint", "/up"
+          "Health Check Protocol", "HTTPS",
+          "HTTPS Health Check Endpoint", "/up",
+          "SSL Certificate Status", "Available"
         ]
+
+        lb.update(health_check_protocol: "tcp", stack: "ipv4")
+        page.refresh
+        expect(page.all("dt,dd").map(&:text)).to eq [
+          "ID", lb.ubid,
+          "Name", "dummy-lb-3",
+          "Connection String", "dummy-lb-3.#{ps.ubid[-5...]}.lb.ubicloud.com",
+          "Private Subnet", "dummy-ps-1",
+          "Algorithm", "Hash Based",
+          "Stack", "IPv4",
+          "Load Balancer Port", "80",
+          "Application Port", "8000",
+          "Health Check Protocol", "TCP",
+          "SSL Certificate Status", "Available"
+        ]
+
+        visit "#{project.path}#{lb.path}/vms"
         expect(page.all("#lb-vms td").map(&:text)).to eq [
           "dummy-vm-1", "down", "Detach",
           "Select a VM", "", "Attach"
         ]
 
+        within("#load-balancer-submenu") { click_link "Overview" }
         click_link "dummy-ps-1"
         expect(page.title).to eq("Ubicloud - #{ps.name}")
       end
@@ -256,6 +318,7 @@ RSpec.describe Clover, "load balancer" do
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
         visit "#{project.path}#{lb2.path}"
+        within("#load-balancer-submenu") { click_link "Virtual Machines" }
         select vm.name, from: "vm_id"
         lb1.add_vm(vm)
         click_button "Attach"
@@ -270,14 +333,14 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
         vm.nics.first.destroy
         vm.destroy
         click_button "Attach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM not found"
+        expect(page).to have_content "No matching VM found in eu-central-h1"
         expect(lb.vms.count).to eq(0)
       end
 
@@ -293,7 +356,7 @@ RSpec.describe Clover, "load balancer" do
 
         lb.add_vm(vm)
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         expect(page).to have_content vm.name
         click_button "Detach"
 
@@ -313,10 +376,9 @@ RSpec.describe Clover, "load balancer" do
         lb.add_cert(cert)
         vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/vms"
         select "dummy-vm-1", from: "vm_id"
         click_button "Attach"
-        visit "#{project.path}#{lb.path}"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
         expect(lb.reload.vms.count).to eq(1)
@@ -325,8 +387,71 @@ RSpec.describe Clover, "load balancer" do
         click_button "Detach"
 
         expect(page.title).to eq("Ubicloud - #{lb.name}")
-        expect(page).to have_content "VM not found"
+        expect(page).to have_content "No matching VM found in eu-central-h1"
         expect(lb.reload.vms.count).to eq(0)
+      end
+
+      it "can not attach vms without permissions" do
+        # Give permission to view, so we can see the detail page
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
+
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/vms"
+        expect(page.title).to eq "Ubicloud - dummy-lb-2"
+
+        expect(page.body).not_to include "attach-vm"
+      end
+    end
+
+    describe "rename" do
+      it "can rename load balancer" do
+        old_name = lb.name
+        visit "#{project.path}#{lb.path}/settings"
+        fill_in "name", with: "new-name%"
+        click_button "Rename"
+        expect(page).to have_flash_error("Validation failed for following fields: name")
+        expect(page).to have_content("Name must only contain lowercase letters, numbers, and hyphens and have max length 63.")
+        expect(lb.reload.name).to eq old_name
+
+        fill_in "name", with: "new-name"
+        click_button "Rename"
+        expect(page).to have_flash_notice("Name updated")
+        expect(lb.reload.name).to eq "new-name"
+        expect(page).to have_content("new-name")
+      end
+
+      it "does not show rename option without permissions" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:delete"])
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/settings"
+        expect(page.title).to eq "Ubicloud - dummy-lb-2"
+        expect(page).to have_no_content("Rename")
+        find ".delete-btn"
+      end
+    end
+
+    describe "toggle-ssl-certificate" do
+      it "can enable cert" do
+        lb.update(cert_enabled: false)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: true, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be true
+      end
+
+      it "can disable cert" do
+        lb.update(cert_enabled: true)
+        visit "#{project.path}#{lb.path}/settings"
+        within("form#cert_enabled_toggle") do
+          _csrf = find("input[name='_csrf']", visible: false).value
+          page.driver.post "#{project.path}#{lb.path}/toggle-ssl-certificate", {cert_enabled: false, _csrf:}
+        end
+
+        expect(page.status_code).to eq(302)
+        expect(lb.reload.cert_enabled).to be false
       end
     end
 
@@ -336,11 +461,10 @@ RSpec.describe Clover, "load balancer" do
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
         visit "#{project.path}#{lb.path}"
+        within("#load-balancer-submenu") { click_link "Settings" }
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        click_button "Delete"
+        expect(page).to have_flash_notice("Load balancer scheduled for deletion.")
 
         expect(lb.destroy_set?).to be true
       end
@@ -348,26 +472,26 @@ RSpec.describe Clover, "load balancer" do
       it "can not delete load balancer when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:view"])
-
-        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}"
+        visit "#{project_wo_permissions.path}#{lb_wo_permission.path}/settings"
         expect(page.title).to eq "Ubicloud - dummy-lb-2"
+        expect(page).to have_no_content("Rename")
 
         expect { find ".delete-btn" }.to raise_error Capybara::ElementNotFound
+
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["LoadBalancer:edit"])
+        page.refresh
+        expect(page).to have_content("Rename")
       end
 
       it "can not delete load balancer when it doesn't exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
 
-        visit "#{project.path}#{lb.path}"
+        visit "#{project.path}#{lb.path}/settings"
 
         lb.update(name: "new-name")
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        expect(page.status_code).to eq(204)
+        click_button "Delete"
+        expect(page.status_code).to eq(404)
       end
     end
   end

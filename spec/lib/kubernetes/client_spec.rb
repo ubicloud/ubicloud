@@ -6,7 +6,7 @@ RSpec.describe Kubernetes::Client do
   let(:kubernetes_cluster) {
     KubernetesCluster.create(
       name: "test",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: private_subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -14,7 +14,7 @@ RSpec.describe Kubernetes::Client do
       target_node_size: "standard-2"
     )
   }
-  let(:session) { instance_double(Net::SSH::Connection::Session) }
+  let(:session) { Net::SSH::Connection::Session.allocate }
   let(:kubernetes_client) { described_class.new(kubernetes_cluster, session) }
 
   describe "service_deleted?" do
@@ -197,21 +197,34 @@ RSpec.describe Kubernetes::Client do
 
   describe "kubectl" do
     it "runs kubectl command in the right format" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes")
-      kubernetes_client.kubectl("get nodes")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect { kubernetes_client.kubectl("get nodes") }.not_to raise_error
+    end
+
+    it "raises an error if passed a non-frozen string" do
+      expect { kubernetes_client.kubectl("get nodes".dup) }.to raise_error(NetSsh::PotentialInsecurity)
+    end
+
+    it "raises an error" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("error happened", 1)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes").and_return(response)
+      expect { kubernetes_client.kubectl("get nodes") }.to raise_error(RuntimeError, "error happened")
     end
   end
 
   describe "version" do
     it "runs a version command on kubectl" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return("Client Version: v1.33.0\nKustomize Version: v5.6.0")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Client Version: v1.33.0\nKustomize Version: v5.6.0", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf version --client").and_return(response)
       expect(kubernetes_client.version).to eq("v1.33")
     end
   end
 
   describe "delete_node" do
     it "deletes a node" do
-      expect(session).to receive(:exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete node asdf").and_return(response)
       kubernetes_client.delete_node("asdf")
     end
   end
@@ -224,7 +237,8 @@ RSpec.describe Kubernetes::Client do
           "name" => "test-svc"
         }
       }
-      expect(kubernetes_client).to receive(:kubectl).with("-n default patch service test-svc --type=merge -p '{\"status\":{\"loadBalancer\":{\"ingress\":[{\"hostname\":\"asdf.com\"}]}}}' --subresource=status")
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n default patch service test-svc --type=merge -p \\{\\\"status\\\":\\{\\\"loadBalancer\\\":\\{\\\"ingress\\\":\\[\\{\\\"hostname\\\":\\\"asdf.com\\\"\\}\\]\\}\\}\\} --subresource=status").and_return(response)
       kubernetes_client.set_load_balancer_hostname(svc, "asdf.com")
     end
   end
@@ -236,14 +250,18 @@ RSpec.describe Kubernetes::Client do
       @response = {
         "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
       }.to_json
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
+      allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      expect(kubernetes_client.instance_variable_get(:@kubernetes_cluster)).to receive(:reload).at_least(:once)
+      expect(kubernetes_client.instance_variable_get(:@load_balancer)).to receive(:reload).at_least(:once)
     end
 
     it "returns true early since there are no LoadBalancer services but there is a port" do
       response = {
         "items" => []
       }.to_json
-      expect(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect(kubernetes_client.any_lb_services_modified?).to be(true)
     end
 
@@ -280,7 +298,8 @@ RSpec.describe Kubernetes::Client do
           }
         ]
       }.to_json
-      expect(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
 
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[], []],
@@ -299,7 +318,8 @@ RSpec.describe Kubernetes::Client do
           "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}
         ]
       }.to_json
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(@response)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
+      allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
     end
 
     it "reconciles with pre existing lb with not ready loadbalancer" do
@@ -330,8 +350,10 @@ RSpec.describe Kubernetes::Client do
     end
 
     it "raises error with non existing lb" do
-      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), instance_double(Net::SSH::Connection::Session))
-      allow(kubernetes_client).to receive(:kubectl).with("get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return({"items" => [{}]}.to_json)
+      session = Net::SSH::Connection::Session.allocate
+      kubernetes_client = described_class.new(instance_double(KubernetesCluster, services_lb: nil), session)
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new({"items" => [{}]}.to_json, 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
       expect { kubernetes_client.sync_kubernetes_services }.to raise_error("services load balancer does not exist.")
     end
   end

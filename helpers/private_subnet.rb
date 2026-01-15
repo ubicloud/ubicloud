@@ -1,8 +1,35 @@
 # frozen_string_literal: true
 
 class Clover
-  def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil, key: "private_subnet_id", id: nil)
-    authorized_object(association: :private_subnets, key:, perm:, location_id:, id:)
+  def authorized_private_subnet(perm: "PrivateSubnet:view", location_id: nil, key: "private_subnet_id", id: nil, name: nil)
+    authorized_object(association: :private_subnets, key:, perm:, location_id:, id:, name:)
+  end
+
+  def private_subnet_connection_action(type, id)
+    authorize("PrivateSubnet:#{type}", @ps.id)
+    handle_validation_failure("networking/private_subnet/show") { @page = "networking" }
+
+    if type == "connect" && id == @ps.id
+      raise CloverError.new(400, "InvalidRequest", "Cannot connect private subnet to itself")
+    end
+
+    if (subnet = authorized_private_subnet(perm: "PrivateSubnet:#{type}", location_id: @location.id, id:))
+      name = subnet.name
+    else
+      raise CloverError.new(400, "InvalidRequest", "Subnet to be #{type}ed not found")
+    end
+
+    DB.transaction do
+      @ps.send(:"#{type}_subnet", subnet)
+      audit_log(@ps, type, subnet)
+    end
+
+    if api?
+      Serializers::PrivateSubnet.serialize(@ps)
+    else
+      flash["notice"] = "#{name} will be #{type}ed in a few seconds"
+      request.redirect @ps, "/networking"
+    end
   end
 
   def private_subnet_list
@@ -10,15 +37,15 @@ class Clover
 
     if api?
       dataset = dataset.where(location: @location) if @location
-      paginated_result(dataset.eager(nics: :private_subnet), Serializers::PrivateSubnet)
+      paginated_result(dataset.eager(:location, :semaphores, firewalls: [:location, :firewall_rules], nics: [:private_subnet, :vm]), Serializers::PrivateSubnet)
     else
-      @pss = Serializers::PrivateSubnet.serialize(dataset.all, {include_path: true})
+      @pss = dataset.eager(:location).all
       view "networking/private_subnet/index"
     end
   end
 
   def private_subnet_post(name)
-    authorize("PrivateSubnet:create", @project.id)
+    authorize("PrivateSubnet:create", @project)
 
     if (firewall_id = typecast_params.nonempty_str("firewall_id"))
       unless (firewall = authorized_firewall(location_id: @location.id))
@@ -41,7 +68,7 @@ class Clover
       Serializers::PrivateSubnet.serialize(ps)
     else
       flash["notice"] = "'#{name}' will be ready in a few seconds"
-      request.redirect "#{@project.path}#{ps.path}"
+      request.redirect ps
     end
   end
 

@@ -4,7 +4,7 @@ class Clover
   hash_branch(:project_prefix, "private-location") do |r|
     r.is do
       r.get do
-        authorize("Location:view", @project.id)
+        authorize("Location:view", @project)
 
         @dataset = @project.locations_dataset
 
@@ -17,7 +17,7 @@ class Clover
       end
 
       r.post do
-        authorize("Location:create", @project.id)
+        authorize("Location:create", @project)
         handle_validation_failure("private-location/create")
         name, provider_location_name, access_key, secret_key = typecast_params.nonempty_str!(["name", "provider_location_name", "access_key", "secret_key"])
 
@@ -32,31 +32,32 @@ class Clover
             ui_name: name,
             visible: true,
             provider: "aws",
-            project_id: @project.id
+            project_id: @project.id,
+            byoc: true
           )
-          LocationCredential.create_with_id(loc.id, access_key:, secret_key:)
+          LocationCredential.create_with_id(loc, access_key:, secret_key:)
           audit_log(loc, "create")
         end
 
         if api?
           Serializers::PrivateLocation.serialize(loc)
         else
-          r.redirect "#{@project.path}#{loc.path}"
+          r.redirect loc
         end
       end
     end
 
     r.get(web?, "create") do
-      authorize("Location:create", @project.id)
+      authorize("Location:create", @project)
       view "private-location/create"
     end
 
-    r.is String do |name|
+    r.on String do |name|
       @location = @project.locations.find { |loc| loc.ui_name == name }
       check_found_object(@location)
 
-      r.get do
-        authorize("Location:view", @project.id)
+      r.get true do
+        authorize("Location:view", @project)
 
         if api?
           Serializers::PrivateLocation.serialize(@location)
@@ -65,8 +66,9 @@ class Clover
         end
       end
 
-      r.delete do
-        authorize("Location:delete", @project.id)
+      r.delete true do
+        authorize("Location:delete", @project)
+        handle_validation_failure("private-location/show")
 
         if @location.has_resources?
           fail DependencyError.new("Private location '#{@location.ui_name}' has some resources, first, delete them.")
@@ -78,11 +80,16 @@ class Clover
           audit_log(@location, "destroy")
         end
 
-        204
+        if web?
+          flash["notice"] = "Private location deleted"
+          r.redirect @project, "/private-location"
+        else
+          204
+        end
       end
 
-      r.post do
-        authorize("Location:edit", @project.id)
+      r.post true do
+        authorize("Location:edit", @project)
         name = typecast_params.nonempty_str("name")
         Validation.validate_name(name)
 
@@ -95,7 +102,7 @@ class Clover
           Serializers::PrivateLocation.serialize(@location)
         else
           flash["notice"] = "The location name is updated to '#{@location.ui_name}'."
-          r.redirect "#{@project.path}#{@location.path}"
+          r.redirect @location
         end
       end
     end

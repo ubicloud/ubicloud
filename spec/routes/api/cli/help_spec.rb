@@ -3,6 +3,11 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "cli help" do
+  it "fails if the account is suspended" do
+    @account.suspend
+    expect(cli(%w[help help], status: 401)).to eq "! Invalid personal access token provided\n"
+  end
+
   it "shows help for specific command if given" do
     expect(cli(%w[help help])).to eq <<~OUTPUT
       Get command help
@@ -34,11 +39,13 @@ RSpec.describe Clover, "cli help" do
   it "shows help for all subcommands of command if -r is given" do
     expect(cli(%w[help -r vm])).to include <<~OUTPUT
       Usage:
-          ubi vm location/vm-name create [options] public_key
+          ubi vm location/vm-name create [options] public-key
 
       Examples:
           ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"
           ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/authorized_keys)"
+          ubi vm eu-central-h1/my-vm-name create registered-ssh-public-key-name
+          ubi vm eu-central-h1/my-vm-name create -i "$(cat /path/to/init/script)" registered-ssh-public-key-name
 
       Options:
           -6, --ipv6-only                  do not enable IPv4
@@ -48,7 +55,7 @@ RSpec.describe Clover, "cli help" do
   it "shows usage for all subcommands of command if -ru is given" do
     expect(cli(%w[help -ru vm])).to include <<~OUTPUT
       ubi vm list [options]
-      ubi vm location/vm-name create [options] public_key
+      ubi vm location/vm-name create [options] public-key
     OUTPUT
   end
 

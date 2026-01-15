@@ -11,17 +11,29 @@ class Clover
 
   def vm_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset, Serializers::Vm)
+    paginated_result(dataset.eager(:assigned_vm_address, :vm_storage_volumes, :location, :semaphores, :strand), Serializers::Vm)
   end
 
   def vm_post(name)
     project = @project
-    authorize("Vm:create", project.id)
+    authorize("Vm:create", project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless project.has_valid_payment_method?
 
-    public_key = typecast_params.nonempty_str!("public_key")
+    if api?
+      public_key = typecast_params.nonempty_str!("public_key")
+      if !public_key.include?(" ") && (ssh_public_key = project.ssh_public_keys_dataset.first(name: public_key))
+        public_key = ssh_public_key.public_key
+      end
+    else
+      public_key = if (spk_id = typecast_params.ubid_uuid("ssh_public_key")) && (ssh_public_key = project.ssh_public_keys_dataset.first(id: spk_id))
+        ssh_public_key.public_key
+      else
+        typecast_params.nonempty_str!("public_key")
+      end
+    end
+
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
@@ -54,12 +66,21 @@ class Clover
       assemble_params.delete(:gpu)
     end
 
-    if assemble_params[:private_subnet_id]
-      unless (ps = authorized_private_subnet(location_id: @location.id))
-        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{assemble_params[:private_subnet_id]}\" is not found in the location \"#{@location.display_name}\""})
+    if (ps_id = assemble_params[:private_subnet_id])
+      if web? && ps_id.start_with?("new-")
+        assemble_params[:private_subnet_id] = nil
+        ps_name = typecast_params.nonempty_str!("new_private_subnet_name")
+        unless ps_name.match(Validation::ALLOWED_NAME_PATTERN)
+          fail Validation::ValidationFailed.new({new_private_subnet_name: "Name must only contain lowercase letters, numbers, and hyphens and have max length 63."})
+        end
+
+        assemble_params[:new_private_subnet_name] = ps_name
+      elsif (ps = authorized_private_subnet(location_id: @location.id))
+        assemble_params[:private_subnet_id] = ps.id
+      else
+        fail Validation::ValidationFailed.new({private_subnet_id: "Private subnet with the given id \"#{ps_id}\" is not found in the location \"#{@location.display_name}\""})
       end
     end
-    assemble_params[:private_subnet_id] = ps&.id
 
     requested_vm_vcpu_count = parsed_size.nil? ? 2 : parsed_size.vcpus
     Validation.validate_vcpu_quota(project, "VmVCpu", requested_vm_vcpu_count)
@@ -80,7 +101,7 @@ class Clover
       Serializers::Vm.serialize(vm, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{project.path}#{vm.path}"
+      request.redirect vm
     end
   end
 
@@ -95,10 +116,12 @@ class Clover
     # nil: Show GPU options, but also show options not valid for GPU configurations
 
     if @show_gpu != false
+      ff_visible_locations = @project.get_ff_visible_locations || []
       available_gpus = DB[:pci_device]
         .join(:vm_host, id: :vm_host_id)
         .join(:location, id: :location_id)
-        .where(device_class: ["0300", "0302"], vm_id: nil, visible: true)
+        .where(device_class: ["0300", "0302"], vm_id: nil)
+        .where(Sequel.|([:visible], name: ff_visible_locations))
         .group_and_count(:vm_host_id, :name, :device)
         .from_self
         .select_group { [name.as(:location_name), device] }
@@ -116,7 +139,7 @@ class Clover
       if @show_gpu
         if gpu_locations.empty? && web?
           flash["error"] = "Unfortunately, no virtual machines with GPUs are currently available."
-          request.redirect "#{@project.path}/vm/create"
+          request.redirect @project, "/vm/create"
         end
 
         location_family_check = lambda do |location, family|
@@ -137,6 +160,13 @@ class Clover
         display_name: it.name
       }
     }
+    Option.locations(feature_flags: @project.feature_flags).each do |location|
+      subnets << {
+        location_id: location.id,
+        value: "new-#{location.ubid}",
+        display_name: "New Private Subnet"
+      }
+    end
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|
       private_subnet[:location_id] == location.id
     end
@@ -145,6 +175,7 @@ class Clover
 
     options.add_option(name: "family", values: Option.families.map(&:name), parent: "location") do |location, family|
       next false if location_family_check&.call(location, family)
+
       !!BillingRate.from_resource_properties("VmVCpu", family, location.name)
     end
 
@@ -173,9 +204,13 @@ class Clover
       end
     end
 
-    options.add_option(name: "boot_image", values: Option::BootImages.map(&:name))
+    boot_images = Option::BootImages.map(&:name)
+    boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
+    options.add_option(name: "boot_image", values: boot_images)
     options.add_option(name: "unix_user")
+    options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
+    options.add_option(name: "init_script")
 
     options.serialize
   end

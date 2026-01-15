@@ -3,8 +3,7 @@
 require_relative "../model"
 
 class NicAwsResource < Sequel::Model
-  many_to_one :nic, key: :id
-
+  many_to_one :nic, key: :id, read_only: true, is_used: true
   plugin ResourceMethods
 end
 
@@ -13,6 +12,8 @@ end
 #  id                   | uuid | PRIMARY KEY
 #  eip_allocation_id    | text |
 #  network_interface_id | text |
+#  subnet_id            | text |
+#  subnet_az            | text |
 # Indexes:
 #  nic_aws_resource_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

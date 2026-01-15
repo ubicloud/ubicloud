@@ -20,5 +20,6 @@ files_with_sizes = Dir.glob(File.join(directory_path, "*"))
   .sort_by { _1[:size] }
 while files_with_sizes.sum { _1[:size] } > 1 * 1024 * 1024 * 1024 # 1GB in bytes
   break unless (largest_file = files_with_sizes.pop)
+
   FileUtils.rm(largest_file[:file])
 end

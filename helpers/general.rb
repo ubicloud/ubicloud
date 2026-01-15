@@ -1,14 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  def self.name_or_ubid_for(model)
-    # (\z)? to force a nil as first capture
-    [/(\z)?(#{model.ubid_type}[a-tv-z0-9]{24})/, /([a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?)/]
-  end
-  [Firewall, KubernetesCluster, LoadBalancer, PostgresResource, PrivateSubnet, Vm].each do |model|
-    const_set(:"#{model.table_name.upcase}_NAME_OR_UBID", name_or_ubid_for(model))
-  end
-
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
@@ -17,6 +9,73 @@ class Clover < Roda
   class RodaRequest
     def accepts_json?
       env["HTTP_ACCEPT"]&.include?("application/json")
+    end
+
+    # Accept PATCH for API, but POST for web, so web requests to the
+    # path are not forced to use javascript.
+    def patch(*a, &)
+      if api?
+        super
+      else
+        post(*a, "patch", &)
+      end
+    end
+
+    # Accept DELETE for API, but POST for web, so web requests to the
+    # path are not forced to use javascript.
+    def delete(*a, &)
+      if api?
+        super
+      else
+        post(*a, "delete", &)
+      end
+    end
+
+    def rename(object, perm:, serializer:, template_prefix:)
+      post "rename" do
+        scope.instance_exec do
+          authorize(perm, object)
+          handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
+          name = typecast_body_params.nonempty_str!("name")
+
+          if name == object.name
+            no_audit_log
+          else
+            if object.is_a?(KubernetesCluster)
+              Validation.validate_kubernetes_name(name)
+            else
+              Validation.validate_name(name)
+            end
+
+            DB.transaction do
+              object.update(name:)
+              yield if block_given?
+              audit_log(object, "update")
+            end
+          end
+
+          if api?
+            serializer.serialize(object)
+          else
+            flash["notice"] = "Name updated"
+            request.redirect object, "/settings"
+          end
+        end
+      end
+    end
+
+    def show_object(object, actions:, perm:, template:)
+      return unless web?
+
+      get actions do |page|
+        scope.instance_exec do
+          authorize(perm, object)
+
+          response.headers["cache-control"] = "no-store"
+          @page = page
+          view template
+        end
+      end
     end
   end
 
@@ -51,6 +110,7 @@ class Clover < Roda
     connect
     create
     create_replica
+    delete_all_cache_entries
     destroy
     destroy_invitation
     detach_vm
@@ -68,8 +128,9 @@ class Clover < Roda
     update
     update_billing
     update_invitation
+    upgrade
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica destroy promote reset_superuser_password restart restore update]).freeze
+  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote reset_superuser_password restart restore update]).freeze
 
   def audit_log(object, action, objects = [])
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
@@ -129,7 +190,7 @@ class Clover < Roda
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
     account.create_project_with_default_policy("Default")
-    ProjectInvitation.where(email: account.email).all do |inv|
+    account.invitations.each do |inv|
       account.add_project(inv.project)
       inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
       inv.destroy
@@ -174,24 +235,24 @@ class Clover < Roda
   end
 
   def authorize(actions, object_id)
-    if @project_permissions && object_id == @project.id
+    if @project_permissions && (object_id == @project || object_id == @project.id)
       fail Authorization::Unauthorized unless has_project_permission(actions)
     else
       each_authorization_id do |id|
-        Authorization.authorize(@project.id, id, actions, object_id)
+        Authorization.authorize(@project, id, actions, object_id)
       end
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(@project.id, id, actions, object_id)
+      Authorization.has_permission?(@project, id, actions, object_id)
     end
   end
 
   def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(@project.id, id, object_id)
+      Authorization.all_permissions(@project, id, object_id)
     end.reduce(:&)
   end
 
@@ -212,14 +273,15 @@ class Clover < Roda
 
   def current_account
     return @current_account if defined?(@current_account)
+
     @current_account = Account[rodauth.session_value]
   end
 
-  def authorized_object(key:, perm:, association: nil, id: nil, ds: @project.send(:"#{association}_dataset"), location_id: nil)
-    if id ||= typecast_params.ubid_uuid(key)
+  def authorized_object(key:, perm:, association: nil, id: nil, name: nil, ds: @project.send(:"#{association}_dataset"), location_id: nil)
+    if name || (id ||= typecast_params.ubid_uuid(key))
       ds = dataset_authorize(ds, perm)
       ds = ds.where(location_id:) if location_id
-      ds.first(id:)
+      name ? ds.first(name:) : ds.first(id:)
     end
   end
 
@@ -230,15 +292,15 @@ class Clover < Roda
     # If location not previously retrieved, require it be visible or tied to the current project
     # when retrieving it.  This is called when creating resources in the web routes.
     @location ||= if (id = typecast_params.ubid_uuid("location"))
-      Location.visible_or_for_project(@project.id).first(id:)
+      Location.visible_or_for_project(@project.id, @project.get_ff_visible_locations).first(id:)
     end
-    handle_invalid_location unless @location&.visible_or_for_project?(@project.id)
+    handle_invalid_location unless @location&.visible_or_for_project?(@project.id, @project.get_ff_visible_locations)
   end
 
   def handle_invalid_location
     if api?
       # Only show locations globally visible or tied to the current project.
-      valid_locations = Location.visible_or_for_project(@project.id).select_order_map(:display_name)
+      valid_locations = Location.visible_or_for_project(@project.id, @project.get_ff_visible_locations).select_order_map(:display_name)
       response.write({error: {
         code: 404,
         type: "InvalidLocation",
@@ -262,10 +324,10 @@ class Clover < Roda
       .group_by { [it["resource_type"], it["resource_family"], it["location"]] }
       .map { |_, brs| brs.max_by { it["active_from"] } }
       .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
-      hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
-        hourly: br["unit_price"].to_f * 60,
-        monthly: br["unit_price"].to_f * 60 * 672
-      }
+        hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
+          hourly: br["unit_price"].to_f * 60,
+          monthly: br["unit_price"].to_f * 60 * 672
+        }
     end
   end
 

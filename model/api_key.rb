@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class ApiKey < Sequel::Model
-  many_to_one :project
+  many_to_one :project, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :key
   include SubjectTag::Cleanup # personal access tokens
@@ -23,6 +23,10 @@ class ApiKey < Sequel::Model
     create(owner_table: "project", owner_id: project.id, used_for: "inference_endpoint", project_id: project.id)
   end
 
+  def self.project_id_for_personal_access_token(id)
+    where(id:).get(:project_id)
+  end
+
   def before_validation
     if new?
       self.key ||= ApiKey.random_key
@@ -32,6 +36,14 @@ class ApiKey < Sequel::Model
     end
 
     super
+  end
+
+  def path
+    if used_for == "api"
+      "/token/#{ubid}/access-control"
+    else # inference_endpoint
+      "/inference-api-key/#{ubid}"
+    end
   end
 
   def unrestricted_token_for_project?(project_id)

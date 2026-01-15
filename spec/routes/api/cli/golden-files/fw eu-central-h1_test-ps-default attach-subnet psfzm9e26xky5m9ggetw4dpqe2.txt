@@ -1,1 +1,1 @@
-Attached private subnet with id psfzm9e26xky5m9ggetw4dpqe2 to firewall with id fwx623er9tyy2q9n1e2c55kvkc
+Attached private subnet psfzm9e26xky5m9ggetw4dpqe2 to firewall with id fwx623er9tyy2q9n1e2c55kvkc

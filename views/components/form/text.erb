@@ -1,35 +1,32 @@
-<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil) %>
-<% value = flash.dig("old", name) || typecast_body_params.str(name) || value if name
-error = rodauth.field_error(name) || flash.dig("errors", name) %>
+<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil, prefix: nil, id: name, handle_params_and_errors: true) %>
+<% if handle_params_and_errors
+value = typecast_body_params.str(name) || value if name
+error = rodauth.field_error(name) || flash.dig("errors", name)
+end %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>
     <label for="<%= name %>" class="block text-sm font-medium leading-6"><%= label %></label>
   <% end %>
-  <div class="flex gap-x-2">
+  <div class="flex">
+    <% if prefix %>
+      <div
+        class="flex shrink-0 items-center rounded-l-md bg-gray-50 px-3 text-base text-gray-500 outline outline-1 -outline-offset-1 outline-gray-300 sm:text-sm/6"
+      ><%= prefix %></div>
+    <% end %>
     <input
-      id="<%= name %>"
+      id="<%= id %>"
       type="<%= type %>"
       name="<%= name %>"
       <% if value %>
       value="<%= value %>"
       <% end %>
-      class="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= extra_class %>"
+      class="block w-full border-0 py-1.5 pl-3 pr-3 shadow-sm ring-1 ring-inset focus:ring-2 focus:ring-inset sm:text-sm sm:leading-6 <%= error ? "text-red-900 ring-red-300 placeholder:text-red-300 focus:ring-red-500" : "text-gray-900 ring-gray-300 placeholder:text-gray-400 focus:ring-orange-600"%> <%= prefix ? "rounded-r-md" : "rounded-md" %> <%= extra_class %>"
       <%== html_attrs(attributes) %>
     >
     <% if button_title %>
       <%== part("components/form/submit_button", text: button_title) %>
     <% end %>
   </div>
-  <% if error %>
-    <% if error.is_a?(Array) %>
-      <p class="text-sm text-red-600 leading-6" id="<%= name %>-error">
-        <% error.each do |e| %>
-          <%= e %><br/>
-        <% end %>
-      </p>
-    <% else %>
-      <p class="text-sm text-red-600 leading-6" id="<%= name %>-error"><%= error %></p>
-    <% end %>
-  <% end %>
+  <%== part("components/form/error", name:, error:) if error %>
 </div>

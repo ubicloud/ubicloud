@@ -1,0 +1,84 @@
+<% @content_class = "" %>
+
+
+<div class="container">
+  <% unless @grouped_pages.empty? %>
+    <table class="page-table">
+      <caption>Active Pages</caption>
+      <thead>
+        <tr>
+          <th>VmHost</th>
+          <th>UBID</th>
+          <th>Created At</th>
+          <th>Summary</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @grouped_pages.sort_by { |k,| k || "z" }.each do |vmh_ubid, pages| %>
+          <% pages.each_with_index do |page, index| %>
+            <tr>
+              <% if index == 0 %>
+                <td rowspan="<%= pages.size %>">
+                  <% if vmh_ubid %>
+                    <a href="/model/VmHost/<%= vmh_ubid %>"><%= vmh_ubid %></a>
+                  <% end%>
+                </td>
+              <% end %>
+              <td><a href="/model/Page/<%= page.ubid %>"><%= page.ubid %></a></td>
+              <td><%= page.created_at.strftime("%F %T") %></td>
+              <td><%= page.summary %></td>
+              <td><%== linkify_ubids(page.details) %></td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+
+  <h2>Browse by Model Class</h2>
+  <ul id="model-class-list">
+    <% autoforme_models = self.class.autoforme_framework.models %>
+    <% @classes.each do |klass| %>
+      <li><a href="<%= autoforme_models[klass.to_s] ? "/autoforme/#{klass}/browse" : "/model/#{klass}" %>"><%= klass %></a></li>
+    <% end %>
+  </ul>
+
+  <h2>Manage</h2>
+  <ul>
+    <li><a href="/change-password">Change Password</a></li>
+    <li><a href="/multifactor-manage">Manage Multifactor Authentication</a></li>
+  </ul>
+
+  <h2>Custom Tools</h2>
+  <ul>
+    <li><a href="/archived-record-by-id">Find Archived Record by ID</a></li>
+    <li><a href="/vm-by-ipv4">Find VM by IPv4 Address</a></li>
+  </ul>
+
+  <% if @info_pages.any? %>
+    <h2>Info Pages</h2>
+    <table class="info-page-table">
+      <thead>
+        <tr>
+          <th>Summary</th>
+          <th>Related Resources</th>
+          <th>Created At</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @info_pages.each do |info_page| %>
+          <tr>
+            <td><a href="/model/Page/<%= info_page.ubid %>"><%= info_page.summary %></a></td>
+            <% if info_page.details["related_resources"] %>
+              <td><%== linkify_ubids(info_page.details["related_resources"].join(" ")) %></td>
+            <% else %>
+              <td>No related resources</td>
+            <% end %>
+            <td><%= info_page.created_at.strftime("%F %T") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>

@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "net/ssh"
+require_relative "../../lib/net_ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
   def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false, verify_host_capacity: true)
@@ -10,6 +10,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
       stack: [{
         "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
+        "first_boot" => true,
         "test_slices" => test_slices,
         "vms" => [],
         "boot_images" => boot_images,
@@ -61,7 +62,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms
-    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it}) }
+    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it, first_boot: frame["first_boot"]}) }
     hop_wait_verify_vms
   end
 
@@ -70,27 +71,12 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_host_capacity
-    hop_verify_storage_backends if !frame["verify_host_capacity"]
+    hop_verify_vm_host_slices if !frame["verify_host_capacity"]
 
     vm_cores = vm_host.vms.sum(&:cores)
     slice_cores = vm_host.slices.sum(&:cores)
-    spdk_cores = vm_host.cpus.count { it.spdk } * vm_host.total_cores / vm_host.total_cpus
 
-    fail_test "Host used cores does not match the allocated VMs cores (vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, spdk_cores=#{spdk_cores}, used_cores=#{vm_host.used_cores})" if vm_cores + slice_cores + spdk_cores != vm_host.used_cores
-
-    hop_verify_storage_backends
-  end
-
-  label def verify_storage_backends
-    fail_test "Expected a vhost block backend" if vm_host.vhost_block_backends.empty?
-
-    Clog.emit("vm_host.vhost_block_backends not empty; performing verification that SPDK is not used")
-
-    spdk_version = vm_host.spdk_installations.first.version
-    spdk_socket = "/home/spdk/spdk-#{spdk_version}.sock"
-    rpc_result = vm_host.sshable.cmd("sudo /opt/spdk-#{spdk_version}/scripts/rpc.py -s #{spdk_socket} bdev_get_bdevs")
-
-    fail_test "SPDK has bdevs but a vhost block backend also exists: #{rpc_result}" unless JSON.parse(rpc_result).empty?
+    fail_test "Host used cores does not match the allocated VMs cores (vm_cores=#{vm_cores}, slice_cores=#{slice_cores}, used_cores=#{vm_host.used_cores})" if vm_cores + slice_cores != vm_host.used_cores
 
     hop_verify_vm_host_slices
   end
@@ -99,11 +85,23 @@ class Prog::Test::VmGroup < Prog::Test::Base
     test_slices = frame.fetch("test_slices")
 
     if !test_slices || (retval&.dig("msg") == "Verified VM Host Slices!")
-      hop_verify_firewall_rules
+      hop_verify_storage_rpc
     end
 
     slices = frame["vms"].map { Vm[it].vm_host_slice&.id }.reject(&:nil?)
     push Prog::Test::VmHostSlices, {"slices" => slices}
+  end
+
+  label def verify_storage_rpc
+    frame["vms"].each do |id|
+      vm = Vm[id]
+      command = {command: "version"}.to_json
+      response = JSON.parse(vm_host.sshable.cmd("sudo nc -U /var/storage/:inhost_name/0/rpc.sock -q 0", inhost_name: vm.inhost_name, stdin: command))
+      expected_version = Config.vhost_block_backend_version.delete_prefix("v")
+      fail_test "Failed to get vhost-block-backend version for VM #{vm.id} using RPC" unless response["version"] == expected_version
+    end
+
+    hop_verify_firewall_rules
   end
 
   label def verify_firewall_rules
@@ -116,7 +114,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
   label def verify_connected_subnets
     if retval&.dig("msg") == "Verified Connected Subnets!"
-      if frame["test_reboot"]
+      if frame["test_reboot"] && frame["first_boot"]
         hop_test_reboot
       else
         hop_destroy_resources
@@ -135,7 +133,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   label def wait_reboot
     if vm_host.strand.label == "wait" && vm_host.strand.semaphores.empty?
       # Run VM tests again, but avoid rebooting again
-      update_stack({"test_reboot" => false})
+      update_stack({"first_boot" => false})
       hop_verify_vms
     end
 

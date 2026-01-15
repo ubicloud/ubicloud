@@ -3,15 +3,14 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Prog::LearnOs do
-  subject(:lo) { described_class.new(Strand.new) }
+  subject(:lo) { described_class.new(Strand.create_with_id(sshable, prog: "LearnOs", label: "start")) }
 
-  let(:sshable) { instance_double(Sshable) }
+  let(:sshable) { Sshable.create }
 
   describe "#start" do
     it "exits, saving OS version" do
-      expect(sshable).to receive(:cmd).with("lsb_release --short --release").and_return("22.04")
-      allow(lo).to receive(:sshable).and_return(sshable)
-      expect { lo.start }.to exit(os_version: "ubuntu-22.04")
+      expect(lo.sshable).to receive(:_cmd).with("lsb_release --short --release").and_return("24.04")
+      expect { lo.start }.to exit(os_version: "ubuntu-24.04")
     end
   end
 end

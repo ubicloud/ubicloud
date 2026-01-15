@@ -14,9 +14,9 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   let(:vm) {
     instance_double(Vm,
       id: "vm-id",
-      sshable: instance_double(Sshable),
-      ephemeral_net4: "1.1.1.1",
-      ephemeral_net6: IPAddr.new("2001:db8::1"),
+      sshable: Sshable.new,
+      ip4: "1.1.1.1",
+      ip6: IPAddr.new("2001:db8::1"),
       strand: instance_double(Strand, label: "wait"))
   }
 
@@ -40,7 +40,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
     instance_double(
       VictoriaMetricsServer,
       id: "test-id",
-      vm: vm,
+      vm:,
       resource: victoria_metrics_resource,
       cert: "cert",
       cert_key: "cert_key",
@@ -105,18 +105,18 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
   describe "#create_victoria_metrics_user" do
     it "creates victoria_metrics user and hops to install" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo useradd --no-create-home --system -g victoria_metrics victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo useradd --no-create-home --system -g victoria_metrics victoria_metrics")
       expect { nx.create_victoria_metrics_user }.to hop("install")
     end
 
     it "handles case where user already exists" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("already exists"))
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("already exists"))
       expect { nx.create_victoria_metrics_user }.to hop("install")
     end
 
     it "raises any other error than already exists" do
-      expect(vm.sshable).to receive(:cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("some other error"))
+      expect(vm.sshable).to receive(:_cmd).with("sudo groupadd -f --system victoria_metrics").and_raise(RuntimeError.new("some other error"))
       expect { nx.create_victoria_metrics_user }.to raise_error(RuntimeError, "some other error")
     end
   end
@@ -160,10 +160,10 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
     it "mounts the disk and hops to configure if mount_data_disk is complete" do
       expect(vm.sshable).to receive(:d_check).with("format_victoria_metrics_disk").and_return("Succeeded")
-      expect(vm.sshable).to receive(:cmd).with("sudo mkdir -p /dat/victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo common/bin/add_to_fstab /dev/sdb /dat/victoria_metrics ext4 defaults 0 0")
-      expect(vm.sshable).to receive(:cmd).with("sudo mount /dev/sdb /dat/victoria_metrics")
-      expect(vm.sshable).to receive(:cmd).with("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo mkdir -p /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/sdb /dat/victoria_metrics ext4 defaults 0 0")
+      expect(vm.sshable).to receive(:_cmd).with("sudo mount /dev/sdb /dat/victoria_metrics")
+      expect(vm.sshable).to receive(:_cmd).with("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
       expect { nx.mount_data_disk }.to hop("configure")
     end
 
@@ -269,13 +269,27 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
   end
 
   describe "#destroy" do
-    it "destroys the victoria metrics server" do
-      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      nx.strand.update(stack: {})
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
       expect(nx).to receive(:decr_destroy)
-      expect(nx.strand).to receive(:children).and_return([])
+      expect(nx).to receive(:register_deadline).with(nil, 10 * 60)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      nx.strand.update(stack: {})
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
+    it "destroys the victoria metrics server" do
       expect(victoria_metrics_server.vm).to receive(:incr_destroy)
       expect(victoria_metrics_server).to receive(:destroy)
-      expect { nx.destroy }.to exit({"msg" => "victoria_metrics server destroyed"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "victoria_metrics server destroyed"})
     end
   end
 
@@ -290,6 +304,25 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(nx).to receive(:when_destroy_set?).and_yield
       expect(nx.strand).to receive(:label).and_return("destroy")
       expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "does not hop to destroy if already in the wait_children_destroyed state" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("wait_children_destroyed")
+      expect { nx.before_run }.not_to hop("destroy")
+    end
+
+    it "pops if in restart state and has a parent" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.strand.parent_id = nx.strand.id
+      expect(nx.strand).to receive(:label).and_return("restart")
+      expect { nx.before_run }.to exit({"msg" => "exiting early due to destroy semaphore"})
+    end
+
+    it "hops to destroy if in restart state and does not have a parent" do
+      expect(nx).to receive(:when_destroy_set?).and_yield
+      expect(nx.strand).to receive(:label).and_return("restart").at_least(:once)
+      expect { nx.before_run }.to hop("destroy")
     end
 
     it "pops if destroy is set and stack has items" do
@@ -342,7 +375,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
 
     it "adds IP SAN if running in development or E2E environment" do
       allow(Config).to receive(:development?).and_return(true)
-      expect(victoria_metrics_server.vm).to receive(:ephemeral_net4).and_return("1.1.1.1")
+      expect(victoria_metrics_server.vm).to receive(:ip4).and_return("1.1.1.1")
       expect(victoria_metrics_server.vm).to receive(:ip6).and_return(NetAddr::IPv6Net.parse("2a01:4f8:10a:128b:814c::/79").nth(2))
 
       expect(Util).to receive(:create_certificate).with(
@@ -410,7 +443,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(client).to receive(:health).and_raise(StandardError.new("Connection failed"))
       expect(victoria_metrics_server).to receive(:client).and_return(client)
       expect(victoria_metrics_server).to receive(:ubid).and_return(nil)
-      expect(Clog).to receive(:emit).with("victoria_metrics server is down").and_call_original
+      expect(Clog).to receive(:emit).with("victoria_metrics server is down", instance_of(Hash)).and_call_original
       expect(nx.available?).to be false
     end
   end

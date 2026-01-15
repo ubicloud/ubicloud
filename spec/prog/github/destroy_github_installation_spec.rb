@@ -5,12 +5,38 @@ require "octokit"
 
 RSpec.describe Prog::Github::DestroyGithubInstallation do
   subject(:dgi) {
-    described_class.new(Strand.new).tap {
-      it.instance_variable_set(:@github_installation, github_installation)
-    }
+    st = Strand.create(prog: "Github::DestroyGithubInstallation", label: "start", stack: [{"subject_id" => github_installation.id}])
+    described_class.new(st)
   }
 
-  let(:github_installation) { GithubInstallation.new(name: "ubicloud", type: "Organization", installation_id: "123") }
+  let(:project) { Project.create(name: "test-github-project") }
+  let(:github_installation) {
+    GithubInstallation.create(
+      name: "ubicloud",
+      type: "Organization",
+      installation_id: 123,
+      project_id: project.id
+    )
+  }
+
+  let(:repository) do
+    repo = GithubRepository.create(installation_id: github_installation.id, name: "ubicloud/ubicloud")
+    Strand.create_with_id(repo, prog: "Github::GithubRepositoryNexus", label: "wait")
+    repo
+  end
+
+  let(:runner) do
+    vm = create_vm
+    runner = GithubRunner.create(
+      installation_id: github_installation.id,
+      repository_id: repository.id,
+      repository_name: repository.name,
+      label: "ubicloud",
+      vm_id: vm.id
+    )
+    Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
+    runner
+  end
 
   describe ".assemble" do
     it "creates a strand" do
@@ -20,20 +46,20 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe ".before_run" do
     it "pops if installation already deleted" do
-      expect(dgi).to receive(:github_installation).and_return(nil)
+      github_installation.destroy
       expect { dgi.before_run }.to exit({"msg" => "github installation is destroyed"})
     end
 
     it "no ops if installation exists" do
-      expect(dgi).to receive(:github_installation).and_return(github_installation)
-      dgi.before_run
+      # Real github_installation exists, so before_run should not exit
+      expect { dgi.before_run }.not_to raise_error
     end
   end
 
   describe "#start" do
     it "hops after registering deadline" do
-      expect(dgi).to receive(:register_deadline)
       expect { dgi.start }.to hop("delete_installation")
+      expect(dgi.strand.stack.first["deadline_at"]).not_to be_nil
     end
   end
 
@@ -55,35 +81,33 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
 
   describe "#destroy_resources" do
     it "hops after incrementing destroy for repositories and runners" do
-      repository = instance_double(GithubRepository)
-      runner = instance_double(GithubRunner)
-      expect(repository).to receive(:incr_destroy)
-      expect(runner).to receive(:incr_skip_deregistration)
-      expect(runner).to receive(:incr_destroy)
-      expect(github_installation).to receive(:repositories).and_return([repository])
-      expect(github_installation).to receive(:runners).and_return([runner])
+      runner
+      expect { dgi.destroy_resources }.to hop("wait_resource_destroy")
 
-      expect { dgi.destroy_resources }.to hop("destroy")
+      # Verify semaphores were created
+      expect(Semaphore.where(strand_id: repository.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: runner.id, name: "skip_deregistration").count).to eq(1)
     end
   end
 
-  describe "#destroy" do
+  describe "#wait_resource_destroy" do
     it "naps if not all runners destroyed" do
-      expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: false))
-      expect { dgi.destroy }.to nap(10)
+      runner
+      expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "naps if not all repositories destroyed" do
-      expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
-      expect(github_installation).to receive(:repositories_dataset).and_return(instance_double(Sequel::Dataset, empty?: false))
-      expect { dgi.destroy }.to nap(10)
+      repository
+      # No runners, but repository exists
+      expect { dgi.wait_resource_destroy }.to nap(10)
     end
 
     it "deletes resource and pops" do
-      expect(github_installation).to receive(:runners_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
-      expect(github_installation).to receive(:repositories_dataset).and_return(instance_double(Sequel::Dataset, empty?: true))
-      expect(github_installation).to receive(:destroy)
-      expect { dgi.destroy }.to exit({"msg" => "github installation destroyed"})
+      # No repositories or runners - installation can be destroyed
+      installation_id = github_installation.id
+      expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
+      expect(GithubInstallation[installation_id]).to be_nil
     end
   end
 end

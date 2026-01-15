@@ -1,17 +1,16 @@
 <%# locals: (action:, form_elements:, option_tree:, option_parents:, method: "POST", pre_selected_values: {}, mode: "create") %>
-<% nonce = SecureRandom.base64(32)
+<% nonce = SecureRandom.hex(32)
 content_security_policy.add_script_src [:nonce, nonce] %>
 
-<script nonce="<%==nonce%>">
-let option_tree = <%==JSON.generate(option_tree)%>
-let option_children = <%==JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })%>
-let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = flash.dig("old", option) || typecast_body_params.str(option) || pre_selected_values[option] })%>
+<script nonce="<%= nonce %>">
+let option_tree = <%== allow_unescaped(JSON.generate(option_tree)) %>
+let option_children = <%== allow_unescaped(JSON.generate(option_parents.each_with_object(Hash.new { |h, k| h[k] = [] }) { |(child, parents), h| h[parents.last] << child if parents.any? })) %>
+let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:name] }.each_with_object(Hash.new { |h, k| h[k] = [] }) { |option, h| h[option] = typecast_body_params.str(option) || pre_selected_values[option] })) %>
 </script>
 
 <div>
   <div class="grid gap-6">
-    <form action="<%= action %>" method="POST" id="creation-form" class="<%= method %>">
-      <%== csrf_tag(action, method) %>
+    <% form(action:, method:, id: "creation-form", class: method) do %>
       <% container_class = (mode == "create") ? "overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white" : "" %>
       <div class="<%= container_class %>">
         <div class="px-4 py-5 sm:p-6">
@@ -32,17 +31,17 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       opt_val = if option[name].is_a?(Sequel::Model)
         option[name].ubid
       elsif type == "select"
-        option[name][:value]
+        option[name][:value].to_s
       else
-        option[name]
+        option[name].to_s
       end
 
       opt_text = content_generator.call(*option.values)
 
-      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v }
+      parents = option.reject { |k, v| k == name }.transform_values { |v| v.is_a?(Sequel::Model) ? v.ubid : v.to_s }
 
       parents_selected = parents.all? { |k, v| selected_options[k] == v }
-      submitted_value = flash.dig("old", name) || typecast_body_params.str(name)
+      submitted_value = typecast_body_params.str(name)
       selected_in_form_submission = submitted_value == opt_val
       selected_in_pre_selection = submitted_value.nil? && selected_options[name] == opt_val
       first_of_its_kind = submitted_value.nil? && selected_options[name].nil? unless type == "checkbox" && !request.get?
@@ -64,7 +63,7 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
 
     case type
     when "radio_small_cards"
-      locals = {name:, label:, options:, attributes:}
+      locals = {name:, label:, options:, attributes:, description_html: element[:description_html], additional_element_html: element[:additional_element_html]}
     when "select"
       locals = {name:, label:, options:, placeholder:, attributes:, description_html: element[:description_html]}
     when "checkbox"
@@ -75,14 +74,14 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
       locals = {name:, label:, type: "number", attributes: attributes.merge!({placeholder:})}
       type = "text"
     when "textarea"
-      locals = {name:, label:, description: element[:description], attributes: attributes.merge!({placeholder:, rows: 3})}
+      locals = {name:, label:, description: element[:description], escape_description: element.fetch(:escape_description, true), attributes: attributes.merge!({placeholder:, rows: 3})}
     when "hidden"
       selected_options[name] = element[:value]
-      locals = {name:, value: element[:value]}
+      locals = {name => element[:value]}
       container_opening_tag, container_closing_tag = "", ""
     when "partnership_notice"
-      description, tos_text = content_generator.call(@flavor)
-      locals = {description:, tos_text:}
+      description_html, tos_text = content_generator.call(@flavor)
+      locals = {description_html:, tos_text:}
     when "section"
       locals = {label:, content: element[:content], separator: element[:separator]}
     # :nocov:
@@ -109,6 +108,6 @@ let option_dirty = <%==JSON.generate(form_elements.map { it[:name] }.each_with_o
           </div>
         </div>
       </div>
-    </form>
+    <% end %>
   </div>
 </div>

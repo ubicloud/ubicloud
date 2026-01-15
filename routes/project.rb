@@ -10,7 +10,7 @@ class Clover
         if api?
           paginated_result(dataset, Serializers::Project)
         else
-          @projects = Serializers::Project.serialize(dataset.all, {include_path: true, web: true})
+          @projects = dataset.all
           view "project/index"
         end
       end
@@ -32,7 +32,7 @@ class Clover
           Serializers::Project.serialize(@project)
         else
           flash["notice"] = "Project created"
-          r.redirect @project.path
+          r.redirect @project
         end
       end
     end
@@ -46,49 +46,52 @@ class Clover
       @project = Clover.authorized_project(current_account, project_id)
       check_found_object(@project)
 
-      @project_data = Serializers::Project.serialize(@project, {include_path: true, web: true})
       @project_permissions = all_permissions(@project.id) if web?
 
-      r.is do
-        r.get do
-          authorize("Project:view", @project.id)
+      r.get true do
+        authorize("Project:view", @project)
 
-          if api?
-            Serializers::Project.serialize(@project)
-          else
-            view "project/show"
-          end
+        if api?
+          Serializers::Project.serialize(@project)
+        else
+          view "project/show"
+        end
+      end
+
+      r.delete true do
+        authorize("Project:delete", @project)
+        handle_validation_failure("project/show")
+
+        if @project.has_resources?
+          fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
         end
 
-        r.delete do
-          authorize("Project:delete", @project.id)
+        DB.transaction do
+          @project.soft_delete
+          audit_log(@project, "destroy")
+        end
 
-          if @project.has_resources?
-            fail DependencyError.new("'#{@project.name}' project has some resources. Delete all related resources first.")
-          end
-
-          DB.transaction do
-            @project.soft_delete
-            audit_log(@project, "destroy")
-          end
-
+        if web?
+          flash["notice"] = "Project deleted"
+          r.redirect "/project"
+        else
           204
         end
+      end
 
-        r.post web? do
-          authorize("Project:edit", @project.id)
+      r.post web? do
+        authorize("Project:edit", @project)
 
-          handle_validation_failure("project/show")
+        handle_validation_failure("project/show")
 
-          DB.transaction do
-            @project.update(name: typecast_params.nonempty_str!("name"))
-            audit_log(@project, "update")
-          end
-
-          flash["notice"] = "The project name is updated to '#{@project.name}'."
-
-          r.redirect @project.path
+        DB.transaction do
+          @project.update(name: typecast_params.nonempty_str!("name"))
+          audit_log(@project, "update")
         end
+
+        flash["notice"] = "The project name is updated to '#{@project.name}'."
+
+        r.redirect @project
       end
 
       r.get(web?, "dashboard") do

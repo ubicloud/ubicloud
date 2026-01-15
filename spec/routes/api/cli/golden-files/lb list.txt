@@ -1,2 +1,2 @@
-location       name     id                          src_port  dst_port  hostname      
+location       name     id                          src-port  dst-port  hostname      
 eu-central-h1  test-lb  1bvp8yk1karj4ngwhtgrfh6esd  12345     54321     test-lb.dpqe2.

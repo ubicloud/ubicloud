@@ -3,14 +3,15 @@
 class Clover
   def visible_capable_models(dataset)
     dataset
-      .where(visible: true)
+      .where(Sequel.|([:visible],
+        Sequel.pg_jsonb_op(:tags)["visible_projects"].contains([@project.id])))
       .where(Sequel.pg_jsonb_op(:tags).get_text("capability") => ["Text Generation", "Embeddings"])
       .order(:model_name)
   end
 
   def inference_endpoint_ds
     dataset_private = dataset_authorize(@project.inference_endpoints_dataset, "InferenceEndpoint:view")
-    dataset_public = InferenceEndpoint.where(is_public: true)
+    dataset_public = InferenceEndpoint.is_public
 
     dataset = dataset_private.union(dataset_public)
     dataset = visible_capable_models(dataset)

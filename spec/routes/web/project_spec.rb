@@ -82,7 +82,7 @@ RSpec.describe Clover, "project" do
         expect(page).to have_flash_notice("Project created")
         expect(page).to have_content name
 
-        project = Project[name: name]
+        project = Project[name:]
         expect(project.accounts_dataset.count).to eq 1
         expect(project.access_control_entries.count).to eq 2
         expect(project.subject_tags.map(&:name).sort).to eq %w[Admin Member]
@@ -144,7 +144,7 @@ RSpec.describe Clover, "project" do
           expect(page).to have_content "Virtual Machines"
           expect(page).to have_content "Databases"
           expect(page).to have_content "Load Balancers"
-          expect(page).to have_content "Firewalls"
+          expect(page).to have_content "Kubernetes Clusters"
           if Config.github_app_name
             expect(page).to have_content "GitHub Runners"
           else
@@ -162,6 +162,7 @@ RSpec.describe Clover, "project" do
           end
           expect(page).to have_content "Create Managed Database"
           expect(page).to have_content "Add User to Project"
+          expect(page).to have_content "Create Kubernetes Cluster"
           expect(page).to have_content "Load Balance Your Traffic"
           expect(page).to have_content "Create Access Token"
           expect(page).to have_content "Documentation"
@@ -454,15 +455,17 @@ RSpec.describe Clover, "project" do
         user2.add_project(project)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
-        btn = find "#user-#{user2.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#user-#{user2.ubid}") do
+          click_button "Remove"
+        end
         expect(page.status_code).to eq 403
 
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         visit "#{project.path}/user"
-        btn = find "#user-#{user2.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(page.status_code).to eq 204
+        within("#user-#{user2.ubid}") do
+          click_button "Remove"
+        end
+        expect(page).to have_flash_notice("Removed #{user2.email} from #{project.name}")
       end
 
       it "can remove user from project" do
@@ -475,24 +478,23 @@ RSpec.describe Clover, "project" do
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user2.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#user-#{user2.ubid}") do
+          click_button "Remove"
+        end
+        expect(page).to have_flash_notice("Removed #{user2.email} from #{project.name}")
 
-        expect(page.body).to be_empty
+        user2.add_project(project)
+        page.refresh
+        project.remove_account(user2)
 
         DB.transaction(rollback: :always) do
           DB[:account_password_hashes].where(id: user2.id).delete(force: true)
           user2.destroy
-          page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}, "HTTP_ACCEPT" => "application/json"
+          within("#user-#{user2.ubid}") do
+            click_button "Remove"
+          end
           expect(page.status_code).to eq(404)
-          expect(JSON.parse(page.body).dig("error", "code")).to eq(404)
         end
-
-        visit "#{project.path}/user"
-        expect(page).to have_content user.email
-        expect(page).to have_flash_notice("Removed #{user2.email} from #{project.name}")
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -506,15 +508,17 @@ RSpec.describe Clover, "project" do
         project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
-        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        within("#invitation-#{invited_email.gsub(/\W+/, "")}") do
+          click_button "Remove"
+        end
         expect(page.status_code).to eq 403
 
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:user"])
         visit "#{project.path}/user"
-        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(page.status_code).to eq 204
+        within("#invitation-#{invited_email.gsub(/\W+/, "")}") do
+          click_button "Remove"
+        end
+        expect(page).to have_flash_notice("Invitation for '#{invited_email}' is removed successfully.")
       end
 
       it "can remove invited user from project" do
@@ -524,12 +528,9 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/user"
         expect(page).to have_content invited_email
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#invitation-#{invited_email.gsub(/\W+/, "")} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-
-        visit "#{project.path}/user"
+        within("#invitation-#{invited_email.gsub(/\W+/, "")}") do
+          click_button "Remove"
+        end
         expect(page).to have_flash_notice("Invitation for '#{invited_email}' is removed successfully.")
 
         visit "#{project.path}/user"
@@ -716,10 +717,7 @@ RSpec.describe Clover, "project" do
       it "can not have more than 50 pending invitations" do
         visit "#{project.path}/user"
 
-        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(project).to receive(:invitations_dataset).and_return(instance_double(Sequel::Dataset, count: 50))
-        expect(project).to receive(:invitations_dataset).and_call_original
-
+        ProjectInvitation.import([:project_id, :email, :inviter_id, :expires_at], Array.new(50) { [project.id, "a#{it}@example.com", user.id, Time.utc(2100)] })
         fill_in "Email", with: "new@example.com"
         click_button "Invite"
 
@@ -731,12 +729,10 @@ RSpec.describe Clover, "project" do
         user
         visit "#{project.path}/user"
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find "#user-#{user.ubid} .delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}, {"HTTP_ACCEPT" => "application/json"}
-        expect(page.status_code).to eq(400)
-        expect(JSON.parse(page.body)).to eq({"error" => {"message" => "You can't remove the last user from '#{project.name}' project. Delete project instead.", "code" => 400, "type" => nil, "details" => nil}})
+        within("#user-#{user.ubid}") do
+          click_button "Remove"
+        end
+        expect(page).to have_flash_error("You can't remove the last user from 'project-1' project. Delete project instead.")
 
         visit "#{project.path}/user"
         expect(page).to have_content user.email
@@ -755,12 +751,9 @@ RSpec.describe Clover, "project" do
       it "can delete project" do
         visit project.path
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
+        click_button "Delete"
+        expect(page).to have_flash_notice("Project deleted")
 
-        expect(page.status_code).to eq(204)
         expect(Project[project.id].visible).to be_falsey
         expect(DB[:access_tag].where(project_id: project.id).count).to eq(0)
         expect(AccessControlEntry.where(project_id: project.id).count).to eq(0)
@@ -772,12 +765,8 @@ RSpec.describe Clover, "project" do
 
         visit project.path
 
-        # We send delete request manually instead of just clicking to button because delete action triggered by JavaScript.
-        # UI tests run without a JavaScript enginer.
-        btn = find ".delete-btn"
-        Capybara.current_session.driver.header "Accept", "application/json"
-        response = page.driver.delete btn["data-url"], {_csrf: btn["data-csrf"]}
-        expect(response).to have_api_error(409, "'#{project.name}' project has some resources. Delete all related resources first.")
+        click_button "Delete"
+        expect(page).to have_flash_error("'project-1' project has some resources. Delete all related resources first.")
 
         visit "/project"
 

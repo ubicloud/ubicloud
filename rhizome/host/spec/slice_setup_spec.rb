@@ -75,7 +75,7 @@ RSpec.describe SliceSetup do
   describe "#start_systemd_unit" do
     it "starts the systemd unit and writes to the cpuset.cpus.partition file" do
       expect(slice_setup).to receive(:r).with("systemctl start slice_name.slice")
-      expect(File).to receive(:write).with("/sys/fs/cgroup/slice_name.slice/cpuset.cpus.partition", "root")
+      expect(File).to receive(:write).with("/sys/fs/cgroup/slice_name.slice/cpuset.cpus.partition", "member")
       slice_setup.start_systemd_unit
     end
   end

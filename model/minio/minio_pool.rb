@@ -3,9 +3,9 @@
 require_relative "../../model"
 
 class MinioPool < Sequel::Model
-  many_to_one :cluster, class: :MinioCluster
-  one_to_many :servers, key: :minio_pool_id, class: :MinioServer, order: :index
-  one_to_one :strand, key: :id
+  many_to_one :cluster, class: :MinioCluster, read_only: true
+  one_to_many :servers, class: :MinioServer, order: :index, read_only: true
+  one_to_one :strand, key: :id, read_only: true
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :add_additional_pool
@@ -13,6 +13,7 @@ class MinioPool < Sequel::Model
   def volumes_url
     return "/minio/dat1" if cluster.single_instance_single_drive?
     return "/minio/dat{1...#{drive_count}}" if cluster.single_instance_multi_drive?
+
     servers_arg = "#{cluster.name}{#{start_index}...#{server_count + start_index - 1}}"
     drivers_arg = "/minio/dat{1...#{per_server_drive_count}}"
     "https://#{servers_arg}.#{Config.minio_host_name}:9000#{drivers_arg}"

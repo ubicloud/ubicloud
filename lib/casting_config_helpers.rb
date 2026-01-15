@@ -13,19 +13,19 @@ module CastingConfigHelpers
     ENV.delete(env_name) if clear
   end
 
-  def mandatory(name, method = nil, clear: false)
+  def mandatory(name, method, clear: false)
     assign_cast_clear name, method, clear do |env_name|
       ENV.fetch(env_name)
     end
   end
 
-  def optional(name, method = nil, clear: false)
+  def optional(name, method, clear: false)
     assign_cast_clear name, method, clear do |env_name|
       ENV[env_name]
     end
   end
 
-  def override(name, default, method = nil)
+  def override(name, default, method)
     value = cast(ENV.fetch(name.to_s.upcase, default), method)
     create(name, value)
   end
@@ -44,6 +44,16 @@ module CastingConfigHelpers
 
   def string
     nil
+  end
+
+  def uuid
+    ->(v) do
+      if v.nil? || /\A\h{8}-\h{4}-\h{4}-\h{4}-\h{12}\z/.match?(v)
+        v
+      else
+        raise "invalid uuid #{v}"
+      end
+    end
   end
 
   def base64
@@ -75,7 +85,7 @@ module CastingConfigHelpers
   def create(name, value)
     instance_variable_set(:"@#{name}", value)
     instance_eval "def #{name}; @#{name} end", __FILE__, __LINE__
-    if value.is_a?(TrueClass) || value.is_a?(FalseClass) || value.is_a?(NilClass)
+    if value.is_a?(TrueClass) || value.is_a?(FalseClass)
       instance_eval "def #{name}?; !!@#{name} end", __FILE__, __LINE__
     end
   end

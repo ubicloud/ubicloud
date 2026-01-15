@@ -22,9 +22,9 @@ RSpec.describe InvoiceGenerator do
       project_id: project.id,
       resource_id: resource.id,
       resource_name: name,
-      span: span,
-      billing_rate_id: billing_rate_id,
-      amount: amount
+      span:,
+      billing_rate_id:,
+      amount:
     )
   end
 
@@ -236,6 +236,24 @@ RSpec.describe InvoiceGenerator do
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
       invoices = described_class.new(begin_time, end_time).run
       expect(invoices.first.content["vat_info"]).to be_nil
+    end
+
+    it "uses US bank info for transfer when no payment method" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud Inc.")
+    end
+
+    it "uses EU bank info for transfer when no payment method" do
+      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
+
+      generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
+      invoice = described_class.new(begin_time, end_time).run.first
+      expect(invoice.content["bank_transfer_info"]["Beneficiary"]).to eq("Ubicloud B.V.")
     end
   end
 

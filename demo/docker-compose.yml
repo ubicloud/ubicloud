@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15.8
+    image: postgres:17.6
     container_name: ubicloud-postgres
     env_file: .env
     ports:

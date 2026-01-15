@@ -14,8 +14,7 @@ RSpec.describe Prog::Test::HetznerServer do
                                                "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
                                                "server_id" => "1234",
                                                "additional_boot_images" => [],
-                                               "setup_host" => true}, hetzner_api: hetzner_api, vm_host: vm_host)
-    SpdkInstallation.create_with_id(vm_host.id, version: "1.0", vm_host_id: vm_host.id, allocation_weight: 100)
+                                               "setup_host" => true}, hetzner_api:, vm_host:)
   }
 
   describe "#assemble" do
@@ -65,12 +64,16 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#wait_reimage" do
     it "hops to setup_host if the server is up" do
-      expect(Util).to receive(:rootish_ssh)
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).with("echo 1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("", 0))
       expect { hs_test.wait_reimage }.to hop("setup_host")
     end
 
     it "naps if the server is not up yet" do
-      expect(Util).to receive(:rootish_ssh).and_raise RuntimeError, "ssh failed"
+      session = Net::SSH::Connection::Session.allocate
+      expect(Net::SSH).to receive(:start).and_yield(session)
+      expect(session).to receive(:_exec!).and_raise(RuntimeError, "ssh failed")
       expect { hs_test.wait_reimage }.to nap(15)
     end
   end
@@ -90,46 +93,50 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "puts the image sizes if the vm host is downloading images" do
       expect(vm_host.strand).to receive(:label).and_return("wait_download_boot_images").at_least(:once)
-      expect(vm_host.sshable).to receive(:cmd).and_return("image_1\nimage_2\n")
+      expect(vm_host.sshable).to receive(:_cmd).and_return("image_1\nimage_2\n")
       expect(Clog).to receive(:emit).with("image_1\timage_2")
       expect { hs_test.wait_setup_host }.to nap(15)
     end
 
-    it "hops to run_integration_specs if rhizome installed" do
+    it "hops to install_integration_specs if the host is ready" do
       expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
+      expect { hs_test.wait_setup_host }.to hop("install_integration_specs")
+    end
+  end
+
+  describe "#install_integration_specs" do
+    it "hops to run_integration_specs if rhizome installed" do
       expect(hs_test).to receive(:retval).and_return({"msg" => "installed rhizome"})
       expect(hs_test).to receive(:verify_specs_installation).with(installed: true)
-      expect { hs_test.wait_setup_host }.to hop("run_integration_specs")
+      expect { hs_test.install_integration_specs }.to hop("run_integration_specs")
     end
 
     it "verifies specs haven't been installed when we setup the host & installs rhizome with specs" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
-      expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
       expect(hs_test).to receive(:verify_specs_installation).with(installed: false)
-      expect { hs_test.wait_setup_host }.to hop("start", "InstallRhizome")
+      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
     end
 
     it "doesn't verify specs not installed if we didn't setup the host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => false})
-      expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
       expect(hs_test).not_to receive(:verify_specs_installation)
-      expect { hs_test.wait_setup_host }.to hop("start", "InstallRhizome")
+      expect { hs_test.install_integration_specs }.to hop("start", "InstallRhizome")
     end
   end
 
   describe "#verify_specs_installation" do
     it "succeeds when installed=false & not exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("0\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("0\n")
       expect { hs_test.verify_specs_installation(installed: false) }.not_to raise_error
     end
 
     it "succeeds when installed=true & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
       expect { hs_test.verify_specs_installation(installed: true) }.not_to raise_error
     end
 
     it "succeeds when installed=false & exists" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).and_return("5\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).and_return("5\n")
       expect(hs_test).to receive(:fail_test).with("verify_specs_installation(installed: false) failed")
       hs_test.verify_specs_installation(installed: false)
     end
@@ -138,25 +145,13 @@ RSpec.describe Prog::Test::HetznerServer do
   describe "#run_integration_specs" do
     it "hops to wait" do
       tmp_dir = "/var/storage/tests"
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo mkdir -p #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo chmod a+rw #{tmp_dir}")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with(
-        "sudo RUN_E2E_TESTS=1 SPDK_TESTS_TMP_DIR=#{tmp_dir} bundle exec rspec host/e2e"
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with(
+        "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
       )
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo rm -rf #{tmp_dir}")
-      expect { hs_test.run_integration_specs }.to hop("install_vhost_backend")
-    end
-  end
-
-  describe "#install_vhost_backend" do
-    it "hops to wait if vhost_backend is installed" do
-      expect(hs_test).to receive(:retval).and_return({"msg" => "VhostBlockBackend was setup"})
-      expect { hs_test.install_vhost_backend }.to hop("wait")
-    end
-
-    it "pushes SetupVhostBlockBackend if not installed" do
-      expect(hs_test).to receive(:retval).and_return(nil)
-      expect { hs_test.install_vhost_backend }.to hop("start", "Storage::SetupVhostBlockBackend")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
+      expect { hs_test.run_integration_specs }.to hop("wait")
     end
   end
 
@@ -196,12 +191,12 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_vm_dir_purged" do
     it "doesn't fail if /vm is empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /vm").and_return("")
       expect { hs_test.verify_vm_dir_purged }.to hop("verify_storage_files_purged")
     end
 
     it "fails if /vm is not empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /vm").and_return("vm1\nvm2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /vm").and_return("vm1\nvm2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM directory not empty: [\"vm1\", \"vm2\"]"})
       expect { hs_test.verify_vm_dir_purged }.to hop("failed")
     end
@@ -209,56 +204,64 @@ RSpec.describe Prog::Test::HetznerServer do
 
   describe "#verify_storage_files_purged" do
     it "succeeds if /var/storage and /var/storage/vhost are empty" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
-      expect { hs_test.verify_storage_files_purged }.to hop("verify_spdk_artifacts_purged")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("")
+      expect { hs_test.verify_storage_files_purged }.to hop("verify_resources_reclaimed")
     end
 
     it "fails if /var/storage has disks" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\ndisk1\ndisk2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\ndisk1\ndisk2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "VM disks not empty: [\"disk1\", \"disk2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
     end
 
     it "fails if /var/storage/vhost has files" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage").and_return("vhost\nimages\n")
+      expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo ls -1 /var/storage/vhost").and_return("file1\nfile2\n")
       expect(hs_test.strand).to receive(:update).with(exitval: {msg: "vhost directory not empty: [\"file1\", \"file2\"]"})
       expect { hs_test.verify_storage_files_purged }.to hop("failed")
     end
   end
 
-  describe "#verify_spdk_artifacts_purged" do
-    it "doesn't fail if no bdevs or vhost controllers" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[]")
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("destroy")
+  describe "#verify_resources_reclaimed" do
+    before {
+      vm_host.add_storage_device(name: "DEFAULT", total_storage_gib: 6800, available_storage_gib: 860)
+    }
+
+    it "fails if used_cores not reclaimed" do
+      vm_host.update(used_cores: 10)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_cores is expected to be zero, actual: 10"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
     end
 
-    it "fails if bdevs are present" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[{\"name\": \"bdev1\", \"size\": 100}]")
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK bdevs not empty: [\"bdev1\"]"})
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
+    it "fails if used_hugepages_1g not reclaimed" do
+      vm_host.update(used_cores: 0, total_hugepages_1g: 384, used_hugepages_1g: 70)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_hugepages_1g is expected to be zero, actual: 70"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
     end
 
-    it "fails if vhost controllers are present" do
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock bdev_get_bdevs").and_return("[]")
-      expect(hs_test.vm_host.sshable).to receive(:cmd).with("sudo /opt/spdk-1.0/scripts/rpc.py -s /home/spdk/spdk-1.0.sock vhost_get_controllers").and_return("[{\"ctrlr\": \"ctrlr1\", \"scsi_target_num\": 0}]")
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "SPDK vhost controllers not empty: [\"ctrlr1\"]"})
-      expect { hs_test.verify_spdk_artifacts_purged }.to hop("failed")
+    it "fails if available_storage_gib not reclaimed" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 500}).at_least(:once)
+      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
+      expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+    end
+
+    it "hops to destroy after resource verified" do
+      expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 860}).at_least(:once)
+      expect { hs_test.verify_resources_reclaimed }.to hop("destroy_vm_host")
     end
   end
 
   describe "#destroy" do
     it "does not delete key and vm host if existing vm host used" do
       expect(hs_test).to receive(:frame).and_return({"destroy" => false})
-      expect { hs_test.destroy }.to hop("finish")
+      expect { hs_test.destroy_vm_host }.to hop("finish")
     end
 
     it "deletes vm host" do
       expect(hs_test).to receive(:frame).and_return({"setup_host" => true})
       expect(vm_host).to receive(:incr_destroy)
-      expect { hs_test.destroy }.to hop("wait_vm_host_destroyed")
+      expect { hs_test.destroy_vm_host }.to hop("wait_vm_host_destroyed")
     end
   end
 

@@ -47,12 +47,21 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "Unregistered installation"}}.to_json)
     end
 
+    it "fails if the project is inactive" do
+      account = create_account.update(suspended_at: Time.now)
+      account.add_project(installation.project)
+      send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Inactive project"}}.to_json)
+    end
+
     it "destroys installation when receive deleted action" do
-      expect(Prog::Github::DestroyGithubInstallation).to receive(:assemble).with(installation)
       send_webhook("installation", {action: "deleted", installation: {id: installation.installation_id}})
 
       expect(page.status_code).to eq(200)
       expect(page.body).to eq({message: "GithubInstallation[#{installation.ubid}] deleted"}.to_json)
+      expect(Strand.where(prog: "Github::DestroyGithubInstallation").count).to eq(1)
     end
   end
 
@@ -65,6 +74,14 @@ RSpec.describe Clover, "github" do
     end
 
     it "fails if label not matched" do
+      send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(label: "other")))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unmatched label"}}.to_json)
+    end
+
+    it "fails if label not matched and logs if queued" do
+      expect(Clog).to receive(:emit).with("Unmatched label", instance_of(Hash)).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "other")))
 
       expect(page.status_code).to eq(200)
@@ -79,14 +96,23 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "No workflow_job in the payload"}}.to_json)
     end
 
-    it "creates runner when receive queued action" do
-      st = instance_double(Strand, id: runner.id)
-      expect(Prog::Vm::GithubRunner).to receive(:assemble).with(installation, repository_name: "my-repo", label: "ubicloud", default_branch: "main").and_return(st)
+    it "uses custom label if label is an existing custom label" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4")
+      send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: workflow_job_object(label: "custom-label-1")))
 
+      expect(page.status_code).to eq(200)
+      created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud-standard-4", actual_label: "custom-label-1")
+      expect(created_runner).not_to be_nil
+      expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
+    end
+
+    it "creates runner when receive queued action" do
       send_webhook("workflow_job", workflow_job_payload(action: "queued"))
 
       expect(page.status_code).to eq(200)
-      expect(page.body).to eq({message: "GithubRunner[#{runner.ubid}] created"}.to_json)
+      created_runner = GithubRunner.first(installation_id: installation.id, repository_name: "my-repo", label: "ubicloud", actual_label: "ubicloud")
+      expect(created_runner).not_to be_nil
+      expect(page.body).to eq({message: "GithubRunner[#{created_runner.ubid}] created"}.to_json)
     end
 
     it "fails if not queued and runner_id is empty" do
@@ -104,7 +130,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "updates job details of runner when receive in_progress action" do
-      expect(Clog).to receive(:emit).with("runner_started").and_call_original
+      expect(Clog).to receive(:emit).with("runner_started", instance_of(Hash)).and_call_original
       runner
       send_webhook("workflow_job", workflow_job_payload(action: "in_progress", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 
@@ -114,7 +140,7 @@ RSpec.describe Clover, "github" do
     end
 
     it "destroys runner when receive completed action" do
-      Strand.create_with_id(runner.id, prog: "Vm::GithubRunner", label: "start")
+      Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
 
       send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(runner_id: runner.runner_id)))
 
@@ -135,7 +161,7 @@ RSpec.describe Clover, "github" do
   def workflow_job_object(runner_id: 123, label: "ubicloud")
     {
       id: 232323,
-      runner_id: runner_id,
+      runner_id:,
       labels: [label],
       name: "test workflow job name",
       job_name: "test job name",
@@ -149,10 +175,10 @@ RSpec.describe Clover, "github" do
 
   def workflow_job_payload(action:, installation_id: installation.installation_id, repository_name: "my-repo", workflow_job: workflow_job_object)
     {
-      action: action,
+      action:,
       installation: {id: installation_id},
       repository: {full_name: repository_name, default_branch: "main"},
-      workflow_job: workflow_job
+      workflow_job:
     }
   end
 

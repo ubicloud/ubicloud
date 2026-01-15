@@ -3,7 +3,7 @@
 # A no-operation prog for testing.
 class Prog::Test < Prog::Base
   subject_is :sshable
-  semaphore :test_semaphore
+  semaphore :test_semaphore, :destroy
 
   label def start
   end
@@ -80,6 +80,10 @@ class Prog::Test < Prog::Base
     fail "failure"
   end
 
+  label def short_napper
+    nap(12)
+  end
+
   label def napper
     nap(123)
   end
@@ -94,6 +98,21 @@ class Prog::Test < Prog::Base
 
   label def invalid_hop_target
     dynamic_hop :black_hole
+  end
+
+  label def bud_short_napper
+    bud self.class, frame, :short_napper
+    hop_reaper
+  end
+
+  label def bud_short_nappers
+    2.times { bud self.class, frame, :short_napper }
+    hop_reaper
+  end
+
+  label def bud_napper
+    bud self.class, frame, :napper
+    hop_reaper
   end
 
   label def budder
@@ -142,7 +161,17 @@ class Prog::Test < Prog::Base
   label def push_subject_id
     push Prog::Test, {"subject_id" => "70b633b7-1d24-4526-a47f-d2580597d53f"}
   end
-end
 
-class Prog::Test2 < Prog::Test
+  label def callee_find_current_prog
+    find_current_prog
+    pop ""
+  end
+
+  def find_current_prog
+    Base.current_prog
+  end
+
+  label def destroy
+    pop "destroyed"
+  end
 end

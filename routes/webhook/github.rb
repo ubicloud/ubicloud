@@ -6,7 +6,7 @@ class Clover
       body = r.body.read
       next 401 unless check_signature(r.headers["x-hub-signature-256"], body)
 
-      response.headers["content-type"] = "application/json"
+      response.content_type = :json
 
       data = JSON.parse(body)
       case r.headers["x-github-event"]
@@ -30,18 +30,19 @@ class Clover
 
   def check_signature(signature, body)
     return false unless signature
+
     method, actual_digest = signature.split("=")
     expected_digest = OpenSSL::HMAC.hexdigest(method, Config.github_app_webhook_secret, body)
     Rack::Utils.secure_compare(actual_digest, expected_digest)
   end
 
   def handle_installation(data)
-    installation = GithubInstallation[installation_id: data["installation"]["id"]]
+    installation = GithubInstallation.with_github_installation_id(data["installation"]["id"])
     case data["action"]
     when "deleted"
-      unless installation
-        return error("Unregistered installation")
-      end
+      return error("Unregistered installation") unless installation
+      return error("Inactive project") unless installation.project.active?
+
       Prog::Github::DestroyGithubInstallation.assemble(installation)
       return success("GithubInstallation[#{installation.ubid}] deleted")
     end
@@ -50,27 +51,38 @@ class Clover
   end
 
   def handle_workflow_job(data)
-    unless (installation = GithubInstallation[installation_id: data["installation"]["id"]])
+    unless (installation = GithubInstallation.with_github_installation_id(data["installation"]["id"]))
       return error("Unregistered installation")
     end
 
     unless (job = data["workflow_job"])
-      Clog.emit("No workflow_job in the payload") { {workflow_job_missing: {installation_id: installation.id, action: data["action"]}} }
+      Clog.emit("No workflow_job in the payload", {workflow_job_missing: {installation_id: installation.id, action: data["action"]}})
       return error("No workflow_job in the payload")
     end
 
-    unless (label = job.fetch("labels").find { Github.runner_labels.key?(it) })
+    job_labels = job.fetch("labels")
+
+    if (label = job_labels.find { Github.runner_labels.key?(it) })
+      actual_label = label
+    elsif (custom_label = installation.custom_labels_dataset.first(name: job_labels))
+      actual_label = custom_label.name
+      label = custom_label.alias_for
+    end
+
+    repository_name = data["repository"]["full_name"]
+    unless label
+      Clog.emit("Unmatched label", {unmatched_label: {repository_name:, labels: job_labels}}) if data["action"] == "queued"
       return error("Unmatched label")
     end
 
     if data["action"] == "queued"
-      st = Prog::Vm::GithubRunner.assemble(
+      runner = Prog::Github::GithubRunnerNexus.assemble(
         installation,
-        repository_name: data["repository"]["full_name"],
-        label: label,
+        repository_name:,
+        label:,
+        actual_label:,
         default_branch: data["repository"]["default_branch"]
-      )
-      runner = GithubRunner[st.id]
+      ).subject
 
       return success("GithubRunner[#{runner.ubid}] created")
     end
@@ -79,9 +91,8 @@ class Clover
       return error("A workflow_job without runner_id")
     end
 
-    runner = GithubRunner.first(
-      installation_id: installation.id,
-      repository_name: data["repository"]["full_name"],
+    runner = installation.runners_dataset.first(
+      repository_name:,
       runner_id:
     )
 

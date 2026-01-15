@@ -39,6 +39,7 @@ class StorageVolume
     @queue_size = params.fetch("queue_size", 256)
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
+    @cpus = params["cpus"]
   end
 
   def vp
@@ -66,6 +67,7 @@ class StorageVolume
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
+
       create_empty_disk_file
       return
     end
@@ -146,6 +148,7 @@ class StorageVolume
         [Service]
         Slice=#{@slice}
         Environment=RUST_LOG=info
+        Environment=RUST_BACKTRACE=1
         ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
         Restart=always
         User=#{@vm_name}
@@ -248,7 +251,9 @@ class StorageVolume
       "copy_on_read" => @copy_on_read,
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
-      "skip_sync" => @skip_sync
+      "skip_sync" => @skip_sync,
+      "write_through" => write_through_device?,
+      "rpc_socket_path" => sp.rpc_socket_path
     }
 
     if @image_path
@@ -263,6 +268,11 @@ class StorageVolume
       config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
     end
 
+    if @cpus
+      config["cpus"] = @cpus
+      config["num_queues"] = @cpus.count
+    end
+
     config
   end
 
@@ -273,6 +283,16 @@ class StorageVolume
       "init_vector" => key_wrapping_secrets["init_vector"].strip,
       "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
     }
+  end
+
+  def write_through_device?
+    st = File.stat(disk_file)
+
+    rp = File.realpath("/sys/dev/block/#{st.dev_major}:#{st.dev_minor}")
+    dev = File.basename(rp)
+    base = File.exist?("/sys/block/#{dev}") ? dev : File.basename(File.dirname(rp))
+
+    File.read("/sys/block/#{base}/queue/write_cache").include?("write through")
   end
 
   def start(key_wrapping_secrets)

@@ -1,1 +1,1 @@
-location  name  id  display_state  version  cp_node_count
+location  name  id  display-state  version  cp-node-count

@@ -1,9 +1,11 @@
 # frozen_string_literal: true
 
-require "net/ssh"
 require_relative "../model"
+require_relative "../lib/net_ssh"
 
 class Sshable < Sequel::Model
+  prepend NetSsh::WarnUnsafe::Sshable
+
   # We need to unrestrict primary key so Sshable.new(...).save_changes works
   # in sshable_spec.rb.
   unrestrict_primary_key
@@ -18,6 +20,10 @@ class Sshable < Sequel::Model
     IOError
   ].freeze
 
+  def admin_label
+    "#{unix_user}@#{host}"
+  end
+
   class SshError < StandardError
     attr_reader :stdout, :stderr, :exit_code, :exit_signal
 
@@ -26,7 +32,21 @@ class Sshable < Sequel::Model
       @exit_signal = exit_signal
       @stdout = stdout
       @stderr = stderr
-      super("command exited with an error: " + cmd)
+      super(message_prefix + cmd)
+    end
+
+    private
+
+    def message_prefix
+      "command exited with an error: "
+    end
+  end
+
+  class SshTimeout < SshError
+    private
+
+    def message_prefix
+      "command timed out: "
     end
   end
 
@@ -44,7 +64,24 @@ class Sshable < Sequel::Model
     self.class.repl?
   end
 
-  def cmd(cmd, stdin: nil, log: true)
+  MAX_TIMEOUT = Strand::LEASE_EXPIRATION - 39
+
+  def write_file(path, content, user: nil, **)
+    args = {path:, stdin: content, **}
+    cmd_str = case user
+    when nil
+      "sudo tee :path > /dev/null"
+    when :current
+      "tee :path > /dev/null"
+    else
+      args[:user] = user
+      "sudo -u :user tee :path > /dev/null"
+    end
+
+    cmd(cmd_str, **args)
+  end
+
+  def cmd(cmd, stdin: nil, log: true, timeout: :default)
     start = Time.now
     stdout = StringIO.new
     stderr = StringIO.new
@@ -52,8 +89,20 @@ class Sshable < Sequel::Model
     exit_signal = nil
     channel_duration = nil
 
+    if timeout == :default
+      timeout = if (apoptosis_at = Thread.current[:apoptosis_at])
+        (apoptosis_at - start - 2).to_i.clamp(1, MAX_TIMEOUT)
+      else
+        MAX_TIMEOUT
+      end
+    end
+
+    wait_deadline = if timeout
+      start + timeout + 0.5
+    end
+
     begin
-      connect.open_channel do |ch|
+      ch = connect.open_channel do |ch|
         channel_duration = Time.now - start
         ch.exec(cmd) do |ch, success|
           ch.on_data do |ch, data|
@@ -75,9 +124,9 @@ class Sshable < Sequel::Model
           end
           ch.send_data stdin
           ch.eof!
-          ch.wait
         end
-      end.wait
+      end
+      channel_wait(ch, wait_deadline)
     rescue
       invalidate_cache_entry
       raise
@@ -87,44 +136,44 @@ class Sshable < Sequel::Model
     stderr_str = stderr.string.freeze
 
     if log
-      Clog.emit("ssh cmd execution") do
-        finish = Time.now
-        embed = {start:, finish:, cmd:, exit_code:, exit_signal:, ubid:, duration: finish - start}
+      finish = Time.now
+      embed = {ubid:, start:, finish:, timeout:, duration: finish - start,
+               cmd:, exit_code:, exit_signal:}
 
-        # Suppress large outputs to avoid annoyance in duplication
-        # when in the REPL.  In principle, the user of the REPL could
-        # read the Clog output and the feature of printing output in
-        # real time to $stderr could be removed, but when supervising
-        # a tty, I've found it can be useful to see data arrive in
-        # real time from SSH.
-        unless repl?
-          embed[:stderr] = stderr_str
-          embed[:stdout] = stdout_str
-        end
-        embed[:channel_duration] = channel_duration
-        embed[:connect_duration] = @connect_duration if @connect_duration
-        {ssh: embed}
+      # Suppress large outputs to avoid annoyance in duplication
+      # when in the REPL.  In principle, the user of the REPL could
+      # read the Clog output and the feature of printing output in
+      # real time to $stderr could be removed, but when supervising
+      # a tty, I've found it can be useful to see data arrive in
+      # real time from SSH.
+      unless repl?
+        embed[:stderr] = stderr_str
+        embed[:stdout] = stdout_str
       end
+      embed[:channel_duration] = channel_duration
+      embed[:connect_duration] = @connect_duration if @connect_duration
+      Clog.emit("ssh cmd execution", {ssh: embed})
     end
 
-    fail SshError.new(cmd, stdout_str, stderr.string.freeze, exit_code, exit_signal) unless exit_code.zero?
+    fail (exit_code ? SshError : SshTimeout).new(cmd, stdout_str, stderr_str, exit_code, exit_signal) unless exit_code&.zero?
+
     stdout_str
   end
 
   def d_check(unit_name)
-    cmd("common/bin/daemonizer2 check #{unit_name.shellescape}")
+    cmd("common/bin/daemonizer2 check :unit_name", unit_name:)
   end
 
   def d_clean(unit_name)
-    cmd("common/bin/daemonizer2 clean #{unit_name.shellescape}")
+    cmd("common/bin/daemonizer2 clean :unit_name", unit_name:)
   end
 
-  def d_run(unit_name, *run_command, stdin: nil, log: true)
-    cmd("common/bin/daemonizer2 run #{unit_name.shellescape} #{Shellwords.join(run_command)}", stdin:, log:)
+  def d_run(unit_name, *shelljoin_run_command, stdin: nil, log: true)
+    cmd("common/bin/daemonizer2 run :unit_name :shelljoin_run_command", unit_name:, shelljoin_run_command:, stdin:, log:)
   end
 
   def d_restart(unit_name)
-    cmd("common/bin/daemonizer2 restart #{unit_name}")
+    cmd("common/bin/daemonizer2 restart :unit_name", unit_name:)
   end
 
   # A huge number of settings are needed to isolate net-ssh from the
@@ -134,6 +183,10 @@ class Sshable < Sequel::Model
                      user_known_hosts_file: [], global_known_hosts_file: [],
                      verify_host_key: :accept_new, keys: [], key_data: [], use_agent: false,
                      keepalive: true, keepalive_interval: 3, keepalive_maxcount: 5}.freeze
+
+  def maybe_ssh_session_lock_name
+    SSH_SESSION_LOCK_NAME if defined?(SSH_SESSION_LOCK_NAME)
+  end
 
   def connect
     Thread.current[:clover_ssh_cache] ||= {}
@@ -148,6 +201,31 @@ class Sshable < Sequel::Model
     sess = start_fresh_session
     @connect_duration = Time.now - start
     Thread.current[:clover_ssh_cache][[host, unix_user]] = sess
+
+    if (lock_name = maybe_ssh_session_lock_name)
+      lock_contents = <<LOCK
+exec 999>/dev/shm/session-lock-:lock_name || exit 92
+flock -xn 999 || { echo "Another session active: " :lock_name; exit 124; }
+sleep infinity </dev/null >/dev/null 2>&1 &
+disown
+LOCK
+
+      begin
+        cmd(lock_contents, lock_name:, log: false)
+      rescue SshError => ex
+        session_fail_msg = case (exit_code = ex.exit_code)
+        when 92
+          "could not create session lock file for #{lock_name}"
+        when 124
+          "session lock conflict for #{lock_name}"
+        else
+          "unknown SshError"
+        end
+
+        Clog.emit("session lock failure", {contended_session_lock: {exit_code:, session_fail_msg:, sshable_ubid: ubid.to_s, prog: Prog::Base.current_prog}})
+      end
+    end
+
     sess
   end
 
@@ -175,6 +253,19 @@ class Sshable < Sequel::Model
       e
     ensure
       cache.delete(key)
+    end
+  end
+
+  private
+
+  def channel_wait(ch, wait_deadline)
+    if wait_deadline
+      ch.connection.loop do
+        ch.active? && Time.now < wait_deadline
+      end
+      ch.close
+    else
+      ch.wait
     end
   end
 end

@@ -34,6 +34,10 @@ module ResourceMethods
       @ubid ||= UBID.from_uuidish(id).to_s.downcase
     end
 
+    def admin_label
+      defined?(name) ? name : ubid
+    end
+
     def to_s
       inspect_prefix
     end
@@ -64,9 +68,10 @@ module ResourceMethods
       "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
       "cidr" => :to_s.to_proc,
       "inet" => :to_s.to_proc,
+      "numeric" => :to_f.to_proc,
       "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
     }.freeze
-    def inspect_values
+    def inspect_values_hash
       inspect_values = {}
       sch = db_schema
       @values.except(*self.class.redacted_columns).each do |k, v|
@@ -82,7 +87,12 @@ module ResourceMethods
           v
         end
       end
-      inspect_values.inspect
+
+      inspect_values
+    end
+
+    def inspect_values
+      inspect_values_hash.inspect
     end
 
     NON_ARCHIVED_MODELS = ["ArchivedRecord", "Semaphore"].freeze
@@ -99,6 +109,14 @@ module ResourceMethods
       end
 
       super
+    end
+  end
+
+  module DatasetMethods
+    def destroy
+      DB.ignore_duplicate_queries do
+        super
+      end
     end
   end
 
@@ -143,9 +161,10 @@ module ResourceMethods
       generate_ubid.to_uuid
     end
 
-    def create_with_id(id, **)
+    def create_with_id(id_or_model_object, **)
+      raise "nil id passed to create_with_id" unless id_or_model_object
       obj = new(**)
-      obj.id = id
+      obj.id = id_or_model_object.is_a?(String) ? id_or_model_object : id_or_model_object.id
       obj.save_changes
     end
 

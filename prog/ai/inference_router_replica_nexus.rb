@@ -10,6 +10,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   subject_is :inference_router_replica
 
   extend Forwardable
+
   def_delegators :inference_router_replica, :vm, :inference_router, :load_balancer_vm_port
 
   def self.assemble(inference_router_id)
@@ -30,17 +31,17 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       inference_router.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceRouterReplica.create(
-        inference_router_id: inference_router_id,
+        inference_router_id:,
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
-      Strand.create_with_id(replica.id, prog: "Ai::InferenceRouterReplicaNexus", label: "start")
+      Strand.create_with_id(replica, prog: "Ai::InferenceRouterReplicaNexus", label: "start")
     end
   end
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !destroying_set?
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference router replica"
@@ -73,11 +74,11 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     access_token = Config.inference_router_access_token
     asset_name = "inference-router-#{release_tag}-x86_64-unknown-linux-gnu"
     vm.sshable.cmd("id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router")
-    vm.sshable.cmd("sudo chown -R inference-router:inference-router #{workdir}")
-    vm.sshable.cmd("sudo wget -O #{workdir}/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64")
-    vm.sshable.cmd("sudo chmod +x #{workdir}/fetch_linux_amd64")
-    vm.sshable.cmd("sudo #{workdir}/fetch_linux_amd64 --github-oauth-token=\"#{access_token}\" --repo=\"https://github.com/ubicloud/inference-router\" --tag=\"#{release_tag}\" --release-asset=\"inference-router-*\" #{workdir}/")
-    vm.sshable.cmd("sudo tar -xzf #{workdir}/#{asset_name}.tar.gz -C #{workdir}")
+    vm.sshable.cmd("sudo chown -R inference-router:inference-router :workdir", workdir:)
+    vm.sshable.cmd("sudo wget -O :workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64", workdir:)
+    vm.sshable.cmd("sudo chmod +x :workdir/fetch_linux_amd64", workdir:)
+    vm.sshable.cmd("sudo :workdir/fetch_linux_amd64 --github-oauth-token=:access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=:release_tag --release-asset=\"inference-router-*\" :workdir/", workdir:, access_token:, release_tag:)
+    vm.sshable.cmd("sudo tar -xzf :workdir/:asset_name.tar.gz -C :workdir", workdir:, asset_name:)
     write_inference_router_service(asset_name, workdir)
     vm.sshable.cmd("sudo systemctl daemon-reload")
     vm.sshable.cmd("sudo systemctl enable --now inference-router")
@@ -86,11 +87,11 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   end
 
   def write_inference_router_service(asset_name, workdir)
-    service_definition = <<~SERVICE
+    vm.sshable.write_file("/etc/systemd/system/inference-router.service", <<~SERVICE)
       [Unit]
       Description=Inference Router
       After=network.target
-  
+
       [Service]
       Type=simple
       User=inference-router
@@ -104,16 +105,16 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       RestartSec=5
       StandardOutput=journal
       StandardError=journal
-  
+
       # File system and device restrictions
       ReadOnlyPaths=/
       ReadWritePaths=/ir/workdir
       PrivateTmp=yes
       PrivateMounts=yes
-  
+
       # User management
       SupplementaryGroups=
-  
+
       # Kernel and system protections
       ProtectKernelTunables=yes
       ProtectKernelModules=yes
@@ -121,17 +122,17 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       ProtectClock=yes
       ProtectHostname=yes
       ProtectControlGroups=yes
-  
+
       # Execution environment restrictions
       NoNewPrivileges=yes
       RestrictNamespaces=yes
       RestrictRealtime=yes
       RestrictSUIDSGID=yes
       LockPersonality=yes
-  
+
       # Network restrictions
       PrivateNetwork=no
-  
+
       # Additional hardening
       KeyringMode=private
       ProtectHome=yes
@@ -146,19 +147,13 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       MemoryDenyWriteExecute=true
       RemoveIPC=true
       UMask=0077
-  
+
       # Resource limits
       LimitNOFILE=65536
-  
+
       [Install]
       WantedBy=multi-user.target
     SERVICE
-
-    vm.sshable.cmd <<~CMD
-      sudo tee /etc/systemd/system/inference-router.service > /dev/null << 'EOF'
-      #{service_definition}
-      EOF
-    CMD
   end
 
   label def wait_router_up
@@ -178,13 +173,19 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     decr_destroy
 
     resolve_page
-    strand.children.each { it.destroy }
-    inference_router.load_balancer.evacuate_vm(vm)
-    inference_router.load_balancer.remove_vm(vm)
-    vm.incr_destroy
-    inference_router_replica.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "inference router replica is deleted"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      inference_router.load_balancer.evacuate_vm(vm)
+      inference_router.load_balancer.remove_vm(vm)
+      vm.incr_destroy
+      inference_router_replica.destroy
+
+      pop "inference router replica is deleted"
+    end
   end
 
   label def unavailable
@@ -232,29 +233,39 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       owner_id: Sequel[:project][:id]
     ).exists
 
-    eligible_projects_ds = Project.where(api_key_ds).order(:id)
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
     valid_payment_method_ds = DB[:payment_method]
       .where(fraud: false)
       .select_group(:billing_info_id)
       .select_append { Sequel.as(Sequel.lit("1"), :valid_payment_method) }
-    eligible_projects_ds = eligible_projects_ds
-      .left_outer_join(valid_payment_method_ds, [:billing_info_id])
-      .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+
+    eligible_projects_ds =
+      Project.where(api_key_ds).then do |ds|
+        if inference_router.location.visible
+          ds
+            .left_outer_join(valid_payment_method_ds, billing_info_id: :billing_info_id)
+            .exclude(valid_payment_method: nil, credit: 0.0, id: free_quota_exhausted_projects_ds)
+        else
+          ds.where(
+            Sequel.pg_jsonb_op(:feature_flags)["visible_locations"]
+                  .contains([inference_router.location.name])
+          )
+        end
+      end.order(:id)
 
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
       .map do
-      {
-        ubid: it.ubid,
-        api_keys: it.api_keys
-          .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
-          .sort_by { |k| k.id }
-          .map { |k| Digest::SHA2.hexdigest(k.key) }
-      }
+        {
+          ubid: it.ubid,
+          api_keys: it.api_keys
+            .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
+            .sort_by { |k| k.id }
+            .map { |k| Digest::SHA2.hexdigest(k.key) }
+        }
     end
 
-    targets = InferenceRouterTarget.order(:created_at).all.group_by(&:inference_router_model)
+    targets = inference_router.targets.group_by(&:inference_router_model)
     routes = targets.map do |inference_router_model, targets_for_model|
       {
         model_name: inference_router_model.model_name,
@@ -268,9 +279,9 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
             targets
               .select { |target| target.enabled }
               .map do |target|
-              target.values.slice(:host, :inflight_limit)
-                .merge(id: target.name, api_key: target.api_key)
-                .merge(target.extra_configs)
+                target.values.slice(:host, :inflight_limit)
+                  .merge(id: target.name, api_key: target.api_key)
+                  .merge(target.extra_configs)
             end
           end
       }
@@ -281,16 +292,16 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         key: OpenSSL::PKey.read(inference_router.load_balancer.active_cert.csr_key).to_pem
       },
       projects: eligible_projects,
-      routes: routes
+      routes:
     }
     new_config = new_config.merge(JSON.parse(File.read("config/inference_router_config.json")))
     new_config_json = JSON.generate(new_config)
     new_md5 = Digest::MD5.hexdigest(new_config_json)
     config_path = "/ir/workdir/config.json"
-    current_md5 = vm.sshable.cmd("md5sum #{config_path} | awk '{ print $1 }'").strip
+    current_md5 = vm.sshable.cmd("md5sum :config_path | awk '{ print $1 }'", config_path:).strip
     if current_md5 != new_md5
       # print("new_md5: #{new_md5}, current_md5: #{current_md5}\n") # Uncomment for obtaining md5 for testing.
-      vm.sshable.cmd("sudo mkdir -p /ir/workdir && sudo tee #{config_path} > /dev/null", stdin: new_config_json)
+      vm.sshable.cmd("sudo mkdir -p /ir/workdir && sudo tee :config_path > /dev/null", config_path:, stdin: new_config_json)
       vm.sshable.cmd("sudo pkill -f -HUP inference-router")
       Clog.emit("Configuration updated successfully.")
     end
@@ -301,7 +312,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     update_config
     usage_response = vm.sshable.cmd("curl -k -m 10 --no-progress-meter https://localhost:8080/usage")
     project_usage = JSON.parse(usage_response)
-    Clog.emit("Successfully pinged inference router.") { {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage: project_usage} }
+    Clog.emit("Successfully pinged inference router.", {inference_router: inference_router.ubid, replica: inference_router_replica.ubid, project_usage:})
     update_billing_records(project_usage, "prompt_billing_resource", "prompt_token_count")
     update_billing_records(project_usage, "completion_billing_resource", "completion_token_count")
   end
@@ -314,10 +325,11 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       model = InferenceRouterModel.from_model_name(usage["model_name"])
       resource_family = model[billing_resource_key.to_sym]
       rate = BillingRate.from_resource_properties("InferenceTokens", resource_family, "global")
-      next if rate["unit_price"].zero?
+
       rate_id = rate["id"]
       tokens = usage[usage_key]
       next if tokens.zero?
+
       project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
@@ -339,7 +351,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Failed to update billing record", {billing_record_update_error: Util.exception_to_hash(ex, into: {project_ubid: project.ubid, replica_ubid: inference_router_replica.ubid, tokens:})})
       end
     end
   end

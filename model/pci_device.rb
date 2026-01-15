@@ -3,16 +3,17 @@
 require_relative "../model"
 
 class PciDevice < Sequel::Model
-  many_to_one :vm_host
-  many_to_one :vm
+  many_to_one :vm, read_only: true
 
   def self.device_name(device_id)
-    # https://download.nvidia.com/XFree86/Linux-x86_64/535.98/README/supportedchips.html
+    # https://download.nvidia.com/XFree86/Linux-x86_64/580.95.05/README/supportedchips.html
     case device_id
     when "20b5"
       "NVIDIA A100 80GB PCIe"
     when "27b0"
       "NVIDIA RTX 4000 SFF Ada Generation"
+    when "2901"
+      "NVIDIA B200"
     else
       "PCI device"
     end
@@ -48,3 +49,5 @@ end
 # Foreign key constraints:
 #  pci_device_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 #  pci_device_vm_id_fkey      | (vm_id) REFERENCES vm(id)
+# Referenced By:
+#  gpu_partitions_pci_devices | gpu_partitions_pci_devices_pci_device_id_fkey | (pci_device_id) REFERENCES pci_device(id) ON DELETE CASCADE

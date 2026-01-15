@@ -2,9 +2,7 @@
 
 <% @page_message = "Verify your sign in" %>
 
-<form action="<%= rodauth.recovery_auth_path %>" class="rodauth space-y-6" role="form" method="POST">
-  <%== rodauth.recovery_auth_additional_form_tags %>
-  <%== rodauth.csrf_tag(rodauth.recovery_auth_path) %>
+<% form(action: rodauth.recovery_auth_path, method: :post, class: "rodauth space-y-6") do %>
 
   <%== part(
     "components/form/text",
@@ -24,4 +22,4 @@
       <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
     </p>
   </div>
-</form>
+<% end %>

@@ -5,19 +5,26 @@ require "aws-sdk-s3"
 require_relative "../../model"
 
 class GithubRepository < Sequel::Model
-  one_to_one :strand, key: :id
-  many_to_one :installation, key: :installation_id, class: :GithubInstallation
-  one_to_many :runners, key: :repository_id, class: :GithubRunner
-  one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry
+  one_to_one :strand, key: :id, read_only: true
+  many_to_one :installation, class: :GithubInstallation
+  one_to_many :runners, key: :repository_id, class: :GithubRunner, read_only: true
+  one_to_many :cache_entries, key: :repository_id, class: :GithubCacheEntry, remover: nil, clearer: nil
 
   plugin :association_dependencies, cache_entries: :destroy
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin SemaphoreMethods, :destroy
+  dataset_module Pagination
 
-  CACHE_SIZE_LIMIT = 10 * 1024 * 1024 * 1024 # 10GB
+  def self.cache_size_limit
+    10_737_418_240 # 10GB
+  end
 
   alias_method :bucket_name, :ubid
+
+  def repository_name
+    name.split("/", 2).last
+  end
 
   def blob_storage_client
     @blob_storage_client ||= s3_client(access_key, secret_key)
@@ -38,21 +45,21 @@ class GithubRepository < Sequel::Model
       blob_storage_client.list_multipart_uploads(bucket: bucket_name).uploads.each do
         blob_storage_client.abort_multipart_upload(bucket: bucket_name, key: it.key, upload_id: it.upload_id)
       end
-    rescue Aws::S3::Errors::Unauthorized
-      Clog.emit("Repository credentials failed to abort multipart uploads") { {failed_abort_multipart_uploads: {bucket_name: bucket_name}} }
+    rescue Aws::S3::Errors::Unauthorized, Aws::S3::Errors::NoSuchBucket
+      Clog.emit("Repository credentials failed to abort multipart uploads", {failed_abort_multipart_uploads: {bucket_name:}})
     end
 
     begin
       admin_client.delete_bucket(bucket: bucket_name)
     rescue Aws::S3::Errors::NoSuchBucket
-      Clog.emit("Bucket already deleted") { {failed_bucket_destroy: {bucket_name: bucket_name}} }
+      Clog.emit("Bucket already deleted", {failed_bucket_destroy: {bucket_name:}})
     end
 
     begin
       CloudflareClient.new(Config.github_cache_blob_storage_api_key).delete_token(access_key)
       this.update(access_key: nil, secret_key: nil)
     rescue Excon::Error::HTTPStatus
-      Clog.emit("Repository credentials failed to delete Cloudflare token") { {failed_cloudflare_token_delete: {bucket_name: bucket_name}} }
+      Clog.emit("Repository credentials failed to delete Cloudflare token", {failed_cloudflare_token_delete: {bucket_name:}})
     end
   end
 
@@ -79,6 +86,7 @@ class GithubRepository < Sequel::Model
 
       token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
       update(access_key: token_id, secret_key: Digest::SHA256.hexdigest(token))
+      Clog.emit("Blob storage setup completed", {blob_storage_setup_completed: {bucket_name:}})
     end
   end
 

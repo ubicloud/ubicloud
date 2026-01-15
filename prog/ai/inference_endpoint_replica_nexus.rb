@@ -9,6 +9,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
   subject_is :inference_endpoint_replica
 
   extend Forwardable
+
   def_delegators :inference_endpoint_replica, :vm, :inference_endpoint, :load_balancer_vm_port
 
   def self.assemble(inference_endpoint_id)
@@ -32,17 +33,17 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       inference_endpoint.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceEndpointReplica.create(
-        inference_endpoint_id: inference_endpoint_id,
+        inference_endpoint_id:,
         vm_id: vm_st.id
       ) { it.id = ubid.to_uuid }
 
-      Strand.create_with_id(replica.id, prog: "Ai::InferenceEndpointReplicaNexus", label: "start")
+      Strand.create_with_id(replica, prog: "Ai::InferenceEndpointReplicaNexus", label: "start")
     end
   end
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !destroying_set?
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the inference endpoint replica"
@@ -128,13 +129,19 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resolve_page
     delete_runpod_pod
-    strand.children.each { it.destroy }
-    inference_endpoint.load_balancer.evacuate_vm(vm)
-    inference_endpoint.load_balancer.remove_vm(vm)
-    vm.incr_destroy
-    inference_endpoint_replica.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "inference endpoint replica is deleted"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      inference_endpoint.load_balancer.evacuate_vm(vm)
+      inference_endpoint.load_balancer.remove_vm(vm)
+      vm.incr_destroy
+      inference_endpoint_replica.destroy
+
+      pop "inference endpoint replica is deleted"
+    end
   end
 
   label def unavailable
@@ -199,12 +206,12 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     eligible_projects = eligible_projects_ds.all
       .select(&:active?)
       .map do
-      {
-        ubid: it.ubid,
-        api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
-        quota_rps: inference_endpoint.max_project_rps,
-        quota_tps: inference_endpoint.max_project_tps
-      }
+        {
+          ubid: it.ubid,
+          api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
+          quota_rps: inference_endpoint.max_project_rps,
+          quota_tps: inference_endpoint.max_project_tps
+        }
     end
 
     body = {
@@ -215,7 +222,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     resp = vm.sshable.cmd("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)
     project_usage = JSON.parse(resp)["projects"]
-    Clog.emit("Successfully pinged inference gateway.") { {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage: project_usage} }
+    Clog.emit("Successfully pinged inference gateway.", {inference_endpoint: inference_endpoint.ubid, replica: inference_endpoint_replica.ubid, project_usage:})
     update_billing_records(project_usage, "input", "prompt_token_count")
     update_billing_records(project_usage, "output", "completion_token_count")
   end
@@ -224,6 +231,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     resource_family = "#{inference_endpoint.model_name}-#{token_type}"
     rate = BillingRate.from_resource_properties("InferenceTokens", resource_family, "global")
     return if rate["unit_price"].zero?
+
     rate_id = rate["id"]
     begin_time = Time.now.to_date.to_time
     end_time = begin_time + 24 * 60 * 60
@@ -231,6 +239,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
     project_usage.each do |usage|
       tokens = usage[usage_key]
       next if tokens.zero?
+
       project = Project[id: UBID.to_uuid(usage["ubid"])]
 
       begin
@@ -253,7 +262,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           )
         end
       rescue Sequel::Error => ex
-        Clog.emit("Failed to update billing record") { {billing_record_update_error: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens: tokens, exception: Util.exception_to_hash(ex)}} }
+        Clog.emit("Failed to update billing record", {billing_record_update_error: Util.exception_to_hash(ex, into: {project_ubid: project.ubid, model_name: inference_endpoint.model_name, replica_ubid: inference_endpoint_replica.ubid, tokens:})})
       end
     end
   end
@@ -281,10 +290,10 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
 
     return pod["id"] if pod
 
-    ssh_keys = vm.sshable.cmd(<<-CMD) + Config.operator_ssh_public_keys
+    ssh_keys = vm.sshable.cmd(<<-CMD, ubid: inference_endpoint_replica.ubid) + Config.operator_ssh_public_keys
 if ! sudo test -f /ie/workdir/.ssh/runpod; then
   sudo -u ie mkdir -p /ie/workdir/.ssh
-  sudo -u ie ssh-keygen -t ed25519 -C #{inference_endpoint_replica.ubid}@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
+  sudo -u ie ssh-keygen -t ed25519 -C :ubid@ubicloud.com -f /ie/workdir/.ssh/runpod -N '' -q
 fi
 sudo cat /ie/workdir/.ssh/runpod.pub
     CMD
@@ -358,6 +367,7 @@ sudo cat /ie/workdir/.ssh/runpod.pub
 
   def delete_runpod_pod
     return unless (pod_id = inference_endpoint_replica.external_state["pod_id"])
+
     Excon.post("https://api.runpod.io/graphql",
       headers: {"content-type" => "application/json", "authorization" => "Bearer #{Config.runpod_api_key}"},
       body: {"query" => "mutation { podTerminate(input: {podId: \"#{pod_id}\"}) }"}.to_json,

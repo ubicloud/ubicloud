@@ -33,13 +33,13 @@ jobs:
 
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Set up Clover
       uses: ./.github/actions/setup-clover
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@v6
       with:
         go-version-file: 'cli/go.mod'
 
@@ -55,7 +55,7 @@ jobs:
       run: "cd cli && go fmt && git diff --stat --exit-code"
 
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v8
+      uses: golangci/golangci-lint-action@v9
       with:
         version: v2.1.5
         working-directory: cli

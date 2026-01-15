@@ -14,6 +14,7 @@ end
 loaded_environment = nil
 load_db = lambda do |env|
   raise "cannot load #{env} environment, already loaded #{loaded_environment} environment" if loaded_environment && loaded_environment != env
+
   loaded_environment = env
   ENV["RACK_ENV"] = env
   require "bundler"
@@ -25,6 +26,7 @@ end
 ncpu = nil
 nproc = lambda do
   return ncpu if ncpu
+
   require "etc"
   # Limit to 10 processes, as higher number results in more time
   ncpu = Etc.nprocessors.clamp(1, 10).to_s
@@ -60,9 +62,9 @@ migrate = lambda do |env, version|
   case DB[<<SQL].get
 SELECT count(*)
 FROM pg_class
-WHERE relnamespace = 'public'::regnamespace AND relname = 'account_password_hashes'
+WHERE relnamespace = 'public'::regnamespace AND relname IN ('account_password_hashes', 'admin_password_hash')
 SQL
-  when 0
+  when 0, 1
     user = DB.get(Sequel.lit("current_user"))
     ph_user = "#{user}_password"
 
@@ -74,8 +76,8 @@ SQL
       Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
     end
     DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
-  when 1
-    # Already ran the "ph" migration as the alternate user.  This
+  when 2
+    # Already ran the "ph" migrations as the alternate user.  This
     # branch is taken nearly all the time in a production situation.
   else
     fail "BUG: account_password_hashes table probing query should return 0 or 1"
@@ -159,8 +161,10 @@ end
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
   raise "env must be test or development" unless ["test", "development"].include?(args[:env])
+
   parallel = args[:parallel] && args[:parallel] != "false"
   raise "parallel can only be used in test" if parallel && args[:env] != "test"
+
   File.binwrite(auto_parallel_tests_file, "1") if parallel && !File.file?(auto_parallel_tests_file)
 
   database_name = "clover_#{args[:env]}"
@@ -225,7 +229,7 @@ task "coverage" => [:coverage_spec]
 
   desc "Run specs#{desc_suffix} with frozen core, Database, and models (similar to production)"
   task "frozen_#{task_suffix}" do
-    block.call("CLOVER_FREEZE" => "1")
+    block.call("CLOVER_FREEZE" => "true")
   end
 end
 
@@ -249,7 +253,7 @@ desc "Run specs in parallel with coverage"
 task "coverage_pspec" do
   output_file = "coverage/output.txt"
   coverage_setup.call
-  command = "bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}"
+  command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
   command_output = File.binread(output_file)
   unless command_output.include?("Line Coverage: 100.0%") && command_output.include?("Branch Coverage: 100.0%")
@@ -259,6 +263,11 @@ task "coverage_pspec" do
   exit(1) if command_output.include?("\nFailures:\n")
 ensure
   File.delete(output_file) if File.file?(output_file)
+end
+
+desc "Run api tests in parallel"
+task "api_spec" do
+  sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "turbo_tests", "-n", nproc.call, "spec/routes/api")
 end
 
 desc "Run rhizome (data plane) tests"
@@ -278,38 +287,87 @@ end
 
 # Other
 
+desc "Create admin account in production environment"
+task "create_prod_admin_account", [:login] do |_, args|
+  load_db.call("production")
+  require_relative "loader"
+  puts "Password for account is: #{CloverAdmin.create_admin_account(args[:login])}"
+end
+
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do
   require "rbconfig"
-  system({"CHECK_LOGGED_SQL" => "1"}, RbConfig.ruby, "-S", "rake", "frozen_sspec")
-  system(RbConfig.ruby, "bin/check_for_parameters", out: "sql_query_parameterization_analysis.txt")
+  sh({"CHECK_LOGGED_SQL" => "1"}, RbConfig.ruby, "-S", "rake", "frozen_sspec")
+  sh(RbConfig.ruby, "bin/check_for_parameters", out: "sql_query_parameterization_analysis.txt")
 end
 
 desc "Check that model files work when required separately"
 task "check_separate_requires" do
   require "rbconfig"
-  system({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
+  sh({"RACK_ENV" => "test", "LOAD_FILES_SEPARATELY_CHECK" => "1"}, RbConfig.ruby, "-r", "./loader", "-e", "")
 end
 
 desc "Run monitor smoke test"
 task :monitor_smoke_test do
-  system(RbConfig.ruby, "spec/monitor_smoke_test.rb")
+  sh(RbConfig.ruby, "spec/monitor_smoke_test.rb")
 end
 
 desc "Run respirate smoke tests"
 task :respirate_smoke_test do
   # not partitioned, 1 process
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb")
 
   # not partitioned, 8 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "1", "8")
 
   # 8-way partition, 8 processes
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8")
 
   # 8-way partition, but only 7 processes. This simulates a crash/apoptosis
   # in a respirate process, checking that other processes pick up the slack.
-  system(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
+  sh(RbConfig.ruby, "spec/respirate_smoke_test.rb", "8", "7")
+end
+
+desc "Report associations that can be removed and association options that should be added"
+task :unused_associations_check do
+  ENV["UNUSED_ASSOCIATIONS"] = "1"
+  spec.call({})
+
+  ENV["FORCE_AUTOLOAD"] = "1"
+  require "./loader"
+  Sequel::Model.update_unused_associations_data
+
+  # Do not complain about unused project, strand, or semaphore associations or options
+  keep_associations = %w[project strand semaphores]
+  keep = proc { |_, association| keep_associations.include?(association) }
+
+  unused = Sequel::Model.unused_associations
+  unused.reject!(&keep)
+  if unused.empty?
+    puts "All Associations Are Used."
+  else
+    puts "Associations That Can Be Removed:", unused.map! { |klass, association| "#{klass}##{association}" }.sort!
+  end
+  puts
+
+  options_data = Sequel::Model.unused_association_options
+  options_data.reject!(&keep)
+  options_data.each do |_, _, opts|
+    opts.delete(:no_dataset_method)
+    opts.delete(:no_association_method)
+  end
+  options_data.reject! { |_, _, opts| opts.empty? }
+  if options_data.empty?
+    puts "No Associations Need Option Changes."
+  else
+    options_data = options_data.map do |klass, association, opts|
+      "#{klass}##{association}: , #{opts.inspect[1...-1]}"
+    end.sort!
+    puts "Associations Option That Can Be Added:", options_data
+  end
+
+  Sequel::Model.delete_unused_associations_files
+  exit(1) unless unused.empty? && options_data.empty?
 end
 
 desc "Run each spec file in a separate process"
@@ -318,6 +376,7 @@ task :spec_separate do
 
   failures = []
   Dir["spec/**/*_spec.rb"].each do |file|
+    # system instead of sh as we are reporting all failures at the end
     failures << file unless system(RbConfig.ruby, "-w", "-S", "rspec", file)
   end
 
@@ -401,7 +460,11 @@ task "annotate" do
   require_relative "model"
   DB.loggers.clear
   require "sequel/annotate"
-  Sequel::Annotate.annotate(Dir["model/**/*.rb"])
+  ignore_dirs = %w[aws metal]
+  files = Dir["model/**/*.rb"].reject do |file|
+    ignore_dirs.include?(File.basename(File.dirname(file)))
+  end
+  Sequel::Annotate.annotate(files)
 end
 
 desc "Build sdk gem"
@@ -469,7 +532,95 @@ namespace :linter do
     sh "npx @stoplight/spectral-cli lint openapi/openapi.yml --fail-severity=warn --ruleset openapi/.spectral.yml"
     sh "npx openapi-format openapi/openapi.yml --configFile openapi/openapi_format.yml"
   end
+
+  desc "Check for potentially unsafe <%== usage in ERB templates"
+  task :xss_check do
+    puts "Checking for potentially unsafe <%== usage in ERB templates..."
+
+    # Patterns that are considered safe (already escaped)
+    # Add additional patterns here as needed
+    safe_patterns = [
+      /@?[a-z_]+_(html|tag)( *)?\z/,
+      /rodauth\.[a-z_]+_(additional_form_tags|footer|explanatory_text)/,
+      "allow_unescaped(",
+      "assets(",
+      "f.button(",
+      "f.input(",
+      "form(",
+      "hidden_inputs(",
+      "html_attrs(",
+      "linkify_ubids(",
+      "part(",
+      "render(",
+      "rodauth.add_recovery_codes_heading",
+      "rodauth.otp_qr_code",
+      "yield"
+    ]
+    safe_regexp = /\A\s*(?:#{Regexp.union(safe_patterns)})/m
+
+    findings = []
+    erb_files = Dir.glob("views/**/*.erb")
+
+    erb_files.each do |file|
+      content = File.read(file)
+      lines = content.lines
+
+      # Find all <%== occurrences (including multi-line)
+      content.scan(/<%==\s*(.+?)\s*%>/m) do |match|
+        tag_content = match[0]
+
+        next if safe_regexp.match?(tag_content)
+
+        # Find the line number where this tag starts
+        offset = Regexp.last_match.begin(0)
+        line_number = content[0...offset].count("\n") + 1
+
+        # Extract the line for display (handle multi-line by showing first line + ...)
+        display_content = tag_content.gsub(/\s+/, " ").strip
+        display_content = "#{display_content[0...100]}..." if display_content.length > 100
+
+        findings << {
+          file:,
+          line: line_number,
+          content: display_content,
+          full_line: lines[line_number - 1].strip
+        }
+      end
+    end
+
+    if findings.empty?
+      puts "✓ No potentially unsafe <%== usage found"
+    else
+      puts "⚠ Found #{findings.size} potentially unsafe <%== usage(s):\n\n"
+
+      findings.each do |finding|
+        puts "#{finding[:file]}:#{finding[:line]}"
+        puts "  Content: #{finding[:content]}"
+        puts "  Line: #{finding[:full_line]}"
+        puts
+      end
+
+      puts "If any of these are safe (already escaped), add them to the safe_patterns array in the rake task."
+      exit 1
+    end
+  end
+
+  desc "Check for potentially unsafe overrides of cmd/exec!"
+  task :cmd_exec do
+    failure = false
+    Dir.glob("spec/**/*.rb").each do |file|
+      number = 0
+      File.foreach(file) do |line|
+        number += 1
+        if /\(:(cmd|exec!|kubectl|rootish_ssh)/.match?(line)
+          failure = true
+          warn "Potentially insecure :cmd/:exec! override: #{file}:#{number}: #{line}"
+        end
+      end
+    end
+    exit(failure ? 1 : 0)
+  end
 end
 
 desc "Run all linters"
-task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go"].map { "linter:#{it}" }
+task linter: ["rubocop", "brakeman", "erb_formatter", "openapi", "go", "xss_check", "cmd_exec"].map { "linter:#{it}" }

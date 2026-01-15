@@ -4,41 +4,63 @@ require_relative "../spec_helper"
 
 RSpec.describe InferenceEndpoint do
   subject(:inference_endpoint) do
-    described_class.new(
+    described_class.create(
       name: "ie-name",
       location_id: Location::HETZNER_FSN1_ID,
-      model_name: "model-name"
-    ) { it.id = "c76fcd0c-3fb0-40cc-8732-d71869ee1341" }
+      model_name: "model-name",
+      project_id: project.id,
+      is_public: false,
+      boot_image: "image",
+      vm_size: "size",
+      storage_volumes: [],
+      engine: "vllm",
+      engine_params: "",
+      replica_count: 1,
+      load_balancer_id: load_balancer.id,
+      private_subnet_id: private_subnet.id
+    )
+  end
+
+  let(:project) { Project.create(name: "test-project") }
+  let(:private_subnet) do
+    PrivateSubnet.create(name: "ps", location_id: Location::HETZNER_FSN1_ID,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+      state: "waiting", project_id: project.id)
+  end
+  let(:load_balancer) do
+    LoadBalancer.create(
+      name: "lb",
+      health_check_protocol: "https",
+      health_check_endpoint: "/health",
+      project_id: project.id,
+      private_subnet_id: private_subnet.id
+    )
   end
 
   describe "#display_states" do
-    let(:strand) { instance_double(Strand) }
-
-    before do
-      allow(inference_endpoint).to receive(:strand).and_return(strand)
-    end
+    let!(:strand) { Strand.create_with_id(inference_endpoint, prog: "Ai::InferenceEndpointNexus", label: "wait") }
 
     context "when state is running" do
-      before { allow(strand).to receive(:label).and_return("wait") }
-
       it "returns 'running'" do
         expect(inference_endpoint.display_state).to eq("running")
       end
     end
 
-    context "when state is deleting" do
-      before { allow(strand).to receive(:label).and_return("destroy") }
-
-      it "returns 'deleting'" do
-        expect(inference_endpoint.display_state).to eq("deleting")
-      end
-    end
-
-    context "when state is creating" do
-      before { allow(strand).to receive(:label).and_return("wait_replicas") }
+    context "when state is wait_replicas" do
+      before { strand.update(label: "wait_replicas") }
 
       it "returns 'creating'" do
         expect(inference_endpoint.display_state).to eq("creating")
+      end
+
+      it "returns 'deleting' when destroy semaphore is set" do
+        inference_endpoint.incr_destroy
+        expect(inference_endpoint.display_state).to eq("deleting")
+      end
+
+      it "returns 'deleting' when destroying semaphore is set" do
+        inference_endpoint.incr_destroying
+        expect(inference_endpoint.display_state).to eq("deleting")
       end
     end
   end
@@ -51,13 +73,11 @@ RSpec.describe InferenceEndpoint do
 
   shared_examples "chat completion request" do |development|
     let(:http) { instance_double(Net::HTTP, read_timeout: 30) }
-    let(:load_balancer) { instance_double(LoadBalancer, health_check_protocol: "https") }
 
     before do
       allow(Net::HTTP).to receive(:new).and_return(http)
       allow(http).to receive(:use_ssl=).with(true)
       allow(http).to receive(:read_timeout=).with(30)
-      allow(inference_endpoint).to receive(:load_balancer).and_return(load_balancer)
     end
 
     it "sends the request correctly" do

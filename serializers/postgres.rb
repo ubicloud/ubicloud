@@ -7,10 +7,11 @@ class Serializers::Postgres < Serializers::Base
       name: pg.name,
       state: pg.display_state,
       location: pg.display_location,
-      vm_size: pg.representative_server&.vm&.display_size || pg.target_vm_size,
+      vm_size: pg.vm_size,
       target_vm_size: pg.target_vm_size,
-      storage_size_gib: pg.representative_server&.storage_size_gib || pg.target_storage_size_gib,
+      storage_size_gib: pg.storage_size_gib,
       target_storage_size_gib: pg.target_storage_size_gib,
+      target_version: pg.target_version,
       version: pg.version,
       ha_type: pg.ha_type,
       flavor: pg.flavor,
@@ -18,18 +19,18 @@ class Serializers::Postgres < Serializers::Base
       maintenance_window_start_at: pg.maintenance_window_start_at,
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
-      tags: pg.tags || []
+      tags: pg.tags || [],
+      created_at: pg.created_at.iso8601
     }
-
-    if options[:include_path]
-      base[:path] = pg.path
-    end
 
     if options[:detailed]
       base.merge!(
         connection_string: pg.connection_string,
+        username: "postgres",
+        password: pg.superuser_password,
+        hostname: pg.hostname,
         primary: pg.representative_server&.primary?,
-        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.firewall_rules.sort_by { |fwr| fwr.cidr.version && fwr.cidr.to_s }),
+        firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
       )
@@ -38,9 +39,9 @@ class Serializers::Postgres < Serializers::Base
         begin
           base[:earliest_restore_time] = pg.timeline.earliest_restore_time&.utc&.iso8601
         rescue => ex
-          Clog.emit("Failed to get earliest restore time") { Util.exception_to_hash(ex) }
+          Clog.emit("Failed to get earliest restore time", Util.exception_to_hash(ex))
         end
-        base[:latest_restore_time] = pg.timeline.latest_restore_time&.utc&.iso8601
+        base[:latest_restore_time] = pg.timeline.latest_restore_time.utc.iso8601
       end
     end
 

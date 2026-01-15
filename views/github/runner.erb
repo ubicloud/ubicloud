@@ -4,11 +4,20 @@
 
 <%== render("github/tabbar") %>
 
+<% if @installation.project.reputation == "limited" && !@installation.project.quota_available?("GithubRunnerVCpu", 0) %>
+  <div class="mb-3 -mt-2 rounded-md bg-red-50 p-4 flex items-center gap-3">
+    <%== part("components/icon", name: "hero-squares-plus", classes: "h-5 w-5 text-red-400") %>
+    <h3 class="text-sm font-medium text-red-800">
+      You've reached your vCPU concurrency limit. If you need higher limits, please contact our support team at support@ubicloud.com
+    </h3>
+  </div>
+<% end %>
+
 <div class="grid gap-6">
   <%
     free_upgrade_badge = if @installation.free_runner_upgrade?
       <<~CONTENT
-        <a href="#{@project_data[:path]}/github/#{@installation.ubid}/setting">
+        <a href="#{path(@installation)}/setting">
           <span class="rounded-full bg-green-600/10 px-2.5 py-1 text-xs/5 font-medium text-green-600">
             You’re eligible for an exclusive <span class="font-semibold">50% off</span> premium runners until
             <span class="font-semibold">#{@installation.free_runner_upgrade_expires_at.strftime("%B %d, %Y")}</span>
@@ -22,7 +31,6 @@
     headers: ["Repository", "Runner", "Workflow Job", "", ""],
     rows:
       @runners.map do |runner|
-        destroy_url = "#{@project_data[:path]}/github/#{@installation.ubid}/runner/#{runner.ubid}"
         os = runner.label_data["boot_image"].match(/(ubuntu-\d{2})\d{2}/)[1]
         family = runner.vm&.family || runner.label_data["family"]
         [
@@ -80,20 +88,15 @@
               ""
             end,
             [
-              "button",
+              "delete_button",
               {
                 component: {
+                  url: "#{@project.path}/github/#{@installation.ubid}/runner/#{runner.ubid}",
                   text: nil,
                   icon: "hero-x-circle",
-                  extra_class: "delete-btn",
-                  type: "danger",
+                  confirmation_message: "Are you sure to terminate this runner?\nThis will cancel its current job and permanently delete all its data.",
                   attributes: {
                     "title" => "Terminate",
-                    "data-url" => destroy_url,
-                    "data-csrf" => csrf_token(destroy_url, "DELETE"),
-                    "data-confirmation-message" => "Are you sure to terminate this runner?\nThis will cancel its current job and permanently delete all its data.",
-                    "data-redirect" => request.path,
-                    "data-method" => "DELETE"
                   }
                 },
                 extra_class: "text-right"

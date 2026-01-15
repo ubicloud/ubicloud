@@ -3,9 +3,50 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe MonitorableResource do
-  let(:postgres_server) { PostgresServer.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ee" } }
+  let(:project) { Project.create(name: "test-project") }
+  let(:location_id) { Location::HETZNER_FSN1_ID }
+
+  let(:private_subnet) {
+    PrivateSubnet.create(
+      name: "test-subnet", project_id: project.id, location_id:,
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+    )
+  }
+
+  let(:postgres_resource) {
+    PostgresResource.create(
+      name: "pg-test",
+      superuser_password: "dummy",
+      ha_type: "none",
+      target_version: "16",
+      location_id:,
+      project_id: project.id,
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    )
+  }
+
+  let(:postgres_timeline) { PostgresTimeline.create(location_id:) }
+
+  let(:postgres_server) {
+    vm = Prog::Vm::Nexus.assemble_with_sshable(
+      project.id, name: "pg-vm", private_subnet_id: private_subnet.id,
+      location_id:, unix_user: "ubi"
+    ).subject
+    PostgresServer.create(
+      timeline: postgres_timeline,
+      resource_id: postgres_resource.id,
+      vm_id: vm.id,
+      representative_at: Time.now,
+      synchronization_status: "ready",
+      timeline_access: "push",
+      version: "16"
+    )
+  }
+
+  let(:vm_host) { create_vm_host }
+
   let(:r_w_event_loop) { described_class.new(postgres_server) }
-  let(:vm_host) { VmHost.new { it.id = "46683a25-acb1-4371-afe9-d39f303e44b4" } }
   let(:r_without_event_loop) { described_class.new(vm_host) }
 
   describe "#open_resource_session" do
@@ -18,79 +59,75 @@ RSpec.describe MonitorableResource do
     end
 
     it "sets session to resource's init_health_monitor_session" do
-      expect(postgres_server).to receive(:reload).and_return(postgres_server)
       expect(postgres_server).to receive(:init_health_monitor_session).and_return("session")
       expect { r_w_event_loop.open_resource_session }.to change { r_w_event_loop.instance_variable_get(:@session) }.from(nil).to("session")
     end
 
     it "sets deleted to true if resource is deleted" do
-      expect(postgres_server).to receive(:reload).and_raise(Sequel::NoExistingObject)
+      postgres_server.destroy
       expect { r_w_event_loop.open_resource_session }.to change(r_w_event_loop, :deleted).from(false).to(true)
     end
 
-    it "ignores exception if it is not Sequel::NoExistingObject" do
+    it "raises the exception if it is not Sequel::NoExistingObject" do
       expect(postgres_server).to receive(:reload).and_raise(StandardError)
-      expect { r_w_event_loop.open_resource_session }.not_to raise_error
-    end
-  end
-
-  describe "#process_event_loop" do
-    before do
-      # We are monkeypatching the sleep method here to avoid the actual sleep.
-      # We also use it to flip the @run_event_loop flag to true, so that the
-      # loop in the process_event_loop method can exit.
-      def r_w_event_loop.sleep(duration)
-        @run_event_loop = true
-      end
-    end
-
-    it "returns if session is nil or resource does not need event loop" do
-      expect(Thread).not_to receive(:new)
-
-      # session is nil
-      r_w_event_loop.process_event_loop
-
-      # resource does not need event loop
-      r_without_event_loop.instance_variable_set(:@session, "not nil")
-      r_without_event_loop.process_event_loop
-    end
-
-    it "creates a new thread and runs the event loop" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      r_w_event_loop.instance_variable_set(:@session, session)
-      expect(Thread).to receive(:new).and_yield
-      expect(session[:ssh_session]).to receive(:loop)
-      r_w_event_loop.process_event_loop
-    end
-
-    it "swallows exception and logs it if event loop fails" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      r_w_event_loop.instance_variable_set(:@session, session)
-      expect(Thread).to receive(:new).and_yield
-      expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
-      expect(Clog).to receive(:emit).and_call_original
-      expect(r_w_event_loop).to receive(:close_resource_session)
-      r_w_event_loop.process_event_loop
+      expect { r_w_event_loop.open_resource_session }.to raise_error(StandardError)
     end
   end
 
   describe "#check_pulse" do
+    it "does not create thread if session is nil or resource does not need event loop" do
+      expect(Thread).not_to receive(:new)
+
+      # session is nil
+      r_w_event_loop.check_pulse
+
+      # resource does not need event loop
+      r_without_event_loop.instance_variable_set(:@session, "not nil")
+      r_without_event_loop.check_pulse
+    end
+
+    it "swallows exception and logs it if event loop fails" do
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
+      r_w_event_loop.instance_variable_set(:@session, session)
+      expect(session[:ssh_session]).to receive(:shutdown!)
+      expect(session[:ssh_session]).to receive(:close)
+      expect(Thread).to receive(:new).and_call_original
+      expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
+      r_w_event_loop.check_pulse
+    end
+
+    it "swallows exception and logs it if check_pulse fails" do
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
+      r_without_event_loop.instance_variable_set(:@session, session)
+      expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
+      expect(Clog).to receive(:emit).and_call_original
+      expect { r_without_event_loop.check_pulse }.not_to raise_error
+    end
+  end
+
+  describe "#check_pulse with session and event loop" do
+    let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
+
+    before do
+      r_w_event_loop.instance_variable_set(:@session, session)
+      expect(session[:ssh_session]).to receive(:loop)
+    end
+
+    it "creates a new thread and runs the event loop" do
+      expect(Thread).to receive(:new).and_call_original
+      r_w_event_loop.check_pulse
+    end
+
     it "calls check_pulse on resource and sets pulse" do
       expect(postgres_server).to receive(:check_pulse).and_return({reading: "up"})
       expect { r_w_event_loop.check_pulse }.to change { r_w_event_loop.instance_variable_get(:@pulse) }.from({}).to({reading: "up"})
     end
 
     it "swallows exception and logs it if check_pulse fails" do
-      expect(vm_host).to receive(:check_pulse).and_raise(StandardError)
+      expect(postgres_server).to receive(:check_pulse).and_raise(StandardError)
       expect(Clog).to receive(:emit).and_call_original
-      expect { r_without_event_loop.check_pulse }.not_to raise_error
-    end
-
-    it "waits for the pulse thread to finish" do
-      pulse_thread = Thread.new {}
-      expect(pulse_thread).to receive(:join)
-      r_w_event_loop.instance_variable_set(:@pulse_thread, pulse_thread)
-      r_w_event_loop.check_pulse
+      expect { r_w_event_loop.check_pulse }.not_to raise_error
     end
 
     it "does not log the pulse if reading is up and reading_rpt is not every 5th and reading_rpt is large enough" do
@@ -118,21 +155,61 @@ RSpec.describe MonitorableResource do
     end
   end
 
-  describe "#close_resource_session" do
-    it "returns if session is nil" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      expect(session[:ssh_session]).not_to receive(:shutdown!)
-      expect(session).to receive(:nil?).and_return(true)
-      r_w_event_loop.instance_variable_set(:@session, session)
-      r_w_event_loop.close_resource_session
-    end
+  [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+    describe "#check_pulse", "stale connection retry behavior with #{ex.class}" do
+      let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
 
-    it "shuts down and closes the session" do
-      session = {ssh_session: instance_double(Net::SSH::Connection::Session)}
-      expect(session[:ssh_session]).to receive(:shutdown!)
-      expect(session[:ssh_session]).to receive(:close)
-      r_w_event_loop.instance_variable_set(:@session, session)
-      r_w_event_loop.close_resource_session
+      before do
+        r_w_event_loop.instance_variable_set(:@session, session)
+        expect(session[:ssh_session]).to receive(:loop)
+      end
+
+      it "retries if the last pulse is not set" do
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = Net::SSH::Connection::Session.allocate
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session[:ssh_session]).to receive(:shutdown!)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 1})
+        r_w_event_loop.check_pulse
+      end
+
+      it "does not retry if the connection is fresh" do
+        session[:last_pulse] = Time.now - 1
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "is up on a retry on a stale connection that works the second time" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = Net::SSH::Connection::Session.allocate
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session[:ssh_session]).to receive(:shutdown!)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 1})
+        r_w_event_loop.check_pulse
+      end
+
+      it "is down if consecutive errors are raised even on a stale connection" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = Net::SSH::Connection::Session.allocate
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session[:ssh_session]).to receive(:shutdown!)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return(ex)
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "is down for a matching exception without a matching message" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex.class.new("something else"))
+        expect(Clog).to receive(:emit).and_call_original
+        expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
     end
   end
 end

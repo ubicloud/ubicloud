@@ -3,10 +3,14 @@
 class Prog::Vm::HostNexus < Prog::Base
   subject_is :sshable, :vm_host
 
-  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: Config.spdk_version, default_boot_images: [])
+  def self.assemble(sshable_hostname, location_id: Location::HETZNER_FSN1_ID, family: "standard", net6: nil, ndp_needed: false, provider_name: nil, server_identifier: nil, spdk_version: nil, vhost_block_backend_version: Config.vhost_block_backend_version, default_boot_images: [])
     DB.transaction do
       unless Location[location_id]
         raise "No existing Location"
+      end
+
+      if spdk_version && vhost_block_backend_version
+        raise "SPDK and VhostBlockBackend cannot be set simultaneously"
       end
 
       id = VmHost.generate_uuid
@@ -34,15 +38,7 @@ class Prog::Vm::HostNexus < Prog::Base
       Strand.create_with_id(id,
         prog: "Vm::HostNexus",
         label: "start",
-        stack: [{"spdk_version" => spdk_version, "default_boot_images" => default_boot_images}])
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
+        stack: [{"spdk_version" => spdk_version, "vhost_block_backend_version" => vhost_block_backend_version, "default_boot_images" => default_boot_images}])
     end
   end
 
@@ -61,7 +57,7 @@ class Prog::Vm::HostNexus < Prog::Base
       public_keys = sshable.keys.first.public_key
       public_keys += "\n#{Config.operator_ssh_public_keys}" if Config.operator_ssh_public_keys
 
-      Util.rootish_ssh(sshable.host, "root", root_ssh_key.private_key, "echo '#{public_keys}' > ~/.ssh/authorized_keys")
+      Util.rootish_ssh(sshable.host, "root", root_ssh_key.private_key, "echo :public_keys > ~/.ssh/authorized_keys", public_keys:)
     end
 
     hop_bootstrap_rhizome
@@ -98,7 +94,7 @@ class Prog::Vm::HostNexus < Prog::Base
       case st.prog
       when "LearnOs"
         os_version = st.exitval.fetch("os_version")
-        vm_host.update(os_version: os_version, accepts_slices: os_supports_slices?(os_version))
+        vm_host.update(os_version:, accepts_slices: os_supports_slices?(os_version))
       when "LearnMemory"
         mem_gib = st.exitval.fetch("mem_gib")
         vm_host.update(total_mem_gib: mem_gib)
@@ -107,11 +103,11 @@ class Prog::Vm::HostNexus < Prog::Base
         total_cores = st.exitval.fetch("total_cores")
         total_cpus = st.exitval.fetch("total_cpus")
         kwargs = {
-          arch: arch,
+          arch:,
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
-          total_cores: total_cores,
-          total_cpus: total_cpus
+          total_cores:,
+          total_cpus:
         }
         vm_host.update(**kwargs)
         (0..total_cpus - 1).each do |cpu|
@@ -128,25 +124,35 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def setup_hugepages
-    hop_setup_spdk if retval&.dig("msg") == "hugepages installed"
+    hop_setup_storage_backend if retval&.dig("msg") == "hugepages installed"
 
     push Prog::SetupHugepages
   end
 
-  label def setup_spdk
-    if retval&.dig("msg") == "SPDK was setup"
+  label def setup_storage_backend
+    case retval&.dig("msg")
+    when "SPDK was setup"
       spdk_installation = vm_host.spdk_installations.first
       spdk_cores = (spdk_installation.cpu_count * vm_host.total_cores) / vm_host.total_cpus
       vm_host.update(used_cores: spdk_cores)
 
       hop_download_boot_images
+    when "VhostBlockBackend was setup"
+      hop_download_boot_images
     end
 
-    push Prog::Storage::SetupSpdk, {
-      "version" => frame["spdk_version"],
-      "start_service" => false,
-      "allocation_weight" => 100
-    }
+    if frame["spdk_version"]
+      push Prog::Storage::SetupSpdk, {
+        "version" => frame["spdk_version"],
+        "start_service" => false,
+        "allocation_weight" => 100
+      }
+    else
+      push Prog::Storage::SetupVhostBlockBackend, {
+        "version" => frame["vhost_block_backend_version"],
+        "allocation_weight" => 100
+      }
+    end
   end
 
   label def download_boot_images
@@ -179,17 +185,22 @@ class Prog::Vm::HostNexus < Prog::Base
   end
 
   label def reboot
+    when_hardware_reset_set? do
+      hop_prep_hardware_reset
+    end
+
     nap 30 unless sshable.available?
 
-    q_last_boot_id = vm_host.last_boot_id.shellescape
-    new_boot_id = sshable.cmd("sudo host/bin/reboot-host #{q_last_boot_id}").strip
+    last_boot_id = vm_host.last_boot_id
+    new_boot_id = sshable.cmd("sudo host/bin/reboot-host :last_boot_id", last_boot_id:).strip
 
     # If we didn't get a valid new boot id, nap. This can happen if reboot-host
     # issues a reboot and returns without closing the ssh connection.
     nap 30 if new_boot_id.length == 0
 
     vm_host.update(last_boot_id: new_boot_id)
-    hop_verify_spdk
+    hop_verify_spdk if frame["spdk_version"]
+    hop_verify_hugepages
   end
 
   label def prep_hardware_reset
@@ -225,8 +236,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def verify_spdk
     vm_host.spdk_installations.each { |installation|
-      q_version = installation.version.shellescape
-      sshable.cmd("sudo host/bin/setup-spdk verify #{q_version}")
+      version = installation.version
+      sshable.cmd("sudo host/bin/setup-spdk verify :version", version:)
     }
 
     hop_verify_hugepages
@@ -245,10 +256,14 @@ class Prog::Vm::HostNexus < Prog::Base
     total_hugepages = Integer(total_hugepages_match.captures.first)
     free_hugepages = Integer(free_hugepages_match.captures.first)
 
-    spdk_hugepages = vm_host.spdk_installations.sum { |i| i.hugepages }
+    spdk_hugepages = vm_host.spdk_installations.sum(&:hugepages)
     fail "Used hugepages exceed SPDK hugepages" unless total_hugepages - free_hugepages <= spdk_hugepages
 
-    total_vm_mem_gib = vm_host.vms.sum { |vm| vm.memory_gib }
+    total_vm_mem_gib = if vm_host.accepts_slices
+      vm_host.slices.sum(&:total_memory_gib)
+    else
+      vm_host.vms.sum(&:memory_gib)
+    end
     fail "Not enough hugepages for VMs" unless total_hugepages - spdk_hugepages >= total_vm_mem_gib
 
     vm_host.update(
@@ -274,6 +289,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     when_graceful_reboot_set? do
       fail "BUG: VmHost not in draining state" unless vm_host.allocation_state == "draining"
+
       vm_host.update(allocation_state: "accepting")
       decr_graceful_reboot
     end
@@ -302,8 +318,8 @@ class Prog::Vm::HostNexus < Prog::Base
 
   label def configure_metrics
     metrics_dir = vm_host.metrics_config[:metrics_dir]
-    sshable.cmd("mkdir -p #{metrics_dir}")
-    sshable.cmd("tee #{metrics_dir}/config.json > /dev/null", stdin: vm_host.metrics_config.to_json)
+    sshable.cmd("mkdir -p :metrics_dir", metrics_dir:)
+    sshable.write_file("#{metrics_dir}/config.json", vm_host.metrics_config.to_json, user: :current)
 
     metrics_service = <<SERVICE
 [Unit]
@@ -317,7 +333,7 @@ ExecStart=/home/rhizome/common/bin/metrics-collector #{metrics_dir}
 StandardOutput=journal
 StandardError=journal
 SERVICE
-    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.service > /dev/null", stdin: metrics_service)
+    sshable.write_file("/etc/systemd/system/vmhost-metrics.service", metrics_service)
 
     metrics_interval = vm_host.metrics_config[:interval] || "15s"
 
@@ -333,7 +349,7 @@ AccuracySec=1s
 [Install]
 WantedBy=timers.target
 TIMER
-    sshable.cmd("sudo tee /etc/systemd/system/vmhost-metrics.timer > /dev/null", stdin: metrics_timer)
+    sshable.write_file("/etc/systemd/system/vmhost-metrics.timer", metrics_timer)
 
     sshable.cmd("sudo systemctl daemon-reload")
     sshable.cmd("sudo systemctl enable --now vmhost-metrics.timer")
@@ -342,17 +358,7 @@ TIMER
   end
 
   label def wait
-    when_graceful_reboot_set? do
-      hop_prep_graceful_reboot
-    end
-
-    when_reboot_set? do
-      hop_prep_reboot
-    end
-
-    when_hardware_reset_set? do
-      hop_prep_hardware_reset
-    end
+    hardware_reset_and_reboot_checks
 
     when_checkup_set? do
       hop_unavailable if !available?
@@ -368,12 +374,14 @@ TIMER
   end
 
   label def unavailable
+    hardware_reset_and_reboot_checks
+
     if available?
       decr_checkup
       hop_wait
     end
 
-    register_deadline("wait", 0)
+    register_deadline("wait", 90)
     nap 30
   end
 
@@ -386,7 +394,7 @@ TIMER
     end
 
     unless vm_host.vms.empty?
-      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up") { vm_host }
+      Clog.emit("Cannot destroy the vm host with active virtual machines, first clean them up", vm_host)
       nap 15
     end
 
@@ -400,8 +408,24 @@ TIMER
     sshable.cmd("cat /proc/sys/kernel/random/boot_id").strip
   end
 
+  def hardware_reset_and_reboot_checks
+    when_graceful_reboot_set? do
+      hop_prep_graceful_reboot
+    end
+
+    when_reboot_set? do
+      hop_prep_reboot
+    end
+
+    when_hardware_reset_set? do
+      hop_prep_hardware_reset
+    end
+  end
+
   def available?
-    vm_host.perform_health_checks(sshable.connect)
+    session = sshable.connect
+    vm_host.check_last_boot_id(session)
+    vm_host.perform_health_checks(session, test_file_suffix: "respirate")
   rescue
     false
   end

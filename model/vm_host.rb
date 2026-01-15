@@ -1,29 +1,29 @@
 # frozen_string_literal: true
 
-require "shellwords"
 require_relative "../model"
 require_relative "../lib/hosting/apis"
 require_relative "../lib/system_parser"
 
 class VmHost < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_one :sshable, key: :id
-  one_to_many :vms
-  one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address
-  one_to_one :provider, key: :id, class: :HostProvider
-  one_to_many :assigned_host_addresses, key: :host_id, class: :AssignedHostAddress
-  one_to_many :spdk_installations, key: :vm_host_id
-  one_to_many :vhost_block_backends
-  one_to_many :storage_devices, key: :vm_host_id
-  one_to_many :pci_devices, key: :vm_host_id
-  one_to_many :boot_images, key: :vm_host_id
-  one_to_many :slices, class: :VmHostSlice, key: :vm_host_id
-  one_to_many :cpus, class: :VmHostCpu, key: :vm_host_id
-  many_to_one :location, key: :location_id, class: :Location
+  one_to_one :sshable, key: :id, read_only: true
+  one_to_many :vms, read_only: true
+  one_to_many :assigned_subnets, key: :routed_to_host_id, class: :Address, read_only: true
+  one_to_one :provider, key: :id, class: :HostProvider, read_only: true
+  one_to_many :assigned_host_addresses, key: :host_id, read_only: true
+  one_to_many :spdk_installations, remover: nil, clearer: nil
+  one_to_many :vhost_block_backends, remover: nil, clearer: nil
+  one_to_many :storage_devices, remover: nil, clearer: nil
+  one_to_many :pci_devices, read_only: true
+  one_to_many :boot_images, read_only: true
+  one_to_many :slices, class: :VmHostSlice, read_only: true
+  one_to_many :cpus, class: :VmHostCpu, read_only: true
+  many_to_one :location, read_only: true
+  one_to_many :gpu_partitions, read_only: true
 
   many_to_many :assigned_vm_addresses, join_table: :address, left_key: :routed_to_host_id, right_key: :id, right_primary_key: :address_id, read_only: true
 
-  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy, vhost_block_backends: :destroy
+  plugin :association_dependencies, assigned_host_addresses: :destroy, assigned_subnets: :destroy, provider: :destroy, spdk_installations: :destroy, storage_devices: :destroy, pci_devices: :destroy, boot_images: :destroy, slices: :destroy, cpus: :destroy, vhost_block_backends: :destroy, gpu_partitions: :destroy
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :checkup, :reboot, :hardware_reset, :destroy, :graceful_reboot, :configure_metrics
@@ -36,6 +36,10 @@ class VmHost < Sequel::Model
 
   def provider_name
     provider&.provider_name
+  end
+
+  def sshable_host
+    sshable.host
   end
 
   # Compute the IPv6 Subnet that can be used to address the host
@@ -77,6 +81,8 @@ class VmHost < Sequel::Model
   # Generate a random network that is a slice of the host's network
   # for delegation to a VM.
   def ip6_random_vm_network
+    return nil unless net6
+
     prefix = host_prefix + 15
     # We generate 2 bytes of entropy for the lower bits
     # and append them to the host's network. This way,
@@ -154,9 +160,9 @@ class VmHost < Sequel::Model
   APIPA_MASK = NetAddr::Mask32.new(32).freeze
 
   def veth_pair_random_ip4_addr
-    ips = vms_dataset.select_map(:local_vetho_ip)
+    ips_string = vms_dataset.select_map(:local_vetho_ip).map { it.network.to_s }
     ip = APIPA_RANGE.nth(2 * SecureRandom.random_number(APIPA_LEN))
-    ip = ip.next.next while ips.include?(ip.to_s)
+    ip = ip.next.next while ips_string.include?(ip.to_s)
     NetAddr::IPv4Net.new(ip, APIPA_MASK)
   end
 
@@ -198,7 +204,8 @@ class VmHost < Sequel::Model
           if Sshable.where(host: source_host_ip).count == 0
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip: is_failover_ip)
+
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:)
         end
 
         unless is_failover_ip
@@ -214,12 +221,12 @@ class VmHost < Sequel::Model
 
   # Introduced for refreshing rhizome programs via REPL.
   def install_rhizome(install_specs: false)
-    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs: install_specs}])
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: id, target_folder: "host", install_specs:}])
   end
 
   # Introduced for downloading a new boot image via REPL.
-  def download_boot_image(image_name, version:, custom_url: nil)
-    Strand.create(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name: image_name, custom_url: custom_url, version: version}])
+  def download_boot_image(image_name, version:, custom_url: nil, download_r2: true)
+    Strand.create(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name:, custom_url:, version:, download_r2:}])
   end
 
   # Introduced for downloading firmware via REPL.
@@ -227,7 +234,8 @@ class VmHost < Sequel::Model
     version, sha256 = (arch == "x64") ? [version_x64, sha256_x64] : [version_arm64, sha256_arm64]
     fail ArgumentError, "No version provided" if version.nil?
     fail ArgumentError, "No SHA-256 digest provided" if sha256.nil?
-    Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version: version, sha256: sha256}])
+
+    Strand.create(prog: "DownloadFirmware", label: "start", stack: [{subject_id: id, version:, sha256:}])
   end
 
   # Introduced for downloading cloud hypervisor via REPL.
@@ -240,7 +248,8 @@ class VmHost < Sequel::Model
       fail "BUG: unexpected architecture"
     end
     fail ArgumentError, "No version provided" if version.nil?
-    Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version: version, sha256_ch_bin: sha256_ch_bin, sha256_ch_remote: sha256_ch_remote}])
+
+    Strand.create(prog: "DownloadCloudHypervisor", label: "start", stack: [{subject_id: id, version:, sha256_ch_bin:, sha256_ch_remote:}])
   end
 
   def set_data_center
@@ -277,24 +286,25 @@ class VmHost < Sequel::Model
 
   def check_storage_smartctl(ssh_session, devices)
     devices.map do |device_name|
-      command = "sudo smartctl -j -H /dev/#{device_name}"
-      command << " -d scsi" if device_name.start_with?("sd")
-      command << " | jq .smart_status.passed"
-      passed = ssh_session.exec!(command).strip == "true"
-      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}") unless passed
+      command = ["sudo smartctl -j -H /dev/:device_name"]
+      command << "-d scsi" if device_name.start_with?("sd")
+      command << "| jq .smart_status.passed"
+      command = NetSsh.combine(*command)
+      passed = ssh_session.exec!(command, device_name:).strip == "true"
+      Clog.emit("Device #{device_name} failed smartctl check on VmHost #{ubid}", {}) unless passed
       passed
     end.all?(true)
   end
 
   def check_storage_nvme(ssh_session, devices)
     devices.reject { |device_name| !device_name.start_with?("nvme") }.map do |device_name|
-      passed = ssh_session.exec!("sudo nvme smart-log /dev/#{device_name} | grep \"critical_warning\" | awk '{print $3}'").strip == "0"
-      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}") unless passed
+      passed = ssh_session.exec!("sudo nvme smart-log /dev/:device_name | grep \"critical_warning\" | awk '{print $3}'", device_name:).strip == "0"
+      Clog.emit("Device #{device_name} failed nvme smart-log check on VmHost #{ubid}", {}) unless passed
       passed
     end.all?(true)
   end
 
-  def check_storage_read_write(ssh_session, devices)
+  def check_storage_read_write(ssh_session, devices, test_file_suffix:)
     lsblk_json_info = ssh_session.exec!("lsblk --json")
     devices_with_mount_points = devices.map { |device| SystemParser.get_device_mount_points_from_lsblk_json(lsblk_json_info, device) }
 
@@ -306,13 +316,14 @@ class VmHost < Sequel::Model
     end
 
     all_mount_points.uniq.all? do |mount_point|
-      file_name = Shellwords.escape(File.join(mount_point, "test-file"))
+      file_name = File.join(mount_point, "test-file-#{test_file_suffix}")
 
-      write_result = ssh_session.exec!("sudo bash -c \"head -c 1M </dev/zero > #{file_name}\"")
+      command = NetSsh.command("head -c 1M </dev/zero > :file_name", file_name:)
+      write_result = ssh_session.exec!("sudo bash -c :command", command:)
       write_status = write_result.exitstatus == 0
-      hash_result = ssh_session.exec!("sha256sum #{file_name}")
+      hash_result = ssh_session.exec!("sha256sum :file_name", file_name:)
       hash_status = hash_result.strip == "30e14955ebf1352266dc2ff8067e68104607e750abb9d3b36582b8af909fcb58  #{file_name}"
-      delete_result = ssh_session.exec!("sudo rm #{file_name}")
+      delete_result = ssh_session.exec!("sudo rm :file_name", file_name:)
       delete_status = delete_result.exitstatus == 0
 
       unless write_status && hash_status && delete_status
@@ -321,7 +332,7 @@ class VmHost < Sequel::Model
         failure_reasons << "Hash check failed (expected hash mismatch, output=#{hash_result.strip})" unless hash_status
         failure_reasons << "Delete failed (exitstatus=#{delete_result.exitstatus}, output=#{delete_result.strip})" unless delete_status
 
-        Clog.emit("Failed to perform write/read/delete on mountpoint #{mount_point} on VmHost #{ubid}: #{failure_reasons.join("; ")}")
+        Clog.emit("Failed to perform write/read/delete on mountpoint #{mount_point} on VmHost #{ubid}: #{failure_reasons.join("; ")}", {})
       end
 
       write_status && hash_status && delete_status
@@ -333,8 +344,28 @@ class VmHost < Sequel::Model
     return false unless kernel_logs.exitstatus == 0
 
     error_count = kernel_logs.scan(/Buffer I\/O error on dev (\w+)/).tally
-    Clog.emit("found error on kernel logs. devices with error_count: #{error_count} on VmHost #{ubid}") unless error_count.empty?
+    Clog.emit("found error on kernel logs. devices with error_count: #{error_count} on VmHost #{ubid}", {}) unless error_count.empty?
     error_count.empty?
+  end
+
+  def check_clock_source(ssh_session)
+    clock_source = ssh_session.exec!("cat /sys/devices/system/clocksource/clocksource0/available_clocksource").strip
+    clock_status = if arch == "arm64"
+      clock_source == "arch_sys_counter"
+    else
+      clock_source.start_with?("tsc")
+    end
+
+    Clog.emit("unexpected clock source", {unexpected_clock_source: {vm_host_ubid: ubid, clock_source:}}) unless clock_status
+    clock_status
+  end
+
+  def check_last_boot_id(ssh_session)
+    boot_id = ssh_session.exec!("cat /proc/sys/kernel/random/boot_id")
+    fail "Failed to exec on session: #{boot_id}" unless boot_id.exitstatus.zero?
+    if boot_id.strip != last_boot_id
+      Prog::PageNexus.assemble("Recorded last_boot_id of #{ubid} in database differs from the actual boot_id", ["LastBootIDDiscrepancy", ubid], ubid, severity: "info")
+    end
   end
 
   def init_health_monitor_session
@@ -359,24 +390,28 @@ class VmHost < Sequel::Model
   end
 
   def disk_device_names(ssh_session)
-    disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/#{id}").delete_prefix("/dev/").strip }
+    disk_device_ids.map { |id| ssh_session.exec!("readlink -f /dev/disk/by-id/:id", id:).delete_prefix("/dev/").strip }
   end
 
-  def perform_health_checks(ssh_session)
+  def perform_health_checks(ssh_session, test_file_suffix: "monitor")
     device_names = disk_device_names(ssh_session)
     check_storage_smartctl(ssh_session, device_names) &&
       check_storage_nvme(ssh_session, device_names) &&
-      check_storage_read_write(ssh_session, device_names) &&
-      check_storage_kernel_logs(ssh_session, device_names)
+      check_storage_read_write(ssh_session, device_names, test_file_suffix:) &&
+      check_storage_kernel_logs(ssh_session, device_names) &&
+      check_clock_source(ssh_session)
   end
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
       perform_health_checks(session[:ssh_session]) ? "up" : "down"
-    rescue
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("Exception in VmHost #{ubid}", Util.exception_to_hash(e))
       "down"
     end
-    pulse = aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    pulse = aggregate_readings(previous_pulse:, reading:)
 
     if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !reload.checkup_set?
       incr_checkup
@@ -446,9 +481,10 @@ end
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
 #  vm_host_net6_key | UNIQUE btree (net6)
 # Check constraints:
-#  core_allocation_limit      | (used_cores <= total_cores)
-#  hugepages_allocation_limit | (used_hugepages_1g <= total_hugepages_1g)
-#  used_cores_above_zero      | (used_cores >= 0)
+#  core_allocation_limit       | (used_cores <= total_cores)
+#  hugepages_allocation_limit  | (used_hugepages_1g <= total_hugepages_1g)
+#  used_cores_above_zero       | (used_cores >= 0)
+#  used_hugepages_non_negative | (used_hugepages_1g >= 0)
 # Foreign key constraints:
 #  vm_host_id_fkey          | (id) REFERENCES sshable(id)
 #  vm_host_location_id_fkey | (location_id) REFERENCES location(id)
@@ -456,6 +492,7 @@ end
 #  address               | address_routed_to_host_id_fkey      | (routed_to_host_id) REFERENCES vm_host(id)
 #  assigned_host_address | assigned_host_address_host_id_fkey  | (host_id) REFERENCES vm_host(id)
 #  boot_image            | boot_image_vm_host_id_fkey          | (vm_host_id) REFERENCES vm_host(id)
+#  gpu_partition         | gpu_partition_vm_host_id_fkey       | (vm_host_id) REFERENCES vm_host(id)
 #  host_provider         | host_provider_id_fkey               | (id) REFERENCES vm_host(id)
 #  pci_device            | pci_device_vm_host_id_fkey          | (vm_host_id) REFERENCES vm_host(id)
 #  spdk_installation     | spdk_installation_vm_host_id_fkey   | (vm_host_id) REFERENCES vm_host(id)

@@ -7,9 +7,10 @@ require "aws-sdk-s3"
 class GithubCacheEntry < Sequel::Model
   plugin :instance_filters
 
-  many_to_one :repository, key: :repository_id, class: :GithubRepository
+  many_to_one :repository, class: :GithubRepository, read_only: true
 
   plugin ResourceMethods
+  dataset_module Pagination
 
   dataset_module do
     # The same as Dataset#destroy, except that it adds the given condition

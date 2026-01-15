@@ -12,12 +12,9 @@ class Serializers::LoadBalancer < Serializers::Base
       health_check_endpoint: lb.health_check_endpoint,
       health_check_protocol: lb.health_check_protocol,
       src_port: lb.src_port,
-      dst_port: lb.dst_port
+      dst_port: lb.dst_port,
+      cert_enabled: lb.cert_enabled
     }
-
-    if options[:include_path]
-      base[:path] = lb.path
-    end
 
     if options[:detailed]
       base[:subnet] = lb.private_subnet.name

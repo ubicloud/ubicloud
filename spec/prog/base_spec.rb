@@ -6,17 +6,66 @@ RSpec.describe Prog::Base do
   it "does not allow failure of one child strand inside donate to affect other strands" do
     parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
     popper = Strand.create(parent_id: parent.id, prog: "Test", label: "popper")
-    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer")
+    failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer", schedule: Time.now + 5)
     Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
-
-    expect(parent).to receive(:children_dataset).twice.and_wrap_original do
-      # Force popper before failer
-      it.call.order(Sequel.case({"popper" => 1}, 2, :label))
-    end
 
     expect { parent.run(10) }.to raise_error(RuntimeError)
     expect(popper.this.get(:exitval)).to eq("msg" => "popped")
     expect(failer.this.get(:exitval)).to be_nil
+  end
+
+  it "reap works if child strand has child strand that needs to be reaped" do
+    parent = Strand.create(prog: "Test", label: "reap_exit_no_children")
+    child = Strand.create(parent_id: parent.id, prog: "Test", label: "popper", exitval: {"msg" => "child exit"})
+    grandchild = Strand.create(parent_id: child.id, prog: "Test", label: "failer", exitval: {"msg" => "grandchild exit"})
+    parent.run
+    expect(parent.exists?).to be false
+    expect(child.exists?).to be false
+    expect(grandchild.exists?).to be false
+  end
+
+  it "parent reap naps for 0.1 seconds less than child if single child naps" do
+    parent = Strand.create(prog: "Test", label: "bud_short_napper")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 11.9
+  end
+
+  it "parent reap naps for at most 120 seconds if single child naps more than 120 seconds" do
+    parent = Strand.create(prog: "Test", label: "bud_napper")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 120
+  end
+
+  it "parent reap naps until 0.1 less than earliest scheduled child if multiple children, and at least 0.1 seconds and at most 120 seconds" do
+    parent = Strand.create(prog: "Test", label: "bud_short_nappers")
+    hop = parent.unsynchronized_run
+    expect(hop).to be_a Prog::Base::Hop
+    expect(hop.new_label).to eq "reaper"
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 0.1
+
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 11.9
+
+    child1, child2 = parent.children
+    child1.this.update(label: "napper", schedule: Sequel::CURRENT_TIMESTAMP + Sequel.cast("123 seconds", :interval))
+    child2.this.update(lease: Sequel::CURRENT_TIMESTAMP + Sequel.cast("1 second", :interval))
+    nap = parent.unsynchronized_run
+    expect(nap).to be_a Prog::Base::Nap
+    expect(nap.seconds).to eq 120
   end
 
   it "can bud and reap" do
@@ -139,9 +188,23 @@ RSpec.describe Prog::Base do
     }.to change { Semaphore.where(strand_id: st.id).any? }.from(true).to(false)
   end
 
+  describe Prog::Base, :current_prog do
+    it "returns nil if Progs are not in the call stack" do
+      expect(described_class.current_prog).to be_nil
+    end
+
+    it "can have its label located deeper in the call stack by Prog.current_prog" do
+      st = Strand.create(prog: "Test", label: "callee_find_current_prog")
+      expect(described_class).to receive(:current_prog).and_wrap_original do |om, *args, **kwargs, &blk|
+        om.call(*args, **kwargs, &blk).tap { expect(it).to eq("Prog::Test#callee_find_current_prog") }
+      end
+      st.run
+    end
+  end
+
   it "calls before_run if it is available" do
-    st = Strand.create(prog: "Prog::Vm::Nexus", label: "wait")
-    prg = instance_double(Prog::Vm::Nexus)
+    st = Strand.create(prog: "Prog::Vm::Aws::Nexus", label: "wait")
+    prg = instance_double(Prog::Vm::Aws::Nexus)
     expect(st).to receive(:load).and_return(prg)
     expect(prg).to receive(:before_run)
     expect(prg).to receive(:wait).and_raise(Prog::Base::Nap.new(30))
@@ -318,7 +381,7 @@ RSpec.describe Prog::Base do
 
     it "can create a page with extra data from a vm" do
       vm = create_vm
-      st = Strand.create_with_id(vm.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -328,7 +391,7 @@ RSpec.describe Prog::Base do
 
     it "can create a page with extra data from a vm with a vm host" do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
-      st = Strand.create_with_id(vm.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -339,7 +402,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a vm host" do
       vmh = create_vm_host(data_center: "FSN1-DC1")
       create_vm(vm_host: vmh)
-      st = Strand.create_with_id(vmh.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(vmh, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -350,7 +413,7 @@ RSpec.describe Prog::Base do
     it "can create a page with extra data from a github runner" do
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", installation:)
-      st = Strand.create_with_id(runner.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
@@ -362,12 +425,54 @@ RSpec.describe Prog::Base do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
-      st = Strand.create_with_id(runner.id, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.active.first
       expect(page).not_to be_nil
       expect(page.details["vm"]).to eq(vm.ubid)
       expect(page.details["data_center"]).to eq(vm.vm_host.data_center)
+    end
+  end
+
+  describe "#before_run" do
+    let(:st) { Strand.create(prog: "Test", label: "napper") }
+
+    it "hops to destroy if destroy semaphore incremented" do
+      Semaphore.incr(st.id, :destroy)
+
+      expect { st.unsynchronized_run }
+        .to change(st, :label).from("napper").to("destroy")
+      expect { st.unsynchronized_run }
+        .to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+    end
+
+    it "hops to destroy if destroy semaphore incremented and run before_destroy" do
+      st.update(prog: "Test2", label: "pusher1")
+      Semaphore.incr(st.id, :destroy)
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("before destroy called")
+      expect { st.unsynchronized_run }.to change(st, :label).from("pusher1").to("destroy")
+      expect { st.unsynchronized_run }.to change(st, :exitval).from(nil).to({"msg" => "destroyed"})
+    end
+
+    it "does not hop to destroy if destroy semaphore not incremented" do
+      expect(Semaphore.where(strand_id: st.id).empty?).to be(true)
+      expect { st.unsynchronized_run }
+        .not_to change(st, :label)
+    end
+
+    it "does not hop to destroy if destroy semaphore incremented" do
+      Semaphore.incr(st.id, :destroy)
+      Semaphore.incr(st.id, :destroying)
+      expect { st.unsynchronized_run }
+        .not_to change(st, :label)
+    end
+
+    it "fails if destroying semaphore not set on destroy label" do
+      st.update(label: "destroy")
+      expect {
+        st.unsynchronized_run
+      }.to raise_error(RuntimeError, "BUG: destroying semaphore not set on destroy label")
     end
   end
 end

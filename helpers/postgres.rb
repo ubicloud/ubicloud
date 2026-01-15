@@ -2,22 +2,26 @@
 
 class Clover
   def postgres_post(name)
-    authorize("Postgres:create", @project.id)
+    authorize("Postgres:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
-    flavor = typecast_params.nonempty_str("flavor", PostgresResource::Flavor::STANDARD)
+    flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
     size = typecast_params.nonempty_str!("size")
     storage_size = typecast_params.pos_int("storage_size")
-    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource::HaType::NONE)
-    version = typecast_params.nonempty_str("version", PostgresResource::DEFAULT_VERSION)
+    ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
+    version = typecast_params.nonempty_str("version", PostgresResource.default_version)
+    user_config = typecast_params.Hash("pg_config", {})
+    pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
     tags = typecast_params.array(:Hash, "tags", [])
+    with_firewall_rules = !typecast_params.bool("restrict_by_default")
+    private_subnet_name = typecast_params.nonempty_str("private_subnet_name") if api?
 
     postgres_params = {
       "flavor" => flavor,
       "location" => @location,
       "family" => Option::POSTGRES_SIZE_OPTIONS[size]&.family,
       "size" => size,
-      "storage_size" => storage_size.to_s,
+      "storage_size" => storage_size,
       "ha_type" => ha_type,
       "version" => version
     }
@@ -29,6 +33,8 @@ class Clover
     requested_postgres_vcpu_count = (requested_standby_count + 1) * parsed_size.vcpu_count
     Validation.validate_vcpu_quota(@project, "PostgresVCpu", requested_postgres_vcpu_count)
 
+    validate_postgres_config(version, user_config, pgbouncer_user_config)
+
     pg = nil
     DB.transaction do
       pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -37,11 +43,15 @@ class Clover
         name:,
         target_vm_size: parsed_size.name,
         target_storage_size_gib: storage_size,
+        target_version: version,
         ha_type:,
-        version:,
-        flavor:
+        with_firewall_rules:,
+        flavor:,
+        private_subnet_name:,
+        user_config:,
+        pgbouncer_user_config:,
+        tags:
       ).subject
-      pg.update(tags:)
       audit_log(pg, "create")
     end
     send_notification_mail_to_partners(pg, current_account.email)
@@ -50,28 +60,38 @@ class Clover
       Serializers::Postgres.serialize(pg, {detailed: true})
     else
       flash["notice"] = "'#{name}' will be ready in a few minutes"
-      request.redirect "#{@project.path}#{pg.path}/overview"
+      request.redirect pg, "/overview"
     end
   end
 
-  def postgres_list
-    dataset = dataset_authorize(@project.postgres_resources_dataset.eager, "Postgres:view").eager(:semaphores, :location, strand: :children)
+  def postgres_list(tags_param: nil)
+    dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:timeline, representative_server: [:strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
+
+    if tags_param
+      tags_param = tags_param.split(",")
+      tags_param = tags_param.map! { |tag| tag.split(":", 2).map(&:strip) }
+      tags_param = tags_param.map! { |key, value| {key:, value:} }
+      tags_param.each do |tag|
+        unless tag[:value]
+          fail Validation::ValidationFailed.new({tags: "Invalid tag format. Expected format: key:value"})
+        end
+      end
+      dataset = dataset.where(Sequel.pg_jsonb_op(:tags).contains(tags_param))
+    end
+
     if api?
       dataset = dataset.where(location_id: @location.id) if @location
       paginated_result(dataset, Serializers::Postgres)
     else
-      dataset = dataset.eager(:representative_server, :timeline)
-      resources = dataset.all
+      @postgres_databases = dataset.all
         .group_by { |r| r.read_replica? ? r[:parent_id] : r[:id] }
         .flat_map { |group_id, rs| rs.sort_by { |r| r[:created_at] } }
-
-      @postgres_databases = Serializers::Postgres.serialize(resources, {include_path: true})
       view "postgres/index"
     end
   end
 
   def send_notification_mail_to_partners(resource, user_email)
-    if [PostgresResource::Flavor::PARADEDB, PostgresResource::Flavor::LANTERN].include?(resource.flavor) && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
+    if resource.requires_partner_notification_email? && (email = Config.send(:"postgres_#{resource.flavor}_notification_email"))
       flavor_name = resource.flavor.capitalize
       Util.send_email(email, "New #{flavor_name} Postgres database has been created.",
         greeting: "Hello #{flavor_name} team,",
@@ -94,12 +114,12 @@ class Clover
     options.add_option(name: "flavor", values: flavor || postgres_flavors.keys)
 
     options.add_option(name: "location", values: location || postgres_locations, parent: "flavor") do |flavor, location|
-      flavor == PostgresResource::Flavor::STANDARD || location.provider != "aws"
+      flavor == PostgresResource.default_flavor || location.provider != "aws"
     end
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       if location.aws?
-        family == "m6id" || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
+        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && @project.send(:"get_ff_enable_#{family}"))
       else
         family == "standard" || family == "burstable"
       end
@@ -109,20 +129,22 @@ class Clover
       Option::POSTGRES_SIZE_OPTIONS[size].family == family
     end
 
-    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flatten.uniq
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.aws?
-        Option::AWS_STORAGE_SIZE_OPTIONS[vcpu_count].include?(storage_size)
+        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "burstable"
-        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size.to_i)
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
       end
     end
 
-    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS)
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
+      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    end
 
     options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
 
@@ -130,11 +152,33 @@ class Clover
   end
 
   def postgres_flavors
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k, _| k == PostgresResource::Flavor::LANTERN && !@project.get_ff_postgres_lantern }
+    PostgresResource.available_flavors(include_lantern: @project.get_ff_postgres_lantern)
+  end
+
+  def postgres_require_customer_firewall!
+    unless (fw = @pg.customer_firewall)
+      raise CloverError.new(400, "InvalidRequest", "PostgreSQL firewall was deleted, manage firewall rules using an appropriate firewall on the #{@pg.private_subnet.name} private subnet (id: #{@pg.private_subnet.ubid})")
+    end
+
+    fw
   end
 
   def postgres_locations
-    Location.where(name: ["hetzner-fsn1", "leaseweb-wdc02"]).all + @project.locations
+    Location.postgres_locations + @project.locations
+  end
+
+  def validate_postgres_config(version, user_config, pgbouncer_user_config)
+    pg_validator = Validation::PostgresConfigValidator.new(version)
+    pg_errors = pg_validator.validation_errors(user_config)
+
+    pgbouncer_validator = Validation::PostgresConfigValidator.new("pgbouncer")
+    pgbouncer_errors = pgbouncer_validator.validation_errors(pgbouncer_user_config)
+
+    if pg_errors.any? || pgbouncer_errors.any?
+      pg_errors = pg_errors.transform_keys { |key| "pg_config.#{key}" }
+      pgbouncer_errors = pgbouncer_errors.transform_keys { |key| "pgbouncer_config.#{key}" }
+      raise Validation::ValidationFailed.new(pg_errors.merge(pgbouncer_errors))
+    end
   end
 
   def validate_postgres_input(name, postgres_params)
@@ -146,7 +190,10 @@ class Clover
       Validation.validate_from_option_tree(option_tree, option_parents, postgres_params)
     rescue Validation::ValidationFailed => e
       fail Validation::ValidationFailed.new({size: "Invalid size."}) if e.details.key?(:family)
+
       raise e
     end
+
+    Validation.validate_postgres_version(postgres_params["version"], postgres_params["flavor"])
   end
 end

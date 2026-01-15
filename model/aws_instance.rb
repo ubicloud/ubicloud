@@ -3,8 +3,7 @@
 require_relative "../model"
 
 class AwsInstance < Sequel::Model
-  one_to_one :vm, key: :id
-
+  many_to_one :vm, key: :id, read_only: true, is_used: true
   plugin ResourceMethods, etc_type: true
 end
 
@@ -14,5 +13,6 @@ end
 #  instance_id   | text |
 #  az_id         | text |
 #  ipv4_dns_name | text |
+#  iam_role      | text |
 # Indexes:
 #  aws_instance_pkey | PRIMARY KEY btree (id)

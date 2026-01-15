@@ -8,6 +8,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
   subject_is :victoria_metrics_server
 
   extend Forwardable
+
   def_delegators :victoria_metrics_server, :vm, :resource
 
   def self.assemble(victoria_metrics_resource_id)
@@ -39,7 +40,12 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      label = strand.label
+      if label == "restart" && strand.parent_id
+        # child strand budded from parent strand unvailable, exit to
+        # avoid two strands in #destroy
+        pop "exiting early due to destroy semaphore"
+      elsif !%w[destroy wait_children_destroyed].include?(label)
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the VictoriaMetrics server"
@@ -54,7 +60,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     register_deadline("wait", 10 * 60)
 
     cert, cert_key = create_certificate
-    victoria_metrics_server.update(cert: cert, cert_key: cert_key)
+    victoria_metrics_server.update(cert:, cert_key:)
 
     hop_bootstrap_rhizome
   end
@@ -96,15 +102,15 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     when "Succeeded"
       vm.sshable.cmd("sudo mkdir -p /dat/victoria_metrics")
       volume = vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).first
-      device_path = volume.device_path.shellescape
-      vm.sshable.cmd("sudo common/bin/add_to_fstab #{device_path} /dat/victoria_metrics ext4 defaults 0 0")
-      vm.sshable.cmd("sudo mount #{device_path} /dat/victoria_metrics")
+      device_path = volume.device_path
+      vm.sshable.cmd("sudo common/bin/add_to_fstab :device_path /dat/victoria_metrics ext4 defaults 0 0", device_path:)
+      vm.sshable.cmd("sudo mount :device_path /dat/victoria_metrics", device_path:)
       vm.sshable.cmd("sudo chown -R victoria_metrics:victoria_metrics /dat/victoria_metrics")
 
       hop_configure
     when "Failed", "NotStarted"
       volume = vm.vm_storage_volumes_dataset.order_by(:disk_index).where(Sequel[:vm_storage_volume][:boot] => false).first
-      device_path = volume.device_path.shellescape
+      device_path = volume.device_path
       cmd = ["mkfs.ext4", device_path]
       vm.sshable.d_run("format_victoria_metrics_disk", *cmd)
     end
@@ -191,11 +197,17 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
     register_deadline(nil, 10 * 60)
     decr_destroy
 
-    strand.children.each(&:destroy)
-    vm.incr_destroy
-    victoria_metrics_server.destroy
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+    hop_wait_children_destroyed
+  end
 
-    pop "victoria_metrics server destroyed"
+  label def wait_children_destroyed
+    reap(nap: 5) do
+      vm.incr_destroy
+      victoria_metrics_server.destroy
+
+      pop "victoria_metrics server destroyed"
+    end
   end
 
   def available?
@@ -203,7 +215,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
 
     victoria_metrics_server.client.health
   rescue => ex
-    Clog.emit("victoria_metrics server is down") { {victoria_metrics_server_down: {ubid: victoria_metrics_server.ubid, exception: Util.exception_to_hash(ex)}} }
+    Clog.emit("victoria_metrics server is down", {victoria_metrics_server_down: Util.exception_to_hash(ex, into: {ubid: victoria_metrics_server.ubid})})
     false
   end
 
@@ -215,7 +227,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       root_cert_key = OpenSSL::PKey::EC.new(resource.root_cert_key_2)
     end
 
-    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{vm.ephemeral_net4},IP:#{vm.ip6}" : nil
+    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{vm.ip4},IP:#{vm.ip6}" : nil
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{resource.ubid} Server Certificate",

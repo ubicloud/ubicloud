@@ -1,0 +1,3 @@
+! Unexpected response status: 400
+Details: Validation failed for following fields: pgbouncer_config.key
+  pgbouncer_config.key: Unknown configuration parameter

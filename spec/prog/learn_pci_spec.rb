@@ -10,7 +10,7 @@ RSpec.describe Prog::LearnPci do
     it "exits, saving model instances" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       lp = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(lp.sshable).to receive(:cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
 Slot:	01:00.0
 Class:	0300
 Vendor:	10de
@@ -46,7 +46,7 @@ EOS
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       lp = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
       PciDevice.create(vm_host_id: vmh.id, slot: "01:00.0", device_class: "dc", vendor: "vd", device: "dv", numa_node: 0, iommu_group: 3)
-      expect(lp.sshable).to receive(:cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
 Slot:	01:00.0
 Class:	0300
 Vendor:	10de
@@ -80,7 +80,7 @@ EOS
     it "ignores devices without iommu group" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       lp = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(lp.sshable).to receive(:cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
 Slot:	01:00.0
 Class:	0300
 Vendor:	10de
@@ -95,7 +95,7 @@ EOS
     it "can raise a data parse error" do
       vmh = Prog::Vm::HostNexus.assemble("::1").subject
       lp = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
-      expect(lp.sshable).to receive(:cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
+      expect(lp.sshable).to receive(:_cmd).with("/usr/bin/lspci -vnmm -d 10de::").and_return(<<EOS)
 Slot:	01:00.0
 Class:	0300
 Device:	27b0

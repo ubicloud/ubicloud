@@ -175,7 +175,7 @@ RSpec.describe Clover, "inference-endpoint" do
         project_id: project.id,
         resource_id: ie.id,
         resource_name: ie.name,
-        span: Sequel::Postgres::PGRange.new(Time.now, nil),
+        span: Sequel::Postgres::PGRange.new(Sequel::CURRENT_TIMESTAMP, nil),
         billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
         amount: 100000
       )
@@ -186,7 +186,7 @@ RSpec.describe Clover, "inference-endpoint" do
         project_id: project.id,
         resource_id: ie.id,
         resource_name: ie.name,
-        span: Sequel::Postgres::PGRange.new(Time.now, nil),
+        span: Sequel::Postgres::PGRange.new(Sequel::CURRENT_TIMESTAMP, nil),
         billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
         amount: 99999999
       )

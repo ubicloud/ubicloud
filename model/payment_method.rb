@@ -4,9 +4,13 @@ require_relative "../model"
 require "stripe"
 
 class PaymentMethod < Sequel::Model
-  many_to_one :billing_info
+  many_to_one :billing_info, read_only: true
 
   plugin ResourceMethods
+
+  def self.fraud?(card_fingerprint)
+    !where(fraud: true, card_fingerprint:).empty?
+  end
 
   def stripe_data
     if (Stripe.api_key = Config.stripe_secret_key)
@@ -19,6 +23,10 @@ class PaymentMethod < Sequel::Model
       Stripe::PaymentMethod.detach(stripe_id)
     end
     super
+  end
+
+  def path
+    "/billing/payment-method/#{ubid}"
   end
 end
 

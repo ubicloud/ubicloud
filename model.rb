@@ -12,7 +12,14 @@ Sequel::Model.plugin :require_valid_schema
 Sequel::Model.plugin :singular_table_names
 Sequel::Model.plugin :subclasses unless ENV["RACK_ENV"] == "development"
 Sequel::Model.plugin :column_encryption do |enc|
-  enc.key 0, Config.clover_column_encryption_key
+  key = Config.clover_column_encryption_key
+  if Config.kms_decrypt_clover_column_encryption_key_with_arn
+    require "aws-sdk-kms"
+    kms_client = Aws::KMS::Client.new
+    response = kms_client.decrypt(ciphertext_blob: key, key_id: Config.kms_decrypt_clover_column_encryption_key_with_arn)
+    key = response.plaintext
+  end
+  enc.key 0, key
 end
 Sequel::Model.plugin :many_through_many
 Sequel::Model.plugin :insert_conflict
@@ -22,6 +29,14 @@ Sequel::Model.plugin :pg_auto_constraint_validations, cache_file: "cache/pg_auto
 Sequel::Model.plugin :pg_auto_validate_enums, message: proc { |valid_values| "is not one of the supported values (#{valid_values.sort.join(", ")})" }
 Sequel::Model.plugin :pg_eager_any_typed_array
 Sequel::Model.plugin :association_lazy_eager_option
+Sequel::Model.plugin :forbid_lazy_load if Config.unfrozen_test?
+Sequel::Model.plugin :detect_unnecessary_association_options, action: :raise if Config.unfrozen_test? && ENV["FORCE_AUTOLOAD"] == "1"
+
+if ENV["UNUSED_ASSOCIATIONS"]
+  Sequel::Model.plugin :unused_associations,
+    file: "unused-associations.json",
+    coverage_file: "unused-associations-coverage.json"
+end
 
 if (level = Config.database_logger_level) || Config.test?
   require "logger"

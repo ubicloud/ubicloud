@@ -4,9 +4,10 @@ require_relative "../model"
 
 class Location < Sequel::Model
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
   dataset_module Pagination
 
-  one_to_one :location_credential, key: :id
+  one_to_one :location_credential, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
 
@@ -27,13 +28,19 @@ class Location < Sequel::Model
       where(Sequel[project_id:] | {project_id: nil})
     end
 
-    def visible_or_for_project(project_id)
-      where(Sequel[project_id:] | {project_id: nil, visible: true})
+    def visible_or_for_project(project_id, project_ff_visible_locations)
+      where(Sequel.|([project_id:], {project_id: nil, visible: true}, name: project_ff_visible_locations || []))
     end
   end
 
-  def visible_or_for_project?(proj_id)
-    (visible && project_id.nil?) || project_id == proj_id
+  def self.postgres_locations
+    where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
+      .or(provider: "aws", project_id: nil)
+      .all
+  end
+
+  def visible_or_for_project?(proj_id, project_ff_visible_locations)
+    (visible && project_id.nil?) || project_id == proj_id || project_ff_visible_locations&.include?(name)
   end
 
   def path
@@ -48,10 +55,6 @@ class Location < Sequel::Model
   def aws?
     provider == "aws"
   end
-
-  def pg_ami(pg_version, arch)
-    PgAwsAmi.find(aws_location_name: name, pg_version:, arch:).aws_ami_id
-  end
 end
 
 # Table: location
@@ -63,6 +66,8 @@ end
 #  visible      | boolean | NOT NULL
 #  provider     | text    | NOT NULL
 #  project_id   | uuid    |
+#  dns_suffix   | text    |
+#  byoc         | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  location_pkey                         | PRIMARY KEY btree (id)
 #  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)
@@ -75,6 +80,7 @@ end
 #  inference_endpoint        | inference_endpoint_location_id_fkey        | (location_id) REFERENCES location(id)
 #  inference_router          | inference_router_location_id_fkey          | (location_id) REFERENCES location(id)
 #  kubernetes_cluster        | kubernetes_cluster_location_id_fkey        | (location_id) REFERENCES location(id)
+#  location_aws_az           | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)

@@ -4,7 +4,7 @@ require_relative "../model"
 require_relative "../lib/system_parser"
 
 class StorageDevice < Sequel::Model
-  many_to_one :vm_host
+  many_to_one :vm_host, read_only: true
 
   plugin ResourceMethods, etc_type: true
 
@@ -23,9 +23,9 @@ class StorageDevice < Sequel::Model
   # All of our disks are either SSD or NVMe, so the assumptions that we can rely on these two prefixes is reliable
   def self.convert_device_name_to_device_id(sshable, device_name)
     if device_name.start_with?("sd")
-      sshable.cmd("ls -l /dev/disk/by-id/ | grep '#{device_name}$' | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'").strip
+      sshable.cmd("ls -l /dev/disk/by-id/ | grep :device_name | grep 'wwn-' | sed -E 's/.*(wwn[^ ]*).*/\\1/'", device_name: "#{device_name}$").strip
     elsif device_name.start_with?("nvme")
-      sshable.cmd("ls -l /dev/disk/by-id/ | grep '#{device_name}$' | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'").strip
+      sshable.cmd("ls -l /dev/disk/by-id/ | grep :device_name | grep 'nvme-eui' | sed -E 's/.*(nvme-eui[^ ]*).*/\\1/'", device_name: "#{device_name}$").strip
     else
       device_name
     end

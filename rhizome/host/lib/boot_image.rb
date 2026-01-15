@@ -26,7 +26,7 @@ class BootImage
     "/var/storage/images"
   end
 
-  def download(url:, ca_path: nil, sha256sum: nil)
+  def download(url:, ca_path: nil, sha256sum: nil, use_htcat: false)
     return if File.exist?(image_path)
 
     FileUtils.mkdir_p image_root
@@ -42,7 +42,11 @@ class BootImage
     temp_file_name = @version.nil? ? @name : "#{@name}-#{@version}"
     temp_path = File.join(image_root, "#{temp_file_name}#{ext}.tmp")
     begin
-      file_sha256sum = curl_image(url, temp_path, ca_path)
+      file_sha256sum = if use_htcat
+        htcat_image(url, temp_path)
+      else
+        curl_image(url, temp_path, ca_path)
+      end
       verify_sha256sum(file_sha256sum, sha256sum)
       convert_image(temp_path, init_format)
     ensure
@@ -72,6 +76,15 @@ class BootImage
     sha256_sum = nil
     File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
       digest_out = r "bash -c 'curl -f -L10 #{url.shellescape}#{ca_arg} | tee >(openssl dgst -sha256) > #{temp_path.shellescape}'"
+      sha256_sum = digest_out.split(" ").last
+    end
+    sha256_sum
+  end
+
+  def htcat_image(url, temp_path)
+    sha256_sum = nil
+    File.open(temp_path, File::RDWR | File::CREAT | File::EXCL, 0o644) do
+      digest_out = r "bash -c 'htcat -parallelism=12 -max-fragment-size=32 #{url.shellescape} | tee >(openssl dgst -sha256) > #{temp_path.shellescape}'"
       sha256_sum = digest_out.split(" ").last
     end
     sha256_sum

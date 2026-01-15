@@ -1,4 +1,4 @@
 nic 1:
-  private_ipv4: 10.67.141.133
-  private_ipv6: fda0:d79a:93e7:d4fd:1c2::2
-  vm_name: test-vm
+  private-ipv4: 10.67.141.133
+  private-ipv6: fda0:d79a:93e7:d4fd:1c2::2
+  vm-name: test-vm

@@ -3,5 +3,5 @@ name: test-vm
 state: creating
 location: eu-central-h1
 size: standard-2
-unix_user: ubi
-storage_size_gib: 0
+unix-user: ubi
+storage-size-gib: 0

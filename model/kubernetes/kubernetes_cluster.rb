@@ -1,22 +1,25 @@
 #  frozen_string_literal: true
 
 require_relative "../../model"
+require_relative "../../lib/net_ssh"
 
 class KubernetesCluster < Sequel::Model
   one_to_one :strand, key: :id
-  many_to_one :api_server_lb, class: :LoadBalancer
+  many_to_one :api_server_lb, class: :LoadBalancer, read_only: true
   many_to_one :services_lb, class: :LoadBalancer
-  many_to_one :private_subnet
-  many_to_one :project
-  many_to_many :cp_vms, join_table: :kubernetes_clusters_cp_vms, class: :Vm, order: :created_at
-  one_to_many :nodepools, class: :KubernetesNodepool
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, &:active
-  many_to_one :location, key: :location_id
+  many_to_one :private_subnet, read_only: true
+  many_to_one :project, read_only: true
+  many_to_many :cp_vms, join_table: :kubernetes_node, right_key: :vm_id, class: :Vm, order: :created_at, conditions: {kubernetes_nodepool_id: nil}, read_only: true
+  one_to_many :nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil}, read_only: true
+  one_to_many :functional_nodes, class: :KubernetesNode, order: :created_at, conditions: {kubernetes_nodepool_id: nil, state: "active"}, read_only: true
+  one_to_many :nodepools, class: :KubernetesNodepool, read_only: true
+  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  many_to_one :location, read_only: true
 
   dataset_module Pagination
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh
+  plugin SemaphoreMethods, :destroy, :sync_kubernetes_services, :upgrade, :install_metrics_server, :sync_worker_mesh, :install_csi, :update_billing_records, :sync_internal_dns_config
   include HealthMonitorMethods
 
   def validate
@@ -27,8 +30,9 @@ class KubernetesCluster < Sequel::Model
 
   def display_state
     label = strand.label
-    return "deleting" if destroy_set? || label == "destroy"
+    return "deleting" if destroying_set? || destroy_set?
     return "running" if label == "wait"
+
     "creating"
   end
 
@@ -44,12 +48,12 @@ class KubernetesCluster < Sequel::Model
     api_server_lb.hostname
   end
 
-  def client(session: cp_vms.first.sshable.connect)
+  def client(session: sshable.connect)
     Kubernetes::Client.new(self, session)
   end
 
   def sshable
-    cp_vms.first.sshable
+    functional_nodes.first.sshable
   end
 
   def services_load_balancer_name
@@ -74,6 +78,14 @@ class KubernetesCluster < Sequel::Model
 
   def kubeconfig
     self.class.kubeconfig(cp_vms.first)
+  end
+
+  def internal_cp_vm_firewall
+    Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-cp-vm-firewall")
+  end
+
+  def internal_worker_vm_firewall
+    Firewall.first(project_id: Config.kubernetes_service_project_id, name: "#{ubid}-worker-vm-firewall")
   end
 
   def vm_diff_for_lb(load_balancer)
@@ -108,15 +120,29 @@ class KubernetesCluster < Sequel::Model
     rescue
       "down"
     end
-    aggregate_readings(previous_pulse: previous_pulse, reading: reading)
+    aggregate_readings(previous_pulse:, reading:)
   end
 
-  def all_vms
-    cp_vms + nodepools.flat_map(&:vms)
+  def install_rhizome
+    cp_vms.each do |vm|
+      Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+    end
+  end
+
+  def all_nodes
+    nodes + nodepools.flat_map(&:nodes)
+  end
+
+  def all_functional_nodes
+    functional_nodes + nodepools.flat_map(&:functional_nodes)
   end
 
   def worker_vms
     nodepools.flat_map(&:vms)
+  end
+
+  def worker_functional_nodes
+    nodepools.flat_map(&:functional_nodes)
   end
 end
 
@@ -144,5 +170,5 @@ end
 #  kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  kubernetes_cluster_services_lb_id_fkey    | (services_lb_id) REFERENCES load_balancer(id)
 # Referenced By:
-#  kubernetes_clusters_cp_vms | kubernetes_clusters_cp_vms_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
-#  kubernetes_nodepool        | kubernetes_nodepool_kubernetes_cluster_id_fkey        | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_node     | kubernetes_node_kubernetes_cluster_id_fkey     | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)
+#  kubernetes_nodepool | kubernetes_nodepool_kubernetes_cluster_id_fkey | (kubernetes_cluster_id) REFERENCES kubernetes_cluster(id)

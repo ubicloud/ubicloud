@@ -3,10 +3,14 @@
 require_relative "../../model"
 
 class InferenceRouterModel < Sequel::Model
-  one_to_many :inference_router_targets
-  one_through_one :inference_router, join_table: :inference_router_target
+  one_to_many :inference_router_targets, read_only: true
+  one_through_one :inference_router, join_table: :inference_router_target, read_only: true
 
   plugin ResourceMethods
+
+  def load_balancer
+    inference_router.load_balancer
+  end
 
   def self.from_model_name(name)
     first(model_name: name)
@@ -17,7 +21,6 @@ end
 # Columns:
 #  id                           | uuid                     | PRIMARY KEY
 #  created_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  updated_at                   | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  model_name                   | text                     | NOT NULL
 #  tags                         | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  visible                      | boolean                  | NOT NULL DEFAULT false

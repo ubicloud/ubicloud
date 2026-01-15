@@ -8,6 +8,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   subject_is :minio_server
 
   extend Forwardable
+
   def_delegators :minio_server, :vm
 
   def self.assemble(minio_pool_id, index)
@@ -41,7 +42,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      if strand.label != "destroy"
+      if !destroying_set?
         hop_destroy
       elsif strand.stack.count > 1
         pop "operation is cancelled due to the destruction of the minio server"
@@ -59,9 +60,9 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
     register_deadline("wait", 10 * 60)
 
-    minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ephemeral_net4.to_s)
+    minio_server.cluster.dns_zone&.insert_record(record_name: cluster.hostname, type: "A", ttl: 10, data: vm.ip4_string)
     cert, cert_key = create_certificate
-    minio_server.update(cert: cert, cert_key: cert_key)
+    minio_server.update(cert:, cert_key:)
 
     hop_bootstrap_rhizome
   end
@@ -130,7 +131,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   label def refresh_certificates
     cert, cert_key = create_certificate
-    minio_server.update(cert: cert, cert_key: cert_key, certificate_last_checked_at: Time.now)
+    minio_server.update(cert:, cert_key:, certificate_last_checked_at: Time.now)
 
     incr_reconfigure
     hop_wait
@@ -170,7 +171,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
   label def destroy
     register_deadline(nil, 10 * 60)
     decr_destroy
-    minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ephemeral_net4&.to_s)
+    minio_server.cluster.dns_zone&.delete_record(record_name: cluster.hostname, type: "A", data: vm.ip4_string)
     minio_server.vm.sshable.destroy
     minio_server.vm.nics.each { it.incr_destroy }
     minio_server.vm.incr_destroy
@@ -181,10 +182,11 @@ class Prog::Minio::MinioServerNexus < Prog::Base
 
   def available?
     return true if minio_server.initial_provisioning_set?
-    server_data = JSON.parse(minio_server.client.admin_info.body)["servers"].find { it["endpoint"] == minio_server.endpoint }
+
+    server_data = minio_server.server_data
     server_data["state"] == "online" && server_data["drives"].all? { it["state"] == "ok" }
   rescue => ex
-    Clog.emit("Minio server is down") { {minio_server_down: {ubid: minio_server.ubid, exception: Util.exception_to_hash(ex)}} }
+    Clog.emit("Minio server is down", {minio_server_down: Util.exception_to_hash(ex, into: {ubid: minio_server.ubid})})
     false
   end
 
@@ -196,7 +198,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       root_cert_key = OpenSSL::PKey::EC.new(minio_server.cluster.root_cert_key_2)
     end
 
-    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{minio_server.vm.ephemeral_net4}" : nil
+    ip_san = (Config.development? || Config.is_e2e) ? ",IP:#{minio_server.vm.ip4}" : nil
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{minio_server.cluster.ubid} Server Certificate",

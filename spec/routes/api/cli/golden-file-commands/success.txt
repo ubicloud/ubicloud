@@ -3,6 +3,8 @@
 --confirm test-pg pg eu-central-h1/test-pg destroy
 --confirm test-ps-default fw eu-central-h1/test-ps-default destroy
 --confirm test-ps ps eu-central-h1/test-ps destroy
+--confirm spk sk sk684jk5sa027g4mmr3rrwmakr destroy
+--confirm spk sk spk destroy
 --confirm test-vm vm eu-central-h1/test-vm destroy
 ai api-key list
 ai api-key list -N
@@ -35,6 +37,10 @@ fw list -l eu-north-h1
 fw list -l eu-north-h1 -f name,id
 fw list -l eu-north-h1 -N -f name,id
 fw list -N
+gh installation list
+gh installation test-installation-name list-repositories
+gh test-installation-name/test-repository-name list-cache-entries
+gh list-cache-entries test-installation-name/test-repository-name
 help
 help help
 help -r
@@ -56,6 +62,7 @@ kc eu-central-h1/test-kc show -v id,name,state,location,size,unix-user,storage-s
 kc eu-central-h1/test-kc show -v ip6,ip4-enabled,ip4
 kc kcnzrctjjg4j4g6eqvdsvzthwp show
 kc list
+kc eu-central-h1/test-kc resize-nodepool test-kc-np 8
 kc list -f location
 kc list -l eu-central-h1
 kc list -l eu-central-h1 -f name,id
@@ -72,8 +79,10 @@ lb eu-central-h1/test-lb show -f stack,health-check-endpoint,health-check-protoc
 lb eu-central-h1/test-lb show -f src-port,dst-port,subnet,vms
 lb eu-central-h1/test-lb destroy -f
 lb eu-central-h1/test-lb detach-vm vmdzyppz6j166jh5e9t2dwrfas
-lb eu-central-h1/test-lb update hash_based 1234 54321 /up2
-lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 true
+lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 false vmdzyppz6j166jh5e9t2dwrfas
+lb eu-central-h1/test-lb enable-ssl-certificate
+lb eu-central-h1/test-lb disable-ssl-certificate
 lb list
 lb list -f src-port,dst-port,hostname
 lb list -l eu-central-h1
@@ -90,16 +99,21 @@ pg eu-central-h1/test2-pg create -s standard-4 -S 128
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -v 17
 pg eu-central-h1/test-pg add-firewall-rule 1.2.3.0/24
 pg eu-central-h1/test-pg add-metric-destination foo bar https://md.example.com
-pg eu-central-h1/test-pg delete-firewall-rule pfb9g14e5ndt6qf59wfk8109bg
+pg eu-central-h1/test-pg delete-firewall-rule frpqgkgjd09y4pnjaq2pkeacam
 pg eu-central-h1/test-pg delete-metric-destination et2t1bswsqz21m7j7njfjbp901
 pg eu-central-h1/test-pg destroy -f
+pg eu-central-h1/test-pg list-backups
 pg eu-central-h1/test-pg reset-superuser-password foo123BAR456
 pg eu-central-h1/test-pg restart
 pg eu-central-h1/test-pg show
 pg eu-central-h1/test-pg show -f firewall-rules,metric-destinations,ca-certificates
 pg eu-central-h1/test-pg show -f ha-type,flavor,connection-string,primary,earliest-restore-time
 pg eu-central-h1/test-pg show -f id
-pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,version
+pg eu-central-h1/test-pg show -f name,state,location,vm-size,storage-size-gib,version,tags
+pg eu-central-h1/test-pg show -f maintenance-window-start-at,read-replica,parent,read-replicas
+pg eu-central-h1/test-pg show-config
+pg eu-central-h1/test-pg show-pgbouncer-config
+pg eu-central-h1/test-pg upgrade
 pg list
 pg list -f location
 pg list -f name,id,version,flavor
@@ -138,6 +152,17 @@ ps list -l eu-north-h1 -N -f name,id
 ps list -N
 ps psfzm9e26xky5m9ggetw4dpqe2 show
 version
+sk list
+sk list -N
+sk sk684jk5sa027g4mmr3rrwmakr destroy -f
+sk sk684jk5sa027g4mmr3rrwmakr rename spk2
+sk sk684jk5sa027g4mmr3rrwmakr show
+sk sk684jk5sa027g4mmr3rrwmakr update "b b"
+sk spk destroy -f
+sk spk rename spk2
+sk spk show
+sk spk update "b b"
+sk spk2 create "b b"
 vm eu-central-h1/test2-vm create -6 "ssh-rsa pk"
 vm eu-central-h1/test2-vm create -b debian-12 "ssh-rsa pk"
 vm eu-central-h1/test2-vm create "ssh-rsa pk"

@@ -4,9 +4,16 @@ require_relative "../lib/util"
 
 class Prog::BootstrapRhizome < Prog::Base
   subject_is :sshable
+  semaphore :destroy
 
   def user
     @user ||= frame.fetch("user", "root")
+  end
+
+  def before_run
+    when_destroy_set? do
+      pop "exiting early due to destroy semaphore"
+    end
   end
 
   label def start
@@ -36,6 +43,12 @@ LogLevel VERBOSE
 # Terminate sessions with clients that cannot return packets rapidly.
 ClientAliveInterval 2
 ClientAliveCountMax 4
+
+# Increase the maximum number of concurrent unauthenticated connections.
+MaxStartups 50:1:150
+
+# Reduce the time allowed for login.
+LoginGraceTime 20s
 SSHD_CONFIG
 
   LOGIND_CONFIG = <<LOGIND
@@ -48,18 +61,20 @@ LOGIND
     pop "rhizome user bootstrapped and source installed" if retval&.dig("msg") == "installed rhizome"
 
     key_data = sshable.keys.map(&:private_key)
-    Util.rootish_ssh(sshable.host, user, key_data, <<SH)
+    Util.rootish_ssh(sshable.host, user, key_data, <<SH, LOGIND_CONFIG:, SSHD_CONFIG:, public_keys: sshable.keys.map(&:public_key).join("\n"))
 set -ueo pipefail
-sudo apt update && sudo apt-get -y install ruby-bundler
+sudo apt-get update
+sudo apt-get -y install ruby-bundler
+sudo which bundle
 sudo userdel -rf rhizome || true
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
 sudo install -o rhizome -g rhizome -m 0600 /dev/null /home/rhizome/.ssh/authorized_keys
 sudo mkdir -p /etc/systemd/logind.conf.d
-echo #{LOGIND_CONFIG.shellescape} | sudo tee /etc/systemd/logind.conf.d/rhizome.conf > /dev/null
-echo #{SSHD_CONFIG.shellescape} | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
-echo #{sshable.keys.map(&:public_key).join("\n").shellescape} | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
+echo :LOGIND_CONFIG | sudo tee /etc/systemd/logind.conf.d/rhizome.conf > /dev/null
+echo :SSHD_CONFIG | sudo tee /etc/ssh/sshd_config.d/10-clover.conf > /dev/null
+echo :public_keys | sudo tee /home/rhizome/.ssh/authorized_keys > /dev/null
 sync
 SH
 

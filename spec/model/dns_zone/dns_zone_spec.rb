@@ -10,15 +10,6 @@ RSpec.describe DnsZone do
     )
   }
 
-  let(:sshable) { instance_double(Sshable) }
-  let(:vm) { instance_double(Vm, sshable: sshable) }
-  let(:dns_server) { instance_double(DnsServer, id: "00000000-0000-0000-0000-000000000000", vms: [vm]) }
-
-  before do
-    allow(dns_zone).to receive(:dns_servers).and_return([dns_server])
-    allow(dns_zone).to receive(:incr_refresh_dns_servers)
-  end
-
   context "when inserting new record" do
     it "creates record in database" do
       dns_zone.insert_record(record_name: "test", type: "A", ttl: 10, data: "1.2.3.4")

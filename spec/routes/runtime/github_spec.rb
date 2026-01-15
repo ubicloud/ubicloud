@@ -36,24 +36,34 @@ RSpec.describe Clover, "github" do
   it "setups blob storage if no access key" do
     vm = create_vm
     login_runtime(vm)
-    repository = instance_double(GithubRepository, access_key: nil)
-    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(instance_double(GithubRunner, repository: repository))
-    expect(repository).to receive(:setup_blob_storage)
+    installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test"))
+    repository = GithubRepository.create(name: "test", access_key: nil, installation:)
+    GithubRunner.create(vm_id: vm.id, repository_name: "test", label: "ubicloud", repository_id: repository.id)
+    blob_storage_client = instance_double(Aws::S3::Client)
+    allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+    expect(blob_storage_client).to receive(:create_bucket)
+    cloudflare_client = instance_double(CloudflareClient)
+    allow(CloudflareClient).to receive(:new).and_return(cloudflare_client)
+    expect(cloudflare_client).to receive(:create_token).and_return(["test-key", "test-secret"])
 
     post "/runtime/github/caches"
 
     expect(last_response).to have_runtime_error(400, "missing parameter for key")
+    expect(repository.reload.access_key).to eq("test-key")
   end
 
   it "handles errors when attempting to setup blob storage" do
     vm = create_vm
     login_runtime(vm)
-    repository = instance_double(GithubRepository, access_key: nil)
-    runner = instance_double(GithubRunner, repository: repository)
-    expect(GithubRunner).to receive(:[]).with(vm_id: vm.id).and_return(runner)
-    expect(runner).to receive(:ubid).and_return(nil)
-    expect(repository).to receive(:ubid).and_return(nil)
-    expect(repository).to receive(:setup_blob_storage).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
+    installation = GithubInstallation.create(installation_id: 456, name: "test-user2", type: "User", project: Project.create(name: "test2"))
+    repository = GithubRepository.create(name: "test2", access_key: nil, installation:)
+    GithubRunner.create(vm_id: vm.id, repository_name: "test2", label: "ubicloud", repository_id: repository.id)
+    blob_storage_client = instance_double(Aws::S3::Client)
+    allow(Aws::S3::Client).to receive(:new).and_return(blob_storage_client)
+    expect(blob_storage_client).to receive(:create_bucket)
+    cloudflare_client = instance_double(CloudflareClient)
+    allow(CloudflareClient).to receive(:new).and_return(cloudflare_client)
+    expect(cloudflare_client).to receive(:create_token).and_raise(Excon::Error::HTTPStatus.new("Expected(200) <=> Actual(520 Unknown)", nil, Excon::Response.new(body: "foo")))
 
     post "/runtime/github/caches"
 
@@ -79,7 +89,7 @@ RSpec.describe Clover, "github" do
           [nil, "v1"],
           ["k1", nil]
         ].each do |key, version|
-          params = {key: key, version: version}.compact
+          params = {key:, version:}.compact
           post "/runtime/github/caches", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for/)
@@ -204,7 +214,7 @@ RSpec.describe Clover, "github" do
           [nil, "upload-id", 100],
           [["etag-1", "etag-2"], nil, 100]
         ].each do |etags, upload_id, size|
-          params = {etags: etags, uploadId: upload_id, size: size}.compact
+          params = {etags:, uploadId: upload_id, size:}.compact
           post "/runtime/github/caches/commit", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for /)
@@ -264,7 +274,7 @@ RSpec.describe Clover, "github" do
           [nil, "v1"],
           ["", "v1"]
         ].each do |keys, version|
-          params = {keys: keys, version: version}.compact
+          params = {keys:, version:}.compact
           get "/runtime/github/cache", params
 
           expect(last_response).to have_runtime_error(400, /missing parameter for |empty string provided for parameter keys/)
@@ -310,6 +320,7 @@ RSpec.describe Clover, "github" do
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body).slice("cacheKey", "cacheVersion", "scope").values).to eq(["k1", "v1", "dev"])
+        expect(runner.reload.workflow_job["head_branch"]).to eq("dev")
       end
 
       it "returns a cache from default branch when no branch info" do
@@ -329,7 +340,7 @@ RSpec.describe Clover, "github" do
           ["k2", "v1", "main"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url")
         get "/runtime/github/cache", {keys: "k2", version: "v1"}
@@ -387,7 +398,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
 
         get "/runtime/github/caches", {key: "k1"}
@@ -405,7 +416,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "feature"],
           ["k2", "v1", "dev"]
         ].each do |key, version, branch|
-          GithubCacheEntry.create(key: key, version: version, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
+          GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
         get "/runtime/github/caches", {key: "k1"}
 

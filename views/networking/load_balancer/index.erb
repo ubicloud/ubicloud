@@ -8,10 +8,10 @@
     rows: @lbs.map do |lb|
       [
         [
-          [lb[:name], {link: @project_data[:path] + lb[:path]}],
-          [lb[:hostname], {copyable: true}]
+          [lb.name, {link: path(lb)}],
+          [lb.hostname, {copyable: true}]
         ],
-        {id: "lb-#{lb[:id]}"}
+        {id: "lb-#{lb.ubid}"}
       ]
     end,
     empty_state: {
@@ -20,7 +20,7 @@
       description: "You don't have permission to create Load Balancers."
     }.merge(has_project_permission("LoadBalancer:create") ? {
       description: "Get started by creating a new Load Balancer.",
-      button_link: "#{@project_data[:path]}/load-balancer/create",
+      button_link: "#{@project.path}/load-balancer/create",
       button_title: "Create Load Balancer"
     } : {})
   ) %>

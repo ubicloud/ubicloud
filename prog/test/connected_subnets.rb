@@ -35,9 +35,7 @@ ExecStart=nc -l 8080 -6
       update_firewall_rules(ps_multiple, ps_single, config: :perform_tests_public_blocked)
       update_firewall_rules(ps_single, ps_multiple, config: :perform_tests_public_blocked)
       ps_multiple.connect_subnet(ps_single)
-      update_stack({
-        "vm_to_be_connected_id" => vm_to_be_connected.id
-      })
+      update_stack({"vm_to_be_connected_id" => vm_to_be_connected.id})
     end
 
     unless ps_multiple.strand.label == "wait" && ps_single.strand.label == "wait" &&
@@ -57,16 +55,14 @@ ExecStart=nc -l 8080 -6
     end
 
     start_listening(ipv4: true)
-    test_connection(vm_to_be_connected.ephemeral_net4, vm_to_connect_outside, should_fail: true, ipv4: true)
+    test_connection(vm_to_be_connected.ip4, vm_to_connect_outside, should_fail: true, ipv4: true)
     hop_perform_tests_private_ipv4
   end
 
   label def perform_tests_private_ipv4
     unless frame["firewalls"] == "connected_private_ipv4"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv4)
-      update_stack({
-        "firewalls" => "connected_private_ipv4"
-      })
+      update_stack({"firewalls" => "connected_private_ipv4"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -83,9 +79,7 @@ ExecStart=nc -l 8080 -6
   label def perform_tests_private_ipv6
     unless frame["firewalls"] == "connected_private_ipv6"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv6)
-      update_stack({
-        "firewalls" => "connected_private_ipv6"
-      })
+      update_stack({"firewalls" => "connected_private_ipv6"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -103,9 +97,7 @@ ExecStart=nc -l 8080 -6
   label def perform_blocked_private_ipv4
     unless frame["firewalls"] == "blocked_private_ipv4"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv4)
-      update_stack({
-        "firewalls" => "blocked_private_ipv4"
-      })
+      update_stack({"firewalls" => "blocked_private_ipv4"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -122,9 +114,7 @@ ExecStart=nc -l 8080 -6
   label def perform_blocked_private_ipv6
     unless frame["firewalls"] == "blocked_private_ipv6"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv6)
-      update_stack({
-        "firewalls" => "blocked_private_ipv6"
-      })
+      update_stack({"firewalls" => "blocked_private_ipv6"})
     end
 
     if ps_multiple.update_firewall_rules_set? || ps_multiple.vms.any? { |vm| vm.update_firewall_rules_set? }
@@ -206,16 +196,21 @@ ExecStart=nc -l 8080 -6
   end
 
   def test_connection(to_connect_ip, connecting, should_fail: false, ipv4: true)
-    test_version_arg = ipv4 ? "" : "-6"
-    connecting.sshable.cmd("nc -zvw 1 #{to_connect_ip} 8080 #{test_version_arg}")
+    cmd_string = if ipv4
+      "nc -zvw 1 :to_connect_ip 8080"
+    else
+      "nc -zvw 1 :to_connect_ip 8080 -6"
+    end
+    connecting.sshable.cmd(cmd_string, to_connect_ip:)
     fail_test "#{connecting.inhost_name} should not be able to connect to #{to_connect_ip} on port 8080" if should_fail
   rescue
     return 0 if should_fail
+
     fail_test "#{connecting.inhost_name} should be able to connect to #{to_connect_ip} on port 8080"
   end
 
   def start_listening(ipv4: true)
-    vm_to_be_connected.sshable.cmd("sudo systemctl stop listening_ipv#{ipv4 ? "6" : "4"}.service")
-    vm_to_be_connected.sshable.cmd("sudo systemctl start listening_ipv#{ipv4 ? "4" : "6"}.service")
+    vm_to_be_connected.sshable.cmd("sudo systemctl stop listening_ipv:rev_version.service", rev_version: ipv4 ? "6" : "4")
+    vm_to_be_connected.sshable.cmd("sudo systemctl start listening_ipv:version.service", version: ipv4 ? "4" : "6")
   end
 end

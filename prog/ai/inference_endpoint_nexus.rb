@@ -8,6 +8,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
   subject_is :inference_endpoint
 
   extend Forwardable
+
   def_delegators :inference_endpoint, :replicas, :load_balancer, :private_subnet, :project
 
   def self.model_for_id(model_id)
@@ -32,8 +33,8 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       model_name: model["model_name"],
       engine: model["engine"],
       engine_params: model["engine_params"],
-      replica_count: replica_count,
-      is_public: is_public,
+      replica_count:,
+      is_public:,
       gpu_count: model["gpu_count"],
       tags: model["tags"],
       max_requests: model["max_requests"],
@@ -58,8 +59,10 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       ubid = InferenceEndpoint.generate_ubid
       internal_project = Project[Config.inference_endpoint_service_project_id]
       fail "No project configured for inference endpoints" unless internal_project
+
       firewall = internal_project.firewalls_dataset.where(location_id:).where(Sequel[:firewall][:name] => "inference-endpoint-firewall").first
       fail "No firewall named 'inference-endpoint-firewall' configured for inference endpoints in #{Location[location_id].name}" unless firewall
+
       subnet_s = Prog::Vnet::SubnetNexus.assemble(internal_project.id, name: ubid.to_s, location_id:, firewall_id: firewall.id)
 
       custom_dns_zone = DnsZone.where(project_id: Config.inference_endpoint_service_project_id).where(name: "ai.ubicloud.com").first
@@ -67,7 +70,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         name + (is_public ? "" : "-#{ubid.to_s[-5...]}")
       end
       lb_s = Prog::Vnet::LoadBalancerNexus.assemble(subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/health", health_check_protocol: "https",
-        health_check_down_threshold: 3, health_check_up_threshold: 1, custom_hostname_prefix: custom_hostname_prefix, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
+        health_check_down_threshold: 3, health_check_up_threshold: 1, custom_hostname_prefix:, custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: "ipv4")
 
       inference_endpoint = InferenceEndpoint.create(
         project_id:, location_id:, boot_image:, name:, vm_size:, storage_volumes:,
@@ -76,15 +79,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         max_requests:, max_project_rps:, max_project_tps:, external_config:
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
-      Strand.create_with_id(inference_endpoint.id, prog: "Ai::InferenceEndpointNexus", label: "start")
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        hop_destroy
-      end
+      Strand.create_with_id(inference_endpoint, prog: "Ai::InferenceEndpointNexus", label: "start")
     end
   end
 
@@ -109,7 +104,6 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
     register_deadline(nil, 5 * 60)
     decr_destroy
 
-    # strand.children.each(&:destroy)
     replicas.each(&:incr_destroy)
     load_balancer.incr_destroy
     private_subnet.incr_destroy
@@ -138,7 +132,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
                   !(it.destroy_set? || it.strand.label == "destroy")
                 }
         .sort_by { |r|
-        [(r.strand.label == "wait") ? 1 : 0, r.created_at]
+          [(r.strand.label == "wait") ? 1 : 0, r.created_at]
       }.take(actual_replica_count - desired_replica_count)
       victims.each(&:incr_destroy)
     end

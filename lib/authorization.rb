@@ -25,8 +25,9 @@ module Authorization
         DB[:applied_action_tag].join(:rec_action_ids, action_id: :tag_id)
           .select(Sequel[:applied_action_tag][:action_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:action_id, :level])
-      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].select(:action_id)].map { [:id, it] }) | DB[:action_ids].where(action_id: nil).exists)
+        args: [:action_id, :level],
+        cycle: {columns: :action_id})
+      .where(Sequel.or([DB[:action_ids], DB[:rec_action_ids].exclude(:is_cycle).select(:action_id)].map { [:id, it] }) | DB[:action_ids].where(action_id: nil).exists)
       .select_order_map(:name)
   end
 
@@ -56,10 +57,16 @@ module Authorization
         DB[table].join(:tag, tag_id: column)
           .select(Sequel[table][:tag_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:tag_id, :level]).select(:tag_id)
+        args: [:tag_id, :level],
+        cycle: {columns: :tag_id})
+      .exclude(:is_cycle)
+      .select(:tag_id)
   end
 
   def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+    project_id = project_id.id if project_id.is_a?(Project)
+    subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
+
     dataset = DB[:access_control_entry]
       .where(project_id:)
       .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
@@ -70,8 +77,11 @@ module Authorization
     end
 
     if object_id
-      # Recognize UUID format
-      if /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+      if object_id.is_a?(Sequel::Model)
+        klass = object_id.class
+        object_id = object_id.id
+      elsif /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
+        # Recognize UUID format
         ubid = UBID.from_uuidish(object_id).to_s
       else
         ubid = object_id
@@ -79,8 +89,11 @@ module Authorization
         object_id = UBID.parse(object_id).to_uuid
       end
 
-      klass = UBID.class_for_ubid(ubid)
-      klass = ApiKey if ubid.start_with?("et")
+      unless klass
+        klass = UBID.class_for_ubid(ubid)
+        klass = ApiKey if ubid.start_with?("et")
+      end
+
       in_project_cond = if klass
         # This checks that the object being authorized is actually related to the project.
         # This is probably a redundant check, but I think it helps to have defense in depth
@@ -120,7 +133,10 @@ module Authorization
         DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
           .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
-        args: [:object_id, :level]).select(:object_id)
+        args: [:object_id, :level],
+        cycle: {columns: :object_id})
+      .exclude(:is_cycle)
+      .select(:object_id)
 
     if dataset.model == ObjectTag
       # Authorization for accessing ObjectTag itself is done by providing the metatag for the object.
@@ -132,11 +148,11 @@ module Authorization
         .select(Sequel.cast(:object_id, String))
         .from_self
         .select {
-        Sequel.join([
-          substr(:object_id, 0, 18),
-          Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
-          substr(:object_id, 19, 18)
-        ]).cast(:uuid).as(:object_id)
+          Sequel.join([
+            substr(:object_id, 0, 18),
+            Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
+            substr(:object_id, 19, 18)
+          ]).cast(:uuid).as(:object_id)
       }
     end
 

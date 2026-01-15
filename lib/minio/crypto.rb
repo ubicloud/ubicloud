@@ -61,6 +61,7 @@ class Minio::Crypto
     pos += 1
 
     raise "Unsupported cipher ID: #{cipher_id}" unless cipher_id.zero?
+
     cipher_provider = AesGcmCipherProvider
 
     nonce = payload.byteslice(pos, NONCE_LEN)
@@ -86,7 +87,7 @@ class Minio::Crypto
   end
 
   def generate_key(password, salt)
-    Argon2::KDF.argon2id(password.encode, salt: salt, t: 1, m: 16, p: 4, length: 32)
+    Argon2::KDF.argon2id(password.encode, salt:, t: 1, m: 16, p: 4, length: 32)
   end
 
   def generate_additional_data(cipher_provider, key, padded_nonce)

@@ -18,6 +18,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
     Validation.validate_vm_size(vm_size, "x64")
     Validation.validate_name(cluster_name)
     Validation.validate_minio_username(admin_user)
+    per_pool_server_count, per_pool_drive_count, per_pool_storage_size = Validation.validate_minio_setup(storage_size_gib:, pool_count:, server_count:, drive_count:)
 
     DB.transaction do
       ubid = MinioCluster.generate_ubid
@@ -32,33 +33,22 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       minio_cluster = MinioCluster.create(
         name: cluster_name,
         location_id: location.id,
-        admin_user: admin_user,
+        admin_user:,
         admin_password: SecureRandom.urlsafe_base64(15),
         private_subnet_id: subnet_st.id,
-        root_cert_1: root_cert_1,
-        root_cert_key_1: root_cert_key_1,
-        root_cert_2: root_cert_2,
-        root_cert_key_2: root_cert_key_2,
+        root_cert_1:,
+        root_cert_key_1:,
+        root_cert_2:,
+        root_cert_key_2:,
         project_id:
       ) { it.id = ubid.to_uuid }
 
-      per_pool_server_count = server_count / pool_count
-      per_pool_drive_count = drive_count / pool_count
-      per_pool_storage_size = storage_size_gib / pool_count
       pool_count.times do |i|
         start_index = i * per_pool_server_count
         Prog::Minio::MinioPoolNexus.assemble(minio_cluster.id, start_index, per_pool_server_count, per_pool_drive_count, per_pool_storage_size, vm_size)
       end
 
-      Strand.create_with_id(minio_cluster.id, prog: "Minio::MinioClusterNexus", label: "wait_pools")
-    end
-  end
-
-  def before_run
-    when_destroy_set? do
-      unless ["destroy", "wait_pools_destroyed"].include?(strand.label)
-        hop_destroy
-      end
+      Strand.create_with_id(minio_cluster, prog: "Minio::MinioClusterNexus", label: "wait_pools")
     end
   end
 

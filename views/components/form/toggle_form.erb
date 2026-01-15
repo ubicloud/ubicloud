@@ -1,8 +1,7 @@
 <%# locals: (name:, action:, active:) %>
 
-<form id="<%= name %>_toggle" action="<%= action %>" role="form" method="POST">
-  <%== csrf_tag(action) %>
-  <%== part("components/form/hidden", name:, value: !active) %>
+<% form(action:, method: :post, id: "#{name}_toggle") do %>
+  <%== hidden_inputs(name => !active) %>
   <div class="group <%= active ? "active" : "" %>">
     <button
       type="submit"
@@ -13,4 +12,4 @@
       ></span>
     </button>
   </div>
-</form>
+<% end %>

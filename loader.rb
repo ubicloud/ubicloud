@@ -28,7 +28,7 @@ AUTOLOAD_CONSTANTS = ["UBID"]
 
 # Set up autoloads using Unreloader using a style much like Zeitwerk:
 # directories are modules, file names are classes.
-autoload_normal = ->(subdirectory, include_first: false, flat: false) do
+autoload_normal = ->(subdirectory, include_first: false, flat: false, exclude_dirs: nil) do
   absolute = File.join(__dir__, subdirectory)
   rgx = if flat
     # No matter how deep the file system traversal, this Regexp
@@ -51,6 +51,7 @@ autoload_normal = ->(subdirectory, include_first: false, flat: false) do
   end
 
   Unreloader.autoload(absolute) do |f|
+    next if exclude_dirs&.include?(File.basename(File.dirname(f)))
     full_name = camelize.call((include_first ? subdirectory + File::SEPARATOR : "") + rgx.match(f)[1])
     AUTOLOAD_CONSTANTS << full_name unless AUTOLOAD_CONSTANTS.frozen?
     full_name
@@ -86,7 +87,15 @@ module Prog::VictoriaMetrics; end
 
 module Prog::Vm; end
 
+module Prog::Vm::Aws; end
+
+module Prog::Vm::Metal; end
+
 module Prog::Vnet; end
+
+module Prog::Vnet::Aws; end
+
+module Prog::Vnet::Metal; end
 
 module Scheduling; end
 
@@ -94,13 +103,14 @@ module Serializers; end
 
 module VictoriaMetrics; end
 
-autoload_normal.call("model", flat: true)
-%w[lib clover.rb].each { autoload_normal.call(it) }
+autoload_normal.call("model", flat: true, exclude_dirs: %w[aws metal])
+%w[lib clover.rb clover_admin.rb].each { autoload_normal.call(it) }
 %w[scheduling prog serializers].each { autoload_normal.call(it, include_first: true) }
 
 if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   files = %w[model lib scheduling prog serializers].flat_map { Dir["#{it}/**/*.rb"] }
   files << "clover.rb"
+  files << "clover_admin.rb"
 
   Sequel::DATABASES.each(&:disconnect)
   files.each do |file|
@@ -136,6 +146,12 @@ if force_autoload
       TYPE2CLASS[str[..1]]
     end
   end
+
+  if Config.unfrozen_test?
+    Sequel::Model.descendants.each(&:detect_unnecessary_association_options)
+  end
+
+  Clover.models_loaded
 end
 
 case Config.mail_driver
@@ -161,7 +177,8 @@ when :test
 end
 
 def clover_freeze
-  return unless Config.production? || ENV["CLOVER_FREEZE"] == "1"
+  return unless Config.production? || Config.frozen_test?
+
   require "refrigerator"
 
   # Take care of library dependencies that modify core classes.
@@ -202,6 +219,7 @@ def clover_freeze
     PostgresResource::HaType,
     Prog,
     Prog::Ai,
+    Prog::Aws,
     Prog::Base::Exit,
     Prog::Base::FlowControl,
     Prog::Base::Hop,
@@ -214,10 +232,15 @@ def clover_freeze
     Prog::Storage,
     Prog::VictoriaMetrics,
     Prog::Vm,
+    Prog::Vm::Aws,
+    Prog::Vm::Metal,
     Prog::Vnet,
+    Prog::Vnet::Aws,
+    Prog::Vnet::Metal,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,
     ResourceMethods::ClassMethods,
+    ResourceMethods::DatasetMethods,
     ResourceMethods::InstanceMethods,
     ResourceMethods::UbidTypeEtcMethods,
     Scheduling,
@@ -242,6 +265,6 @@ def clover_freeze
     Validation::ValidationFailed
   ].each(&:freeze)
 
-  RubyVM::YJIT.enable
+  RubyVM::YJIT.enable if defined?(RubyVM::YJIT)
   Refrigerator.freeze_core
 end

@@ -9,7 +9,7 @@ RSpec.describe Clover, "cli kc destroy" do
 
   it "destroys kubernetes cluster" do
     expect(KubernetesCluster.count).to eq 0
-    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v v1.32])
+    cli(%W[kc eu-central-h1/test-kc create -c 1 -z standard-2 -w 1 -v #{Option.kubernetes_versions.first}])
     expect(KubernetesCluster.count).to eq 1
     kc = KubernetesCluster.first
     expect(Semaphore.where(strand_id: kc.id, name: "destroy")).to be_empty

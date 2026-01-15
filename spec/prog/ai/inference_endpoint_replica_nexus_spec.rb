@@ -48,10 +48,10 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
     )
   }
 
-  let(:sshable) { instance_double(Sshable, host: "3.4.5.6") }
+  let(:sshable) { create_mock_sshable(host: "3.4.5.6") }
 
   before do
-    allow(nx).to receive_messages(vm: vm, inference_endpoint: inference_endpoint, inference_endpoint_replica: replica)
+    allow(nx).to receive_messages(vm:, inference_endpoint:, inference_endpoint_replica: replica)
     allow(vm).to receive(:sshable).and_return(sshable)
     load_balancer.add_vm(vm)
   end
@@ -84,19 +84,20 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#before_run" do
     it "hops to destroy when needed" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
+      nx.incr_destroy
       expect { nx.before_run }.to hop("destroy")
+        .and change { Semaphore[strand_id: st.id, name: "destroying"] }.from(nil).to(be_a(Semaphore))
     end
 
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+    it "does not hop to destroy if already destroying" do
+      nx.incr_destroy
+      nx.incr_destroying
       expect { nx.before_run }.not_to hop("destroy")
     end
 
     it "pops additional operations from stack" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
+      nx.incr_destroy
+      nx.incr_destroying
       expect(nx.strand.stack).to receive(:count).and_return(2)
       expect { nx.before_run }.to exit({"msg" => "operation is cancelled due to the destruction of the inference endpoint replica"})
     end
@@ -134,7 +135,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#download_lb_cert" do
     it "downloads lb cert and hops to setup_external" do
-      expect(sshable).to receive(:cmd).with("sudo inference_endpoint/bin/download-lb-cert")
+      expect(sshable).to receive(:_cmd).with("sudo inference_endpoint/bin/download-lb-cert")
       expect { nx.download_lb_cert }.to hop("setup_external")
     end
   end
@@ -171,7 +172,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         )
         .to_return(status: 200, body: {"data" => {"podFindAndDeployOnDemand" => {"id" => "thepodid"}}}.to_json, headers: {})
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
-      expect(sshable).to receive(:cmd).and_return("vm ssh key\n")
+      expect(sshable).to receive(:_cmd).and_return("vm ssh key\n")
       expect { nx.setup_external }.to nap(10)
     end
 
@@ -266,58 +267,58 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#setup" do
     it "triggers setup if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:gpu_count).and_return(1).twice
       expect(inference_endpoint).to receive(:engine).and_return("vllm").twice
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params").twice
       expect(inference_endpoint).to receive(:model_name).and_return("llama").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
       expect { nx.setup }.to nap(5)
     end
 
     it "triggers setup for vllm with cpu if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"/opt/miniconda/envs/vllm-cpu/bin/vllm serve /ie/models/model --served-model-name llama --disable-log-requests --host 127.0.0.1 --some-params\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"})
       expect(inference_endpoint).to receive(:gpu_count).and_return(0)
       expect(inference_endpoint).to receive(:engine).and_return("vllm")
       expect(inference_endpoint).to receive(:engine_params).and_return("--some-params")
       expect(inference_endpoint).to receive(:model_name).and_return("llama")
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
     end
 
     it "triggers setup for runpod if setup command is not sent yet or failed" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", {stdin: "{\"engine_start_cmd\":\"ssh -N -L 8000:localhost:8000 root@ -p  -i /ie/workdir/.ssh/runpod -o UserKnownHostsFile=/ie/workdir/.ssh/known_hosts -o StrictHostKeyChecking=accept-new\",\"replica_ubid\":\"#{replica.ubid}\",\"ssl_crt_path\":\"/ie/workdir/ssl/ubi_cert.pem\",\"ssl_key_path\":\"/ie/workdir/ssl/ubi_key.pem\",\"gateway_port\":8443,\"max_requests\":500}"}).twice
       expect(inference_endpoint).to receive(:engine).and_return("runpod").twice
 
       # NotStarted
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect { nx.setup }.to nap(5)
 
       # Failed
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Failed")
       expect { nx.setup }.to nap(5)
     end
 
     it "hops to wait_endpoint_up if setup command has succeeded" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Succeeded")
       expect { nx.setup }.to hop("wait_endpoint_up")
     end
 
     it "naps if script return unknown status" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("Unknown")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("Unknown")
       expect { nx.setup }.to nap(5)
     end
 
     it "fails if inference engine is unsupported" do
-      expect(sshable).to receive(:cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check setup").and_return("NotStarted")
       expect(inference_endpoint).to receive(:engine).and_return("unsupported engine")
       expect { nx.setup }.to raise_error("BUG: unsupported inference engine")
     end
@@ -325,12 +326,12 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#wait_endpoint_up" do
     it "naps if vm is not up" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect { nx.wait_endpoint_up }.to nap(5)
     end
 
     it "sets hops to wait when vm is in active set of load balancer" do
-      LoadBalancerVmPort.first.update(state: "up")
+      LoadBalancerVmPort.dataset.update(state: "up")
       expect { nx.wait_endpoint_up }.to hop("wait")
     end
   end
@@ -350,14 +351,14 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
   describe "#unavailable" do
     it "creates a page if replica is unavailable" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect(Prog::PageNexus).to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "does not create a page if replica is in maintenance mode" do
-      LoadBalancerVmPort.first.update(state: "down")
+      LoadBalancerVmPort.dataset.update(state: "down")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(inference_endpoint).to receive(:maintenance_set?).and_return(true)
       expect { nx.unavailable }.to nap(30)
@@ -379,23 +380,13 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#destroy" do
-    it "deletes resources and exits" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
-      expect(lb).to receive(:evacuate_vm).with(vm)
-      expect(lb).to receive(:remove_vm).with(vm)
-
-      expect(vm).to receive(:incr_destroy)
-      expect(replica).to receive(:destroy)
-
-      expect { nx.destroy }.to exit({"msg" => "inference endpoint replica is deleted"})
+    it "adds destroy semaphore to children and hops to wait_children_destroyed" do
+      st = Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+      expect(Semaphore.where(name: "destroy").select_order_map(:strand_id)).to eq [st.id]
     end
 
     it "deletes runpod pod if there is one" do
-      lb = instance_double(LoadBalancer)
-      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
-      expect(lb).to receive(:evacuate_vm).with(vm)
-      expect(lb).to receive(:remove_vm).with(vm)
       expect(replica).to receive(:external_state).and_return({"pod_id" => "thepodid"})
 
       stub_request(:post, "https://api.runpod.io/graphql")
@@ -411,10 +402,25 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         .to_return(status: 200, body: "", headers: {})
 
       expect(replica).to receive(:update).with(external_state: "{}")
+
+      expect { nx.destroy }.to hop("wait_children_destroyed")
+    end
+  end
+
+  describe "#wait_children_destroyed" do
+    it "naps if children still exist" do
+      Strand.create(prog: "Prog::BootstrapRhizome", label: "start", parent_id: nx.strand.id)
+      expect { nx.wait_children_destroyed }.to nap(5)
+    end
+
+    it "exits and destroys resources if no children exist" do
+      lb = instance_double(LoadBalancer)
+      expect(inference_endpoint).to receive(:load_balancer).and_return(lb).twice
+      expect(lb).to receive(:evacuate_vm).with(vm)
+      expect(lb).to receive(:remove_vm).with(vm)
       expect(vm).to receive(:incr_destroy)
       expect(replica).to receive(:destroy)
-
-      expect { nx.destroy }.to exit({"msg" => "inference endpoint replica is deleted"})
+      expect { nx.wait_children_destroyed }.to exit({"msg" => "inference endpoint replica is deleted"})
     end
   end
 
@@ -438,7 +444,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
         "output", "completion_token_count"
       )
-      expect(sshable).to receive(:cmd).with("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
+      expect(sshable).to receive(:_cmd).with("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
     end
 
@@ -451,7 +457,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 100, "quota_tps" => 10000}
       ].sort_by { |p| p["ubid"] }
 
-      expect(sshable).to receive(:cmd) do |command, options|
+      expect(sshable).to receive(:_cmd) do |command, options|
         json_sent = JSON.parse(options[:stdin])
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)

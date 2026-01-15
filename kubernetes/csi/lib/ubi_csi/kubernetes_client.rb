@@ -13,10 +13,6 @@ module Csi
       @logger = logger
     end
 
-    def log_with_id(req_id, message)
-      @logger.debug("[req_id=#{req_id}] #{message}")
-    end
-
     def run_kubectl(*args, yaml_data: nil)
       cmd = ["kubectl", *args]
       stdin_data = yaml_data ? YAML.dump(yaml_data) : nil
@@ -25,6 +21,7 @@ module Csi
         if output.strip.end_with?("not found")
           raise ObjectNotFoundError, output
         end
+
         raise "Command failed: #{cmd.join(" ")}\nOutput: #{output}"
       end
       output
@@ -73,6 +70,26 @@ module Csi
 
     def delete_pvc(namespace, name)
       run_kubectl("-n", namespace, "delete", "pvc", name, "--wait=false", "--ignore-not-found=true")
+    end
+
+    def patch_resource(resource, name, annotation_key, annotation_value, namespace: "")
+      patch = {metadata: {annotations: {annotation_key => annotation_value}}}.to_json
+      cmd = ["patch", resource, name, "--type=merge", "-p", patch]
+      cmd = ["-n", namespace] + cmd unless namespace.empty?
+      run_kubectl(*cmd)
+    end
+
+    # This function will first try to get the pvc in order to make sure pvc exists
+    def remove_pvc_finalizers(namespace, name)
+      get_pvc(namespace, name)
+      patch = {metadata: {finalizers: nil}}.to_json
+      run_kubectl("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", patch)
+    rescue ObjectNotFoundError
+    end
+
+    def remove_pvc_annotation(namespace, name, annotation_key)
+      patch = {metadata: {annotations: {annotation_key => nil}}}.to_json
+      run_kubectl("-n", namespace, "patch", "pvc", name, "--type=merge", "-p", patch)
     end
 
     def node_schedulable?(name)

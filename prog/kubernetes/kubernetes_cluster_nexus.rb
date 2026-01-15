@@ -3,30 +3,49 @@
 class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   subject_is :kubernetes_cluster
 
-  def self.assemble(name:, project_id:, location_id:, version: "v1.32", private_subnet_id: nil, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
+  def self.assemble(name:, project_id:, location_id:, version: Option.kubernetes_versions.first, private_subnet_id: nil, cp_node_count: 3, target_node_size: "standard-2", target_node_storage_size_gib: nil)
     DB.transaction do
       unless (project = Project[project_id])
         fail "No existing project"
       end
 
-      unless Option.kubernetes_versions.include?(version)
-        fail "Invalid Kubernetes Version"
-      end
-
+      Validation.validate_kubernetes_version(version)
       Validation.validate_kubernetes_name(name)
       Validation.validate_kubernetes_cp_node_count(cp_node_count)
 
       ubid = KubernetesCluster.generate_ubid
       subnet = if private_subnet_id
-        PrivateSubnet[id: private_subnet_id, project_id: Config.kubernetes_service_project_id] || fail("Given subnet is not available in the k8s project")
+        PrivateSubnet[id: private_subnet_id, project_id:] || fail("Given subnet is not available in the project")
       else
+        # Will create customer private subnet with customer firewall
         Prog::Vnet::SubnetNexus.assemble(
-          Config.kubernetes_service_project_id,
+          project_id,
           name: "#{ubid}-subnet",
           location_id:,
-          ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 18).to_s
+          firewall_name: "#{ubid}-firewall",
+          ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[location_id], project, 16).to_s
         ).subject
       end
+
+      # Internal control plane node firewall, will be directly attached to kubernetes control plane VMs
+      internal_cp_vm_firewall = Firewall.create(name: "#{ubid}-cp-vm-firewall", location_id:, description: "Kubernetes control plane node internal firewall", project_id: Config.kubernetes_service_project_id)
+      internal_cp_vm_firewall.replace_firewall_rules(
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
+          {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
+          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+        ]
+      )
+
+      # Internal worker node firewall, will be directly attached to kubernetes worker VMs
+      internal_worker_vm_firewall = Firewall.create(name: "#{ubid}-worker-vm-firewall", location_id:, description: "Kubernetes worker node internal firewall", project_id: Config.kubernetes_service_project_id)
+      internal_worker_vm_firewall.replace_firewall_rules(
+        Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
+          {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
+        ]
+      )
 
       # TODO: Validate location
       # TODO: Validate node count
@@ -38,19 +57,20 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
   end
 
-  def before_run
-    when_destroy_set? do
-      if strand.label != "destroy"
-        kubernetes_cluster.active_billing_records.each(&:finalize)
-        hop_destroy
-      end
-    end
+  def before_destroy
+    kubernetes_cluster.active_billing_records.each(&:finalize)
+  end
+
+  def billing_rate_for(type, family)
+    BillingRate.from_resource_properties(type, family, kubernetes_cluster.location.name)
   end
 
   label def start
     register_deadline("wait", 120 * 60)
     incr_install_metrics_server
     incr_sync_worker_mesh
+    incr_install_csi
+    incr_sync_internal_dns_config
     hop_create_load_balancers
   end
 
@@ -76,41 +96,31 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       custom_hostname_prefix: custom_apiserver_hostname_prefix
     ).subject
 
-    services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
+    services_lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
       kubernetes_cluster.private_subnet_id,
+      ports: [],
       name: kubernetes_cluster.services_load_balancer_name,
       algorithm: "hash_based",
-      # TODO: change the api to support LBs without ports
-      # The next two fields will be later modified by the sync_kubernetes_services label
-      # These are just set for passing the creation validations
-      src_port: 443,
-      dst_port: 6443,
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix: custom_services_hostname_prefix,
-      stack: LoadBalancer::Stack::IPV4 # TODO: Can we change this to DUAL?
+      custom_hostname_prefix: custom_services_hostname_prefix
     ).subject
 
     kubernetes_cluster.update(api_server_lb_id: api_server_lb.id, services_lb_id: services_lb.id)
 
     services_lb.dns_zone&.insert_record(record_name: "*.#{services_lb.hostname}.", type: "CNAME", ttl: 3600, data: "#{services_lb.hostname}.")
 
-    hop_bootstrap_control_plane_vms
+    hop_bootstrap_control_plane_nodes
   end
 
-  label def bootstrap_control_plane_vms
+  label def bootstrap_control_plane_nodes
     nap 5 unless kubernetes_cluster.endpoint
 
-    # In 1-node control plane setup, we will wait until it's over
-    # In 3-node control plane setup, we start the bootstrapping after
-    # the first CP bootstrap
-    ready_to_bootstrap_workers =
-      kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count ||
-      (kubernetes_cluster.cp_node_count == 3 && kubernetes_cluster.cp_vms.count == 1)
+    ready_to_bootstrap_workers = kubernetes_cluster.nodes.count >= 1
     kubernetes_cluster.nodepools.each(&:incr_start_bootstrapping) if ready_to_bootstrap_workers
 
-    hop_wait_nodes if kubernetes_cluster.cp_vms.count >= kubernetes_cluster.cp_node_count
+    hop_wait_nodes if kubernetes_cluster.nodes.count >= kubernetes_cluster.cp_node_count
 
     bud Prog::Kubernetes::ProvisionKubernetesNode, {"subject_id" => kubernetes_cluster.id}
 
@@ -118,32 +128,57 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def wait_control_plane_node
-    reap(:bootstrap_control_plane_vms)
+    reap(:bootstrap_control_plane_nodes)
   end
 
   label def wait_nodes
     nap 10 unless kubernetes_cluster.nodepools.all? { it.strand.label == "wait" }
-    hop_create_billing_records
+    hop_wait
   end
 
-  label def create_billing_records
-    records =
-      kubernetes_cluster.cp_vms.map { {type: "KubernetesControlPlaneVCpu", family: it.family, amount: it.vcpus} } +
-      kubernetes_cluster.nodepools.flat_map(&:vms).flat_map {
-        [
-          {type: "KubernetesWorkerVCpu", family: it.family, amount: it.vcpus},
-          {type: "KubernetesWorkerStorage", family: "standard", amount: it.storage_size_gib}
-        ]
-      }
+  label def update_billing_records
+    decr_update_billing_records
 
-    records.each do |record|
-      BillingRecord.create(
-        project_id: kubernetes_cluster.project_id,
-        resource_id: kubernetes_cluster.id,
-        resource_name: kubernetes_cluster.name,
-        billing_rate_id: BillingRate.from_resource_properties(record[:type], record[:family], kubernetes_cluster.location.name)["id"],
-        amount: record[:amount]
-      )
+    desired_records = kubernetes_cluster
+      .all_nodes
+      .reject(&:retire_set?)
+      .flat_map(&:billing_records)
+      .tally
+
+    existing_records = kubernetes_cluster.active_billing_records.map do |record|
+      {
+        type: record.billing_rate["resource_type"],
+        family: record.billing_rate["resource_family"],
+        amount: record.amount
+      }
+    end.tally
+
+    desired_records.each do |record, want|
+      have = existing_records[record] || 0
+      (want - have).times do
+        BillingRecord.create(
+          project_id: kubernetes_cluster.project_id,
+          resource_id: kubernetes_cluster.id,
+          resource_name: kubernetes_cluster.name,
+          billing_rate_id: billing_rate_for(record[:type], record[:family])["id"],
+          amount: record[:amount]
+        )
+      end
+    end
+
+    existing_records.each do |record, have|
+      want = desired_records[record] || 0
+      next unless (surplus = have - want) > 0
+
+      br = billing_rate_for(record[:type], record[:family])
+      kubernetes_cluster
+        .active_billing_records_dataset
+        .where(billing_rate_id: br["id"], amount: record[:amount])
+        .reverse(Sequel.function(:lower, :span))
+        .limit(surplus)
+        .all do |r|
+          r.finalize
+      end
     end
 
     hop_wait
@@ -165,6 +200,19 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     when_sync_worker_mesh_set? do
       hop_sync_worker_mesh
     end
+
+    when_install_csi_set? do
+      hop_install_csi
+    end
+
+    when_update_billing_records_set? do
+      hop_update_billing_records
+    end
+
+    when_sync_internal_dns_config_set? do
+      hop_sync_internal_dns_config
+    end
+
     nap 6 * 60 * 60
   end
 
@@ -178,18 +226,19 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def upgrade
     decr_upgrade
 
-    node_to_upgrade = kubernetes_cluster.cp_vms.find do |vm|
-      vm_version = kubernetes_cluster.client(session: vm.sshable.connect).version
-      vm_minor_version = vm_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+    node_to_upgrade = kubernetes_cluster.nodes.find do |node|
+      node_version = kubernetes_cluster.client(session: node.sshable.connect).version
+      node_minor_version = node_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
       cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
 
-      next false unless vm_minor_version && cluster_minor_version
-      vm_minor_version == cluster_minor_version - 1
+      next false unless node_minor_version && cluster_minor_version
+
+      node_minor_version == cluster_minor_version - 1
     end
 
     hop_wait unless node_to_upgrade
 
-    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_vm_id" => node_to_upgrade.id}
+    bud Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => node_to_upgrade.id}
     hop_wait_upgrade
   end
 
@@ -221,17 +270,75 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def sync_worker_mesh
     decr_sync_worker_mesh
 
-    key_pairs = kubernetes_cluster.worker_vms.map do |vm|
-      {vm: vm, ssh_key: SshKey.generate}
+    key_pairs = kubernetes_cluster.worker_functional_nodes.map do |node|
+      {vm: node.vm, ssh_key: SshKey.generate}
     end
 
     public_keys = key_pairs.map { |kp| kp[:ssh_key].public_key }
     key_pairs.each do |kp|
       vm = kp[:vm]
       vm.sshable.cmd("tee ~/.ssh/id_ed25519 > /dev/null && chmod 0600 ~/.ssh/id_ed25519", stdin: kp[:ssh_key].private_key)
-      all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\n")
+      all_keys_str = ([vm.sshable.keys.first.public_key] + public_keys).join("\n") + "\n"
       vm.sshable.cmd("tee ~/.ssh/authorized_keys > /dev/null && chmod 0600 ~/.ssh/authorized_keys", stdin: all_keys_str)
     end
+
+    hop_wait
+  end
+
+  label def install_csi
+    decr_install_csi
+    kubernetes_cluster.client.kubectl("apply -f kubernetes/manifests/ubicsi")
+    hop_wait
+  end
+
+  # Dynamically injects static hosts DNS records for K8s nodes into CoreDNS Corefile after the kubernetes plugin block,
+  # then updates and replaces the kube-system/coredns ConfigMap to apply the changes.
+  label def sync_internal_dns_config
+    decr_sync_internal_dns_config
+
+    dns_records = kubernetes_cluster.all_functional_nodes.flat_map { |n| ["#{n.vm.ip4} #{n.name}", "#{n.vm.ip6} #{n.name}"] }
+
+    coredns_configmap = YAML.load(kubernetes_cluster.client.kubectl("-n kube-system get cm coredns -oyaml"))
+    unless (corefile = coredns_configmap.dig("data", "Corefile"))
+      # Customers may have deleted this entry or have custom tunings.
+      # We will ignore such cases and return early.
+      hop_wait
+    end
+
+    # Remove existing Ubicloud hosts block if present (matches full block with comments)
+    # Example matched block (with ~8-space indent for contents):
+    #     hosts {
+    #         # Ubicloud Hosts
+    #         178.63.152.192 kcg0zevswgsp6hqepg9de83wwq-nz1df
+    #         178.63.152.197 knbvkn6c55gt1mfhab6znfv4j5-ukgtf
+    #         # End Ubicloud Hosts
+    #         fallthrough
+    #     }
+    corefile.gsub!(/^\s*hosts\s*\{\s*\n(?:\s*# Ubicloud Hosts\n)?(?:\s*        .*\n)*?\s*(?:# End Ubicloud Hosts\n)?\s*        fallthrough\s*\n\s*\}\s*$/m, "")
+    lines = corefile.split("\n")
+
+    # The new block should be right after the kubernetes block, so we aim to find the block and insert
+    # after the block ends
+    kubernetes_block_start = lines.find_index { |l| l.strip.end_with?("{") && l.include?("kubernetes") }
+    fail "Kubernetes block not found." unless kubernetes_block_start
+
+    end_idx = lines[(kubernetes_block_start + 1)..].find_index { |l| l.strip.end_with?("}") }
+    fail "Closing brace not found." unless end_idx
+    kubernetes_block_end = kubernetes_block_start + 1 + end_idx
+
+    # Build new hosts block with comment markers for future idempotency (split records for proper indentation)
+    hosts_lines = <<~HOSTS
+    hosts {
+        # Ubicloud Hosts
+#{dns_records.map { |l| "        #{l}" }.join("\n")}
+        # End of Ubicloud Hosts
+        fallthrough
+    }
+    HOSTS
+    new_lines = lines[0...kubernetes_block_end + 1] + hosts_lines.split("\n") + lines[kubernetes_block_end + 1..]
+    new_corefile = new_lines.join("\n")
+    coredns_configmap["data"]["Corefile"] = new_corefile
+    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf replace -f -", stdin: YAML.dump(coredns_configmap))
 
     hop_wait
   end
@@ -240,17 +347,26 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     reap do
       decr_destroy
 
+      kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
+        ubid: kubernetes_cluster.ubid,
+        vm_ids: kubernetes_cluster.all_nodes.map(&:vm_id)
+      )
+
+      kubernetes_cluster.nodes.each(&:incr_destroy)
+      kubernetes_cluster.nodepools.each(&:incr_destroy)
+
+      nap 5 unless kubernetes_cluster.nodepools.empty?
+      nap 5 unless kubernetes_cluster.nodes.empty?
+
       if (services_lb = kubernetes_cluster.services_lb)
-        services_lb.dns_zone.delete_record(record_name: "*.#{services_lb.hostname}.")
+        services_lb.dns_zone&.delete_record(record_name: "*.#{services_lb.hostname}.")
         services_lb.incr_destroy
       end
-
       kubernetes_cluster.api_server_lb&.incr_destroy
-      kubernetes_cluster.cp_vms.each(&:incr_destroy)
-      kubernetes_cluster.remove_all_cp_vms
-      kubernetes_cluster.nodepools.each { it.incr_destroy }
-      kubernetes_cluster.private_subnet.incr_destroy
-      nap 5 unless kubernetes_cluster.nodepools.empty?
+
+      kubernetes_cluster.internal_cp_vm_firewall.destroy
+      kubernetes_cluster.internal_worker_vm_firewall.destroy
+
       kubernetes_cluster.destroy
       pop "kubernetes cluster is deleted"
     end

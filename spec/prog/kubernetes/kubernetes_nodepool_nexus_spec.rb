@@ -11,7 +11,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   let(:kc) {
     kc = KubernetesCluster.create(
       name: "k8scluster",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
@@ -21,12 +21,18 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
-    kc.add_cp_vm(create_vm)
-    kc.add_cp_vm(create_vm)
+    [create_vm, create_vm].each do |vm|
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+    end
     kc.update(api_server_lb_id: lb.id)
-    kc
   }
-  let(:kn) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2") }
+  let(:kn) {
+    kn = KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+    [create_vm, create_vm].each do |vm|
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+    end
+    kn
+  }
 
   before do
     allow(nx).to receive(:kubernetes_nodepool).and_return(kn)
@@ -67,19 +73,6 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     end
   end
 
-  describe "#before_run" do
-    it "hops to destroy" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect { nx.before_run }.to hop("destroy")
-    end
-
-    it "does not hop to destroy if already in the destroy state" do
-      expect(nx).to receive(:when_destroy_set?).and_yield
-      expect(nx.strand).to receive(:label).and_return("destroy")
-      expect { nx.before_run }.not_to hop("destroy")
-    end
-  end
-
   describe "#start" do
     it "naps if the kubernetes cluster is not ready" do
       expect { nx.start }.to nap(10)
@@ -88,21 +81,32 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     it "registers a deadline and hops if the cluster is ready" do
       expect(nx).to receive(:when_start_bootstrapping_set?).and_yield
       expect(nx).to receive(:register_deadline)
-      expect { nx.start }.to hop("bootstrap_worker_vms")
+      expect { nx.start }.to hop("bootstrap_worker_nodes")
     end
   end
 
-  describe "#bootstrap_worker_vms" do
-    it "buds a total of node_count times ProvisionKubernetesNode prog to create VMs" do
-      kn.node_count.times do
+  describe "#bootstrap_worker_nodes" do
+    it "buds enough number of times ProvisionKubernetesNode progs when we need to provision more nodes" do
+      kn.update(node_count: 4)
+      (kn.node_count - kn.functional_nodes.count).times do
         expect(nx).to receive(:bud).with(Prog::Kubernetes::ProvisionKubernetesNode, {"nodepool_id" => kn.id, "subject_id" => kn.cluster.id})
       end
-      expect { nx.bootstrap_worker_vms }.to hop("wait_worker_node")
+      expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
+    end
+
+    it "retires enough number of nodes when we need to decommission some" do
+      kn.update(node_count: 1)
+      expect(kn.functional_nodes.first).to receive(:incr_retire)
+      expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
+    end
+
+    it "does nothing when we have the right number of nodes" do
+      expect { nx.bootstrap_worker_nodes }.to hop("wait_worker_node")
     end
   end
 
   describe "#wait_worker_node" do
-    it "hops back to bootstrap_worker_vms if there are no sub-programs running" do
+    it "hops back to bootstrap_worker_nodes if there are no sub-programs running" do
       st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_worker_node", stack: [{}])
       expect { nx.wait_worker_node }.to hop("wait")
     end
@@ -123,53 +127,58 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect(nx).to receive(:when_upgrade_set?).and_yield
       expect { nx.wait }.to hop("upgrade")
     end
+
+    it "hops to bootstrap_worker_nodes when its semaphore is set" do
+      expect(nx).to receive(:when_scale_worker_count_set?).and_yield
+      expect(nx).to receive(:decr_scale_worker_count)
+      expect { nx.wait }.to hop("bootstrap_worker_nodes")
+    end
   end
 
   describe "#upgrade" do
-    let(:first_vm) { create_vm }
-    let(:second_vm) { create_vm }
+    let(:first_node) { kn.nodes[0] }
+    let(:second_node) { kn.nodes[1] }
     let(:client) { instance_double(Kubernetes::Client) }
 
     before do
-      sshable0, sshable1 = instance_double(Sshable), instance_double(Sshable)
-      expect(kn).to receive(:vms).and_return([first_vm, second_vm])
-      allow(first_vm).to receive(:sshable).and_return(sshable0)
-      allow(second_vm).to receive(:sshable).and_return(sshable1)
+      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
+      allow(first_node).to receive(:sshable).and_return(sshable0)
+      allow(second_node).to receive(:sshable).and_return(sshable1)
       allow(sshable0).to receive(:connect)
       allow(sshable1).to receive(:connect)
 
       expect(kn.cluster).to receive(:client).and_return(client).at_least(:once)
     end
 
-    it "selects a VM with minor version one less than the cluster's version" do
+    it "selects a node with minor version one less than the cluster's version" do
       expect(kn.cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.32", "v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_vm_id" => second_vm.id, "subject_id" => kn.cluster.id})
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_node_id" => second_node.id, "subject_id" => kn.cluster.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
-    it "hops to wait when all VMs are at the cluster's version" do
+    it "hops to wait when all nodes are at the cluster's version" do
       expect(kn.cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.32", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "does not select a VM with minor version more than one less than the cluster's version" do
+    it "does not select a node with minor version more than one less than the cluster's version" do
       expect(kn.cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.30", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "skips VMs with invalid version formats" do
+    it "skips nodes with invalid version formats" do
       expect(kn.cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("invalid", "v1.32")
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "selects the first VM that is one minor version behind" do
+    it "selects the first node that is one minor version behind" do
       expect(kn.cluster).to receive(:version).and_return("v1.32")
       expect(client).to receive(:version).and_return("v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_vm_id" => first_vm.id, "subject_id" => kn.cluster.id})
+      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_node_id" => first_node.id, "subject_id" => kn.cluster.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
@@ -179,7 +188,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.upgrade }.to hop("wait")
     end
 
-    it "does not select a VM with a higher minor version than the cluster" do
+    it "does not select a node with a higher minor version than the cluster" do
       expect(kn.cluster).to receive(:version).and_return("v1.32").twice
       expect(client).to receive(:version).and_return("v1.33", "v1.32")
       expect { nx.upgrade }.to hop("wait")
@@ -206,12 +215,18 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       expect { nx.destroy }.to nap(120)
     end
 
-    it "destroys the nodepool and its vms" do
-      vms = [create_vm, create_vm]
-      expect(kn).to receive(:vms).and_return(vms)
+    it "completes destroy when nodes are gone" do
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kn.cluster.id, kubernetes_nodepool_id: kn.id)
+      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "destroy", stack: [{}])
+      expect(kn.nodes).to all(receive(:incr_destroy))
 
-      expect(vms).to all(receive(:incr_destroy))
-      expect(kn).to receive(:remove_all_vms)
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "destroys the nodepool and its nodes" do
+      kn.nodes_dataset.destroy
+
+      expect(kn.nodes).to all(receive(:incr_destroy))
       expect(kn).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "kubernetes nodepool is deleted"})
     end

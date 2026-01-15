@@ -21,32 +21,47 @@ class InvoiceGenerator
     DB.transaction do
       active_billing_records.group_by { |br| br[:project] }.each do |project, project_records|
         project_content = {}
-
         project_content[:project_id] = project.id
         project_content[:project_name] = project.name
-        country = project.billing_info&.country
-        project_content[:billing_info] = project.billing_info&.stripe_data&.merge({
-          "id" => project.billing_info.id,
-          "ubid" => project.billing_info.ubid,
-          "in_eu_vat" => !!country&.in_eu_vat?
+        bi = project.billing_info
+        country = bi&.country
+        is_eu = country&.in_eu_vat?
+        project_content[:billing_info] = bi&.stripe_data&.merge({
+          "id" => bi.id,
+          "ubid" => bi.ubid,
+          "in_eu_vat" => !!is_eu
         })
 
+        project_content[:bank_transfer_info] = if bi && bi.payment_methods.empty?
+          project_content[:due_date] = (Date.today + 30).to_s
+          if is_eu
+            {
+              "Beneficiary" => "Ubicloud B.V.",
+              "IBAN" => "NL30REVO6759811127",
+              "BIC" => "REVONL22",
+              "Intermediary BIC" => "CHASGB2L",
+              "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
+              "Bank/Payment institution" => "Revolut Bank UAB",
+              "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands"
+            }
+          else
+            {
+              "Beneficiary" => "Ubicloud Inc.",
+              "Beneficiary address" => "310 Santa Ana Ave, San Francisco, CA 94127",
+              "ABA/Routing number" => "121145349",
+              "Account number" => "974842159957503",
+              "Bank/Payment institution" => "Column NA - Brex",
+              "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129"
+            }
+          end
+        end
         # Invoices are issued by Ubicloud Inc. for non-EU customers without VAT applied.
         # Invoices are issued by Ubicloud B.V. for EU customers.
         #   - If the customer has provided a VAT number from the Netherlands, we charge 21% VAT.
         #   - If the customer has provided a VAT number from another European country, we include a reverse charge notice along with 0% VAT.
         #   - If the customer hasn't provided a VAT number, we charge 21% VAT until non-Dutch EU sales exceed annual threshold, than we charge local VAT.
-        issuer = {
-          name: "Ubicloud Inc.",
-          address: "310 Santa Ana Avenue",
-          country: "US",
-          city: "San Francisco",
-          state: "CA",
-          postal_code: "94127"
-        }
-        vat_info = nil
-        if country&.in_eu_vat?
-          issuer = {
+        project_content[:issuer_info] = if is_eu
+          {
             name: "Ubicloud B.V.",
             address: "Turfschip 267",
             country: "NL",
@@ -56,13 +71,23 @@ class InvoiceGenerator
             trade_id: "88492729",
             in_eu_vat: true
           }
-          vat_info = if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
+        else
+          {
+            name: "Ubicloud Inc.",
+            address: "310 Santa Ana Avenue",
+            country: "US",
+            city: "San Francisco",
+            state: "CA",
+            postal_code: "94127"
+          }
+        end
+        vat_info = if is_eu
+          if (tax_id = project_content[:billing_info]["tax_id"]) && !tax_id.empty? && country.alpha2 != "NL"
             {rate: 0, reversed: true}
           else
             {rate: Config.annual_non_dutch_eu_sales_exceed_threshold ? country.vat_rates["standard"] : 21, reversed: false, eur_rate: @eur_rate}
           end
         end
-        project_content[:issuer_info] = issuer
         project_content[:resources] = []
         project_content[:subtotal] = 0
         project_records.group_by { |pr| [pr[:resource_id], pr[:resource_name]] }.each do |(resource_id, resource_name), line_items|
@@ -153,7 +178,7 @@ class InvoiceGenerator
           invoice_order = format("%04d", project.invoices.count + 1)
           invoice_number = "#{invoice_month}-#{invoice_customer}-#{invoice_order}"
 
-          invoice = Invoice.create(project_id: project.id, invoice_number: invoice_number, content: project_content, begin_time: @begin_time, end_time: @end_time)
+          invoice = Invoice.create(project_id: project.id, invoice_number:, content: project_content, begin_time: @begin_time, end_time: @end_time)
 
           # Don't substract the 1$ credit from customer's overall credit as it will be applied each month to each customer
           project_content[:credit] -= project_content.fetch(:github_credit, 0)
@@ -184,7 +209,7 @@ class InvoiceGenerator
   end
 
   def active_billing_records
-    active_billing_records = BillingRecord.eager(project: [:billing_info, :invoices])
+    active_billing_records = BillingRecord.eager(project: [:invoices, billing_info: :payment_methods])
       .where { |br| Sequel.pg_range(br.span).overlaps(Sequel.pg_range(@begin_time...@end_time)) }
     active_billing_records = active_billing_records.where(project_id: @project_ids) unless @project_ids.empty?
     active_billing_records.all.map do |br|
@@ -201,7 +226,7 @@ class InvoiceGenerator
         resource_family: br.billing_rate["resource_family"],
         amount: br.amount,
         cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
-        duration: duration,
+        duration:,
         begin_time: br.span.begin,
         unit_price: br.billing_rate["unit_price"]
       }

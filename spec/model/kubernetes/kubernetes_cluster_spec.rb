@@ -8,7 +8,7 @@ RSpec.describe KubernetesCluster do
     private_subnet = PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
     described_class.create(
       name: "kc-name",
-      version: "v1.32",
+      version: Option.kubernetes_versions.first,
       location_id: Location::HETZNER_FSN1_ID,
       cp_node_count: 3,
       project_id: project.id,
@@ -25,8 +25,22 @@ RSpec.describe KubernetesCluster do
     expect(kc.path).to eq("/location/eu-central-h1/kubernetes-cluster/kc-name")
   end
 
+  it "#display_state shows appropriate state" do
+    kc.strand = Strand.new(prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
+    expect(kc.display_state).to eq "running"
+    kc.strand.label = "start"
+    expect(kc.display_state).to eq "creating"
+    kc.incr_destroy
+    kc.reload
+    expect(kc.display_state).to eq "deleting"
+    Semaphore.dataset.destroy
+    kc.incr_destroying
+    kc.reload
+    expect(kc.display_state).to eq "deleting"
+  end
+
   it "initiates a new health monitor session" do
-    sshable = instance_double(Sshable)
+    sshable = Sshable.new
     expect(kc).to receive(:sshable).and_return(sshable)
     expect(sshable).to receive(:start_fresh_session)
     kc.init_health_monitor_session
@@ -34,7 +48,7 @@ RSpec.describe KubernetesCluster do
 
   it "checks pulse" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "down",
@@ -47,12 +61,12 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_return(true)
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
   it "checks pulse on with no changes to the internal services" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "up",
@@ -64,12 +78,12 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_return(false)
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("up")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
   end
 
   it "checks pulse and fails" do
     session = {
-      ssh_session: instance_double(Net::SSH::Connection::Session)
+      ssh_session: Net::SSH::Connection::Session.allocate
     }
     pulse = {
       reading: "down",
@@ -81,13 +95,13 @@ RSpec.describe KubernetesCluster do
     expect(kc).to receive(:client).and_return(client)
     expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
 
-    expect(kc.check_pulse(session: session, previous_pulse: pulse)[:reading]).to eq("down")
+    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
   end
 
   describe "#kubectl" do
     it "create a new client" do
-      session = instance_double(Net::SSH::Connection::Session)
-      expect(kc.client(session: session)).to be_an_instance_of(Kubernetes::Client)
+      session = Net::SSH::Connection::Session.allocate
+      expect(kc.client(session:)).to be_an_instance_of(Kubernetes::Client)
     end
   end
 
@@ -102,11 +116,11 @@ RSpec.describe KubernetesCluster do
     end
 
     it "validates version" do
-      kc.version = "v1.34"
+      kc.version = "v1.30"
       expect(kc.valid?).to be false
       expect(kc.errors[:version]).to eq(["must be a valid Kubernetes version"])
 
-      kc.version = "v1.32"
+      kc.version = Option.kubernetes_versions.first
       expect(kc.valid?).to be true
     end
 
@@ -133,14 +147,13 @@ RSpec.describe KubernetesCluster do
             client-certificate-data: "mocked_cert_data"
             client-key-data: "mocked_key_data"
     YAML
-    let(:sshable) { instance_double(Sshable) }
-    let(:vm) { instance_double(Vm, sshable: sshable) }
-    let(:cp_vms) { [vm] }
 
     it "removes client certificate and key data from users and adds an RBAC token to users" do
-      expect(kc).to receive(:cp_vms).and_return(cp_vms)
-      expect(sshable).to receive(:cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
-      expect(sshable).to receive(:cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
+      sshable = Sshable.new
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
+      expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_return("mocked_rbac_token")
+      expect(sshable).to receive(:_cmd).with("sudo cat /etc/kubernetes/admin.conf", log: false).and_return(kubeconfig)
       customer_config = kc.kubeconfig
       YAML.safe_load(customer_config)["users"].each do |user|
         expect(user["user"]).not_to have_key("client-certificate-data")
@@ -151,13 +164,13 @@ RSpec.describe KubernetesCluster do
   end
 
   describe "vm_diff_for_lb" do
-    it "finds the extra and missing vms" do
+    it "finds the extra and missing nodes" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 443, dst_port: 8443).subject
       extra_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "extra-vm", private_subnet_id: kc.private_subnet.id).subject
       missing_vm = Prog::Vm::Nexus.assemble("k y", kc.project.id, name: "missing-vm", private_subnet_id: kc.private_subnet.id).subject
       lb.add_vm(extra_vm)
-      np = instance_double(KubernetesNodepool, vms: [missing_vm])
-      expect(kc).to receive(:nodepools).and_return([np])
+      kn = KubernetesNodepool.create(name: "np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      KubernetesNode.create(vm_id: missing_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
       extra_vms, missing_vms = kc.vm_diff_for_lb(lb)
       expect(extra_vms.count).to eq(1)
       expect(extra_vms[0].id).to eq(extra_vm.id)
@@ -167,7 +180,7 @@ RSpec.describe KubernetesCluster do
   end
 
   describe "port_diff_for_lb" do
-    it "finds the extra and missing vms" do
+    it "finds the extra and missing nodes" do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(kc.private_subnet.id, name: kc.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
       extra_ports, missing_ports = kc.port_diff_for_lb(lb, [[443, 8443]])
       expect(extra_ports.count).to eq(1)
@@ -177,16 +190,28 @@ RSpec.describe KubernetesCluster do
     end
   end
 
-  describe "#all_vms" do
-    it "returns all VMs in the cluster, including CP and worker nodes" do
-      expect(kc).to receive(:cp_vms).and_return([1, 2])
-      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
-      expect(kc.all_vms).to eq([1, 2, 3, 4, 5, 6])
+  describe "#install_rhizome" do
+    it "creates a strand for each control plane vm to update the contents of rhizome folder" do
+      sshable = create_mock_sshable(id: "someid")
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).twice
+      kc.cp_vms.each do |vm|
+        expect(Strand).to receive(:create).with(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+      end
+      kc.install_rhizome
+    end
+  end
+
+  describe "#all_nodes" do
+    it "returns all nodes in the cluster" do
+      expect(kc).to receive(:nodes).and_return([1, 2])
+      expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, nodes: [3, 4]), instance_double(KubernetesNodepool, nodes: [5, 6])])
+      expect(kc.all_nodes).to eq([1, 2, 3, 4, 5, 6])
     end
   end
 
   describe "#worker_vms" do
-    it "returns all worker VMs in the cluster" do
+    it "returns all worker vms in the cluster" do
       expect(kc).to receive(:nodepools).and_return([instance_double(KubernetesNodepool, vms: [3, 4]), instance_double(KubernetesNodepool, vms: [5, 6])])
       expect(kc.worker_vms).to eq([3, 4, 5, 6])
     end

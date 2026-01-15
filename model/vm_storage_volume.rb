@@ -4,23 +4,24 @@ require_relative "../model"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
-  many_to_one :spdk_installation
-  many_to_one :vhost_block_backend
+  many_to_one :spdk_installation, read_only: true
+  many_to_one :vhost_block_backend, read_only: true
   many_to_one :storage_device
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
-  many_to_one :boot_image
+  many_to_one :boot_image, read_only: true
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
   plugin ResourceMethods
+  plugin ProviderDispatcher, __FILE__
+
+  def aws?
+    vm.location.aws?
+  end
 
   def device_id
     "#{vm.inhost_name}_#{disk_index}"
-  end
-
-  def device_path
-    vm.location.aws? ? "/dev/nvme#{disk_index}n1" : "/dev/disk/by-id/virtio-#{device_id}"
   end
 
   def spdk_version
@@ -33,7 +34,7 @@ class VmStorageVolume < Sequel::Model
 
   def num_queues
     @num_queues ||= if vhost_block_backend
-      [vm.vcpus / 2, 1].max
+      vring_workers
     else
       # SPDK volumes
       1
@@ -67,9 +68,13 @@ end
 #  max_read_mbytes_per_sec  | integer |
 #  max_write_mbytes_per_sec | integer |
 #  vhost_block_backend_id   | uuid    |
+#  vring_workers            | integer |
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
+# Check constraints:
+#  vring_workers_null_if_not_ubiblk | (vhost_block_backend_id IS NOT NULL OR vring_workers IS NULL)
+#  vring_workers_positive_if_ubiblk | (vhost_block_backend_id IS NULL OR vring_workers IS NOT NULL AND vring_workers > 0)
 # Foreign key constraints:
 #  vm_storage_volume_boot_image_id_fkey           | (boot_image_id) REFERENCES boot_image(id)
 #  vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)

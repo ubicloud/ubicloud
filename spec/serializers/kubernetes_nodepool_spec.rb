@@ -9,7 +9,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
       kc = KubernetesCluster.create(
         name: "cluster",
-        version: "v1.32",
+        version: Option.kubernetes_versions.first,
         cp_node_count: 3,
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,
@@ -18,7 +18,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       )
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
       vm = create_vm
-      kn.add_vm(vm)
+      KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
 
       expected_result = {
         id: kn.ubid,
@@ -37,7 +37,7 @@ RSpec.describe Serializers::KubernetesNodepool do
       subnet = PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id)
       kc = KubernetesCluster.create(
         name: "cluster",
-        version: "v1.32",
+        version: Option.kubernetes_versions.first,
         cp_node_count: 3,
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,

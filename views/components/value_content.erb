@@ -9,7 +9,7 @@
 <% elsif opts[:component] %>
   <%== part("components/#{content}", **opts[:component]) %>
 <% elsif opts[:escape] == false %>
-  <%== content %>
+  <%== allow_unescaped(content) %>
 <% else %>
   <%= content || "-" %>
 <% end %>

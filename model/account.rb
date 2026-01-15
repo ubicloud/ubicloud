@@ -3,18 +3,28 @@
 require_relative "../model"
 
 class Account < Sequel::Model(:accounts)
-  one_to_many :usage_alerts, key: :user_id
-  one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}
-  one_to_many :identities, class: :AccountIdentity
-  many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id, right_key: :project_id
+  one_to_many :usage_alerts, key: :user_id, read_only: true
+  one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}, read_only: true
+  one_to_many :identities, class: :AccountIdentity, remover: nil, clearer: nil
+  one_to_many :invitations, class: :ProjectInvitation, primary_key: :email, key: :email, read_only: true
+  many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id
 
   plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
   plugin ResourceMethods
   include SubjectTag::Cleanup
 
-  def create_project_with_default_policy(name, default_policy: true)
-    project = Project.create(name: name)
+  alias_method :admin_label, :email
+
+  FREE_MAIL_DOMAINS = %w[gmail.com outlook.com hotmail.com yahoo.com icloud.com protonmail.com proton.me].freeze
+
+  def provider_names
+    identities.map(&:provider).join(", ")
+  end
+
+  def create_project_with_default_policy(name, reputation: "new", default_policy: true)
+    reputation = "limited" if FREE_MAIL_DOMAINS.any? { email.end_with?("@#{it}") } && projects.none? { it.reputation == "verified" }
+    project = Project.create(name:, reputation:)
     add_project(project)
 
     if default_policy
@@ -31,11 +41,21 @@ class Account < Sequel::Model(:accounts)
     project
   end
 
+  def first_sole_project_with_resources
+    Project
+      .where(id: DB[:access_tag]
+        .select_group(:project_id)
+        .where(project_id: projects_dataset.select(Sequel[:project][:id]))
+        .having(Sequel.function(:count).* => 1))
+      .first_project_with_resources
+  end
+
   def suspend
     update(suspended_at: Time.now)
     DB[:account_active_session_keys].where(account_id: id).delete(force: true)
-
+    api_keys_dataset.update(is_valid: false)
     PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
+    ProjectInvitation.where(inviter_id: id).destroy
   end
 end
 

@@ -2,9 +2,7 @@
 
 <% @page_message = "Verify your sign in" %>
 
-<form action="<%= rodauth.otp_auth_path %>" class="rodauth space-y-6" role="form" method="POST">
-  <%== rodauth.otp_auth_additional_form_tags %>
-  <%== rodauth.csrf_tag(rodauth.otp_auth_path) %>
+<% form(action: rodauth.otp_auth_path, method: :post, class: "rodauth space-y-6") do %>
 
   <%== render("components/rodauth/otp_auth_code_field") %>
 
@@ -13,11 +11,11 @@
     <p class="mt-10 text-center text-sm text-gray-400">
       Can't access your authentication app?
       <br>
-      <a href="/<%= rodauth.recovery_auth_route %>" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">Enter a recovery code</a>
+      <a href="<%= rodauth.recovery_auth_path %>" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">Enter a recovery code</a>
       or
       <a href="mailto:support@ubicloud.com" class="font-semibold leading-6 text-orange-500 hover:text-orange-700">contact support</a>
     </p>
   </div>
-</form>
+<% end %>
 
 <%== rodauth.otp_auth_form_footer %>

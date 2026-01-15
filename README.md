@@ -8,22 +8,22 @@
 Ubicloud is an open source cloud that can run anywhere. Think of it as an open alternative
 to cloud providers, like what Linux is to proprietary operating systems.
 
-Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, Leaseweb, 
-and AWS Bare Metal. You can set it up yourself on these providers or you can use our 
+Ubicloud provides IaaS cloud features on bare metal providers, such as Hetzner, Leaseweb,
+and AWS Bare Metal. You can set it up yourself on these providers or you can use our
 [managed service](https://console.ubicloud.com).
 
 ## Quick start
 
 ### Managed platform
 
-You can use Ubicloud without installing anything. When you do this, we pass along the 
+You can use Ubicloud without installing anything. When you do this, we pass along the
 underlying provider's benefits to you, such as price or location.
 
 https://console.ubicloud.com
 
 ### Build your own cloud
 
-You can also build your own cloud. To do this, start up Ubicloud's control plane and 
+You can also build your own cloud. To do this, start up Ubicloud's control plane and
 connect to its cloud console.
 
 ```
@@ -59,20 +59,20 @@ resources on these machines.
 docker exec -it ubicloud-app ./demo/cloudify_server
 ```
 
-Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP 
-doesn't support IPv6, please use a VPN or tunnel broker such as Mullvad or Hurricane 
+Later when you create VMs, Ubicloud will assign them IPv6 addresses. If your ISP
+doesn't support IPv6, please use a VPN or tunnel broker such as Mullvad or Hurricane
 Electric's https://tunnelbroker.net/ to connect. Alternatively, you could lease
 IPv4 addresses from your provider and add them to your control plane.
 
 ## Why use it
 
-Public cloud providers like AWS, Azure, and Google Cloud have made life easier for 
-start-ups and enterprises. But they are closed source, have you rent computers 
-at a huge premium, and lock you in. Ubicloud offers an open source alternative, 
-reduces your costs, and returns control of your infrastructure back to you. All 
+Public cloud providers like AWS, Azure, and Google Cloud have made life easier for
+start-ups and enterprises. But they are closed source, have you rent computers
+at a huge premium, and lock you in. Ubicloud offers an open source alternative,
+reduces your costs, and returns control of your infrastructure back to you. All
 without sacrificing the cloud's convenience.
 
-Today, AWS offers about two hundred cloud services. Ultimately, we will implement 
+Today, AWS offers about two hundred cloud services. Ultimately, we will implement
 10% of the cloud services that make up 80% of that consumption.
 
 Example workloads and reasons to use Ubicloud today include:
@@ -81,7 +81,7 @@ Example workloads and reasons to use Ubicloud today include:
 GitHub Actions), or you'd like to run compute/memory heavy tests. Our managed
 cloud is ~3x cheaper than AWS, so you save on costs.
 
-* You want a portable and simple app deployment service like 
+* You want a portable and simple app deployment service like
 [Kamal](https://github.com/basecamp/kamal). We're moving Ubicloud's control plane
 from Heroku to Kamal; and we want to provide open and portable services for
 Kamal's dependencies in the process.
@@ -94,8 +94,8 @@ cloud for portability, security, or compliance reasons.
 You can provide us your feedback, get help, or ask us questions regarding your
 Ubicloud installations in the [Community Forum](https://github.com/ubicloud/ubicloud/discussions).
 
-We follow an established architectural pattern in building public cloud services. 
-A control plane manages a data plane, where the data plane leverages open source 
+We follow an established architectural pattern in building public cloud services.
+A control plane manages a data plane, where the data plane leverages open source
 software.  You can find our current cloud components / services below.
 
 * **Elastic Compute**: Our control plane communicates with Linux bare metal servers
@@ -119,7 +119,7 @@ follow security best practices and encrypt the data encryption key itself.
 
 * **Attribute-Based Access Control (ABAC)**: With ABAC, you can define attributes,
 roles, and permissions for users and give them fine-grained access to resources. You
-can read more about our [ABAC design here](doc/authorization.md).
+can read more about our [ABAC design here](https://www.ubicloud.com/docs/architecture/attribute-based-access-control-abac#attribute-based-access-control-abac-design).
 
 * **What's Next?**: We're planning to work on a managed K8s or metrics/monitoring
 service next. If you have a workload that would benefit from a specific cloud
@@ -152,22 +152,22 @@ it](https://learnthisrepo.com/ubicloud).
 ### Do you have any experience with building this sort of thing?
 
 Our founding team comes from Azure; and worked at Amazon and Heroku before that.
-We also have start-up experience. We were co-founders and founding team members 
-at [Citus Data](https://github.com/citusdata/citus), [which got acquired by 
+We also have start-up experience. We were co-founders and founding team members
+at [Citus Data](https://github.com/citusdata/citus), [which got acquired by
 Microsoft](https://news.ycombinator.com/item?id=18990469).
 
 ### How is this different than OpenStack?
 
 We see three differences. First, Ubicloud is available as a managed service (vs boxed
 software). This way, you can get started in minutes rather than weeks. Since Ubicloud
-is designed for multi-tenancy, it comes with built-in features such as encryption 
+is designed for multi-tenancy, it comes with built-in features such as encryption
 at rest and in transit, virtual networking, secrets rotation, etc.
 
-Second, we're initially targeting developers. This -we hope- will give us fast feedback 
-cycles and enable us to have 6 key services in GA form in the next two years. OpenStack 
+Second, we're initially targeting developers. This -we hope- will give us fast feedback
+cycles and enable us to have 6 key services in GA form in the next two years. OpenStack
 is still primarily used for 3 cloud services.
 
-Last, we're designing for simplicity. With OpenStack, you pick between 10 hypervisors, 
-10 S3 implementations, and 5 block storage implementations. The software needs to work 
+Last, we're designing for simplicity. With OpenStack, you pick between 10 hypervisors,
+10 S3 implementations, and 5 block storage implementations. The software needs to work
 in a way where all of these implementations are compatible with each other. That leads
 to consultant-ware. We'll take a more opinionated approach with Ubicloud.

@@ -3,24 +3,25 @@
 require_relative "../model"
 
 class LoadBalancer < Sequel::Model
-  many_to_one :project
-  many_to_many :vms
+  many_to_one :project, read_only: true
+  many_to_many :vms, read_only: true
   one_to_one :strand, key: :id
-  many_to_one :private_subnet
-  one_to_many :load_balancer_vms
-  one_to_many :ports, class: :LoadBalancerPort
-  many_to_many :certs
-  one_to_many :load_balancer_certs
-  many_to_one :custom_hostname_dns_zone, class: :DnsZone
+  many_to_one :private_subnet, read_only: true
+  one_to_many :load_balancer_vms, read_only: true
+  one_to_many :ports, class: :LoadBalancerPort, remover: nil, clearer: nil
+  many_to_many :certs, remover: nil, clearer: nil
+  one_to_many :load_balancer_certs, read_only: true
+  many_to_one :custom_hostname_dns_zone, class: :DnsZone, read_only: true
   many_to_many :vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true
   many_to_many :active_vm_ports, join_table: :load_balancer_port, right_key: :id, right_primary_key: :load_balancer_port_id, class: :LoadBalancerVmPort, read_only: true, conditions: {state: "up"}
-  many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"])
+  many_through_many :vms_to_dns, [[:load_balancer_port, :load_balancer_id, :id], [:load_balancer_vm_port, :load_balancer_port_id, :load_balancer_vm_id], [:load_balancers_vms, :id, :vm_id]], class: :Vm, conditions: Sequel.~(Sequel[:load_balancer_vm_port][:state] => ["evacuating", "detaching"]), is_used: true
 
   plugin :association_dependencies, load_balancer_vms: :destroy, ports: :destroy, load_balancer_certs: :destroy
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :update_load_balancer, :rewrite_dns_records, :refresh_cert
   include ObjectTag::Cleanup
+
   dataset_module Pagination
 
   def display_location
@@ -37,6 +38,10 @@ class LoadBalancer < Sequel::Model
 
   def dst_port
     first_port&.dst_port
+  end
+
+  def health_check_url(use_endpoint: false, path: (health_check_endpoint if use_endpoint))
+    "#{health_check_protocol}://#{hostname}#{":#{dst_port}" if use_endpoint}#{path}"
   end
 
   def path
@@ -59,10 +64,15 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       port = super(src_port:, dst_port:)
       load_balancer_vms.each do |lb_vm|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm.id)
+        add_port_with_stack(port, lb_vm.id)
       end
       incr_update_load_balancer
     end
+  end
+
+  def add_port_with_stack(port, lb_vm_id)
+    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv4") if ipv4_enabled?
+    LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: lb_vm_id, stack: "ipv6") if ipv6_enabled?
   end
 
   def remove_port(port)
@@ -77,17 +87,32 @@ class LoadBalancer < Sequel::Model
     DB.transaction do
       load_balancer_vm = LoadBalancerVm.create(load_balancer_id: id, vm_id: vm.id)
       ports.each { |port|
-        LoadBalancerVmPort.create(load_balancer_port_id: port.id, load_balancer_vm_id: load_balancer_vm.id)
+        add_port_with_stack(port, load_balancer_vm.id)
       }
-      Strand.create(prog: "Vnet::CertServer", label: "put_certificate", stack: [{subject_id: id, vm_id: vm.id}], parent_id: id) if cert_enabled_lb?
+      setup_cert_server(vm.id) if cert_enabled
       incr_rewrite_dns_records
     end
+  end
+
+  def enable_cert_server
+    update(cert_enabled: true)
+    DB.ignore_duplicate_queries do
+      vms.each { |vm| setup_cert_server(vm.id) }
+    end
+  end
+
+  def disable_cert_server
+    update(cert_enabled: false)
+    DB.ignore_duplicate_queries do
+      vms.each { |vm| remove_cert_server(vm.id) }
+    end
+    certs.each(&:incr_destroy)
   end
 
   def detach_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down", "evacuating"]).update(state: "detaching")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
     end
   end
@@ -95,19 +120,25 @@ class LoadBalancer < Sequel::Model
   def evacuate_vm(vm)
     DB.transaction do
       vm_ports_by_vm_and_state(vm, ["up", "down"]).update(state: "evacuating")
-      remove_cert_server(vm.id)
+      remove_cert_server(vm.id) if cert_enabled
       incr_update_load_balancer
       incr_rewrite_dns_records
     end
   end
 
   def remove_cert_server(vm_id)
-    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id) if cert_enabled_lb?
+    Strand.create(prog: "Vnet::CertServer", label: "remove_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
+  end
+
+  def setup_cert_server(vm_id)
+    Strand.create(prog: "Vnet::CertServer", label: "setup_cert_server", stack: [{subject_id: id, vm_id:}], parent_id: id)
   end
 
   def remove_vm(vm)
     DB.transaction do
-      vm_ports_by_vm(vm).destroy
+      DB.ignore_duplicate_queries do
+        vm_ports_by_vm(vm).destroy
+      end
       load_balancer_vms_dataset[vm_id: vm.id].destroy
       incr_rewrite_dns_records
     end
@@ -115,7 +146,9 @@ class LoadBalancer < Sequel::Model
 
   def remove_vm_port(vm_port)
     DB.transaction do
-      vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
+      DB.ignore_duplicate_queries do
+        vm_ports_dataset.where(Sequel[:load_balancer_vm_port][:id] => vm_port.id).destroy
+      end
       if vm_ports_dataset.where(load_balancer_vm_id: vm_port.load_balancer_vm_id).count.zero?
         load_balancer_vms_dataset[id: vm_port.load_balancer_vm_id].destroy
       end
@@ -131,12 +164,8 @@ class LoadBalancer < Sequel::Model
     custom_hostname_dns_zone || DnsZone[project_id: Config.load_balancer_service_project_id, name: Config.load_balancer_service_hostname]
   end
 
-  def cert_enabled_lb?
-    health_check_protocol == "https"
-  end
-
   def need_certificates?
-    return false unless cert_enabled_lb?
+    return false unless cert_enabled
 
     certs_dataset.with_cert.needing_recert.empty?
   end
@@ -153,10 +182,19 @@ class LoadBalancer < Sequel::Model
     stack == Stack::IPV6 || stack == Stack::DUAL
   end
 
+  def self.stack_options
+    [Stack::IPV4, Stack::IPV6, Stack::DUAL].freeze
+  end
+
   module Stack
     IPV4 = "ipv4"
     IPV6 = "ipv6"
     DUAL = "dual"
+  end
+
+  def validate
+    super
+    errors.add(:name, "cannot start with 'private-'") if name&.start_with?("private-")
   end
 end
 
@@ -177,6 +215,7 @@ end
 #  stack                       | lb_stack                 | NOT NULL DEFAULT 'dual'::lb_stack
 #  project_id                  | uuid                     | NOT NULL
 #  created_at                  | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  cert_enabled                | boolean                  | DEFAULT false
 # Indexes:
 #  load_balancer_pkey                        | PRIMARY KEY btree (id)
 #  load_balancer_custom_hostname_key         | UNIQUE btree (custom_hostname)
