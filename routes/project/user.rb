@@ -20,7 +20,9 @@ class Clover
           email = typecast_params.nonempty_str!("email")
           handle_validation_failure("project/user")
 
-          if @project.invitations_dataset.first(email:)
+          if @project.accounts_dataset.first(email:)
+            raise_web_error("The requested user already has access to this project")
+          elsif @project.invitations_dataset.first(email:)
             raise_web_error("'#{email}' already invited to join the project.")
           elsif @project.invitations_dataset.count >= 50
             raise_web_error("You can't have more than 50 pending invitations.")
@@ -35,45 +37,27 @@ class Clover
           user = Account.exclude(status_id: 3)[email:]
 
           DB.transaction do
+            @project.add_invitation(email:, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
+            audit_log(@project, "add_invitation")
+
             if user
-              result = DB[:access_tag]
-                .returning(:hyper_tag_id)
-                .insert_conflict
-                .insert(hyper_tag_id: user.id, project_id: @project.id)
-              audit_log(@project, "add_account", user)
-
-              if result.empty?
-                raise_web_error("The requested user already has access to this project")
-              end
-
-              if tag
-                tag.add_subject(user.id)
-                audit_log(tag, "add_member", user)
-              end
-
-              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-                greeting: "Hello,",
-                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                  "To join project, click the button below.",
-                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-                button_title: "Join Project",
-                button_link: "#{Config.base_url}#{@project.path}/dashboard")
+              msg = "To accept or decline the invitation, click the button below."
+              link = "project"
             else
-              @project.add_invitation(email:, policy: (policy if tag), inviter_id: current_account_id, expires_at: Time.now + 7 * 24 * 60 * 60)
-              audit_log(@project, "add_invitation")
-
-              Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
-                greeting: "Hello,",
-                body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
-                  "To join project, you need to create an account on Ubicloud. Once you create an account, you'll be automatically joined to the project.",
-                  "For any questions or assistance, reach out to our team at support@ubicloud.com."],
-                button_title: "Create Account",
-                button_link: "#{Config.base_url}/create-account")
+              msg = "To join the project, you need to create an account on Ubicloud. Once you create an account, you can accept the invitation on the Projects page."
+              link = "create-account"
             end
+
+            Util.send_email(email, "Invitation to Join '#{@project.name}' Project on Ubicloud",
+              greeting: "Hello,",
+              body: ["You're invited by '#{current_account.name}' to join the '#{@project.name}' project on Ubicloud.",
+                msg,
+                "For any questions or assistance, reach out to our team at support@ubicloud.com."],
+              button_title: "Join Project",
+              button_link: "#{Config.base_url}/#{link}")
           end
 
           flash["notice"] = "Invitation sent successfully to '#{email}'."
-
           r.redirect user_path
         end
       end

@@ -386,7 +386,7 @@ RSpec.describe Clover, "project" do
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
         click_button "Invite"
-        expect(ProjectInvitation.count).to eq 0
+        expect(ProjectInvitation.count).to eq 1
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -406,8 +406,8 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
-        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
+        expect(ProjectInvitation.count).to eq 1
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -426,6 +426,7 @@ RSpec.describe Clover, "project" do
         click_button "Invite"
         expect(page).to have_flash_notice("Invitation sent successfully to 'user2@example.com'.")
 
+        project.add_account(user2)
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
         click_button "Invite"
@@ -433,8 +434,8 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
-        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
+        expect(ProjectInvitation.count).to eq 1
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -458,7 +459,7 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
+        expect(ProjectInvitation.count).to eq 1
         expect(Mail::TestMailer.deliveries.length).to eq 1
         expect(allowed.member_ids).to be_empty
       end
