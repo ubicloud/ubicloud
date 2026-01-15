@@ -246,6 +246,7 @@ end
 # Referenced By:
 #  access_control_entry      | access_control_entry_project_id_fkey      | (project_id) REFERENCES project(id)
 #  access_tag                | access_tag_project_id_fkey                | (project_id) REFERENCES project(id)
+#  account_default_project   | account_default_project_project_id_fkey   | (project_id) REFERENCES project(id) ON DELETE CASCADE
 #  action_tag                | action_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
