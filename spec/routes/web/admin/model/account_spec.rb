@@ -9,11 +9,12 @@ RSpec.describe CloverAdmin, "Account" do
   end
 
   it "displays the Account instance page correctly" do
+    @instance.update(name: "Test-Admin-Account")
     click_link "Account"
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - Account - Browse"
 
-    click_link @instance.admin_label
+    click_link @instance.name
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - Account #{@instance.ubid}"
   end

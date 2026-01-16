@@ -11,10 +11,6 @@ RSpec.configure do |config|
       AccessControlEntry.create(project_id: project.id, subject_id: subject_tag.id)
     end
 
-    def create_account
-      super
-    end
-
     def create_action_tag
       project = Project.create(name: "test-project")
       ActionTag.create(project_id: project.id, name: "test-action")
@@ -214,10 +210,17 @@ RSpec.configure do |config|
     end
 
     def create_inference_router_target
+      router = create_inference_router
       router_model = create_inference_router_model
-      create_inference_endpoint
-      replica = create_inference_endpoint_replica
-      InferenceRouterTarget.create(inference_router_model_id: router_model.id, inference_endpoint_replica_id: replica.id, is_default: true)
+      InferenceRouterTarget.create(
+        name: "test-inference-router",
+        host: "127.0.0.1",
+        api_key: "a",
+        inflight_limit: 1,
+        priority: 1,
+        inference_router_id: router.id,
+        inference_router_model_id: router_model.id
+      )
     end
 
     def create_invoice
@@ -401,7 +404,7 @@ RSpec.configure do |config|
         target_storage_size_gib: 100,
         target_version: "16"
       )
-      PostgresMetricDestination.create_with_id(pg.id, url: "https://metrics.example.com", username: "test", password: "test-pass")
+      PostgresMetricDestination.create_with_id(pg.id, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
     end
 
     def create_postgres_resource
@@ -423,7 +426,7 @@ RSpec.configure do |config|
       timeline = PostgresTimeline.create(location_id: pg.location_id, access_key: "test-key", secret_key: "test-secret")
       vm = Prog::Vm::Nexus.assemble_with_sshable(pg.project_id, name: "pg-vm", location_id: pg.location_id, unix_user: "ubi").subject
       VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1)
-      PostgresServer.create(timeline_id: timeline.id, resource_id: pg.id, vm_id: vm.id)
+      PostgresServer.create(timeline_id: timeline.id, resource_id: pg.id, vm_id: vm.id, version: "18")
     end
 
     def create_postgres_timeline
