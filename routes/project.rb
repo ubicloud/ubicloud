@@ -35,6 +35,20 @@ class Clover
       end
     end
 
+    r.post web?, "set-default", :ubid_uuid do |project_id|
+      no_authorization_needed
+      no_audit_log
+
+      if (project = current_account.projects_dataset.with_pk(project_id))
+        current_account.default_project = project
+        flash["notice"] = "Default project updated"
+      else
+        flash["error"] = "Invalid default project selected"
+      end
+
+      r.redirect "/project"
+    end
+
     r.on web?, "invitation", :ubid_uuid do |project_id|
       invitation = current_account.invitations_dataset.first(project_id:)
       check_found_object(invitation)

@@ -8,6 +8,7 @@ class Account < Sequel::Model(:accounts)
   one_to_many :identities, class: :AccountIdentity, remover: nil, clearer: nil
   one_to_many :invitations, class: :ProjectInvitation, primary_key: :email, key: :email, read_only: true
   many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id
+  one_through_one :default_project, class: :Project, join_table: :account_default_project, left_key: :id, right_key: :project_id
 
   plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
 
@@ -79,6 +80,7 @@ end
 #  account_active_session_keys       | account_active_session_keys_account_id_fkey       | (account_id) REFERENCES accounts(id)
 #  account_activity_times            | account_activity_times_id_fkey                    | (id) REFERENCES accounts(id)
 #  account_authentication_audit_logs | account_authentication_audit_logs_account_id_fkey | (account_id) REFERENCES accounts(id)
+#  account_default_project           | account_default_project_id_fkey                   | (id) REFERENCES accounts(id) ON DELETE CASCADE
 #  account_email_auth_keys           | account_email_auth_keys_id_fkey                   | (id) REFERENCES accounts(id)
 #  account_identities                | account_identities_account_id_fkey                | (account_id) REFERENCES accounts(id)
 #  account_jwt_refresh_keys          | account_jwt_refresh_keys_account_id_fkey          | (account_id) REFERENCES accounts(id)

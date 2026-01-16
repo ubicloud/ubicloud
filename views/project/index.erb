@@ -12,11 +12,16 @@
 <div class="grid gap-6">
   <%== part(
       "components/table_card",
-      headers: %w[Name Remove\ Access],
+      headers: ["Name", "Set As Default", "Remove Access"],
       rows: @projects.map do |p|
          [
            [
              [p.name, {link: "#{p.path}/dashboard"}],
+             if current_account.default_project == p
+               ["Default"]
+             else
+               [part("components/submit_button", action: "/project/set-default/#{p.ubid}", text: "Set As Default"), {escape: false}]
+             end,
              [
                part("components/delete_button",
                  url: "/project/#{p.ubid}/user/#{current_account.ubid}",
