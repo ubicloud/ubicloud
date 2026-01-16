@@ -164,6 +164,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(nx).to receive(:incr_sync_internal_dns_config)
       expect(nx).to receive(:incr_install_csi)
       expect { nx.start }.to hop("create_load_balancers")
+      expect(KubernetesEtcdBackup.first.kubernetes_cluster_id).to eq(kubernetes_cluster.id)
     end
   end
 
@@ -797,6 +798,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "triggers deletion of associated resources and completes destroy when nodepools are gone" do
+      KubernetesEtcdBackup.create(kubernetes_cluster_id: kubernetes_cluster.id, access_key: "access", secret_key: "secret", location_id: Location::HETZNER_FSN1_ID)
       st.update(prog: "Kubernetes::KubernetesClusterNexus", label: "destroy", stack: [{}])
       kubernetes_cluster.nodepools.first.destroy
       kubernetes_cluster.nodes.map(&:destroy)
@@ -806,6 +808,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.services_lb).to receive(:incr_destroy)
       expect(kubernetes_cluster.cp_vms).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
+
+      expect(kubernetes_cluster.kubernetes_etcd_backup).to receive(:incr_destroy)
+      kubernetes_cluster.kubernetes_etcd_backup.destroy
 
       expect(kubernetes_cluster.nodepools).to be_empty
 

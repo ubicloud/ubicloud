@@ -66,6 +66,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   end
 
   label def start
+    Prog::Kubernetes::EtcdBackupNexus.assemble(kubernetes_cluster.id)
     register_deadline("wait", 120 * 60)
     incr_install_metrics_server
     incr_sync_worker_mesh
@@ -346,6 +347,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
   label def destroy
     reap do
       decr_destroy
+
+      kubernetes_cluster.kubernetes_etcd_backup&.incr_destroy
 
       kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
         ubid: kubernetes_cluster.ubid,
