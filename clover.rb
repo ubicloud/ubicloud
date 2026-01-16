@@ -851,7 +851,11 @@ class Clover < Roda
   hash_branch("after-login") do |r|
     r.get web? do
       no_authorization_needed
-      redirect_default_project_dashboard
+      if current_account.invitations_dataset.empty?
+        redirect_default_project_dashboard
+      else
+        r.redirect "/project"
+      end
     end
   end
 
