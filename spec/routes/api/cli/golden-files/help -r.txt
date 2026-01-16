@@ -517,6 +517,7 @@ Post Commands:
     restore                            Restore a PostgreSQL database backup to a new database
     set-maintenance-window             Set the maintenance window for a PostgreSQL database
     show                               Show details for a PostgreSQL database
+    show-computed-config               Show computed configuration for a PostgreSQL database
     show-config                        Show configuration for a PostgreSQL database
     show-pgbouncer-config              Show pgbouncer configuration for a PostgreSQL database
     show-upgrade-status                Show the status of a major version upgrade of the PostgreSQL database
@@ -755,6 +756,12 @@ Examples:
     ubi pg pg-id set-maintenance-window 3   #  3 am
     ubi pg pg-id set-maintenance-window 23  # 11 pm
     ubi pg pg-id set-maintenance-window ""  # unset
+
+
+Show computed configuration for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) show-computed-config
 
 
 Show configuration for a PostgreSQL database
