@@ -367,6 +367,11 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.display_state).to eq("finalizing_restore")
     end
 
+    it "returns 'restarting' when representative server's strand label is 'restart'" do
+      create_representative_server(strand_label: "restart")
+      expect(postgres_resource.display_state).to eq("restarting")
+    end
+
     it "returns 'running' when strand label is 'wait' and has no children" do
       # The strand already has label "wait" from subject, no children by default
       expect(postgres_resource.display_state).to eq("running")
