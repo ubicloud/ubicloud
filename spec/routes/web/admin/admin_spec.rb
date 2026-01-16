@@ -343,7 +343,7 @@ RSpec.describe CloverAdmin do
     expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
     payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1234567890")
-    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from("id" => "pm_1234567890", "card" => Stripe::StripeObject.construct_from("brand" => "Visa", "last4" => "1234", "exp_month" => 12, "exp_year" => 2023)))
+    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from(id: "pm_1234567890", card: {brand: "Visa", last4: "1234", exp_month: 12, exp_year: 2023, country: "NL", funding: "debit", wallet: {type: "apple_pay"}, checks: {address_line1_check: "pass", cvc_check: "pass"}}))
     visit "/model/PaymentMethod/#{payment_method.ubid}"
     expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
     expect(page).to have_content "Stripe Data"
