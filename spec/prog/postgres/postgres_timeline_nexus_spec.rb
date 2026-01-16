@@ -87,10 +87,9 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       visible: true,
       provider: "aws"
     )
-    LocationCredential.create(
+    LocationCredential.create_with_id(loc,
       access_key: "access-key-id",
-      secret_key: "secret-access-key"
-    ) { it.id = loc.id }
+      secret_key: "secret-access-key")
     loc
   end
 
