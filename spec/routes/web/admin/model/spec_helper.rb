@@ -340,7 +340,7 @@ RSpec.configure do |config|
 
     def create_nic_aws_resource
       nic = create_nic
-      NicAwsResource.create_with_id(nic.id, network_interface_id: "eni-12345")
+      NicAwsResource.create_with_id(nic, network_interface_id: "eni-12345")
     end
 
     def create_object_tag
@@ -404,7 +404,7 @@ RSpec.configure do |config|
         target_storage_size_gib: 100,
         target_version: "16"
       )
-      PostgresMetricDestination.create_with_id(pg.id, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
+      PostgresMetricDestination.create_with_id(pg, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
     end
 
     def create_postgres_resource
@@ -440,7 +440,7 @@ RSpec.configure do |config|
 
     def create_private_subnet_aws_resource
       ps = create_private_subnet
-      PrivateSubnetAwsResource.create_with_id(ps.id, vpc_id: "vpc-12345")
+      PrivateSubnetAwsResource.create_with_id(ps, vpc_id: "vpc-12345")
     end
 
     def create_project
@@ -548,7 +548,7 @@ RSpec.configure do |config|
 
     def create_vm_init_script
       vm = create_vm
-      VmInitScript.create_with_id(vm.id, init_script: "echo 'test'")
+      VmInitScript.create_with_id(vm, init_script: "echo 'test'")
     end
 
     def create_vm_pool
