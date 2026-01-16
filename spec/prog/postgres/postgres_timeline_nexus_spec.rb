@@ -306,7 +306,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 3 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("NotStarted")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("NotStarted")
 
       expect { nx.wait }.to hop("take_backup")
     end
@@ -324,7 +324,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 3 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.wait }.to nap(20 * 60)
       expect(Page.active.count).to eq(1)
@@ -343,7 +343,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 1 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
 
       # Create a real Page with the "MissingBackup" tag and its Strand (needed for semaphores)
       page = Page.create(tag: Page.generate_tag(["MissingBackup", postgres_timeline.id]), summary: "Missing backup")
@@ -366,7 +366,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       backup = Struct.new(:key, :last_modified).new("basebackups_005/base_backup_stop_sentinel.json", Time.now - 1 * 24 * 60 * 60)
       expect(blob_storage_client).to receive(:list_objects).and_return([backup])
 
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.wait }.to nap(20 * 60)
     end
@@ -387,7 +387,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(latest_backup_started_at: Time.now)
 
       # need_backup? calls sshable.cmd once, returns "Succeeded" so need_backup? is false
-      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("Succeeded")
 
       expect { nx.take_backup }.to hop("wait")
     end
