@@ -24,6 +24,16 @@ RSpec.describe Clover, "project" do
     end
   end
 
+  describe "authenticated with open invitations" do
+    it "redirects to projects page on login" do
+      project
+      new_project = user2.create_project_with_default_policy("project-3")
+      new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member", expires_at: Time.now + 1000)
+      login(user.email, title_end_with: "Projects")
+      expect(page).to have_content "Project Invitations"
+    end
+  end
+
   describe "authenticated" do
     before do
       login(user.email)
