@@ -43,7 +43,7 @@
              [
                inv.project.name,
                project_ubid,
-               inv.inviter.email,
+               inv.inviter&.email || "-Account Deleted-",
                [part("components/submit_button", action: "/project/invitation/#{project_ubid}/accept", text: "Accept"), {escape: false}],
                [part("components/delete_button", url: "/project/invitation/#{project_ubid}/decline", text: "Decline", exact_url: true, icon: nil), {escape: false}]
              ],
