@@ -154,10 +154,8 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Verify Account")
 
     click_button "Verify Account"
-    expect(page.title).to eq("Ubicloud - Default Dashboard")
-
-    visit p.path
-    expect(page.title).to eq("Ubicloud - ResourceNotFound")
+    expect(page.title).to eq("Ubicloud - Projects")
+    expect(page).to have_content "Project Invitations"
   end
 
   it "can remember login" do
