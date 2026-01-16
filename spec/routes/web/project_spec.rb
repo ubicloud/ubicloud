@@ -148,6 +148,34 @@ RSpec.describe Clover, "project" do
         expect(page).to have_no_content "Project Invitations"
         expect(page).to have_no_content new_project.name
       end
+
+      it "can remove self from any project with multiple users" do
+        project.add_account(user2)
+
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Remove Access" }
+        expect(page).to have_flash_notice("Removed your access to the project")
+        expect(page).to have_no_content "project-1"
+      end
+
+      it "can remove self from any project with multiple users, even without authorization" do
+        project.add_account(user2)
+        AccessControlEntry.dataset.destroy
+
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Remove Access" }
+        expect(page).to have_flash_notice("Removed your access to the project")
+        expect(page).to have_no_content "project-1"
+      end
+
+      it "cannot remove self from project where you are the only user" do
+        project
+        visit "/project"
+        within("#project-#{project.ubid}") { click_button "Remove Access" }
+        expect(page).to have_flash_error("You can't remove the last user from 'project-1' project. Delete project instead.")
+        within("#project-#{project.ubid}") { click_link project.name }
+        expect(page.title).to eq "Ubicloud - project-1 Dashboard"
+      end
     end
 
     describe "create" do
