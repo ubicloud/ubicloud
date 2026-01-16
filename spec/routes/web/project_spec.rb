@@ -75,6 +75,7 @@ RSpec.describe Clover, "project" do
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content "Project Invitations"
         expect(page).to have_content new_project.name
+        expect(page).to have_content user2.email
         click_button "Accept"
         expect(page).to have_flash_notice("Accepted invitation to join project")
         expect(user.invitations.count).to eq 0
@@ -90,12 +91,15 @@ RSpec.describe Clover, "project" do
         project
         new_project = user2.create_project_with_default_policy("project-3")
         new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member2", expires_at: Time.now + 1000)
+        DB[:account_password_hashes].where(id: user2.id).delete
+        user2.destroy
 
         visit "/project"
 
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content "Project Invitations"
         expect(page).to have_content new_project.name
+        expect(page).to have_content "-Account Deleted-"
         click_button "Accept"
         expect(page).to have_flash_notice("Accepted invitation to join project")
         expect(user.invitations.count).to eq 0
