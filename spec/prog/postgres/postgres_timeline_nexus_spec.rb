@@ -19,32 +19,30 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   }
 
   def create_minio_cluster(loc_id: location_id, proj_id: service_project.id)
-    mc_id = MinioCluster.generate_uuid
-    mc = MinioCluster.create_with_id(mc_id,
+    mc = MinioCluster.create(
       location_id: loc_id,
       project_id: proj_id,
-      name: "minio-cluster-#{SecureRandom.hex(4)}",
+      name: "minio-cluster-test",
       admin_user: "admin",
       admin_password: "secret",
       root_cert_1: "certs",
       private_subnet_id: private_subnet.id)
-    Strand.create_with_id(mc_id, prog: "Minio::MinioClusterNexus", label: "wait")
+    Strand.create_with_id(mc, prog: "Minio::MinioClusterNexus", label: "wait")
     mc
   end
 
   def create_postgres_timeline(loc_id: location_id)
-    tl_id = PostgresTimeline.generate_uuid
-    tl = PostgresTimeline.create_with_id(tl_id,
+    tl = PostgresTimeline.create(
       location_id: loc_id,
       access_key: "dummy-access-key",
       secret_key: "dummy-secret-key")
-    Strand.create_with_id(tl_id, prog: "Postgres::PostgresTimelineNexus", label: "start")
+    Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "start")
     tl
   end
 
   def create_postgres_resource(loc_id: location_id)
     pr = PostgresResource.create(
-      name: "pg-test-#{SecureRandom.hex(4)}",
+      name: "pg-test-resource",
       superuser_password: "dummy-password",
       ha_type: "none",
       target_version: "16",
@@ -65,12 +63,11 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   def create_postgres_server(resource:, timeline:, timeline_access: "push", representative: true, version: "16", strand_label: "wait", vm: nil, loc_id: location_id, subnet: private_subnet)
     vm ||= Prog::Vm::Nexus.assemble_with_sshable(
-      project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: subnet.id,
+      project.id, name: "pg-vm-test", private_subnet_id: subnet.id,
       location_id: loc_id, unix_user: "ubi"
     ).subject
     VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
-    server_id = PostgresServer.generate_uuid
-    server = PostgresServer.create_with_id(server_id,
+    server = PostgresServer.create(
       timeline:,
       resource:,
       vm_id: vm.id,
@@ -78,7 +75,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       synchronization_status: "ready",
       timeline_access:,
       version:)
-    Strand.create_with_id(server_id, prog: "Postgres::PostgresServerNexus", label: strand_label)
+    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: strand_label)
     server
   end
 
