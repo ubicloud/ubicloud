@@ -26,7 +26,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       admin_user: "admin",
       admin_password: "secret",
       root_cert_1: "certs",
-      private_subnet_id: private_subnet.id)
+      private_subnet_id: private_subnet.id
+    )
     Strand.create_with_id(mc, prog: "Minio::MinioClusterNexus", label: "wait")
     mc
   end
@@ -35,7 +36,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     tl = PostgresTimeline.create(
       location_id: loc_id,
       access_key: "dummy-access-key",
-      secret_key: "dummy-secret-key")
+      secret_key: "dummy-secret-key"
+    )
     Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "start")
     tl
   end
@@ -74,7 +76,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       representative_at: representative ? Time.now : nil,
       synchronization_status: "ready",
       timeline_access:,
-      version:)
+      version:
+    )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: strand_label)
     server
   end
