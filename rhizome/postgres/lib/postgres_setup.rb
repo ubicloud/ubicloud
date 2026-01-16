@@ -33,6 +33,35 @@ class PostgresSetup
     r "rm -rf /etc/postgresql/#{@version}"
 
     r "echo \"data_directory = '/dat/#{@version}/data'\" | sudo tee /etc/postgresql-common/createcluster.d/data-dir.conf"
+
+    safe_write_to_file("/etc/systemd/system/disk-full-check@.service", <<~DISKFULL)
+      [Unit]
+      Wants=disk-full-check@%i.timer
+      Description=Mitigate disk full scenarios
+
+      [Service]
+      Type=oneshot
+      User=postgres
+      ExecStart=/home/rhizome/bin/disk-full-check
+
+      [Install]
+      WantedBy=multi-user.target
+    DISKFULL
+
+    safe_write_to_file("/etc/systemd/system/disk-full-check@.timer", <<~DISKFULL)
+      [Unit]
+      Description=Schedule disk full check
+
+      [Timer]
+      OnUnitInactiveSec=20sec
+      Unit=disk-full-check@%i.service
+      Persistent=true
+
+      [Install]
+      WantedBy=multiuser.target
+    DISKFULL
+
+    r "sudo systemctl enable disk-full-check@#{@version}.timer"
   end
 
   def create_cluster
