@@ -94,7 +94,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "validates input" do
       expect {
-        described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: "pjtyk9ryq65t1j01jpv00m03eb", location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
       }.to raise_error RuntimeError, "No existing project"
 
       expect {
@@ -102,42 +102,42 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       }.to raise_error RuntimeError, "No existing location"
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128)
       }.not_to raise_error
 
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "pgd2m9djgryj6nq73jrdddnkrt")
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: "pgd2m9djgryj6nq73jrdddnkrt")
       }.to raise_error RuntimeError, "No existing parent"
 
       private_location.update(project: customer_project)
       described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 118)
 
       expect {
-        parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
+        parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: restore_target"
     end
 
     it "does not allow giving different version than parent for restore" do
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-parent-name", target_vm_size: "standard-2", target_storage_size_gib: 128, target_version: "16").subject
       expect {
-        described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target: Time.now)
+        described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, target_version: "17", restore_target: Time.now)
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: version"
     end
 
     it "passes timeline of parent resource if parent is passed" do
-      parent = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      parent = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       restore_target = Time.now
       parent.timeline.update(cached_earliest_backup_at: restore_target - 15 * 60)
 
-      child_strand = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:)
+      child_strand = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: parent.id, restore_target:)
       child = child_strand.subject
       expect(child.representative_server.timeline_id).to eq(parent.timeline.id)
       expect(child.representative_server.timeline_access).to eq("fetch")
     end
 
     it "creates internal firewall and customer private subnet and firewall" do
-      pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       private_subnet = pg.private_subnet
       expect(private_subnet.project_id).to eq customer_project.id
@@ -166,7 +166,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "uses Config.control_plane_outbound_cidrs to limit SSH access" do
       expect(Config).to receive(:control_plane_outbound_cidrs).and_return(["1.2.3.4/32"]).at_least(:once)
-      pg = described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
 
       internal_firewall = pg.internal_firewall
       expect(internal_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
