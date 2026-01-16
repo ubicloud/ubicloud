@@ -1077,6 +1077,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(server).to receive(:_run_query).with("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
       expect(sshable).to receive(:_cmd).with("sudo postgres/bin/lockout 16")
       expect(sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m smart")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop postgres-metrics.timer")
       expect { nx.fence }.to hop("wait_in_fence")
     end
   end
@@ -1277,6 +1278,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "sets deadline, restarts and exits" do
       expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
       expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl restart postgres-metrics.timer")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
       expect(nx.strand.stack.first["deadline_target"]).to eq("wait")
       expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 5 * 60)

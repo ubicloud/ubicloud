@@ -590,6 +590,7 @@ SQL
     postgres_server.run_query("CHECKPOINT; CHECKPOINT; CHECKPOINT;")
     postgres_server.vm.sshable.cmd("sudo postgres/bin/lockout :version", version:)
     postgres_server.vm.sshable.cmd("sudo pg_ctlcluster :version main stop -m smart", version:)
+    postgres_server.vm.sshable.cmd("sudo systemctl stop postgres-metrics.timer")
 
     hop_wait_in_fence
   end
@@ -689,6 +690,7 @@ SQL
 
     vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
+    vm.sshable.cmd("sudo systemctl restart postgres-metrics.timer")
     pop "postgres server is restarted"
   end
 
