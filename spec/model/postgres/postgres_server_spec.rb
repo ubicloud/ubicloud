@@ -155,6 +155,11 @@ RSpec.describe PostgresServer do
       postgres_server.timeline_access = "push"
       expect(postgres_server.configure_hash[:configs]).to include(:log_line_prefix, :log_connections, :log_disconnections)
     end
+
+    it "sets allow_alter_system to off for version >= 17" do
+      postgres_server.update(version: "17")
+      expect(postgres_server.configure_hash[:configs]).to include("allow_alter_system" => "off")
+    end
   end
 
   describe "#trigger_failover" do
