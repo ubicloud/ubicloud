@@ -41,6 +41,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     begin
       distinct_storage_devices = frame["distinct_storage_devices"] || false
       host_exclusion_filter = frame["exclude_host_ids"] || []
+      data_center_exclusion_filter = frame["exclude_data_centers"] || []
       gpu_count = frame["gpu_count"] || 0
       gpu_device = frame["gpu_device"] || nil
       runner = GithubRunner.first(vm_id: vm.id) if vm.location_id == Location::GITHUB_RUNNERS_ID
@@ -80,6 +81,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         location_preference:,
         host_filter:,
         host_exclusion_filter:,
+        data_center_exclusion_filter:,
         gpu_count:,
         gpu_device:,
         family_filter:

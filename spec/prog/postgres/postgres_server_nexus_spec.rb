@@ -1038,6 +1038,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#unavailable" do
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
+      expect(nx).to receive(:decr_recycle)
       expect { nx.unavailable }.to hop("wait")
     end
 
@@ -1045,6 +1046,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
+      expect(postgres_server.reload.recycle_set?).to be true
+    end
+
+    it "buds restart without incrementing recycle when recycle is already set" do
+      postgres_server.incr_recycle
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
+    end
+
+    it "does not create convergence strand if one is already running" do
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: postgres_resource.strand.id)
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect { nx.unavailable }.to nap(5)
+      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
+      expect(postgres_server.reload.recycle_set?).to be true
     end
 
     it "does not bud restart if there is already one restart going on" do
