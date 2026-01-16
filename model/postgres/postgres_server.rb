@@ -79,6 +79,10 @@ class PostgresServer < Sequel::Model
       configs["hnsw.external_index_secure"] = "true"
     end
 
+    if version.to_i >= 17
+      configs["allow_alter_system"] = "off"
+    end
+
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"

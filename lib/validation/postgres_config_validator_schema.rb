@@ -2282,7 +2282,8 @@ module Validation
         "allow_alter_system" => {
           description: "Allows running the ALTER SYSTEM command.",
           type: :bool,
-          default: "on"
+          default: "on",
+          deny: true
         },
         "commit_timestamp_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the commit timestamp cache.",
