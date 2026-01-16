@@ -76,6 +76,42 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect(nx).not_to receive(:az_to_provision_subnet)
       expect { nx.create_subnet }.to hop("wait_subnet_created")
     end
+
+    it "retries with a new IP on InvalidSubnetConflict" do
+      expect(nx).to receive(:old_subnet?).and_return(false)
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_subnets, subnets: [])
+      client.stub_responses(:create_subnet, Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "The CIDR '10.0.0.0/24' conflicts with another subnet"))
+      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+
+      new_ipv4 = NetAddr::IPv4Net.parse("10.0.1.0/32")
+      expect(nic.private_subnet).to receive(:random_private_ipv4).and_return(new_ipv4)
+      expect(nic).to receive(:update).with(private_ipv4: new_ipv4.to_s)
+      expect(nx).to receive(:update_stack).with({"subnet_conflict_retry_count" => 1})
+      expect { nx.create_subnet }.to nap(0)
+    end
+
+    it "raises error after 5 InvalidSubnetConflict retries" do
+      expect(nx).to receive(:old_subnet?).and_return(false)
+      expect(nx).to receive(:frame).and_return({"subnet_conflict_retry_count" => 5}).at_least(:once)
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_subnets, subnets: [])
+      client.stub_responses(:create_subnet, Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "The CIDR '10.0.0.0/24' conflicts with another subnet"))
+      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+
+      expect { nx.create_subnet }.to raise_error(Aws::EC2::Errors::InvalidSubnetConflict)
+    end
+
+    it "fails if random_private_ipv4 returns nil during retry" do
+      expect(nx).to receive(:old_subnet?).and_return(false)
+      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
+      client.stub_responses(:describe_subnets, subnets: [])
+      client.stub_responses(:create_subnet, Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "The CIDR '10.0.0.0/24' conflicts with another subnet"))
+      expect(nx).to receive(:az_to_provision_subnet).and_return("a")
+
+      expect(nic.private_subnet).to receive(:random_private_ipv4).and_return(nil)
+      expect { nx.create_subnet }.to raise_error(RuntimeError, /exhausted random private ipv4 addresses/)
+    end
   end
 
   describe "#wait_subnet_created" do
