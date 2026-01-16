@@ -13,7 +13,7 @@ RSpec.describe CloverAdmin, "AssignedHostAddress" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - AssignedHostAddress"
 
-    click_link @instance.admin_label
+    click_link @instance.admin_label.to_s
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - AssignedHostAddress #{@instance.ubid}"
   end
