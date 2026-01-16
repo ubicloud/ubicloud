@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "ActionType" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_action_type
     admin_account_setup_and_login

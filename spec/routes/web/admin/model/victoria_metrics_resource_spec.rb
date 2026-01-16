@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "VictoriaMetricsResource" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_victoria_metrics_resource
     admin_account_setup_and_login

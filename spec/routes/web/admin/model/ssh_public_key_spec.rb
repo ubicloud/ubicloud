@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "SshPublicKey" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_ssh_public_key
     admin_account_setup_and_login

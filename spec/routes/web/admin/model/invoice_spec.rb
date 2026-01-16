@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "Invoice" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_invoice
     admin_account_setup_and_login

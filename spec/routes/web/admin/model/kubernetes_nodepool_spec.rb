@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "KubernetesNodepool" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_kubernetes_nodepool
     admin_account_setup_and_login

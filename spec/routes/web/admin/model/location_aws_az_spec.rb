@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "LocationAwsAz" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_location_aws_az
     admin_account_setup_and_login

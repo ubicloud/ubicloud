@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "ProjectDiscountCode" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_project_discount_code
     admin_account_setup_and_login

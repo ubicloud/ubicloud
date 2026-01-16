@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "LoadBalancerPort" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_load_balancer_port
     admin_account_setup_and_login

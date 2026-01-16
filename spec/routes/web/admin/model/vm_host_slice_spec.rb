@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "VmHostSlice" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_vm_host_slice
     admin_account_setup_and_login

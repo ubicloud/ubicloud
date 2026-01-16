@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "MinioServer" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_minio_server
     admin_account_setup_and_login

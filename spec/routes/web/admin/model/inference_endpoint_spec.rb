@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "InferenceEndpoint" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_inference_endpoint
     admin_account_setup_and_login

@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "Cert" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_cert
     admin_account_setup_and_login

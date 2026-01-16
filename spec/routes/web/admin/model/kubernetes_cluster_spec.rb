@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "KubernetesCluster" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_kubernetes_cluster
     admin_account_setup_and_login

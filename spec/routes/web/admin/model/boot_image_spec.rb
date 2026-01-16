@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "BootImage" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_boot_image
     admin_account_setup_and_login

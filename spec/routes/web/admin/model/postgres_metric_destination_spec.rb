@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "PostgresMetricDestination" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_postgres_metric_destination
     admin_account_setup_and_login

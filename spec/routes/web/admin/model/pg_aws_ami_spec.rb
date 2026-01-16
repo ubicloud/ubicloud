@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "PgAwsAmi" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_pg_aws_ami
     admin_account_setup_and_login

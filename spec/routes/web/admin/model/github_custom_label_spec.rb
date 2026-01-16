@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "GithubCustomLabel" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_github_custom_label
     admin_account_setup_and_login

@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "NicAwsResource" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_nic_aws_resource
     admin_account_setup_and_login

@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "ConnectedSubnet" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_connected_subnet
     admin_account_setup_and_login

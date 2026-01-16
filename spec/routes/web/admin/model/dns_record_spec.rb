@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "DnsRecord" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_dns_record
     admin_account_setup_and_login

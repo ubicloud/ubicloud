@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "AssignedVmAddress" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_assigned_vm_address
     admin_account_setup_and_login

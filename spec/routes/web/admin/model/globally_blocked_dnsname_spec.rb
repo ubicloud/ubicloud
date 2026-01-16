@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "GloballyBlockedDnsname" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_globally_blocked_dnsname
     admin_account_setup_and_login

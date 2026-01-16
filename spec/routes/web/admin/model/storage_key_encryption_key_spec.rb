@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "StorageKeyEncryptionKey" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_storage_key_encryption_key
     admin_account_setup_and_login

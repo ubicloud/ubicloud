@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "GpuPartition" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_gpu_partition
     admin_account_setup_and_login

@@ -3,6 +3,8 @@
 require_relative "spec_helper"
 
 RSpec.describe CloverAdmin, "VhostBlockBackend" do
+  include AdminModelSpecHelper
+
   before do
     @instance = create_vhost_block_backend
     admin_account_setup_and_login
