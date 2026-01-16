@@ -100,7 +100,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe ".assemble" do
     it "throws an exception if parent is not found" do
       expect {
-        described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: "69c0f4cd-99c1-8ed0-acfe-7b013ce2fa0b")
+        described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: PostgresResource.generate_ubid.to_uuid)
       }.to raise_error RuntimeError, "No existing parent"
     end
 
@@ -113,7 +113,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "creates postgres timeline" do
       st = described_class.assemble(location_id: Location::HETZNER_FSN1_ID)
 
-      expect(st.subject.exists?).to be true
+      expect(st.subject).to exist
     end
 
     it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
@@ -407,7 +407,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     it "completes destroy even if dns zone and blob_storage are not configured" do
       # No minio cluster, so blob_storage is nil
       expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-      expect(postgres_timeline.exists?).to be false
+      expect(postgres_timeline).not_to exist
     end
 
     describe "when blob storage is minio" do
@@ -424,7 +424,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(admin_blob_storage_client).to receive(:admin_policy_remove).with(postgres_timeline.ubid).and_return(200)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-        expect(postgres_timeline.exists?).to be false
+        expect(postgres_timeline).not_to exist
       end
     end
 
@@ -445,7 +445,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
-        expect(postgres_timeline.exists?).to be false
+        expect(postgres_timeline).not_to exist
       end
     end
   end
