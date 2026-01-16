@@ -402,6 +402,7 @@ class Clover < Roda
 
     login_view { view "auth/login", "Login" }
     login_redirect { "/after-login" }
+    verify_account_redirect { "/after-login" }
     login_return_to_requested_location? true
     login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
