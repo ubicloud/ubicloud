@@ -685,6 +685,16 @@ RSpec.describe CloverAdmin do
     expect(GithubRunner.select_map([:repository_name, :label, :installation_id])).to eq([["test-repo", "ubicloud", ins.id]] * 2)
   end
 
+  it "shows workflow job for github runner as extra" do
+    workflow_job = {id: 60587328050, name: "ubicloud-standard-2", status: "in_progress"}
+    installation_id = GithubInstallation.create(installation_id: 123, name: "ubicloud", type: "User").id
+    runner = GithubRunner.create(repository_name: "ubicloud/ubicloud", label: "ubicloud-standard-2", installation_id:, workflow_job:)
+    visit "/model/GithubRunner/#{runner.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner #{runner.ubid}"
+    expect(page.all(".workflow-job-table td").map(&:text))
+      .to eq ["id", "60587328050", "name", "ubicloud-standard-2", "status", "in_progress"]
+  end
+
   it "supports suspending Accounts" do
     account = create_account(with_project: false)
     fill_in "UBID or UUID", with: account.ubid
