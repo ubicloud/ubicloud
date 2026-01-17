@@ -261,6 +261,10 @@ usermod -L ubuntu
   describe "#wait_instance_profile_created" do
     it "waits for instance profile to be created" do
       iam_client.stub_responses(:get_instance_profile, instance_profile: {instance_profile_name: "#{vm.name}-instance-profile", instance_profile_id: "#{vm.name}-instance-profile-id", path: "/", roles: [], arn: "arn:aws:iam::#{vm.project.id}:instance-profile/#{vm.name}-instance-profile", create_date: Time.now})
+      expect(iam_client).to receive(:get_instance_profile).with({
+        instance_profile_name: "#{vm.name}-instance-profile"
+      }).and_call_original
+
       expect { nx.wait_instance_profile_created }.to hop("create_instance")
     end
 
