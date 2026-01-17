@@ -219,6 +219,7 @@ usermod -L ubuntu
 
     it "hops to create_instance_profile if policy already exists" do
       iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      expect(iam_client).to receive(:list_policies).with(scope: "Local", marker: nil, max_items: 100).and_call_original
       expect(iam_client).to receive(:attach_role_policy).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
       expect { nx.attach_role_policy }.to hop("create_instance_profile")
     end
