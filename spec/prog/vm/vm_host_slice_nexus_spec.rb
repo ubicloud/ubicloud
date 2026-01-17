@@ -126,12 +126,6 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       expect { nx.wait }.to hop("unavailable")
     end
 
-    it "hops to unavailable when SSH fails during checkup" do
-      nx.incr_checkup
-      expect(sshable).to receive(:start_fresh_session).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
-      expect { nx.wait }.to hop("unavailable")
-    end
-
     it "naps when checkup finds slice available" do
       nx.incr_checkup
       stub_available(available: true)
@@ -194,6 +188,11 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
 
     it "fails on the incorrect partition status" do
       expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_return("isolated\n").once
+      expect(nx.available?).to be false
+    end
+
+    it "fails when SSH fails during" do
+      expect(session).to receive(:_exec!).with("cat /sys/fs/cgroup/standard.slice/cpuset.cpus.partition").and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
       expect(nx.available?).to be false
     end
   end

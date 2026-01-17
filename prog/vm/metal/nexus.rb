@@ -261,10 +261,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
-    rescue Sshable::SshError
-      # Host is likely to be down, which will be handled by HostNexus. We still
-      # go to the unavailable state for keeping track of the state.
-      hop_unavailable
     end
 
     nap 6 * 60 * 60
@@ -309,19 +305,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_start_after_host_reboot
     end
 
-    begin
-      if available?
-        decr_checkup
-        hop_wait
-      else
-        # Use deadlines to create a page instead of a custom page, so page
-        # resolution in different states can be handled properly.
-        register_deadline("wait", 0)
-      end
-    rescue Sshable::SshError
-      # Host is likely to be down, which will be handled by HostNexus. No need
-      # to create a page for this case.
+    if available?
+      decr_checkup
+      hop_wait
     end
+
+    register_deadline("wait", 0)
 
     nap 30
   end
@@ -457,5 +446,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def available?
     host.sshable.cmd("systemctl is-active :vm_name :vm_name-dnsmasq", vm_name:).split("\n").all?("active")
+  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+    false
   end
 end
