@@ -643,19 +643,14 @@ usermod -L ubuntu
   end
 
   describe "#destroy", "with aws_instance" do
-    before do
-      aws_instance
-    end
-
     it "deletes the instance" do
+      aws_instance
       expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})
       expect { nx.destroy }.to hop("cleanup_roles")
       expect(aws_instance).not_to exist
     end
 
     it "hops to cleanup_roles if there is no aws_instance" do
-      aws_instance.destroy
-      nx.instance_variable_set(:@aws_instance, nil)
       expect { nx.destroy }.to hop("cleanup_roles")
     end
   end
