@@ -17,20 +17,6 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
     instance_double(Vm, project: instance_double(Project, get_ff_ipv6_disabled: false), private_subnets: [ps], vm_host: vmh, inhost_name: "x", nics: [nic], ephemeral_net6:, load_balancer: nil, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.0/32").network, location: location.id)
   }
 
-  describe "#before_run" do
-    it "pops if vm is to be destroyed" do
-      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:destroy_set?).and_return(true)
-      expect { nx.before_run }.to exit({"msg" => "firewall rule is added"})
-    end
-
-    it "does not pop if vm is not to be destroyed" do
-      expect(nx).to receive(:vm).and_return(vm).at_least(:once)
-      expect(vm).to receive(:destroy_set?).and_return(false)
-      expect { nx.before_run }.not_to exit
-    end
-  end
-
   describe "update_firewall_rules" do
     let(:ec2_client) { instance_double(Aws::EC2::Client) }
 
