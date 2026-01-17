@@ -33,6 +33,26 @@ RSpec.describe Prog::Vm::Aws::Nexus do
 
   let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
+  let(:user_data) {
+    public_key = vm.sshable.keys.first.public_key.shellescape
+    <<~USER_DATA
+#!/bin/bash
+custom_user="#{vm.unix_user}"
+if [ ! -d /home/$custom_user ]; then
+  adduser $custom_user --disabled-password --gecos ""
+  usermod -aG sudo $custom_user
+  echo "$custom_user ALL=(ALL:ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/$custom_user
+  mkdir -p /home/$custom_user/.ssh
+  cp /home/ubuntu/.ssh/authorized_keys /home/$custom_user/.ssh/
+  chown -R $custom_user:$custom_user /home/$custom_user/.ssh
+  chmod 700 /home/$custom_user/.ssh
+  chmod 600 /home/$custom_user/.ssh/authorized_keys
+fi
+echo #{public_key} > /home/$custom_user/.ssh/authorized_keys
+usermod -L ubuntu
+    USER_DATA
+  }
+
   before do
     allow(Aws::EC2::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(client)
     allow(Aws::IAM::Client).to receive(:new).with(credentials: anything, region: "us-west-2").and_return(iam_client)
@@ -256,43 +276,17 @@ RSpec.describe Prog::Vm::Aws::Nexus do
     end
 
     it "creates an instance" do
-      expect(client).to receive(:run_instances) do |params|
-        user_data = Base64.decode64(params[:user_data])
-        expect(user_data).to include("custom_user=\"#{vm.unix_user}\"")
-        expect(user_data).to include("authorized_keys")
-        expect(user_data).to include("usermod -L ubuntu")
-
-        expect(params).to include(
-          image_id: "ami-030c060f85668b37d",
-          instance_type: "m6gd.large",
-          min_count: 1,
-          max_count: 1,
-          client_token: vm.id,
-          instance_market_options: nil,
-          iam_instance_profile: {name: "#{vm.name}-instance-profile"}
-        )
-        expect(params[:block_device_mappings]).to eq([
-          {
-            device_name: "/dev/sda1",
-            ebs: {
-              encrypted: true,
-              delete_on_termination: true,
-              iops: 3000,
-              volume_size: 30,
-              volume_type: "gp3",
-              throughput: 125
-            }
-          }
-        ])
-        expect(params[:network_interfaces]).to eq([
-          {
-            network_interface_id: "eni-0123456789abcdefg",
-            device_index: 0
-          }
-        ])
-
-        client.stub_data(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
-      end
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
+      expect(client).to receive(:run_instances).with(hash_including(
+        image_id: "ami-030c060f85668b37d",
+        instance_type: "m6gd.large",
+        min_count: 1,
+        max_count: 1,
+        client_token: vm.id,
+        instance_market_options: nil,
+        iam_instance_profile: {name: "#{vm.name}-instance-profile"},
+        user_data: Base64.encode64(user_data)
+      )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
@@ -316,12 +310,12 @@ RSpec.describe Prog::Vm::Aws::Nexus do
     end
 
     it "sets transparent cache host for runners" do
+      client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
-      expect(client).to receive(:run_instances) do |params|
-        user_data = Base64.decode64(params[:user_data])
-        expect(user_data).to include("#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net")
-        client.stub_data(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
-      end
+      expected_user_data = user_data + "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
+      expect(client).to receive(:run_instances).with(hash_including(
+        user_data: Base64.encode64(expected_user_data)
+      )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
     end
