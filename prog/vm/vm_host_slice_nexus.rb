@@ -51,7 +51,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     when_checkup_set? do
       hop_unavailable if !available?
       decr_checkup
-    rescue Sshable::SshError
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
       # Host is likely to be down, which will be handled by HostNexus. We still
       # go to the unavailable state for keeping track of the state.
       hop_unavailable
