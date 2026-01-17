@@ -463,7 +463,7 @@ usermod -L ubuntu
 
     it "updates the vm" do
       now = Time.now.floor
-      allow(Time).to receive(:now).and_return(now)
+      expect(Time).to receive(:now).at_least(:once).and_return(now)
       expect { nx.wait_instance_created }.to hop("wait_sshable")
       vm.reload
       expect(vm.cores).to eq(1)
@@ -626,7 +626,7 @@ usermod -L ubuntu
   describe "#prevent_destroy" do
     it "registers a deadline and naps while preventing" do
       now = Time.now
-      allow(Time).to receive(:now).and_return(now)
+      expect(Time).to receive(:now).at_least(:once).and_return(now)
       expect { nx.prevent_destroy }.to nap(30)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
       expect(nx.strand.stack.first["deadline_at"]).to eq(now + 24 * 60 * 60)
