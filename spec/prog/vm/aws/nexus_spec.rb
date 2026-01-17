@@ -285,11 +285,36 @@ usermod -L ubuntu
       expect(client).to receive(:run_instances).with(hash_including(
         image_id: "ami-030c060f85668b37d",
         instance_type: "m6gd.large",
+        block_device_mappings: [
+          {
+            device_name: "/dev/sda1",
+            ebs: {
+              encrypted: true,
+              delete_on_termination: true,
+              iops: 3000,
+              volume_size: 30,
+              volume_type: "gp3",
+              throughput: 125
+            }
+          }
+        ],
+        network_interfaces: [
+          {
+            network_interface_id: "eni-0123456789abcdefg",
+            device_index: 0
+          }
+        ],
+        private_dns_name_options: {
+          hostname_type: "ip-name",
+          enable_resource_name_dns_a_record: false,
+          enable_resource_name_dns_aaaa_record: false
+        },
         min_count: 1,
         max_count: 1,
+        tag_specifications: Util.aws_tag_specifications("instance", vm.name),
+        iam_instance_profile: {name: "#{vm.name}-instance-profile"},
         client_token: vm.id,
         instance_market_options: nil,
-        iam_instance_profile: {name: "#{vm.name}-instance-profile"},
         user_data: Base64.encode64(user_data)
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
