@@ -477,7 +477,16 @@ usermod -L ubuntu
     it "handles vm without sshable" do
       vm.sshable.destroy
       vm.associations.delete(:sshable) # clear cached association
-      expect { nx.wait_instance_created }.to hop("wait_sshable")
+      expect { nx.wait_instance_created }
+        .to hop("wait_sshable")
+        .and change(client, :api_requests)
+        .to(include(a_hash_including(
+          operation_name: :describe_instances,
+          params: a_hash_including(filters: [
+            {name: "instance-id", values: ["i-0123456789abcdefg"]},
+            {name: "tag:Ubicloud", values: ["true"]}
+          ])
+        )))
       expect(vm.reload.cores).to eq(1)
     end
 
