@@ -212,7 +212,7 @@ usermod -L ubuntu
       expect(iam_client).to receive(:attach_role_policy).with({
         role_name: vm.name,
         policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"
-      })
+      }).and_call_original
 
       expect { nx.attach_role_policy }.to hop("create_instance_profile")
     end
