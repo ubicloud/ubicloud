@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "jwt"
+require "shellwords"
 require_relative "../model"
 
 class Vm < Sequel::Model
@@ -230,7 +231,12 @@ class Vm < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:ssh_session].exec!("systemctl is-active :inhost_name :inhost_name-dnsmasq", inhost_name:).split("\n").all?("active") ? "up" : "down"
+      units = [inhost_name, "#{inhost_name}-dnsmasq"]
+      vm_storage_volumes.each do |vol|
+        units << vol.vhost_backend_systemd_unit_name if vol.vhost_block_backend
+      end
+
+      session[:ssh_session].exec!("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n").all?("active") ? "up" : "down"
     rescue
       "down"
     end

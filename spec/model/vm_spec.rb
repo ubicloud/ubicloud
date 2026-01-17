@@ -197,12 +197,14 @@ RSpec.describe Vm do
     end
   end
 
-  it "initiates a new health monitor session" do
-    vmh = create_vm_host
-    vm = create_vm(vm_host_id: vmh.id)
-    sshable = vm.vm_host.sshable
-    expect(sshable).to receive(:start_fresh_session)
-    vm.init_health_monitor_session
+  describe "#init_health_monitor_session" do
+    it "initiates a new health monitor session" do
+      vmh = create_vm_host
+      vm = create_vm(vm_host_id: vmh.id)
+      sshable = vm.vm_host.sshable
+      expect(sshable).to receive(:start_fresh_session)
+      vm.init_health_monitor_session
+    end
   end
 
   it "checks underlying enum value when validating" do
@@ -227,8 +229,9 @@ RSpec.describe Vm do
   end
 
   describe "#check_pulse" do
+    let(:vmh) { create_vm_host }
     let(:pulse_vm) {
-      v = create_vm
+      v = create_vm(vm_host_id: vmh.id)
       Strand.create_with_id(v, prog: "Vm::Nexus", label: "wait")
       v
     }
@@ -236,9 +239,42 @@ RSpec.describe Vm do
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
     let(:pulse) { {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30} }
 
-    it "returns up when both services are active" do
-      expect(session[:ssh_session]).to receive(:_exec!).and_return("active\nactive\n")
-      expect(pulse_vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+    context "when vm is not sshable" do
+      it "checks inhost_name and dnsmasq services" do
+        expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq"
+        expect(session[:ssh_session]).to receive(:_exec!).with(expected_cmd).and_return("active\nactive\n")
+        expect(pulse_vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+      end
+
+      it "checks volume services if present" do
+        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
+
+        expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
+        expect(session[:ssh_session]).to receive(:_exec!).with(expected_cmd).and_return("active\nactive\nactive\n")
+        expect(pulse_vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+      end
+    end
+
+    context "when vm is sshable" do
+      it "checks only volume services if present" do
+        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
+
+        expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
+        expect(session[:ssh_session]).to receive(:_exec!).with(expected_cmd).and_return("active\nactive\nactive\n")
+        expect(pulse_vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
+      end
+
+      it "skips volumes without vhost_block_backend" do
+        spdk_installation = SpdkInstallation.create_with_id(vmh, version: "spdk1", allocation_weight: 100, cpu_count: 2, vm_host_id: vmh.id)
+        VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, spdk_installation_id: spdk_installation.id)
+
+        expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq"
+        expect(session[:ssh_session]).to receive(:_exec!).with(expected_cmd).and_return("active\nactive\n")
+        result = pulse_vm.check_pulse(session:, previous_pulse: pulse)
+        expect(result[:reading]).to eq("up")
+      end
     end
 
     it "returns down and increments checkup when a service is inactive" do
