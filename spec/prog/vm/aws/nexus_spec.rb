@@ -247,7 +247,7 @@ usermod -L ubuntu
       expect(iam_client).to receive(:add_role_to_instance_profile).with({
         instance_profile_name: "#{vm.name}-instance-profile",
         role_name: vm.name
-      })
+      }).and_call_original
 
       expect { nx.add_role_to_instance_profile }.to hop("wait_instance_profile_created")
     end
