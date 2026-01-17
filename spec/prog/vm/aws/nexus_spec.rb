@@ -124,7 +124,7 @@ usermod -L ubuntu
 
     it "creates a role for instance" do
       vm.nics.first.strand.update(label: "wait")
-      iam_client.stub_responses(:create_role, {})
+      iam_client.stub_responses(:create_role, {role: {role_name: vm.name, path: "/", role_id: "ROLE123", arn: "arn:aws:iam::123456789012:role/#{vm.name}", create_date: Time.now}})
       expect(iam_client).to receive(:create_role).with({
         role_name: vm.name,
         assume_role_policy_document: {
@@ -137,7 +137,7 @@ usermod -L ubuntu
             }
           ]
         }.to_json
-      })
+      }).and_call_original
 
       expect { nx.start }.to hop("create_role_policy")
     end
