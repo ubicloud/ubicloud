@@ -746,7 +746,14 @@ usermod -L ubuntu
       iam_client.stub_responses(:remove_role_from_instance_profile, {})
       iam_client.stub_responses(:delete_instance_profile, {})
       iam_client.stub_responses(:delete_role, {})
-      expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
+      expect { nx.cleanup_roles }
+        .to exit({"msg" => "vm destroyed"})
+        .and change(iam_client, :api_requests)
+        .to(include(
+          a_hash_including(operation_name: :remove_role_from_instance_profile, params: a_hash_including(instance_profile_name: "testvm-instance-profile", role_name: "testvm")),
+          a_hash_including(operation_name: :delete_instance_profile, params: a_hash_including(instance_profile_name: "testvm-instance-profile")),
+          a_hash_including(operation_name: :delete_role, params: a_hash_including(role_name: "testvm"))
+        ))
     end
   end
 end
