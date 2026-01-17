@@ -707,6 +707,10 @@ usermod -L ubuntu
 
       policy = nx.cloudwatch_policy
       expect(policy).to be_nil
+      expect(iam_client.api_requests).to include(
+        a_hash_including(operation_name: :list_policies, params: a_hash_including(scope: "Local", max_items: 100, marker: nil)),
+        a_hash_including(operation_name: :list_policies, params: a_hash_including(scope: "Local", max_items: 100, marker: "next-page-marker"))
+      )
     end
   end
 
