@@ -492,7 +492,16 @@ usermod -L ubuntu
 
     it "naps if the instance is not running" do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
-      expect { nx.wait_instance_created }.to nap(1)
+      expect { nx.wait_instance_created }
+        .to nap(1)
+        .and change { client.api_requests }
+        .to(include(a_hash_including(
+          operation_name: :describe_instances,
+          params: a_hash_including(filters: [
+            {name: "instance-id", values: ["i-0123456789abcdefg"]},
+            {name: "tag:Ubicloud", values: ["true"]}
+          ])
+        )))
     end
   end
 
