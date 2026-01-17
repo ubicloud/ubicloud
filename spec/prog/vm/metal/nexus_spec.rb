@@ -796,10 +796,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.wait }.to hop("unavailable")
 
       vm.incr_checkup
-      expect(nx).to receive(:available?).and_raise Sshable::SshError.new("ssh failed", "", "", nil, nil)
-      expect { nx.wait }.to hop("unavailable")
-
-      vm.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
@@ -1090,6 +1086,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:_cmd).and_return("active\nactive\n")
       expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
       expect(nx.available?).to be true
+    end
+
+    it "fails when SSH fails" do
+      expect(sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
+      expect(nx.available?).to be false
     end
   end
 end
