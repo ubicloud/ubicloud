@@ -194,7 +194,7 @@ usermod -L ubuntu
             }
           ]
         }.to_json
-      })
+      }).and_call_original
 
       expect { nx.create_role_policy }.to hop("attach_role_policy")
     end
