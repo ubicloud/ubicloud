@@ -3,10 +3,6 @@
 class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   subject_is :vm
 
-  def before_run
-    pop "firewall rule is added" if vm.destroy_set?
-  end
-
   label def update_firewall_rules
     rules = vm.firewall_rules
     rules.select(&:port_range).map! do |rule|

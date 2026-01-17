@@ -62,17 +62,6 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
     @st = Strand.create_with_id(vm, prog: "Vnet::Metal::UpdateFirewallRules", label: "update_firewall_rules")
   end
 
-  describe "#before_run" do
-    it "pops if vm is to be destroyed" do
-      vm.incr_destroy
-      expect { nx.before_run }.to exit({"msg" => "firewall rule is added"})
-    end
-
-    it "does not pop if vm is not to be destroyed" do
-      expect { nx.before_run }.not_to exit
-    end
-  end
-
   describe "update_firewall_rules" do
     def create_firewall_rules
       firewall.replace_firewall_rules([
