@@ -12,15 +12,34 @@ RSpec.describe Prog::Vm::Aws::Nexus do
     vm.strand
   }
 
+  let(:project) { Project.create(name: "test-prj") }
+
+  let(:location) {
+    Location.create(name: "us-west-2", provider: "aws", project_id: project.id,
+      display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
+  }
+
+  let(:location_credential) {
+    LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+  }
+
+  let(:storage_volumes) {
+    [{encrypted: true, size_gib: 30}, {encrypted: true, size_gib: 3800}]
+  }
+
+  let(:vm_params) {
+    {location_id: location.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d",
+     name: "testvm", size: "m6gd.large", arch: "arm64", storage_volumes:}
+  }
+
   let(:vm) {
-    prj = Project.create(name: "test-prj")
-    loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
-    storage_volumes = [
-      {encrypted: true, size_gib: 30},
-      {encrypted: true, size_gib: 3800}
-    ]
-    Prog::Vm::Nexus.assemble_with_sshable(prj.id, location_id: loc.id, unix_user: "test-user-aws", boot_image: "ami-030c060f85668b37d", name: "testvm", size: "m6gd.large", arch: "arm64", storage_volumes:).subject
+    location_credential  # force creation
+    Prog::Vm::Nexus.assemble_with_sshable(project.id, **vm_params).subject
+  }
+
+  let(:vm_without_sshable) {
+    location_credential
+    Prog::Vm::Nexus.assemble("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI", project.id, **vm_params).subject
   }
 
   let(:aws_instance) { AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg") }
@@ -59,8 +78,6 @@ usermod -L ubuntu
   end
 
   describe ".assemble" do
-    let(:project) { Project.create(name: "test-prj") }
-
     it "creates correct number of storage volumes for storage optimized instance types" do
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       storage_volumes = [
@@ -501,22 +518,6 @@ usermod -L ubuntu
       expect(vm.sshable.reload.host).to eq("1.2.3.4")
     end
 
-    it "handles vm without sshable" do
-      vm.sshable.destroy
-      vm.associations.delete(:sshable) # clear cached association
-      expect { nx.wait_instance_created }
-        .to hop("wait_sshable")
-        .and change(client, :api_requests)
-        .to(include(a_hash_including(
-          operation_name: :describe_instances,
-          params: a_hash_including(filters: [
-            {name: "instance-id", values: ["i-0123456789abcdefg"]},
-            {name: "tag:Ubicloud", values: ["true"]}
-          ])
-        )))
-      expect(vm.reload.cores).to eq(1)
-    end
-
     it "naps if the instance is not running" do
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
       expect { nx.wait_instance_created }
@@ -529,6 +530,30 @@ usermod -L ubuntu
             {name: "tag:Ubicloud", values: ["true"]}
           ])
         )))
+    end
+  end
+
+  describe "#wait_instance_created", "without sshable" do
+    let(:vm) { vm_without_sshable }
+    let(:aws_instance) { AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg") }
+
+    before do
+      aws_instance
+      client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "running"}, network_interfaces: [{association: {public_ip: "1.2.3.4"}, ipv_6_addresses: [{ipv_6_address: "2a01:4f8:173:1ed3:aa7c::/79"}]}]}]}])
+    end
+
+    it "handles vm without sshable" do
+      expect { nx.wait_instance_created }
+        .to hop("wait_sshable")
+        .and change(client, :api_requests)
+        .to(include(a_hash_including(
+          operation_name: :describe_instances,
+          params: a_hash_including(filters: [
+            {name: "instance-id", values: ["i-0123456789abcdefg"]},
+            {name: "tag:Ubicloud", values: ["true"]}
+          ])
+        )))
+      expect(vm.reload.cores).to eq(1)
     end
   end
 
@@ -669,6 +694,10 @@ usermod -L ubuntu
       vm.update(unix_user: "runneradmin")
       expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
     end
+
+    it "hops to cleanup_roles if there is no aws_instance" do
+      expect { nx.destroy }.to hop("cleanup_roles")
+    end
   end
 
   describe "#destroy", "with aws_instance" do
@@ -677,10 +706,6 @@ usermod -L ubuntu
       expect(client).to receive(:terminate_instances).with({instance_ids: ["i-0123456789abcdefg"]})
       expect { nx.destroy }.to hop("cleanup_roles")
       expect(aws_instance).not_to exist
-    end
-
-    it "hops to cleanup_roles if there is no aws_instance" do
-      expect { nx.destroy }.to hop("cleanup_roles")
     end
   end
 
