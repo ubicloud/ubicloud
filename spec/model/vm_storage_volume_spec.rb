@@ -68,4 +68,127 @@ RSpec.describe VmStorageVolume do
       expect(v.queue_size).to eq(64)
     end
   end
+
+  describe "#init_health_monitor_session" do
+    let(:vm) { create_vm }
+    let(:v) { described_class.create(disk_index: 0, vm_id: vm.id, size_gib: 40, boot: true) }
+
+    it "returns empty hash if no vm host associated" do
+      expect(v.init_health_monitor_session).to eq({})
+    end
+
+    it "returns empty hash if vm is nil" do
+      orphan = described_class.new
+      expect(orphan.init_health_monitor_session).to eq({})
+    end
+
+    it "starts a fresh ssh session from the host" do
+      vm_host = create_vm_host
+      vm.update(vm_host_id: vm_host.id)
+
+      expect(v.vm.vm_host.sshable).to receive(:start_fresh_session).and_return("ssh_session")
+      expect(v.init_health_monitor_session).to eq({ssh_session: "ssh_session"})
+    end
+  end
+
+  describe "#check_pulse" do
+    let(:vm_host) { create_vm_host }
+    let(:vm) { create_vm(vm_host_id: vm_host.id, display_state: "running") }
+    let(:volume) { described_class.create(disk_index: 0, vm_id: vm.id, size_gib: 40, boot: true) }
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+    let(:previous_pulse) { {reading: "up", reading_rpt: 1, reading_chg: Time.now} }
+
+    context "when not vhost_block_backend" do
+      it "returns up" do
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+        expect(volume).not_to receive(:aggregate_readings)
+      end
+    end
+
+    context "when vm host is missing" do
+      it "returns up" do
+        backend = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "test", allocation_weight: 100)
+        volume.update(vhost_block_backend_id: backend.id, vring_workers: 2)
+
+        vm.update(vm_host_id: nil)
+
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+      end
+    end
+
+    context "when vm is missing (orphan)" do
+      it "returns up" do
+        backend = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "test", allocation_weight: 100)
+
+        orphan = described_class.new(vhost_block_backend_id: backend.id, disk_index: 0)
+
+        result = orphan.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+      end
+    end
+
+    context "when vm is not running" do
+      it "returns up" do
+        backend = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "test", allocation_weight: 100)
+        volume.update(vhost_block_backend_id: backend.id, vring_workers: 2)
+
+        vm.update(display_state: "creating")
+
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+      end
+    end
+
+    context "when session is missing" do
+      it "returns up" do
+        backend = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "test", allocation_weight: 100)
+        volume.update(vhost_block_backend_id: backend.id, vring_workers: 2)
+
+        result = volume.check_pulse(session: {}, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+      end
+    end
+
+    context "when all conditions met" do
+      before do
+        backend = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "test", allocation_weight: 100)
+        volume.update(vhost_block_backend_id: backend.id, vring_workers: 2)
+      end
+
+      it "returns up when service is active" do
+        expect(session[:ssh_session]).to receive(:exec!).with("systemctl is-active :service_name", service_name: "#{vm.inhost_name}-0-storage.service").and_return("active\n")
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("up")
+      end
+
+      it "returns down when service is inactive" do
+        expect(session[:ssh_session]).to receive(:exec!).with("systemctl is-active :service_name", service_name: "#{vm.inhost_name}-0-storage.service").and_return("inactive\n")
+        expect(Clog).to receive(:emit).with(/systemd unit .* is not active/, anything)
+
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("down")
+      end
+
+      it "returns down on ssh error" do
+        expect(session[:ssh_session]).to receive(:exec!).and_raise(RuntimeError)
+        expect(Clog).to receive(:emit).with(/check_pulse ssh error/, anything)
+        expect(Clog).to receive(:emit).with(/systemd unit .* is not active/, anything)
+
+        result = volume.check_pulse(session:, previous_pulse:)
+        expect(result[:reading]).to eq("down")
+      end
+
+      it "raises IOError" do
+        expect(session[:ssh_session]).to receive(:exec!).and_raise(IOError)
+        expect { volume.check_pulse(session:, previous_pulse:) }.to raise_error(IOError)
+      end
+
+      it "raises Errno::ECONNRESET" do
+        expect(session[:ssh_session]).to receive(:exec!).and_raise(Errno::ECONNRESET)
+        expect { volume.check_pulse(session:, previous_pulse:) }.to raise_error(Errno::ECONNRESET)
+      end
+    end
+  end
 end

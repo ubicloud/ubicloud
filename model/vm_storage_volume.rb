@@ -15,9 +15,45 @@ class VmStorageVolume < Sequel::Model
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
+  include HealthMonitorMethods
 
   def aws?
     vm.location.aws?
+  end
+
+  def init_health_monitor_session
+    return {} unless vm&.vm_host
+
+    {
+      ssh_session: vm.vm_host.sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    return {reading: "up", reading_rpt: 1, reading_chg: Time.now} unless vhost_block_backend
+    return {reading: "up", reading_rpt: 1, reading_chg: Time.now} unless vm&.vm_host
+    return {reading: "up", reading_rpt: 1, reading_chg: Time.now} unless vm.display_state == "running"
+    return {reading: "up", reading_rpt: 1, reading_chg: Time.now} unless session[:ssh_session]
+
+    service_name = "#{vm.inhost_name}-#{disk_index}-storage.service"
+    cmd = "systemctl is-active :service_name"
+    kw = {service_name:}
+
+    reading = begin
+      status = session[:ssh_session].exec!(cmd, **kw)
+      (status.strip == "active") ? "up" : "down"
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("VmStorageVolume #{id} check_pulse ssh error", Util.exception_to_hash(e))
+      "down"
+    end
+
+    if reading == "down"
+      Clog.emit("VmStorageVolume #{id} (VM #{vm.id}) systemd unit #{service_name} is not active", {})
+    end
+
+    aggregate_readings(previous_pulse:, reading:)
   end
 
   def device_id
