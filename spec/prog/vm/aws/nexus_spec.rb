@@ -462,11 +462,13 @@ usermod -L ubuntu
     end
 
     it "updates the vm" do
+      now = Time.now.floor
+      allow(Time).to receive(:now).and_return(now)
       expect { nx.wait_instance_created }.to hop("wait_sshable")
       vm.reload
       expect(vm.cores).to eq(1)
       expect(vm.ephemeral_net6.to_s).to eq("2a01:4f8:173:1ed3:aa7c::/79")
-      expect(vm.allocated_at).to be_within(5).of(Time.now)
+      expect(vm.allocated_at).to eq(now)
     end
 
     it "updates the sshable host" do
@@ -623,9 +625,11 @@ usermod -L ubuntu
 
   describe "#prevent_destroy" do
     it "registers a deadline and naps while preventing" do
+      now = Time.now
+      allow(Time).to receive(:now).and_return(now)
       expect { nx.prevent_destroy }.to nap(30)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 24 * 60 * 60)
+      expect(nx.strand.stack.first["deadline_at"]).to eq(now + 24 * 60 * 60)
     end
   end
 
