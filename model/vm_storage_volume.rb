@@ -20,6 +20,10 @@ class VmStorageVolume < Sequel::Model
     vm.location.aws?
   end
 
+  def vhost_backend_systemd_unit_name
+    "#{vm.inhost_name}-#{disk_index}-storage.service"
+  end
+
   def device_id
     "#{vm.inhost_name}_#{disk_index}"
   end
