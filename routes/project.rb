@@ -5,12 +5,10 @@ class Clover
     r.is do
       r.get do
         no_authorization_needed
-        dataset = current_account.projects_dataset.where(visible: true)
 
         if api?
-          paginated_result(dataset, Serializers::Project)
+          paginated_result(current_account.projects_dataset.where(:visible), Serializers::Project)
         else
-          @projects = dataset.all
           view "project/index"
         end
       end
@@ -34,6 +32,52 @@ class Clover
           flash["notice"] = "Project created"
           r.redirect @project
         end
+      end
+    end
+
+    r.on web?, "invitation", :ubid_uuid do |project_id|
+      invitation = current_account.invitations_dataset.first(project_id:)
+      check_found_object(invitation)
+      no_authorization_needed
+      handle_validation_failure("project/index")
+
+      r.post "accept" do
+        success = true
+
+        DB.transaction do
+          result = DB[:access_tag]
+            .returning(:hyper_tag_id)
+            .insert_conflict
+            .insert(hyper_tag_id: current_account.id, project_id:)
+
+          if result.empty?
+            success = false
+            no_audit_log
+          else
+            invitation
+              .project
+              .subject_tags_dataset
+              .first(name: invitation.policy)
+              &.add_subject(current_account.id)
+            audit_log(current_account, "accept_invitation", project_id: invitation.project_id)
+          end
+
+          # Destroy invitation whether or not the account is already a project member
+          invitation.destroy
+        end
+
+        raise_web_error("You are already a member of the project, ignoring invitation") unless success
+        flash["notice"] = "Accepted invitation to join project"
+        r.redirect "/project"
+      end
+
+      r.post "decline" do
+        DB.transaction do
+          invitation.destroy
+          audit_log(current_account, "decline_invitation", project_id: invitation.project_id)
+        end
+        flash["notice"] = "Declined invitation to join project"
+        r.redirect "/project"
       end
     end
 

@@ -74,14 +74,14 @@ RSpec.configure do |config|
   end
 
   config.include(Module.new do
-    def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD)
+    def login(email = TEST_USER_EMAIL, password = TEST_USER_PASSWORD, title_end_with: "Dashboard")
       visit "/login"
       fill_in "Email Address", with: email
       click_button "Sign in"
       fill_in "Password", with: password
       click_button "Sign in"
 
-      expect(page.title).to end_with("Dashboard")
+      expect(page.title).to end_with(title_end_with)
     end
   end)
 end

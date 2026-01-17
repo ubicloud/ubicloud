@@ -60,6 +60,7 @@ RSpec.describe Clover do
   end
 
   it "raises error for unsupported audit log action" do
+    create_account.create_project_with_default_policy("project-1")
     expect { post "/webhook/test-no-audit-logging/bad" }.to raise_error(RuntimeError, "unsupported audit_log action: bad_action")
   end
 

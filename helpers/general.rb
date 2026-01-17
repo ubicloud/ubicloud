@@ -102,7 +102,7 @@ class Clover < Roda
 
   AUDIT_LOG_DS = DB[:audit_log].returning(nil)
   SUPPORTED_ACTIONS = Set.new(<<~ACTIONS.split.each(&:freeze)).freeze
-    add_account
+    accept_invitation
     add_invitation
     add_member
     associate
@@ -110,6 +110,7 @@ class Clover < Roda
     connect
     create
     create_replica
+    decline_invitation
     delete_all_cache_entries
     destroy
     destroy_invitation
@@ -132,7 +133,7 @@ class Clover < Roda
   ACTIONS
   LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote reset_superuser_password restart restore update]).freeze
 
-  def audit_log(object, action, objects = [])
+  def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
 
     # Currently, only store create and destroy actions in non-test mode.
@@ -141,7 +142,6 @@ class Clover < Roda
     return unless LOGGED_ACTIONS.include?(action) || Config.test?
     # :nocov:
 
-    project_id = @project.id
     subject_id = current_account.id
     ubid_type = object.class.ubid_type
 
@@ -190,11 +190,6 @@ class Clover < Roda
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
     account.create_project_with_default_policy("Default")
-    account.invitations.each do |inv|
-      account.add_project(inv.project)
-      inv.project.subject_tags_dataset.first(name: inv.policy)&.add_subject(account_id)
-      inv.destroy
-    end
   end
 
   def current_account_id

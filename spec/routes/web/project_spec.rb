@@ -24,6 +24,16 @@ RSpec.describe Clover, "project" do
     end
   end
 
+  describe "authenticated with open invitations" do
+    it "redirects to projects page on login" do
+      project
+      new_project = user2.create_project_with_default_policy("project-3")
+      new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member", expires_at: Time.now + 1000)
+      login(user.email, title_end_with: "Projects")
+      expect(page).to have_content "Project Invitations"
+    end
+  end
+
   describe "authenticated" do
     before do
       login(user.email)
@@ -52,6 +62,90 @@ RSpec.describe Clover, "project" do
 
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content project.name
+        expect(page).to have_no_content new_project.name
+      end
+
+      it "can accept invitations to projects and join given subject tag" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member", expires_at: Time.now + 1000)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        expect(page).to have_content user2.email
+        click_button "Accept"
+        expect(page).to have_flash_notice("Accepted invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(new_project.subject_tags_dataset.first(name: "Member").member_ids).to include user.id
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "can accept invitations to projects and not join invalid subject tag" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member2", expires_at: Time.now + 1000)
+        DB[:account_password_hashes].where(id: user2.id).delete
+        user2.destroy
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        expect(page).to have_content "-Account Deleted-"
+        click_button "Accept"
+        expect(page).to have_flash_notice("Accepted invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(new_project.subject_tags_dataset.first(name: "Member").member_ids).not_to include user.id
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "shows error if accepting an invitation to a project where account is already a member" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, expires_at: Time.now + 1000)
+        new_project.add_account(user)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Accept"
+        expect(page).to have_flash_error("You are already a member of the project, ignoring invitation")
+        expect(user.invitations.count).to eq 0
+
+        expect(page).to have_no_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        within("#project-#{new_project.ubid}") { click_link new_project.name }
+        expect(page.title).to eq "Ubicloud - project-3 Dashboard"
+      end
+
+      it "can decline invitations to projects" do
+        project
+        new_project = user2.create_project_with_default_policy("project-3")
+        new_project.add_invitation(email: user.email, inviter_id: user2.id, expires_at: Time.now + 1000)
+
+        visit "/project"
+
+        expect(page.title).to eq("Ubicloud - Projects")
+        expect(page).to have_content "Project Invitations"
+        expect(page).to have_content new_project.name
+        click_button "Decline"
+        expect(page).to have_flash_notice("Declined invitation to join project")
+        expect(user.invitations.count).to eq 0
+        expect(page).to have_no_content "Project Invitations"
         expect(page).to have_no_content new_project.name
       end
     end
@@ -306,7 +400,7 @@ RSpec.describe Clover, "project" do
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
         click_button "Invite"
-        expect(ProjectInvitation.count).to eq 0
+        expect(ProjectInvitation.count).to eq 1
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -326,8 +420,8 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
-        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
+        expect(ProjectInvitation.count).to eq 1
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -346,6 +440,7 @@ RSpec.describe Clover, "project" do
         click_button "Invite"
         expect(page).to have_flash_notice("Invitation sent successfully to 'user2@example.com'.")
 
+        project.add_account(user2)
         fill_in "Email", with: user2.email
         select "Admin", from: "policy"
         click_button "Invite"
@@ -353,8 +448,8 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
-        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).not_to be_nil
+        expect(ProjectInvitation.count).to eq 1
+        expect(DB[:applied_subject_tag].first(tag_id: subject_tag.id, subject_id: user2.id)).to be_nil
         expect(Mail::TestMailer.deliveries.length).to eq 1
       end
 
@@ -378,7 +473,7 @@ RSpec.describe Clover, "project" do
 
         expect(page).to have_content user.email
         expect(page).to have_content user2.email
-        expect(ProjectInvitation.count).to eq 0
+        expect(ProjectInvitation.count).to eq 1
         expect(Mail::TestMailer.deliveries.length).to eq 1
         expect(allowed.member_ids).to be_empty
       end
