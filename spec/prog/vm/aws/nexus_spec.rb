@@ -494,7 +494,7 @@ usermod -L ubuntu
       client.stub_responses(:describe_instances, reservations: [{instances: [{state: {name: "pending"}}]}])
       expect { nx.wait_instance_created }
         .to nap(1)
-        .and change { client.api_requests }
+        .and change(client, :api_requests)
         .to(include(a_hash_including(
           operation_name: :describe_instances,
           params: a_hash_including(filters: [
@@ -726,10 +726,19 @@ usermod -L ubuntu
         {policy_name: "policy-name", policy_arn: "policy-arn"}
       ]})
       iam_client.stub_responses(:list_attached_role_policies, policies)
-      expect(iam_client).to receive(:detach_role_policy).with({policy_arn: "arn:aws:iam::aws:policy/testvm-cw-agent-policy", role_name: "testvm"})
-      expect(iam_client).to receive(:detach_role_policy).with({role_name: vm.name, policy_arn: "policy-arn"})
+      iam_client.stub_responses(:detach_role_policy, {})
+      expect(iam_client).to receive(:detach_role_policy).with({policy_arn: "arn:aws:iam::aws:policy/testvm-cw-agent-policy", role_name: "testvm"}).and_call_original
+      expect(iam_client).to receive(:detach_role_policy).with({role_name: vm.name, policy_arn: "policy-arn"}).and_call_original
 
-      expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
+      expect { nx.cleanup_roles }
+        .to exit({"msg" => "vm destroyed"})
+        .and change(iam_client, :api_requests)
+        .to(include(
+          a_hash_including(operation_name: :remove_role_from_instance_profile, params: a_hash_including(instance_profile_name: "testvm-instance-profile", role_name: "testvm")),
+          a_hash_including(operation_name: :delete_instance_profile, params: a_hash_including(instance_profile_name: "testvm-instance-profile")),
+          a_hash_including(operation_name: :delete_policy, params: a_hash_including(policy_arn: "arn:aws:iam::aws:policy/testvm-cw-agent-policy")),
+          a_hash_including(operation_name: :delete_role, params: a_hash_including(role_name: "testvm"))
+        ))
     end
 
     it "skips policy cleanup if the cloudwatch policy doesn't exist" do
