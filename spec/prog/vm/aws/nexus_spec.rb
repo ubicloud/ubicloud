@@ -306,7 +306,10 @@ usermod -L ubuntu
 
     it "naps until instance profile not propagated yet" do
       client.stub_responses(:run_instances, Aws::EC2::Errors::InvalidParameterValue.new(nil, "Invalid IAM Instance Profile name"))
-      expect { nx.create_instance }.to nap(1)
+      expect { nx.create_instance }
+        .to nap(1)
+        .and change(client, :api_requests)
+        .to(include(a_hash_including(operation_name: :run_instances)))
     end
 
     it "raises exception if it's not for invalid instance profile" do
