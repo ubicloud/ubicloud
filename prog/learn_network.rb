@@ -6,7 +6,7 @@ class Prog::LearnNetwork < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
-    ip6 = parse_ip_addr_j(sshable.cmd("/usr/sbin/ip -j -6 addr show scope global"))
+    ip6 = parse_ip_addr_j(sshable.cmd_json("/usr/sbin/ip -j -6 addr show scope global"))
 
     # While it would be ideal for NetAddr's IPv6 support to convey
     # both address and prefix information together as `ip` does, it's
@@ -33,7 +33,7 @@ class Prog::LearnNetwork < Prog::Base
   Ip6 = Struct.new(:addr, :prefixlen)
 
   def parse_ip_addr_j(s)
-    case JSON.parse(s)
+    case s
     in [iface]
       case iface.fetch("addr_info").filter_map { |info|
              if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 112

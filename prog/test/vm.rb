@@ -98,9 +98,7 @@ class Prog::Test::Vm < Prog::Test::Base
             --name=test-job --eta-newline=1 --output-format=json
     CMD
 
-    fio_read_output = JSON.parse(sshable.cmd(fio_read_cmd))
-
-    fio_read_output.dig("jobs", 0, "read", "bw_bytes")
+    sshable.cmd_json(fio_read_cmd).dig("jobs", 0, "read", "bw_bytes")
   end
 
   def get_write_bw_bytes
@@ -110,9 +108,7 @@ class Prog::Test::Vm < Prog::Test::Base
             --name=test-job --eta-newline=1 --output-format=json
     CMD
 
-    fio_write_output = JSON.parse(sshable.cmd(fio_write_cmd))
-
-    fio_write_output.dig("jobs", 0, "write", "bw_bytes")
+    sshable.cmd_json(fio_write_cmd).dig("jobs", 0, "write", "bw_bytes")
   end
 
   label def verify_io_rates

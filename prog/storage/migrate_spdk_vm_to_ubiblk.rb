@@ -137,7 +137,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def update_prep_json_file
-    prep_json = JSON.parse(vm.vm_host.sshable.cmd("sudo cat /vm/:inhost_name/prep.json", inhost_name:))
+    prep_json = vm.vm_host.sshable.cmd_json("sudo cat /vm/:inhost_name/prep.json", inhost_name:)
     prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
     prep_json["storage_volumes"][0]["spdk_version"] = nil
     vm.vm_host.sshable.write_file("/vm/#{inhost_name}/prep.json", JSON.pretty_generate(prep_json))

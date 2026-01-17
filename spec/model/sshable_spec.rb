@@ -263,6 +263,13 @@ LOCK
     end
   end
 
+  describe "#cmd_json" do
+    it "parses cmd output as JSON" do
+      expect(sa).to receive(:_cmd).with("cat data.json").and_return('{"key": "value"}')
+      expect(sa.cmd_json("cat data.json")).to eq({"key" => "value"})
+    end
+  end
+
   describe "daemonizer methods" do
     let(:unit_name) { "test_unit" }
     let(:run_command) { "sudo host/bin/setup-vm prep test_unit" }
