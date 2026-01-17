@@ -227,10 +227,10 @@ usermod -L ubuntu
 
   describe "#create_instance_profile" do
     it "creates an instance profile" do
-      iam_client.stub_responses(:create_instance_profile, {})
+      iam_client.stub_responses(:create_instance_profile, instance_profile: {instance_profile_name: "#{vm.name}-instance-profile", instance_profile_id: "test-id", path: "/", roles: [], arn: "arn:aws:iam::123456789012:instance-profile/#{vm.name}-instance-profile", create_date: Time.now})
       expect(iam_client).to receive(:create_instance_profile).with({
         instance_profile_name: "#{vm.name}-instance-profile"
-      })
+      }).and_call_original
 
       expect { nx.create_instance_profile }.to hop("add_role_to_instance_profile")
     end
