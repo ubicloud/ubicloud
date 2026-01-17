@@ -33,13 +33,27 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       [subnet.subnet_id, subnet.availability_zone]
     elsif subnet_response.subnets.empty?
       subnet_az = az_to_provision_subnet
-      subnet_id = client.create_subnet({
-        vpc_id:,
-        cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(24)).to_s,
-        ipv_6_cidr_block: ipv_6_cidr_block.to_s,
-        availability_zone: private_subnet.location.name + subnet_az,
-        tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
-      }).subnet.subnet_id
+      begin
+        subnet_id = client.create_subnet({
+          vpc_id:,
+          cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(24)).to_s,
+          ipv_6_cidr_block: ipv_6_cidr_block.to_s,
+          availability_zone: private_subnet.location.name + subnet_az,
+          tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
+        }).subnet.subnet_id
+      rescue Aws::EC2::Errors::InvalidSubnetConflict => e
+        retry_count = frame["subnet_conflict_retry_count"] || 0
+        if retry_count >= 5
+          raise e
+        end
+
+        Clog.emit("subnet CIDR conflict, retrying with new IP", {subnet_conflict_retry: {nic: nic.ubid, retry_count: retry_count + 1, message: e.message}})
+        new_ipv4 = private_subnet.random_private_ipv4
+        fail "exhausted random private ipv4 addresses after #{retry_count + 1} retries" unless new_ipv4
+        nic.update(private_ipv4: new_ipv4.to_s)
+        update_stack({"subnet_conflict_retry_count" => retry_count + 1})
+        nap 0
+      end
       client.modify_subnet_attribute({
         subnet_id:,
         assign_ipv_6_address_on_creation: {value: true}
