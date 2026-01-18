@@ -181,9 +181,9 @@ jobs:
       continue-on-error: true
       run: |
         echo "## Exceptions" >> $GITHUB_STEP_SUMMARY
-        echo '| Time | Thread | Class | Message | First Backtrace Line |' >> $GITHUB_STEP_SUMMARY
-        echo '|---|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
-        grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r '[.time, .thread, .exception.class, (.exception.message | gsub("\n"; " ")), (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
+        echo '| Time | Thread | Prog | Class | Message | First Backtrace Line |' >> $GITHUB_STEP_SUMMARY
+        echo '|---|---|---|---|---|---|' >> $GITHUB_STEP_SUMMARY
+        grep 'respirate.*"exception"' foreman.log | cut -d'|' -f2 | jq -r '[.time, .thread, .prog_label, .exception.class, (.exception.message | gsub("\n"; " ")), (.exception.backtrace[0] // "" | gsub("\n"; " "))] | "| " + join(" | ") + " |"' >> $GITHUB_STEP_SUMMARY
 
     - name: Upload logs
       if: always()
