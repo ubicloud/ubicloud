@@ -214,7 +214,7 @@ class VmHost < Sequel::Model
       end
     end
 
-    Strand.create(prog: "SetupNftables", label: "start", stack: [{subject_id: id}])
+    Strand.create(prog: "SetupNftables", label: "start", stack: [{subject_id: id}]) unless allocation_state == "unprepared"
   end
 
   # Operational Functions

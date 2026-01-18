@@ -215,7 +215,19 @@ RSpec.describe VmHost do
       expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
       vm_host.sshable.update(host: "1.1.0.0")
       Sshable.create(host: "1.1.1.1")
-      expect { vm_host.create_addresses }.to change { vm_host.assigned_subnets_dataset.count }.by(4)
+      expect { vm_host.create_addresses }
+        .to change { vm_host.assigned_subnets_dataset.count }.by(4)
+        .and change { Strand.where(prog: "SetupNftables").count }.by(1)
+    end
+
+    it "does not setup nftables while preparing the vm host" do
+      expect(Hosting::Apis).to receive(:pull_ips).and_return(hetzner_ips)
+      vm_host.sshable.update(host: "1.1.0.0")
+      Sshable.create(host: "1.1.1.1")
+      vm_host.update(allocation_state: "unprepared")
+      expect { vm_host.create_addresses }
+        .to change { vm_host.assigned_subnets_dataset.count }.by(4)
+        .and not_change { Strand.where(prog: "SetupNftables").count }
     end
 
     it "returns immediately if there are no addresses to create" do
