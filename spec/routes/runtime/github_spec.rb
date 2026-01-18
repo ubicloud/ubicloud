@@ -208,6 +208,13 @@ RSpec.describe Clover, "github" do
     end
 
     describe "commits cache" do
+      it "fails if no access key" do
+        repository.update(access_key: nil)
+        post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
+
+        expect(last_response.status).to eq(204)
+      end
+
       it "fails if one of the parameters are missing" do
         [
           [["etag-1", "etag-2"], "upload-id", nil],
@@ -268,6 +275,13 @@ RSpec.describe Clover, "github" do
     end
 
     describe "gets cache entry" do
+      it "fails if no access key" do
+        repository.update(access_key: nil)
+        get "/runtime/github/cache", {keys: "k1", version: "v1"}
+
+        expect(last_response.status).to eq(204)
+      end
+
       it "fails if one of the parameters are missing" do
         [
           ["k1,k2", nil],
