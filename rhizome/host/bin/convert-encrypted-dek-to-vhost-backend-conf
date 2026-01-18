@@ -185,4 +185,4 @@ rescue => e
   exit 1
 end
 
-convert(dek_data, kek_data, options[:output_file], options[:vm_name])
+convert(dek_data, kek_data, options[:output_file], options[:vm_name], options[:device])
