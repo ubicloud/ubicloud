@@ -53,7 +53,7 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
-  def create_postgres_resource(name, **)
+  def create_postgres_resource(name, location: self.location, **)
     PostgresResource.create(
       name:, project:, location:,
       ha_type: PostgresResource::HaType::NONE,
@@ -63,18 +63,34 @@ RSpec.describe PostgresServer do
     )
   end
 
+  def create_aws_location(name: "aws-location-#{SecureRandom.hex(4)}")
+    Location.create(
+      name:, project:,
+      display_name: name, ui_name: name,
+      provider: "aws", visible: true
+    )
+  end
+
+  def create_postgres_server(target_resource: resource, target_timeline: timeline, target_vm: nil,
+    timeline_access: "push", representative: true, version: "16", synchronization_status: "ready")
+    server_vm = target_vm || create_hosted_vm(project, private_subnet, "server-vm-#{SecureRandom.hex(4)}")
+    described_class.create(
+      timeline: target_timeline, resource: target_resource, vm_id: server_vm.id,
+      representative_at: representative ? Time.now : nil,
+      synchronization_status:, timeline_access:, version:
+    )
+  end
+
   def add_data_volume(target_vm = vm, size_gib: 64)
     VmStorageVolume.create(vm: target_vm, disk_index: 0, boot: false, size_gib:)
   end
 
-  def create_failover_server(prefix:, label:, vm_size: "standard-2")
+  def create_failover_server(prefix:, label:, vm_size: "standard-2", target_resource: resource)
     @failover_counter = (@failover_counter || 0) + 1
-    server_vm = create_hosted_vm(project, private_subnet, "#{prefix}-#{@failover_counter}")
-    family, vcpus = vm_size.split("-")
-    server_vm.update(family:, vcpus: vcpus.to_i, arch: "x64", cpu_percent_limit: nil)
+    server_vm = create_hosted_vm(project, private_subnet, "#{prefix}-#{@failover_counter}", size: vm_size)
     add_data_volume(server_vm)
     server = described_class.create(
-      timeline:, resource:, vm_id: server_vm.id,
+      timeline:, resource: target_resource, vm_id: server_vm.id,
       synchronization_status: "ready", timeline_access: "fetch", version: "16"
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
@@ -99,10 +115,6 @@ RSpec.describe PostgresServer do
   end
 
   describe "#configure" do
-    before do
-      resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
-    end
-
     it "does not set archival related configs if blob storage is not configured" do
       expect(Config).to receive(:postgres_service_project_id).and_return(nil)
       expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
@@ -111,14 +123,9 @@ RSpec.describe PostgresServer do
 
   describe "#configure", "with blob storage" do
     before do
-      resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
       MinioCluster.create(
         project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root"
       )
-    end
-
-    def create_standby_resource(suffix)
-      create_postgres_resource("postgres-standby-#{suffix}", ha_type: PostgresResource::HaType::SYNC)
     end
 
     it "sets configs that are specific to primary" do
@@ -139,50 +146,38 @@ RSpec.describe PostgresServer do
     end
 
     it "sets synchronous_standby_names for sync replication mode" do
-      postgres_server
-      resource.update(ha_type: PostgresResource::HaType::SYNC)
+      sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
+      primary = create_postgres_server(target_resource: sync_resource)
 
-      described_class.create(
-        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby1").id,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
-      )
-      standby2 = described_class.create(
-        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby2").id,
-        synchronization_status: "ready", timeline_access: "fetch", version: "16"
-      )
+      create_postgres_server(target_resource: sync_resource, timeline_access: "fetch", representative: false, synchronization_status: "catching_up")
+      standby2 = create_postgres_server(target_resource: sync_resource, timeline_access: "fetch", representative: false)
 
-      expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
+      expect(primary.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
     end
 
     it "sets synchronous_standby_names as empty if there is no caught up standby" do
-      resource.update(ha_type: PostgresResource::HaType::SYNC)
+      sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
+      primary = create_postgres_server(target_resource: sync_resource)
 
-      described_class.create(
-        timeline:, resource: create_standby_resource("1"), vm_id: create_hosted_vm(project, private_subnet, "standby1").id, representative_at: Time.now,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
-      )
-      described_class.create(
-        timeline:, resource: create_standby_resource("2"), vm_id: create_hosted_vm(project, private_subnet, "standby2").id, representative_at: Time.now,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
-      )
+      # Standbys belong to different resources (not the primary's resource)
+      standby_resource1 = create_postgres_resource("standby-resource-1", ha_type: PostgresResource::HaType::SYNC)
+      standby_resource2 = create_postgres_resource("standby-resource-2", ha_type: PostgresResource::HaType::SYNC)
+      create_postgres_server(target_resource: standby_resource1, timeline_access: "fetch", synchronization_status: "catching_up")
+      create_postgres_server(target_resource: standby_resource2, timeline_access: "fetch", synchronization_status: "catching_up")
 
-      expect(postgres_server.configure_hash[:configs]).not_to include(:synchronous_standby_names)
+      expect(primary.configure_hash[:configs]).not_to include(:synchronous_standby_names)
     end
 
     it "sets configs that are specific to standby" do
-      postgres_server.update(timeline_access: "fetch", representative_at: nil)
-      primary_vm = create_hosted_vm(project, private_subnet, "primary")
-      described_class.create(
-        timeline:, resource:, vm_id: primary_vm.id, representative_at: Time.now,
-        timeline_access: "push", version: "16"
-      )
-      expect(postgres_server.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
+      standby = create_postgres_server(timeline_access: "fetch", representative: false)
+      create_postgres_server(target_resource: resource) # primary
+      expect(standby.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
     it "sets configs that are specific to restoring servers" do
-      postgres_server.update(timeline_access: "fetch")
-      resource.update(restore_target: Time.now)
-      expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
+      restoring_resource = create_postgres_resource("restoring", restore_target: Time.now)
+      restoring_server = create_postgres_server(target_resource: restoring_resource, timeline_access: "fetch")
+      expect(restoring_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
     it "sets primary_slot_name to ubid on standby when physical_slot_ready" do
@@ -193,13 +188,15 @@ RSpec.describe PostgresServer do
     end
 
     it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
-      resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
+      paradedb_resource = create_postgres_resource("paradedb-resource", flavor: PostgresResource::Flavor::PARADEDB)
+      paradedb_server = create_postgres_server(target_resource: paradedb_resource)
+      expect(paradedb_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
     end
 
     it "puts lantern_extras to shared_preload_libraries for Lantern" do
-      resource.update(flavor: PostgresResource::Flavor::LANTERN)
-      expect(postgres_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
+      lantern_resource = create_postgres_resource("lantern-resource", flavor: PostgresResource::Flavor::LANTERN)
+      lantern_server = create_postgres_server(target_resource: lantern_resource)
+      expect(lantern_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
     it "puts extra logging options for AWS" do
@@ -216,9 +213,9 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
-      postgres_server.update(representative_at: nil)
-      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", {ubid: postgres_server.ubid})
-      expect(postgres_server.trigger_failover(mode: "planned")).to be false
+      non_primary = create_postgres_server(representative: false)
+      expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", {ubid: non_primary.ubid})
+      expect(non_primary.trigger_failover(mode: "planned")).to be false
     end
 
     it "logs error when no suitable standby found" do
@@ -237,8 +234,10 @@ RSpec.describe PostgresServer do
 
   describe "#read_replica?" do
     it "returns true when resource has parent_id and no restore_target" do
-      resource.update(parent_id: create_postgres_resource("parent").id)
-      expect(postgres_server).to be_read_replica
+      parent = create_postgres_resource("parent")
+      replica_resource = create_postgres_resource("replica", parent_id: parent.id)
+      replica_server = create_postgres_server(target_resource: replica_resource)
+      expect(replica_server).to be_read_replica
     end
 
     it "returns false when resource has no parent_id" do
@@ -248,7 +247,6 @@ RSpec.describe PostgresServer do
 
   describe "#failover_target" do
     before do
-      postgres_server.update(representative_at: Time.now)
       add_data_volume
     end
 
@@ -261,56 +259,58 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target).to be_nil
     end
 
-    it "returns the standby with highest lsn in sync replication" do
-      resource.update(ha_type: PostgresResource::HaType::SYNC)
-      create_failover_server(prefix: "standby", label: "wait_catch_up")
-      standby2 = create_failover_server(prefix: "standby", label: "wait")
-      standby3 = create_failover_server(prefix: "standby", label: "wait")
-      stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
-      expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
+    context "with sync replication" do
+      let(:resource) { create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC) }
+
+      it "returns the standby with highest lsn" do
+        create_failover_server(prefix: "standby", label: "wait_catch_up")
+        standby2 = create_failover_server(prefix: "standby", label: "wait")
+        standby3 = create_failover_server(prefix: "standby", label: "wait")
+        stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
+        expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
+      end
     end
 
-    it "returns nil if last_known_lsn is unknown for async replication" do
-      resource.update(ha_type: PostgresResource::HaType::ASYNC)
-      PostgresLsnMonitor.create { it.postgres_server_id = postgres_server.id }
-      standby = create_failover_server(prefix: "standby", label: "wait")
-      stub_current_lsn(standby.id => "1/10")
-      expect(postgres_server.failover_target).to be_nil
-    end
+    context "with async replication" do
+      let(:resource) { create_postgres_resource("async-resource", ha_type: PostgresResource::HaType::ASYNC) }
 
-    it "returns nil if no lsn_monitor for async replication" do
-      resource.update(ha_type: PostgresResource::HaType::ASYNC)
-      expect(postgres_server.failover_target).to be_nil
-    end
+      it "returns nil if last_known_lsn is unknown" do
+        PostgresLsnMonitor.create { it.postgres_server_id = postgres_server.id }
+        standby = create_failover_server(prefix: "standby", label: "wait")
+        stub_current_lsn(standby.id => "1/10")
+        expect(postgres_server.failover_target).to be_nil
+      end
 
-    it "returns nil if lsn difference is too high for async replication" do
-      resource.update(ha_type: PostgresResource::HaType::ASYNC)
-      PostgresLsnMonitor.create { |m|
-        m.postgres_server_id = postgres_server.id
-        m.last_known_lsn = "2/0"
-      }
-      standby = create_failover_server(prefix: "standby", label: "wait")
-      stub_current_lsn(standby.id => "1/10")
-      expect(postgres_server.failover_target).to be_nil
-    end
+      it "returns nil if no lsn_monitor" do
+        expect(postgres_server.failover_target).to be_nil
+      end
 
-    it "returns the standby with highest lsn if lsn difference is not high in async replication" do
-      resource.update(ha_type: PostgresResource::HaType::ASYNC)
-      PostgresLsnMonitor.create { |m|
-        m.postgres_server_id = postgres_server.id
-        m.last_known_lsn = "1/11"
-      }
-      create_failover_server(prefix: "standby", label: "wait_catch_up")
-      standby2 = create_failover_server(prefix: "standby", label: "wait")
-      standby3 = create_failover_server(prefix: "standby", label: "wait")
-      stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
-      expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
+      it "returns nil if lsn difference is too high" do
+        PostgresLsnMonitor.create { |m|
+          m.postgres_server_id = postgres_server.id
+          m.last_known_lsn = "2/0"
+        }
+        standby = create_failover_server(prefix: "standby", label: "wait")
+        stub_current_lsn(standby.id => "1/10")
+        expect(postgres_server.failover_target).to be_nil
+      end
+
+      it "returns the standby with highest lsn if lsn difference is not high" do
+        PostgresLsnMonitor.create { |m|
+          m.postgres_server_id = postgres_server.id
+          m.last_known_lsn = "1/11"
+        }
+        create_failover_server(prefix: "standby", label: "wait_catch_up")
+        standby2 = create_failover_server(prefix: "standby", label: "wait")
+        standby3 = create_failover_server(prefix: "standby", label: "wait")
+        stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
+        expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
+      end
     end
 
     context "when read replica" do
-      before do
-        resource.update(parent_id: create_postgres_resource("parent-resource").id)
-      end
+      let(:parent_resource) { create_postgres_resource("parent-resource") }
+      let(:resource) { create_postgres_resource("replica-resource", parent_id: parent_resource.id) }
 
       it "returns nil if there is no replica to failover" do
         expect(postgres_server.failover_target).to be_nil
@@ -344,29 +344,37 @@ RSpec.describe PostgresServer do
 
   describe "lsn_caught_up" do
     it "returns true if read replica and the parent is nil" do
-      postgres_server.resource.update(parent_id: PostgresResource.generate_uuid)
-      expect(postgres_server.read_replica?).to be(true)
-      expect(postgres_server.lsn_caught_up).to be(true)
+      # Create a replica with a non-existent parent (simulates orphaned replica)
+      replica_resource = create_postgres_resource("replica", parent_id: PostgresResource.generate_uuid)
+      replica_server = create_postgres_server(target_resource: replica_resource)
+      expect(replica_server.read_replica?).to be(true)
+      expect(replica_server.lsn_caught_up).to be(true)
     end
 
     it "returns true when no representative server" do
-      expect(postgres_server).to receive(:read_replica?).and_return(false)
-      postgres_server.update(representative_at: nil)
-      expect(postgres_server.lsn_caught_up).to be(true)
+      non_rep_server = create_postgres_server(representative: false)
+      expect(non_rep_server).to receive(:read_replica?).and_return(false)
+      expect(non_rep_server.lsn_caught_up).to be(true)
     end
   end
 
   describe "lsn_caught_up", "with parent resource" do
+    let(:parent_resource) { create_postgres_resource("postgres-resource-parent") }
+    let(:resource) { create_postgres_resource("replica-resource", parent_id: parent_resource.id) }
+
+    subject(:postgres_server) {
+      described_class.create(
+        timeline:, resource:, vm_id: vm.id, representative_at: Time.now,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16"
+      )
+    }
+
     before do
-      parent_resource = create_postgres_resource("postgres-resource-parent")
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
       described_class.create(
         timeline:, resource: parent_resource, vm_id: parent_vm.id, representative_at: Time.now,
         synchronization_status: "ready", timeline_access: "push", version: "16"
       )
-
-      resource.update(parent: parent_resource)
-      postgres_server.update(timeline_access: "fetch")
       allow(resource.parent.representative_server).to receive(:current_lsn).and_return("F/F")
     end
 
@@ -413,24 +421,20 @@ RSpec.describe PostgresServer do
   end
 
   it "checks pulse for restoring server (not primary, not standby) and does not trigger checkup when pulse recovers" do
-    postgres_server.update(timeline_access: "fetch")
-    result = postgres_server.check_pulse(session: check_pulse_session, previous_pulse: down_pulse)
+    restoring_server = create_postgres_server(timeline_access: "fetch")
+    result = restoring_server.check_pulse(session: check_pulse_session, previous_pulse: down_pulse)
     expect(result[:reading]).to eq("up")
-    expect(postgres_server.reload.checkup_set?).to be false
+    expect(restoring_server.reload.checkup_set?).to be false
   end
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
-    postgres_server.update(timeline_access: "fetch", representative_at: nil)
-    primary_vm = create_hosted_vm(project, private_subnet, "primary")
-    described_class.create(
-      timeline:, resource:, vm_id: primary_vm.id, representative_at: Time.now,
-      timeline_access: "push", version: "16"
-    )
-    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    standby = create_postgres_server(timeline_access: "fetch", representative: false)
+    create_postgres_server(target_resource: resource) # primary
+    Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
     session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
-    postgres_server.check_pulse(session:, previous_pulse: down_pulse)
-    expect(postgres_server.reload.checkup_set?).to be true
+    standby.check_pulse(session:, previous_pulse: down_pulse)
+    expect(standby.reload.checkup_set?).to be true
   end
 
   it "uses pg_current_wal_lsn to track lsn for primaries" do
@@ -442,12 +446,12 @@ RSpec.describe PostgresServer do
   end
 
   it "uses pg_last_wal_replay_lsn to track lsn for restoring servers" do
-    postgres_server.update(timeline_access: "fetch")
-    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    restoring_server = create_postgres_server(timeline_access: "fetch")
+    Strand.create_with_id(restoring_server, prog: "Postgres::PostgresServerNexus", label: "wait")
     session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
-    postgres_server.check_pulse(session:, previous_pulse: down_pulse)
-    expect(postgres_server.reload.checkup_set?).to be true
+    restoring_server.check_pulse(session:, previous_pulse: down_pulse)
+    expect(restoring_server.reload.checkup_set?).to be true
   end
 
   it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
@@ -771,53 +775,53 @@ PGDATA=/dat/16/data
 
   describe "#metrics_config" do
     it "includes additional_labels from resource tags" do
-      postgres_server.resource.update(tags: {"env" => "prod", "team" => "devops"})
-      config = postgres_server.metrics_config
+      tagged_resource = create_postgres_resource("tagged-resource", tags: {"env" => "prod", "team" => "devops"})
+      tagged_server = create_postgres_server(target_resource: tagged_resource)
+      config = tagged_server.metrics_config
       expect(config[:additional_labels]).to eq({"pg_tags_label_env" => "prod", "pg_tags_label_team" => "devops"})
     end
   end
 
   if Config.unfrozen_test?
     describe "#attach_s3_policy_if_needed" do
-      it "calls attach_role_policy when needs s3 policy attachment" do
-        location.update(provider: "aws")
-        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
-        AwsInstance.create_with_id(vm, iam_role: "role")
-        iam_client = Aws::IAM::Client.new(stub_responses: true)
-        LocationCredential.create(location:, assume_role: "role")
+      context "with AWS location" do
+        let(:location) { create_aws_location(name: "us-west-2") }
+        let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
-        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
-        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
-        expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
-        postgres_server.attach_s3_policy_if_needed
+        before do
+          AwsInstance.create_with_id(vm, iam_role: "role")
+          LocationCredential.create(location:, assume_role: "role")
+        end
+
+        it "calls attach_role_policy when Config.aws_postgres_iam_access is true" do
+          expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+          expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+          expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+          expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+          postgres_server.attach_s3_policy_if_needed
+        end
+
+        context "with parent timeline" do
+          let(:parent_timeline) { PostgresTimeline.create(location:) }
+          let(:timeline) { PostgresTimeline.create(location:, parent: parent_timeline) }
+
+          it "detaches parent timeline when Config.aws_postgres_iam_access is true" do
+            expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
+            expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+            expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+            expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+            expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
+            postgres_server.attach_s3_policy_if_needed
+          end
+        end
+
+        it "does not attach policy when Config.aws_postgres_iam_access is not set" do
+          expect(postgres_server.vm.aws_instance).not_to receive(:iam_role)
+          postgres_server.attach_s3_policy_if_needed
+        end
       end
 
-      it "detaches parent timeline when Config.aws_postgres_iam_access set" do
-        location.update(provider: "aws")
-        expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
-        AwsInstance.create_with_id(vm, iam_role: "role")
-        iam_client = Aws::IAM::Client.new(stub_responses: true)
-        LocationCredential.create(location:, assume_role: "role")
-
-        parent = PostgresTimeline.create(location:)
-        timeline.update(parent:)
-        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
-        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
-        expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
-        expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
-        postgres_server.attach_s3_policy_if_needed
-      end
-
-      it "does not detach parent timeline when Config.aws_postgres_iam_access not set" do
-        location.update(provider: "aws")
-        AwsInstance.create_with_id(vm, iam_role: "role")
-        LocationCredential.create(location:, assume_role: "role")
-
-        expect(postgres_server.vm.aws_instance).not_to receive(:iam_role)
-        postgres_server.attach_s3_policy_if_needed
-      end
-
-      it "does not call attach_role_policy when needs s3 policy attachment" do
+      it "does not call attach_role_policy for non-AWS location" do
         LocationCredential.create(location:, assume_role: "role")
         expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
         postgres_server.attach_s3_policy_if_needed

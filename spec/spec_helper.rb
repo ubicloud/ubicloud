@@ -242,6 +242,50 @@ RSpec.configure do |config|
     end
   end
 
+  # Extends change matcher with .to_now chain that verifies:
+  # 1. Matcher does NOT match before the block
+  # 2. Matcher DOES match after the block
+  #
+  # Inspired by https://github.com/ashanbrown/rspec-change_to_now
+  #
+  # Usage:
+  #   expect { action }.to change(obj, :attr).to_now(include(something))
+  #
+  RSpec::Matchers::BuiltIn::Change.class_eval do
+    def to_now(matcher)
+      ChangeToNowMatcher.new(change_details, matcher)
+    end
+  end
+
+  class ChangeToNowMatcher
+    include RSpec::Matchers::Composable
+
+    def initialize(change_details, matcher)
+      @change_details = change_details
+      @matcher = matcher
+    end
+
+    def matches?(event_proc)
+      @change_details.perform_change(event_proc) do |actual_before|
+        @before_matched = values_match?(@matcher, actual_before)
+      end
+      @after_matched = values_match?(@matcher, @change_details.actual_after)
+      !@before_matched && @after_matched
+    end
+
+    def failure_message
+      if @before_matched
+        "expected #{@change_details.value_representation} not to match #{RSpec::Support::ObjectFormatter.format(@matcher)} initially, but it did"
+      else
+        "expected #{@change_details.value_representation} to match #{RSpec::Support::ObjectFormatter.format(@matcher)} after the change, but it did not"
+      end
+    end
+
+    def supports_block_expectations?
+      true
+    end
+  end
+
   if Config.frozen_test?
     require_relative "thawed_mock"
 
@@ -274,10 +318,10 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
-    def create_hosted_vm(project, private_subnet, name)
+    def create_hosted_vm(project, private_subnet, name, size: nil)
       Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name:, private_subnet_id: private_subnet.id,
-        location_id: location.id, unix_user: "ubi"
+        location_id: location.id, unix_user: "ubi", **(size ? {size:} : {})
       ).subject
     end
 
