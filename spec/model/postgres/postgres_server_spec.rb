@@ -158,6 +158,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets synchronous_standby_names as empty if there is no caught up standby" do
+      minio_cluster
       sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
       primary = create_postgres_server(target_resource: sync_resource, vm_name: "sync-primary-2")
 
