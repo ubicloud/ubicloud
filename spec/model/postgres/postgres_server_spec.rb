@@ -811,7 +811,7 @@ PGDATA=/dat/16/data
           expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
           expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
           expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
-          expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
+          expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn).and_call_original
           postgres_server.attach_s3_policy_if_needed
         end
 
@@ -825,8 +825,8 @@ PGDATA=/dat/16/data
             expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
             expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
             expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
-            expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
-            expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
+            expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn).and_call_original
+            expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn).and_call_original
             postgres_server.attach_s3_policy_if_needed
           end
         end
