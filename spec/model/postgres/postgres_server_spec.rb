@@ -175,7 +175,7 @@ RSpec.describe PostgresServer do
     it "sets configs that are specific to standby" do
       minio_cluster
       standby = create_postgres_server(vm_name: "standby-config", timeline_access: "fetch", representative: false)
-      create_postgres_server(target_resource: resource, vm_name: "primary-for-standby") # primary
+      create_postgres_server(target_resource: resource, vm_name: "primary-for-standby")
       expect(standby.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
@@ -440,7 +440,7 @@ RSpec.describe PostgresServer do
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     standby = create_postgres_server(vm_name: "standby-checkup", timeline_access: "fetch", representative: false)
-    create_postgres_server(target_resource: resource, vm_name: "primary-for-checkup") # primary
+    create_postgres_server(target_resource: resource, vm_name: "primary-for-checkup")
     Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
     session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
