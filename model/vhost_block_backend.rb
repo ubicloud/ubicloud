@@ -21,4 +21,5 @@ end
 # Foreign key constraints:
 #  vhost_block_backend_vm_host_id_fkey | (vm_host_id) REFERENCES vm_host(id)
 # Referenced By:
-#  vm_storage_volume | vm_storage_volume_vhost_block_backend_id_fkey | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)
+#  persistent_storage_volume | persistent_storage_volume_vhost_block_backend_id_fkey | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)
+#  vm_storage_volume         | vm_storage_volume_vhost_block_backend_id_fkey         | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)
