@@ -49,10 +49,6 @@ RSpec.describe PostgresServer do
     )
   }
 
-  before do
-    allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
-  end
-
   def create_postgres_resource(name, location: self.location, **)
     PostgresResource.create(
       name:, project:, location:,
@@ -117,12 +113,16 @@ RSpec.describe PostgresServer do
 
   describe "#configure" do
     it "does not set archival related configs if blob storage is not configured" do
-      expect(Config).to receive(:postgres_service_project_id).and_return(nil)
+      allow(Config).to receive(:postgres_service_project_id).and_return(nil)
       expect(postgres_server.configure_hash[:configs]).not_to include(:archive_mode, :archive_timeout, :archive_command, :synchronous_standby_names, :primary_conninfo, :recovery_target_time, :restore_command)
     end
   end
 
   describe "#configure", "with blob storage" do
+    before do
+      allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
+    end
+
     let(:minio_cluster) {
       MinioCluster.create(
         project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root"
@@ -252,15 +252,15 @@ RSpec.describe PostgresServer do
   end
 
   describe "#failover_target" do
-    before do
-      add_data_volume
-    end
+    let(:data_volume) { add_data_volume }
 
     it "returns nil if there is no standby" do
+      data_volume
       expect(postgres_server.failover_target).to be_nil
     end
 
     it "returns nil if there is no fresh standby" do
+      data_volume
       create_failover_server(prefix: "standby", label: "wait", vm_size: "standard-4")
       expect(postgres_server.failover_target).to be_nil
     end
@@ -269,6 +269,7 @@ RSpec.describe PostgresServer do
       let(:resource) { create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC) }
 
       it "returns the standby with highest lsn" do
+        data_volume
         create_failover_server(prefix: "standby", label: "wait_catch_up")
         standby2 = create_failover_server(prefix: "standby", label: "wait")
         standby3 = create_failover_server(prefix: "standby", label: "wait")
@@ -304,6 +305,7 @@ RSpec.describe PostgresServer do
       end
 
       it "returns the standby with highest lsn if lsn difference is not high" do
+        data_volume
         PostgresLsnMonitor.create { |m|
           m.postgres_server_id = postgres_server.id
           m.last_known_lsn = "1/11"
@@ -330,6 +332,7 @@ RSpec.describe PostgresServer do
       end
 
       it "returns the replica with highest lsn" do
+        data_volume
         create_failover_server(prefix: "replica", label: "wait_catch_up")
         replica2 = create_failover_server(prefix: "replica", label: "wait")
         replica3 = create_failover_server(prefix: "replica", label: "wait")
@@ -801,12 +804,12 @@ PGDATA=/dat/16/data
         let(:location) { create_aws_location(name: "us-west-2") }
         let(:iam_client) { Aws::IAM::Client.new(stub_responses: true) }
 
-        before do
-          AwsInstance.create_with_id(vm, iam_role: "role")
-          LocationCredential.create(location:, assume_role: "role")
-        end
+        let(:aws_instance) { AwsInstance.create_with_id(vm, iam_role: "role") }
+        let(:aws_credential) { LocationCredential.create(location:, assume_role: "role") }
 
         it "calls attach_role_policy when Config.aws_postgres_iam_access is true" do
+          aws_instance
+          aws_credential
           expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
           expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
           expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
@@ -819,6 +822,8 @@ PGDATA=/dat/16/data
           let(:timeline) { PostgresTimeline.create(location:, parent: parent_timeline) }
 
           it "detaches parent timeline when Config.aws_postgres_iam_access is true" do
+            aws_instance
+            aws_credential
             expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
             expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
             expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
@@ -829,6 +834,7 @@ PGDATA=/dat/16/data
         end
 
         it "does not attach policy when Config.aws_postgres_iam_access is not set" do
+          aws_instance
           expect(postgres_server.vm.aws_instance).not_to receive(:iam_role)
           postgres_server.attach_s3_policy_if_needed
         end
