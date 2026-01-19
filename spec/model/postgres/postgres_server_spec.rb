@@ -168,6 +168,7 @@ RSpec.describe PostgresServer do
       create_postgres_server(target_resource: standby_resource1, vm_name: "standby-res1-catching-up", timeline_access: "fetch", synchronization_status: "catching_up")
       create_postgres_server(target_resource: standby_resource2, vm_name: "standby-res2-catching-up", timeline_access: "fetch", synchronization_status: "catching_up")
 
+      expect(primary.configure_hash[:configs]).to include(:archive_mode)  # Ensures blob_storage is configured
       expect(primary.configure_hash[:configs]).not_to include(:synchronous_standby_names)
     end
 
