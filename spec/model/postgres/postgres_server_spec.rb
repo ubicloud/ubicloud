@@ -67,10 +67,9 @@ RSpec.describe PostgresServer do
     )
   end
 
-  def create_postgres_server(target_resource: resource, target_timeline: timeline, target_vm: nil,
+  def create_postgres_server(target_resource: resource, target_timeline: timeline, target_vm: nil, vm_name: nil,
     timeline_access: "push", representative: true, version: "16", synchronization_status: "ready")
-    @server_vm_counter = (@server_vm_counter || 0) + 1
-    server_vm = target_vm || create_hosted_vm(project, private_subnet, "server-vm-#{@server_vm_counter}")
+    server_vm = target_vm || create_hosted_vm(project, private_subnet, vm_name)
     described_class.create(
       timeline: target_timeline, resource: target_resource, vm_id: server_vm.id,
       representative_at: representative ? Time.now : nil,
@@ -150,38 +149,38 @@ RSpec.describe PostgresServer do
     it "sets synchronous_standby_names for sync replication mode" do
       minio_cluster
       sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
-      primary = create_postgres_server(target_resource: sync_resource)
+      primary = create_postgres_server(target_resource: sync_resource, vm_name: "sync-primary-1")
 
-      create_postgres_server(target_resource: sync_resource, timeline_access: "fetch", representative: false, synchronization_status: "catching_up")
-      standby2 = create_postgres_server(target_resource: sync_resource, timeline_access: "fetch", representative: false)
+      create_postgres_server(target_resource: sync_resource, vm_name: "sync-standby-catching-up", timeline_access: "fetch", representative: false, synchronization_status: "catching_up")
+      standby2 = create_postgres_server(target_resource: sync_resource, vm_name: "sync-standby-ready", timeline_access: "fetch", representative: false)
 
       expect(primary.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
     end
 
     it "sets synchronous_standby_names as empty if there is no caught up standby" do
       sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
-      primary = create_postgres_server(target_resource: sync_resource)
+      primary = create_postgres_server(target_resource: sync_resource, vm_name: "sync-primary-2")
 
       # Standbys belong to different resources (not the primary's resource)
       standby_resource1 = create_postgres_resource("standby-resource-1", ha_type: PostgresResource::HaType::SYNC)
       standby_resource2 = create_postgres_resource("standby-resource-2", ha_type: PostgresResource::HaType::SYNC)
-      create_postgres_server(target_resource: standby_resource1, timeline_access: "fetch", synchronization_status: "catching_up")
-      create_postgres_server(target_resource: standby_resource2, timeline_access: "fetch", synchronization_status: "catching_up")
+      create_postgres_server(target_resource: standby_resource1, vm_name: "standby-res1-catching-up", timeline_access: "fetch", synchronization_status: "catching_up")
+      create_postgres_server(target_resource: standby_resource2, vm_name: "standby-res2-catching-up", timeline_access: "fetch", synchronization_status: "catching_up")
 
       expect(primary.configure_hash[:configs]).not_to include(:synchronous_standby_names)
     end
 
     it "sets configs that are specific to standby" do
       minio_cluster
-      standby = create_postgres_server(timeline_access: "fetch", representative: false)
-      create_postgres_server(target_resource: resource) # primary
+      standby = create_postgres_server(vm_name: "standby-config", timeline_access: "fetch", representative: false)
+      create_postgres_server(target_resource: resource, vm_name: "primary-for-standby") # primary
       expect(standby.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
     it "sets configs that are specific to restoring servers" do
       minio_cluster
       restoring_resource = create_postgres_resource("restoring", restore_target: Time.now)
-      restoring_server = create_postgres_server(target_resource: restoring_resource, timeline_access: "fetch")
+      restoring_server = create_postgres_server(target_resource: restoring_resource, vm_name: "restoring-server", timeline_access: "fetch")
       expect(restoring_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
@@ -194,13 +193,13 @@ RSpec.describe PostgresServer do
 
     it "puts pg_analytics to shared_preload_libraries for ParadeDB" do
       paradedb_resource = create_postgres_resource("paradedb-resource", flavor: PostgresResource::Flavor::PARADEDB)
-      paradedb_server = create_postgres_server(target_resource: paradedb_resource)
+      paradedb_server = create_postgres_server(target_resource: paradedb_resource, vm_name: "paradedb-server")
       expect(paradedb_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,pg_analytics,pg_search'")
     end
 
     it "puts lantern_extras to shared_preload_libraries for Lantern" do
       lantern_resource = create_postgres_resource("lantern-resource", flavor: PostgresResource::Flavor::LANTERN)
-      lantern_server = create_postgres_server(target_resource: lantern_resource)
+      lantern_server = create_postgres_server(target_resource: lantern_resource, vm_name: "lantern-server")
       expect(lantern_server.configure_hash[:configs]).to include("shared_preload_libraries" => "'pg_cron,pg_stat_statements,lantern_extras'")
     end
 
@@ -218,7 +217,7 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
-      non_primary = create_postgres_server(representative: false)
+      non_primary = create_postgres_server(vm_name: "non-primary-failover", representative: false)
       expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", {ubid: non_primary.ubid})
       expect(non_primary.trigger_failover(mode: "planned")).to be false
     end
@@ -241,7 +240,7 @@ RSpec.describe PostgresServer do
     it "returns true when resource has parent_id and no restore_target" do
       parent = create_postgres_resource("parent")
       replica_resource = create_postgres_resource("replica", parent_id: parent.id)
-      replica_server = create_postgres_server(target_resource: replica_resource)
+      replica_server = create_postgres_server(target_resource: replica_resource, vm_name: "read-replica-check")
       expect(replica_server).to be_read_replica
     end
 
@@ -356,13 +355,13 @@ RSpec.describe PostgresServer do
     it "returns true if read replica and the parent is nil" do
       # Create a replica with a non-existent parent (simulates orphaned replica)
       replica_resource = create_postgres_resource("replica", parent_id: PostgresResource.generate_uuid)
-      replica_server = create_postgres_server(target_resource: replica_resource)
+      replica_server = create_postgres_server(target_resource: replica_resource, vm_name: "orphan-replica")
       expect(replica_server.read_replica?).to be(true)
       expect(replica_server.lsn_caught_up).to be(true)
     end
 
     it "returns true when no representative server" do
-      non_rep_server = create_postgres_server(representative: false)
+      non_rep_server = create_postgres_server(vm_name: "non-rep-lsn", representative: false)
       expect(non_rep_server).to receive(:read_replica?).and_return(false)
       expect(non_rep_server.lsn_caught_up).to be(true)
     end
@@ -431,15 +430,15 @@ RSpec.describe PostgresServer do
   end
 
   it "checks pulse for restoring server (not primary, not standby) and does not trigger checkup when pulse recovers" do
-    restoring_server = create_postgres_server(timeline_access: "fetch")
+    restoring_server = create_postgres_server(vm_name: "restoring-pulse-check", timeline_access: "fetch")
     result = restoring_server.check_pulse(session: check_pulse_session, previous_pulse: down_pulse)
     expect(result[:reading]).to eq("up")
     expect(restoring_server.reload.checkup_set?).to be false
   end
 
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
-    standby = create_postgres_server(timeline_access: "fetch", representative: false)
-    create_postgres_server(target_resource: resource) # primary
+    standby = create_postgres_server(vm_name: "standby-checkup", timeline_access: "fetch", representative: false)
+    create_postgres_server(target_resource: resource, vm_name: "primary-for-checkup") # primary
     Strand.create_with_id(standby, prog: "Postgres::PostgresServerNexus", label: "wait")
     session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
@@ -456,7 +455,7 @@ RSpec.describe PostgresServer do
   end
 
   it "uses pg_last_wal_replay_lsn to track lsn for restoring servers" do
-    restoring_server = create_postgres_server(timeline_access: "fetch")
+    restoring_server = create_postgres_server(vm_name: "restoring-lsn-track", timeline_access: "fetch")
     Strand.create_with_id(restoring_server, prog: "Postgres::PostgresServerNexus", label: "wait")
     session = check_pulse_session(db_connection: instance_double(Sequel::Postgres::Database))
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
@@ -791,7 +790,7 @@ PGDATA=/dat/16/data
   describe "#metrics_config" do
     it "includes additional_labels from resource tags" do
       tagged_resource = create_postgres_resource("tagged-resource", tags: {"env" => "prod", "team" => "devops"})
-      tagged_server = create_postgres_server(target_resource: tagged_resource)
+      tagged_server = create_postgres_server(target_resource: tagged_resource, vm_name: "tagged-server")
       config = tagged_server.metrics_config
       expect(config[:additional_labels]).to eq({"pg_tags_label_env" => "prod", "pg_tags_label_team" => "devops"})
     end
