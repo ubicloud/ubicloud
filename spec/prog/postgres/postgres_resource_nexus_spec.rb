@@ -423,6 +423,68 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       resource_types = billing_records.map { it.billing_rate["resource_type"] }
       expect(resource_types).to include("PostgresStandbyVCpu", "PostgresStandbyStorage")
     end
+
+    it "does not recreate billing records when they match existing records" do
+      postgres_server
+      project.update(billable: true)
+
+      vcpu_rate_id = BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", "hetzner-fsn1", false)["id"]
+      storage_rate_id = BillingRate.from_resource_properties("PostgresStorage", "standard", "hetzner-fsn1", false)["id"]
+      br_vcpu = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: vcpu_rate_id,
+        amount: 2
+      )
+      br_storage = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: storage_rate_id,
+        amount: 64
+      )
+
+      expect { nx.update_billing_records }.to hop("wait")
+
+      expect(br_vcpu.reload.span.end).to be_nil
+      expect(br_storage.reload.span.end).to be_nil
+      expect(BillingRecord.where(resource_id: postgres_resource.id).count).to eq(2)
+    end
+
+    it "finalizes old and creates new billing records when amount changes" do
+      postgres_server
+      project.update(billable: true)
+
+      past_span = Sequel.pg_range((Time.now - 3600)..)
+      vcpu_rate_id = BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", "hetzner-fsn1", false)["id"]
+      storage_rate_id = BillingRate.from_resource_properties("PostgresStorage", "standard", "hetzner-fsn1", false)["id"]
+      br_vcpu = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: vcpu_rate_id,
+        amount: 4,
+        span: past_span
+      )
+      br_storage = BillingRecord.create(
+        project_id: project.id,
+        resource_id: postgres_resource.id,
+        resource_name: postgres_resource.name,
+        billing_rate_id: storage_rate_id,
+        amount: 128,
+        span: past_span
+      )
+
+      expect { nx.update_billing_records }.to hop("wait")
+
+      expect(br_vcpu.reload.span.end).not_to be_nil
+      expect(br_storage.reload.span.end).not_to be_nil
+
+      active_records = postgres_resource.active_billing_records
+      expect(active_records.count).to eq(2)
+      expect(active_records.map(&:amount).sort).to eq([2, 64])
+    end
   end
 
   describe "#wait" do
