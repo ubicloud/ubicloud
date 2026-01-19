@@ -203,27 +203,36 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     decr_update_billing_records
 
     if postgres_resource.project.billable
-      postgres_resource.active_billing_records.each(&:finalize)
-
       flavor = postgres_resource.flavor
       vm_family = representative_server.vm.family
       vcpu_count = representative_server.vm.vcpus
       storage_size_gib = representative_server.storage_size_gib
+      location = postgres_resource.location
 
-      billing_record_parts = []
-      postgres_resource.target_server_count.times do |index|
-        billing_record_parts.push({resource_type: index.zero? ? "PostgresVCpu" : "PostgresStandbyVCpu", resource_family: "#{flavor}-#{vm_family}", amount: vcpu_count})
-        billing_record_parts.push({resource_type: index.zero? ? "PostgresStorage" : "PostgresStandbyStorage", resource_family: flavor, amount: storage_size_gib})
+      new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|
+        resource_type = index.zero? ? "" : "Standby"
+        [
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib}
+        ]
       end
 
-      billing_record_parts.each do |brp|
-        BillingRecord.create(
-          project_id: postgres_resource.project_id,
-          resource_id: postgres_resource.id,
-          resource_name: postgres_resource.name,
-          billing_rate_id: BillingRate.from_resource_properties(brp[:resource_type], brp[:resource_family], postgres_resource.location.name, postgres_resource.location.byoc)["id"],
-          amount: brp[:amount]
-        )
+      existing_billing_records = postgres_resource.active_billing_records.map do |br|
+        {billing_rate_id: br.billing_rate_id, amount: br.amount}
+      end
+
+      if new_billing_records.sort_by { it.values } != existing_billing_records.sort_by { it.values }
+        postgres_resource.active_billing_records.each(&:finalize)
+
+        new_billing_records.each do |br|
+          BillingRecord.create(
+            project_id: postgres_resource.project_id,
+            resource_id: postgres_resource.id,
+            resource_name: postgres_resource.name,
+            billing_rate_id: br[:billing_rate_id],
+            amount: br[:amount]
+          )
+        end
       end
     end
 
