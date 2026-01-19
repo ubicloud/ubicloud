@@ -123,13 +123,14 @@ RSpec.describe PostgresServer do
   end
 
   describe "#configure", "with blob storage" do
-    before do
+    let(:minio_cluster) {
       MinioCluster.create(
         project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root"
       )
-    end
+    }
 
     it "sets configs that are specific to primary" do
+      minio_cluster
       expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
     end
 
@@ -139,6 +140,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets archive_command for walg client according to resource.use_old_walg_command_set?" do
+      minio_cluster
       Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
       resource.incr_use_old_walg_command
       expect(postgres_server.reload.configure_hash[:configs]).to include(archive_command: "'/usr/bin/wal-g wal-push %p --config /etc/postgresql/wal-g.env'")
@@ -147,6 +149,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets synchronous_standby_names for sync replication mode" do
+      minio_cluster
       sync_resource = create_postgres_resource("sync-resource", ha_type: PostgresResource::HaType::SYNC)
       primary = create_postgres_server(target_resource: sync_resource)
 
@@ -170,12 +173,14 @@ RSpec.describe PostgresServer do
     end
 
     it "sets configs that are specific to standby" do
+      minio_cluster
       standby = create_postgres_server(timeline_access: "fetch", representative: false)
       create_postgres_server(target_resource: resource) # primary
       expect(standby.configure_hash[:configs]).to include(:primary_conninfo, :restore_command)
     end
 
     it "sets configs that are specific to restoring servers" do
+      minio_cluster
       restoring_resource = create_postgres_resource("restoring", restore_target: Time.now)
       restoring_server = create_postgres_server(target_resource: restoring_resource, timeline_access: "fetch")
       expect(restoring_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
