@@ -29,6 +29,10 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     )
   end
 
+  def vm_storage_volume
+    vm.vm_storage_volumes.first
+  end
+
   label def stop_vm
     register_deadline(nil, 60 * 60)
     vm.incr_stop
@@ -55,7 +59,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def generate_vhost_backend_conf
-    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: vm.vm_storage_volumes.first.storage_device.name, stdin: vm.storage_secrets.to_json)
+    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: vm_storage_volume.storage_device.name, stdin: vm.storage_secrets.to_json)
     vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :vhost_conf_path", inhost_name:, vhost_conf_path:)
     hop_ready_migration
   end
@@ -113,9 +117,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def start_ubiblk_systemd_unit
-    disk_index = 0
-    unit_name = "#{vm.inhost_name}-#{disk_index}-storage.service"
-    vm.vm_host.sshable.cmd("sudo systemctl start :unit_name", unit_name:)
+    vm.vm_host.sshable.cmd("sudo systemctl start :unit_name", unit_name: vm_storage_volume.vhost_backend_systemd_unit_name)
     # Disk encryption happens using DEKs (Data Encryption Keys). DEKs needs to be presented
     # to the hypervisor to run the Vm. Now in the case of a breach to a VmHost, we don't want
     # to give away the keys easily so we encrypt the DEK with another set of keys: KEKs (key encryption key)
@@ -126,7 +128,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def update_vm_model
-    vm.vm_storage_volumes.first.update(
+    vm_storage_volume.update(
       use_bdev_ubi: false,
       vhost_block_backend_id: vm_host_vhost_block_backend.id,
       vring_workers: [1, vm.vcpus / 2].max,
@@ -153,17 +155,16 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   def migration_script_params
-    vsv = vm.vm_storage_volumes.first
     {
       "slice" => vm.vm_host_slice.name,
-      "device" => vsv.storage_device.name,
+      "device" => vm_storage_volume.storage_device.name,
       "vm_name" => vm.inhost_name,
       "encrypted" => true,
       "disk_index" => 0,
       "vhost_block_backend_version" => Config.vhost_block_backend_version,
-      "max_read_mbytes_per_sec" => vsv.max_read_mbytes_per_sec,
-      "max_write_mbytes_per_sec" => vsv.max_write_mbytes_per_sec,
-      "spdk_version" => vsv.spdk_installation.version
+      "max_read_mbytes_per_sec" => vm_storage_volume.max_read_mbytes_per_sec,
+      "max_write_mbytes_per_sec" => vm_storage_volume.max_write_mbytes_per_sec,
+      "spdk_version" => vm_storage_volume.spdk_installation.version
     }.to_json
   end
 
@@ -180,7 +181,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   def write_kek_pipe
-    kek = vm.vm_storage_volumes.first.key_encryption_key_1
+    kek = vm_storage_volume.key_encryption_key_1
     kek_data = {
       "key" => kek.key.strip,
       "init_vector" => kek.init_vector.strip,
@@ -191,7 +192,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   def base_image_path
-    vm.vm_storage_volumes.first.boot_image.path
+    vm_storage_volume.boot_image.path
   end
 
   def vm_host_vhost_block_backend
