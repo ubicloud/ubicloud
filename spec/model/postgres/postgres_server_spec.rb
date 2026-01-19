@@ -359,15 +359,15 @@ RSpec.describe PostgresServer do
   end
 
   describe "lsn_caught_up", "with parent resource" do
-    let(:parent_resource) { create_postgres_resource("postgres-resource-parent") }
-    let(:resource) { create_postgres_resource("replica-resource", parent_id: parent_resource.id) }
-
     subject(:postgres_server) {
       described_class.create(
         timeline:, resource:, vm_id: vm.id, representative_at: Time.now,
         synchronization_status: "ready", timeline_access: "fetch", version: "16"
       )
     }
+
+    let(:parent_resource) { create_postgres_resource("postgres-resource-parent") }
+    let(:resource) { create_postgres_resource("replica-resource", parent_id: parent_resource.id) }
 
     before do
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
