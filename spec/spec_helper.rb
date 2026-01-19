@@ -277,7 +277,7 @@ RSpec.configure do |config|
     def create_hosted_vm(project, private_subnet, name, size: nil)
       Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name:, private_subnet_id: private_subnet.id,
-        location_id: location.id, unix_user: "ubi", **(size ? {size:} : {})
+        location_id: location.id, unix_user: "ubi", **({size:} if size)
       ).subject
     end
 
