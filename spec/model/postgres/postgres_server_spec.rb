@@ -282,6 +282,8 @@ RSpec.describe PostgresServer do
       end
 
       it "returns nil if no lsn_monitor" do
+        standby = create_failover_server(prefix: "standby", label: "wait")
+        stub_current_lsn(standby.id => "1/10")
         expect(postgres_server.failover_target).to be_nil
       end
 
