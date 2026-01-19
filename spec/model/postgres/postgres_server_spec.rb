@@ -658,8 +658,8 @@ PGDATA=/dat/16/data
     }
 
     before do
-      # Use 32 GiB storage which gives threshold of 10 (32*1024/1600*5 = 102, then capped)
-      # For smaller threshold, use smaller storage: 5 GiB => 5*1024/1600*5 = 16, rounded to 16
+      # 5 GiB storage gives threshold of 16 WAL files
+      # Tests: 5 (within), 20 (outside), 3 (resolved)
       add_data_volume(vm, size_gib: 5)
     end
 
