@@ -63,7 +63,7 @@ RSpec.describe PostgresServer do
     )
   end
 
-  def create_aws_location(name: "aws-location-#{SecureRandom.hex(4)}")
+  def create_aws_location(name: "test-aws-location")
     Location.create(
       name:, project:,
       display_name: name, ui_name: name,
@@ -73,7 +73,8 @@ RSpec.describe PostgresServer do
 
   def create_postgres_server(target_resource: resource, target_timeline: timeline, target_vm: nil,
     timeline_access: "push", representative: true, version: "16", synchronization_status: "ready")
-    server_vm = target_vm || create_hosted_vm(project, private_subnet, "server-vm-#{SecureRandom.hex(4)}")
+    @server_vm_counter = (@server_vm_counter || 0) + 1
+    server_vm = target_vm || create_hosted_vm(project, private_subnet, "server-vm-#{@server_vm_counter}")
     described_class.create(
       timeline: target_timeline, resource: target_resource, vm_id: server_vm.id,
       representative_at: representative ? Time.now : nil,
