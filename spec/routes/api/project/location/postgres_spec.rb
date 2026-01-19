@@ -308,6 +308,16 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Database is not ready for update")
       end
 
+      it "fails to update read replica" do
+        pg.update(parent_id: pg.id)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-4"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Read replicas cannot be modified directly! Please modify the parent database instead.")
+      end
+
       it "read-replica" do
         VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
