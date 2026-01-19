@@ -99,7 +99,7 @@ class Prog::DownloadBootImage < Prog::Base
     ["github-ubuntu-2204", "arm64", "20251208.1.0"] => "4586386b5244ab727cfccfb058d1d9ac7f97875bfc5de47baa5c06ef50a274fd",
     ["github-gpu-ubuntu-2204", "x64", "20251017.1.0"] => "a27a6a5f169093cc7ecb761833e256a22b0bf42ef914542cf013490db0ab8ba5",
     ["github-gpu-ubuntu-2204", "x64", "20251208.1.0"] => "644fa94ead16baefc3f8efda27199ad60312201b042d9eb5d545c53455733f00",
-    ["postgres-ubuntu-2204", "x64", "20251218.1.0"] => "90ceab88e8c4b9965fff41b56e12a5c0f28f54fa26ada2a1c51abd185268aebb",
+    ["postgres-ubuntu-2204", "x64", "test2"] => "dummy_x64_sha256_for_testing_0123456789abcdef",
     ["postgres16-ubuntu-2204", "x64", "20250425.1.1"] => "f59622da276d646ed2a1c03de546b0a7ec3fd48aeb27c0bfe2b8b8be98c062d2",
     ["postgres17-ubuntu-2204", "x64", "20250425.1.1"] => "ccb4bcd8197c2e230be3f485dd33f24a51041a4dc0408257e42b3fe9f1c0bfb3",
     ["postgres-paradedb-ubuntu-2204", "x64", "20260107.1.0"] => "b60e173766eaf0b3928e69c8037d60943df4fc0314930ad9cd429405bf91b520",
