@@ -469,6 +469,11 @@ RSpec.describe PostgresServer do
     expect(postgres_server.run_query("SELECT 1")).to eq("1")
   end
 
+  it "raises PotentialInsecurity when query is an unfrozen string" do
+    unfrozen_query = +"SELECT 1"
+    expect { postgres_server.run_query(unfrozen_query) }.to raise_error(NetSsh::PotentialInsecurity, /Interpolated string passed to PostgresServer#run_query/)
+  end
+
   it "returns the right storage_device_paths for AWS" do
     vm # load before setting aws provider so test controls VmStorageVolume setup
     location.update(provider: "aws")
