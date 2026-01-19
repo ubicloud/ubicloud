@@ -82,9 +82,8 @@ RSpec.describe PostgresServer do
     VmStorageVolume.create(vm: target_vm, disk_index: 0, boot: false, size_gib:)
   end
 
-  def create_failover_server(prefix:, label:, vm_size: "standard-2", target_resource: resource)
-    @failover_counter = (@failover_counter || 0) + 1
-    server_vm = create_hosted_vm(project, private_subnet, "#{prefix}-#{@failover_counter}", size: vm_size)
+  def create_failover_server(name:, label:, vm_size: "standard-2", target_resource: resource)
+    server_vm = create_hosted_vm(project, private_subnet, name, size: vm_size)
     add_data_volume(server_vm)
     server = described_class.create(
       timeline:, resource: target_resource, vm_id: server_vm.id,
@@ -231,7 +230,7 @@ RSpec.describe PostgresServer do
 
     it "returns true only when failover is successfully triggered" do
       add_data_volume
-      standby = create_failover_server(prefix: "standby", label: "wait")
+      standby = create_failover_server(name: "standby-1", label: "wait")
       stub_current_lsn(standby.id => "0/0")
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
       expect(standby.reload.planned_take_over_set?).to be true
@@ -261,7 +260,7 @@ RSpec.describe PostgresServer do
 
     it "returns nil if there is no fresh standby" do
       data_volume
-      create_failover_server(prefix: "standby", label: "wait", vm_size: "standard-4")
+      create_failover_server(name: "standby-1", label: "wait", vm_size: "standard-4")
       expect(postgres_server.failover_target).to be_nil
     end
 
@@ -270,9 +269,9 @@ RSpec.describe PostgresServer do
 
       it "returns the standby with highest lsn" do
         data_volume
-        create_failover_server(prefix: "standby", label: "wait_catch_up")
-        standby2 = create_failover_server(prefix: "standby", label: "wait")
-        standby3 = create_failover_server(prefix: "standby", label: "wait")
+        create_failover_server(name: "standby-1", label: "wait_catch_up")
+        standby2 = create_failover_server(name: "standby-2", label: "wait")
+        standby3 = create_failover_server(name: "standby-3", label: "wait")
         stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
         expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
       end
@@ -283,13 +282,13 @@ RSpec.describe PostgresServer do
 
       it "returns nil if last_known_lsn is unknown" do
         PostgresLsnMonitor.create { it.postgres_server_id = postgres_server.id }
-        standby = create_failover_server(prefix: "standby", label: "wait")
+        standby = create_failover_server(name: "standby-1", label: "wait")
         stub_current_lsn(standby.id => "1/10")
         expect(postgres_server.failover_target).to be_nil
       end
 
       it "returns nil if no lsn_monitor" do
-        standby = create_failover_server(prefix: "standby", label: "wait")
+        standby = create_failover_server(name: "standby-1", label: "wait")
         stub_current_lsn(standby.id => "1/10")
         expect(postgres_server.failover_target).to be_nil
       end
@@ -299,7 +298,7 @@ RSpec.describe PostgresServer do
           m.postgres_server_id = postgres_server.id
           m.last_known_lsn = "2/0"
         }
-        standby = create_failover_server(prefix: "standby", label: "wait")
+        standby = create_failover_server(name: "standby-1", label: "wait")
         stub_current_lsn(standby.id => "1/10")
         expect(postgres_server.failover_target).to be_nil
       end
@@ -310,9 +309,9 @@ RSpec.describe PostgresServer do
           m.postgres_server_id = postgres_server.id
           m.last_known_lsn = "1/11"
         }
-        create_failover_server(prefix: "standby", label: "wait_catch_up")
-        standby2 = create_failover_server(prefix: "standby", label: "wait")
-        standby3 = create_failover_server(prefix: "standby", label: "wait")
+        create_failover_server(name: "standby-1", label: "wait_catch_up")
+        standby2 = create_failover_server(name: "standby-2", label: "wait")
+        standby3 = create_failover_server(name: "standby-3", label: "wait")
         stub_current_lsn(standby2.id => "1/5", standby3.id => "1/10")
         expect(postgres_server.failover_target.ubid).to eq(standby3.ubid)
       end
@@ -327,15 +326,15 @@ RSpec.describe PostgresServer do
       end
 
       it "returns nil if there is no fresh read_replica" do
-        create_failover_server(prefix: "replica", label: "wait", vm_size: "standard-4")
+        create_failover_server(name: "replica-1", label: "wait", vm_size: "standard-4")
         expect(postgres_server.failover_target).to be_nil
       end
 
       it "returns the replica with highest lsn" do
         data_volume
-        create_failover_server(prefix: "replica", label: "wait_catch_up")
-        replica2 = create_failover_server(prefix: "replica", label: "wait")
-        replica3 = create_failover_server(prefix: "replica", label: "wait")
+        create_failover_server(name: "replica-1", label: "wait_catch_up")
+        replica2 = create_failover_server(name: "replica-2", label: "wait")
+        replica3 = create_failover_server(name: "replica-3", label: "wait")
         stub_current_lsn(replica2.id => "1/5", replica3.id => "1/10")
         expect(postgres_server.failover_target.ubid).to eq(replica3.ubid)
       end
