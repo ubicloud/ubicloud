@@ -918,11 +918,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to prepare_for_unplanned_take_over if take_over is set" do
       nx.incr_unplanned_take_over
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.wait }.to hop("prepare_for_unplanned_take_over")
     end
 
     it "hops to prepare_for_planned_take_over if take_over is set" do
       nx.incr_planned_take_over
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.wait }.to hop("prepare_for_planned_take_over")
     end
 
@@ -939,6 +941,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to unavailable if checkup is set and the server is not available" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.wait }.to hop("unavailable")
     end
 
@@ -1102,7 +1105,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "stops postgres in representative server and destroys it" do
       standby_nx.incr_unplanned_take_over
-      expect(@standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate")
       expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
@@ -1111,7 +1113,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "handles SSH connection errors gracefully and continues with destroy" do
       standby_nx.incr_unplanned_take_over
-      expect(@standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect(representative_sshable).to receive(:_cmd).with("sudo pg_ctlcluster 16 main stop -m immediate").and_raise(Sshable::SshError.new("", "", "", "", ""))
       expect { standby_nx.prepare_for_unplanned_take_over }.to hop("taking_over")
       expect(Semaphore.where(strand_id: standby_nx.postgres_server.id, name: "unplanned_take_over").count).to eq(0)
@@ -1126,7 +1127,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "starts fencing on representative server" do
       @standby_nx.incr_planned_take_over
-      expect(@standby_nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect { @standby_nx.prepare_for_planned_take_over }.to hop("wait_fencing_of_old_primary")
       expect(Semaphore.where(strand_id: @standby_nx.postgres_server.id, name: "planned_take_over").count).to eq(0)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "fence").count).to eq(1)
@@ -1279,7 +1279,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
       expect(nx.strand.stack.first["deadline_target"]).to eq("wait")
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 10 * 60)
+      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 5 * 60)
     end
   end
 
