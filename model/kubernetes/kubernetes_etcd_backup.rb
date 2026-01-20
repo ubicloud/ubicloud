@@ -36,7 +36,7 @@ class KubernetesEtcdBackup < Sequel::Model
 
   def blob_storage
     return @blob_storage if defined?(@blob_storage)
-    @blob_storage = MinioCluster[project_id: Config.minio_service_project_id, location_id: location.id]
+    @blob_storage = MinioCluster[project_id: Config.postgres_service_project_id, location_id: location.id]
   end
 
   def blob_storage_policy
