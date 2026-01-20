@@ -32,7 +32,7 @@ RSpec.describe KubernetesEtcdBackup do
   }
 
   before do
-    allow(Config).to receive(:minio_service_project_id).and_return(project.id)
+    allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
   end
 
   describe "#blob_storage" do
