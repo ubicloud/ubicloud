@@ -13,8 +13,9 @@ class KubernetesEtcdBackup < Sequel::Model
   BACKUP_BUCKET_EXPIRATION_DAYS = 7
 
   def need_backup?
-    return false unless blob_storage
-    return false if kubernetes_cluster.functional_nodes.empty?
+    return false unless blob_storage &&
+      kubernetes_cluster.functional_nodes.any? &&
+      kubernetes_cluster.strand.label == "wait"
 
     sshable = kubernetes_cluster.sshable
     case sshable.d_check("backup_etcd")

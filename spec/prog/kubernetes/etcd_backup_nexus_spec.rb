@@ -10,7 +10,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: location.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kc) {
     MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test",
       version: Option.kubernetes_versions.first,
       location_id: location.id,
@@ -18,10 +18,11 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       private_subnet_id: private_subnet.id,
       cp_node_count: 1,
       target_node_size: "standard-2"
-    )
+    ).subject
     vm = Prog::Vm::Nexus.assemble("public key", project.id, name: "cp", private_subnet_id: kc.private_subnet.id).subject
     Sshable.create_with_id(vm)
     KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
+    kc.strand.update(label: "wait")
     kc
   }
   let(:kubernetes_etcd_backup) {
@@ -34,7 +35,10 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
   }
 
   before do
-    allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+    allow(Config).to receive_messages(
+      postgres_service_project_id: project.id,
+      kubernetes_service_project_id: project.id
+    )
     allow(nx).to receive(:kubernetes_etcd_backup).and_return(kubernetes_etcd_backup)
   end
 
@@ -130,12 +134,12 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
 
   describe "#run_backup" do
     it "naps if cluster is not in wait state" do
-      Strand.create_with_id(kc, prog: "Kubernetes::KubernetesClusterNexus", label: "starting")
+      kc.strand.update(label: "starting")
       expect { nx.run_backup }.to nap(20 * 60)
     end
 
     it "runs backup command and hops to wait" do
-      Strand.create_with_id(kc, prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
+      kc.strand.update(label: "wait")
 
       creds = {
         "access_key" => kubernetes_etcd_backup.access_key,
@@ -156,7 +160,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
     end
 
     it "updates latest_backup_started_at" do
-      Strand.create_with_id(kc.id, prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
+      kc.strand.update(label: "wait")
 
       expect(nx.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_run)
 

@@ -16,7 +16,7 @@ RSpec.describe KubernetesEtcdBackup do
   let(:location) { Location[Location::HETZNER_FSN1_ID] }
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: location.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kc) {
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "test-cluster",
       version: Option.kubernetes_versions.first,
       location_id: location.id,
@@ -24,7 +24,7 @@ RSpec.describe KubernetesEtcdBackup do
       private_subnet_id: private_subnet.id,
       cp_node_count: 1,
       target_node_size: "standard-2"
-    )
+    ).subject
     vm = Prog::Vm::Nexus.assemble("public key", project.id, name: "cp", private_subnet_id: kc.private_subnet.id).subject
     Sshable.create_with_id(vm)
     KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id)
@@ -32,7 +32,10 @@ RSpec.describe KubernetesEtcdBackup do
   }
 
   before do
-    allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
+    allow(Config).to receive_messages(
+      postgres_service_project_id: project.id,
+      kubernetes_service_project_id: project.id
+    )
   end
 
   describe "#blob_storage" do
@@ -71,6 +74,15 @@ RSpec.describe KubernetesEtcdBackup do
 
     context "when blob storage is present" do
       let(:sshable) { keb.kubernetes_cluster.functional_nodes.first.vm.sshable }
+
+      before do
+        keb.kubernetes_cluster.strand.update(label: "wait")
+      end
+
+      it "returns false if kubernetes cluster strand label is not wait" do
+        keb.kubernetes_cluster.strand.update(label: "creating")
+        expect(keb.need_backup?).to be false
+      end
 
       it "returns true if backup status is Failed" do
         expect(sshable).to receive(:d_check).with("backup_etcd").and_return("Failed")
