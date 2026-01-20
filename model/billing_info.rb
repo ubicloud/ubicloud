@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../model"
-require "stripe"
 require "countries"
 require "excon"
 
@@ -12,9 +11,9 @@ class BillingInfo < Sequel::Model
   plugin ResourceMethods
 
   def stripe_data
-    if (Stripe.api_key = Config.stripe_secret_key)
+    if Config.stripe_secret_key
       @stripe_data ||= begin
-        data = Stripe::Customer.retrieve(stripe_id)
+        data = StripeClient.customers.retrieve(stripe_id)
         return nil unless data
 
         address = data["address"] || {}
@@ -44,8 +43,8 @@ class BillingInfo < Sequel::Model
   end
 
   def after_destroy
-    if (Stripe.api_key = Config.stripe_secret_key)
-      Stripe::Customer.delete(stripe_id)
+    if Config.stripe_secret_key
+      StripeClient.customers.delete(stripe_id)
     end
     super
   end

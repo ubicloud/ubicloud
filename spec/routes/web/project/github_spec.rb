@@ -70,8 +70,11 @@ RSpec.describe Clover, "github" do
 
     it "shows new billing info button instead of connect account if project has no valid payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+      sessions_service = instance_double(Stripe::Checkout::SessionService)
+      allow(StripeClient).to receive(:checkout).and_return(instance_double(Stripe::CheckoutService, sessions: sessions_service))
+
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
+      expect(sessions_service).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
       # rubocop:enable RSpec/VerifiedDoubles
 
       visit "#{project.path}/github"
