@@ -123,6 +123,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
     it "hops to unavailable when checkup finds slice unavailable" do
       nx.incr_checkup
       stub_available(available: false)
+      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
     end
 
@@ -155,9 +156,8 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       expect(Semaphore.where(strand_id: vm_host_slice.id, name: "checkup").count).to eq(1)
     end
 
-    it "registers an immediate deadline if slice is unavailable" do
+    it "naps if slice is still unavailable" do
       stub_available(available: false)
-      expect(nx).to receive(:register_deadline).with("wait", 0)
       expect { nx.unavailable }.to nap(30)
     end
 
