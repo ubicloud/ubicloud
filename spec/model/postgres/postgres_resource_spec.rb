@@ -170,6 +170,22 @@ RSpec.describe PostgresResource do
       expect(new_server.timeline_id).to eq(parent_timeline.id)
       expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
     end
+
+    it "provisions a new server excluding the representative server's host for leaseweb" do
+      allow(Config).to receive(:allow_unspread_servers).and_return(false)
+      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::LEASEWEB_PROVIDER_NAME).at_least(:once)
+      ps1
+      vm_host = create_vm_host
+      vm1.update(vm_host_id: vm_host.id)
+      ps1.update(representative_at: Time.now)
+
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [vm_host.id])).and_call_original
+
+      postgres_resource.provision_new_standby
+      expect(postgres_resource.reload.servers.count).to eq(2)
+      new_server = PostgresServer.exclude(id: ps1.id).first
+      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([vm_host.id])
+    end
   end
 
   it "returns has_enough_fresh_servers correctly" do
