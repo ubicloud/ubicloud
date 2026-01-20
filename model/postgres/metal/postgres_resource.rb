@@ -14,7 +14,8 @@ class PostgresResource < Sequel::Model
     def metal_new_server_exclusion_filters
       # If the server is in leaseweb, we don't have multiple DCs, that's
       # why we return an empty list of data centers.
-      return ServerExclusionFilters.new(exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if Config.allow_unspread_servers || location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
+      return ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if Config.allow_unspread_servers
+      return ServerExclusionFilters.new(exclude_host_ids: [representative_server.vm.vm_host_id], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
 
       exclude_data_centers = VmHost
         .where(data_center: VmHost
@@ -24,7 +25,7 @@ class PostgresResource < Sequel::Model
           .distinct)
         .select_map(:data_center)
 
-      ServerExclusionFilters.new(exclude_data_centers:, exclude_availability_zones: [], availability_zone: nil)
+      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers:, exclude_availability_zones: [], availability_zone: nil)
     end
   end
 end

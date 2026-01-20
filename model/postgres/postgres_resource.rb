@@ -24,7 +24,7 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
   include ObjectTag::Cleanup
 
-  ServerExclusionFilters = Struct.new(:exclude_data_centers, :exclude_availability_zones, :availability_zone)
+  ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
 
   def self.available_flavors(include_lantern: false)
     Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !include_lantern }
