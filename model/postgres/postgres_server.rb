@@ -208,10 +208,6 @@ class PostgresServer < Sequel::Model
     end
   end
 
-  def lsn_function
-    "#{lsn_function_name}()"
-  end
-
   def init_health_monitor_session
     FileUtils.rm_rf(health_monitor_socket_path)
     FileUtils.mkdir_p(health_monitor_socket_path)
