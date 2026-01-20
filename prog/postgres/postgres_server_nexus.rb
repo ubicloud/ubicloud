@@ -399,6 +399,11 @@ SQL
 
   label def run_post_installation_script
     if postgres_server.primary? && postgres_server.resource.flavor != PostgresResource::Flavor::STANDARD
+      postgres_server.vm.sshable.cmd(<<CMD, version: postgres_server.version)
+set -ueo pipefail
+sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-analytics.deb
+sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-search.deb
+CMD
       postgres_server.run_query(<<SQL)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_search;
