@@ -24,6 +24,8 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
   end
 
   label def setup_blob_storage
+    nap 60 unless kubernetes_etcd_backup.blob_storage
+
     admin_client.admin_add_user(kubernetes_etcd_backup.access_key, kubernetes_etcd_backup.secret_key)
     admin_client.admin_policy_add(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.blob_storage_policy)
     admin_client.admin_policy_set(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.access_key)
@@ -66,8 +68,12 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
   label def destroy
     register_deadline(nil, 5 * 60)
     decr_destroy
-    admin_client.admin_remove_user(kubernetes_etcd_backup.access_key)
-    admin_client.admin_policy_remove(kubernetes_etcd_backup.ubid)
+    # Reason for the followiwng "if" is that the MinioCluster might
+    # be destroyed before this logic and it would cause nil reference exeception
+    if kubernetes_etcd_backup.blob_storage
+      admin_client.admin_remove_user(kubernetes_etcd_backup.access_key)
+      admin_client.admin_policy_remove(kubernetes_etcd_backup.ubid)
+    end
 
     kubernetes_etcd_backup.destroy
     pop "kubernetes etcd backup is deleted"
