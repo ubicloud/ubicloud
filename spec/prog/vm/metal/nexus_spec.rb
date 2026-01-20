@@ -793,6 +793,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to unavailable based on the vm's available status" do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
 
       vm.incr_checkup
@@ -856,8 +857,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.checkup_set? }.from(false).to(true)
     end
 
-    it "register an immediate deadline if vm is unavailable" do
-      expect(nx).to receive(:register_deadline).with("wait", 0)
+    it "naps if vm is still unavailable" do
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end

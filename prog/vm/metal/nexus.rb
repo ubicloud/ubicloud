@@ -259,7 +259,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     when_checkup_set? do
-      hop_unavailable if !available?
+      unless available?
+        register_deadline("wait", 2 * 60)
+        hop_unavailable
+      end
       decr_checkup
     end
 
@@ -309,8 +312,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_checkup
       hop_wait
     end
-
-    register_deadline("wait", 0)
 
     nap 30
   end
