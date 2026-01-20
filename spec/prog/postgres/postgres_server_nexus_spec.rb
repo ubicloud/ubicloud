@@ -775,14 +775,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.update_superuser_password }.to hop("restart")
     end
 
-    it "updates password and hops to wait during initial provisioning if restart is already executed" do
+    it "updates password and hops to run_post_installation_script during initial provisioning if restart is already executed" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
       nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
-      expect { nx.update_superuser_password }.to hop("wait")
+      expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
     it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
@@ -806,16 +806,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#run_post_installation_script" do
-    it "runs post installation script and hops wait" do
-      command = <<~COMMAND
-      set -ueo pipefail
-      [[ -f /etc/postgresql-partners/post-installation-script ]] || { echo "Post-installation script not found. Exiting..."; exit 0; }
-      sudo cp /etc/postgresql-partners/post-installation-script postgres/bin/post-installation-script
-      sudo chown ubi:ubi postgres/bin/post-installation-script
-      sudo chmod +x postgres/bin/post-installation-script
-      postgres/bin/post-installation-script
-      COMMAND
-      expect(sshable).to receive(:_cmd).with(command)
+    it "creates extensions for non-standard flavor and hops wait" do
+      postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
+      expect(sshable).to receive(:_cmd).with(
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
+        hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/)
+      ).and_return("")
+      expect { nx.run_post_installation_script }.to hop("wait")
+    end
+
+    it "skips extension creation for standard flavor and hops wait" do
+      expect(sshable).not_to receive(:_cmd)
       expect { nx.run_post_installation_script }.to hop("wait")
     end
   end
