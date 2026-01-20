@@ -6,66 +6,72 @@ require "aws-sdk-s3"
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
 
-  def image_name
-    @image_name ||= frame.fetch("image_name")
+  def self.assemble(vm_host, name, version: default_boot_image_version(name), custom_url: nil, download_r2: true)
+    BootImage.create(vm_host_id: vm_host.id, name:, version:, size_gib: 0)
+
+    Strand.create(
+      prog: "DownloadBootImage",
+      label: "start",
+      stack: [{
+        "subject_id" => vm_host.id,
+        "image_name" => name,
+        "version" => version,
+        "custom_url" => custom_url,
+        "download_r2" => download_r2
+      }.compact]
+    )
   end
 
-  def version
-    @version ||= frame.fetch("version") { default_boot_image_version(image_name) }
+  label def start
+    register_deadline(nil, 24 * 60 * 60)
+    hop_download
   end
 
-  def download_from_blob_storage?
-    image_name.start_with?("github", "postgres", "ai-", "kubernetes", "gpu") || Config.production?
-  end
-
-  def default_boot_image_version(image_name)
-    config_name = image_name.tr("-", "_") + "_version"
-    fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
-
-    Config.send(config_name)
-  end
-
-  def download_from_r2?
-    frame["download_r2"] || Config.production?
-  end
-
-  def url
-    @url ||=
-      if frame["custom_url"]
-        frame["custom_url"]
-      elsif download_from_blob_storage?
-        suffixes = {
-          "github" => "raw",
-          "postgres" => "raw",
-          "postgres16" => "raw",
-          "postgres17" => "raw",
-          "ubuntu" => "img",
-          "almalinux" => "qcow2",
-          "debian" => "raw",
-          "ai" => "raw",
-          "kubernetes" => "raw",
-          "gpu" => "raw"
-        }
-        image_family = image_name.split("-").first
-        suffix = suffixes.fetch(image_family, nil)
-        arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
-        key = "#{image_name}#{arch}#{version}.#{suffix}"
-        download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
-      elsif image_name == "ubuntu-noble"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "ubuntu-jammy"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
-      elsif image_name == "debian-12"
-        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
-        "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
-      elsif image_name == "almalinux-9"
-        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
-        "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+  label def download
+    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
+    when "Succeeded"
+      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+      hop_update_available_storage_space
+    when "NotStarted"
+      certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
+      params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
+      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
+    when "Failed"
+      restarted = frame["restarted"] || 0
+      if restarted < 10
+        sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
+        sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
+        sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+        update_stack({"restarted" => restarted + 1})
       else
-        fail "Unknown image name: #{image_name}"
+        Clog.emit("Failed to download boot image. Use incr_destroy to cleanup.", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
+        nap 60 * 60
       end
+    end
+
+    nap 15
+  end
+
+  label def update_available_storage_space
+    image = boot_image_ds.first
+    size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
+    size_gib = (size_bytes / 1024.0**3).ceil
+    vm_host.storage_devices_dataset.where(name: "DEFAULT").update(
+      available_storage_gib: Sequel[:available_storage_gib] - size_gib
+    )
+    image.update(size_gib:)
+    hop_activate_boot_image
+  end
+
+  label def activate_boot_image
+    boot_image_ds.update(activated_at: Time.now)
+    pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
+  end
+
+  label def destroy
+    sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+    boot_image_ds.destroy
+    pop "image download cancelled"
   end
 
   BOOT_IMAGE_SHA256 = {
@@ -131,10 +137,80 @@ class Prog::DownloadBootImage < Prog::Base
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
+  def image_name
+    @image_name ||= frame.fetch("image_name")
+  end
+
+  def version
+    @version ||= frame.fetch("version")
+  end
+
+  def url
+    @url ||=
+      if frame["custom_url"]
+        frame["custom_url"]
+      elsif download_from_blob_storage?
+        suffixes = {
+          "github" => "raw",
+          "postgres" => "raw",
+          "postgres16" => "raw",
+          "postgres17" => "raw",
+          "ubuntu" => "img",
+          "almalinux" => "qcow2",
+          "debian" => "raw",
+          "ai" => "raw",
+          "kubernetes" => "raw",
+          "gpu" => "raw"
+        }
+        image_family = image_name.split("-").first
+        suffix = suffixes.fetch(image_family, nil)
+        arch = image_name.start_with?("ai-model") ? "-" : "-#{vm_host.arch}-"
+        key = "#{image_name}#{arch}#{version}.#{suffix}"
+        download_from_r2? ? r2_signed_url(key) : minio_signed_url(key)
+      elsif image_name == "ubuntu-noble"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+        "https://cloud-images.ubuntu.com/releases/noble/release-#{version}/ubuntu-24.04-server-cloudimg-#{arch}.img"
+      elsif image_name == "ubuntu-jammy"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+        "https://cloud-images.ubuntu.com/releases/jammy/release-#{version}/ubuntu-22.04-server-cloudimg-#{arch}.img"
+      elsif image_name == "debian-12"
+        arch = vm_host.render_arch(arm64: "arm64", x64: "amd64")
+        "https://cloud.debian.org/images/cloud/bookworm/#{version}/debian-12-genericcloud-#{arch}-#{version}.raw"
+      elsif image_name == "almalinux-9"
+        arch = vm_host.render_arch(arm64: "aarch64", x64: "x86_64")
+        "https://repo.almalinux.org/almalinux/9/cloud/#{arch}/images/AlmaLinux-9-GenericCloud-#{version}.#{arch}.qcow2"
+      else
+        fail "Unknown image name: #{image_name}"
+      end
+  end
+
+  def boot_image_ds
+    vm_host.boot_images_dataset.where(name: image_name, version:)
+  end
+
+  def daemon_name
+    "download_#{image_name}_#{version}"
+  end
+
   def sha256sum
-    # YYY: In future all images should be checked for sha256 sum, so the nil
-    # default will be removed.
-    BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version], nil)
+    BOOT_IMAGE_SHA256.fetch([image_name, vm_host.arch, version]) do
+      fail "Downloading a boot image without sha256 is not allowed in production" if Config.production?
+    end
+  end
+
+  def self.default_boot_image_version(image_name)
+    config_name = image_name.tr("-", "_") + "_version"
+    fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
+
+    Config.send(config_name)
+  end
+
+  def download_from_blob_storage?
+    image_name.start_with?("github", "postgres", "ai-", "kubernetes", "gpu") || Config.production?
+  end
+
+  def download_from_r2?
+    frame["download_r2"] || Config.production?
   end
 
   def r2_signed_url(key)
@@ -157,71 +233,5 @@ class Prog::DownloadBootImage < Prog::Base
       ssl_ca_data: Config.ubicloud_images_blob_storage_certs
     )
     client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, key, 60 * 60).to_s
-  end
-
-  label def start
-    register_deadline(nil, 24 * 60 * 60)
-
-    # YYY: we can remove this once we enforce it in the database layer.
-    # Although the default version is used if version is not passed, adding
-    # a sanity check here to make sure version is not passed as nil.
-    fail "Version can not be passed as nil" if version.nil?
-
-    pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
-
-    BootImage.create(
-      vm_host_id: vm_host.id,
-      name: image_name,
-      version:,
-      activated_at: nil,
-      size_gib: 0
-    )
-    hop_download
-  end
-
-  label def download
-    daemon_name = "download_#{image_name}_#{version}"
-    case sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
-    when "Succeeded"
-      sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
-      hop_update_available_storage_space
-    when "NotStarted"
-      certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
-      params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
-      sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
-    when "Failed"
-      restarted = frame["restarted"] || 0
-      if restarted < 10
-        sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
-        sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
-        sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
-        update_stack({"restarted" => restarted + 1})
-      else
-        vm_host.boot_images_dataset.where(name: image_name, version:).destroy
-        Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
-      end
-    end
-
-    nap 15
-  end
-
-  label def update_available_storage_space
-    image = BootImage[vm_host_id: vm_host.id, name: image_name, version:]
-    image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
-    image_size_gib = (image_size_bytes / 1024.0**3).ceil
-    StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
-      available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
-    )
-    image.update(size_gib: image_size_gib)
-    hop_activate_boot_image
-  end
-
-  label def activate_boot_image
-    BootImage.where(
-      vm_host_id: vm_host.id,
-      name: image_name,
-      version:
-    ).update(activated_at: Time.now)
-    pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end
 end
