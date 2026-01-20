@@ -143,6 +143,10 @@ module Config
 
   # Vhost Block Backend
   override :vhost_block_backend_version, "v0.2.1", string
+  optional :storage_archive_access_key, string, clear: true
+  optional :storage_archive_secret_key, string, clear: true
+  optional :storage_archive_bucket, string
+  optional :storage_archive_endpoint, string
 
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
