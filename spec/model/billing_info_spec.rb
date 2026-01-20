@@ -5,49 +5,51 @@ require_relative "spec_helper"
 RSpec.describe BillingInfo do
   subject(:billing_info) { described_class.create(stripe_id: "cs_1234567890") }
 
-  it "return Stripe Data if Stripe enabled" do
+  let(:customers_service) { instance_double(Stripe::CustomerService) }
+
+  before do
     allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-    expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"line1" => "123 Main St"}, "metadata" => {}})
+    allow(StripeClient).to receive(:customers).and_return(customers_service)
+  end
+
+  it "return Stripe Data if Stripe enabled" do
+    expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "John Doe", "address" => {"line1" => "123 Main St"}, "metadata" => {}})
     expect(billing_info.stripe_data["name"]).to eq("John Doe")
     expect(billing_info.stripe_data["address"]).to eq("123 Main St")
   end
 
   it "not return Stripe Data if Stripe not enabled" do
-    allow(Config).to receive(:stripe_secret_key).and_return(nil)
-    expect(Stripe::Customer).not_to receive(:retrieve)
+    expect(Config).to receive(:stripe_secret_key).and_return(nil)
+    expect(customers_service).not_to receive(:retrieve)
     expect(billing_info.stripe_data).to be_nil
   end
 
   describe ".has_address?" do
     it "returns true when Stripe customer has address" do
-      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      allow(Stripe::Customer).to receive(:retrieve).and_return({"address" => {"line1" => "Some Rd", "country" => "US"}, "metadata" => {}})
+      expect(customers_service).to receive(:retrieve).and_return({"address" => {"line1" => "Some Rd", "country" => "US"}, "metadata" => {}})
       expect(billing_info.has_address?).to be true
     end
 
     it "returns false when Stripe customer has no address" do
-      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      allow(Stripe::Customer).to receive(:retrieve).and_return({})
+      expect(customers_service).to receive(:retrieve).and_return({})
       expect(billing_info.has_address?).to be false
     end
 
     it "returns false when Stripe customer is nil" do
-      allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-      allow(Stripe::Customer).to receive(:retrieve).and_return(nil)
+      expect(customers_service).to receive(:retrieve).and_return(nil)
       expect(billing_info.has_address?).to be false
     end
   end
 
   it "delete Stripe customer if Stripe enabled" do
-    allow(Config).to receive(:stripe_secret_key).and_return("secret_key")
-    expect(Stripe::Customer).to receive(:delete).with("cs_1234567890")
+    expect(customers_service).to receive(:delete).with("cs_1234567890")
 
     billing_info.destroy
   end
 
   it "not delete Stripe customer if Stripe not enabled" do
-    allow(Config).to receive(:stripe_secret_key).and_return(nil)
-    expect(Stripe::Customer).not_to receive(:delete)
+    expect(Config).to receive(:stripe_secret_key).and_return(nil)
+    expect(customers_service).not_to receive(:delete)
 
     billing_info.destroy
   end

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../model"
-require "stripe"
 
 class PaymentMethod < Sequel::Model
   many_to_one :billing_info, read_only: true
@@ -13,14 +12,14 @@ class PaymentMethod < Sequel::Model
   end
 
   def stripe_data
-    if (Stripe.api_key = Config.stripe_secret_key)
-      @stripe_data ||= Stripe::PaymentMethod.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year country funding wallet checks])
+    if Config.stripe_secret_key
+      @stripe_data ||= StripeClient.payment_methods.retrieve(stripe_id)["card"].to_h.transform_keys!(&:to_s).slice(*%w[last4 brand exp_month exp_year country funding wallet checks])
     end
   end
 
   def after_destroy
-    if (Stripe.api_key = Config.stripe_secret_key)
-      Stripe::PaymentMethod.detach(stripe_id)
+    if Config.stripe_secret_key
+      StripeClient.payment_methods.detach(stripe_id)
     end
     super
   end

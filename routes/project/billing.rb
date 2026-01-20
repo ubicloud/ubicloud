@@ -1,12 +1,11 @@
 # frozen_string_literal: true
 
-require "stripe"
 require "countries"
 
 class Clover
   hash_branch(:project_prefix, "billing") do |r|
     r.web do
-      unless (Stripe.api_key = Config.stripe_secret_key)
+      unless Config.stripe_secret_key
         response.status = 501
         response.content_type = :text
         next "Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing."
@@ -25,7 +24,7 @@ class Clover
           tp = typecast_params
           new_tax_id = tp.str("tax_id").gsub(/[^a-zA-Z0-9]/, "")
           begin
-            Stripe::Customer.update(billing_info.stripe_id, {
+            StripeClient.customers.update(billing_info.stripe_id, {
               name: tp.str!("name"),
               email: tp.str!("email").strip,
               address: {
@@ -61,7 +60,7 @@ class Clover
           no_audit_log
         end
 
-        checkout = Stripe::Checkout::Session.create(
+        checkout = StripeClient.checkout.sessions.create(
           payment_method_types: ["card"],
           mode: "setup",
           customer_creation: "always",
@@ -75,11 +74,11 @@ class Clover
 
       r.get "success" do
         handle_validation_failure("project/billing")
-        checkout_session = Stripe::Checkout::Session.retrieve(typecast_params.str!("session_id"))
-        setup_intent = Stripe::SetupIntent.retrieve(checkout_session["setup_intent"])
+        checkout_session = StripeClient.checkout.sessions.retrieve(typecast_params.str!("session_id"))
+        setup_intent = StripeClient.setup_intents.retrieve(checkout_session["setup_intent"])
 
         stripe_id = setup_intent["payment_method"]
-        stripe_payment_method = Stripe::PaymentMethod.retrieve(stripe_id)
+        stripe_payment_method = StripeClient.payment_methods.retrieve(stripe_id)
         card_fingerprint = stripe_payment_method["card"]["fingerprint"]
         if PaymentMethod.fraud?(card_fingerprint)
           raise_web_error("Payment method you added is labeled as fraud. Please contact support.")
@@ -96,7 +95,7 @@ class Clover
           # That money will be kept until next billing period and if
           # it's not a fraud, it will be applied to the invoice.
           preauth_amount = [100, 200, 300, 400, 500].sample
-          payment_intent = Stripe::PaymentIntent.create({
+          payment_intent = StripeClient.payment_intents.create({
             amount: preauth_amount,
             currency: "usd",
             confirm: true,
@@ -125,7 +124,7 @@ class Clover
         end
 
         unless @project.billing_info.has_address?
-          Stripe::Customer.update(@project.billing_info.stripe_id, {
+          StripeClient.customers.update(@project.billing_info.stripe_id, {
             address: stripe_payment_method["billing_details"]["address"].to_hash
           })
         end
@@ -138,7 +137,7 @@ class Clover
         r.get "create" do
           next unless (billing_info = @project.billing_info)
 
-          checkout = Stripe::Checkout::Session.create(
+          checkout = StripeClient.checkout.sessions.create(
             payment_method_types: ["card"],
             mode: "setup",
             customer: billing_info.stripe_id,
@@ -192,7 +191,7 @@ class Clover
           handle_validation_failure("project/billing")
           raise_web_error("Invoice is not payable") unless invoice.payable?
           bi = invoice.project.billing_info
-          checkout = Stripe::Checkout::Session.create(
+          checkout = StripeClient.checkout.sessions.create(
             payment_method_types: ["card"],
             mode: "payment",
             line_items: [{
@@ -225,7 +224,7 @@ class Clover
           handle_validation_failure("project/billing")
           session_id = typecast_params.str!("session_id")
           begin
-            checkout_session = Stripe::Checkout::Session.retrieve(session_id)
+            checkout_session = StripeClient.checkout.sessions.retrieve(session_id)
           rescue Stripe::InvalidRequestError => e
             Clog.emit("invalid invoice payment", {unsuccessful_invoice_payment: {invoice_ubid: invoice.ubid, session_id:, message: e.message}})
             raise_web_error("We couldn't validate your payment. If you think this is a mistake, please reach out to our support team at support@ubicloud")

@@ -160,12 +160,15 @@ RSpec.describe InvoiceGenerator do
   end
 
   context "when project has billing info" do
+    let(:customers_service) { instance_double(Stripe::CustomerService) }
+
     before do
       allow(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+      allow(StripeClient).to receive(:customers).and_return(customers_service)
     end
 
     it "charges no VAT for non-EU customer" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -174,7 +177,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "charges 21% VAT for Dutch customer with tax id" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -183,7 +186,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "charges 21% VAT for Dutch customer without tax id" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -192,7 +195,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "reverse charges VAT for non-Dutch EU customer with tax id" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -202,7 +205,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges 21% VAT for non-Dutch EU customer without tax id until threshold" do
       expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(false)
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -212,7 +215,7 @@ RSpec.describe InvoiceGenerator do
 
     it "charges local VAT for non-Dutch EU customer without tax id if threshold exceeds" do
       expect(Config).to receive(:annual_non_dutch_eu_sales_exceed_threshold).and_return(true)
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -221,7 +224,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "charges no VAT if the total is less than minimum invoice charge threshold" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => {"line1" => "123 Main St", "country" => "DE"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
@@ -230,7 +233,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "charges no VAT if the address is missing" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => nil}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {}, "address" => nil}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time, begin_time + 0.5 * day), 2)
@@ -239,7 +242,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "uses US bank info for transfer when no payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
@@ -248,7 +251,7 @@ RSpec.describe InvoiceGenerator do
     end
 
     it "uses EU bank info for transfer when no payment method" do
-      expect(Stripe::Customer).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
+      expect(customers_service).to receive(:retrieve).with("cs_1234567890").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "NL"}}).at_least(:once)
       p1.update(billing_info_id: BillingInfo.create(stripe_id: "cs_1234567890").id)
 
       generate_billing_record(p1, vm1, Sequel::Postgres::PGRange.new(begin_time - 90 * day, nil))
