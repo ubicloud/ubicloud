@@ -104,7 +104,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
     end
 
     available
-  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+  rescue
     false
   end
 
