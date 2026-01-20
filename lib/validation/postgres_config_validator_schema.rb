@@ -732,6 +732,20 @@ module Validation
         type: :bool,
         default: "off"
       },
+      "huge_page_size" => {
+        description: "The size of huge page that should be requested.",
+        type: :string,
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
+        default: "0",
+        deny: true
+      },
+      "huge_pages" => {
+        description: "Use of huge pages on Linux or Windows.",
+        type: :enum,
+        allowed_values: ["try", "on", "off"],
+        default: "on",
+        deny: true
+      },
       "icu_validation_level" => {
         description: "Log level for reporting invalid ICU locale strings.",
         type: :enum,
@@ -1506,6 +1520,13 @@ module Validation
         type: :enum,
         allowed_values: ["origin", "replica", "local"],
         default: "origin"
+      },
+      "shared_buffers" => {
+        description: "Sets the number of shared memory buffers used by the server.",
+        type: :string,
+        pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
+        default: "(25% of total memory)",
+        deny: true
       },
       "shared_memory_type" => {
         description: "Selects the shared memory implementation used for the main shared memory region.",
