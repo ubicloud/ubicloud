@@ -2,7 +2,7 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/storage_volume"
+require_relative "../lib/stripe_server"
 require_relative "../lib/vm_path"
 
 unless (action = ARGV.shift)
@@ -12,17 +12,12 @@ end
 
 params = JSON.parse($stdin.read)
 
-unless (vm_name = params["vm_name"])
-  puts "expected vm_name in params"
+unless (stripe_server = params["stripe_server"])
+  puts "expected stripe_server in params"
   exit 1
 end
 
-unless (volume_params = params["storage_volume"])
-  puts "expected storage_volume in params"
-  exit 1
-end
-
-storage_volume = StorageVolume.new(vm_name, volume_params)
+stripe_server = StripeServer.new(stripe_server)
 
 case action
 when "prep", "start"
@@ -31,10 +26,10 @@ when "prep", "start"
     exit 1
   end
 
-  storage_volume.prep(key_encryption_key) if action == "prep"
-  storage_volume.start(key_encryption_key) if action == "start"
+  stripe_server.prep(key_encryption_key) if action == "prep"
+  stripe_server.start(key_encryption_key) if action == "start"
 when "purge"
-  storage_volume.purge
+  stripe_server.purge
 else
   puts "Invalid action #{action}"
   exit 1

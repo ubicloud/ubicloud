@@ -41,6 +41,7 @@ class StorageVolume
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
     @stripe_source = params["stripe_source"]
+    @persistent_volume_name = params["persistent_volume_name"]
   end
 
   def vp
@@ -602,7 +603,7 @@ class StorageVolume
   end
 
   def sp
-    @sp ||= StoragePath.new(@vm_name, @device, @disk_index)
+    @sp ||= StoragePath.new(@vm_name, @device, @disk_index, @persistent_volume_name)
   end
 
   def storage_root

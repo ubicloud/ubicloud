@@ -3,10 +3,11 @@
 DEFAULT_STORAGE_DEVICE = "DEFAULT"
 
 class StoragePath
-  def initialize(vm_name, device, disk_index)
+  def initialize(vm_name, device, disk_index, persistent_volume_name = nil)
     @vm_name = vm_name
     @device = device
     @disk_index = disk_index
+    @persistent_volume_name = persistent_volume_name
   end
 
   def device_path
@@ -21,7 +22,11 @@ class StoragePath
   end
 
   def storage_dir
-    @storage_dir ||= File.join(storage_root, @disk_index.to_s)
+    @storage_dir ||= if @persistent_volume_name
+      File.join(device_path, "persistent_volumes", @persistent_volume_name)
+    else
+      File.join(storage_root, @disk_index.to_s)
+    end
   end
 
   def disk_file
@@ -42,6 +47,10 @@ class StoragePath
 
   def vhost_backend_config
     @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
+  end
+
+  def stripe_server_config
+    @stripe_server_config ||= File.join(storage_dir, "stripe-server.conf")
   end
 
   def vhost_backend_metadata

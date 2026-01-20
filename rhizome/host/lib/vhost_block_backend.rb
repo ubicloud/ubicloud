@@ -42,6 +42,10 @@ class VhostBlockBackend
     "#{dir}/init-metadata"
   end
 
+  def stripe_server_path
+    "#{dir}/remote-stripe-server"
+  end
+
   def download
     temp_tarball = "/tmp/vhost-backend-#{@version}.tar.gz"
     puts "Downloading ubiblk package from #{url}"
