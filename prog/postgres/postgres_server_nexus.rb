@@ -465,10 +465,12 @@ SQL
     end
 
     when_unplanned_take_over_set? do
+      register_deadline("wait", 5 * 60)
       hop_prepare_for_unplanned_take_over
     end
 
     when_planned_take_over_set? do
+      register_deadline("wait", 5 * 60)
       hop_prepare_for_planned_take_over
     end
 
@@ -481,7 +483,11 @@ SQL
     end
 
     when_checkup_set? do
-      hop_unavailable if !available?
+      unless available?
+        register_deadline("wait", 5 * 60)
+        hop_unavailable
+      end
+
       decr_checkup
     end
 
@@ -545,8 +551,6 @@ SQL
   end
 
   label def unavailable
-    register_deadline("wait", 10 * 60)
-
     nap 0 if postgres_server.resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
 
     reap(fallthrough: true)
@@ -603,7 +607,6 @@ SQL
 
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
-    register_deadline("wait", 10 * 60)
 
     representative_server = postgres_server.resource.representative_server
 
@@ -619,7 +622,6 @@ SQL
 
   label def prepare_for_planned_take_over
     decr_planned_take_over
-    register_deadline("wait", 10 * 60)
 
     postgres_server.resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
@@ -683,7 +685,7 @@ SQL
   label def restart
     decr_restart
 
-    register_deadline("wait", 10 * 60)
+    register_deadline("wait", 5 * 60)
 
     vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
     vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
