@@ -447,7 +447,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def available?
     host.sshable.cmd("systemctl is-active :vm_name :vm_name-dnsmasq", vm_name:).split("\n").all?("active")
-  rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+  rescue
     false
   end
 end
