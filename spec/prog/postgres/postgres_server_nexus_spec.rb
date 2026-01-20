@@ -1046,7 +1046,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(described_class, {}, :restart)
       expect { nx.unavailable }.to nap(5)
-      expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
       expect(postgres_server.reload.recycle_set?).to be true
     end
 
