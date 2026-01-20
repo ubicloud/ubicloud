@@ -15,8 +15,13 @@ class Sshable < Sequel::Model
   SSH_CONNECTION_ERRORS = [
     Net::SSH::Disconnect,
     Net::SSH::ConnectionTimeout,
+    Net::OpenTimeout,
     Errno::ECONNRESET,
     Errno::ECONNREFUSED,
+    Errno::ETIMEDOUT,
+    Errno::EHOSTUNREACH,
+    SocketError,
+    EOFError,
     IOError
   ].freeze
 
