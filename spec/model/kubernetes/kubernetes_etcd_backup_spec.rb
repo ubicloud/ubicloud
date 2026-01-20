@@ -36,21 +36,16 @@ RSpec.describe KubernetesEtcdBackup do
   end
 
   describe "#blob_storage" do
+    before do
+      MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
+    end
+
     it "returns the minio cluster for the project and location" do
-      minio_cluster = MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
-      allow(minio_cluster).to receive(:url).and_return("https://minio.test")
-      expect(keb.blob_storage).to eq minio_cluster
+      expect(keb.blob_storage).to eq MinioCluster[name: "minio-cluster"]
     end
 
-    it "returns nil if no minio cluster is found" do
-      expect(keb.blob_storage).to be_nil
-    end
-
-    it "memoizes the blob storage" do
-      minio_cluster = MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
-      allow(minio_cluster).to receive(:url).and_return("https://minio.test")
-
-      expect(MinioCluster).to receive(:[]).once.and_call_original
+    it "memoizes the result" do
+      expect(MinioCluster).to receive(:[]).with(project_id: project.id, location_id: location.id).once.and_call_original
       keb.blob_storage
       keb.blob_storage
     end

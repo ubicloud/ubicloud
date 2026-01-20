@@ -9,6 +9,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
   let(:location) { Location[Location::HETZNER_FSN1_ID] }
   let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: location.id, net6: "fe80::/64", net4: "192.168.0.0/24") }
   let(:kc) {
+    MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
     kc = KubernetesCluster.create(
       name: "test",
       version: Option.kubernetes_versions.first,
@@ -32,16 +33,9 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
     )
   }
 
-  let(:minio_cluster) {
-    cluster = MinioCluster.create(project_id: project.id, location_id: location.id, name: "minio-cluster", admin_user: "admin", admin_password: "password", root_cert_1: "certs")
-    allow(cluster).to receive(:url).and_return("https://minio.test")
-    cluster
-  }
-
   before do
-    allow(Config).to receive(:minio_service_project_id).and_return(project.id)
+    allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
     allow(nx).to receive(:kubernetes_etcd_backup).and_return(kubernetes_etcd_backup)
-    allow(kubernetes_etcd_backup).to receive(:blob_storage).and_return(minio_cluster)
   end
 
   describe ".assemble" do
@@ -64,16 +58,21 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
   describe "#setup_blob_storage" do
     let(:admin_client) { instance_double(Minio::Client) }
 
-    before do
-      expect(Minio::Client).to receive(:new).and_return(admin_client)
-    end
-
     it "sets up user and policy in minio and hops" do
+      expect(Minio::Client).to receive(:new).and_return(admin_client)
       expect(admin_client).to receive(:admin_add_user).with(kubernetes_etcd_backup.access_key, kubernetes_etcd_backup.secret_key)
       expect(admin_client).to receive(:admin_policy_add).with(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.blob_storage_policy)
       expect(admin_client).to receive(:admin_policy_set).with(kubernetes_etcd_backup.ubid, kubernetes_etcd_backup.access_key)
 
       expect { nx.setup_blob_storage }.to hop("setup_bucket")
+    end
+
+    context "when blob storage is not available" do
+      it "naps" do
+        MinioCluster[name: "minio-cluster"].destroy
+        expect(Minio::Client).not_to receive(:new)
+        expect { nx.setup_blob_storage }.to nap(60)
+      end
     end
   end
 
@@ -85,11 +84,12 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
         endpoint: "https://minio.test",
         access_key: kubernetes_etcd_backup.access_key,
         secret_key: kubernetes_etcd_backup.secret_key,
-        ssl_ca_data: minio_cluster.root_certs
+        ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs
       ).and_return(client)
     end
 
     it "calls setup_bucket on model and hops" do
+      expect(kubernetes_etcd_backup.blob_storage).to receive(:url).and_return("https://minio.test")
       expect(client).to receive(:create_bucket)
       expect(client).to receive(:set_lifecycle_policy)
       expect { nx.setup_bucket }.to hop("wait")
@@ -168,15 +168,22 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
   describe "#destroy" do
     let(:admin_client) { instance_double(Minio::Client) }
 
-    before do
-      expect(Minio::Client).to receive(:new).and_return(admin_client)
-    end
-
     it "removes user and policy from minio" do
+      expect(kubernetes_etcd_backup.blob_storage).to receive(:url).and_return("https://minio.test")
+      expect(Minio::Client).to receive(:new).and_return(admin_client)
+
       expect(admin_client).to receive(:admin_remove_user).with(kubernetes_etcd_backup.access_key)
       expect(admin_client).to receive(:admin_policy_remove).with(kubernetes_etcd_backup.ubid)
 
       expect { nx.destroy }.to exit({"msg" => "kubernetes etcd backup is deleted"})
+    end
+
+    context "when blob storage is missing" do
+      it "does not attempt to remove user or policy and exits" do
+        MinioCluster[name: "minio-cluster"].destroy
+        expect(Minio::Client).not_to receive(:new)
+        expect { nx.destroy }.to exit({"msg" => "kubernetes etcd backup is deleted"})
+      end
     end
   end
 end
