@@ -207,7 +207,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
 
     params["storage_volumes"].reject { _1["read_only"] }.each { |params|
       volume = StorageVolume.new(@vm_name, params)
-      volume.purge_spdk_artifacts
+      volume.purge
       storage_roots.append(volume.storage_root)
     }
 

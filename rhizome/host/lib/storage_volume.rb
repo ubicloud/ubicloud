@@ -40,6 +40,7 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+    @stripe_source = params["stripe_source"]
   end
 
   def vp
@@ -261,6 +262,12 @@ class StorageVolume
       config["metadata_path"] = sp.vhost_backend_metadata
     end
 
+    if @stripe_source
+      kind = @stripe_source["source"]
+      raise "Unsupported stripe source: #{kind}" unless kind == "remote"
+      config["stripe_source"] = remote_stripe_source_config(@stripe_source, key_wrapping_secrets)
+    end
+
     if @encrypted
       key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
       key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
@@ -274,6 +281,16 @@ class StorageVolume
     end
 
     config
+  end
+
+  def remote_stripe_source_config(stripe_source, key_wrapping_secrets)
+    key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
+    psk_secret = wrap_key_b64(key_encryption, stripe_source["psk_secret"])
+    {
+      address: stripe_source["address"],
+      psk_identity: stripe_source["psk_identity"],
+      psk_secret: psk_secret
+    }
   end
 
   def vhost_backend_kek(key_wrapping_secrets)
@@ -312,7 +329,7 @@ class StorageVolume
       # to prevent potential retry loops.
       if retries == 0
         retries += 1
-        purge_spdk_artifacts
+        purge
         retry
       end
       raise
@@ -351,7 +368,7 @@ class StorageVolume
     raise unless e.stderr.include?("not loaded")
   end
 
-  def purge_spdk_artifacts
+  def purge
     if @vhost_backend_version
       service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
       stop_service_if_loaded(vhost_user_block_service)

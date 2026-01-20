@@ -1,0 +1,41 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/storage_volume"
+require_relative "../lib/vm_path"
+
+unless (action = ARGV.shift)
+  puts "expected action as argument"
+  exit 1
+end
+
+params = JSON.parse($stdin.read)
+
+unless (vm_name = params["vm_name"])
+  puts "expected vm_name in params"
+  exit 1
+end
+
+unless (volume_params = params["storage_volume"])
+  puts "expected storage_volume in params"
+  exit 1
+end
+
+storage_volume = StorageVolume.new(vm_name, volume_params)
+
+case action
+when "prep", "start"
+  unless (key_encryption_key = params["key_encryption_key"])
+    puts "expected key_encryption_key in params"
+    exit 1
+  end
+
+  storage_volume.prep(key_encryption_key) if action == "prep"
+  storage_volume.start(key_encryption_key) if action == "start"
+when "purge"
+  storage_volume.purge
+else
+  puts "Invalid action #{action}"
+  exit 1
+end
