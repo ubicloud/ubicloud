@@ -109,7 +109,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo mv /var/storage/#{vm.inhost_name}/0/disk.raw /var/storage/#{vm.inhost_name}/0/disk.raw.bk")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo rm /var/storage/#{vm.inhost_name}/0/vhost.sock")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo mkfifo /var/storage/#{vm.inhost_name}/0/kek.pipe")
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/kek.pipe")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown -R #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}")
       expect { prog.ready_migration }.to hop("download_migration_binaries")
     end
   end
