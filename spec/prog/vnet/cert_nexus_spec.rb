@@ -129,10 +129,11 @@ RSpec.describe Prog::Vnet::CertNexus do
 
       expect(@order.authorizations.first.dns).to receive(:request_validation)
       expect { nx.wait_dns_update }.to hop("wait_dns_validation")
+      expect(st.reload.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
     end
   end
 
-  describe "#wait_dns_validation" do
+  describe "#wait_dns_validation with single authorization" do
     before do
       @order = setup_order
       @challenge = @order.authorizations.first.dns
@@ -148,6 +149,14 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect { nx.wait_dns_validation }.to nap(10)
     end
 
+    it "rerequests DNS validation if it has been more than 2 minutes and is still not valid" do
+      expect(@challenge).to receive(:status).and_return("processing")
+      expect(@challenge).to receive(:request_validation)
+      refresh_frame(nx, new_values: {"last_dns_validation_request" => Time.now.to_i - 130})
+      expect { nx.wait_dns_validation }.to nap(10)
+      expect(st.reload.stack[0]["last_dns_validation_request"]).to be_within(10).of(Time.now.to_i)
+    end
+
     it "hops to restart if dns_challenge validation fails" do
       expect(@challenge).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("DNS validation failed", instance_of(Hash)).and_call_original
@@ -158,6 +167,27 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "hops to cert_finalization when dns_challenge is valid" do
       expect(@challenge).to receive(:status).and_return("valid")
 
+      key = Clec::Cert.ec_key
+      expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
+      expect { nx.wait_dns_validation }.to hop("cert_finalization")
+      expect(cert.reload.csr_key).not_to be_nil
+    end
+  end
+
+  describe "#wait_dns_validation with multiple authorizations" do
+    it "waits for dns_challenge to be validated if one authorization is processing and another is valid" do
+      order = setup_order(add_private: true)
+      challenge1, challenge2 = order.authorizations.map(&:dns)
+      expect(challenge1).to receive(:status).and_return("processing")
+      expect(challenge2).to receive(:status).and_return("valid")
+      expect { nx.wait_dns_validation }.to nap(10)
+    end
+
+    it "hops to cert_finalization when all authorizations are valid" do
+      order = setup_order(add_private: true)
+      challenge1, challenge2 = order.authorizations.map(&:dns)
+      expect(challenge1).to receive(:status).and_return("valid")
+      expect(challenge2).to receive(:status).and_return("valid")
       key = Clec::Cert.ec_key
       expect(OpenSSL::PKey::EC).to receive(:generate).and_return(key)
       expect { nx.wait_dns_validation }.to hop("cert_finalization")

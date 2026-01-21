@@ -59,20 +59,28 @@ class Prog::Vnet::CertNexus < Prog::Base
     end
 
     each_authorization { it.dns.request_validation }
+    update_stack("last_dns_validation_request" => Time.now.to_i)
 
     hop_wait_dns_validation
   end
 
   label def wait_dns_validation
+    all_valid = true
     each_authorization do |authorization|
       dns_challenge = authorization.dns
       case (order_status = dns_challenge.status)
       when "pending", "processing"
-        # do nothing
+        all_valid = false
+        t = Time.now.to_i
+        if frame["last_dns_validation_request"]&.<(t - 120)
+          # Rerequest DNS validation every 2 minutes, in case the ACME provider
+          # checked originally and couldn't validate the DNS record, and won't
+          # check again (or as quickly) until rerequested.
+          dns_challenge.request_validation
+          update_stack("last_dns_validation_request" => t)
+        end
       when "valid"
-        # Any valid challenge is sufficient according to RFC 8555 Section 7.1.4
-        cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
-        hop_cert_finalization
+        # do nothing
       else
         Clog.emit("DNS validation failed", {order_status:})
         cleanup_dns_challenge_records
@@ -80,8 +88,13 @@ class Prog::Vnet::CertNexus < Prog::Base
       end
     end
 
-    # All challenges in pending or processing
-    nap 10
+    if all_valid
+      cert.update(csr_key: OpenSSL::PKey::EC.generate("prime256v1").to_der)
+      hop_cert_finalization
+    else
+      # At least one authorization still pending or processing
+      nap 10
+    end
   end
 
   label def cert_finalization
