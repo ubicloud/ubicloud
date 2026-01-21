@@ -156,7 +156,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   def migration_script_params
     {
-      "slice" => vm.vm_host_slice.name,
+      "slice" => vm.vm_host_slice&.name,
       "device" => vm_storage_volume.storage_device.name,
       "vm_name" => vm.inhost_name,
       "encrypted" => true,
