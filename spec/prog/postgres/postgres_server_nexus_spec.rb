@@ -354,10 +354,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "mounts data disk correctly when there are multiple storage volumes" do
       expect(server).to receive(:storage_size_gib).and_return(128)
       expect(server).to receive(:storage_device_paths).and_return(["/dev/nvme1n1", "/dev/nvme2n1"])
-      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/nvme1n1 -r 1677696").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
       expect(sshable).to receive(:_cmd).with("sudo update-initramfs -u")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/md0 -r 1677696").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
       expect(sshable).to receive(:_cmd).with("sudo mount /dev/md0 /dat")
