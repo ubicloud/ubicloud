@@ -93,6 +93,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
         .and change { Strand.where(prog: "Vnet::CertNexus").count }.from(1).to(2)
         .and change { Strand.where(prog: "Vnet::CertNexus").all.select { it.stack[0]["add_private"] }.count }.from(0).to(1)
         .and change { nx.load_balancer.certs.count }.from(1).to(2)
+      expect(st.reload.stack[0]["cert"]).to be_a String
     end
 
     it "creates a cert without dns zone in development" do
@@ -110,12 +111,19 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_provisioning }.to nap(60)
     end
 
-    it "hops to wait_cert_broadcast if need_certificates? is false and refresh_cert is set" do
+    it "naps for 60 seconds if cert is set in frame but does not have valid cert entry" do
+      cert = Cert.create(hostname: nx.load_balancer.hostname)
+      refresh_frame(nx, new_values: {"cert" => cert.id})
+      expect { nx.wait_cert_provisioning }.to nap(60)
+    end
+
+    it "hops to wait_cert_broadcast if certificate is ready and refresh_cert is set" do
       vm = Prog::Vm::Nexus.assemble("pub key", ps.project_id, name: "testvm", private_subnet_id: ps.id).subject
       nx.load_balancer.add_vm(vm)
       nx.load_balancer.incr_refresh_cert
       expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
-      expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
+      cert = Cert.create(hostname: nx.load_balancer.hostname, cert: "a")
+      refresh_frame(nx, new_values: {"cert" => cert.id})
       expect { nx.wait_cert_provisioning }.to hop("wait_cert_broadcast")
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 1
     end
@@ -126,6 +134,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(Strand.where(prog: "Vnet::CertServer", label: "setup_cert_server").count).to eq 1
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect { nx.wait_cert_provisioning }.to hop("wait")
+      expect(st.reload.stack[0].fetch("cert")).to be_nil
       expect(Strand.where(prog: "Vnet::CertServer", label: "reshare_certificate").count).to eq 0
     end
   end
@@ -157,6 +166,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait_cert_broadcast }.to hop("wait")
       expect(Semaphore[name: "destroy", strand_id: cert_to_remove.id]).not_to be_nil
       expect(nx.load_balancer.reload.certs.count).to eq 1
+      expect(st.reload.stack[0].fetch("cert")).to be_nil
     end
   end
 
