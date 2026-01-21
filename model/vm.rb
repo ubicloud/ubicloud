@@ -237,7 +237,10 @@ class Vm < Sequel::Model
       end
 
       session[:ssh_session].exec!("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n").all?("active") ? "up" : "down"
-    rescue
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("Exception in Vm #{ubid}", Util.exception_to_hash(e))
       "down"
     end
     pulse = aggregate_readings(previous_pulse:, reading:)
