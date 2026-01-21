@@ -112,6 +112,8 @@ RSpec.describe VmHostSlice do
   end
 
   describe "availability monitoring" do
+    let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
+
     it "initiates a new health monitor session" do
       expect(vm_host_slice.vm_host.sshable).to receive(:start_fresh_session)
       vm_host_slice.init_health_monitor_session
@@ -119,9 +121,6 @@ RSpec.describe VmHostSlice do
 
     it "checks pulse" do
       Strand.create_with_id(vm_host_slice, prog: "Vm::VmHostSliceNexus", label: "wait")
-      session = {
-        ssh_session: Net::SSH::Connection::Session.allocate
-      }
       pulse = {
         reading: "down",
         reading_rpt: 5,
@@ -140,6 +139,13 @@ RSpec.describe VmHostSlice do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise Sshable::SshError
       expect(vm_host_slice.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
       expect(Semaphore.where(strand_id: vm_host_slice.id, name: "checkup").count).to eq(1)
+    end
+
+    [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+      it "reraises the exception for exception class: #{ex.class}" do
+        expect(session[:ssh_session]).to receive(:_exec!).and_raise(ex)
+        expect { vm_host_slice.check_pulse(session:, previous_pulse: "notnil") }.to raise_error(ex)
+      end
     end
   end
 end
