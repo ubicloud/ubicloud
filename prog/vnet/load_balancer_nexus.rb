@@ -54,6 +54,10 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
   end
 
   label def wait
+    when_refresh_cert_set? do
+      hop_create_new_cert
+    end
+
     if load_balancer.need_certificates?
       load_balancer.incr_refresh_cert
       hop_create_new_cert
