@@ -67,6 +67,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait }.to hop("rewrite_dns_records")
     end
 
+    it "creates new cert if refresh_cert semaphore is set" do
+      nx.load_balancer.incr_refresh_cert
+      expect { nx.wait }.to hop("create_new_cert")
+    end
+
     it "creates new cert if needed" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
       expect { nx.wait }.to hop("create_new_cert")
