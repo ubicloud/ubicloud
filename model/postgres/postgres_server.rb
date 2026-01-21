@@ -159,6 +159,10 @@ class PostgresServer < Sequel::Model
     resource.read_replica?
   end
 
+  def paradedb_and_primary?
+    primary? && resource.flavor == PostgresResource::Flavor::PARADEDB
+  end
+
   def storage_size_gib
     vm.vm_storage_volumes.reject(&:boot).sum(&:size_gib)
   end
