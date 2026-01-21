@@ -709,7 +709,7 @@ module Scheduling::Allocator
           boot_image_id: image_id,
           skip_sync: volume["skip_sync"],
           disk_index:,
-          key_encryption_key_1_id: key_encryption_key&.id,
+          key_encryption_key_1_id: nil,
           spdk_installation_id:,
           vhost_block_backend_id:,
           storage_device_id: @volume_to_device_map[disk_index],

@@ -253,7 +253,8 @@ class StorageVolume
       "device_id" => @device_id,
       "skip_sync" => @skip_sync,
       "write_through" => write_through_device?,
-      "rpc_socket_path" => sp.rpc_socket_path
+      "rpc_socket_path" => sp.rpc_socket_path,
+      "track_written" => true
     }
 
     if @image_path
