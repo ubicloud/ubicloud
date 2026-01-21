@@ -260,7 +260,7 @@ class Vm < Sequel::Model
     incr_update_spdk_dependency
   end
 
-  def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil)
+  def params_json(swap_size_bytes: nil, hypervisor: nil, ch_version: nil, firmware_version: nil, hugepages: nil, prefix: nil)
     topo = cloud_hypervisor_cpu_topology
 
     project_public_keys = project.get_ff_vm_public_ssh_keys || []
@@ -284,7 +284,7 @@ class Vm < Sequel::Model
       cpu_topology: topo.to_s,
       mem_gib: memory_gib,
       ndp_needed: vm_host.ndp_needed,
-      storage_volumes:,
+      storage_volumes: storage_volumes(prefix:),
       swap_size_bytes:,
       pci_devices: pci_devices.map { [it.slot, it.iommu_group] },
       gpu_partition_id: gpu_partition&.partition_id,
@@ -300,7 +300,7 @@ class Vm < Sequel::Model
     )
   end
 
-  def storage_volumes
+  def storage_volumes(prefix: nil)
     add_cpus = vm_host.spdk_installations.empty? && !vm_host.accepts_slices
 
     vm_storage_volumes.map { |s|
@@ -328,7 +328,27 @@ class Vm < Sequel::Model
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
         "copy_on_read" => false
-      }.tap { |v| v["cpus"] = cpus if add_cpus }
+      }.tap { |v|
+        v["cpus"] = cpus if add_cpus
+
+        if prefix && s.vhost_block_backend_version
+          v["stripe_source"] = {
+            "source" => "archive",
+            "type" => "s3",
+            "bucket" => Config.storage_archive_bucket,
+            "prefix" => prefix,
+            "endpoint" => "https://c8f0cfc00294455265aa09519fcca930.eu.r2.cloudflarestorage.com",
+            "region" => "auto",
+            "credentials" => {
+              "access_key_id" => Config.storage_archive_access_key,
+              "secret_access_key" => Config.storage_archive_secret_key
+            }
+          }
+          # If we are restoring from archive, we want copy_on_read to be true
+          # to lazily fetch data.
+          v["copy_on_read"] = true
+        end
+      }
     }
   end
 
