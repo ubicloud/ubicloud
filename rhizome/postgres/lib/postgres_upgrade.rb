@@ -24,7 +24,7 @@ class PostgresUpgrade
   end
 
   def promote(version)
-    if r("sudo -u postgres psql -t -c 'SELECT pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
+    if r("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").strip == "f"
       @logger.info("Server is already promoted (not in recovery mode)")
       return
     end
@@ -79,13 +79,13 @@ class PostgresUpgrade
   end
 
   def run_post_upgrade_extension_update
-    databases = r("sudo -u postgres psql -t -c 'SELECT datname FROM pg_database WHERE datistemplate = false;'").split("\n").map(&:strip)
+    databases = r("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").split("\n").map(&:strip)
 
     scripts = EXTENSION_UPGRADE_SCRIPTS[@version]
     scripts.each do |extension, script|
       @logger.info("Running post upgrade extension update for #{extension}")
       databases.each do |database|
-        installed = r("sudo -u postgres psql -d #{database.shellescape} -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_extension WHERE extname = '#{extension.gsub("'", "''")}'").strip
+        installed = r("sudo -u postgres psql -d #{database.shellescape} -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = '#{extension.gsub("'", "''")}'").strip
         if installed == "1"
           @logger.info("Running post upgrade extension update for #{extension} on database #{database}")
           r("sudo -u postgres psql -d #{database.shellescape} -v 'ON_ERROR_STOP=1'", stdin: script)
