@@ -6,6 +6,7 @@
         ["Login Methods", "/account/login-method", "hero-finger-print", disallow_login_methods],
         ["#{rodauth.has_password? ? "Change" : "Create"} Password", "/account/change-password", "hero-key", disallow_login_methods],
         ["Change Email", "/account/change-login", "hero-envelope", disallow_login_methods],
+        ["Change Name", "/account/rename", "hero-document-text", disallow_login_methods],
         ["Close Account", "/account/close-account", "hero-x-circle"]
       ].each do |label, url, icon, disallowed| %>
       <% next if disallowed %>

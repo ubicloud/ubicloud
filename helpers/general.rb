@@ -31,11 +31,15 @@ class Clover < Roda
       end
     end
 
-    def rename(object, perm:, serializer:, template_prefix:)
+    def rename(object, perm:, serializer:, template:, page: "settings")
       post "rename" do
         scope.instance_exec do
-          authorize(perm, object)
-          handle_validation_failure("#{template_prefix}/show") { @page = "settings" }
+          if perm
+            authorize(perm, object)
+          else
+            no_authorization_needed
+          end
+          handle_validation_failure(template) { @page = page }
           name = typecast_body_params.nonempty_str!("name")
 
           if name == object.name
@@ -43,6 +47,8 @@ class Clover < Roda
           else
             if object.is_a?(KubernetesCluster)
               Validation.validate_kubernetes_name(name)
+            elsif object.is_a?(Account)
+              Validation.validate_account_name(name)
             else
               Validation.validate_name(name)
             end
@@ -58,7 +64,7 @@ class Clover < Roda
             serializer.serialize(object)
           else
             flash["notice"] = "Name updated"
-            request.redirect object, "/settings"
+            request.redirect object, "/#{page}"
           end
         end
       end
@@ -140,6 +146,9 @@ class Clover < Roda
     # :nocov:
     return unless LOGGED_ACTIONS.include?(action) || Config.test?
     # :nocov:
+
+    # log only if we have a project context
+    return unless @project
 
     project_id = @project.id
     subject_id = current_account.id

@@ -1,9 +1,10 @@
-<%# locals: (object:, type:, text: nil) %>
+<%# locals: (object:, type: nil, text: nil) %>
 
 <div class="sm:flex sm:items-center sm:justify-between">
   <div>
-    <h3 class="text-base font-semibold leading-6 text-gray-900">Rename
-      <%= type %></h3>
+    <% if type %>
+      <h3 class="text-base font-semibold leading-6 text-gray-900">Rename <%= type %></h3>
+    <% end %>
     <% if text %>
       <div class="mt-2 text-sm text-gray-500">
         <p><%= text %></p>
