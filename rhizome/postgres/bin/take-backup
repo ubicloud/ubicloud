@@ -9,4 +9,4 @@ end
 
 v = ARGV[0]
 
-r "sudo -u postgres wal-g backup-push /dat/#{v}/data --config /etc/postgresql/wal-g.env"
+r "sudo -u postgres wal-g backup-push /dat/#{v}/data --config /etc/postgresql/wal-g.env --verify"
