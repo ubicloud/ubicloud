@@ -254,6 +254,13 @@ RSpec.describe Vm do
         expect(session[:ssh_session]).to receive(:_exec!).with(expected_cmd).and_return("active\nactive\nactive\n")
         expect(pulse_vm.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
       end
+
+      [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+        it "reraises the exception for exception class: #{ex.class}" do
+          expect(session[:ssh_session]).to receive(:_exec!).and_raise(ex)
+          expect { pulse_vm.check_pulse(session:, previous_pulse: "notnil") }.to raise_error(ex)
+        end
+      end
     end
 
     context "when vm is sshable" do
