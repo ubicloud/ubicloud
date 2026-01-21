@@ -83,8 +83,8 @@ class Clover
           next unless (runner = @installation.runners_dataset.with_pk(id))
 
           DB.transaction do
-            runner.incr_skip_deregistration
-            runner.incr_destroy
+            runner.incr_skip_deregistration(request.get_header("X-RequestID"))
+            runner.incr_destroy(request.get_header("X-RequestID"))
             audit_log(runner, "destroy")
           end
           flash["notice"] = "Runner '#{runner.ubid}' forcibly terminated"

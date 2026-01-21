@@ -36,7 +36,7 @@ class Clover
       r.delete true do
         authorize("Postgres:delete", pg)
         DB.transaction do
-          pg.incr_destroy
+          pg.incr_destroy(request.get_header("X-RequestID"))
           audit_log(pg, "destroy")
         end
 
@@ -117,8 +117,8 @@ class Clover
       end
 
       r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
-        pg.incr_refresh_dns_record
-        pg.incr_refresh_certificates
+        pg.incr_refresh_dns_record(request.get_header("X-RequestID"))
+        pg.incr_refresh_certificates(request.get_header("X-RequestID"))
       end
 
       show_actions = if pg.read_replica?
@@ -131,7 +131,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg)
         DB.transaction do
-          pg.incr_restart
+          pg.incr_restart(request.get_header("X-RequestID"))
           audit_log(pg, "restart")
         end
 
@@ -243,7 +243,7 @@ class Clover
 
           DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
-            pg.servers.each(&:incr_configure_metrics)
+            pg.servers.each { it.ncr_configure_metrics(request.get_header("X-RequestID")) }
             audit_log(md, "create", pg)
           end
 
@@ -261,7 +261,7 @@ class Clover
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
-              pg.servers.each(&:incr_configure_metrics)
+              pg.servers.each { it.incr_configure_metrics(request.get_header("X-RequestID")) }
               audit_log(md, "destroy")
             end
           else
@@ -335,7 +335,7 @@ class Clover
         end
 
         DB.transaction do
-          pg.incr_promote
+          pg.incr_promote(request.get_header("X-RequestID"))
           audit_log(pg, "promote")
         end
 
@@ -405,7 +405,7 @@ class Clover
 
         DB.transaction do
           pg.update(superuser_password: password)
-          pg.representative_server.incr_update_superuser_password
+          pg.representative_server.incr_update_superuser_password(request.get_header("X-RequestID"))
           audit_log(pg, "reset_superuser_password")
         end
 
@@ -581,7 +581,7 @@ class Clover
           validate_postgres_config(pg.version, pg_config, pgbouncer_config)
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
-          pg.servers.each(&:incr_configure)
+          pg.servers.each { it.incr_configure(request.get_header("X-RequestID")) }
 
           audit_log(pg, "update")
 

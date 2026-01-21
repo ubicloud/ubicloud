@@ -69,7 +69,7 @@ class Clover
       r.delete true do
         authorize("LoadBalancer:delete", lb)
         DB.transaction do
-          lb.incr_destroy
+          lb.incr_destroy(request.get_header("X-RequestID"))
           audit_log(lb, "destroy")
         end
 
@@ -115,7 +115,7 @@ class Clover
             lb.remove_vm(vm)
           end
 
-          lb.incr_update_load_balancer
+          lb.incr_update_load_balancer(request.get_header("X-RequestID"))
           if cert_enablement_changed
             cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
           end
@@ -125,8 +125,8 @@ class Clover
       end
 
       r.rename lb, perm: "LoadBalancer:edit", serializer: Serializers::LoadBalancer, template_prefix: "networking/load_balancer" do
-        lb.incr_rewrite_dns_records
-        lb.incr_refresh_cert
+        lb.incr_rewrite_dns_records(request.get_header("X-RequestID"))
+        lb.incr_refresh_cert(request.get_header("X-RequestID"))
       end
 
       r.post "toggle-ssl-certificate" do
