@@ -48,13 +48,13 @@ RSpec.describe PostgresUpgrade do
 
   describe "#promote" do
     it "promotes server if in recovery mode" do
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
       expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
       postgres_upgrade.promote(16)
     end
 
     it "skips promotion if server is already promoted" do
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("f\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("f\n")
       expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
       expect(logger).to receive(:info).with("Server is already promoted (not in recovery mode)")
       postgres_upgrade.promote(16)
@@ -128,9 +128,9 @@ RSpec.describe PostgresUpgrade do
 
   describe "#run_post_upgrade_extension_update" do
     it "updates extensions on databases where they are installed" do
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_database WHERE datistemplate = false;'").and_return("postgres\nmydb\n")
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_extension WHERE extname = 'postgis'").and_return("1")
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d mydb -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_extension WHERE extname = 'postgis'").and_return("")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("postgres\nmydb\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'postgis'").and_return("1")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d mydb -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'postgis'").and_return("")
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1'", stdin: "SELECT postgis_extensions_upgrade();")
       expect(logger).to receive(:info).with("Running post upgrade extension update for postgis")
       expect(logger).to receive(:info).with("Running post upgrade extension update for postgis on database postgres")
@@ -139,8 +139,8 @@ RSpec.describe PostgresUpgrade do
     end
 
     it "skips databases where extension is not installed" do
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_database WHERE datistemplate = false;'").and_return("postgres\n")
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_extension WHERE extname = 'postgis'").and_return("")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("postgres\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'postgis'").and_return("")
       expect(postgres_upgrade).not_to receive(:r).with("sudo -u postgres psql -d postgres -v 'ON_ERROR_STOP=1'", stdin: anything)
       expect(logger).to receive(:info).with("Running post upgrade extension update for postgis")
 
@@ -153,9 +153,9 @@ RSpec.describe PostgresUpgrade do
           "ext'sname" => "ALTER EXTENSION \"ext'sname\" UPDATE;"
         }
       })
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_database WHERE datistemplate = false;'").and_return("mydb$(pwd)\n")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("mydb$(pwd)\n")
       expect(logger).to receive(:info).with("Running post upgrade extension update for ext'sname")
-      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d mydb\\$\\(pwd\\) -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_extension WHERE extname = 'ext''sname'").and_return("1")
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d mydb\\$\\(pwd\\) -v 'ON_ERROR_STOP=1' -t", stdin: "SELECT 1 FROM pg_catalog.pg_extension WHERE extname = 'ext''sname'").and_return("1")
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -d mydb\\$\\(pwd\\) -v 'ON_ERROR_STOP=1'", stdin: "ALTER EXTENSION \"ext'sname\" UPDATE;")
       expect(logger).to receive(:info).with("Running post upgrade extension update for ext'sname on database mydb$(pwd)")
 
