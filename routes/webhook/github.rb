@@ -115,7 +115,7 @@ class Clover
       runner.log_duration("runner_started", Time.parse(job["started_at"]) - Time.parse(job["created_at"]))
       success("GithubRunner[#{runner.ubid}] picked job #{job.fetch("id")}")
     when "completed"
-      runner.incr_destroy
+      runner.incr_destroy(request.get_header("X-RequestID"))
 
       success("GithubRunner[#{runner.ubid}] deleted")
     else
