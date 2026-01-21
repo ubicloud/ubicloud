@@ -25,4 +25,10 @@ Allowed Option Values:
           i7i.large i7i.xlarge i7i.2xlarge i7i.4xlarge i7i.8xlarge i7i.12xlarge
           i7i.16xlarge i7i.24xlarge i7ie.large i7ie.xlarge i7ie.2xlarge
           i7ie.3xlarge i7ie.6xlarge i7ie.12xlarge i7ie.18xlarge i7ie.24xlarge
+          r8gd.medium r8gd.large r8gd.xlarge r8gd.2xlarge r8gd.4xlarge
+          r8gd.8xlarge r8gd.12xlarge r8gd.16xlarge r8gd.24xlarge r8gd.48xlarge
+          r6gd.medium r6gd.large r6gd.xlarge r6gd.2xlarge r6gd.4xlarge
+          r6gd.8xlarge r6gd.12xlarge r6gd.16xlarge r6id.large r6id.xlarge
+          r6id.2xlarge r6id.4xlarge r6id.8xlarge r6id.12xlarge r6id.16xlarge
+          r6id.24xlarge r6id.32xlarge
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
