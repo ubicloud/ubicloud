@@ -788,6 +788,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
+        /sudo apt-get install.*pg-analytics.*pg-search/m
+      ).and_return("")
+      expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
@@ -808,9 +811,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#run_post_installation_script" do
     it "creates extensions for non-standard flavor and hops wait" do
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
-      expect(sshable).to receive(:_cmd).with(
-        /sudo apt-get install.*pg-analytics.*pg-search/m
-      ).and_return("")
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/)
