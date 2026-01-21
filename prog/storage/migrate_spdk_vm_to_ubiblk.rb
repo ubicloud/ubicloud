@@ -70,7 +70,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     vm.vm_host.sshable.cmd("sudo rm :root_dir_path/vhost.sock", root_dir_path:)
 
     vm.vm_host.sshable.cmd("sudo mkfifo :kek_file_path", kek_file_path:)
-    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :kek_file_path", inhost_name:, kek_file_path:)
+    vm.vm_host.sshable.cmd("sudo chown -R :inhost_name::inhost_name :root_vm_storage_path", inhost_name:, root_vm_storage_path:)
 
     hop_download_migration_binaries
   end
@@ -168,8 +168,12 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     }.to_json
   end
 
+  def root_vm_storage_path
+    "/var/storage/#{vm.inhost_name}"
+  end
+
   def root_dir_path
-    "/var/storage/#{vm.inhost_name}/0"
+    "#{root_vm_storage_path}/0"
   end
 
   def kek_file_path
