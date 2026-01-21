@@ -63,7 +63,10 @@ class VmHostSlice < Sequel::Model
   def check_pulse(session:, previous_pulse:)
     reading = begin
       up?(session[:ssh_session]) ? "up" : "down"
-    rescue
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("Exception in VmHostSlice #{ubid}", Util.exception_to_hash(e))
       "down"
     end
     pulse = aggregate_readings(previous_pulse:, reading:)

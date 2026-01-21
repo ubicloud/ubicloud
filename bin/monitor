@@ -46,7 +46,7 @@ else
     Vm.exclude(vm_host_id: nil).exclude(unix_user: "runneradmin").eager(:vm_host, :sshable, :vm_storage_volumes),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
-    VmHostSlice,
+    VmHostSlice.eager(:vm_host),
     LoadBalancerVmPort,
     KubernetesCluster,
     VictoriaMetricsServer
