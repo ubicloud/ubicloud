@@ -43,7 +43,7 @@ else
   monitor_models = [
     VmHost,
     PostgresServer,
-    Vm.exclude(vm_host_id: nil).eager(:vm_host, :sshable, :vm_storage_volumes),
+    Vm.exclude(vm_host_id: nil).exclude(unix_user: "runneradmin").eager(:vm_host, :sshable, :vm_storage_volumes),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
     VmHostSlice,
