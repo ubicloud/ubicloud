@@ -378,6 +378,35 @@ RSpec.describe Vm do
       expect(storage_volumes[0]["cpus"].count).to eq(1)
       expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
     end
+
+    it "adds stripe_source config when umi is true and volume has vhost_block_backend" do
+      allow(Config).to receive_messages(
+        storage_archive_bucket: "test-bucket",
+        storage_archive_endpoint: "https://s3.example.com",
+        storage_archive_access_key: "access_key",
+        storage_archive_secret_key: "secret_key"
+      )
+
+      vm.update(umi: true)
+      storage_volumes = vm.storage_volumes
+
+      expect(storage_volumes[0]["stripe_source"]).to be_nil
+      expect(storage_volumes[0]["copy_on_read"]).to be false
+
+      expect(storage_volumes[1]["stripe_source"]).to eq({
+        "source" => "archive",
+        "type" => "s3",
+        "bucket" => "test-bucket",
+        "prefix" => vm.inhost_name,
+        "endpoint" => "https://s3.example.com",
+        "region" => "auto",
+        "credentials" => {
+          "access_key_id" => "access_key",
+          "secret_access_key" => "secret_key"
+        }
+      })
+      expect(storage_volumes[1]["copy_on_read"]).to be true
+    end
   end
 
   describe "#save_with_ephemeral_net6_error_retrying" do
