@@ -210,4 +210,21 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       expect { prog.start_vm }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
     end
   end
+
+  describe "#migration_script_params" do
+    it "works when vm_host_slice is not present" do
+      vm.update(vm_host_slice_id: nil)
+      expect(JSON.parse(prog.migration_script_params)).to eq({
+        "slice" => nil,
+        "device" => "nvme0",
+        "vm_name" => vm.inhost_name,
+        "encrypted" => true,
+        "spdk_version" => "v1",
+        "disk_index" => 0,
+        "vhost_block_backend_version" => Config.vhost_block_backend_version,
+        "max_read_mbytes_per_sec" => nil,
+        "max_write_mbytes_per_sec" => nil
+      })
+    end
+  end
 end
