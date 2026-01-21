@@ -370,6 +370,7 @@ class Clover < Roda
       end
       verify_account_view { view "auth/verify_account", "Verify Account" }
       resend_verify_account_view { view "auth/verify_account_resend", "Resend Verification" }
+      verify_account_redirect { "/after-login" }
       verify_account_email_sent_redirect { login_route }
       verify_account_email_recently_sent_redirect { login_route }
       verify_account_set_password? false
@@ -402,7 +403,6 @@ class Clover < Roda
 
     login_view { view "auth/login", "Login" }
     login_redirect { "/after-login" }
-    verify_account_redirect { "/after-login" }
     login_return_to_requested_location? true
     login_label "Email Address"
     two_factor_auth_return_to_requested_location? true
