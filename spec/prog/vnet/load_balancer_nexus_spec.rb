@@ -262,18 +262,18 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private.#{st.subject.hostname}")
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
     it "does not rewrite dns records if no vms" do
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private.#{st.subject.hostname}")
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return([])
       expect(nx.load_balancer).not_to receive(:dns_zone)
       expect { nx.rewrite_dns_records }.to hop("wait")
@@ -290,11 +290,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private.#{st.subject.hostname}")
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
@@ -304,11 +304,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private.#{st.subject.hostname}")
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
-      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
@@ -318,11 +318,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)
-      expect(dns_zone).to receive(:delete_record).with(record_name: "private-#{st.subject.hostname}")
+      expect(dns_zone).to receive(:delete_record).with(record_name: "private.#{st.subject.hostname}")
       expect(dns_zone).to receive(:insert_record).with(record_name: st.subject.hostname, type: "A", data: "192.168.1.0", ttl: 10)
-      expect(dns_zone).to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
+      expect(dns_zone).to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "A", data: "1.2.3.4", ttl: 10)
       expect(dns_zone).not_to receive(:insert_record).with(record_name: st.subject.hostname, type: "AAAA", data: "fd10:9b0b:6b4b:8fb0::2", ttl: 10)
-      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private-#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
+      expect(dns_zone).not_to receive(:insert_record).with(record_name: "private.#{st.subject.hostname}", type: "AAAA", data: "fd10:9b0b:6b4b:8fb2::2", ttl: 10)
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
   end

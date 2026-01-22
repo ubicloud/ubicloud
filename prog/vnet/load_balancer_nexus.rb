@@ -177,7 +177,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
 
     if (dns_zone = load_balancer.dns_zone)
       hostname = load_balancer.hostname
-      private_hostname = "private-#{hostname}"
+      private_hostname = "private.#{hostname}"
       dns_zone.delete_record(record_name: hostname)
       dns_zone.delete_record(record_name: private_hostname)
 
