@@ -448,7 +448,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def available?
-    host.sshable.cmd("systemctl is-active :vm_name :vm_name-dnsmasq", vm_name:).split("\n").all?("active")
+    host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n").all?("active")
   rescue
     false
   end
