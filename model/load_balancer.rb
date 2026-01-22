@@ -191,11 +191,6 @@ class LoadBalancer < Sequel::Model
     IPV6 = "ipv6"
     DUAL = "dual"
   end
-
-  def validate
-    super
-    errors.add(:name, "cannot start with 'private-'") if name&.start_with?("private-")
-  end
 end
 
 # Table: load_balancer
