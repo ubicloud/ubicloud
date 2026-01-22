@@ -20,6 +20,12 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       fail "VmHost does not have the right vhost block backend installed"
     end
 
+    begin
+      vm.vm_host.sshable.cmd("test -d :storage_dir", storage_dir: "/var/storage/#{vm.inhost_name}/0")
+    rescue Sshable::SshError
+      fail "Vm storage directory does not exist"
+    end
+
     Strand.create(
       prog: "Storage::MigrateSpdkVmToUbiblk",
       label: "stop_vm",

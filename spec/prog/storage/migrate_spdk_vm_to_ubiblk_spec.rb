@@ -51,30 +51,46 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       }.to raise_error("Vm does not exist")
     end
 
-    it "fails because vm does not have exactly one VmStorageVolume" do
-      expect {
-        described_class.assemble(create_vm.id)
-      }.to raise_error("This prog only supports Vms with exactly one disk")
-    end
+    context "when vm exists" do
+      before do
+        expect(Vm).to receive(:[]).with(vm.id).and_return(vm)
+      end
 
-    it "fails if the vm has a ubiblk disk" do
-      vm.vm_storage_volumes.first.update(vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1)
-      expect {
-        described_class.assemble(vm.id)
-      }.to raise_error("Vm is already using Ubiblk")
-    end
+      it "fails because vm does not have exactly one VmStorageVolume" do
+        vm.vm_storage_volumes.each(&:destroy)
+        vm.reload
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("This prog only supports Vms with exactly one disk")
+      end
 
-    it "fails is the underlying vmhost does not have a vhost block backend" do
-      vm_host.vhost_block_backends.each(&:destroy)
-      expect {
-        described_class.assemble(vm.id)
-      }.to raise_error("VmHost does not have the right vhost block backend installed")
-    end
+      it "fails if the vm has a ubiblk disk" do
+        vm.vm_storage_volumes.first.update(vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1)
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("Vm is already using Ubiblk")
+      end
 
-    it "creates the strand" do
-      expect {
-        described_class.assemble(vm.id)
-      }.not_to raise_error
+      it "fails is the underlying vmhost does not have a vhost block backend" do
+        vm_host.vhost_block_backends.each(&:destroy)
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("VmHost does not have the right vhost block backend installed")
+      end
+
+      it "fails if the vm storage directory does not exist" do
+        expect(vm.vm_host.sshable).to receive(:_cmd).with("test -d /var/storage/#{vm.inhost_name}/0").and_raise(Sshable::SshError.new("cmd", "", "", 1, nil))
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("Vm storage directory does not exist")
+      end
+
+      it "creates the strand" do
+        expect {
+          expect(vm.vm_host.sshable).to receive(:_cmd).with("test -d /var/storage/#{vm.inhost_name}/0").and_return("")
+          described_class.assemble(vm.id)
+        }.not_to raise_error
+      end
     end
   end
 
