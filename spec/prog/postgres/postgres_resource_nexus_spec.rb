@@ -274,7 +274,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).count).to eq(4)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
+        ["A", "pg-test-resource.pg.example.com."],
+        ["A", "private.pg-test-resource.pg.example.com."],
+        ["AAAA", "pg-test-resource.pg.example.com."],
+        ["AAAA", "private.pg-test-resource.pg.example.com."]
+      ]
     end
 
     it "creates CNAME DNS records for AWS instances" do
@@ -285,7 +290,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, type: "CNAME").first).to exist
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "pg-test-resource.pg.example.com."]]
     end
 
     it "hops even if dns zone is not configured" do
