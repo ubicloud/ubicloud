@@ -384,6 +384,7 @@ task :spec_separate do
     puts "All files passed"
   else
     puts "Failures in:", failures
+    exit 1
   end
 end
 
