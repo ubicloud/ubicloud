@@ -338,6 +338,12 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "64.0 GB is used (50.0%)"
       end
 
+      it "shows appropriate message if there is no representative server" do
+        pg.representative_server.destroy
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "No database server available"
+      end
+
       it "shows the disk usage in red if usage is high" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
