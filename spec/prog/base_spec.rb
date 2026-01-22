@@ -410,6 +410,16 @@ RSpec.describe Prog::Base do
       expect(page.details["vm_count"]).to eq(1)
     end
 
+    it "can create a page with extra data from a vm host slice" do
+      slice = VmHostSlice.create(vm_host_id: create_vm_host.id, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
+      st = Strand.create_with_id(slice, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st.unsynchronized_run
+      page = Page.active.first
+      expect(page).not_to be_nil
+      expect(page.details["vm_host"]).to eq(slice.vm_host.ubid)
+      expect(page.details["location"]).to eq(slice.vm_host.location.display_name)
+    end
+
     it "can create a page with extra data from a github runner" do
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", installation:)
