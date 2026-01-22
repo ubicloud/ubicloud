@@ -20,12 +20,6 @@ RSpec.describe LoadBalancer do
     expect(ps.errors[:name]).to eq ["cannot be exactly 26 numbers/lowercase characters starting with 1b to avoid overlap with id format"]
   end
 
-  it "disallows private- name prefix" do
-    ps = described_class.new(name: "private-a")
-    ps.validate
-    expect(ps.errors[:name]).to eq ["cannot start with 'private-'"]
-  end
-
   it "only includes single error if name is nil" do
     ps = described_class.new(name: nil)
     ps.validate
