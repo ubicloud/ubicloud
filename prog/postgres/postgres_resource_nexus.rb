@@ -15,7 +15,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true, user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil)
 
-    unless Project[project_id]
+    unless (project = Project[project_id])
       fail "No existing project"
     end
 
@@ -83,7 +83,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
 
-      Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
+      strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
+
+      if project.get_ff_postgres_aws_use_different_azs_for_standbys && location.aws?
+        postgres_resource.incr_use_different_az
+      end
+
+      strand
     end
   end
 

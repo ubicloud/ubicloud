@@ -221,7 +221,8 @@ class Project < Sequel::Model
     :skip_runner_pool,
     :spill_to_alien_runners,
     :visible_locations,
-    :vm_public_ssh_keys
+    :vm_public_ssh_keys,
+    :postgres_aws_use_different_azs_for_standbys
   )
 end
 

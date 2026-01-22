@@ -177,6 +177,31 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         "#{pg.private_subnet.net6}:6432...6433"
       ]
     end
+
+    it "sets use_different_az semaphore for AWS locations when FF is set" do
+      customer_project.set_ff_postgres_aws_use_different_azs_for_standbys(true)
+      private_location.update(project: customer_project)
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+
+      expect(pg.use_different_az_set?).to be true
+    end
+
+    it "does not set use_different_az for non-AWS locations when FF is set" do
+      customer_project.set_ff_postgres_aws_use_different_azs_for_standbys(true)
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+
+      expect(pg.use_different_az_set?).to be false
+    end
+
+    it "does not set use_different_az when FF is not set" do
+      private_location.update(project: customer_project)
+
+      pg = described_class.assemble(project_id: customer_project.id, location_id: private_location.id, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
+
+      expect(pg.use_different_az_set?).to be false
+    end
   end
 
   describe "#before_run" do
