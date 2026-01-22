@@ -135,7 +135,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       else
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.ip4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
-        record_name = "private-#{record_name}"
+        record_name = "private.#{record_name}"
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end
@@ -318,7 +318,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.identity}",
-      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private-#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
+      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private.#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key
