@@ -574,28 +574,34 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_flash_error("Non read replica servers cannot be promoted.")
       end
 
-      it "can reset superuser password of PostgreSQL database" do
-        visit "#{project.path}#{pg.path}/settings"
-        expect(page.title).to eq "Ubicloud - pg-with-permission"
-        expect(page).to have_content "Reset superuser password"
-        password = pg.superuser_password
+      [true, false].each do |with_representative_server|
+        it "can reset superuser password of PostgreSQL database with#{"out" unless with_representative_server} represenative server" do
+          visit "#{project.path}#{pg.path}/settings"
+          expect(page.title).to eq "Ubicloud - pg-with-permission"
+          expect(page).to have_content "Reset superuser password"
+          password = pg.superuser_password
 
-        find(".reset-superuser-password-new-password").set("Dummy")
-        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
-        click_button "Reset"
-        expect(page).to have_flash_error "Validation failed for following fields: password, repeat_password"
-        expect(find_by_id("password-error").text).to eq "Password must have 12 characters minimum. Password must have at least one digit."
-        expect(find_by_id("repeat_password-error").text).to eq "Passwords must match."
+          pg.representative_server.destroy unless with_representative_server
+          find(".reset-superuser-password-new-password").set("Dummy")
+          find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
+          click_button "Reset"
+          expect(page).to have_flash_error "Validation failed for following fields: password, repeat_password"
+          expect(find_by_id("password-error").text).to eq "Password must have 12 characters minimum. Password must have at least one digit."
+          expect(find_by_id("repeat_password-error").text).to eq "Passwords must match."
 
-        expect(pg.reload.superuser_password).to eq password
+          expect(pg.reload.superuser_password).to eq password
 
-        find(".reset-superuser-password-new-password").set("DummyPassword123")
-        find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
-        click_button "Reset"
+          find(".reset-superuser-password-new-password").set("DummyPassword123")
+          find(".reset-superuser-password-new-password-repeat").set("DummyPassword123")
+          click_button "Reset"
 
-        expect(page).to have_flash_notice "The superuser password will be updated in a few seconds"
-        expect(pg.reload.superuser_password).to eq("DummyPassword123")
-        expect(page.status_code).to eq(200)
+          expect(page).to have_flash_notice "The superuser password will be updated in a few seconds"
+          expect(pg.reload.superuser_password).to eq("DummyPassword123")
+          if with_representative_server
+            expect(pg.representative_server.update_superuser_password_set?).to be true
+          end
+          expect(page.status_code).to eq(200)
+        end
       end
 
       it "can restart PostgreSQL database" do

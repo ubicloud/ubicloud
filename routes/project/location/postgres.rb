@@ -377,7 +377,7 @@ class Clover
 
         DB.transaction do
           pg.update(superuser_password: password)
-          pg.representative_server.incr_update_superuser_password
+          pg.representative_server&.incr_update_superuser_password
           audit_log(pg, "reset_superuser_password")
         end
 
