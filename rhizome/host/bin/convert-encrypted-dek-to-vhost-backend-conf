@@ -112,12 +112,13 @@ def write_vhost_conf(output_file, conf)
   yaml = YAML.dump(conf)
 
   # Sometimes key strings do not start with characters or numbers, as a result when
-  # encoded, they are wrapped in double quotes, breaking the migration binary because it
+  # encoded, they are wrapped in single or double quotes, breaking the migration binary because it
   # expects it to have a certain length.
   # The migration binary can be improved to address such encoding scenarios better but
   # since it's C code and wanted to keep it minimal, I thought I can tweak it here.
   # remove quotes around base64 strings in encryption_key
   yaml.gsub!(/- "(.*?)"$/, '- \1')
+  yaml.gsub!(/- '(.*?)'$/, '- \1')
   File.write(output_file, yaml)
 end
 
