@@ -1,0 +1,65 @@
+name: Daily CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron:  '42 9 * * 1-5'
+
+env:
+  CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
+
+jobs:
+  daily-ci:
+    strategy:
+      fail-fast: false
+    name: Daily CI
+    runs-on: ubicloud-standard-8
+    timeout-minutes: 25
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Set up Clover
+      uses: ./.github/actions/setup-clover
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+         node-version-file: "package.json"
+
+    - name: Install node packages
+      run: npm ci
+
+    - name: Run unused associations check
+      run: bundle exec rake unused_associations_check
+
+    - name: Run check separate requires
+      run: bundle exec rake check_separate_requires
+
+    - name: Run each spec file in separate process
+      run: bundle exec rake spec_separate
+
+    - name: Send notification if failed
+      if: ${{ failure() && github.ref_name == 'main' }}
+      uses: slackapi/slack-github-action@v2.1.1
+      with:
+        webhook: ${{ secrets.SLACK_WEBHOOK_PAGER_URL }}
+        webhook-type: incoming-webhook
+        payload: |
+          text: "*Daily CI Failed* :this-is-fine-fire:"
+          attachments:
+            - color: "E33122"
+              fields:
+                - title: "Event"
+                  short: true
+                  value: "${{ github.event_name }}"
+                - title: "Reference"
+                  short: true
+                  value: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.ref_name }}>"
+                - title: "Action"
+                  short: true
+                  value: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
