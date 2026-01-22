@@ -86,9 +86,10 @@ end
 
 def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
   write_through = StorageVolume.new(vm_name, {"storage_device" => device, "disk_index" => 0}).write_through_device?
+  root_storage_dir = (device == "DEFAULT") ? "/var/storage/#{vm_name}" : "/var/storage/devices/#{device}/#{vm_name}"
   config = {
-    "socket" => "/var/storage/#{vm_name}/0/vhost.sock",
-    "path" => "/var/storage/#{vm_name}/0/disk.raw",
+    "socket" => "#{root_storage_dir}/0/vhost.sock",
+    "path" => "#{root_storage_dir}/0/disk.raw",
     "num_queues" => 1,
     "queue_size" => 256,
     "seg_size_max" => 65536,
