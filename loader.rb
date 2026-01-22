@@ -113,16 +113,19 @@ if ENV["LOAD_FILES_SEPARATELY_CHECK"] == "1"
   files << "clover_admin.rb"
 
   Sequel::DATABASES.each(&:disconnect)
+  all_pass = true
   files.each do |file|
     pid = fork do
       require_relative file
       exit(0)
     rescue LoadError, StandardError => e
       puts "ERROR: problems loading #{file}: #{e.class}: #{e.message}"
+      exit(1)
     end
     Process.wait(pid)
+    all_pass = false if $?.exitstatus == 1
   end
-  exit(0)
+  exit(all_pass)
 end
 
 AUTOLOAD_CONSTANTS.freeze
