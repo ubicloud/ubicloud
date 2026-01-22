@@ -20,8 +20,10 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       fail "VmHost does not have the right vhost block backend installed"
     end
 
+    storage_device_name = vm.vm_storage_volumes.first.storage_device.name
+    storage_dir = (storage_device_name == "DEFAULT") ? "/var/storage/#{vm.inhost_name}/0" : "/var/storage/devices/#{storage_device_name}/#{vm.inhost_name}/0"
     begin
-      vm.vm_host.sshable.cmd("test -d :storage_dir", storage_dir: "/var/storage/#{vm.inhost_name}/0")
+      vm.vm_host.sshable.cmd("test -d :storage_dir", storage_dir:)
     rescue Sshable::SshError
       fail "Vm storage directory does not exist"
     end
@@ -65,7 +67,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def generate_vhost_backend_conf
-    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: vm_storage_volume.storage_device.name, stdin: vm.storage_secrets.to_json)
+    vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: storage_device_name, stdin: vm.storage_secrets.to_json)
     vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :vhost_conf_path", inhost_name:, vhost_conf_path:)
     hop_ready_migration
   end
@@ -163,7 +165,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   def migration_script_params
     {
       "slice" => vm.vm_host_slice&.name,
-      "device" => vm_storage_volume.storage_device.name,
+      "storage_device" => storage_device_name,
       "vm_name" => vm.inhost_name,
       "encrypted" => true,
       "disk_index" => 0,
@@ -174,8 +176,12 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     }.to_json
   end
 
+  def storage_device_name
+    vm_storage_volume.storage_device.name
+  end
+
   def root_vm_storage_path
-    "/var/storage/#{vm.inhost_name}"
+    (storage_device_name == "DEFAULT") ? "/var/storage/#{vm.inhost_name}" : "/var/storage/devices/#{storage_device_name}/#{vm.inhost_name}"
   end
 
   def root_dir_path

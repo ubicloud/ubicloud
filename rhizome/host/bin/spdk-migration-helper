@@ -9,7 +9,7 @@ unless (action = ARGV.shift)
 end
 
 params = JSON.parse($stdin.read)
-%w[vm_name device disk_index vhost_block_backend_version slice max_read_mbytes_per_sec max_write_mbytes_per_sec encrypted spdk_version].each do |key|
+%w[vm_name storage_device disk_index vhost_block_backend_version slice max_read_mbytes_per_sec max_write_mbytes_per_sec encrypted spdk_version].each do |key|
   unless params.has_key?(key)
     puts "Needed #{key} in parameters"
     exit 1

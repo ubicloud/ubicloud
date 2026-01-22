@@ -22,7 +22,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       init_vector: "iv_1", auth_data: "somedata"
     )
     dev = StorageDevice.create(
-      name: "nvme0",
+      name: "DEFAULT",
       total_storage_gib: 100,
       available_storage_gib: 80
     )
@@ -91,6 +91,14 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
           described_class.assemble(vm.id)
         }.not_to raise_error
       end
+
+      it "creates the strand when disk is not in DEFAULT device" do
+        expect {
+          vm.vm_storage_volumes.first.storage_device.update(name: "disk1")
+          expect(vm.vm_host.sshable).to receive(:_cmd).with("test -d /var/storage/devices/disk1/#{vm.inhost_name}/0").and_return("")
+          described_class.assemble(vm.id)
+        }.not_to raise_error
+      end
     end
   end
 
@@ -132,7 +140,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "#generate_vhost_backend_conf" do
     it "generates the vhost backend conf" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name} --device nvme0", stdin: vm.storage_secrets.to_json)
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file /var/storage/#{vm.inhost_name}/0/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file /var/storage/#{vm.inhost_name}/0/vhost-backend.conf --vm-name #{vm.inhost_name} --device DEFAULT", stdin: vm.storage_secrets.to_json)
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/vhost-backend.conf")
       expect { prog.generate_vhost_backend_conf }.to hop("ready_migration")
     end
@@ -232,7 +240,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       vm.update(vm_host_slice_id: nil)
       expect(JSON.parse(prog.migration_script_params)).to eq({
         "slice" => nil,
-        "device" => "nvme0",
+        "storage_device" => "DEFAULT",
         "vm_name" => vm.inhost_name,
         "encrypted" => true,
         "spdk_version" => "v1",
@@ -241,6 +249,13 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
         "max_read_mbytes_per_sec" => nil,
         "max_write_mbytes_per_sec" => nil
       })
+    end
+  end
+
+  describe "#root_vm_storage_path" do
+    it "returns the right path when device is not default" do
+      vm.vm_storage_volumes.first.storage_device.update(name: "disk2")
+      expect(prog.root_vm_storage_path).to eq("/var/storage/devices/disk2/#{vm.inhost_name}")
     end
   end
 end
