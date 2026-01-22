@@ -556,24 +556,36 @@ RSpec.describe PostgresServer do
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
     let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
 
-    it "calls observe_archival_backlog at every 12th export" do
+    it "calls observe_archival_backlog at export counts where count % 12 == 1" do
       session[:export_count] = 12
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
       expect(postgres_server).to receive(:observe_archival_backlog).with(session)
+      expect(postgres_server).not_to receive(:observe_metrics_backlog)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
 
-    it "does not call observe_archival_backlog on every export" do
+    it "calls observe_metrics_backlog at export counts where count % 12 == 7" do
+      session[:export_count] = 6
+      allow(postgres_server).to receive(:scrape_endpoints).and_return([])
+      expect(postgres_server).not_to receive(:observe_archival_backlog)
+      expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
+
+      postgres_server.export_metrics(session:, tsdb_client:)
+    end
+
+    it "does not call observe_archival_backlog or observe_metrics_backlog on every export" do
       session[:export_count] = 2
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
       expect(postgres_server).not_to receive(:observe_archival_backlog).with(session)
+      expect(postgres_server).not_to receive(:observe_metrics_backlog).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
 
     it "increments export_count in session" do
       allow(postgres_server).to receive(:observe_archival_backlog).with(session)
+      allow(postgres_server).to receive(:observe_metrics_backlog).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
       expect(session[:export_count]).to be_nil
@@ -649,6 +661,66 @@ RSpec.describe PostgresServer do
     it "returns smaller threshold for smaller storage sizes" do
       allow(postgres_server).to receive(:storage_size_gib).and_return(100)
       expect(postgres_server.archival_backlog_threshold).to eq(320)
+    end
+  end
+
+  describe "#observe_metrics_backlog" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+
+    before do
+      allow(postgres_server).to receive(:metrics_config).and_return({
+        metrics_dir: "/home/ubi/postgres/metrics",
+        interval: "15s"
+      })
+    end
+
+    it "checks metrics backlog and does nothing if it is within limits" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+      ).and_return("10\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(nil)
+
+      postgres_server.observe_metrics_backlog(session)
+    end
+
+    it "checks metrics backlog and creates a page if it exceeds threshold" do
+      # 30 files * 15 seconds = 450 > 300 threshold
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+      ).and_return("30\n")
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "#{postgres_server.ubid} metrics backlog high",
+        ["PGMetricsBacklogHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {metrics_backlog: 30}
+      )
+
+      postgres_server.observe_metrics_backlog(session)
+    end
+
+    it "checks metrics backlog and resolves a page if it is back within limits" do
+      existing_page = instance_double(Page)
+      # 10 files * 15 seconds = 150 < 300 threshold
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+      ).and_return("10\n")
+      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(existing_page)
+      expect(existing_page).to receive(:incr_resolve)
+
+      postgres_server.observe_metrics_backlog(session)
+    end
+
+    it "logs errors when checking metrics backlog fails" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+      ).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
+
+      postgres_server.observe_metrics_backlog(session)
     end
   end
 

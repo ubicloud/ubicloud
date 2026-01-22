@@ -296,13 +296,13 @@ class PostgresServer < Sequel::Model
     session[:export_count] ||= 0
     session[:export_count] += 1
 
-    # Check archival backlog every 12 exports (similar to pulse check frequency)
-    # We do this in metrics export rather than pulse check because the metrics
-    # export session does not use an event loop. Calling exec! on an SSH session
-    # with an active event loop is not thread-safe and leads to stuck sessions.
-    if session[:export_count] % 12 == 1
-      observe_archival_backlog(session)
-    end
+    # Check archival and metrics backlog every 12 exports (similar to pulse
+    # check frequency) We do this in metrics export rather than pulse check
+    # because the metrics export session does not use an event loop. Calling
+    # exec! on an SSH session with an active event loop is not thread-safe and
+    # leads to stuck sessions.
+    observe_archival_backlog(session) if session[:export_count] % 12 == 1
+    observe_metrics_backlog(session) if session[:export_count] % 12 == 7
 
     # Call parent implementation to export actual metrics
     super
@@ -391,6 +391,27 @@ class PostgresServer < Sequel::Model
     [(storage_size_gib * 1024 / (16 * 100)) * archival_backlog_threshold_percent, archival_backlog_threshold_count].min
   end
 
+  def observe_metrics_backlog(session)
+    metrics_done_dir = "#{metrics_config[:metrics_dir]}/done"
+    result = session[:ssh_session].exec!(
+      "find :metrics_done_dir -name '*.txt' | wc -l",
+      metrics_done_dir:
+    )
+    metrics_backlog = Integer(result.strip, 10)
+    metrics_interval = metrics_config[:interval].to_i
+
+    if metrics_backlog * metrics_interval > METRICS_BACKLOG_THRESHOLD_SECONDS
+      Prog::PageNexus.assemble("#{ubid} metrics backlog high",
+        ["PGMetricsBacklogHigh", id], ubid,
+        severity: "warning", extra_data: {metrics_backlog:})
+    else
+      Page.from_tag_parts("PGMetricsBacklogHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe metrics backlog", {postgres_server_id: id, exception: Util.exception_to_hash(ex)})
+  end
+
+  METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over"].freeze
 end
 
