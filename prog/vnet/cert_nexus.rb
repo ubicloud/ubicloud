@@ -33,7 +33,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     client = Acme::Client.new(private_key: account_key, directory: Config.acme_directory)
     account = client.new_account(contact: "mailto:#{Config.acme_email}", terms_of_service_agreed: true, external_account_binding: {kid: Config.acme_eab_kid, hmac_key: Config.acme_eab_hmac_key})
     identifiers = [cert.hostname]
-    identifiers << "private-#{cert.hostname}" if frame["add_private"]
+    identifiers << "private.#{cert.hostname}" if frame["add_private"]
     order = client.new_order(identifiers:)
     cert.update(kid: account.kid, account_key: account_key.to_der, order_url: order.url)
     order.authorizations.each do |authorization|
@@ -98,7 +98,7 @@ class Prog::Vnet::CertNexus < Prog::Base
   end
 
   label def cert_finalization
-    names = frame["add_private"] ? ["private-#{cert.hostname}"] : []
+    names = frame["add_private"] ? ["private.#{cert.hostname}"] : []
     acme_order.finalize(csr: Acme::Client::CertificateRequest.new(private_key: OpenSSL::PKey::EC.new(cert.csr_key), common_name: cert.hostname, names:))
     hop_wait_cert_finalization
   end

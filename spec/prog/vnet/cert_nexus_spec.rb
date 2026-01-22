@@ -24,7 +24,7 @@ RSpec.describe Prog::Vnet::CertNexus do
 
     if add_private
       private_dns_challenge = instance_double(Acme::Client::Resources::Challenges::DNS01, record_name: "test-record-name", record_type: "test-record-type", record_content: "test-record-content-private")
-      private_authorization = instance_double(Acme::Client::Resources::Authorization, dns: private_dns_challenge, domain: "private-#{cert.hostname}")
+      private_authorization = instance_double(Acme::Client::Resources::Authorization, dns: private_dns_challenge, domain: "private.#{cert.hostname}")
       authorizations << private_authorization
     end
 
@@ -46,7 +46,7 @@ RSpec.describe Prog::Vnet::CertNexus do
   def use_add_private(identifiers: [])
     st.stack = [{"restarted" => 0, "add_private" => true}]
     nx.instance_variable_set(:@frame, nil)
-    identifiers << "private-#{cert.hostname}"
+    identifiers << "private.#{cert.hostname}"
   end
 
   describe ".assemble" do
@@ -101,7 +101,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(cert.order_url).to eq("test-order-url")
       # Each authorization creates ONE DNS record for its own domain
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.").count).to eq(1)
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.").count).to eq(1)
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.").count).to eq(1)
     end
 
     it "creates a self-signed certificate in development environments without dns" do
@@ -248,7 +248,7 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(order).to receive(:certificate).and_return("test-certificate")
 
       DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private-cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content-private")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content-private")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(2)
       expect(cert.reload.cert).to eq("test-certificate")
