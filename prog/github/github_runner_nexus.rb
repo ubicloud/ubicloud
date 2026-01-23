@@ -397,6 +397,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Prog::PageNexus.assemble("Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], installation_ubid, severity: "warning")
       github_runner.incr_destroy
       nap 0
+    elsif e.message.include?("your IP address is not permitted to access this resource")
+      installation_ubid = github_runner.installation.ubid
+      Prog::PageNexus.assemble("The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], installation_ubid, severity: "warning")
+      github_runner.incr_destroy
+      nap 0
     end
     raise
   end
