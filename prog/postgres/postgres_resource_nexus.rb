@@ -174,6 +174,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   label def refresh_certificates
+    refresh = false
     # We stop using root_cert_1 to sign server certificates at the beginning
     # of 9th year of its validity. However it is possible that it is used to
     # sign a server just at the beginning of the 9 year mark, thus it needs
@@ -184,19 +185,20 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     if OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
       postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = postgres_resource.root_cert_2, postgres_resource.root_cert_key_2
       postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
-      servers.each(&:incr_refresh_certificates)
+      refresh = true
     end
 
-    refresh = false
+    request_ids = nil
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       refresh = true
     end
     when_refresh_certificates_set? do
+      request_ids = get_request_ids(:refresh_certificates)
       refresh = true
     end
     if refresh
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
-      servers.each(&:incr_refresh_certificates)
+      servers.each { it.incr_refresh_certificates(request_ids) }
     end
 
     postgres_resource.certificate_last_checked_at = Time.now

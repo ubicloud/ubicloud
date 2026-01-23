@@ -36,7 +36,7 @@ class Clover
         authorize("Vm:delete", vm)
 
         DB.transaction do
-          vm.incr_destroy(request.get_header("X-RequestID"))
+          vm.incr_destroy(request.get_header("X-Request-ID"))
           audit_log(vm, "destroy")
         end
 
@@ -56,7 +56,7 @@ class Clover
         authorize("Vm:edit", vm)
 
         DB.transaction do
-          vm.incr_restart(request.get_header("X-RequestID"))
+          vm.incr_restart(request.get_header("X-Request-ID"))
           audit_log(vm, "restart")
         end
 
