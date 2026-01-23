@@ -9,11 +9,9 @@ class PostgresSetup
   end
 
   def install_packages
-    # Check if the package list exist before installing packages, as Lantern
-    # images do not have a packages list and have the packages pre installed.
-    if File.exist?("/usr/local/share/postgresql/packages/#{@version}.txt")
-      r "xargs -a /usr/local/share/postgresql/packages/#{@version}.txt sudo apt-get -y install"
-      r "xargs -a /usr/local/share/postgresql/packages/common.txt sudo apt-get -y install"
+    # Check if the packages exist in the cache, if so, install them.
+    if File.exist?("/var/cache/postgresql-packages/#{@version}")
+      r "sudo install-postgresql-packages #{@version}"
     end
   end
 
