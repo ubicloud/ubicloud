@@ -71,7 +71,17 @@ class Clover
 
     repository_name = data["repository"]["full_name"]
     unless label
-      Clog.emit("Unmatched label", {unmatched_label: {repository_name:, labels: job_labels}}) if data["action"] == "queued"
+      if data["action"] == "completed"
+        Clog.emit("Unmatched label", {
+          unmatched_label: {
+            repository_name:,
+            labels: job_labels,
+            started_in: Time.parse(job["started_at"]) - Time.parse(job["created_at"]),
+            completed_in: Time.parse(job["completed_at"]) - Time.parse(job["started_at"]),
+            conclusion: job["conclusion"]
+          }
+        })
+      end
       return error("Unmatched label")
     end
 
