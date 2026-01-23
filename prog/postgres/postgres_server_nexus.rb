@@ -490,6 +490,7 @@ SQL
 
   label def wait
     decr_initial_provisioning
+    decr_reach_wait
 
     when_fence_set? do
       hop_fence
@@ -527,12 +528,16 @@ SQL
     end
 
     when_configure_metrics_set? do
+      request_ids = Semaphore.request_ids(:configure)
       decr_configure_metrics
+      incr_reach_wait(request_ids)
       hop_configure_metrics
     end
 
     when_configure_set? do
+      request_ids = Semaphore.request_ids(:configure)
       decr_configure
+      incr_reach_wait(request_ids)
       hop_configure
     end
 
