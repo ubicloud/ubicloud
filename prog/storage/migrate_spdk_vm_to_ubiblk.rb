@@ -68,7 +68,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def generate_vhost_backend_conf
     vm.vm_host.sshable.cmd("sudo host/bin/convert-encrypted-dek-to-vhost-backend-conf --encrypted-dek-file :root_dir_path/data_encryption_key.json --kek-file /dev/stdin --vhost-conf-output-file :vhost_conf_path --vm-name :inhost_name --device :device", inhost_name:, root_dir_path:, vhost_conf_path:, device: storage_device_name, stdin: vm.storage_secrets.to_json)
-    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :vhost_conf_path", inhost_name:, vhost_conf_path:)
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :vhost_conf_path && sudo chmod 600 :vhost_conf_path", inhost_name:, vhost_conf_path:)
     hop_ready_migration
   end
 
@@ -119,7 +119,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def create_ubiblk_systemd_unit
-    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :root_dir_path/disk.raw", inhost_name:, root_dir_path:)
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :root_dir_path/disk.raw && sudo chmod 600 :root_dir_path/disk.raw && sudo rm -f :kek_file_path", inhost_name:, root_dir_path:, kek_file_path:)
     vm.vm_host.sshable.cmd("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: migration_script_params)
     hop_start_ubiblk_systemd_unit
   end
