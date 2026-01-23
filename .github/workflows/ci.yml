@@ -53,6 +53,9 @@ jobs:
     - name: Run linter:cmd_exec
       run: bundle exec rake linter:cmd_exec
 
+    - name: Run check_missing_admin_model_specs
+      run: bundle exec rake check_missing_admin_model_specs
+
     - name: Run annotate
       run: bundle exec rake annotate
 
