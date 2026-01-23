@@ -12,7 +12,7 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [], prefix: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -168,7 +168,8 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
-          "private_subnet_id" => subnet.id
+          "private_subnet_id" => subnet.id,
+          "prefix" => prefix
         }]
       ) { it.id = vm.id }
     end
