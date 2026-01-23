@@ -388,6 +388,19 @@ task :spec_separate do
   end
 end
 
+desc "Check for one admin model spec for each model"
+task :check_missing_admin_model_specs do
+  model_files = Dir["model/**/*.rb"]
+  model_files.select! { File.read(it).include?("ResourceMethods") }
+  model_files.map! { File.basename(it) }
+  spec_files = Dir["spec/routes/web/admin/model/*_spec.rb"].map! { File.basename(it).gsub("_spec.rb", ".rb") }
+  missing_files = model_files - spec_files
+  unless missing_files.empty?
+    puts "Models missing admin model specs:", missing_files
+    exit 1
+  end
+end
+
 cli_version = lambda do
   # Bump version for new releases
   File.read("cli/version.txt").chomp
