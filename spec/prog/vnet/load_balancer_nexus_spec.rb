@@ -285,8 +285,35 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.rewrite_dns_records }.to hop("wait")
     end
 
-    it "does not create public IPv4 or IPv6 dns records if the public IP addresses don't exist" do
-      vms = [instance_double(Vm, ip4_string: nil, ip6_string: nil, private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2")]
+    it "nap 5 if neither public IP address exists" do
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: nil, private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2", ip4_enabled: false)]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).not_to receive(:delete_record)
+      expect(dns_zone).not_to receive(:insert_record)
+      expect { nx.rewrite_dns_records }.to nap(5)
+    end
+
+    it "nap 5 if public IPv6 address exists but public IPv4 address does not, and VM is IPv4 enabled" do
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "::1", private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2", ip4_enabled: true)]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).not_to receive(:delete_record)
+      expect(dns_zone).not_to receive(:insert_record)
+      expect { nx.rewrite_dns_records }.to nap(5)
+    end
+
+    it "nap 5 if public IPv4 addresses exists, but public IPv6 address does not" do
+      vms = [instance_double(Vm, ip4_string: "1.2.3.4", ip6_string: nil, private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2", ip4_enabled: true)]
+      expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
+      expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
+      expect(dns_zone).not_to receive(:delete_record)
+      expect(dns_zone).not_to receive(:insert_record)
+      expect { nx.rewrite_dns_records }.to nap(5)
+    end
+
+    it "create records if IPv6 address exists but public IPv4 address does not, and VM is not IPv4 enabled" do
+      vms = [instance_double(Vm, ip4_string: nil, ip6_string: "::1", private_ipv4_string: "1.2.3.4", private_ipv6_string: "fd10:9b0b:6b4b:8fb2::2", ip4_enabled: false)]
       expect(nx.load_balancer).to receive(:vms_to_dns).and_return(vms)
       expect(nx.load_balancer).to receive(:dns_zone).and_return(dns_zone).at_least(:once)
       expect(dns_zone).to receive(:delete_record).with(record_name: st.subject.hostname)

@@ -178,16 +178,16 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
     if (dns_zone = load_balancer.dns_zone)
       hostname = load_balancer.hostname
       private_hostname = "private.#{hostname}"
-      dns_zone.delete_record(record_name: hostname)
-      dns_zone.delete_record(record_name: private_hostname)
 
+      ip_info = []
       load_balancer.vms_to_dns.each do |vm|
-        ip_info = []
-
         # Insert IPv4 record if stack is ipv4 or dual, and vm has IPv4
         if load_balancer.ipv4_enabled?
           if vm.ip4_string
             ip_info << [vm.ip4_string, "A", hostname]
+          elsif vm.ip4_enabled
+            # VM will have a public IPv4 address, but it is not assigned yet
+            nap 5
           end
           ip_info << [vm.private_ipv4_string, "A", private_hostname]
         end
@@ -195,18 +195,23 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         if load_balancer.ipv6_enabled?
           if vm.ip6_string
             ip_info << [vm.ip6_string, "AAAA", hostname]
+          else
+            # VM public IPv6 address not assigned yet
+            nap 5
           end
           ip_info << [vm.private_ipv6_string, "AAAA", private_hostname]
         end
+      end
 
-        ip_info.each do |data, type, record_name|
-          dns_zone.insert_record(
-            record_name:,
-            type:,
-            ttl: 10,
-            data:
-          )
-        end
+      dns_zone.delete_record(record_name: hostname)
+      dns_zone.delete_record(record_name: private_hostname)
+      ip_info.each do |data, type, record_name|
+        dns_zone.insert_record(
+          record_name:,
+          type:,
+          ttl: 10,
+          data:
+        )
       end
     end
 
