@@ -265,6 +265,16 @@ module AdminModelSpecHelper
       )
     end
 
+    def create_kubernetes_etcd_backup
+      cluster = create_kubernetes_cluster
+      KubernetesEtcdBackup.create(
+        access_key: "a",
+        secret_key: "b",
+        location_id: Location::HETZNER_FSN1_ID,
+        kubernetes_cluster_id: cluster.id
+      )
+    end
+
     def create_kubernetes_node
       cluster = create_kubernetes_cluster
       vm = Prog::Vm::Nexus.assemble_with_sshable(cluster.project_id, name: "k8s-node-vm", private_subnet_id: cluster.private_subnet_id).subject
