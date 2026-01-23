@@ -30,12 +30,22 @@ end
     end
   end
 
+  def get_request_ids(name)
+    request_ids = Semaphore.get_request_ids(@strand.id, name)
+  end
+
+  def convert_semaphore(name_from, name_into)
+    request_ids = Semaphore.get_request_ids(@strand.id, name_from)
+    @snap.incr(name_into, request_ids)
+    @snap.decr(name_from)
+  end
+
   def self.semaphore(*names)
     names.map!(&:intern)
     names << :destroying if names.include?(:destroy) && !names.include?(:destroying)
     names.each do |name|
-      define_method :"incr_#{name}" do
-        @snap.incr(name)
+      define_method :"incr_#{name}" do |request_ids = nil|
+        @snap.incr(name, request_ids)
       end
 
       define_method :"decr_#{name}" do
