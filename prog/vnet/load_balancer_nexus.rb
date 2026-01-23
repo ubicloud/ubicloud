@@ -71,27 +71,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
       hop_rewrite_dns_records
     end
 
-    if need_to_rewrite_dns_records?
-      load_balancer.incr_rewrite_dns_records
-    end
-
-    nap 5
-  end
-
-  def need_to_rewrite_dns_records?
-    return false unless load_balancer.dns_zone
-
-    load_balancer.vms_to_dns.each do |vm|
-      if load_balancer.ipv4_enabled? && vm.ip4_string
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "A" && it.data == vm.ip4_string }
-      end
-
-      if load_balancer.ipv6_enabled?
-        return true unless load_balancer.dns_zone.records_dataset.find { it.name == load_balancer.hostname + "." && it.type == "AAAA" && it.data == vm.ip6_string }
-      end
-    end
-
-    false
+    nap 86400
   end
 
   label def create_new_cert
