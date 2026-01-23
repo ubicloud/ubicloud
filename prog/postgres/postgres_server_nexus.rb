@@ -557,16 +557,12 @@ SQL
     end
 
     when_configure_metrics_set? do
-      request_ids = Semaphore.request_ids(:configure)
-      decr_configure_metrics
-      incr_reach_wait(request_ids)
+      convert_semaphore(:configure_metrics, :reach_wait)
       hop_configure_metrics
     end
 
     when_configure_set? do
-      request_ids = Semaphore.request_ids(:configure)
-      decr_configure
-      incr_reach_wait(request_ids)
+      convert_semaphore(:configure, :reach_wait)
       hop_configure
     end
 

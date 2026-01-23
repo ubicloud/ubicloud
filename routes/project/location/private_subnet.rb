@@ -48,7 +48,7 @@ class Clover
         end
 
         DB.transaction do
-          ps.incr_destroy(request.get_header("X-RequestID"))
+          ps.incr_destroy(request.get_header("X-Request-ID"))
           audit_log(ps, "destroy")
         end
 
