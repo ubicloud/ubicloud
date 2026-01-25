@@ -1,5 +1,12 @@
 name: 'Setup Clover'
 
+inputs:
+  setup-node:
+    description: 'Set up Node.js and install npm dependencies'
+    required: false
+    type: boolean
+    default: false
+
 runs:
   using: "composite"
   steps:
@@ -45,3 +52,15 @@ runs:
         createuser -U postgres clover
         createuser -U postgres clover_password
         bundle exec rake setup_database\[test,true\]
+
+    - name: Set up Node.js
+      if: ${{ inputs.setup-node == 'true' }}
+      uses: actions/setup-node@v6
+      with:
+        node-version-file: "package.json"
+        cache: "npm"
+
+    - name: Install node packages
+      if: ${{ inputs.setup-node == 'true' }}
+      shell: bash
+      run: npm ci
