@@ -120,3 +120,6 @@ RSpec/NestedGroups:
 
 RSpec/LeakyLocalVariable:
   Enabled: false
+
+RSpec/Output:
+  Enabled: false
