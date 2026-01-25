@@ -26,14 +26,8 @@ jobs:
 
     - name: Set up Clover
       uses: ./.github/actions/setup-clover
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v6
       with:
-         node-version-file: "package.json"
-
-    - name: Install node packages
-      run: npm ci
+        setup-node: true
 
     - name: Run erb-formatter
       run: bundle exec rake linter:erb_formatter
