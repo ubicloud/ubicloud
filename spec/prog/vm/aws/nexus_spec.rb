@@ -537,6 +537,11 @@ usermod -L ubuntu
           ])
         )))
     end
+
+    it "naps if the reservations response is empty" do
+      client.stub_responses(:describe_instances, reservations: [])
+      expect { nx.wait_instance_created }.to nap(1)
+    end
   end
 
   describe "#wait_instance_created", "without sshable" do
