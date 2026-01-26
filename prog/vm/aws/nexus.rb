@@ -196,17 +196,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         vm.incr_destroy
         nap 0
       end
-      raise
-    rescue Aws::EC2::Errors::Unsupported => e
-      if (retry_count = frame["retry_count"] || 0) >= 5
-        raise e
-      end
 
-      Clog.emit("unsupported instance type", {unsupported_instance_type: {vm:, message: e.message, retry_count: retry_count + 1}})
-      azs_excluded = ((nic.strand.stack.first["exclude_availability_zones"] || []) + [nic.nic_aws_resource.subnet_az]).uniq
-      update_stack({"exclude_availability_zones" => azs_excluded, "retry_count" => retry_count + 1})
-      nic.incr_destroy
-      hop_wait_old_nic_deleted
+      retry_in_different_az(e)
+    rescue Aws::EC2::Errors::Unsupported => e
+      retry_in_different_az(e)
     end
     instance = instance_response.instances.first
     instance_id = instance.instance_id
@@ -422,6 +415,18 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   def is_runner?
     return @is_runner if defined?(@is_runner)
     @is_runner = vm.unix_user == "runneradmin"
+  end
+
+  def retry_in_different_az(e)
+    if (retry_count = frame["retry_count"] || 0) >= 5
+      raise e
+    end
+
+    Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, retry_count: retry_count + 1}})
+    azs_excluded = ((nic.strand.stack.first["exclude_availability_zones"] || []) + [nic.nic_aws_resource.subnet_az]).uniq
+    update_stack({"exclude_availability_zones" => azs_excluded, "retry_count" => retry_count + 1})
+    nic.incr_destroy
+    hop_wait_old_nic_deleted
   end
 
   def ignore_invalid_entity
