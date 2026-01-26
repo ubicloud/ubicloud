@@ -71,7 +71,7 @@ module Util
     [cert, key]
   end
 
-  def self.exception_to_hash(ex, backtrace: ex.backtrace, into: {})
+  def self.exception_to_hash(ex, backtrace: ex.backtrace[0...50], into: {})
     into[:exception] = {message: ex.message, class: ex.class.to_s, backtrace:}
     # Don't log causes if we aren't logging backtraces
     if backtrace && (cause = ex.cause)
@@ -79,7 +79,7 @@ module Util
       while cause && (cause != ex)
         ex = cause
         cause = ex.cause
-        array << {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace}
+        array << {message: ex.message, class: ex.class.to_s, backtrace: ex.backtrace[0...3]}
       end
     end
     into
