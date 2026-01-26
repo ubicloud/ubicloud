@@ -484,7 +484,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
-      cache_proxy_log_line_counts = cache_proxy_log.lines.each(&:strip!).reject(&:empty?).tally
+      cache_proxy_log_line_counts = cache_proxy_log.lines.each(&:strip!).each { it.gsub!(/ host: \S+/, "") }.reject(&:empty?).tally
       Clog.emit("Cache proxy log line counts", {cache_proxy_log_line_counts:})
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
