@@ -233,9 +233,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_instance_created
-    instance_response = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations[0].instances[0]
-    nap 1 unless instance_response.dig(:state, :name) == "running"
-
+    unless (reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first) &&
+        (instance_response = reservation.instances.first) &&
+        instance_response.dig(:state, :name) == "running"
+      nap 1
+    end
     public_ipv4 = instance_response.dig(:network_interfaces, 0, :association, :public_ip)
     public_ipv6 = instance_response.dig(:network_interfaces, 0, :ipv_6_addresses, 0, :ipv_6_address)
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
