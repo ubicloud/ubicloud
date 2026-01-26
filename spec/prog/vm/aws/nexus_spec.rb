@@ -442,23 +442,18 @@ usermod -L ubuntu
       end
     end
 
-    it "fails if not runner when encountering insufficient capacity error" do
-      client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity for instance type"))
-      expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InsufficientInstanceCapacity)
-    end
-
-    describe "when unsupported instance type error" do
+    describe "when insufficient capacity error for non-runner" do
       let(:nic) { vm.nics.first }
       let(:nic_nx) { Prog::Vnet::Aws::NicNexus.new(nic.strand) }
 
       before do
-        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported in availability zone"))
-        refresh_frame(nic_nx, new_frame: {"exclude_availability_zones" => []})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
         nic.nic_aws_resource.update(subnet_az: "a")
+        refresh_frame(nic_nx, new_frame: {"exclude_availability_zones" => []})
       end
 
       it "retries by excluding the failed AZ on first failure" do
-        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_call_original
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
           .and change { nic.reload.destroy_set? }.from(false).to(true)
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
@@ -468,7 +463,7 @@ usermod -L ubuntu
       it "increments retry count on subsequent failures" do
         refresh_frame(nx, new_values: {"retry_count" => 2})
         refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
-        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_call_original
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
           "retry_count" => 3
@@ -484,17 +479,74 @@ usermod -L ubuntu
 
       it "raises exception after 5 retry attempts" do
         refresh_frame(nx, new_values: {"retry_count" => 5})
-        expect(Clog).not_to receive(:emit).with("unsupported instance type")
+        expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
+        expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InsufficientInstanceCapacity)
+        expect(nic.reload.destroy_set?).to be false
+      end
+
+      it "logs retry details in emission" do
+        refresh_frame(nx, new_values: {"retry_count" => 3})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b).to eq(retry_different_az: {
+            vm:,
+            error: "Aws::EC2::Errors::InsufficientInstanceCapacity",
+            message: "Insufficient capacity",
+            retry_count: 4
+          })
+        end
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      end
+    end
+
+    describe "when unsupported instance type error" do
+      let(:nic) { vm.nics.first }
+      let(:nic_nx) { Prog::Vnet::Aws::NicNexus.new(nic.strand) }
+
+      before do
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
+        nic.nic_aws_resource.update(subnet_az: "a")
+        refresh_frame(nic_nx, new_frame: {"exclude_availability_zones" => []})
+      end
+
+      it "retries by excluding the failed AZ on first failure" do
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+          .and change { nic.reload.destroy_set? }.from(false).to(true)
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
+        expect(st.stack.last["retry_count"]).to eq(1)
+      end
+
+      it "increments retry count on subsequent failures" do
+        refresh_frame(nx, new_values: {"retry_count" => 2})
+        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
+        expect(nx).to receive(:update_stack).with({
+          "exclude_availability_zones" => ["b", "c", "a"],
+          "retry_count" => 3
+        }).and_call_original
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      end
+
+      it "avoids duplicate AZs in exclusion list" do
+        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
+      end
+
+      it "raises exception after 5 retry attempts" do
+        refresh_frame(nx, new_values: {"retry_count" => 5})
+        expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::Unsupported)
         expect(nic.reload.destroy_set?).to be false
       end
 
-      it "logs retry count in emission" do
+      it "logs retry details in emission" do
         refresh_frame(nx, new_values: {"retry_count" => 3})
-        expect(Clog).to receive(:emit).with("unsupported instance type", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b).to eq(unsupported_instance_type: {
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_wrap_original do |m, a, b|
+          expect(b).to eq(retry_different_az: {
             vm:,
-            message: "Instance type not supported in availability zone",
+            error: "Aws::EC2::Errors::Unsupported",
+            message: "Instance type not supported",
             retry_count: 4
           })
         end
