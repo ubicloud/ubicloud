@@ -854,9 +854,19 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
+        Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172_27_211_181:51123
+        Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172.27.211.182:51123
+        Received request - method: POST urlPath: /random_token/_apis/artifactcache/caches host: 10_0_0_1:51123
+        ReserveCache request failed with status code: 409
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1}})
+      LOG
+
+      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {
+        "Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache" => 2,
+        "Received request - method: POST urlPath: /random_token/_apis/artifactcache/caches" => 1,
+        "ReserveCache request failed with status code: 409" => 1
+      }})
 
       nx.collect_final_telemetry
     end
