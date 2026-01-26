@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+
+read name btotal bused bavailable usedp mount_path <<< `df -P -B1 /dat | tail -n +2`
+usedp=`echo "$usedp" | sed s/%$//`
+export PGDATA="/dat/$1/data"
+
+if test "$usedp" -lt 93 || test "$bavailable" -gt 7516192768; then
+  if grep "default_transaction_read_only = 'on'" "/dat/$1/data/postgresql.auto.conf"; then
+    sed -i "/default_transaction_read_only = 'on'/d" "/dat/$1/data/postgresql.auto.conf"
+    test -f "/dat/disk-full-read-only-pending-restart-$1" && rm -f "/dat/disk-full-read-only-pending-restart-$1"
+    pg_ctl reload
+  elif ! test -f /dat/disk-full-human-buffer; then
+    fallocate -l 1G /dat/disk-full-human-buffer
+  fi
+elif test "$usedp" -gt 95 || test "$bavailable" -lt 5368709120; then
+  if ! grep "default_transaction_read_only = 'on'" "/dat/$1/data/postgresql.auto.conf"; then
+    if ! test -z `tail -c 1 "/dat/$1/data/postgresql.auto.conf"`; then
+      echo >> "/dat/$1/data/postgresql.auto.conf"
+    fi
+    echo "default_transaction_read_only = 'on'" >> "/dat/$1/data/postgresql.auto.conf"
+    touch "/dat/disk-full-read-only-pending-restart-$1"
+    pg_ctl reload
+  elif (test "$usedp" -gt 97 || test "$bavailable" -lt 3221225472) && test -f "/dat/disk-full-read-only-pending-restart-$1"; then
+    pg_ctl restart
+    rm -f "/dat/disk-full-read-only-pending-restart-$1"
+  fi
+fi
