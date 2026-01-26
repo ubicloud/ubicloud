@@ -188,7 +188,31 @@ class PostgresServer < Sequel::Model
       resource.representative_server
     end
 
-    !parent_server || lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
+    return true unless parent_server
+
+    begin
+      parent_lsn = parent_server.current_lsn
+    rescue
+      # Primary is unreachable - check if we've replayed all available WAL
+      return caught_up_to_archive?
+    end
+
+    lsn_diff(parent_lsn, current_lsn) < 80 * 1024 * 1024
+  end
+
+  def caught_up_to_archive?
+    # Check if WAL receiver is streaming from primary
+    wal_receiver_status = run_query("SELECT status FROM pg_stat_wal_receiver").chomp
+    return false if wal_receiver_status == "streaming"
+
+    # Not streaming - check if replay has caught up to what was received
+    receive_lsn = run_query("SELECT pg_last_wal_receive_lsn()").chomp
+
+    # If receive_lsn is empty (never connected), we're caught up to archive
+    return true if receive_lsn.empty?
+
+    replay_lsn = run_query("SELECT pg_last_wal_replay_lsn()").chomp
+    lsn_diff(receive_lsn, replay_lsn) < 80 * 1024 * 1024
   end
 
   def current_lsn
