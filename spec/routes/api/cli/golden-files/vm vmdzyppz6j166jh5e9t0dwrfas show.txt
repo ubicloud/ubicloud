@@ -18,6 +18,8 @@ Post Commands:
     sftp       Copy files to or from virtual machine using `sftp`
     show       Show details for a virtual machine
     ssh        Connect to a virtual machine using `ssh`
+    start      Start a virtual machine
+    stop       Stop a virtual machine
 
 Post Options:
     -4, --ip4                        use IPv4 address
