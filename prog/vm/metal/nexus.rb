@@ -295,9 +295,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def stopped
     when_stop_set? do
+      decr_stop
       host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
     end
-    decr_stop
 
     nap 60 * 60
   end
