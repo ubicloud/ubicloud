@@ -484,8 +484,14 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
-      cache_proxy_log_line_counts = cache_proxy_log.lines.each(&:strip!).each { it.gsub!(/ host: \S+/, "") }.reject(&:empty?).tally
-      Clog.emit("Cache proxy log line counts", {cache_proxy_log_line_counts:})
+      cache_proxy_log.lines
+        .each(&:strip!)
+        .select { it.include?("Error") || (it.include?("failed") && !it.include?("code: 204")) }
+        .each { it.gsub!(/ host: \S+/, "") }
+        .tally
+        .each do |message, count|
+          Clog.emit("Cache proxy error", {cache_proxy_error: {message:, count:}})
+        end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry", github_runner)

@@ -812,8 +812,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
-
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1}})
+      expect(Clog).not_to receive(:emit).with("Cache proxy error", Hash)
 
       nx.collect_final_telemetry
     end
@@ -826,8 +825,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1}})
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409"}})
 
       nx.collect_final_telemetry
     end
@@ -840,9 +839,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
-      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReceived request - method: GET urlPath: foo\nGetCacheEntry  request failed with status code: 204\n")
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {"Received request - method: GET urlPath: foo" => 2, "GetCacheEntry  request failed with status code: 204" => 1}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409"}})
 
       nx.collect_final_telemetry
     end
@@ -859,14 +858,18 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache host: 172.27.211.182:51123
         Received request - method: POST urlPath: /random_token/_apis/artifactcache/caches host: 10_0_0_1:51123
         ReserveCache request failed with status code: 409
+        ReserveCache request failed with status code: 409
+        Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled
+        PUT request failed with status code: 500
+
+        GetCacheEntry request failed with status code: 204
+        Starting cache proxy server
 
       LOG
 
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {
-        "Received request - method: GET urlPath: /random_token/_apis/artifactcache/cache" => 2,
-        "Received request - method: POST urlPath: /random_token/_apis/artifactcache/caches" => 1,
-        "ReserveCache request failed with status code: 409" => 1
-      }})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 2, message: "ReserveCache request failed with status code: 409"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "PUT request failed with status code: 500"}})
 
       nx.collect_final_telemetry
     end
@@ -879,8 +882,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       COMMAND
       expect(Clog).to receive(:emit).with("Remaining DockerHub rate limits", {dockerhub_rate_limits: {limit: 100, limit_window: 21600, remaining: 98, remaining_window: 21600, source: "192.168.1.1"}})
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("")
-
-      expect(Clog).to receive(:emit).with("Cache proxy log line counts", {cache_proxy_log_line_counts: {}})
 
       nx.collect_final_telemetry
     end
