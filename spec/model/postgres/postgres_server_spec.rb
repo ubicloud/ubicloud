@@ -81,12 +81,13 @@ RSpec.describe PostgresServer do
     VmStorageVolume.create(vm: target_vm, disk_index: 0, boot: false, size_gib:)
   end
 
-  def create_failover_server(name:, label:, vm_size: "standard-2", target_resource: resource)
+  def create_failover_server(name:, label:, vm_size: "standard-2", target_resource: resource, physical_slot_ready: true)
     server_vm = create_hosted_vm(project, private_subnet, name, size: vm_size)
     add_data_volume(server_vm)
     server = described_class.create(
       timeline:, resource: target_resource, vm_id: server_vm.id,
-      synchronization_status: "ready", timeline_access: "fetch", version: "16"
+      synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      physical_slot_ready: physical_slot_ready
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
     server
@@ -133,6 +134,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets synchronized_standby_slots on Postgres 17" do
+      minio_cluster
       postgres_server.update(version: "17")
       expect(postgres_server.configure_hash[:configs]).to include(:synchronized_standby_slots)
     end
@@ -187,6 +189,7 @@ RSpec.describe PostgresServer do
     end
 
     it "sets primary_slot_name to ubid on standby when physical_slot_ready" do
+      minio_cluster
       postgres_server.timeline_access = "fetch"
       expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to be_nil
       postgres_server.physical_slot_ready = true
@@ -791,10 +794,17 @@ PGDATA=/dat/16/data
 
   describe "#metrics_config" do
     it "includes additional_labels from resource tags" do
-      tagged_resource = create_postgres_resource("tagged-resource", tags: {"env" => "prod", "team" => "devops"})
+      tagged_resource = create_postgres_resource("tagged-resource", tags: [{"key" => "env", "value" => "prod"}, {"key" => "team", "value" => "devops"}])
       tagged_server = create_postgres_server(target_resource: tagged_resource, vm_name: "tagged-server")
       config = tagged_server.metrics_config
-      expect(config[:additional_labels]).to eq({"pg_tags_label_env" => "prod", "pg_tags_label_team" => "devops"})
+      expect(config[:additional_labels]).to include(
+        "pg_tags_label_env" => "prod",
+        "pg_tags_label_team" => "devops",
+        location_name: "us-west-2",
+        location_provider: "ubicloud",
+        location_display_name: "us-west-2"
+      )
+      expect(config[:additional_labels][:location_id].to_s).to eq(UBID.from_uuidish(tagged_resource.location_id).to_s)
     end
   end
 
