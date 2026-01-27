@@ -813,6 +813,12 @@ RSpec.describe Clover, "vm" do
     %w[restart start stop].each do |action|
       describe action do
         it "can #{action} vm" do
+          if action == "start"
+            vm.strand.update(label: "stopped")
+          else
+            vm.update(display_state: "running")
+          end
+
           visit "#{project.path}#{vm.path}"
           within("#vm-submenu") { click_link "Settings" }
           click_button action.capitalize
@@ -826,13 +832,19 @@ RSpec.describe Clover, "vm" do
           end
         end
 
+        it "cannot #{action} vm not in state supporting it" do
+          visit "#{project.path}#{vm.path}"
+          within("#vm-submenu") { click_link "Settings" }
+          expect(page).to have_no_content action.capitalize
+        end
+
         it "can not #{action} virtual machine without edit permissions" do
           AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
 
           visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
           expect(page.title).to eq "Ubicloud - dummy-vm-2"
 
-          expect(page).to have_no_content "Restart"
+          expect(page).to have_no_content action.capitalize
         end
       end
     end
