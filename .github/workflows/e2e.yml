@@ -256,3 +256,75 @@ jobs:
                 - title: "Last Line"
                   short: false
                   value: "${{ steps.extract_last.outputs.LAST_LINE }}"
+
+    - name: Cleanup AWS resources
+      if: always()
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.E2E_AWS_ACCESS_KEY }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+      run: |
+        log_instance_ids=$(grep -oh '"instance_id":"[^"]*"' foreman.log 2>/dev/null | cut -d'"' -f4 | sort -u | tr ',' '\n' | paste -sd, -)
+        if [ -z "$log_instance_ids" ]; then
+          echo "No instance IDs found in logs"
+          exit 0
+        fi
+        echo "Found instances in logs: $log_instance_ids"
+
+        for region in eu-central-1 us-west-2; do
+          echo "Cleaning up resources in $region"
+
+          # Find instances that exist in this region (filter doesn't error for non-existent IDs)
+          instance_ids=$(aws ec2 describe-instances --region $region \
+            --filters "Name=instance-id,Values=$log_instance_ids" \
+            --query "Reservations[].Instances[].InstanceId" --output text | tr '\t' ' ' || true)
+          if [ -z "$(echo "$instance_ids" | tr -d ' ')" ]; then
+            echo "No instances found in $region"
+            continue
+          fi
+          echo "Found instances in $region: $instance_ids"
+
+          # Fetch associated resources before terminating instances
+          eni_ids=$(aws ec2 describe-instances --instance-ids $instance_ids --region $region \
+            --query "Reservations[].Instances[].NetworkInterfaces[].NetworkInterfaceId" --output text | sort -u || true)
+          eip_ids=$(aws ec2 describe-addresses --region $region \
+            --filters "Name=instance-id,Values=$(echo $instance_ids | tr ' ' ',')" \
+            --query "Addresses[].AllocationId" --output text | sort -u || true)
+          vpc_ids=$(aws ec2 describe-instances --instance-ids $instance_ids --region $region \
+            --query "Reservations[].Instances[].VpcId" --output text | sort -u || true)
+          echo "Found ENIs: $eni_ids"
+          echo "Found EIPs: $eip_ids"
+          echo "Found VPCs: $vpc_ids"
+
+          echo "Terminating instances: $instance_ids"
+          aws ec2 terminate-instances --instance-ids $instance_ids --region $region || true
+          aws ec2 wait instance-terminated --instance-ids $instance_ids --region $region || true
+
+          for eni_id in $eni_ids; do
+            echo "Deleting Network Interface: $eni_id"
+            aws ec2 delete-network-interface --network-interface-id $eni_id --region $region || true
+          done
+
+          for eip_id in $eip_ids; do
+            echo "Releasing Elastic IP: $eip_id"
+            aws ec2 release-address --allocation-id $eip_id --region $region || true
+          done
+
+          for vpc_id in $vpc_ids; do
+            echo "Deleting VPC: $vpc_id"
+            for igw_id in $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc_id" --query 'InternetGateways[].InternetGatewayId' --output text --region $region); do
+              aws ec2 detach-internet-gateway --internet-gateway-id $igw_id --vpc-id $vpc_id --region $region || true
+              aws ec2 delete-internet-gateway --internet-gateway-id $igw_id --region $region || true
+            done &
+            for subnet_id in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc_id" --query 'Subnets[].SubnetId' --output text --region $region); do
+              aws ec2 delete-subnet --subnet-id $subnet_id --region $region || true
+            done &
+            for sg_id in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$vpc_id" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text --region $region); do
+              aws ec2 delete-security-group --group-id $sg_id --region $region || true
+            done &
+            for rt_id in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc_id" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text --region $region); do
+              aws ec2 delete-route-table --route-table-id $rt_id --region $region || true
+            done &
+            wait
+            aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
+          done
+        done
