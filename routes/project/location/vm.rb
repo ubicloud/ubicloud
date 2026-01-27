@@ -52,18 +52,18 @@ class Clover
 
       r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
 
-      r.post "restart" do
+      r.post %w[restart start stop] do |action|
         authorize("Vm:edit", vm)
 
         DB.transaction do
-          vm.incr_restart
-          audit_log(vm, "restart")
+          vm.public_send(:"incr_#{action}")
+          audit_log(vm, action)
         end
 
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
         else
-          flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
+          flash["notice"] = "Scheduled #{action} of #{vm.name}"
           r.redirect vm, "/settings"
         end
       end
