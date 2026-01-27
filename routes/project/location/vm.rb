@@ -55,6 +55,10 @@ class Clover
       r.post %w[restart start stop] do |action|
         authorize("Vm:edit", vm)
 
+        if vm.aws?
+          raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported for VMs running on AWS")
+        end
+
         DB.transaction do
           vm.public_send(:"incr_#{action}")
           audit_log(vm, action)
