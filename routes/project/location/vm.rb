@@ -67,7 +67,11 @@ class Clover
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
         else
-          flash["notice"] = "Scheduled #{action} of #{vm.name}"
+          notice = "Scheduled #{action} of #{vm.name}"
+          if action == "stop"
+            notice << ". Note that stopped VMs still accrue billing charges. To stop billing charges, delete the VM."
+          end
+          flash["notice"] = notice
           r.redirect vm, "/settings"
         end
       end
