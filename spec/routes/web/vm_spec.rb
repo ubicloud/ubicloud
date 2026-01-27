@@ -832,6 +832,19 @@ RSpec.describe Clover, "vm" do
           end
         end
 
+        it "cannot #{action} AWS VM" do
+          vm.update(location: Location[name: "us-east-1"])
+          if action == "start"
+            vm.strand.update(label: "stopped")
+          else
+            vm.update(display_state: "running")
+          end
+
+          visit "#{project.path}#{vm.path}"
+          within("#vm-submenu") { click_link "Settings" }
+          expect(page).to have_no_content action.capitalize
+        end
+
         it "cannot #{action} vm not in state supporting it" do
           visit "#{project.path}#{vm.path}"
           within("#vm-submenu") { click_link "Settings" }
