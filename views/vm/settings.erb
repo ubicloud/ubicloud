@@ -16,7 +16,7 @@
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <!-- Restart Card -->
-    <% if edit_perm %>
+    <% if edit_perm && !@vm.aws? %>
       <% if @vm.can_restart? %>
         <div class="px-4 py-5 sm:p-6">
           <% form(action: "#{path(@vm)}/restart", method: :post) do %>
