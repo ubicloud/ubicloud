@@ -131,6 +131,18 @@ class Vm < Sequel::Model
     super
   end
 
+  def can_restart?
+    display_state == "running"
+  end
+
+  def can_stop?
+    %w[running restarting unavailable rebooting].include?(display_state)
+  end
+
+  def can_start?
+    %w[unavailable stopped].include?(display_state)
+  end
+
   # cloud-hypervisor takes topology information in this format:
   #
   # topology=<threads_per_core>:<cores_per_die>:<dies_per_package>:<packages>
