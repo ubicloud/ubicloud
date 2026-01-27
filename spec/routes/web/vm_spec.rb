@@ -810,24 +810,30 @@ RSpec.describe Clover, "vm" do
       end
     end
 
-    describe "restart" do
-      it "can restart vm" do
-        visit "#{project.path}#{vm.path}"
-        within("#vm-submenu") { click_link "Settings" }
-        expect(page).to have_content "Restart"
-        click_button "Restart"
+    %w[restart start stop].each do |action|
+      describe action do
+        it "can #{action} vm" do
+          visit "#{project.path}#{vm.path}"
+          within("#vm-submenu") { click_link "Settings" }
+          click_button action.capitalize
 
-        expect(page.status_code).to eq(200)
-        expect(vm.restart_set?).to be true
-      end
+          expect(page.status_code).to eq(200)
+          expect(vm.send(:"#{action}_set?")).to be true
+          if action == "stop"
+            expect(page).to have_flash_notice("Scheduled stop of #{vm.name}. Note that stopped VMs still accrue billing charges. To stop billing charges, delete the VM.")
+          else
+            expect(page).to have_flash_notice("Scheduled #{action} of #{vm.name}")
+          end
+        end
 
-      it "can not restart virtual machine without edit permissions" do
-        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        it "can not #{action} virtual machine without edit permissions" do
+          AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
 
-        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
-        expect(page.title).to eq "Ubicloud - dummy-vm-2"
+          visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
+          expect(page.title).to eq "Ubicloud - dummy-vm-2"
 
-        expect(page).to have_no_content "Restart"
+          expect(page).to have_no_content "Restart"
+        end
       end
     end
   end

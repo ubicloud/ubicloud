@@ -34,6 +34,43 @@
           </div>
         <% end %>
       </div>
+
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(@vm)}/start", method: :post) do %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Start virtual machine</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will start the virtual machine if it is currently stopped.</p>
+              </div>
+            </div>
+            <div id="vm-restart-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== part("components/form/submit_button", text: "Start", extra_class: "start-btn") %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(@vm)}/stop", method: :post) do %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Stop virtual machine</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will stop the virtual machine, causing it to be offline until it is started. Note that
+                  stopped VMs still accrue billing charges. To stop billing charges, delete the VM.</p>
+              </div>
+            </div>
+            <div id="vm-restart-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== part("components/form/submit_button", text: "Stop", extra_class: "stop-btn") %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
     <% end %>
     <!-- Delete Card -->
     <% if has_permission?("Vm:delete", @vm) %>
