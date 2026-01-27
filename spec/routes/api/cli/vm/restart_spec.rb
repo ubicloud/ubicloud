@@ -9,8 +9,8 @@ RSpec.describe Clover, "cli vm restart" do
   end
 
   it "restarts vm" do
-    expect(Semaphore.where(strand_id: @vm.id, name: "restart")).to be_empty
-    expect(cli(%w[vm eu-central-h1/test-vm restart])).to eq "Scheduled restart of VM with id #{@vm.ubid}\n"
-    expect(Semaphore.where(strand_id: @vm.id, name: "restart")).not_to be_empty
+    expect do
+      expect(cli(%w[vm eu-central-h1/test-vm restart])).to eq("Scheduled restart of VM with id #{@vm.ubid}\n")
+    end.to change { Semaphore.where(strand_id: @vm.id, name: "restart").count }.from(0).to(1)
   end
 end
