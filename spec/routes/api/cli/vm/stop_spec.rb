@@ -17,4 +17,11 @@ destroy the VM.
 END
     end.to change { Semaphore.where(strand_id: @vm.id, name: "stop").count }.from(0).to(1)
   end
+
+  it "raises error if running on AWS" do
+    @vm.update(location: Location[name: "us-east-1"])
+    expect do
+      expect(cli(%w[vm us-east-1/test-vm stop], status: 400)).to eq "! Unexpected response status: 400\nDetails: The stop action is not supported for VMs running on AWS\n"
+    end.to not_change { Semaphore.where(strand_id: @vm.id, name: "stop").count }
+  end
 end
