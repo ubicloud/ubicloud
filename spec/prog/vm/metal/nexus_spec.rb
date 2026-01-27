@@ -871,6 +871,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.checkup_set? }.from(false).to(true)
     end
 
+    it "hops to restart when needed" do
+      vm.incr_restart
+      expect { nx.unavailable }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
     it "naps if vm is still unavailable" do
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)

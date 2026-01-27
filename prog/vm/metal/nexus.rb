@@ -310,6 +310,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_start_after_host_reboot
     end
 
+    when_restart_set? do
+      register_deadline("wait", 5 * 60)
+      hop_restart
+    end
+
     if available?
       decr_checkup
       hop_wait
