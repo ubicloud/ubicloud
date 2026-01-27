@@ -185,21 +185,16 @@ module Config
   override :github_gpu_ubuntu_2204_version, "20251208.1.0", string
   override :github_ubuntu_2204_aws_ami_version, "ami-0db39f24fb80dd3d2", string
   override :github_ubuntu_2404_aws_ami_version, "ami-0daff749acdc980cd", string
-  override :postgres_ubuntu_2204_version, "20251218.1.0", string
+  override :postgres_ubuntu_2204_version, "20260123.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
   override :postgres_paradedb_ubuntu_2204_version, "20260107.1.0", string
   override :postgres16_paradedb_ubuntu_2204_version, "20250901.1.0", string
   override :postgres17_paradedb_ubuntu_2204_version, "20250901.1.0", string
-  override :postgres16_lantern_ubuntu_2204_version, "20250103.1.0", string
-  override :postgres17_lantern_ubuntu_2204_version, "20250103.1.0", string
   override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
   override :kubernetes_v1_32_version, "20250320.1.0", string
   override :kubernetes_v1_33_version, "20250506.1.0", string
   override :kubernetes_v1_34_version, "20250828.1.0", string
-
-  override :aws_based_postgres_16_ubuntu_2204_ami_version, "ami-0c15093fa829f190a", string
-  override :aws_based_postgres_17_ubuntu_2204_ami_version, "ami-0c8f8ddefeb7bd695", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float
