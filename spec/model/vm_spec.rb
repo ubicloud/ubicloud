@@ -32,6 +32,11 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("stopped")
     end
 
+    it "returns unavailable if strand is at unavailable label" do
+      vm.strand.update(label: "unavailable")
+      expect(vm.display_state).to eq("unavailable")
+    end
+
     it "returns waiting for capacity if semaphore increased" do
       vm.incr_waiting_for_capacity
       expect(vm.display_state).to eq("waiting for capacity")
