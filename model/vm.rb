@@ -121,6 +121,7 @@ class Vm < Sequel::Model
     return "deleting" if destroying_set? || destroy_set?
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
+    return "unavailable" if label == "unavailable"
 
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
