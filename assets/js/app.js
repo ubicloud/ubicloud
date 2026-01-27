@@ -37,6 +37,14 @@ $(".dropdown").on("click", function (event) {
   $(this).toggleClass("active");
 });
 
+$(document).on("click", ".tag-pill", function (event) {
+  event.stopPropagation();
+  let content = $(this).data("content");
+  navigator.clipboard.writeText(content).then(function() {
+    notification("Copied to clipboard");
+  });
+});
+
 $(".toggle-parent-to-active").on("click", function (event) {
   $(this).parent().toggleClass("active");
 });

@@ -1,6 +1,6 @@
 <% @page_title = "PostgreSQL Databases" %>
 
-<% if @postgres_databases.count > 0 %>
+<% if @postgres_databases.count > 0 || (@tags_filter && @project.get_ff_postgres_tag_search_ui) %>
   <%== part(
     "components/page_header",
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["PostgreSQL Databases", "#"]],
@@ -24,23 +24,35 @@
     DROPDOWN
   ) %>
 
+  <% if @project.get_ff_postgres_tag_search_ui %>
+    <%== part("components/tag_filter",
+      action: "#{@project.path}/postgres",
+      value: @tags_filter
+    ) %>
+  <% end %>
+
   <div class="grid gap-6">
+    <%
+      show_tags = @project.get_ff_postgres_tag_search_ui
+      headers = ["Name", "Compute", "Storage", "Version", "Parent", "Location"]
+      headers << "Tags" if show_tags
+      headers << "State"
+    %>
     <%== part(
       "components/table_card",
-      headers: ["Name", "Compute", "Storage", "Version", "Parent", "Location", "State"],
+      headers:,
       rows: @postgres_databases.map do |pg|
-        [
-          [
-            [pg.name, {link: "#{path(pg)}/overview"}],
-            [pg.vm_size],
-            [pg.storage_size_gib],
-            [pg.version],
-            pg.parent ? [pg.parent.name, {link: path(pg.parent)}] : [""],
-            [pg.display_location],
-            ["pg_state_label", {component: { state: pg.display_state }}]
-          ],
-          {id: "pg-#{pg.ubid}"}
+        cols = [
+          [pg.name, {link: "#{path(pg)}/overview"}],
+          [pg.vm_size],
+          [pg.storage_size_gib],
+          [pg.version],
+          pg.parent ? [pg.parent.name, {link: path(pg.parent)}] : [""],
+          [pg.display_location]
         ]
+        cols << ["postgres_tags", {component: { tags: pg.tags }}] if show_tags
+        cols << ["pg_state_label", {component: { state: pg.display_state }}]
+        [cols, {id: "pg-#{pg.ubid}"}]
       end
     ) %>
   </div>

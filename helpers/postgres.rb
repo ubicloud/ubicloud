@@ -69,6 +69,8 @@ class Clover
   def postgres_list(tags_param: nil)
     dataset = dataset_authorize(@project.postgres_resources_dataset.eager(:timeline, representative_server: [:strand, vm: :vm_storage_volumes]), "Postgres:view").eager(:semaphores, :location, strand: :children)
 
+    @tags_filter = tags_param
+
     if tags_param
       tags_param = tags_param.split(",")
       tags_param = tags_param.map! { |tag| tag.split(":", 2).map(&:strip) }
