@@ -77,7 +77,7 @@ class Clover
             repository_name:,
             labels: job_labels,
             started_in: Time.parse(job["started_at"]) - Time.parse(job["created_at"]),
-            completed_in: Time.parse(job["completed_at"]) - Time.parse(job["started_at"]),
+            completed_in: job["completed_at"] ? (Time.parse(job["completed_at"]) - Time.parse(job["started_at"])) : nil,
             conclusion: job["conclusion"]
           }
         })

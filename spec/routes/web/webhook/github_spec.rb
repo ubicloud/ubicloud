@@ -88,6 +88,14 @@ RSpec.describe Clover, "github" do
       expect(page.body).to eq({error: {message: "Unmatched label"}}.to_json)
     end
 
+    it "fails if label not matched and logs even completed_at is nil" do
+      expect(Clog).to receive(:emit).with("Unmatched label", instance_of(Hash)).and_call_original
+      send_webhook("workflow_job", workflow_job_payload(action: "completed", workflow_job: workflow_job_object(label: "other", completed_at: nil)))
+
+      expect(page.status_code).to eq(200)
+      expect(page.body).to eq({error: {message: "Unmatched label"}}.to_json)
+    end
+
     it "fails if workflow job is empty" do
       expect(Clog).to receive(:emit).at_least(:once).and_call_original
       send_webhook("workflow_job", workflow_job_payload(action: "queued", workflow_job: nil))
@@ -158,7 +166,7 @@ RSpec.describe Clover, "github" do
     end
   end
 
-  def workflow_job_object(runner_id: 123, label: "ubicloud")
+  def workflow_job_object(runner_id: 123, label: "ubicloud", completed_at: "2024-04-24T16:13:40Z")
     {
       id: 232323,
       runner_id:,
@@ -170,7 +178,7 @@ RSpec.describe Clover, "github" do
       head_branch: "test head branch",
       created_at: "2024-04-24T16:02:42Z",
       started_at: "2024-04-24T16:03:40Z",
-      completed_at: "2024-04-24T16:13:40Z"
+      completed_at:
     }
   end
 
