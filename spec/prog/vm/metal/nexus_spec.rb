@@ -807,7 +807,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to unavailable based on the vm's available status" do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
 
       vm.incr_checkup

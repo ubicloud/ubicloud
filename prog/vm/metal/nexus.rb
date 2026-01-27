@@ -262,7 +262,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     when_checkup_set? do
       unless available?
-        register_deadline("wait", 2 * 60)
         hop_unavailable
       end
       decr_checkup
