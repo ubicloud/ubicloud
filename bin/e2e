@@ -22,6 +22,13 @@ def test_metal(options, test_cases)
   hetzner_server_st = Prog::Test::HetznerServer.assemble(vm_host_id: options[:vm_host_id], default_boot_images:)
   wait_until(hetzner_server_st, "wait")
 
+  if options[:test_cases].include?("postgres_ha") || options[:test_cases].include?("postgres_upgrade")
+    Project[Config.postgres_service_project_id] ||
+      Project.create_with_id(Config.postgres_service_project_id, name: "Postgres-Service-Project")
+    minio_cluster_st = Prog::Test::MinioCluster.assemble(Config.postgres_service_project_id)
+    wait_until(minio_cluster_st, "wait")
+  end
+
   tests_to_wait = []
   if options[:test_cases].include?("vm") && (test_case = test_cases["vm"])
     # Testing slices is not parallel with other tests as it requires a specific host state
@@ -66,6 +73,11 @@ def test_metal(options, test_cases)
   # it won't affect the total time as other strands will continue in parallel.
   # No need to make it parallel.
   tests_to_wait.each { |st| wait_until(st) }
+
+  if minio_cluster_st
+    Semaphore.incr(minio_cluster_st.id, "destroy_and_verify")
+    wait_until(minio_cluster_st)
+  end
 
   Semaphore.incr(hetzner_server_st.id, "verify_cleanup_and_destroy")
   wait_until(hetzner_server_st)
