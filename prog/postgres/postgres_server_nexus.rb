@@ -771,10 +771,11 @@ SQL
       return true
     rescue
     end
-
-    # Do not declare unavailability if Postgres is in crash recovery
+    # Do not declare unavailability if Postgres is in crash recovery.
+    # Check if log file was modified recently and last 50 lines contain recovery messages.
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/:version/data/pg_log/postgresql.log", version:).include?("redo in progress")
+      log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/postgresql.log -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
+      return true unless log_output.empty?
     rescue
     end
 
