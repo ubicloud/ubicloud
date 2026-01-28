@@ -67,6 +67,14 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.post "create-umi" do
+        handle_validation_failure("vm/show") { @page = "settings" }
+        authorize("Vm:edit", vm)
+
+        name = typecast_params.str!("name").strip
+        vm_create_umi(name)
+      end
     end
   end
 end

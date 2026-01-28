@@ -830,5 +830,62 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_no_content "Restart"
       end
     end
+
+    describe "create-umi" do
+      it "can create umi when vm is running" do
+        vm.this.update(display_state: "running")
+        expect(Prog::Storage::ArchiveVm).to receive(:assemble).with(vm.id, kind_of(String))
+
+        visit "#{project.path}#{vm.path}/settings"
+        expect(page).to have_content "Create Machine Image"
+
+        fill_in "Machine Image Name", with: "test-umi"
+        click_button "Create UMI"
+
+        expect(page).to have_flash_notice("UMI creation started. The VM will be stopped and archived.")
+        expect(MachineImage.find(name: "test-umi", project_id: vm.project_id)).not_to be_nil
+      end
+
+      it "shows error when name is missing" do
+        vm.this.update(display_state: "running")
+
+        visit "#{project.path}#{vm.path}/settings"
+        fill_in "Machine Image Name", with: ""
+        click_button "Create UMI"
+
+        expect(page).to have_flash_error("Name is required")
+      end
+
+      it "shows error when name is duplicate" do
+        vm.this.update(display_state: "running")
+        MachineImage.create(
+          name: "test-umi",
+          bucket_prefix: "test-prefix",
+          project_id: vm.project_id,
+          location_id: vm.location_id
+        ).this.update(ready: true)
+
+        visit "#{project.path}#{vm.path}/settings"
+        fill_in "Machine Image Name", with: "test-umi"
+        click_button "Create UMI"
+
+        expect(page).to have_flash_error("Machine image with this name already exists")
+      end
+
+      it "does not show create umi when vm is not running" do
+        vm.this.update(display_state: "creating")
+
+        visit "#{project.path}#{vm.path}/settings"
+        expect(page).to have_no_content "Create Machine Image"
+      end
+
+      it "cannot create umi without edit permission" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Vm:view"])
+        vm_wo_permission.this.update(display_state: "running")
+
+        visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/settings"
+        expect(page).to have_no_content "Create Machine Image"
+      end
+    end
   end
 end

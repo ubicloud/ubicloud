@@ -6,17 +6,18 @@ class OptionTreeGenerator
     @parents = {}
   end
 
-  def add_option(name:, values: nil, parent: nil, &check)
-    @options << {name:, values:, parent:, check:}
+  def add_option(name:, values: nil, parent: nil, sort_key: nil, &check)
+    @options << {name:, values:, parent:, check:, sort_key:}
   end
 
   def build_subtree(option, path)
     return unless option[:values]
 
-    subtree = {}
-    Array(option[:values]).each do |value|
-      next if option[:check] && !option[:check].call(*path, value)
+    values = Array(option[:values]).select { |v| !option[:check] || option[:check].call(*path, v) }
+    values = values.sort_by { |v| option[:sort_key].call(v, *path) } if option[:sort_key]
 
+    subtree = {}
+    values.each do |value|
       child_options = @options.select { |opt| opt[:parent] == option[:name] }
       subtree[value] = child_options.to_h do |child_option|
         @parents[child_option[:name]] = @parents[option[:name]] + [option[:name]]

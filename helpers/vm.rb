@@ -105,6 +105,63 @@ class Clover
     end
   end
 
+  def vm_create_umi(name)
+    vm = @vm
+
+    if name.to_s.empty?
+      if api?
+        fail Validation::ValidationFailed.new({name: "Name is required"})
+      else
+        flash["error"] = "Name is required"
+        request.redirect vm, "/settings"
+      end
+    end
+
+    if vm.vm_storage_volumes.count != 1
+      fail Validation::ValidationFailed.new({name: "Machine image can be created for Vms with exactly 1 disk"})
+    end
+    if vm.vm_storage_volumes.first.size_gib != 20
+      fail Validation::ValidationFailed.new({name: "Machine image can be created for Vms with one 20GB disk"})
+    end
+
+    if MachineImage.where(project_id: vm.project_id, name:).count > 0
+      if api?
+        fail Validation::ValidationFailed.new({name: "Machine image with this name already exists"})
+      else
+        flash["error"] = "Machine image with this name already exists"
+        request.redirect vm, "/settings"
+      end
+    end
+
+    unless vm.display_state == "running"
+      if api?
+        fail Validation::ValidationFailed.new({vm: "VM must be in running state to create UMI"})
+      else
+        flash["error"] = "VM must be in running state to create UMI"
+        request.redirect vm, "/settings"
+      end
+    end
+
+    DB.transaction do
+      machine_image = MachineImage.create(
+        name:,
+        bucket_prefix: SecureRandom.alphanumeric(15),
+        project_id: vm.project_id,
+        location_id: vm.location_id
+      )
+
+      Prog::Storage::ArchiveVm.assemble(vm.id, machine_image.id)
+      audit_log(vm, "create_umi")
+    end
+
+    if api?
+      Serializers::Vm.serialize(vm, {detailed: true})
+    else
+      flash["notice"] = "UMI creation started. The VM will be stopped and archived."
+      request.redirect vm, "/settings"
+    end
+  end
+
   def generate_vm_options
     options = OptionTreeGenerator.new
 
@@ -184,7 +241,10 @@ class Clover
       vm_size.family == family
     end
 
-    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size") do |location, family, size, storage_size|
+    options.add_option(name: "storage_size", values: ["10", "20", "40", "80", "160", "320", "600", "640", "1200", "2400"], parent: "size", sort_key: ->(storage_size, location, family, size) {
+      vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
+      vm_size.storage_size_options.index(storage_size.to_i)
+    }) do |location, family, size, storage_size|
       vm_size = Option::VmSizes.find { it.display_name == size && it.arch == "x64" }
       vm_size.storage_size_options.include?(storage_size.to_i)
     end

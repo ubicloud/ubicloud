@@ -110,6 +110,7 @@ class Clover < Roda
     connect
     create
     create_replica
+    create_umi
     decline_invitation
     delete_all_cache_entries
     destroy

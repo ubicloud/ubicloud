@@ -1825,6 +1825,33 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/create-umi':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    post:
+      operationId: createVmUMI
+      summary: Create a Ubicloud Machine Image from VM
+      description: Stops the VM and creates an archived disk image that can be used to boot new VMs.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Name of the Machine Image
+              required:
+                - name
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
   '/project/{project_id}/object-info/{object_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
