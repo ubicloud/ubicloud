@@ -85,7 +85,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     # the state to database. Since backup taking is an expensive operation,
     # we check if backup is truly needed.
     if postgres_timeline.need_backup?
-      d_command = NetSsh.command("sudo postgres/bin/take-backup :version", version: postgres_timeline.leader.resource.version)
+      d_command = NetSsh.command("sudo postgres/bin/take-backup :version", version: postgres_timeline.leader.version)
       postgres_timeline.leader.vm.sshable.cmd("common/bin/daemonizer :d_command take_postgres_backup", d_command:)
       postgres_timeline.latest_backup_started_at = Time.now
       postgres_timeline.save_changes
