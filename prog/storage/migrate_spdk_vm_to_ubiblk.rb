@@ -159,6 +159,11 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
     vm.vm_host.sshable.cmd("sudo systemctl start :inhost_name", inhost_name:)
     vm.strand.update(label: "wait")
 
+    hop_clean_up
+  end
+
+  label def clean_up
+    vm.vm_host.sshable.cmd("sudo rm -f :kek_file_path", kek_file_path:)
     pop "Vm successfully migrated to ubiblk"
   end
 

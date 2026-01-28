@@ -226,12 +226,19 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   end
 
   describe "#start_vm" do
-    it "starts the vm and exits" do
+    it "starts the vm and hops to clean_up" do
       st = instance_double(Strand)
       expect(vm).to receive(:strand).and_return(st)
       expect(st).to receive(:update).with(label: "wait")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
-      expect { prog.start_vm }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
+      expect { prog.start_vm }.to hop("clean_up")
+    end
+  end
+
+  describe "#clean_up" do
+    it "cleans up and pops" do
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo rm -f /var/storage/#{vm.inhost_name}/0/kek.pipe")
+      expect { prog.clean_up }.to exit({"msg" => "Vm successfully migrated to ubiblk"})
     end
   end
 
