@@ -378,6 +378,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       expect { nx.wait }.to nap(20 * 60)
     end
+
+    it "naps for 20 seconds if no backup has been taken yet" do
+      create_minio_cluster
+      resource = create_postgres_resource
+      create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
+
+      # No backups exist yet, backup is in progress
+      mock_minio_client(list_objects: [])
+
+      expect(nx.postgres_timeline.leader.vm.sshable).to receive(:_cmd).with("common/bin/daemonizer --check take_postgres_backup").and_return("InProgress")
+
+      expect { nx.wait }.to nap(20)
+    end
   end
 
   describe "#take_backup" do
