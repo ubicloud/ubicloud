@@ -773,7 +773,16 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/:version/data/pg_log/postgresql.log", version:).include?("redo in progress")
+      log_output = vm.sshable.cmd(<<~CMD, version:)
+  sudo tac /dat/:version/data/pg_log/postgresql.log | awk -v cutoff="$(date -u -d '5 minutes ago' '+%Y-%m-%d %H:%M')" '
+    $0 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}/ {
+      timestamp = substr($0, 1, 16)
+      if (timestamp < cutoff) exit
+      if (/redo in progress/ || /Consistent recovery state has not been yet reached/) { print; exit }
+    }
+  '
+      CMD
+      return true unless log_output.empty?
     rescue
     end
 
