@@ -1097,8 +1097,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
   describe "#available?" do
     it "returns the available status" do
-      expect(sshable).to receive(:_cmd).and_return("active\nactive\n")
-      expect(vm).to receive(:inhost_name).and_return("vmxxxx").at_least(:once)
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect(nx.available?).to be true
     end
 

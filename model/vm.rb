@@ -229,14 +229,14 @@ class Vm < Sequel::Model
     }
   end
 
+  def healthcheck_systemd_units
+    [inhost_name, "#{inhost_name}-dnsmasq"] +
+      vm_storage_volumes.filter_map { it.vhost_backend_systemd_unit_name if it.vhost_block_backend }
+  end
+
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      units = [inhost_name, "#{inhost_name}-dnsmasq"]
-      vm_storage_volumes.each do |vol|
-        units << vol.vhost_backend_systemd_unit_name if vol.vhost_block_backend
-      end
-
-      session[:ssh_session].exec!("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n").all?("active") ? "up" : "down"
+      session[:ssh_session].exec!("systemctl is-active :shelljoin_units", shelljoin_units: healthcheck_systemd_units).split("\n").all?("active") ? "up" : "down"
     rescue IOError, Errno::ECONNRESET
       raise
     rescue => e
