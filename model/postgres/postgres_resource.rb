@@ -96,16 +96,18 @@ class PostgresResource < Sequel::Model
   end
 
   def replication_connection_string(application_name:)
+    return nil unless Util.use_dns_zone?(dns_zone) || representative_server
+
     query_parameters = {
       sslrootcert: "/etc/ssl/certs/ca.crt",
       sslcert: "/etc/ssl/certs/server.crt",
       sslkey: "/etc/ssl/certs/server.key",
-      sslmode: "verify-full",
+      sslmode: Util.use_dns_zone?(dns_zone) ? "verify-full" : "require",
       dbname: "postgres",
       application_name:
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
-    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: identity, query: query_parameters).to_s
+    URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: Util.use_dns_zone?(dns_zone) ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
   end
 
   def version

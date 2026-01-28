@@ -117,4 +117,8 @@ module Util
       .select_order_map { set_masklen(:cidr, 16).as(:masked) }
       .join("\n")
   end
+
+  def self.use_dns_zone?(dns_zone)
+    dns_zone || !Config.development?
+  end
 end

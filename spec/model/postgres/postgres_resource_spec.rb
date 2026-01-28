@@ -58,9 +58,34 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.connection_string).to be_nil
   end
 
+  it "returns replication connection string as nil if there is no server" do
+    # No server created, no dns_zone
+    allow(Config).to receive(:development?).and_return(true)
+    expect(postgres_resource.dns_zone).to be_nil
+    expect(postgres_resource.replication_connection_string(application_name: "pgubidstandby")).to be_nil
+  end
+
   it "returns replication_connection_string" do
+    expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
     expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
+  end
+
+  it "returns replication_connection_string in development with dns name when dns_zone exists" do
+    allow(Config).to receive(:development?).and_return(true)
+    expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
+    s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
+    expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
+  end
+
+  it "returns replication_connection_string with ip when no dns_zone exists" do
+    allow(Config).to receive(:development?).and_return(true)
+    vm = create_hosted_vm(project, private_subnet, "pg-vm")
+    PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
+    expect(postgres_resource.dns_zone).to be_nil
+    s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
+    expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
   end
 
   describe "#provision_new_standby" do
