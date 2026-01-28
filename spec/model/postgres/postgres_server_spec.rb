@@ -87,7 +87,7 @@ RSpec.describe PostgresServer do
     server = described_class.create(
       timeline:, resource: target_resource, vm_id: server_vm.id,
       synchronization_status: "ready", timeline_access: "fetch", version: "16",
-      physical_slot_ready: physical_slot_ready
+      physical_slot_ready:
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
     server
@@ -748,10 +748,9 @@ PGDATA=/dat/16/data
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(nil)
 
       postgres_server.observe_metrics_backlog(session)
+      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "checks metrics backlog and creates a page if it exceeds threshold" do
@@ -759,27 +758,28 @@ PGDATA=/dat/16/data
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("30\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} metrics backlog high",
-        ["PGMetricsBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {metrics_backlog: 30}
-      )
 
       postgres_server.observe_metrics_backlog(session)
+      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("#{postgres_server.ubid} metrics backlog high")
     end
 
     it "checks metrics backlog and resolves a page if it is back within limits" do
-      existing_page = instance_double(Page)
+      Prog::PageNexus.assemble(
+        "#{postgres_server.ubid} metrics backlog high",
+        ["PGMetricsBacklogHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning"
+      )
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
-      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(existing_page)
-      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_metrics_backlog(session)
+      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(page.resolve_set?).to be true
     end
 
     it "logs errors when checking metrics backlog fails" do
@@ -800,9 +800,9 @@ PGDATA=/dat/16/data
       expect(config[:additional_labels]).to include(
         "pg_tags_label_env" => "prod",
         "pg_tags_label_team" => "devops",
-        location_name: "us-west-2",
-        location_provider: "ubicloud",
-        location_display_name: "us-west-2"
+        :location_name => "us-west-2",
+        :location_provider => "ubicloud",
+        :location_display_name => "us-west-2"
       )
       expect(config[:additional_labels][:location_id].to_s).to eq(UBID.from_uuidish(tagged_resource.location_id).to_s)
     end
