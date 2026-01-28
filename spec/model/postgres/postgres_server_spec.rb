@@ -264,6 +264,14 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "1/11")).twice
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
+
+    it "returns nil if standby has physical_slot_ready false" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false)
+      ])
+      expect(postgres_server.failover_target).to be_nil
+    end
   end
 
   describe "#failover_target read_replica" do
@@ -296,6 +304,14 @@ RSpec.describe PostgresServer do
 
     it "returns the replica with highest lsn" do
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+    end
+
+    it "returns the replica even if physical_slot_ready is false" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false)
+      ])
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
   end
 
