@@ -774,7 +774,8 @@ SQL
 
     # Do not declare unavailability if Postgres is in crash recovery
     begin
-      return true if vm.sshable.cmd("sudo tail -n 5 /dat/:version/data/pg_log/postgresql.log", version:).include?("redo in progress")
+      log_output = vm.sshable.cmd("sudo tail -n 10 /dat/:version/data/pg_log/postgresql.log", version:)
+      return true if log_output.include?("redo in progress") || log_output.include?("Consistent recovery state has not been yet reached")
     rescue
     end
 
