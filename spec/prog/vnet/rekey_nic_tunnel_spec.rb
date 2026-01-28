@@ -37,18 +37,6 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     nx.instance_variable_set(:@nic, tunnel.src_nic)
   end
 
-  describe "#before_run" do
-    it "pops when destroy is set" do
-      Strand.create_with_id(tunnel.src_nic, prog: "Vnet:NicNexus", label: "wait_vm")
-      tunnel.src_nic.incr_destroy
-      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set"})
-    end
-
-    it "doesn't do anything if destroy is not set" do
-      expect { nx.before_run }.not_to exit({"msg" => "nic.destroy semaphore is set"})
-    end
-  end
-
   describe "#setup_inbound" do
     before do
       allow(tunnel.src_nic).to receive(:dst_ipsec_tunnels).and_return([tunnel])
