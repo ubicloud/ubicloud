@@ -25,34 +25,8 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   end
 
   describe "#start" do
-    it "creates a minio cluster and hops to wait_minio_cluster" do
-      expect { pgr_test.start }.to hop("wait_minio_cluster")
-      minio_cluster_id = frame_value(pgr_test, "minio_cluster_id")
-      expect(minio_cluster_id).not_to be_nil
-      expect(MinioCluster[minio_cluster_id]).not_to be_nil
-    end
-  end
-
-  describe "#wait_minio_cluster" do
-    before do
-      minio_cluster_strand = Prog::Minio::MinioClusterNexus.assemble(postgres_service_project_id, "test-minio", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
-      refresh_frame(pgr_test, new_values: {"minio_cluster_id" => minio_cluster_strand.id})
-      @minio_cluster_strand = minio_cluster_strand
-    end
-
-    it "naps for 10 seconds if the minio cluster is not ready" do
-      expect { pgr_test.wait_minio_cluster }.to nap(10)
-    end
-
-    it "hops to create_postgres_resource if the minio cluster is ready" do
-      @minio_cluster_strand.update(label: "wait")
-      expect { pgr_test.wait_minio_cluster }.to hop("create_postgres_resource")
-    end
-  end
-
-  describe "#create_postgres_resource" do
-    it "creates a postgres resource with version 17 and async HA" do
-      expect { pgr_test.create_postgres_resource }.to hop("wait_postgres_resource")
+    it "creates a postgres resource with version 17 and async HA and hops to wait_postgres_resource" do
+      expect { pgr_test.start }.to hop("wait_postgres_resource")
       postgres_resource_id = frame_value(pgr_test, "postgres_resource_id")
       expect(postgres_resource_id).not_to be_nil
       pg = PostgresResource[postgres_resource_id]
@@ -283,18 +257,15 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
       replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
-      minio_cluster_strand = Prog::Minio::MinioClusterNexus.assemble(postgres_service_project_id, "test-minio", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id, "minio_cluster_id" => minio_cluster_strand.id})
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
       @pg_strand = pg_strand
       @replica_strand = replica_strand
-      @minio_cluster_strand = minio_cluster_strand
     end
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@replica_strand.subject.destroy_set?).to be true
-      expect(@minio_cluster_strand.subject.destroy_set?).to be true
     end
   end
 
@@ -313,7 +284,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "hops to destroy if all resources are destroyed" do
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "minio_cluster_id" => nil})
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
       expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
     end
   end
@@ -387,20 +358,6 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       representative_server = pgr_test.representative_server
       expect(representative_server).to be_a(PostgresServer)
       expect(representative_server).to eq(@pg_strand.subject.representative_server)
-    end
-  end
-
-  describe "#minio_cluster" do
-    before do
-      minio_cluster_strand = Prog::Minio::MinioClusterNexus.assemble(postgres_service_project_id, "test-minio", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
-      refresh_frame(pgr_test, new_values: {"minio_cluster_id" => minio_cluster_strand.id})
-      @minio_cluster_strand = minio_cluster_strand
-    end
-
-    it "returns the minio cluster" do
-      minio_cluster = pgr_test.minio_cluster
-      expect(minio_cluster).to be_a(MinioCluster)
-      expect(minio_cluster.id).to eq(@minio_cluster_strand.id)
     end
   end
 

@@ -7,10 +7,6 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   def self.assemble
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
-    Project[Config.postgres_service_project_id] ||
-      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
-    Project[Config.minio_service_project_id] ||
-      Project.create_with_id(Config.minio_service_project_id || Project.generate_uuid, name: "Minio-Service-Project")
 
     Strand.create(
       prog: "Test::UpgradePostgresResource",
@@ -20,22 +16,6 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def start
-    st = Prog::Minio::MinioClusterNexus.assemble(Config.postgres_service_project_id,
-      "postgres-minio-test-upgrade", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
-
-    update_stack({"minio_cluster_id" => st.id})
-    hop_wait_minio_cluster
-  end
-
-  label def wait_minio_cluster
-    if minio_cluster.strand.label == "wait"
-      hop_create_postgres_resource
-    end
-
-    nap 10
-  end
-
-  label def create_postgres_resource
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
       location_id: Location::HETZNER_FSN1_ID,
@@ -206,12 +186,11 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   label def destroy_postgres
     read_replica.incr_destroy
     postgres_resource.incr_destroy
-    minio_cluster.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 5 if read_replica || postgres_resource || minio_cluster
+    nap 5 if read_replica || postgres_resource
     hop_destroy
   end
 
@@ -241,10 +220,6 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   def representative_server
     @representative_server ||= postgres_resource.representative_server
-  end
-
-  def minio_cluster
-    MinioCluster[frame["minio_cluster_id"]]
   end
 
   def test_queries_sql
