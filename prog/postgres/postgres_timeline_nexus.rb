@@ -77,7 +77,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       hop_take_backup
     end
 
-    nap 20 * 60
+    # if the initial backup is not taken yet, nap for 20 seconds and retry
+    nap (latest_backup_completed_at == postgres_timeline.created_at) ? 20 : 20 * 60
   end
 
   label def take_backup
