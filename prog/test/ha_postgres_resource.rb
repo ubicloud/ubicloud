@@ -9,8 +9,9 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
-    Project[Config.minio_service_project_id] ||
-      Project.create_with_id(Config.minio_service_project_id || Project.generate_uuid, name: "Minio-Service-Project")
+    # move to Prog::Test::MinioCluster
+    # Project[Config.minio_service_project_id] ||
+    #   Project.create_with_id(Config.minio_service_project_id || Project.generate_uuid, name: "Minio-Service-Project")
 
     frame = {
       "postgres_test_project_id" => postgres_test_project.id,
@@ -25,20 +26,22 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def start
-    st = Prog::Minio::MinioClusterNexus.assemble(Config.postgres_service_project_id,
-      "postgres-minio-test-0", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
+    # move to Prog::Test::MinioCluster
+    # st = Prog::Minio::MinioClusterNexus.assemble(Config.postgres_service_project_id,
+    #   "postgres-minio-test-0", Location::HETZNER_FSN1_ID, "admin", 32, 1, 1, 1, "standard-2")
 
-    update_stack({"minio_cluster_id" => st.id})
-    hop_wait_minio_cluster
+    # update_stack({"minio_cluster_id" => st.id})
+    # hop_wait_minio_cluster
   end
 
-  label def wait_minio_cluster
-    if minio_cluster.strand.label == "wait"
-      hop_create_postgres_resource
-    else
-      nap 10
-    end
-  end
+  # move to Prog::Test::MinioCluster
+  # label def wait_minio_cluster
+  #   if minio_cluster.strand.label == "wait"
+  #     hop_create_postgres_resource
+  #   else
+  #     nap 10
+  #   end
+  # end
 
   label def create_postgres_resource
     st = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -121,12 +124,12 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
   label def destroy_postgres
     postgres_resource.incr_destroy
-    minio_cluster.incr_destroy
+    # minio_cluster.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 5 if postgres_resource || minio_cluster
+    nap 5 if postgres_resource
     hop_destroy
   end
 
