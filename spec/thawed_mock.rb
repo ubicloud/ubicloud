@@ -77,7 +77,6 @@ module ThawedMock
   allow_mocking(PrivateSubnet, :[], :random_subnet, :generate_ubid)
   allow_mocking(PrivateSubnetAwsResource, :create_with_id)
   allow_mocking(PrivateSubnetFirewall, :where)
-  allow_mocking(PostgresLsnMonitor, :new)
   allow_mocking(PostgresMetricDestination, :generate_uuid)
   allow_mocking(PostgresResource, :[], :generate_uuid)
   allow_mocking(PostgresServer, :[], :create, :create_with_id, :victoria_metrics_client)
