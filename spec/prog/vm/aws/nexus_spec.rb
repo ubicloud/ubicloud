@@ -477,11 +477,11 @@ usermod -L ubuntu
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
       end
 
-      it "raises exception after 5 retry attempts" do
+      it "clear exclude_availability_zones after 5 retry attempts" do
         refresh_frame(nx, new_values: {"retry_count" => 5})
         expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
-        expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::InsufficientInstanceCapacity)
-        expect(nic.reload.destroy_set?).to be false
+        expect { nx.create_instance }.to nap(60)
+        expect(st.stack.last["exclude_availability_zones"]).to be_nil
       end
 
       it "logs retry details in emission" do
@@ -533,11 +533,11 @@ usermod -L ubuntu
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
       end
 
-      it "raises exception after 5 retry attempts" do
+      it "clear exclude_availability_zones after 5 retry attempts" do
         refresh_frame(nx, new_values: {"retry_count" => 5})
         expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
-        expect { nx.create_instance }.to raise_error(Aws::EC2::Errors::Unsupported)
-        expect(nic.reload.destroy_set?).to be false
+        expect { nx.create_instance }.to nap(60)
+        expect(st.stack.last["exclude_availability_zones"]).to be_nil
       end
 
       it "logs retry details in emission" do
