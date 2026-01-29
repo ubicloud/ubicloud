@@ -22,12 +22,33 @@ on:
     - cron:  '0 */2 * * *'
 
 jobs:
-  run-ci:
+  setup:
     if: vars.RUN_E2E == 'true'
+    runs-on: ubuntu-slim
+    outputs:
+      providers: ${{ steps.set-providers.outputs.providers }}
+    steps:
+      - name: Set provider matrix
+        id: set-providers
+        run: |
+          providers="metal,aws"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
+            providers="${{ inputs.providers }}"
+          fi
+          # Convert comma-separated list to JSON array
+          echo "providers=$(echo "$providers" | jq -Rc 'split(",")')" >> $GITHUB_OUTPUT
+
+  e2e:
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: ${{ fromJson(needs.setup.outputs.providers) }}
+    name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
-    environment: E2E-CI
+    environment: E2E-${{ matrix.provider }}
     timeout-minutes: 85
-    concurrency: e2e_environment
+    concurrency: E2E-${{ matrix.provider }}
 
     steps:
     - name: Check out code
@@ -65,16 +86,12 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        providers="metal,aws"
-        if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
-          providers="${{ inputs.providers }}"
-        fi
         test_cases="$(yq -r '[.[] | select(.name != "postgres_upgrade") | .name] | join(",")' config/e2e_test_cases.yml)"
         if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.test_cases }}" ]]; then
           test_cases="${{ inputs.test_cases }}"
         fi
-        echo "Running e2e providers:$providers test cases:$test_cases"
-        echo "e2e: bin/e2e --providers=$providers --test-cases=$test_cases" >> Procfile
+        echo "Running e2e ${{ matrix.provider }} test cases:$test_cases"
+        echo "e2e: bin/e2e --provider=${{ matrix.provider }} --test-cases=$test_cases" >> Procfile
 
     - name: Run tests
       env:
@@ -136,7 +153,7 @@ jobs:
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
 
     - name: Extract image download time
-      if: always()
+      if: always() && matrix.provider == 'metal'
       id: extract_download
       run: |
         download_time="$(grep "VmHost.wait_download_boot_images" foreman.log | cut -d'|' -f2 | tail -1)"
@@ -182,7 +199,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v6
       with:
-        name: e2e-${{ github.run_id }}-logs
+        name: e2e-${{ matrix.provider }}-${{ github.run_id }}-logs
         path: foreman.log
 
     - name: Dump PostgreSQL database
@@ -227,7 +244,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v6
       with:
-        name: e2e-${{ github.run_id }}-db-dump
+        name: e2e-${{ matrix.provider }}-${{ github.run_id }}-db-dump
         path: clover_test_dump.sql
 
     - name: Send notification if failed
@@ -244,9 +261,9 @@ jobs:
                 - title: "Event"
                   short: true
                   value: "${{ github.event_name }}"
-                - title: "Reference"
+                - title: "Provider"
                   short: true
-                  value: "<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|${{ github.ref_name }}>"
+                  value: "${{ matrix.provider }}"
                 - title: "Action"
                   short: true
                   value: "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|${{ github.workflow }}>"
@@ -258,7 +275,7 @@ jobs:
                   value: "${{ steps.extract_last.outputs.LAST_LINE }}"
 
     - name: Cleanup AWS resources
-      if: always()
+      if: always() && matrix.provider == 'aws'
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}

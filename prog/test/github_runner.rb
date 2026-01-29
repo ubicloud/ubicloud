@@ -75,8 +75,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def trigger_test_runs
     test_runs.each do |test_run|
-      unless trigger_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
+      unless trigger_test_run(repo_name(test_run["repo_name"]), test_run["workflow_name"], test_run["branch_name"])
+        update_stack({"fail_message" => "Can not trigger workflow for #{repo_name(test_run["repo_name"])}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
         hop_clean_resources
       end
     end
@@ -91,17 +91,17 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   label def check_test_runs
     test_runs.each do |test_run|
-      latest_run = latest_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
+      latest_run = latest_run(repo_name(test_run["repo_name"]), test_run["workflow_name"], test_run["branch_name"])
 
       # In case the run can not be triggered in the previous state
       if latest_run[:created_at] < Time.parse(frame["created_at"])
-        update_stack({"fail_message" => "Can not trigger workflow for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
+        update_stack({"fail_message" => "Can not trigger workflow for #{repo_name(test_run["repo_name"])}, #{test_run["workflow_name"]}, #{test_run["branch_name"]}"})
         break
       end
 
       conclusion = latest_run[:conclusion]
       if FAIL_CONCLUSIONS.include?(conclusion)
-        update_stack({"fail_message" => "Test run for #{test_run["repo_name"]}, #{test_run["workflow_name"]}, #{test_run["branch_name"]} failed with conclusion #{conclusion}"})
+        update_stack({"fail_message" => "Test run for #{repo_name(test_run["repo_name"])}, #{test_run["workflow_name"]}, #{test_run["branch_name"]} failed with conclusion #{conclusion}"})
         break
       elsif IN_PROGRESS_CONCLUSIONS.include?(conclusion) || conclusion.nil?
         nap 15
@@ -163,7 +163,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   def cancel_test_runs
     test_runs.each do |test_run|
-      cancel_test_run(test_run["repo_name"], test_run["workflow_name"], test_run["branch_name"])
+      cancel_test_run(repo_name(test_run["repo_name"]), test_run["workflow_name"], test_run["branch_name"])
     end
   end
 
@@ -178,6 +178,10 @@ class Prog::Test::GithubRunner < Prog::Test::Base
 
   def test_runs
     @test_runs ||= frame["test_cases"].map { it["details"] }
+  end
+
+  def repo_name(base_name)
+    "#{base_name}-#{frame["provider"]}"
   end
 
   def client

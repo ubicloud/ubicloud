@@ -9,12 +9,7 @@ require "optparse"
 
 def main(options)
   test_cases = YAML.load_file("config/e2e_test_cases.yml").to_h { [it["name"], it] }
-
-  ["metal", "aws"].each do |provider|
-    next unless options[:providers].include?(provider)
-    puts "Starting #{provider} tests"
-    send("test_#{provider}", options, test_cases)
-  end
+  send("test_#{options[:provider]}", options, test_cases)
 end
 
 def test_metal(options, test_cases)
@@ -126,7 +121,7 @@ end
 options = {test_cases: ["vm"]}
 OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? UBID.to_uuid(v) : v }
-  opts.on("--providers PROVIDERS", Array, "List of providers to run separated by comma") { |v| options[:providers] = v }
+  opts.on("--provider PROVIDER", String, "Provider to run tests on (metal, aws)") { |v| options[:provider] = v }
   opts.on("--test-cases TEST_CASES", Array, "List of test cases to run separated by comma") { |v| options[:test_cases] = v }
 end.parse!
 
