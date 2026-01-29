@@ -421,7 +421,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   def retry_in_different_az(e)
     if (retry_count = frame["retry_count"] || 0) >= 5
-      raise e
+      Clog.emit("resetting excluding azs to retry", {retry_different_az_failed: {vm:, error: e.class.name, message: e.message, retry_count:}})
+      update_stack({"exclude_availability_zones" => nil, "retry_count" => 0})
+      nap 60
     end
 
     Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, retry_count: retry_count + 1}})
