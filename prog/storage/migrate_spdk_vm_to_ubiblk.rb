@@ -119,7 +119,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def create_ubiblk_systemd_unit
-    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :root_dir_path/disk.raw && sudo chmod 600 :root_dir_path/disk.raw && sudo rm -f :kek_file_path", inhost_name:, root_dir_path:, kek_file_path:)
+    vm.vm_host.sshable.cmd("sudo chown :inhost_name::inhost_name :root_dir_path/disk.raw && sudo chmod 600 :root_dir_path/disk.raw", inhost_name:, root_dir_path:)
     vm.vm_host.sshable.cmd("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: migration_script_params)
     hop_start_ubiblk_systemd_unit
   end
