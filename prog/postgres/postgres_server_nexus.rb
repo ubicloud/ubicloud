@@ -660,6 +660,12 @@ SQL
   label def lockout
     decr_lockout
 
+    # Destroy child strands to avoid infinite wait in wait_lockout_attempt during
+    # reap. Since we are locking out, no child strand should be necessary. The
+    # specific scenario: a restart strand stuck due to unavailability was
+    # blocking reap. Our standard way of doing this via
+    Semaphore.incr(strand.children_dataset.select(:id), "destroy")
+
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
     unless postgres_server.resource.location.aws?
