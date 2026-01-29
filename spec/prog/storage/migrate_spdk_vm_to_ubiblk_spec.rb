@@ -195,7 +195,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "#create_ubiblk_systemd_unit" do
     it "creates the systemd unit and hops to the next label" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/disk.raw && sudo chmod 600 /var/storage/#{vm.inhost_name}/0/disk.raw && sudo rm -f /var/storage/#{vm.inhost_name}/0/kek.pipe")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo chown #{vm.inhost_name}:#{vm.inhost_name} /var/storage/#{vm.inhost_name}/0/disk.raw && sudo chmod 600 /var/storage/#{vm.inhost_name}/0/disk.raw")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/spdk-migration-helper create-vhost-backend-service-file", stdin: prog.migration_script_params)
       expect { prog.create_ubiblk_systemd_unit }.to hop("start_ubiblk_systemd_unit")
     end
