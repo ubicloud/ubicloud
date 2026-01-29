@@ -212,9 +212,9 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready")
       ])
     end
 
@@ -265,10 +265,29 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
 
-    it "returns nil if standby has physical_slot_ready false" do
+    it "returns standby with physical_slot_ready false as fallback" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+      ])
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
+    end
+
+    it "prefers standby with physical_slot_ready true over higher lsn without" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+      ])
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
+    end
+
+    it "returns nil if standby has synchronization_status catching_up" do
+      allow(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "catching_up")
       ])
       expect(postgres_server.failover_target).to be_nil
     end
@@ -281,9 +300,9 @@ RSpec.describe PostgresServer do
 
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready")
       ])
     end
 
@@ -309,7 +328,7 @@ RSpec.describe PostgresServer do
     it "returns the replica even if physical_slot_ready is false" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false)
+        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false, synchronization_status: "ready")
       ])
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
