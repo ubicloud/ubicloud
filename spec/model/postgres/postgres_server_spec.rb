@@ -244,7 +244,6 @@ RSpec.describe PostgresServer do
 
     it "returns nil if last_known_lsn in unknown for async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: nil))
       expect(postgres_server.failover_target).to be_nil
     end
 
@@ -255,14 +254,20 @@ RSpec.describe PostgresServer do
 
     it "returns nil if lsn difference is too hign for async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "2/0")).twice
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "2/0")
       expect(postgres_server.failover_target).to be_nil
+    ensure
+      # POSTGRES_MONITOR_DB doesn't use transactional testing, so it must be manually cleaned up
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
     it "returns the standby with highest lsn if lsn difference is not high in async replication" do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::ASYNC)
-      expect(postgres_server).to receive(:lsn_monitor).and_return(instance_double(PostgresLsnMonitor, last_known_lsn: "1/11")).twice
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].insert(postgres_server_id: postgres_server.id, last_known_lsn: "1/11")
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
+    ensure
+      # POSTGRES_MONITOR_DB doesn't use transactional testing, so it must be manually cleaned up
+      POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
     it "returns standby with physical_slot_ready false as fallback" do
@@ -500,13 +505,10 @@ RSpec.describe PostgresServer do
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 
-  it "catches Sequel::Error if updating PostgresLsnMonitor fails" do
-    lsn_monitor = instance_double(PostgresLsnMonitor, last_known_lsn: "1/5")
-    expect(PostgresLsnMonitor).to receive(:new).and_return(lsn_monitor)
-    expect(lsn_monitor).to receive(:insert_conflict).and_return(lsn_monitor)
-    expect(lsn_monitor).to receive(:save_changes).and_raise(Sequel::Error)
-    expect(Clog).to receive(:emit).with("Failed to update PostgresLsnMonitor", instance_of(Hash)).and_call_original
+  it "catches Sequel::Error if updating last known lsn fails" do
+    expect(Clog).to receive(:emit).with("Failed to update last known lsn", instance_of(Hash)).and_call_original
     expect(postgres_server).to receive(:primary?).and_return(true)
+    expect(postgres_server).to receive(:update_last_known_lsn).and_raise(Sequel::Error)
     postgres_server.check_pulse(session: {db_connection: DB}, previous_pulse: {})
   end
 
