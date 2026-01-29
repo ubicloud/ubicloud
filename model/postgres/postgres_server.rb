@@ -9,9 +9,6 @@ class PostgresServer < Sequel::Model
   many_to_one :resource, class: :PostgresResource
   many_to_one :timeline, class: :PostgresTimeline
   many_to_one :vm, read_only: true
-  one_to_one :lsn_monitor, class: :PostgresLsnMonitor, read_only: true, is_used: true
-
-  plugin :association_dependencies, lsn_monitor: :destroy
 
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
@@ -23,6 +20,11 @@ class PostgresServer < Sequel::Model
 
   def self.victoria_metrics_client
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
+  end
+
+  def before_destroy
+    super
+    lsn_monitor_ds.delete
   end
 
   def aws?
@@ -195,6 +197,10 @@ class PostgresServer < Sequel::Model
     run_query(DB.select(Sequel.function(lsn_function_name)))
   end
 
+  def lsn_monitor_ds
+    POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: id)
+  end
+
   def failover_target
     target = resource.servers
       .reject { it.representative_at }
@@ -205,8 +211,8 @@ class PostgresServer < Sequel::Model
     return nil if target.nil?
 
     if resource.ha_type == PostgresResource::HaType::ASYNC
-      return nil if lsn_monitor&.last_known_lsn.nil?
-      return nil if lsn_diff(lsn_monitor.last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
+      return unless (last_known_lsn = lsn_monitor_ds.get(:last_known_lsn))
+      return if lsn_diff(last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
     target[:server]
@@ -254,13 +260,9 @@ class PostgresServer < Sequel::Model
     DB.transaction do
       if pulse[:reading] == "up" && pulse[:reading_rpt] % 12 == 1
         begin
-          PostgresLsnMonitor.new(last_known_lsn:) { it.postgres_server_id = id }
-            .insert_conflict(
-              target: :postgres_server_id,
-              update: {last_known_lsn:}
-            ).save_changes
+          update_last_known_lsn(last_known_lsn)
         rescue Sequel::Error => ex
-          Clog.emit("Failed to update PostgresLsnMonitor", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
+          Clog.emit("Failed to update last known lsn", {lsn_update_error: Util.exception_to_hash(ex, into: {ubid:, last_known_lsn:})})
         end
       end
 
@@ -270,6 +272,12 @@ class PostgresServer < Sequel::Model
     end
 
     pulse
+  end
+
+  def update_last_known_lsn(last_known_lsn)
+    POSTGRES_MONITOR_DB[:postgres_lsn_monitor]
+      .insert_conflict(target: :postgres_server_id, update: {last_known_lsn:})
+      .insert(postgres_server_id: id, last_known_lsn:)
   end
 
   def needs_event_loop_for_pulse_check?
