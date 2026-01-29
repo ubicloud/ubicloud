@@ -1351,13 +1351,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx.configure_set?).to be true
     end
 
-    it "sets deadline, restarts and exits" do
-      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl restart postgres-metrics.timer")
+    it "cleans up, restarts services and exits when daemonizer reports Succeeded" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("postgres_restart")
+      nx.incr_restart
       expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
       expect(nx.strand.stack.first["deadline_target"]).to eq("wait")
       expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 5 * 60)
+      expect(nx.restart_set?).to be false
+    end
+
+    it "cleans up and naps when daemonizer reports Failed" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("Failed")
+      expect(sshable).to receive(:d_clean).with("postgres_restart")
+      expect { nx.restart }.to nap(5)
+    end
+
+    it "starts restart via daemonizer when NotStarted" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", "16")
+      expect { nx.restart }.to nap(5)
+    end
+
+    it "naps when restart is InProgress" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("InProgress")
+      expect { nx.restart }.to nap(5)
     end
   end
 

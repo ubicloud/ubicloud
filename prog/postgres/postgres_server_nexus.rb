@@ -750,14 +750,20 @@ SQL
       pop "restart deferred due to pending configure"
     end
 
-    decr_restart
-
     register_deadline("wait", 5 * 60)
 
-    vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
-    vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
-    vm.sshable.cmd("sudo systemctl restart postgres-metrics.timer")
-    pop "postgres server is restarted"
+    case vm.sshable.d_check("postgres_restart")
+    when "Succeeded"
+      vm.sshable.d_clean("postgres_restart")
+      decr_restart
+      pop "postgres server is restarted"
+    when "Failed"
+      vm.sshable.d_clean("postgres_restart")
+    when "NotStarted"
+      vm.sshable.d_run("postgres_restart", "sudo", "postgres/bin/restart", version)
+    end
+
+    nap 5
   end
 
   def available?
