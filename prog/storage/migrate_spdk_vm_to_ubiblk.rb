@@ -143,14 +143,20 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       spdk_installation_id: nil
     )
 
-    hop_update_prep_json_file
+    hop_update_vm_configurations
   end
 
-  label def update_prep_json_file
+  label def update_vm_configurations
     prep_json = vm.vm_host.sshable.cmd_json("sudo cat /vm/:inhost_name/prep.json", inhost_name:)
     prep_json["storage_volumes"][0]["vhost_block_backend_version"] = Config.vhost_block_backend_version
     prep_json["storage_volumes"][0]["spdk_version"] = nil
     vm.vm_host.sshable.write_file("/vm/#{inhost_name}/prep.json", JSON.pretty_generate(prep_json))
+
+    storage_unit = vm_storage_volume.vhost_backend_systemd_unit_name
+    vm_unit_path = "/etc/systemd/system/#{vm.inhost_name}.service"
+    vm.vm_host.sshable.cmd("sudo sed -i 's/After=spdk-.*\\.service/After=:storage_unit/' :vm_unit_path", storage_unit:, vm_unit_path:)
+    vm.vm_host.sshable.cmd("sudo sed -i 's/Requires=spdk-.*\\.service/Requires=:storage_unit/' :vm_unit_path", storage_unit:, vm_unit_path:)
+    vm.vm_host.sshable.cmd("sudo systemctl daemon-reload")
 
     hop_start_vm
   end

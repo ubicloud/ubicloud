@@ -213,15 +213,20 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   describe "#update_vm_model" do
     it "updates the vm to be identified as a ubiblk vm" do
       expect(vm.vm_storage_volumes.first).to receive(:update).with(use_bdev_ubi: false, vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1, spdk_installation_id: nil)
-      expect { prog.update_vm_model }.to hop("update_prep_json_file")
+      expect { prog.update_vm_model }.to hop("update_vm_configurations")
     end
   end
 
-  describe "#update_prep_json_file" do
-    it "update the prep json file for proper cleanup of the vm later" do
+  describe "#update_vm_configurations" do
+    it "updates prep.json and vm systemd unit for proper cleanup later" do
+      storage_unit = vm.vm_storage_volumes.first.vhost_backend_systemd_unit_name
+      vm_unit_path = "/etc/systemd/system/#{vm.inhost_name}.service"
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
-      expect { prog.update_prep_json_file }.to hop("start_vm")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/After=spdk-.*\\.service/After=#{storage_unit}/' #{vm_unit_path}")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/Requires=spdk-.*\\.service/Requires=#{storage_unit}/' #{vm_unit_path}")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect { prog.update_vm_configurations }.to hop("start_vm")
     end
   end
 
