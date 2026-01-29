@@ -307,6 +307,36 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       ]
     end
 
+    it "does not create public AAAA record for older resources" do
+      postgres_server.resource.update(created_at: Time.utc(2026, 1, 13, 19))
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      nx.incr_initial_provisioning
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
+        ["A", "pg-test-resource.pg.example.com."],
+        ["A", "private.pg-test-resource.pg.example.com."],
+        ["AAAA", "private.pg-test-resource.pg.example.com."]
+      ]
+    end
+
+    it "updates public AAAA record if it already exists for older resources" do
+      postgres_server.resource.update(created_at: Time.utc(2026, 1, 13, 19))
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      dns_zone.insert_record(record_name: postgres_server.resource.hostname, type: "AAAA", ttl: 10, data: "::1")
+      DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 60)
+      nx.incr_initial_provisioning
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      DnsRecord.where(dns_zone_id: dns_zone.id).where { created_at < Time.now - 10 }.destroy
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
+        ["A", "pg-test-resource.pg.example.com."],
+        ["A", "private.pg-test-resource.pg.example.com."],
+        ["AAAA", "pg-test-resource.pg.example.com."],
+        ["AAAA", "private.pg-test-resource.pg.example.com."]
+      ]
+    end
+
     it "creates CNAME DNS records for AWS instances" do
       postgres_server
       AwsInstance.create_with_id(postgres_server.vm, ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
