@@ -14,9 +14,20 @@ class Prog::Postgres::Restart < Prog::Base
       pop "restart deferred due to pending configure"
     end
 
-    vm.sshable.cmd("sudo postgres/bin/restart :version", version: postgres_server.version)
-    vm.sshable.cmd("sudo systemctl restart 'pgbouncer@*.service'")
-    vm.sshable.cmd("sudo systemctl restart postgres-metrics.timer")
-    pop "postgres server is restarted"
+    hop_restart
+  end
+
+  label def restart
+    case vm.sshable.d_check("postgres_restart")
+    when "Succeeded"
+      vm.sshable.d_clean("postgres_restart")
+      pop "postgres server is restarted"
+    when "Failed"
+      vm.sshable.d_clean("postgres_restart")
+    when "NotStarted"
+      vm.sshable.d_run("postgres_restart", "sudo", "postgres/bin/restart", postgres_server.version)
+    end
+
+    nap 5
   end
 end
