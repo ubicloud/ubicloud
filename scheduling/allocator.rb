@@ -491,7 +491,7 @@ module Scheduling::Allocator
       # select the cpuset for the new slice
       cpus = VmHostCpu
         .where(vm_host_id:, spdk: false, vm_host_slice_id: nil)
-        .order_by(Sequel.asc(:cpu_number))
+        .order_by(:cpu_number)
         .limit(n)
         .map(&:cpu_number)
 
