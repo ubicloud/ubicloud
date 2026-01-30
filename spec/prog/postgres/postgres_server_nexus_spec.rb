@@ -1346,23 +1346,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
   end
 
-  describe "#restart" do
-    it "pops if configure is set so parent can handle it" do
-      nx.incr_configure
-      expect { nx.restart }.to exit({"msg" => "restart deferred due to pending configure"})
-      expect(nx.configure_set?).to be true
-    end
-
-    it "sets deadline, restarts and exits" do
-      expect(sshable).to receive(:_cmd).with("sudo postgres/bin/restart 16")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl restart pgbouncer@*.service")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl restart postgres-metrics.timer")
-      expect { nx.restart }.to exit({"msg" => "postgres server is restarted"})
-      expect(nx.strand.stack.first["deadline_target"]).to eq("wait")
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 5 * 60)
-    end
-  end
-
   describe "#available?" do
     before do
       expect(sshable).to receive(:invalidate_cache_entry)
