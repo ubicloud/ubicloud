@@ -249,7 +249,7 @@ class PostgresServer < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", connect_timeout: 4, keep_reference: false)
+      session[:db_connection] ||= Sequel.connect(adapter: "postgres", host: health_monitor_socket_path, user: "postgres", database: "template1", connect_timeout: 4, keep_reference: false)
       last_known_lsn = session[:db_connection].get(Sequel.function(lsn_function_name).as(:lsn))
       "up"
     rescue
@@ -307,7 +307,7 @@ class PostgresServer < Sequel::Model
   end
 
   private def _run_query(query)
-    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
+    vm.sshable.cmd("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'", stdin: query).chomp
   end
 
   def export_metrics(session:, tsdb_client:)
