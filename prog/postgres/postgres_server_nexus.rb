@@ -751,22 +751,6 @@ SQL
     pop "postgres server is deleted"
   end
 
-  label def restart
-    when_configure_set? do
-      # Pop so that the parent can handle the configure
-      pop "restart deferred due to pending configure"
-    end
-
-    decr_restart
-
-    register_deadline("wait", 5 * 60)
-
-    vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
-    vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
-    vm.sshable.cmd("sudo systemctl restart postgres-metrics.timer")
-    pop "postgres server is restarted"
-  end
-
   def available?
     vm.sshable.invalidate_cache_entry
 
