@@ -18,6 +18,10 @@ partition_number = Integer(partition_number)
 raise "invalid partition_number: #{partition_number}" if partition_number < 1 || partition_number > max_partition
 
 require_relative "../loader"
+
+checkout_telemetry = ConnectionCheckoutTelemetry.new
+checkout_telemetry.setup_and_run_thread
+
 clover_freeze
 
 # Information (seconds, log message, log key) for stuck pulses for monitor jobs.
@@ -91,6 +95,7 @@ end
 do_shutdown = proc do
   repartitioner.shutdown!
   runner.shutdown!
+  checkout_telemetry.shutdown!
 end
 
 Signal.trap("INT", &do_shutdown)
