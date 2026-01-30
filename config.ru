@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+ENV["PROCESS_TYPE"] = "web"
+
 require_relative "loader"
 
 clover_freeze

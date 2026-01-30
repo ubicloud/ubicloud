@@ -107,7 +107,7 @@ module Util
   end
 
   def self.monitor_process?
-    ENV["MONITOR_PROCESS"] == "1"
+    ENV["PROCESS_TYPE"] == "monitor"
   end
 
   def self.calculate_ips_v4

@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-ENV["MONITOR_PROCESS"] = "1"
+ENV["PROCESS_TYPE"] = "monitor"
 
 partition_number = ARGV[0]
 partition_number ||= if (match = /monitor\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
