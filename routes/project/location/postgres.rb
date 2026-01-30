@@ -135,6 +135,26 @@ class Clover
         end
       end
 
+      r.post web?, "add-aaaa-record" do
+        authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "settings" }
+
+        unless pg.can_add_aaaa_record?
+          no_audit_log
+          flash["error"] = "Cannot add AAAA record for this database"
+          r.redirect pg, "/settings"
+        end
+
+        DB.transaction do
+          pg.dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: pg.representative_server.vm.ip6_string)
+          pg.incr_refresh_dns_record
+          audit_log(pg, "add_aaaa_record")
+        end
+
+        flash["notice"] = "The AAAA DNS record will be added in a few seconds"
+        r.redirect pg, "/settings"
+      end
+
       r.on api?, "firewall-rule" do
         r.is do
           r.get do

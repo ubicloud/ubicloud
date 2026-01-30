@@ -68,6 +68,18 @@ class PostgresResource < Sequel::Model
     @dns_zone ||= DnsZone[project_id: Config.postgres_service_project_id, name: hostname_suffix]
   end
 
+  AAAA_CUTOFF = Time.utc(2026, 1, 13, 20)
+  def can_add_aaaa_record?
+    !location.aws? &&
+      created_at < AAAA_CUTOFF &&
+      dns_zone &&
+      representative_server&.vm&.ip6_string &&
+      dns_zone
+        .records_dataset
+        .where(type: "AAAA", name: hostname + ".")
+        .empty?
+  end
+
   def hostname
     if dns_zone
       return "#{name}.#{hostname_suffix}" if hostname_version == "v1"
