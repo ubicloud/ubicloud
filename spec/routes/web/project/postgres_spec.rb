@@ -618,75 +618,62 @@ RSpec.describe Clover, "postgres" do
         before do
           allow(Config).to receive(:postgres_service_hostname).and_return("pg.example.com")
           @dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+          pg.representative_server.vm.update(ephemeral_net6: "::/64")
         end
 
         it "can add AAAA record if database was created before cutoff and no AAAA exists" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
           visit "#{project.path}#{pg.path}/settings"
 
           expect(page).to have_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_css(".add-aaaa-btn")
+          click_button "Add AAAA Record"
 
-          find(".add-aaaa-btn").click
-
-          expect(page).to have_flash_notice("AAAA DNS record will be added in a few seconds")
+          expect(page).to have_flash_notice("The AAAA DNS record will be added in a few seconds")
           expect(pg.reload.semaphores_dataset.where(name: "refresh_dns_record").count).to eq(1)
-          expect(page.status_code).to eq(200)
+          expect(pg.dns_zone.records_dataset.where(type: "AAAA").get(:name)).to eq(pg.hostname + ".")
         end
 
         it "does not show button if AAAA record already exists" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
           @dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: "::1")
 
           visit "#{project.path}#{pg.path}/settings"
-
           expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_no_css(".add-aaaa-btn")
+          expect(page).to have_no_content "Add AAAA Record"
+        end
+
+        it "does not show button if there is no representative server" do
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
+          pg.representative_server.update(representative_at: nil)
+
+          visit "#{project.path}#{pg.path}/settings"
+          expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
+          expect(page).to have_no_content "Add AAAA Record"
         end
 
         it "handles race condition when AAAA is added between page load and button click" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
           visit "#{project.path}#{pg.path}/settings"
-          expect(page).to have_css(".add-aaaa-btn")
 
-          # Simulate another process adding AAAA
           @dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: "::1")
 
-          find(".add-aaaa-btn").click
+          click_button "Add AAAA Record"
 
-          expect(page).to have_flash_notice("AAAA DNS record already exists for this database")
+          expect(page).to have_flash_error("Cannot add AAAA record for this database")
           expect(page.status_code).to eq(200)
+
+          expect(page).to have_no_content "Add AAAA Record"
         end
 
         it "does not show button for databases created after cutoff" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF + 86400)
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF + 86400)
 
           visit "#{project.path}#{pg.path}/settings"
 
           expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_no_css(".add-aaaa-btn")
-        end
-
-        it "does not show button for read replicas" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
-
-          pg_replica = Prog::Postgres::PostgresResourceNexus.assemble(
-            project_id: project.id,
-            location_id: pg.location_id,
-            name: "test-replica",
-            target_vm_size: pg.target_vm_size,
-            target_storage_size_gib: pg.target_storage_size_gib,
-            target_version: "16",
-            parent_id: pg.id
-          ).subject
-          pg_replica.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
-
-          visit "#{project.path}#{pg_replica.path}/settings"
-
-          expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_no_css(".add-aaaa-btn")
+          expect(page).to have_no_content "Add AAAA Record"
         end
 
         it "does not show button for AWS instances" do
@@ -702,23 +689,23 @@ RSpec.describe Clover, "postgres" do
             target_storage_size_gib: 128,
             target_version: "16"
           ).subject
-          pg_aws.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
+          pg_aws.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
           visit "#{project.path}#{pg_aws.path}/settings"
 
           expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_no_css(".add-aaaa-btn")
+          expect(page).to have_no_content "Add AAAA Record"
         end
 
         it "does not show button when user does not have edit permissions" do
-          pg.update(created_at: Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF - 86400)
+          pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
           AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
 
           visit "#{project_wo_permissions.path}#{pg_wo_permission.path}/settings"
 
           expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
-          expect(page).to have_no_css(".add-aaaa-btn")
+          expect(page).to have_no_content "Add AAAA Record"
         end
       end
 
