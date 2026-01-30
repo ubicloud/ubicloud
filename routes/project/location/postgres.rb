@@ -135,55 +135,24 @@ class Clover
         end
       end
 
-      r.post "add-aaaa-record" do
+      r.post web?, "add-aaaa-record" do
         authorize("Postgres:edit", pg)
+        handle_validation_failure("postgres/show") { @page = "settings" }
 
-        # Validate preconditions
-        if pg.read_replica?
-          raise CloverError.new(400, "InvalidRequest", "AAAA records cannot be added for read replicas")
+        unless pg.can_add_aaaa_record?
+          no_audit_log
+          flash["error"] = "Cannot add AAAA record for this database"
+          r.redirect pg, "/settings"
         end
 
-        if pg.location.aws?
-          raise CloverError.new(400, "InvalidRequest", "AAAA records are not supported for AWS instances")
-        end
-
-        if pg.created_at >= Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF
-          raise CloverError.new(400, "InvalidRequest", "This database already has AAAA record support")
-        end
-
-        # Race condition check: verify AAAA doesn't already exist
-        dns_zone = pg.dns_zone
-        unless dns_zone
-          raise CloverError.new(400, "InvalidRequest", "DNS zone not available for this database")
-        end
-
-        record_name = pg.hostname + "."
-        aaaa_exists = !dns_zone.records_dataset.where(type: "AAAA", name: record_name).empty?
-
-        if aaaa_exists
-          # Log the attempt even though no action was taken
+        DB.transaction do
+          pg.dns_zone.insert_record(record_name: pg.hostname, type: "AAAA", ttl: 10, data: pg.representative_server.vm.ip6_string)
+          pg.incr_refresh_dns_record
           audit_log(pg, "add_aaaa_record")
-
-          if api?
-            raise CloverError.new(400, "InvalidRequest", "AAAA DNS record already exists")
-          else
-            flash["notice"] = "AAAA DNS record already exists for this database"
-            r.redirect pg, "/settings"
-          end
-        else
-          # Add AAAA record by triggering DNS refresh
-          DB.transaction do
-            pg.incr_refresh_dns_record
-            audit_log(pg, "add_aaaa_record")
-          end
-
-          if api?
-            Serializers::Postgres.serialize(pg, {detailed: true})
-          else
-            flash["notice"] = "AAAA DNS record will be added in a few seconds"
-            r.redirect pg, "/settings"
-          end
         end
+
+        flash["notice"] = "The AAAA DNS record will be added in a few seconds"
+        r.redirect pg, "/settings"
       end
 
       r.on api?, "firewall-rule" do

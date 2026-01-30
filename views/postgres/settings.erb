@@ -67,14 +67,15 @@
         </div>
       <% end %>
       <!-- Add AAAA DNS Record -->
-      <% if @edit_perm && !@pg.read_replica? && !@pg.location.aws? && @pg.created_at < Prog::Postgres::PostgresResourceNexus::AAAA_CUTOFF && @pg.dns_zone&.records_dataset&.where(type: "AAAA", name: @pg.hostname + ".")&.empty? %>
+      <% if @edit_perm && @pg.can_add_aaaa_record? %>
         <div class="px-4 py-5 sm:p-6">
           <% form(action: "#{path(@pg)}/add-aaaa-record", method: :post) do %>
             <div class="sm:flex sm:items-center sm:justify-between">
               <div>
                 <h3 class="text-base font-semibold leading-6 text-gray-900">Add IPv6 (AAAA) DNS record</h3>
                 <div class="mt-2 text-sm text-gray-500">
-                  <p>This action will add an IPv6 (AAAA) DNS record for this PostgreSQL database. This enables connections over IPv6.</p>
+                  <p>This action will add an IPv6 (AAAA) DNS record for this PostgreSQL database. This enables
+                    connections over IPv6.</p>
                 </div>
               </div>
               <div id="postgres-aaaa-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
