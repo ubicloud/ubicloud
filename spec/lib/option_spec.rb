@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "rspec"
-require_relative "../../lib/option"
+require_relative "../spec_helper"
 
 RSpec.describe Option do
   describe "#VmSize options" do

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require "rspec"
-require_relative "../../lib/util"
+require_relative "../spec_helper"
 
 RSpec.describe Util do
   describe "#rootish_ssh" do

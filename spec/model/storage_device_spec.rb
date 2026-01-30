@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../../lib/system_parser"
-require "rspec"
+require_relative "spec_helper"
 
 RSpec.describe StorageDevice do
   describe "#migrate_device_name_to_device_id" do
