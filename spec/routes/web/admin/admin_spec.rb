@@ -312,9 +312,11 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows stripe data for billing info as extra" do
-    expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    customers_service = instance_double(Stripe::CustomerService)
+    allow(StripeClient).to receive(:customers).and_return(customers_service)
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
-    expect(Stripe::Customer).to receive(:retrieve).with("cus_test123").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+    expect(customers_service).to receive(:retrieve).with("cus_test123").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
     visit "/model/BillingInfo/#{billing_info.ubid}"
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
     expect(page).to have_content "Stripe Data"
@@ -340,10 +342,12 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows stripe data for payment method as extra" do
-    expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    payment_methods_service = instance_double(Stripe::PaymentMethodService)
+    allow(StripeClient).to receive(:payment_methods).and_return(payment_methods_service)
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
     payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1234567890")
-    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from(id: "pm_1234567890", card: {brand: "Visa", last4: "1234", exp_month: 12, exp_year: 2023, country: "NL", funding: "debit", wallet: {type: "apple_pay"}, checks: {address_line1_check: "pass", cvc_check: "pass"}}))
+    expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from(id: "pm_1234567890", card: {brand: "Visa", last4: "1234", exp_month: 12, exp_year: 2023, country: "NL", funding: "debit", wallet: {type: "apple_pay"}, checks: {address_line1_check: "pass", cvc_check: "pass"}}))
     visit "/model/PaymentMethod/#{payment_method.ubid}"
     expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
     expect(page).to have_content "Stripe Data"

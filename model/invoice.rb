@@ -5,7 +5,6 @@ require "aws-sdk-s3"
 require "countries"
 require "prawn"
 require "prawn/table"
-require "stripe"
 
 class Invoice < Sequel::Model
   unrestrict_primary_key
@@ -69,7 +68,7 @@ class Invoice < Sequel::Model
 
   def charge
     reload # Reload to get the latest status to avoid double charging
-    unless (Stripe.api_key = Config.stripe_secret_key)
+    unless Config.stripe_secret_key
       Clog.emit("Billing is not enabled. Set STRIPE_SECRET_KEY to enable billing.")
       return true
     end
@@ -102,7 +101,7 @@ class Invoice < Sequel::Model
     errors = []
     billing_info.payment_methods.each do |pm|
       begin
-        payment_intent = Stripe::PaymentIntent.create({
+        payment_intent = StripeClient.payment_intents.create({
           amount: (amount * 100).to_i, # 100 cents to charge $1.00
           currency: "usd",
           confirm: true,
