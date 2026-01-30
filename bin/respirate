@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+ENV["PROCESS_TYPE"] = "respirate"
+
 partition_number = ARGV[0]
 partition_number ||= if (match = /respirate\.(\d+)\z/.match(ENV["DYNO"] || ENV["PS"]))
   match[1] # Heroku/Foreman
