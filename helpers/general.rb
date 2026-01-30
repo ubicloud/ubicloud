@@ -103,6 +103,7 @@ class Clover < Roda
   AUDIT_LOG_DS = DB[:audit_log].returning(nil)
   SUPPORTED_ACTIONS = Set.new(<<~ACTIONS.split.each(&:freeze)).freeze
     accept_invitation
+    add_aaaa_record
     add_invitation
     add_member
     associate
@@ -131,7 +132,7 @@ class Clover < Roda
     update_invitation
     upgrade
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote reset_superuser_password restart restore update]).freeze
+  LOGGED_ACTIONS = Set.new(%w[add_aaaa_record create create_replica delete_all_cache_entries destroy promote reset_superuser_password restart restore update]).freeze
 
   def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
