@@ -397,6 +397,44 @@ RSpec.describe StorageVolume do
     end
   end
 
+  describe "#vhost_backend_config" do
+    it "includes stripe_source when present" do
+      stripe_source = {
+        "source" => "archive",
+        "type" => "s3",
+        "bucket" => "test-bucket",
+        "prefix" => "test-prefix",
+        "endpoint" => "https://s3.example.com",
+        "region" => "auto",
+        "credentials" => {
+          "access_key_id" => "access_key",
+          "secret_access_key" => "secret_key"
+        }
+      }
+      params = {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => false,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.1-5",
+        "num_queues" => 4,
+        "queue_size" => 128,
+        "stripe_source" => stripe_source
+      }
+      sv = described_class.new("test", params)
+      allow(sv).to receive(:write_through_device?).and_return(true)
+
+      config = sv.vhost_backend_config(nil, nil)
+      expect(config["stripe_source"]).to eq(stripe_source)
+    end
+
+    it "does not include stripe_source when not present" do
+      allow(unencrypted_vhost_sv).to receive(:write_through_device?).and_return(true)
+      config = unencrypted_vhost_sv.vhost_backend_config(nil, nil)
+      expect(config["stripe_source"]).to be_nil
+    end
+  end
+
   describe "#write_through_device" do
     it "can check if a device is write-through" do
       expect(File).to receive(:stat).with(disk_file).and_return(instance_double(File::Stat, dev_major: 1, dev_minor: 2))

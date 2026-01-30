@@ -367,5 +367,47 @@ RSpec.describe Clover, "vm" do
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
     end
+
+    describe "create-umi" do
+      it "success when vm is running" do
+        vm.update(display_state: "running")
+        expect(Prog::Storage::ArchiveVm).to receive(:assemble).with(vm.id, kind_of(String))
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/create-umi", {name: "test-umi"}.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq(vm.name)
+        expect(MachineImage.find(name: "test-umi", project_id: vm.project_id)).not_to be_nil
+      end
+
+      it "fails when name is missing" do
+        vm.update(display_state: "running")
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/create-umi", {name: ""}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Name is required"})
+      end
+
+      it "fails when machine image with name already exists" do
+        vm.update(display_state: "running")
+        MachineImage.create(
+          name: "test-umi",
+          bucket_prefix: "test-prefix",
+          project_id: vm.project_id,
+          location_id: vm.location_id
+        ).this.update(ready: true)
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/create-umi", {name: "test-umi"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: name", {"name" => "Machine image with this name already exists"})
+      end
+
+      it "fails when vm is not running" do
+        vm.update(display_state: "creating")
+
+        post "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}/create-umi", {name: "test-umi"}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm", {"vm" => "VM must be in running state to create UMI"})
+      end
+    end
   end
 end

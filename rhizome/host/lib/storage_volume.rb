@@ -40,6 +40,7 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+    @stripe_source = params["stripe_source"]
   end
 
   def vp
@@ -253,7 +254,8 @@ class StorageVolume
       "device_id" => @device_id,
       "skip_sync" => @skip_sync,
       "write_through" => write_through_device?,
-      "rpc_socket_path" => sp.rpc_socket_path
+      "rpc_socket_path" => sp.rpc_socket_path,
+      "track_written" => true
     }
 
     if @image_path
@@ -271,6 +273,10 @@ class StorageVolume
     if @cpus
       config["cpus"] = @cpus
       config["num_queues"] = @cpus.count
+    end
+
+    if @stripe_source
+      config["stripe_source"] = @stripe_source
     end
 
     config

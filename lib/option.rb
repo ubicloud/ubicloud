@@ -88,15 +88,15 @@ module Option
     alias_method :display_name, :name
   end
   VmSizes = [2, 4, 8, 16, 30, 60].map {
-    storage_size_options = [it * 20, it * 40]
+    storage_size_options = [it * 20, it * 40, 20]
     VmSize.new("standard-#{it}", "standard", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, vring_workers(it), true, "x64")
   }.concat([2, 4, 8, 16, 30, 60].map {
-    storage_size_options = [it * 20, it * 40]
+    storage_size_options = [it * 20, it * 40, 20]
     VmSize.new("standard-#{it}", "standard", it, it * 100, 0, (it * 3.2).to_i, storage_size_options, NO_IO_LIMITS, vring_workers(it), false, "arm64")
   }).concat([6].map {
     VmSize.new("standard-gpu-#{it}", "standard-gpu", it, it * 100, 0, (it * 5.34).to_i, [it * 30], NO_IO_LIMITS, vring_workers(it), false, "x64")
   }).concat([2, 4, 8, 16, 30].map {
-    storage_size_options = [it * 20, it * 40]
+    storage_size_options = [it * 20, it * 40, 20]
     VmSize.new("premium-#{it}", "premium", it, it * 100, 0, it * 4, storage_size_options, NO_IO_LIMITS, vring_workers(it), false, "x64")
   }).concat([1, 2].map {
     storage_size_options = [it * 10, it * 20]

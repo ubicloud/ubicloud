@@ -238,7 +238,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         project.set_ff_ipv6_disabled(true)
 
         expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("NotStarted")
-        expect(sshable).to receive(:_cmd).with(/sudo -u vm[0-9a-z]+ tee/, stdin: String) do |**kwargs|
+        expect(sshable).to receive(:_cmd).with(/sudo -u vm[0-9a-z]+ tee/, log: false, stdin: String) do |**kwargs|
           require "json"
           params = JSON(kwargs.fetch(:stdin))
           expect(params).to include(
