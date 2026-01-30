@@ -585,7 +585,7 @@ SQL
     end
 
     reap(fallthrough: true)
-    nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty? && strand.children_dataset.where(prog: "Postgres::Restart").empty?
+    nap 5 unless strand.children_dataset.where(prog: "Postgres::Restart").empty?
 
     if available?
       decr_checkup
@@ -743,22 +743,6 @@ SQL
     postgres_server.destroy
 
     pop "postgres server is deleted"
-  end
-
-  label def restart
-    when_configure_set? do
-      # Pop so that the parent can handle the configure
-      pop "restart deferred due to pending configure"
-    end
-
-    decr_restart
-
-    register_deadline("wait", 5 * 60)
-
-    vm.sshable.cmd("sudo postgres/bin/restart :version", version:)
-    vm.sshable.cmd("sudo systemctl restart pgbouncer@*.service")
-    vm.sshable.cmd("sudo systemctl restart postgres-metrics.timer")
-    pop "postgres server is restarted"
   end
 
   def available?
