@@ -4,6 +4,9 @@ ENV["PROCESS_TYPE"] = "web"
 
 require_relative "loader"
 
+CONNECTION_CHECKOUT_TELEMETRY = ConnectionCheckoutTelemetry.new
+CONNECTION_CHECKOUT_TELEMETRY.setup
+
 clover_freeze
 
 app = if Config.development?

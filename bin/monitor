@@ -79,6 +79,8 @@ repartitioner = Repartitioner.new(partition_number:, channel: :monitor, listen_t
 runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, **runner_args)
 
 repartition_thread = Thread.new { repartitioner.listen }
+checkout_telemetry = ConnectionCheckoutTelemetry.new
+checkout_telemetry.setup_and_run_thread
 
 # Only NOTIFY for the first 3-5 seconds, so that by the time we actually start monitoring,
 # all monitor processes know the expected partitioning. The rand is to avoid thundering herd issues.
@@ -91,6 +93,7 @@ end
 do_shutdown = proc do
   repartitioner.shutdown!
   runner.shutdown!
+  checkout_telemetry.shutdown!
 end
 
 Signal.trap("INT", &do_shutdown)

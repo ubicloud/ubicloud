@@ -3,7 +3,11 @@
 require_relative "../model/spec_helper"
 
 RSpec.describe Scheduling::Dispatcher do
-  subject(:di) { described_class.new(pool_size: 1) }
+  subject(:di) { described_class.new(pool_size: 1, telemetry_db:) }
+
+  # Use a mock database for the telemetry database in frozen tests,
+  # as it fails with the main database if it is already frozen.
+  let(:telemetry_db) { Config.frozen_test? ? Sequel.mock : DB }
 
   after do
     (@di || di).shutdown_and_cleanup_threads
@@ -11,7 +15,7 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   def new_dispatcher(**)
-    described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, **)
+    described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, telemetry_db:, **)
   end
 
   describe "#shutdown" do
@@ -212,7 +216,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).with(2).and_invoke(->(_) { exited = true })
-      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
+      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1, telemetry_db:)
       start_queue = di.instance_variable_get(:@thread_data).dig(0, :start_queue)
       start_queue.push(true)
       t = Time.now
@@ -228,7 +232,7 @@ RSpec.describe Scheduling::Dispatcher do
       exited = false
       expect(ThreadPrinter).to receive(:run)
       expect(Kernel).to receive(:exit!).with(2).and_invoke(->(_) { exited = true })
-      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1)
+      di = @di = described_class.new(apoptosis_timeout: 0.05, pool_size: 1, telemetry_db:)
       thread_data = di.instance_variable_get(:@thread_data)
       start_queue = thread_data.dig(0, :start_queue)
       finish_queue = thread_data.dig(0, :finish_queue)
@@ -419,6 +423,7 @@ RSpec.describe Scheduling::Dispatcher do
 
       st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
       expect(st).to receive(:run).and_raise(ex)
+      telemetry_db
 
       # Go to the trouble of emitting those exceptions to provoke
       # plausible crashes in serialization.
