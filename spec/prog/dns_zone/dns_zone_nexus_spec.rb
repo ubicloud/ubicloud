@@ -69,6 +69,7 @@ zone-commit postgres.ubicloud.com
 COMMANDS
 
       expect(sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: expected_commands.chomp).and_return("OK\nOK\nOK\nOK\nOK")
+      DnsRecord.where(data: "5.6.7.8").update(created_at: Time.now - 60)
       expect { nx.refresh_dns_servers }.to hop("wait")
     end
 
