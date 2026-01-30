@@ -58,3 +58,7 @@ DB.load_index_cache?("cache/index.cache")
 
 DB.extension :temporarily_release_connection if ENV["SHARED_CONNECTION"] == "1"
 DB.extension :query_blocker if Config.frozen_test?
+
+# Will be required separately by web, respirate, and monitor, but too late
+# when running frozen tests, so load the extension eagerly in that case
+DB.extension :connection_checkout_event_callback if Config.frozen_test?
