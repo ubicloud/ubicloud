@@ -15,6 +15,9 @@
 
   <% if strand || @obj.is_a?(Strand) %>
     <% strand ||= @obj %>
+    <% if @obj.is_a?(Strand) && strand.subject != strand %>
+      <a href="/model/<%= strand.subject.class %>/<%= strand.subject.ubid %>">Subject</a> |
+    <% end %>
     <%== form({action: "/model/Strand/#{strand.ubid}/schedule", method: :post}, button: "Schedule Strand to Run Now") %>
   <% end %>
 </div>
