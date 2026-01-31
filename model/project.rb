@@ -220,6 +220,7 @@ class Project < Sequel::Model
     :ipv6_disabled,
     :postgres_hostname_override,
     :postgres_lantern,
+    :postgres_tag_search_ui,
     :private_locations,
     :skip_runner_pool,
     :spill_to_alien_runners,
