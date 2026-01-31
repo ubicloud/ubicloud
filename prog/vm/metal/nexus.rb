@@ -262,6 +262,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     when_checkup_set? do
       unless available?
+        update_stack("reason_determined" => false)
         hop_unavailable
       end
       decr_checkup
@@ -347,7 +348,52 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
     if available?
       decr_checkup
+      Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
       hop_wait
+    elsif !frame["reason_determined"]
+      begin
+        result, invocation_id = host.sshable.cmd("systemctl show -p Result -p InvocationID --value :vm_name", vm_name:).strip.split("\n")
+
+        reason = if %w[signal core-dump oom-kill timeout success].include?(result)
+          result
+        else
+          host.sshable.cmd(<<~END, invocation_id:).strip
+            sudo journalctl _SYSTEMD_INVOCATION_ID=:invocation_id -o cat -n 50 --no-pager | \
+              grep -m1 -oF \
+                -e 'ACPI Shutdown signalled' \
+                -e 'vCPU thread panicked' \
+                -e 'VCPU generated error' \
+                -e 'thread panicked'
+          END
+        end
+      rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+        reason = "unknown"
+      end
+
+      case reason
+      when "ACPI Shutdown signalled", "success"
+        msg = if reason == "success"
+          # ExecStop succeeded: someone ran systemctl stop or ch-remote shutdown-vmm.
+          # Deliberate action, not an issue, don't page
+          "VM stopped by operator"
+        else
+          # Customer shutdown their VM from inside the VM, don't page
+          "VM stopped by guest ACPI shutdown"
+        end
+        Clog.emit(msg, {vm_exit: {vm: vm.ubid}})
+        decr_checkup
+        incr_stop
+        hop_stopped
+      else
+        # Unexpected exit: signal, crash, unknown cause.
+        # Page with the reason in the summary.
+        Prog::PageNexus.assemble(
+          "#{vm.ubid} stopped unexpectedly (#{reason})",
+          ["VmExit", vm.ubid], vm.ubid,
+          extra_data: {vm_host: host.ubid, result:, reason:}
+        )
+        update_stack("reason_determined" => true)
+      end
     end
 
     nap 30
