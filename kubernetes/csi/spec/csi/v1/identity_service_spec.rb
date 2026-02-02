@@ -4,7 +4,8 @@ require "logger"
 require "spec_helper"
 
 RSpec.describe Csi::V1::IdentityService do
-  let(:service) { described_class.new(logger: Logger.new($stdout)) }
+  let(:logger) { Logger.new(File::NULL) }
+  let(:service) { described_class.new(logger:) }
   let(:call) { instance_double(GRPC::ActiveCall) }
 
   describe "#log_with_id" do

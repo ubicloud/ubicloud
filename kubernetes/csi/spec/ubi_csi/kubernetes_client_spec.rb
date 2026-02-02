@@ -4,11 +4,8 @@ require "logger"
 require "spec_helper"
 
 RSpec.describe Csi::KubernetesClient do
-  let(:client) { described_class.new(req_id: "test-req-id", logger: Logger.new($stdout)) }
-
-  before do
-    allow(client).to receive(:log_with_id) # suppress logs during test runs
-  end
+  let(:logger) { Logger.new(File::NULL) }
+  let(:client) { described_class.new(req_id: "test-req-id", logger:) }
 
   describe "#initialize" do
     it "initializes correctly with req_id" do
