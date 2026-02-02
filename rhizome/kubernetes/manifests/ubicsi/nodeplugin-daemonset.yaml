@@ -74,6 +74,7 @@ spec:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
             - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.ubicloud.com/csi.sock"
+            - "--http-endpoint=:8080"
           env:
             - name: KUBE_NODE_NAME
               valueFrom:

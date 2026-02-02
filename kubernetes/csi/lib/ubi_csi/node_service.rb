@@ -8,6 +8,7 @@ require "shellwords"
 require "base64"
 require_relative "errors"
 require_relative "kubernetes_client"
+require_relative "mesh_connectivity_checker"
 require_relative "../csi_services_pb"
 
 module Csi
@@ -28,6 +29,7 @@ module Csi
       def initialize(logger:, node_id:)
         @logger = logger
         @node_id = node_id
+        start_mesh_connectivity_checker
       end
 
       attr_reader :node_id
@@ -359,6 +361,15 @@ module Csi
         rescue => e
           log_and_raise(req_id, e)
         end
+      end
+
+      def start_mesh_connectivity_checker
+        @mesh_checker = Csi::MeshConnectivityChecker.new(logger: @logger, node_id: @node_id)
+        @mesh_checker.start
+      end
+
+      def shutdown!
+        @mesh_checker.shutdown!
       end
     end
   end

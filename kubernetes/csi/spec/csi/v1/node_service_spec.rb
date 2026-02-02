@@ -385,7 +385,7 @@ RSpec.describe Csi::V1::NodeService do
     let(:response) { Csi::V1::NodeStageVolumeResponse.new }
 
     it "stages a volume successfully" do
-      expect(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient)
+      expect(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient).at_least(:once)
       expect(service).to receive_messages(
         fetch_and_migrate_pvc: pvc,
         perform_node_stage_volume: response,
@@ -398,7 +398,7 @@ RSpec.describe Csi::V1::NodeService do
     end
 
     it "re raises error" do
-      expect(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient)
+      expect(Csi::KubernetesClient).to receive(:new).and_return(Csi::KubernetesClient).at_least(:once)
       expect(service).to receive(:fetch_and_migrate_pvc).and_raise("some error")
       expect { service.node_stage_volume(req, nil) }.to raise_error(GRPC::Internal, "13:some error")
     end
@@ -872,6 +872,16 @@ RSpec.describe Csi::V1::NodeService do
       expect(result).not_to have_key("status")
 
       expect(result).to eq(pvc)
+    end
+  end
+
+  describe "#shutdown!" do
+    it "calls shutdown! on mesh_checker" do
+      mesh_checker = instance_double(Csi::MeshConnectivityChecker)
+      service.instance_variable_set(:@mesh_checker, mesh_checker)
+      expect(mesh_checker).to receive(:shutdown!)
+
+      service.shutdown!
     end
   end
 end
