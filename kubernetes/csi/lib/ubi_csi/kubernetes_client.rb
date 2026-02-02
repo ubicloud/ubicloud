@@ -104,5 +104,17 @@ module Csi
 
       pv
     end
+
+    def get_nodeplugin_pods
+      pods_yaml = yaml_load_kubectl("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin", "-oyaml")
+      pods_yaml["items"].filter_map do |pod|
+        next unless pod.dig("status", "phase") == "Running"
+        {
+          "name" => pod.dig("metadata", "name"),
+          "ip" => pod.dig("status", "podIP"),
+          "node" => pod.dig("spec", "nodeName")
+        }
+      end
+    end
   end
 end

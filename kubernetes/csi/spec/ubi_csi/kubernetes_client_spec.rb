@@ -185,4 +185,55 @@ RSpec.describe Csi::KubernetesClient do
       expect { client.find_pv_by_volume_id("vol-999") }.to raise_error(ObjectNotFoundError)
     end
   end
+
+  describe "#get_nodeplugin_pods" do
+    let(:pods_list) do
+      {"items" => [
+        {
+          "metadata" => {"name" => "ubicsi-nodeplugin-abc"},
+          "spec" => {"nodeName" => "worker-1"},
+          "status" => {"phase" => "Running", "podIP" => "10.0.0.1"}
+        },
+        {
+          "metadata" => {"name" => "ubicsi-nodeplugin-xyz"},
+          "spec" => {"nodeName" => "worker-2"},
+          "status" => {"phase" => "Running", "podIP" => "10.0.0.2"}
+        },
+        {
+          "metadata" => {"name" => "ubicsi-nodeplugin-pending"},
+          "spec" => {"nodeName" => "worker-3"},
+          "status" => {"phase" => "Pending", "podIP" => nil}
+        }
+      ]}
+    end
+
+    it "returns only running nodeplugin pods" do
+      expect(client).to receive(:run_kubectl).with("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin", "-oyaml").and_return(YAML.dump(pods_list))
+
+      result = client.get_nodeplugin_pods
+
+      expect(result.size).to eq(2)
+      expect(result).to include({"name" => "ubicsi-nodeplugin-abc", "ip" => "10.0.0.1", "node" => "worker-1"})
+      expect(result).to include({"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"})
+      expect(result).not_to include(hash_including("name" => "ubicsi-nodeplugin-pending"))
+    end
+
+    it "handles pods with missing fields" do
+      pods_with_missing_fields = {"items" => [
+        {
+          "metadata" => {},
+          "spec" => {},
+          "status" => {"phase" => "Running"}
+        }
+      ]}
+      expect(client).to receive(:run_kubectl).with("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin", "-oyaml").and_return(YAML.dump(pods_with_missing_fields))
+
+      result = client.get_nodeplugin_pods
+
+      expect(result.size).to eq(1)
+      expect(result.first["name"]).to be_nil
+      expect(result.first["ip"]).to be_nil
+      expect(result.first["node"]).to be_nil
+    end
+  end
 end
