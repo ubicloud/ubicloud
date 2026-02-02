@@ -437,11 +437,21 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to nap(120)
     end
 
-    it "logs and naps 120 when cluster_health_report raises" do
+    it "creates the page if cluster_health_report raises 3 times" do
       kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
-      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed"))
-      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id))
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).exactly(3).times
+      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id)).exactly(3).times
       expect { nx.wait }.to nap(120)
+    end
+
+    it "succeeds if cluster_health_report raises less than 3 times and then succeeds" do
+      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).twice
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed")).once.and_return([{node: "n1", healthy: true}, {node: "n2", healthy: true}])
+      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id)).twice
+      expect { nx.wait }.to nap(120)
+
+      expect(Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)).to be_nil
     end
   end
 

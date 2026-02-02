@@ -65,6 +65,25 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     BillingRate.from_resource_properties(type, family, kubernetes_cluster.location.name)
   end
 
+  def check_external_connectivity
+    retries = 3
+    report = nil
+    begin
+      report = kubernetes_cluster.cluster_health_report
+    rescue => e
+      Clog.emit("Failed to get cluster health report", {kubernetes_cluster_id: kubernetes_cluster.id, exception: Util.exception_to_hash(e)})
+      retries -= 1
+      retry if retries > 0
+    end
+
+    if report&.all? { it[:healthy] }
+      Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)&.incr_resolve
+    else
+      Prog::PageNexus.assemble("#{kubernetes_cluster.ubid} external connectivity unhealthy",
+        ["K8sExternalConnectivityFailed", kubernetes_cluster.ubid], kubernetes_cluster.ubid, extra_data: {report:})
+    end
+  end
+
   label def start
     register_deadline("wait", 120 * 60)
     Prog::Kubernetes::EtcdBackupNexus.assemble(kubernetes_cluster.id)
@@ -215,18 +234,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     end
 
     if kubernetes_cluster.connectivity_check_target
-      begin
-        report = kubernetes_cluster.cluster_health_report
-        if report.all? { it[:healthy] }
-          Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)&.incr_resolve
-        else
-          Prog::PageNexus.assemble("#{kubernetes_cluster.ubid} external connectivity unhealthy",
-            ["K8sExternalConnectivityFailed", kubernetes_cluster.ubid], kubernetes_cluster.ubid, extra_data: {report:})
-        end
-      rescue => e
-        Clog.emit("Failed to get cluster health report", {kubernetes_cluster_id: kubernetes_cluster.id, exception: Util.exception_to_hash(e)})
-      end
-
+      check_external_connectivity
       nap 120
     else
       nap 6 * 60 * 60
