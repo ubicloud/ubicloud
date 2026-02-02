@@ -1,6 +1,9 @@
 # frozen_string_literal: true
 
 require "socket"
+require "json"
+require "tempfile"
+require "fileutils"
 require_relative "kubernetes_client"
 
 module Csi
@@ -8,12 +11,15 @@ module Csi
     CONNECTIVITY_CHECK_INTERVAL = 30
     CONNECTION_TIMEOUT = 5
     REGISTRAR_HEALTHZ_PORT = 8080
+    STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
 
     def initialize(logger:, node_id:)
       @logger = logger
       @node_id = node_id
       @queue = Queue.new
       @shutdown = false
+      @pod_status = {}
+      @mutex = Mutex.new
     end
 
     def shutdown!
@@ -27,10 +33,20 @@ module Csi
       @logger.info("[MeshConnectivity] Started mesh connectivity checker for node #{@node_id}")
     end
 
+    def status_response
+      @mutex.synchronize do
+        {
+          node_id: @node_id,
+          pods: @pod_status.dup
+        }
+      end
+    end
+
     def spawn_connectivity_check_thread
       Thread.new do
         until @shutdown
           check_all_pods_connectivity
+          write_status_file
           @queue.pop(timeout: CONNECTIVITY_CHECK_INTERVAL)
         end
       end
@@ -49,14 +65,14 @@ module Csi
       targets = pods.filter_map do |pod|
         next if pod["node"] == @node_id
         next unless pod["ip"]
-        {host: pod["ip"], port: REGISTRAR_HEALTHZ_PORT, label: "Pod #{pod["name"]}"}
+        {host: pod["ip"], port: REGISTRAR_HEALTHZ_PORT, name: pod["name"]}
       end
 
       check_endpoints(targets)
     end
 
     # Checks multiple endpoints concurrently using non-blocking I/O.
-    # Each target should be a hash with :host, :port, and :label keys.
+    # Each target should be a hash with :host, :port, and :name keys.
     def check_endpoints(targets)
       return if targets.empty?
 
@@ -64,10 +80,12 @@ module Csi
       targets.each do |target|
         result = initiate_connection(target)
         if result == :connected
+          update_pod_status(target[:name], target[:host], true)
           log_reachable(target)
         elsif result.respond_to?(:connect_nonblock)
           pending[result] = target
         else
+          update_pod_status(target[:name], target[:host], false, error: result)
           log_unreachable(target, result)
         end
       end
@@ -87,8 +105,10 @@ module Csi
           error = check_socket_error(socket)
           socket.close
           if error
+            update_pod_status(target[:name], target[:host], false, error:)
             log_unreachable(target, error)
           else
+            update_pod_status(target[:name], target[:host], true)
             log_reachable(target)
           end
         end
@@ -96,6 +116,7 @@ module Csi
 
       pending.each do |socket, target|
         socket.close
+        update_pod_status(target[:name], target[:host], false, error: "Connection timed out")
         log_unreachable(target, "Connection timed out")
       end
     end
@@ -128,12 +149,40 @@ module Csi
       "#{e.class}: #{e.message}"
     end
 
+    def update_pod_status(name, ip, reachable, error: nil)
+      hash = {
+        ip:,
+        reachable:,
+        error:,
+        last_check: Time.now.utc.iso8601
+      }
+      @mutex.synchronize do
+        @pod_status[name] = hash
+      end
+    end
+
+    def write_status_file
+      dir = File.dirname(STATUS_FILE_PATH)
+      Tempfile.create("mesh_status", dir) do |temp_file|
+        temp_file.write(JSON.pretty_generate(status_response))
+        temp_file.close
+        File.rename(temp_file.path, STATUS_FILE_PATH)
+        FileUtils.chmod(0o644, STATUS_FILE_PATH)
+      end
+    rescue => e
+      @logger.error("[MeshConnectivity] Failed to write status file: #{e.message}")
+    else
+      @logger.debug("[MeshConnectivity] Wrote status to #{STATUS_FILE_PATH}")
+    end
+
+    private
+
     def log_reachable(target)
-      @logger.debug("[MeshConnectivity] #{target[:label]} (#{target[:host]}:#{target[:port]}) reachable")
+      @logger.debug("[MeshConnectivity] Pod #{target[:name]} (#{target[:host]}:#{target[:port]}) reachable")
     end
 
     def log_unreachable(target, error)
-      @logger.warn("[MeshConnectivity] #{target[:label]} (#{target[:host]}:#{target[:port]}) unreachable: #{error}")
+      @logger.warn("[MeshConnectivity] Pod #{target[:name]} (#{target[:host]}:#{target[:port]}) unreachable: #{error}")
     end
   end
 end
