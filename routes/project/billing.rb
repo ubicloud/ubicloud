@@ -169,7 +169,7 @@ class Clover
       end
 
       r.on "invoice", ["current", :ubid_uuid] do |id|
-        next unless (invoice = (id == "current") ? @project.current_invoice : @project.invoices_dataset.with_pk(:id))
+        next unless (invoice = (id == "current") ? @project.current_invoice : @project.invoices_dataset.with_pk(id))
 
         r.get true do
           if invoice.status == "current"
