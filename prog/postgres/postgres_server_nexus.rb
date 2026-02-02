@@ -57,7 +57,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
       )
 
-      synchronization_status = representative_at ? "ready" : "catching_up"
+      synchronization_status = (representative_at && !postgres_resource.read_replica?) ? "ready" : "catching_up"
       postgres_server = PostgresServer.create_with_id(
         ubid.to_uuid,
         resource_id:,
@@ -450,6 +450,7 @@ SQL
     hop_wait if postgres_server.read_replica?
 
     postgres_server.update(synchronization_status: "ready")
+
     postgres_server.resource.representative_server.incr_configure
     hop_wait_synchronization if postgres_server.resource.ha_type == PostgresResource::HaType::SYNC
     hop_wait
@@ -713,7 +714,7 @@ SQL
 
   label def taking_over
     if postgres_server.read_replica?
-      postgres_server.update(representative_at: Time.now)
+      postgres_server.update(representative_at: Time.now, synchronization_status: "ready")
       postgres_server.resource.servers.each(&:incr_configure_metrics)
       postgres_server.resource.incr_refresh_dns_record
       hop_configure
