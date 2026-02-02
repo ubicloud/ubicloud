@@ -5,12 +5,12 @@ require "spec_helper"
 
 RSpec.describe Csi::V1::NodeService do
   let(:req_id) { "test-req-id" }
-  let(:client) { Csi::KubernetesClient.new(logger: Logger.new($stdout), req_id:) }
-  let(:service) { described_class.new(logger: Logger.new($stdout), node_id: "test-node") }
+  let(:logger) { Logger.new(File::NULL) }
+  let(:client) { Csi::KubernetesClient.new(logger:, req_id:) }
+  let(:service) { described_class.new(logger:, node_id: "test-node") }
 
   before do
     allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
-    allow(service).to receive(:log_with_id) # suppress logs during test runs
   end
 
   describe ".mkdir_p" do

@@ -4,7 +4,8 @@ require "logger"
 require "spec_helper"
 
 RSpec.describe Csi::V1::ControllerService do
-  let(:service) { described_class.new(logger: Logger.new($stdout)) }
+  let(:logger) { Logger.new(File::NULL) }
+  let(:service) { described_class.new(logger:) }
 
   describe "#log_with_id" do
     it "logs messages with request ID" do
@@ -171,7 +172,7 @@ RSpec.describe Csi::V1::ControllerService do
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum" do
         ENV.delete("DISK_LIMIT_GB")
-        service = described_class.new(logger: Logger.new($stdout))
+        service = described_class.new(logger:)
 
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
@@ -182,7 +183,7 @@ RSpec.describe Csi::V1::ControllerService do
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum when a dynamic value is set" do
         ENV["DISK_LIMIT_GB"] = "40"
-        service = described_class.new(logger: Logger.new($stdout))
+        service = described_class.new(logger:)
 
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
@@ -224,7 +225,7 @@ RSpec.describe Csi::V1::ControllerService do
 
   describe "#delete_volume" do
     let(:call) { instance_double(GRPC::ActiveCall) }
-    let(:kubernetes_client) { Csi::KubernetesClient.new(req_id: "test-uuid", logger: Logger.new($stdout)) }
+    let(:kubernetes_client) { Csi::KubernetesClient.new(req_id: "test-uuid", logger:) }
     let(:success_status) { instance_double(Process::Status, success?: true) }
     let(:failure_status) { instance_double(Process::Status, success?: false) }
 
