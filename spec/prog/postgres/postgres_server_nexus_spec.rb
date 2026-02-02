@@ -713,13 +713,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       }
     end
 
-    it "updates password and pushes restart during the initial provisioning" do
+    it "updates password and buds restart during the initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
-      expect { nx.update_superuser_password }.to hop("restart")
+      expect(nx).to receive(:push).with(Prog::Postgres::Restart)
+      expect { nx.update_superuser_password }.to hop("wait")
     end
 
     it "updates password and hops to run_post_installation_script during initial provisioning if restart is already executed" do
@@ -932,7 +933,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "pushes restart if restart is set" do
       nx.incr_restart
-      expect { nx.wait }.to hop("restart")
+      expect(nx).to receive(:push).with(Prog::Postgres::Restart)
+      expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
     it "promotes" do
@@ -1016,7 +1018,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "buds restart if the server is not available" do
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
       expect(postgres_server.reload.recycle_set?).to be true
     end
@@ -1024,7 +1026,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "buds restart without incrementing recycle when recycle is already set" do
       postgres_server.incr_recycle
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
     end
@@ -1032,16 +1034,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "does not create convergence strand if one is already running" do
       Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: postgres_resource.strand.id)
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(described_class, {}, :restart)
+      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
       expect(postgres_server.reload.recycle_set?).to be true
     end
 
     it "does not bud restart if there is already one restart going on" do
-      Strand.create(parent: st, prog: "Postgres::PostgresServerNexus", label: "restart", stack: [{}], lease: Time.now + 10)
+      Strand.create(parent: st, prog: "Postgres::Restart", label: "start", stack: [{}], lease: Time.now + 10)
       expect { nx.unavailable }.to nap(5)
-      expect(Strand.where(prog: "Postgres::PostgresServerNexus", label: "restart").count).to eq 1
+      expect(Strand.where(prog: "Postgres::Restart", label: "start").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do

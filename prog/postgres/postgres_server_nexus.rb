@@ -412,7 +412,7 @@ CMD
       if retval&.dig("msg") == "postgres server is restarted"
         hop_run_post_installation_script
       end
-      push self.class, frame, "restart"
+      push Prog::Postgres::Restart
     end
 
     hop_wait
@@ -523,7 +523,8 @@ SQL
     end
 
     when_restart_set? do
-      push self.class, frame, "restart"
+      decr_restart
+      push Prog::Postgres::Restart
     end
 
     when_promote_set? do
@@ -584,7 +585,7 @@ SQL
     end
 
     reap(fallthrough: true)
-    nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty?
+    nap 5 unless strand.children_dataset.where(prog: "Postgres::PostgresServerNexus", label: "restart").empty? && strand.children_dataset.where(prog: "Postgres::Restart").empty?
 
     if available?
       decr_checkup
@@ -596,7 +597,7 @@ SQL
       postgres_server.incr_recycle
     end
 
-    bud self.class, {}, :restart
+    bud Prog::Postgres::Restart
     nap 5
   end
 
