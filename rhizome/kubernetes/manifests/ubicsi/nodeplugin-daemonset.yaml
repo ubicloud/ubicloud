@@ -18,10 +18,8 @@ spec:
         component: nodeplugin
     spec:
       serviceAccountName: ubicsi-nodeplugin
-      hostNetwork: true
       hostPID: true
       priorityClassName: system-node-critical
-      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: ubicsi
           image: ubicloud/ubicsi:0.3.0
