@@ -202,6 +202,97 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#cluster_health_report" do
+    def stub_kubectl(session, command, return_value)
+      cmd = "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{command}"
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(return_value, 0)
+      expect(session).to receive(:_exec!).with(match(cmd)).and_return(response)
+    end
+
+    def stub_connectivity_checks(session, fleet)
+      fleet.each do |nodename, status|
+        case status
+        when :success
+          stub_kubectl(session,
+            "get pods -n ubicsi --field-selector spec.nodeName=#{nodename} -o jsonpath='{.items[*].metadata.name}'",
+            "ubicsi-nodeplugin-#{nodename} ubicsi-something-else")
+
+          stub_kubectl(session,
+            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c .*",
+            "OK-#{nodename}")
+        when :failure
+          stub_kubectl(session,
+            "get pods -n ubicsi --field-selector spec.nodeName=#{nodename} -o jsonpath='{.items[*].metadata.name}'",
+            "ubicsi-nodeplugin-#{nodename} ubicsi-something-else")
+
+          stub_kubectl(session,
+            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c .*",
+            "FAIL")
+        when :nocsi
+          stub_kubectl(session,
+            "get pods -n ubicsi --field-selector spec.nodeName=#{nodename} -o jsonpath='{.items[*].metadata.name}'",
+            "someother-pod-abc")
+        else
+          fail "BUG"
+        end
+      end
+    end
+
+    let(:session) { Net::SSH::Connection::Session.allocate }
+
+    before do
+      kn = KubernetesNodepool.create(name: "np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
+      kc.update(connectivity_check_target: "example.com:443")
+      expect(kc.reload.all_functional_nodes.count).to eq(4)
+      allow(kc).to receive(:client).and_return(Kubernetes::Client.new(kc, session))
+    end
+
+    it "returns nil when connectivity_check_target is not set" do
+      kc.update(connectivity_check_target: nil)
+      expect(kc.cluster_health_report).to be_nil
+    end
+
+    it "only includes worker nodes, not control plane nodes" do
+      kn = kc.nodepools.first
+      fleet = kn.nodes.map { [it.name, :success] }
+      stub_connectivity_checks(session, fleet)
+
+      report = kc.cluster_health_report
+      cp_node = kc.nodes.first
+
+      expect(report.length).to eq(kn.nodes.count)
+      expect(report.map { it[:node] }).not_to include(cp_node.ubid)
+      expect(report).to all(include(healthy: true))
+      expect(report.map { it[:node] }).to eq(kn.nodes.map(&:ubid))
+    end
+
+    it "reports nodes as failed if ubicsi plugin is missing or connectivity fails" do
+      kn = kc.nodepools.first
+      fleet = kn.nodes.map { [it.name, :success] }
+      fleet[0][1] = :nocsi
+      fleet[1][1] = :failure
+      stub_connectivity_checks(session, fleet)
+
+      report = kc.cluster_health_report
+
+      expect(report[0]).to eq(node: kn.nodes[0].ubid, healthy: false)
+      expect(report[1]).to eq(node: kn.nodes[1].ubid, healthy: false)
+      expect(report[2]).to eq(node: kn.nodes[2].ubid, healthy: true)
+    end
+
+    it "returns empty array when there are no worker nodes" do
+      kc.nodepools.first.nodes_dataset.destroy
+      kc.nodepools_dataset.destroy
+      kc.reload
+
+      expect(kc.cluster_health_report).to eq([])
+    end
+  end
+
   describe "#all_nodes" do
     it "returns all nodes in the cluster" do
       expect(kc).to receive(:nodes).and_return([1, 2])
