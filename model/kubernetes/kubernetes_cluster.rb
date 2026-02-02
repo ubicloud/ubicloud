@@ -108,6 +108,24 @@ class KubernetesCluster < Sequel::Model
     [extra_ports, missing_ports]
   end
 
+  def cluster_health_report
+    return unless connectivity_check_target
+
+    nodepools.flat_map(&:nodes).map do |kd|
+      pod_name = client.kubectl(
+        "get pods -n ubicsi --field-selector spec.nodeName=:nodename -o jsonpath='{.items[*].metadata.name}'",
+        nodename: kd.name
+      ).split.find { it.start_with?("ubicsi-nodeplugin-") }
+
+      next {node: kd.ubid, healthy: false} unless pod_name
+
+      host, port = connectivity_check_target.split(":", 2)
+      cmd = NetSsh.command("timeout 3 bash -c \"echo > /dev/tcp/:host/:port\" && echo OK-:nodename || echo FAIL", host:, port:, nodename: kd.name)
+      res = client.kubectl("exec -n ubicsi :pod_name -- sh -c :cmd", pod_name:, cmd:)
+      {node: kd.ubid, healthy: res[/OK-#{kd.name}/] ? true : false}
+    end
+  end
+
   def init_health_monitor_session
     {
       ssh_session: sshable.start_fresh_session
@@ -161,6 +179,7 @@ end
 #  target_node_storage_size_gib | bigint                   |
 #  location_id                  | uuid                     | NOT NULL
 #  services_lb_id               | uuid                     |
+#  connectivity_check_target    | text                     |
 # Indexes:
 #  kubernetes_cluster_pkey                             | PRIMARY KEY btree (id)
 #  kubernetes_cluster_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)

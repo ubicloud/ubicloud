@@ -214,7 +214,23 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       hop_sync_internal_dns_config
     end
 
-    nap 6 * 60 * 60
+    if kubernetes_cluster.connectivity_check_target
+      begin
+        report = kubernetes_cluster.cluster_health_report
+        if report.all? { it[:healthy] }
+          Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)&.incr_resolve
+        else
+          Prog::PageNexus.assemble("#{kubernetes_cluster.ubid} external connectivity unhealthy",
+            ["K8sExternalConnectivityFailed", kubernetes_cluster.ubid], kubernetes_cluster.ubid, extra_data: {report:})
+        end
+      rescue => e
+        Clog.emit("Failed to get cluster health report", {kubernetes_cluster_id: kubernetes_cluster.id, exception: Util.exception_to_hash(e)})
+      end
+
+      nap 120
+    else
+      nap 6 * 60 * 60
+    end
   end
 
   label def sync_kubernetes_services

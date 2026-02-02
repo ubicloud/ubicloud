@@ -413,8 +413,35 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect { nx.wait }.to hop("update_billing_records")
     end
 
-    it "naps if no semaphore is set" do
+    it "naps 6 hours if no semaphore is set and no connectivity_check_target" do
+      expect(kubernetes_cluster.connectivity_check_target).to be_nil
       expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "creates or resolves depending on the connectivity to the connectivity_check_target set" do
+      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
+
+      report = [{node: "n1", healthy: true}, {node: "n2", healthy: false}]
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_return(report)
+      expect { nx.wait }.to nap(120)
+
+      page = Page.from_tag_parts("K8sExternalConnectivityFailed", kubernetes_cluster.ubid)
+      expect(page).not_to be_nil
+      expect(page.details["report"]).to eq report.map { it.transform_keys(&:to_s) }
+
+      report[1][:healthy] = true
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_return(report)
+      expect(Page).to receive(:from_tag_parts).with("K8sExternalConnectivityFailed", kubernetes_cluster.ubid).and_return(page)
+      expect(page).to receive(:incr_resolve)
+
+      expect { nx.wait }.to nap(120)
+    end
+
+    it "logs and naps 120 when cluster_health_report raises" do
+      kubernetes_cluster.update(connectivity_check_target: "some.pg.ubicloud.com:5432")
+      expect(kubernetes_cluster).to receive(:cluster_health_report).and_raise(RuntimeError.new("kubectl failed"))
+      expect(Clog).to receive(:emit).with("Failed to get cluster health report", hash_including(kubernetes_cluster_id: kubernetes_cluster.id))
+      expect { nx.wait }.to nap(120)
     end
   end
 
