@@ -450,10 +450,11 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def collect_final_telemetry
+    vm_host = vm.vm_host
     # If the runner is not assigned any job or job is not successful, we log
     # journalctl output to debug if there was any problem with the runner script.
     if (job = github_runner.workflow_job).nil? || job.fetch("conclusion") != "success"
-      if vm.vm_host
+      if vm_host
         serial_log_path = "/vm/#{vm.inhost_name}/serial.log"
         vm.vm_host.sshable.cmd("sudo ln :serial_log_path /var/log/ubicloud/serials/:ubid\\_serial.log", serial_log_path:, ubid: github_runner.ubid)
       end
@@ -490,7 +491,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         .each { it.gsub!(/ host: \S+/, "") }
         .tally
         .each do |message, count|
-          Clog.emit("Cache proxy error", {cache_proxy_error: {message:, count:}})
+          Clog.emit("Cache proxy error", {cache_proxy_error: {message:, count:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
         end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
