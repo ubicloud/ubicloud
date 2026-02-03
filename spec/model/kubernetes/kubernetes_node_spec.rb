@@ -58,7 +58,8 @@ RSpec.describe KubernetesNode do
         "pods" => {
           "ubicsi-nodeplugin-abc" => {"ip" => "10.0.0.2", "reachable" => true, "last_check" => Time.now.utc.iso8601},
           "ubicsi-nodeplugin-xyz" => {"ip" => "10.0.0.3", "reachable" => true, "last_check" => Time.now.utc.iso8601}
-        }
+        },
+        "external_endpoints" => {}
       })
       expect(ssh_session).to receive(:_exec!).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
@@ -77,7 +78,7 @@ RSpec.describe KubernetesNode do
     end
 
     it "returns up when pods hash is empty" do
-      status_json = JSON.generate({"node_id" => "node-1", "pods" => {}})
+      status_json = JSON.generate({"node_id" => "node-1", "pods" => {}, "external_endpoints" => {}})
       expect(ssh_session).to receive(:_exec!).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
@@ -97,6 +98,36 @@ RSpec.describe KubernetesNode do
         expect(ssh_session).to receive(:_exec!).and_raise(ex)
         expect { kn.check_pulse(session:, previous_pulse: pulse) }.to raise_error(ex)
       end
+    end
+
+    it "returns down when any external endpoint is unreachable" do
+      status_json = JSON.generate({
+        "node_id" => "node-1",
+        "pods" => {
+          "ubicsi-nodeplugin-abc" => {"ip" => "10.0.0.2", "reachable" => true, "last_check" => Time.now.utc.iso8601}
+        },
+        "external_endpoints" => {
+          "10.20.30.40:443" => {"reachable" => true, "last_check" => Time.now.utc.iso8601},
+          "api.example.com:8080" => {"reachable" => false, "last_check" => Time.now.utc.iso8601}
+        }
+      })
+      expect(ssh_session).to receive(:_exec!).and_return(status_json)
+      expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    end
+
+    it "returns up when all external endpoints are reachable" do
+      status_json = JSON.generate({
+        "node_id" => "node-1",
+        "pods" => {
+          "ubicsi-nodeplugin-abc" => {"ip" => "10.0.0.2", "reachable" => true, "last_check" => Time.now.utc.iso8601}
+        },
+        "external_endpoints" => {
+          "10.20.30.40:443" => {"reachable" => true, "last_check" => Time.now.utc.iso8601},
+          "api.example.com:8080" => {"reachable" => true, "last_check" => Time.now.utc.iso8601}
+        }
+      })
+      expect(ssh_session).to receive(:_exec!).and_return(status_json)
+      expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
   end
 end
