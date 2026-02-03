@@ -794,6 +794,16 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_no_content "Cancel automatic storage scale-up"
       end
 
+      it "can failover PostgreSQL database" do
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content "Recycle"
+        click_button "Recycle"
+
+        expect(page).to have_flash_notice "'#{pg.name}' will be recycled soon"
+        expect(page.status_code).to eq(200)
+        expect(pg.representative_server.recycle_set?).to be true
+      end
+
       it "doesn't show reset button when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])

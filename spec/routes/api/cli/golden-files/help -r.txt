@@ -509,6 +509,7 @@ Post Commands:
     pg_dumpall                         Dump a entire PostgreSQL database cluster using `pg_dumpall`
     promote-read-replica               Promote a read replica PostgreSQL database to a primary
     psql                               Connect to a PostgreSQL database using `psql`
+    recycle                            Request recycle of primary
     remove-config-entries              Remove configuration entries from a PostgreSQL database
     remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
     rename                             Rename a PostgreSQL database
@@ -724,6 +725,12 @@ Connect to a PostgreSQL database using `psql`
 
 Usage:
     ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
+
+
+Request recycle of primary
+
+Usage:
+    ubi pg (location/pg-name | pg-id) recycle
 
 
 Remove configuration entries from a PostgreSQL database

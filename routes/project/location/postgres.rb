@@ -400,6 +400,26 @@ class Clover
         end
       end
 
+      r.post "recycle" do
+        authorize("Postgres:edit", pg)
+
+        if pg.representative_server.nil?
+          raise CloverError.new(400, "InvalidRequest", "No representative server available to recycle")
+        end
+
+        DB.transaction do
+          pg.representative_server.incr_recycle
+          audit_log(pg, "recycle")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "'#{pg.name}' will be recycled soon"
+          r.redirect pg, "/settings"
+        end
+      end
+
       r.post "reset-superuser-password" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
