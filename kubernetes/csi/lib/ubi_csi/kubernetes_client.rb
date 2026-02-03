@@ -28,11 +28,11 @@ module Csi
     end
 
     def yaml_load_kubectl(*)
-      YAML.safe_load(run_kubectl(*))
+      YAML.safe_load(run_kubectl(*, "-oyaml"))
     end
 
     def get_node(name)
-      yaml_load_kubectl("get", "node", name, "-oyaml")
+      yaml_load_kubectl("get", "node", name)
     end
 
     def get_node_ip(name)
@@ -41,7 +41,7 @@ module Csi
     end
 
     def get_pv(name)
-      yaml_load_kubectl("get", "pv", name, "-oyaml")
+      yaml_load_kubectl("get", "pv", name)
     end
 
     def extract_node_from_pv(pv)
@@ -57,7 +57,7 @@ module Csi
     end
 
     def get_pvc(namespace, name)
-      yaml_load_kubectl("-n", namespace, "get", "pvc", name, "-oyaml")
+      yaml_load_kubectl("-n", namespace, "get", "pvc", name)
     end
 
     def create_pvc(yaml_data)
@@ -97,7 +97,7 @@ module Csi
     end
 
     def find_pv_by_volume_id(volume_id)
-      pv_list = yaml_load_kubectl("get", "pv", "-oyaml")
+      pv_list = yaml_load_kubectl("get", "pv")
       pv = pv_list["items"].find { |pv| pv.dig("spec", "csi", "volumeHandle") == volume_id }
 
       raise ObjectNotFoundError, "PersistentVolume with volumeHandle '#{volume_id}' not found" unless pv
@@ -106,7 +106,7 @@ module Csi
     end
 
     def get_nodeplugin_pods
-      pods_yaml = yaml_load_kubectl("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin", "-oyaml")
+      pods_yaml = yaml_load_kubectl("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin")
       pods_yaml["items"].filter_map do |pod|
         next unless pod.dig("status", "phase") == "Running"
         {
