@@ -13,7 +13,8 @@ RUN apt update && apt install -y apt-transport-https ca-certificates curl gnupg 
 RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
 RUN echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' | tee /etc/apt/sources.list.d/kubernetes.list && \
     chmod 644 /etc/apt/sources.list.d/kubernetes.list
-RUN  apt update && apt install -y kubectl
+RUN apt update && apt install -y kubectl iputils-ping dnsutils curl telnet \
+    net-tools iproute2 netcat-openbsd mtr-tiny traceroute
 
 COPY --from=builder /usr/local/bundle /usr/local/bundle
 

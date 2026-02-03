@@ -34,7 +34,7 @@ spec:
       priorityClassName: system-cluster-critical
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:0.3.0
+          image: ubicloud/ubicsi:v0.4.0
           imagePullPolicy: IfNotPresent
           env:
             - name: NODE_ID
