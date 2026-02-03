@@ -372,7 +372,7 @@ class Clover
       end
 
       r.post "reset-superuser-password" do
-        authorize("Postgres:view", pg)
+        authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
 
         if pg.read_replica?
