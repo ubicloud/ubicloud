@@ -50,14 +50,14 @@ class Firewall < Sequel::Model
     super
   end
 
-  def associate_with_private_subnet(private_subnet, apply_firewalls: true)
+  def associate_with_private_subnet(private_subnet, apply_firewalls: true, request_ids: nil)
     add_private_subnet(private_subnet)
-    private_subnet.incr_update_firewall_rules if apply_firewalls
+    private_subnet.incr_update_firewall_rules(request_ids) if apply_firewalls
   end
 
-  def disassociate_from_private_subnet(private_subnet, apply_firewalls: true)
+  def disassociate_from_private_subnet(private_subnet, apply_firewalls: true, request_ids: nil)
     remove_private_subnet(private_subnet)
-    private_subnet.incr_update_firewall_rules if apply_firewalls
+    private_subnet.incr_update_firewall_rules(request_ids) if apply_firewalls
   end
 
   def update_private_subnet_firewall_rules
