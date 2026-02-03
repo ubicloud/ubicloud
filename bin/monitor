@@ -53,7 +53,8 @@ else
     VmHostSlice.eager(:vm_host),
     LoadBalancerVmPort,
     KubernetesCluster,
-    VictoriaMetricsServer
+    VictoriaMetricsServer,
+    KubernetesNode.eager(:vm, :kubernetes_cluster)
   ]
 
   metric_export_models = [

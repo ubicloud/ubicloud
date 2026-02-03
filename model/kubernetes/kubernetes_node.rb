@@ -10,9 +10,44 @@ class KubernetesNode < Sequel::Model
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy, :retire
+  include HealthMonitorMethods
+
+  MESH_STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
 
   def sshable
     vm.sshable
+  end
+
+  def init_health_monitor_session
+    {
+      ssh_session: sshable.start_fresh_session
+    }
+  end
+
+  def check_pulse(session:, previous_pulse:)
+    reading = begin
+      file_content = session[:ssh_session].exec!("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
+      if file_content.empty?
+        "up" # File doesn't exist yet - CSI not updated, consider healthy
+      else
+        status = JSON.parse(file_content)
+        pods_status = status["pods"]
+        unreachable_pods = pods_status.select { |_, v| v["reachable"] == false }
+        if unreachable_pods.any?
+          errors = unreachable_pods.transform_values { |v| v["error"] }.compact
+          Clog.emit("Mesh connectivity issue detected", {kubernetes_node_mesh: {ubid:, unreachable_pods: unreachable_pods.keys, errors:}})
+          "down"
+        else
+          "up"
+        end
+      end
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("Exception in KubernetesNode pulse check", Util.exception_to_hash(e, into: {ubid:}))
+      "down"
+    end
+    aggregate_readings(previous_pulse:, reading:)
   end
 
   def billing_records
