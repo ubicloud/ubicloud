@@ -371,6 +371,26 @@ class Clover
         end
       end
 
+      r.post "failover" do
+        authorize("Postgres:edit", pg)
+
+        if pg.representative_server.nil?
+          raise CloverError.new(400, "InvalidRequest", "No representative server available for failover")
+        end
+
+        DB.transaction do
+          pg.representative_server.incr_recycle
+          audit_log(pg, "failover")
+        end
+
+        if api?
+          Serializers::Postgres.serialize(pg, {detailed: true})
+        else
+          flash["notice"] = "'#{pg.name}' will failover soon"
+          r.redirect pg, "/settings"
+        end
+      end
+
       r.post "reset-superuser-password" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }

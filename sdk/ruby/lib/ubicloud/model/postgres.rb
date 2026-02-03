@@ -136,6 +136,12 @@ module Ubicloud
       merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
     end
 
+    # Request primary to failover.
+    # Returns self.
+    def failover
+      merge_into_values(adapter.post(_path("/failover")))
+    end
+
     # Schedule a password reset for the database superuser (postgres) for the database.
     # Returns self.
     def reset_superuser_password(password)

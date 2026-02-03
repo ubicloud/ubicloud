@@ -648,6 +648,16 @@ RSpec.describe Clover, "postgres" do
         expect(pg.servers.map { it.restart_set? }).to all(be true)
       end
 
+      it "can failover PostgreSQL database" do
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content "Failover"
+        click_button "Failover"
+
+        expect(page).to have_flash_notice "'#{pg.name}' will failover soon"
+        expect(page.status_code).to eq(200)
+        expect(pg.representative_server.recycle_set?).to be true
+      end
+
       it "doesn't show reset button when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
