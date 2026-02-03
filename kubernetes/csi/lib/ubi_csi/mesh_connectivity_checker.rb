@@ -19,6 +19,8 @@ module Csi
       @queue = Queue.new
       @shutdown = false
       @pod_status = {}
+      @external_endpoints = parse_external_endpoints(ENV["EXTERNAL_ENDPOINTS"])
+      @external_status = {}
       @mutex = Mutex.new
     end
 
@@ -26,6 +28,26 @@ module Csi
       @shutdown = true
       @queue.close
       @thread&.join
+    end
+
+    def parse_external_endpoints(env_value)
+      return [] if env_value.nil? || env_value.strip.empty?
+      env_value.split(",").filter_map do |endpoint|
+        endpoint = endpoint.strip
+        next if endpoint.empty?
+        # Use rpartition to split on the LAST ":" which handles both IPv4 and IPv6:
+        #   "example.com:443"    -> ["example.com", ":", "443"]
+        #   "10.0.0.1:8080"      -> ["10.0.0.1", ":", "8080"]
+        #   "2001:db8::1:443"    -> ["2001:db8::1", ":", "443"] (IPv6 with port)
+        parts = endpoint.rpartition(":")
+        raise "Port required in endpoint: #{endpoint}" if parts[1].empty?
+        host = parts[0]
+        raise "Invalid IPv6 address (missing port?): #{endpoint}" if host.end_with?(":")
+        port = Integer(parts[2])
+        {host:, port:}
+      rescue ArgumentError
+        raise "Invalid port in endpoint: #{endpoint}"
+      end
     end
 
     def start
@@ -37,7 +59,8 @@ module Csi
       @mutex.synchronize do
         {
           node_id: @node_id,
-          pods: @pod_status.dup
+          pods: @pod_status.dup,
+          external_endpoints: @external_status.dup
         }
       end
     end
@@ -46,6 +69,7 @@ module Csi
       Thread.new do
         until @shutdown
           check_all_pods_connectivity
+          check_all_external_endpoints
           write_status_file
           @queue.pop(timeout: CONNECTIVITY_CHECK_INTERVAL)
         end
@@ -68,24 +92,27 @@ module Csi
         {host: pod["ip"], port: REGISTRAR_HEALTHZ_PORT, name: pod["name"]}
       end
 
-      check_endpoints(targets)
+      check_endpoints(targets) do |target, reachable, error|
+        update_pod_status(target[:name], target[:host], reachable, error:)
+      end
     end
 
     # Checks multiple endpoints concurrently using non-blocking I/O.
     # Each target should be a hash with :host, :port, and :name keys.
-    def check_endpoints(targets)
+    # Yields target, reachable, and optional error for each result.
+    def check_endpoints(targets, &block)
       return if targets.empty?
 
       pending = {}
       targets.each do |target|
         result = initiate_connection(target)
         if result == :connected
-          update_pod_status(target[:name], target[:host], true)
+          yield(target, true, nil)
           log_reachable(target)
         elsif result.respond_to?(:connect_nonblock)
           pending[result] = target
         else
-          update_pod_status(target[:name], target[:host], false, error: result)
+          yield(target, false, result)
           log_unreachable(target, result)
         end
       end
@@ -105,10 +132,10 @@ module Csi
           error = check_socket_error(socket)
           socket.close
           if error
-            update_pod_status(target[:name], target[:host], false, error:)
+            yield(target, false, error)
             log_unreachable(target, error)
           else
-            update_pod_status(target[:name], target[:host], true)
+            yield(target, true, nil)
             log_reachable(target)
           end
         end
@@ -116,7 +143,7 @@ module Csi
 
       pending.each do |socket, target|
         socket.close
-        update_pod_status(target[:name], target[:host], false, error: "Connection timed out")
+        yield(target, false, "Connection timed out")
         log_unreachable(target, "Connection timed out")
       end
     end
@@ -158,6 +185,28 @@ module Csi
       }
       @mutex.synchronize do
         @pod_status[name] = hash
+      end
+    end
+
+    def check_all_external_endpoints
+      endpoints = @mutex.synchronize { @external_endpoints.dup }
+      return if endpoints.empty?
+
+      targets = endpoints.map { |ep| {host: ep[:host], port: ep[:port], name: "#{ep[:host]}:#{ep[:port]}"} }
+
+      check_endpoints(targets) do |target, reachable, error|
+        update_external_status(target[:name], reachable, error:)
+      end
+    end
+
+    def update_external_status(key, reachable, error: nil)
+      hash = {
+        reachable:,
+        error:,
+        last_check: Time.now.utc.iso8601
+      }
+      @mutex.synchronize do
+        @external_status[key] = hash
       end
     end
 
