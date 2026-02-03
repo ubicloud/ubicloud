@@ -8,6 +8,17 @@ RSpec.describe Csi::MeshConnectivityChecker do
   let(:node_id) { "worker-1" }
   let(:checker) { described_class.new(logger:, node_id:) }
 
+  describe "#initialize" do
+    it "parses external endpoints from ENV" do
+      ENV["EXTERNAL_ENDPOINTS"] = "10.0.0.1:443,api.example.com:8080"
+      checker_with_endpoints = described_class.new(logger:, node_id:)
+      endpoints = checker_with_endpoints.instance_variable_get(:@external_endpoints)
+      expect(endpoints).to eq([{host: "10.0.0.1", port: 443}, {host: "api.example.com", port: 8080}])
+    ensure
+      ENV.delete("EXTERNAL_ENDPOINTS")
+    end
+  end
+
   describe "#shutdown!" do
     it "sets shutdown flag, closes queue, and joins thread" do
       thread = instance_double(Thread)
@@ -81,8 +92,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(client).to receive(:get_nodeplugin_pods).and_return(pods)
       expect(logger).to receive(:debug).with("[MeshConnectivity] Found 2 nodeplugin pods").and_call_original
       expect(checker).to receive(:check_endpoints).with([{host: "10.0.0.2", port: 8080, name: "ubicsi-nodeplugin-xyz"}])
+        .and_yield({host: "10.0.0.2", port: 8080, name: "ubicsi-nodeplugin-xyz"}, true, nil)
 
       checker.check_all_pods_connectivity
+
+      status = checker.instance_variable_get(:@pod_status)["ubicsi-nodeplugin-xyz"]
+      expect(status[:reachable]).to be true
+      expect(status[:ip]).to eq("10.0.0.2")
     end
 
     it "logs error and returns early when client fails" do
@@ -111,10 +127,10 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "returns early for empty targets" do
       expect(Socket).not_to receive(:getaddrinfo)
-      checker.check_endpoints([])
+      checker.check_endpoints([]) { |_t, _r, _e| }
     end
 
-    it "logs reachable and updates status when connection succeeds immediately" do
+    it "yields reachable when connection succeeds immediately" do
       expect(Socket).to receive(:getaddrinfo).with("10.0.0.1", 443, nil, :STREAM).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -125,25 +141,25 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:debug).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) reachable").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
-      status = checker.instance_variable_get(:@pod_status)["test-pod"]
-      expect(status[:reachable]).to be true
-      expect(status[:ip]).to eq("10.0.0.1")
+      expect(results.first[:reachable]).to be true
+      expect(results.first[:error]).to be_nil
     end
 
-    it "logs unreachable and updates status when DNS lookup fails" do
+    it "yields unreachable when DNS lookup fails" do
       expect(Socket).to receive(:getaddrinfo).and_raise(SocketError.new("getaddrinfo failed"))
       expect(logger).to receive(:warn).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) unreachable: SocketError: getaddrinfo failed").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
-      status = checker.instance_variable_get(:@pod_status)["test-pod"]
-      expect(status[:reachable]).to be false
-      expect(status[:error]).to eq("SocketError: getaddrinfo failed")
+      expect(results.first[:reachable]).to be false
+      expect(results.first[:error]).to eq("SocketError: getaddrinfo failed")
     end
 
-    it "handles pending connection that succeeds after IO.select" do
+    it "yields reachable for pending connection that succeeds after IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -158,13 +174,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:debug).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) reachable").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
-      status = checker.instance_variable_get(:@pod_status)["test-pod"]
-      expect(status[:reachable]).to be true
+      expect(results.first[:reachable]).to be true
     end
 
-    it "logs unreachable when connection fails after IO.select" do
+    it "yields unreachable when connection fails after IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -179,13 +195,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:warn).with(/\[MeshConnectivity\] Pod test-pod \(10\.0\.0\.1:443\) unreachable: Errno::ECONNREFUSED/).and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
-      status = checker.instance_variable_get(:@pod_status)["test-pod"]
-      expect(status[:reachable]).to be false
+      expect(results.first[:reachable]).to be false
     end
 
-    it "handles timeout when IO.select returns nil" do
+    it "yields unreachable when IO.select returns nil" do
       expect(Socket).to receive(:getaddrinfo).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -197,14 +213,14 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:warn).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) unreachable: Connection timed out").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
-      status = checker.instance_variable_get(:@pod_status)["test-pod"]
-      expect(status[:reachable]).to be false
-      expect(status[:error]).to eq("Connection timed out")
+      expect(results.first[:reachable]).to be false
+      expect(results.first[:error]).to eq("Connection timed out")
     end
 
-    it "handles deadline exceeded before IO.select" do
+    it "yields unreachable when deadline exceeded before IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -217,10 +233,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:warn).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) unreachable: Connection timed out").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
+
+      expect(results.first[:error]).to eq("Connection timed out")
     end
 
-    it "handles pending connection where connect_nonblock succeeds without EISCONN" do
+    it "yields reachable for pending connection where connect_nonblock succeeds without EISCONN" do
       expect(Socket).to receive(:getaddrinfo).and_return([
         ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
       ])
@@ -235,7 +254,10 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(socket).to receive(:close)
       expect(logger).to receive(:debug).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) reachable").and_call_original
 
-      checker.check_endpoints([target])
+      results = []
+      checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
+
+      expect(results.first[:reachable]).to be true
     end
   end
 
@@ -292,6 +314,116 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(logger).to receive(:error).with(/\[MeshConnectivity\] Failed to write status file:/).and_call_original
 
       checker.write_status_file
+    end
+  end
+
+  describe "#parse_external_endpoints" do
+    it "returns empty array for nil input" do
+      expect(checker.parse_external_endpoints(nil)).to eq([])
+    end
+
+    it "returns empty array for empty string" do
+      expect(checker.parse_external_endpoints("")).to eq([])
+    end
+
+    it "returns empty array for whitespace only string" do
+      expect(checker.parse_external_endpoints("   ")).to eq([])
+    end
+
+    it "parses single endpoint with port" do
+      result = checker.parse_external_endpoints("10.0.0.1:443")
+      expect(result).to eq([{host: "10.0.0.1", port: 443}])
+    end
+
+    it "raises error for endpoint without port" do
+      expect { checker.parse_external_endpoints("10.0.0.1") }.to raise_error("Port required in endpoint: 10.0.0.1")
+    end
+
+    it "parses multiple endpoints" do
+      result = checker.parse_external_endpoints("10.0.0.1:443,api.example.com:8080")
+      expect(result).to eq([
+        {host: "10.0.0.1", port: 443},
+        {host: "api.example.com", port: 8080}
+      ])
+    end
+
+    it "handles whitespace in endpoints" do
+      result = checker.parse_external_endpoints("  10.0.0.1:443 , api.example.com:8080  ")
+      expect(result).to eq([
+        {host: "10.0.0.1", port: 443},
+        {host: "api.example.com", port: 8080}
+      ])
+    end
+
+    it "skips empty entries" do
+      result = checker.parse_external_endpoints("10.0.0.1:443,,api.example.com:8080")
+      expect(result).to eq([
+        {host: "10.0.0.1", port: 443},
+        {host: "api.example.com", port: 8080}
+      ])
+    end
+
+    it "raises error for invalid port" do
+      expect { checker.parse_external_endpoints("10.0.0.1:invalid") }.to raise_error("Invalid port in endpoint: 10.0.0.1:invalid")
+    end
+
+    it "raises error for IPv6 address without port" do
+      expect { checker.parse_external_endpoints("2001:db8::1") }.to raise_error("Invalid IPv6 address (missing port?): 2001:db8::1")
+    end
+  end
+
+  describe "#status_response with external endpoints" do
+    it "includes external_endpoints in response" do
+      checker.instance_variable_set(:@pod_status, {
+        "kube-proxy-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+      })
+      checker.instance_variable_set(:@external_status, {
+        "10.0.0.1:443" => {reachable: true, last_check: "2026-01-01T00:00:00Z"}
+      })
+
+      response = checker.status_response
+
+      expect(response[:node_id]).to eq("worker-1")
+      expect(response[:pods]["kube-proxy-xyz"][:reachable]).to be true
+      expect(response[:external_endpoints]["10.0.0.1:443"][:reachable]).to be true
+    end
+  end
+
+  describe "#check_all_external_endpoints" do
+    it "checks all external endpoints using check_endpoints" do
+      endpoints = [{host: "10.0.0.1", port: 443}, {host: "api.example.com", port: 8080}]
+      checker.instance_variable_set(:@external_endpoints, endpoints)
+
+      expect(checker).to receive(:check_endpoints).with([
+        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"},
+        {host: "api.example.com", port: 8080, name: "api.example.com:8080"}
+      ]).and_yield({host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, true, nil)
+
+      checker.check_all_external_endpoints
+
+      status = checker.instance_variable_get(:@external_status)["10.0.0.1:443"]
+      expect(status[:reachable]).to be true
+    end
+
+    it "handles empty endpoints list" do
+      checker.instance_variable_set(:@external_endpoints, [])
+      expect(checker).not_to receive(:check_endpoints)
+      checker.check_all_external_endpoints
+    end
+
+    it "updates external status with errors" do
+      endpoints = [{host: "10.0.0.1", port: 443}]
+      checker.instance_variable_set(:@external_endpoints, endpoints)
+
+      expect(checker).to receive(:check_endpoints).and_yield(
+        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, false, "Connection refused"
+      )
+
+      checker.check_all_external_endpoints
+
+      status = checker.instance_variable_get(:@external_status)["10.0.0.1:443"]
+      expect(status[:reachable]).to be false
+      expect(status[:error]).to eq("Connection refused")
     end
   end
 end

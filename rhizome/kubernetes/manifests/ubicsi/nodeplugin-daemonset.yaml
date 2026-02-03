@@ -31,6 +31,8 @@ spec:
                   fieldPath: spec.nodeName
             - name: CSI_ENDPOINT
               value: "unix:///csi/csi.sock"
+            - name: EXTERNAL_ENDPOINTS
+              value: ""
           securityContext:
             privileged: true
             capabilities:
