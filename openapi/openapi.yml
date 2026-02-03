@@ -1391,6 +1391,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/recycle':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: recycle
+      summary: Request primary to be recycled
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/rename':
     parameters:
       - $ref: '#/components/parameters/project_id'

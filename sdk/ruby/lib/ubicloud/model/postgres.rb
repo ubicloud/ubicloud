@@ -136,6 +136,12 @@ module Ubicloud
       merge_into_values(adapter.post(_path("/set-maintenance-window"), params))
     end
 
+    # Request primary to be recycled.
+    # Returns self.
+    def recycle
+      merge_into_values(adapter.post(_path("/recycle")))
+    end
+
     # Schedule a password reset for the database superuser (postgres) for the database.
     # Returns self.
     def reset_superuser_password(password)

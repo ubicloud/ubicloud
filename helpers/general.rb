@@ -120,6 +120,7 @@ class Clover < Roda
     disassociate
     disconnect
     promote
+    recycle
     remove_account
     remove_member
     reset_superuser_password
@@ -133,7 +134,7 @@ class Clover < Roda
     update_invitation
     upgrade
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote reset_superuser_password restart restore update cancel_storage_auto_scale]).freeze
+  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote recycle reset_superuser_password restart restore update cancel_storage_auto_scale]).freeze
 
   def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)

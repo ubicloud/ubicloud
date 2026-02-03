@@ -523,6 +523,13 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
       end
 
+      it "recycle fails without representative_server" do
+        pg.representative_server.update(representative_at: nil)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/recycle"
+
+        expect(last_response.status).to eq(400)
+      end
+
       it "reset password" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "DummyPassword123"
