@@ -33,9 +33,12 @@ class KubernetesNode < Sequel::Model
         status = JSON.parse(file_content)
         pods_status = status["pods"]
         unreachable_pods = pods_status.select { |_, v| v["reachable"] == false }
-        if unreachable_pods.any?
-          errors = unreachable_pods.transform_values { |v| v["error"] }.compact
-          Clog.emit("Mesh connectivity issue detected", {kubernetes_node_mesh: {ubid:, unreachable_pods: unreachable_pods.keys, errors:}})
+        external_status = status["external_endpoints"]
+        unreachable_external = external_status.select { |_, v| v["reachable"] == false }
+        if unreachable_pods.any? || unreachable_external.any?
+          pod_errors = unreachable_pods.transform_values { |v| v["error"] }.compact
+          external_errors = unreachable_external.transform_values { |v| v["error"] }.compact
+          Clog.emit("Mesh connectivity issue detected", {kubernetes_node_mesh: {ubid:, unreachable_pods: unreachable_pods.keys, unreachable_external: unreachable_external.keys, pod_errors:, external_errors:}})
           "down"
         else
           "up"
