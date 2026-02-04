@@ -73,4 +73,18 @@ RSpec.configure do |config|
 
   config.order = :random
   Kernel.srand config.seed
+
+  leaked_threads = ObjectSpace::WeakMap.new
+  leaked_threads[Thread.current] = true
+
+  config.around do |example|
+    example.run
+
+    Thread.list.each do |thread|
+      next if leaked_threads[thread]
+
+      p [:leaked_thread, thread]
+      leaked_threads[thread] = true
+    end
+  end
 end
