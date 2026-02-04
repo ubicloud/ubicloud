@@ -66,6 +66,9 @@ Layout/EmptyLinesAroundMethodBody:
 Lint/UnderscorePrefixedVariableName:
   Enabled: false
 
+RSpec/ExpectChange:
+  Enabled: false
+
 RSpec/AnyInstance:
   Enabled: false
 
