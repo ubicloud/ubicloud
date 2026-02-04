@@ -8,9 +8,11 @@ RSpec.describe Csi::V1::NodeService do
   let(:logger) { Logger.new(File::NULL) }
   let(:client) { Csi::KubernetesClient.new(logger:, req_id:) }
   let(:service) { described_class.new(logger:, node_id: "test-node") }
+  let(:mesh_checker) { instance_double(Csi::MeshConnectivityChecker, start: nil, shutdown!: nil) }
 
   before do
     allow(SecureRandom).to receive(:uuid).and_return("test-req-id")
+    allow(Csi::MeshConnectivityChecker).to receive(:new).and_return(mesh_checker)
   end
 
   describe ".mkdir_p" do
@@ -875,10 +877,19 @@ RSpec.describe Csi::V1::NodeService do
     end
   end
 
+  describe "#start_mesh_connectivity_checker" do
+    it "creates and starts a mesh connectivity checker" do
+      checker = instance_double(Csi::MeshConnectivityChecker)
+      expect(Csi::MeshConnectivityChecker).to receive(:new).with(logger:, node_id: "test-node").and_return(checker)
+      expect(checker).to receive(:start)
+
+      svc = described_class.new(logger:, node_id: "test-node")
+      expect(svc.instance_variable_get(:@mesh_checker)).to eq(checker)
+    end
+  end
+
   describe "#shutdown!" do
     it "calls shutdown! on mesh_checker" do
-      mesh_checker = instance_double(Csi::MeshConnectivityChecker)
-      service.instance_variable_set(:@mesh_checker, mesh_checker)
       expect(mesh_checker).to receive(:shutdown!)
 
       service.shutdown!
