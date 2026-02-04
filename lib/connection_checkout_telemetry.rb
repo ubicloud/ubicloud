@@ -84,8 +84,8 @@ class ConnectionCheckoutTelemetry
     bucket_names = %w[immediate 0_30_ms 30_100_ms 100_300_ms 300_1000_ms 1_3_s over_3_s].freeze
 
     requests = immediates = waits = 0
-    bucket_count = bucket_names.length
-    empty_buckups = [0] * bucket_count
+    bucket_count = bucket_names.length - 1
+    empty_buckups = ([0] * bucket_count).freeze
     buckets = empty_buckups.dup
 
     # Use separate counter instead of requests % check_every == 0
