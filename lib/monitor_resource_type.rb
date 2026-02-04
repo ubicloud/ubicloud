@@ -109,8 +109,8 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
   end
 
   # Update the run_queue with jobs that have finished. Then enqueue each resource
-  # if . Enqueued resources will be processed by the worker
-  # thread pool.
+  # if it finished before the given time. Enqueued resources will be processed by
+  # the worker thread pool.
   def enqueue(before)
     # Pop all available jobs out of the finish queue and add them to the
     # run queue. This can result in jobs that a very slightly out of order,
