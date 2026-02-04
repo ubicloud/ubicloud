@@ -13,7 +13,7 @@ class ConnectionCheckoutTelemetry
   # key :: Clog.emit key to use
   # check_every :: the number of connection requests between deciding whether to report
   # report_every :: the minimum number of seconds between reports
-  def initialize(db: DB, key: "#{ENV["PROCESS_TYPE"]}_connection_checkout_metrics", check_every: 1000, report_every: 60)
+  def initialize(db: DB, key: "#{ENV["PROCESS_TYPE"]}_connection_checkout_metrics", check_every: 300, report_every: 20)
     db.extension :connection_checkout_event_callback
     @pool = db.pool
     @key = key
