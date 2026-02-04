@@ -48,14 +48,13 @@ RSpec.describe ConnectionCheckoutTelemetry do
       expect(msg).to eq "test"
       data = hash["test"]
       expect(data).to eq({
-        "0_10_us" => 0.0,
-        "100_1000_ms" => 0.0,
-        "100_1000_us" => 0.0,
-        "10_100_ms" => 0.0,
-        "10_100_us" => 0.0,
-        "1_10_ms" => 0.0,
+        "0_30_ms" => 0.0,
+        "30_100_ms" => 0.0,
+        "100_300_ms" => 0.0,
+        "300_1000_ms" => 0.0,
+        "1_3_s" => 0.0,
         "immediate" => 50.0,
-        "over_1_s" => 0.0,
+        "over_3_s" => 0.0,
         "requests" => 2,
         "pool_size" => 1
       })
@@ -89,41 +88,31 @@ RSpec.describe ConnectionCheckoutTelemetry do
   it "#run handles wait times for connections" do
     expect(Clog).to receive(:emit) do |_, hash|
       data = hash["test"]
-      expect(data["over_1_s"]).to eq 50.0
-      expect(data["100_1000_ms"]).to eq 50.0
+      expect(data["over_3_s"]).to eq 50.0
+      expect(data["1_3_s"]).to eq 50.0
     end
+    cct.queue.push(4)
     cct.queue.push(2)
+    cct.queue.push(nil)
+    cct.run
+
+    expect(Clog).to receive(:emit) do |_, hash|
+      data = hash["test"]
+      expect(data["300_1000_ms"]).to eq 50.0
+      expect(data["100_300_ms"]).to eq 50.0
+    end
+    cct.queue.push(0.4)
     cct.queue.push(0.2)
     cct.queue.push(nil)
     cct.run
 
     expect(Clog).to receive(:emit) do |_, hash|
       data = hash["test"]
-      expect(data["10_100_ms"]).to eq 50.0
-      expect(data["1_10_ms"]).to eq 50.0
+      expect(data["30_100_ms"]).to eq 50.0
+      expect(data["0_30_ms"]).to eq 50.0
     end
+    cct.queue.push(0.04)
     cct.queue.push(0.02)
-    cct.queue.push(0.002)
-    cct.queue.push(nil)
-    cct.run
-
-    expect(Clog).to receive(:emit) do |_, hash|
-      data = hash["test"]
-      expect(data["100_1000_us"]).to eq 50.0
-      expect(data["10_100_us"]).to eq 50.0
-    end
-    cct.queue.push(0.0002)
-    cct.queue.push(0.00002)
-    cct.queue.push(nil)
-    cct.run
-
-    expect(Clog).to receive(:emit) do |_, hash|
-      data = hash["test"]
-      expect(data["0_10_us"]).to eq 50.0
-      expect(data["immediate"]).to eq 50.0
-    end
-    cct.queue.push(:immediately_available)
-    cct.queue.push(0.000002)
     cct.queue.push(nil)
     cct.run
   end
