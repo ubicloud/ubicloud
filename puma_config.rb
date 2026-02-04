@@ -13,9 +13,9 @@ before_fork do
   Sequel::DATABASES.each(&:disconnect)
 end
 before_worker_boot do
-  CONNECTION_CHECKOUT_TELEMETRY.run_thread
+  CONNECTION_CHECKOUT_TELEMETRY&.run_thread
 end
 after_stopped do
-  CONNECTION_CHECKOUT_TELEMETRY.shutdown!
+  CONNECTION_CHECKOUT_TELEMETRY&.shutdown!
 end
 # :nocov:
