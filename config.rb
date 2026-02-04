@@ -82,6 +82,8 @@ module Config
   override :base_url, "http://localhost:9292", string
   override :database_timeout, 10, int
   override :db_pool, 5, int
+  override :db_pool_web, Config.db_pool, int
+  override :db_pool_respirate, Config.db_pool, int
   override :db_pool_monitor, Config.db_pool, int
   override :dispatcher_max_threads, 8, int
   override :dispatcher_min_threads, 1, int

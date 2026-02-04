@@ -14,8 +14,15 @@ end
 
 db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "db_ca_bundle.crt")
 Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs)
-max_connections = (Util.monitor_process? ? Config.db_pool_monitor : Config.db_pool) - 1
-max_connections = 1 if ENV["SHARED_CONNECTION"] == "1"
+
+max_connections = if ENV["SHARED_CONNECTION"] == "1"
+  1
+elsif (process_type = ENV["PROCESS_TYPE"])
+  Config.send(:"db_pool_#{process_type}") - 1
+else
+  Config.db_pool - 1
+end
+
 pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
 DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: Config.database_timeout, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:)
 

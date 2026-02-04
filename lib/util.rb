@@ -106,10 +106,6 @@ module Util
     [{resource_type:, tags:}].compact
   end
 
-  def self.monitor_process?
-    ENV["PROCESS_TYPE"] == "monitor"
-  end
-
   def self.calculate_ips_v4
     Address
       .where { (family(:cidr) =~ 4) & (masklen(:cidr) !~ 32) }
