@@ -50,7 +50,16 @@ Csi::V1::NodeService.mkdir_p
 logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
 server.handle(Csi::V1::ControllerService.new(logger:))
-server.handle(Csi::V1::NodeService.new(logger:, node_id:))
+node_service = Csi::V1::NodeService.new(logger:, node_id:)
+server.handle(node_service)
+
+%w[TERM INT].each do |signal|
+  Signal.trap(signal) do
+    logger.info("Received #{signal}, shutting down gracefully...")
+    node_service.shutdown!
+    server.stop
+  end
+end
 
 logger.debug("Starting UbiCSI server on #{endpoint}")
 begin
