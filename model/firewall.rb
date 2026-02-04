@@ -22,18 +22,18 @@ class Firewall < Sequel::Model
     "/location/#{display_location}/firewall/#{name}"
   end
 
-  def remove_firewall_rule(firewall_rule)
+  def remove_firewall_rule(firewall_rule, request_ids: nil)
     firewall_rules_dataset.where(id: firewall_rule.id).destroy
-    update_private_subnet_firewall_rules
+    update_private_subnet_firewall_rules(request_ids)
   end
 
-  def insert_firewall_rule(cidr, port_range, description: nil)
+  def insert_firewall_rule(cidr, port_range, description: nil, request_ids: nil)
     fwr = add_firewall_rule(cidr:, port_range:, description:)
-    update_private_subnet_firewall_rules
+    update_private_subnet_firewall_rules(request_ids)
     fwr
   end
 
-  def replace_firewall_rules(new_firewall_rules)
+  def replace_firewall_rules(new_firewall_rules, request_ids: nil)
     firewall_rules.each(&:destroy)
     DB.ignore_duplicate_queries do
       new_firewall_rules.each do
@@ -41,7 +41,7 @@ class Firewall < Sequel::Model
       end
     end
 
-    update_private_subnet_firewall_rules
+    update_private_subnet_firewall_rules(request_ids)
   end
 
   def before_destroy
@@ -60,8 +60,8 @@ class Firewall < Sequel::Model
     private_subnet.incr_update_firewall_rules(request_ids) if apply_firewalls
   end
 
-  def update_private_subnet_firewall_rules
-    private_subnets.each(&:incr_update_firewall_rules)
+  def update_private_subnet_firewall_rules(request_ids = nil)
+    private_subnets.each { it.incr_update_firewall_rules(request_ids) }
   end
 end
 

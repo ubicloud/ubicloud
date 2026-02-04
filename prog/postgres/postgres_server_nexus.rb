@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [], request_ids: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -72,6 +72,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
       Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      postgres_server.incr_initial_provisioning(request_ids) if request_ids
     end
   end
 

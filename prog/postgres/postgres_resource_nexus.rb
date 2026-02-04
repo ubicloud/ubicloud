@@ -73,7 +73,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
           {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
           {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
-        ]
+        ], reuqest_ids:
       )
 
       if with_firewall_rules
@@ -82,10 +82,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
           {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
           {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
-        ])
+        ], request_ids:)
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now, request_ids:)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
 

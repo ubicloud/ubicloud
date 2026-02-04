@@ -185,10 +185,10 @@ class Clover
 
             firewall_rule = nil
             DB.transaction do
-              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:)
+              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:, request_ids: request.get_header("X-Request-ID"))
               audit_log(firewall_rule, "create", [fw, pg])
 
-              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:)
+              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:, request_ids: request.get_header("X-Request-ID"))
               audit_log(firewall_rule2, "create", [fw, pg])
             end
 
