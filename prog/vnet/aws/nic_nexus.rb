@@ -33,9 +33,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
       [subnet.subnet_id, subnet.availability_zone]
     elsif subnet_response.subnets.empty?
       subnet_az = az_to_provision_subnet
+      subnet_size = [24, private_subnet.net4.netmask.prefix_len].max
       subnet_id = client.create_subnet({
         vpc_id:,
-        cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(24)).to_s,
+        cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(subnet_size)).to_s,
         ipv_6_cidr_block: ipv_6_cidr_block.to_s,
         availability_zone: private_subnet.location.name + subnet_az,
         tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
