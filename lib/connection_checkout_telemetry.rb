@@ -81,7 +81,7 @@ class ConnectionCheckoutTelemetry
     check_every = @check_every
     report_every = @report_every
     queue = @queue
-    bucket_names = %w[immediate 0_10_us 10_100_us 100_1000_us 1_10_ms 10_100_ms 100_1000_ms over_1_s].freeze
+    bucket_names = %w[immediate 0_30_ms 30_100_ms 100_300_ms 300_1000_ms 1_3_s over_3_s].freeze
 
     requests = immediates = waits = 0
     bucket_count = bucket_names.length
@@ -106,20 +106,18 @@ class ConnectionCheckoutTelemetry
         waits += 1
         time = event
 
-        # Benchmarks faster than a Math.log10(time * 100000 + 1) approach
+        # Benchmarks faster than a Math.log10 approach
         # Nested conditional for at most 3 comparisons per iteration
-        bucket = if time < 0.01
-          if time < 0.0001
-            (time < 0.00001) ? 0 : 1
-          elsif time < 0.001
-            2
+        bucket = if time < 0.3
+          if time < 0.1
+            (time < 0.03) ? 0 : 1
           else
-            3
+            2
           end
-        elsif time < 1
-          (time < 0.1) ? 4 : 5
+        elsif time < 3
+          (time < 1) ? 3 : 4
         else
-          6
+          5
         end
 
         buckets[bucket] += 1
