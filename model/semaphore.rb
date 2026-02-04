@@ -27,6 +27,10 @@ class Semaphore < Sequel::Model
       .insert([:id, :strand_id, :name, :request_ids],
         DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name, request_ids))
   end
+
+  def self.get_request_ids(id, name)
+    DB.from { Sequel.lit("semaphore, unnest(request_ids)") }.get{array_agg(:unnest).distinct}
+  end
 end
 
 # Table: semaphore

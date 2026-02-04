@@ -31,11 +31,11 @@ end
   end
 
   def get_request_ids(name)
-    request_ids = Semaphore.get_request_ids(@strand.id, name)
+    Semaphore.get_request_ids(@strand.id, name.to_s)
   end
 
   def convert_semaphore(name_from, name_into)
-    request_ids = Semaphore.get_request_ids(@strand.id, name_from)
+    request_ids = Semaphore.get_request_ids(@strand.id, name_from.to_s)
     @snap.incr(name_into, request_ids)
     @snap.decr(name_from)
   end

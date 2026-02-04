@@ -68,11 +68,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id,
         version: server_version
       )
+      postgres_server.incr_initial_provisioning(request_ids) if request_ids
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
       Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
-      postgres_server.incr_initial_provisioning(request_ids) if request_ids
     end
   end
 
