@@ -128,6 +128,7 @@ class Clover
             cidrs, pg_range, description = firewall_rule_params
             description = nil if description&.empty?
 
+<<<<<<< HEAD
             DB.transaction do
               DB.ignore_duplicate_queries do
                 cidrs.map! do |cidr|
@@ -135,6 +136,18 @@ class Clover
                   audit_log(firewall_rule, "create", firewall)
                   firewall_rule
                 end
+=======
+          port_range = Validation.validate_port_range(typecast_params.str("port_range"))
+          description = typecast_params.nonempty_str("description")
+          pg_range = Sequel.pg_range(port_range.first..port_range.last)
+
+          DB.transaction do
+            DB.ignore_duplicate_queries do
+              cidrs.map! do |cidr|
+                firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:, request_ids: request.get_header("X-Request-ID"))
+                audit_log(firewall_rule, "create", firewall)
+                firewall_rule
+>>>>>>> e516e822f (more request ids)
               end
             end
 
@@ -196,7 +209,7 @@ class Clover
           r.delete true do
             authorize("Firewall:edit", firewall)
             DB.transaction do
-              firewall.remove_firewall_rule(firewall_rule)
+              firewall.remove_firewall_rule(firewall_rule, request_ids: request.get_header("X-Request-ID"))
               audit_log(firewall_rule, "destroy", firewall)
             end
 
