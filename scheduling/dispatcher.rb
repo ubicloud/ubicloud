@@ -109,9 +109,6 @@ class Scheduling::Dispatcher
     # based on metrics. Used for calculating the sleep duration.
     @strands_per_second = 1
 
-    @checkout_telemetry = ConnectionCheckoutTelemetry.new(db: telemetry_db)
-    @checkout_telemetry.setup_and_run_thread
-
     if partition_number
       # Handles repartitioning when new partitions show up or old partitions
       # go stale.
@@ -156,9 +153,6 @@ class Scheduling::Dispatcher
     # Close down the repartition thread if is exists.  Note that
     # this can block for up to a second.
     @repartition_thread&.join
-
-    # Close down the telemetry thread. This shouldn't block for long.
-    @checkout_telemetry.shutdown!
 
     # After all queues have been pushed to, it is safe to
     # attempt joining them.
