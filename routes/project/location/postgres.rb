@@ -10,7 +10,7 @@ class Clover
       if pg_name
         r.post api? do
           check_visible_location
-          postgres_post(pg_name)
+          postgres_post(pg_name, request_ids: request.get_header("X-Request-ID"))
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -227,7 +227,7 @@ class Clover
                 cidr: new_cidr,
                 description:
               )
-              firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
+              firewall.update_private_subnet_firewall_rules(request.get_header("X-Request-ID")) if current_cidr != new_cidr
               audit_log(fwr, "update")
             end
 
@@ -237,7 +237,7 @@ class Clover
           r.delete do
             DB.transaction do
               fwr.destroy
-              firewall.update_private_subnet_firewall_rules
+              firewall.update_private_subnet_firewall_rules(request.get_header("X-Request-ID"))
               audit_log(fwr, "destroy")
             end
 
@@ -327,7 +327,8 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target: nil,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
+            request_ids: request.get_header("X-Request-ID")
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -399,7 +400,8 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
+            request_ids: request.get_header("X-Request-ID")
           ).subject
           audit_log(pg, "restore", restored)
         end

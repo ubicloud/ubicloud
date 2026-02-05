@@ -3,7 +3,7 @@
 class Prog::Vnet::NicNexus < Prog::Base
   subject_is :nic
 
-  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil)
+  def self.assemble(private_subnet_id, name: nil, ipv6_addr: nil, ipv4_addr: nil, exclude_availability_zones: [], availability_zone: nil, request_ids: nil)
     unless (subnet = PrivateSubnet[private_subnet_id])
       fail "Given subnet doesn't exist with the id #{private_subnet_id}"
     end

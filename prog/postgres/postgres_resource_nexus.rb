@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id).id, "push", target_version]
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id, request_ids:).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
@@ -61,7 +61,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       # Customer firewall, will be attached to created customer subnet
       firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
       subnet_name = private_subnet_name || "#{postgres_resource.ubid}-subnet"
-      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id).subject
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id, request_ids:).subject
       private_subnet_id = private_subnet.id
       postgres_resource.update(private_subnet_id:)
 

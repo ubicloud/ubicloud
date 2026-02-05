@@ -60,6 +60,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         availability_zone:,
         exclude_data_centers:,
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
+        request_ids:
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
