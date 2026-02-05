@@ -13,9 +13,14 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
+    az_a = LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     ps.strand.update(label: "wait")
-    PrivateSubnetAwsResource.create_with_id(ps.id, security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
+    # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
+    # Update them with the test values
+    ps.private_subnet_aws_resource.update(security_group_id: "sg-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg")
+    aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
+    aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
     nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic").subject
     NicAwsResource.create_with_id(nic.id, subnet_id: "subnet-0123456789abcdefg", subnet_az: "us-west-2a")
     nic
@@ -44,64 +49,23 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect { nx.create_subnet }.to nap(2)
     end
 
-    it "creates a subnet and hops to wait_subnet_created" do
-      expect(nx).to receive(:old_subnet?).and_return(false)
-      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [])
-      client.stub_responses(:create_subnet, subnet: {subnet_id: "subnet-0123456789abcdefg"})
-      client.stub_responses(:modify_subnet_attribute)
-      expect(client).to receive(:modify_subnet_attribute).with({subnet_id: "subnet-0123456789abcdefg", assign_ipv_6_address_on_creation: {value: true}}).and_call_original
-      expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-0123456789abcdefg", subnet_az: "a")
-      expect(nx).to receive(:az_to_provision_subnet).and_return("a").at_least(:once)
-      expect { nx.create_subnet }.to hop("wait_subnet_created")
+    it "uses aws_subnet_id from frame and hops to create_network_interface" do
+      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: nic.private_subnet.private_subnet_aws_resource.id).first
+      expect(nx).to receive(:frame).and_return({"aws_subnet_id" => aws_subnet.id}).at_least(:once)
+      expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: aws_subnet.subnet_id, subnet_az: aws_subnet.az_suffix, aws_subnet_id: aws_subnet.id)
+      expect { nx.create_subnet }.to hop("create_network_interface")
     end
 
-    it "reuses existing subnet" do
-      expect(nx).to receive(:old_subnet?).and_return(false)
-      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
-      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
-      expect(client).not_to receive(:create_route_table)
-      expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).not_to receive(:az_to_provision_subnet)
-      expect { nx.create_subnet }.to hop("wait_subnet_created")
+    it "fails if aws_subnet_id from frame is not found" do
+      expect(nx).to receive(:frame).and_return({"aws_subnet_id" => "00000000-0000-0000-0000-000000000000"}).at_least(:once)
+      expect { nx.create_subnet }.to raise_error("No available AWS subnet found")
     end
 
-    it "reuses existing subnet for old aws subnet" do
+    it "uses existing subnet for old aws subnet" do
       expect(nx).to receive(:old_subnet?).and_return(true)
-      client.stub_responses(:describe_vpcs, vpcs: [{ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}], vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing", availability_zone: "a"}])
-      client.stub_responses(:modify_subnet_attribute)
-      expect(client).not_to receive(:create_route_table)
       expect(nic.nic_aws_resource).to receive(:update).with(subnet_id: "subnet-existing", subnet_az: "a")
-      expect(nx).not_to receive(:az_to_provision_subnet)
-      expect { nx.create_subnet }.to hop("wait_subnet_created")
-    end
-  end
-
-  describe "#wait_subnet_created" do
-    it "just hops to create the network interface for old aws subnet" do
-      expect(nx).to receive(:old_subnet?).and_return(true)
-      expect { nx.wait_subnet_created }.to hop("create_network_interface")
-    end
-
-    it "checks if subnet is available, if not naps" do
-      client.stub_responses(:describe_subnets, subnets: [{state: "pending"}])
-      expect { nx.wait_subnet_created }.to nap(1)
-    end
-
-    it "checks if subnet is available, if so associates with the route_table and hops to create_network_interface" do
-      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
-      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: []}])
-      client.stub_responses(:associate_route_table)
-      expect(client).to receive(:associate_route_table).with({route_table_id: "rtb-0123456789abcdefg", subnet_id: "subnet-0123456789abcdefg"}).and_call_original
-      expect { nx.wait_subnet_created }.to hop("create_network_interface")
-    end
-
-    it "checks if subnet is available, doesn't associate with the route_table if it's already associated and hops to create_network_interface" do
-      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
-      client.stub_responses(:describe_route_tables, route_tables: [{route_table_id: "rtb-0123456789abcdefg", associations: [{subnet_id: "subnet-0123456789abcdefg"}]}])
-      expect(client).not_to receive(:associate_route_table)
-      expect { nx.wait_subnet_created }.to hop("create_network_interface")
+      expect { nx.create_subnet }.to hop("create_network_interface")
     end
   end
 
@@ -274,7 +238,21 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   end
 
   describe "#delete_subnet" do
-    it "deletes the subnet" do
+    it "skips deletion for shared subnets (aws_subnet_id set)" do
+      aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: nic.private_subnet.private_subnet_aws_resource.id).first
+      nic.nic_aws_resource.update(aws_subnet_id: aws_subnet.id)
+      expect(client).not_to receive(:delete_subnet)
+      expect { nx.delete_subnet }.to hop("destroy_entities")
+    end
+
+    it "deletes legacy per-NIC subnet (aws_subnet_id nil)" do
+      client.stub_responses(:delete_subnet)
+      expect(client).to receive(:delete_subnet).with({subnet_id: nic.nic_aws_resource.subnet_id}).and_call_original
+      expect { nx.delete_subnet }.to hop("destroy_entities")
+    end
+
+    it "deletes subnet for old aws subnet" do
+      expect(nx).to receive(:old_subnet?).and_return(true)
       client.stub_responses(:delete_subnet)
       expect(client).to receive(:delete_subnet).with({subnet_id: nic.nic_aws_resource.subnet_id}).and_call_original
       expect { nx.delete_subnet }.to hop("destroy_entities")
@@ -315,36 +293,6 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
     it "gracefully continues if the nic is not found" do
       expect(nx).to receive(:nic).and_return(nil).at_least(:once)
       expect { nx.destroy_entities }.to exit({"msg" => "nic deleted"})
-    end
-  end
-
-  describe "#az_to_provision_subnet" do
-    before do
-      nic.private_subnet.location.add_location_aws_az(az: "a", zone_id: "123")
-      nic.private_subnet.location.add_location_aws_az(az: "b", zone_id: "456")
-      nic.private_subnet.location.add_location_aws_az(az: "c", zone_id: "789")
-    end
-
-    it "returns the az if set" do
-      expect(nx).to receive(:frame).and_return({"availability_zone" => "a"})
-      expect(nx.az_to_provision_subnet).to eq("a")
-    end
-
-    it "returns an az that is not in excluded_availability_zones" do
-      expect(nx).to receive(:frame).and_return({"exclude_availability_zones" => ["a"]}).at_least(:once)
-      expect(["b", "c"]).to include(nx.az_to_provision_subnet) # rubocop:disable RSpec/ExpectActual
-    end
-
-    it "returns a if nothing is available" do
-      expect(nx).to receive(:frame).and_return({"exclude_availability_zones" => ["a", "b", "c"]}).at_least(:once)
-      expect(nx.az_to_provision_subnet).to eq("a")
-    end
-
-    it "fetches azs if not present" do
-      nic.private_subnet.location.reload.location_aws_azs.map(&:destroy)
-      client.stub_responses(:describe_availability_zones, availability_zones: [{zone_name: "us-west-2a", zone_id: "123"}, {zone_name: "us-west-2b", zone_id: "456"}, {zone_name: "us-west-2c", zone_id: "789"}])
-      expect(["a", "b", "c"]).to include(nx.az_to_provision_subnet) # rubocop:disable RSpec/ExpectActual
-      expect(LocationAwsAz.count).to eq(3)
     end
   end
 end
