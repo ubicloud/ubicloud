@@ -36,6 +36,33 @@ class MonitorRunner
     @resource_types.each { it.wait_cleanup!(seconds) }
   end
 
+  def initial_scan
+    id_range = @repartitioner.strand_id_range
+
+    @resource_types.each do |resource_type|
+      new_resources = resource_type.scan(id_range)
+
+      # Spread the initial resources over the first third of the scan
+      # period, to avoid the thundering herd.
+      spread_each = (new_resources.size * 3) / @scan_every
+      i = 0
+      t = Time.now
+      before = t - @enqueue_every
+
+      new_resources.each do
+        if i == spread_each
+          i = 0
+          before += 1
+        else
+          i += 1
+        end
+        it.monitor_job_finished_at = before
+      end
+
+      resource_type.run_queue.concat(new_resources)
+    end
+  end
+
   def scan
     id_range = @repartitioner.strand_id_range
 
@@ -90,7 +117,7 @@ class MonitorRunner
     end
   end
 
-  def run
+  def run(phased_initial_scan: true)
     # Time after which to run the scan query to check for new resources.
     scan_after = Time.now
 
@@ -110,7 +137,12 @@ class MonitorRunner
         scan_after = t + @scan_every
         @repartitioner.repartitioned = false
 
-        scan
+        if phased_initial_scan
+          phased_initial_scan = true
+          initial_scan
+        else
+          scan
+        end
 
         # Pushing to the queue may block, and there may a large amount of time
         # since the last Time.now call.
