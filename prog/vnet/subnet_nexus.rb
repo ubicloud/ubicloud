@@ -52,8 +52,34 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Metal::SubnetNexus"
+      prog = if location.aws?
+        # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ
+        ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
+        create_aws_subnet_records(ps, ps_aws_resource, location)
+        "Vnet::Aws::VpcNexus"
+      else
+        "Vnet::Metal::SubnetNexus"
+      end
       Strand.create_with_id(id, prog:, label: "start")
+    end
+  end
+
+  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location)
+    azs = location.azs
+    vpc_ipv4 = private_subnet.net4
+
+    ipv4_prefix = 24
+
+    azs.each_with_index do |az, idx|
+      ipv4_cidr = vpc_ipv4.nth_subnet(ipv4_prefix, idx)
+
+      AwsSubnet.create(
+        private_subnet_aws_resource_id: ps_aws_resource.id,
+        location_aws_az_id: az.id,
+        ipv4_cidr: ipv4_cidr.to_s,
+        ipv6_cidr: nil,  # Will be set when VPC is created
+        subnet_id: nil   # Will be set when AWS subnet is created
+      )
     end
   end
 
