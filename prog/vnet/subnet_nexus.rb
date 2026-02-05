@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, limit_to_single_az: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
