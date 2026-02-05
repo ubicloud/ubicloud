@@ -33,7 +33,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.postgres_service_project_id)
     }
     let(:aws_location) {
-      Location.create(
+      loc = Location.create(
         name: "us-west-2",
         display_name: "aws-us-west-2",
         ui_name: "aws-us-west-2",
@@ -41,6 +41,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         provider: "aws",
         project: user_project
       )
+      LocationCredential.create(
+        access_key: "access-key-id",
+        secret_key: "secret-access-key"
+      ) { it.id = loc.id }
+      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      loc
     }
     let(:postgres_resource) {
       PostgresResource.create(
