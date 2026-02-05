@@ -9,7 +9,7 @@ class KubernetesNode < Sequel::Model
   many_to_one :kubernetes_nodepool, read_only: true
 
   plugin ResourceMethods
-  plugin SemaphoreMethods, :destroy, :retire
+  plugin SemaphoreMethods, :destroy, :retire, :checkup
   include HealthMonitorMethods
 
   MESH_STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
@@ -26,23 +26,12 @@ class KubernetesNode < Sequel::Model
 
   def check_pulse(session:, previous_pulse:)
     reading = begin
-      file_content = session[:ssh_session].exec!("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
-      if file_content.empty?
-        "up" # File doesn't exist yet - CSI not updated, consider healthy
+      available_result = check_mesh_availability(session[:ssh_session])
+      if available_result[:available]
+        "up"
       else
-        status = JSON.parse(file_content)
-        pods_status = status["pods"]
-        unreachable_pods = pods_status.select { |_, v| v["reachable"] == false }
-        external_status = status["external_endpoints"]
-        unreachable_external = external_status.select { |_, v| v["reachable"] == false }
-        if unreachable_pods.any? || unreachable_external.any?
-          pod_errors = unreachable_pods.transform_values { |v| v["error"] }.compact
-          external_errors = unreachable_external.transform_values { |v| v["error"] }.compact
-          Clog.emit("Mesh connectivity issue detected", {kubernetes_node_mesh: {ubid:, unreachable_pods: unreachable_pods.keys, unreachable_external: unreachable_external.keys, pod_errors:, external_errors:}})
-          "down"
-        else
-          "up"
-        end
+        Clog.emit("Mesh connectivity issue detected", {kubernetes_node_mesh: {ubid:, **available_result}})
+        "down"
       end
     rescue IOError, Errno::ECONNRESET
       raise
@@ -50,7 +39,51 @@ class KubernetesNode < Sequel::Model
       Clog.emit("Exception in KubernetesNode pulse check", Util.exception_to_hash(e, into: {ubid:}))
       "down"
     end
-    aggregate_readings(previous_pulse:, reading:)
+    pulse = aggregate_readings(previous_pulse:, reading:)
+
+    if pulse[:reading] == "down" && pulse[:reading_rpt] > 5 && Time.now - pulse[:reading_chg] > 30 && !checkup_set?
+      incr_checkup
+    end
+
+    pulse
+  end
+
+  def available?
+    check_mesh_availability[:available]
+  rescue => e
+    Clog.emit("Failed to check mesh availability", Util.exception_to_hash(e, into: {ubid:}))
+    false
+  end
+
+  # ssh_session is optional to allow nexus to call available? without an active session
+  def check_mesh_availability(ssh_session = nil)
+    file_content = if ssh_session
+      ssh_session.exec!("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
+    else
+      sshable.cmd("cat :MESH_STATUS_FILE_PATH 2>/dev/null || echo -n", MESH_STATUS_FILE_PATH:)
+    end
+
+    if file_content.empty?
+      return {available: true} # File doesn't exist yet - CSI not updated, consider healthy
+    end
+
+    status = JSON.parse(file_content)
+    pods_status = status["pods"]
+    external_status = status["external_endpoints"]
+    unreachable_pods = pods_status.select { |_, v| v["reachable"] == false }
+    unreachable_external = external_status.select { |_, v| v["reachable"] == false }
+
+    if unreachable_pods.any? || unreachable_external.any?
+      {
+        available: false,
+        unreachable_pods: unreachable_pods.keys,
+        unreachable_external: unreachable_external.keys,
+        pod_errors: unreachable_pods.transform_values { |v| v["error"] }.compact,
+        external_errors: unreachable_external.transform_values { |v| v["error"] }.compact
+      }
+    else
+      {available: true}
+    end
   end
 
   def billing_records

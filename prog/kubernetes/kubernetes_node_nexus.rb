@@ -45,10 +45,25 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
   end
 
   label def wait
+    when_checkup_set? do
+      hop_unavailable
+    end
+
     when_retire_set? do
       hop_retire
     end
     nap 6 * 60 * 60
+  end
+
+  label def unavailable
+    if available?
+      decr_checkup
+      hop_wait
+    end
+
+    Clog.emit("KubernetesNode is unavailable due to mesh connectivity issues", {kubernetes_node_unavailable: {ubid: kubernetes_node.ubid, name: kubernetes_node.name}})
+    register_deadline("wait", 15 * 60)
+    nap 15
   end
 
   label def retire
@@ -99,5 +114,9 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     cluster.incr_sync_internal_dns_config
     cluster.incr_sync_worker_mesh
     pop "kubernetes node is deleted"
+  end
+
+  def available?
+    kubernetes_node.available?
   end
 end
