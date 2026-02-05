@@ -347,7 +347,7 @@ class RegenScreenshots
         project.id,
         name: "#{kc_ubid}-subnet",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv4_range: Prog::Vnet::SubnetNexus.random_private_ipv4(Location[Location::HETZNER_FSN1_ID], project, 18).to_s
+        ipv4_range_size: 18
       ).subject.id,
       project_id: project.id
     ) do |kc|

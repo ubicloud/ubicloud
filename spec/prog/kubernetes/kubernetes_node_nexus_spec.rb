@@ -6,7 +6,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
   subject(:nx) { described_class.new(kd.strand) }
 
   let(:project) { Project.create(name: "default") }
-  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
+  let(:subnet) { Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range_size: 16, ipv6_range: "fd40:1a0a:8d48:182a::/64").subject }
   let(:kc) {
     kc = KubernetesCluster.create(
       name: "cluster",
@@ -45,6 +45,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect(kd.ubid).to start_with("kd")
       expect(kd.kubernetes_cluster_id).to eq kc.id
       expect(st.label).to eq "start"
+      expect(kd.kubernetes_cluster.private_subnet.net4.netmask.prefix_len).to eq 16
     end
 
     it "attaches internal cp vm firewall to control plane node" do
