@@ -5,11 +5,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   subject_is :private_subnet
 
   label def start
-    PrivateSubnetAwsResource.create_with_id(private_subnet.id)
-    hop_create_vpc
-  end
-
-  label def create_vpc
+    # PrivateSubnetAwsResource and AwsSubnet records are created in SubnetNexus.assemble
     vpc_response = client.describe_vpcs({filters: [{name: "tag:Name", values: [private_subnet.name]}]})
 
     vpc_id = if vpc_response.vpcs.empty?
@@ -60,7 +56,6 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def create_route_table
-    # Step 3: Update the route table for ipv_6 traffic
     route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]})
     route_table_id = route_table_response.route_tables[0].route_table_id
     private_subnet_aws_resource.update(route_table_id:)
@@ -94,6 +89,49 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         gateway_id: internet_gateway_id
       })
     rescue Aws::EC2::Errors::RouteAlreadyExists
+    end
+
+    hop_create_az_subnets
+  end
+
+  label def create_az_subnets
+    vpc = client.describe_vpcs({filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]}).vpcs[0]
+    vpc_ipv6 = NetAddr::IPv6Net.parse(vpc.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block)
+
+    # AwsSubnet records were pre-created in SubnetNexus.assemble with IPv4 CIDRs
+    # Now create the actual AWS subnets and update records with subnet_id and IPv6
+    private_subnet_aws_resource.aws_subnets.each_with_index do |aws_subnet, idx|
+      subnet = if aws_subnet.subnet_id
+        client.describe_subnets({filters: [{name: "subnet-id", values: [aws_subnet.subnet_id]}]}).subnets[0]
+      else
+        ipv6_cidr = vpc_ipv6.nth_subnet(64, idx)
+
+        client.create_subnet({
+          vpc_id: private_subnet_aws_resource.vpc_id,
+          cidr_block: aws_subnet.ipv4_cidr.to_s,
+          ipv_6_cidr_block: ipv6_cidr.to_s,
+          availability_zone: location.name + aws_subnet.location_aws_az.az,
+          tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_aws_az.az}")
+        }).subnet
+      end
+
+      aws_subnet.update(subnet_id: subnet.subnet_id, ipv6_cidr: subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block)
+      client.modify_subnet_attribute({
+        subnet_id: subnet.subnet_id,
+        assign_ipv_6_address_on_creation: {value: true}
+      })
+    end
+
+    hop_associate_az_route_tables
+  end
+
+  label def associate_az_route_tables
+    private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
+      client.associate_route_table({
+        route_table_id: private_subnet_aws_resource.route_table_id,
+        subnet_id: aws_subnet.subnet_id
+      })
+    rescue Aws::EC2::Errors::ResourceAlreadyAssociated
     end
 
     hop_wait
@@ -146,12 +184,30 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     ignore_invalid_id do
       client.delete_internet_gateway({internet_gateway_id: private_subnet_aws_resource.internet_gateway_id})
     end
+    hop_delete_az_subnets
+  end
+
+  label def delete_az_subnets
+    # Delete AWS subnets tracked in our database
+    private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
+      ignore_invalid_id do
+        client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+      end
+    end
+
+    # AwsSubnet DB records are cleaned up via CASCADE when
+    # private_subnet_aws_resource is destroyed in #finish
     hop_delete_vpc
   end
 
   label def delete_vpc
-    ignore_invalid_id do
+    begin
       client.delete_vpc({vpc_id: private_subnet_aws_resource.vpc_id})
+    rescue Aws::EC2::Errors::DependencyViolation => e
+      Clog.emit("VPC has dependencies, retrying subnet cleanup", {vpc_dependency: {vpc_id: private_subnet_aws_resource.vpc_id, error: e.message}})
+      raise e
+    rescue Aws::EC2::Errors::InvalidVpcIDNotFound
+      # VPC already deleted
     end
     hop_finish
   end
