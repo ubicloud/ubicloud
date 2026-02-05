@@ -643,7 +643,19 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "Restart"
         click_button "Restart"
 
+        expect(page).to have_flash_notice "'#{pg.name}' will be restarted in a few seconds"
         expect(page.status_code).to eq(200)
+        expect(pg.servers.map { it.restart_set? }).to all(be true)
+      end
+
+      it "can failover PostgreSQL database" do
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_content "Failover"
+        click_button "Failover"
+
+        expect(page).to have_flash_notice "'#{pg.name}' will failover soon"
+        expect(page.status_code).to eq(200)
+        expect(pg.representative_server.recycle_set?).to be true
       end
 
       it "doesn't show reset button when does not have permissions" do

@@ -147,8 +147,8 @@ pre_selected_values = {
           <% end %>
         </div>
       <% end %>
-      <!-- Restart Card -->
       <% if @edit_perm %>
+        <!-- Restart Card -->
         <div class="px-4 py-5 sm:p-6">
           <% form(action: "#{path(@pg)}/restart", method: :post) do %>
             <div class="sm:flex sm:items-center sm:justify-between">
@@ -162,6 +162,23 @@ pre_selected_values = {
               <div id="postgres-restart-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
                 <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
                   <%== part("components/form/submit_button", text: "Restart", extra_class: "restart-btn") %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+        <div class="px-4 py-5 sm:p-6">
+          <% form(action: "#{path(@pg)}/failover", method: :post) do %>
+            <div class="sm:flex sm:items-center sm:justify-between">
+              <div>
+                <h3 class="text-base font-semibold leading-6 text-gray-900">Failover PostgreSQL database</h3>
+                <div class="mt-2 text-sm text-gray-500">
+                  <p>Will trigger failover for PostgreSQL database.</p>
+                </div>
+              </div>
+              <div id="postgres-failover-<%=@pg.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                  <%== part("components/form/submit_button", text: "Failover") %>
                 </div>
               </div>
             </div>
