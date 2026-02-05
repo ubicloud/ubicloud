@@ -286,7 +286,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       fresh_nx = described_class.new(st)
       parent_sshable = fresh_nx.postgres_resource.parent.representative_server.vm.sshable
-      expect(parent_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'", hash_including(:stdin)).and_return("1234")
+      expect(parent_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", hash_including(:stdin)).and_return("1234")
 
       expect { fresh_nx.trigger_pg_current_xact_id_on_parent }.to exit({"msg" => "triggered pg_current_xact_id"})
     end

@@ -744,7 +744,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates password and buds restart during the initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
       expect(nx).to receive(:push).with(Prog::Postgres::Restart)
@@ -754,7 +754,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates password and hops to run_post_installation_script during initial provisioning if restart is already executed" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
       nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
@@ -767,7 +767,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         /sudo apt-get install.*pg-analytics.*pg-search/m
       ).and_return("")
       expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
       nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
@@ -777,7 +777,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher)
       ).and_return("")
       expect { nx.update_superuser_password }.to hop("wait")
@@ -788,7 +788,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "creates extensions for non-standard flavor and hops wait" do
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'",
+        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/)
       ).and_return("")
       expect { nx.run_post_installation_script }.to hop("wait")
@@ -841,13 +841,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait if sync replication is established" do
-      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum", "sync")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("quorum", "sync")
       expect { standby_nx.wait_synchronization }.to hop("wait")
       expect { standby_nx.wait_synchronization }.to hop("wait")
     end
 
     it "naps if sync replication is not established" do
-      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -d template1 -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("", "async")
+      expect(representative_sshable).to receive(:_cmd).with("PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'", stdin: anything).and_return("", "async")
       expect { standby_nx.wait_synchronization }.to nap(30)
       expect { standby_nx.wait_synchronization }.to nap(30)
     end
