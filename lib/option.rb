@@ -40,7 +40,7 @@ module Option
     [1, vcpus / 2].max
   end
 
-  AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m8gd", "i8g", "i8ge", "i7i", "i7ie", "r8gd", "r6gd", "r6id"].freeze
+  AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m7g", "m8g", "m8gd", "i8g", "i8ge", "i7i", "i7ie", "r8gd", "r6gd", "r6id"].freeze
   non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
@@ -49,6 +49,8 @@ module Option
     "m6gd" => non_storage_optimized_vm_storage_size_options,
     "m7a" => non_storage_optimized_vm_storage_size_options,
     "m7i" => non_storage_optimized_vm_storage_size_options,
+    "m7g" => non_storage_optimized_vm_storage_size_options,
+    "m8g" => non_storage_optimized_vm_storage_size_options,
     "m8gd" => non_storage_optimized_vm_storage_size_options,
     "i8g" => {2 => [468], 4 => [937], 8 => [1875], 16 => [3750], 32 => [7500], 64 => [15000], 96 => [22500]},
     "i8ge" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]},

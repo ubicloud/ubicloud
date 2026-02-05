@@ -11,6 +11,13 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def_delegators :github_runner, :installation, :vm, :label_data
   def_delegators :installation, :project
 
+  AWS_AMI_VERSIONS = [
+    Config.github_ubuntu_2204_x64_aws_ami_version,
+    Config.github_ubuntu_2404_x64_aws_ami_version,
+    Config.github_ubuntu_2204_arm64_aws_ami_version,
+    Config.github_ubuntu_2404_arm64_aws_ami_version
+  ].freeze
+
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
     unless Github.runner_labels[label]
       fail "Invalid GitHub runner label: #{label}"
@@ -60,11 +67,16 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     exclude_availability_zones = []
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
-      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
+    if github_runner.spill_over_set? || rand < alien_ratio
+      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
-      size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
-      alternative_families << "m7i" << "m6a"
+      if x64?
+        size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
+        alternative_families << "m7i" << "m6a"
+      else
+        size = Option.aws_instance_type_name("m8g", label_data["vcpus"])
+        alternative_families << "m7g"
+      end
       exclude_availability_zones << "a" # eu-central-1a is usually give capacity errors
     end
 
@@ -99,9 +111,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
-    billed_vm_size = if arch == "arm64"
-      "#{label_data["vm_size"]}-arm"
-    elsif installation.free_runner_upgrade?(github_runner.created_at)
+    billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
       # the customer for the label's VM size instead of the effective VM size.
       label_data["vm_size"]
@@ -110,6 +120,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     else
       "#{vm.family}-#{vm.vcpus}"
     end
+    billed_vm_size += "-arm" if arch == "arm64"
     github_runner.update(billed_vm_size:)
     rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
 
@@ -226,23 +237,22 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if is_high_util
-      should_spill_over = x64? &&
-        project.get_ff_spill_to_alien_runners &&
+      should_spill_over = project.get_ff_spill_to_alien_runners &&
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
       if should_spill_over
-        spilled_vcpus = Vm.where(boot_image: [Config.github_ubuntu_2204_aws_ami_version, Config.github_ubuntu_2404_aws_ami_version]).sum(:vcpus) || 0
+        spilled_vcpus = Vm.where(boot_image: AWS_AMI_VERSIONS).sum(:vcpus) || 0
         if spilled_vcpus >= Config.github_runner_aws_spill_vcpu_capacity
-          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, repository_name: github_runner.repository_name}})
+          Clog.emit("not allowed because of high utilization and spill capacity exceeded", {exceeded_spill_capacity: {family_utilization:, spilled_vcpus:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
           nap rand(5..15)
         end
 
-        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
+        Clog.emit("spilled over runner", {spilled_over_runner: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
         github_runner.incr_spill_over
         hop_allocate_vm
       end
 
-      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, repository_name: github_runner.repository_name}})
+      Clog.emit("not allowed because of high utilization", {reached_concurrency_limit: {family_utilization:, label: github_runner.label, arch:, repository_name: github_runner.repository_name}})
       nap rand(5..15)
     end
 
