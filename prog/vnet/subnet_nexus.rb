@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, limit_to_single_az: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -55,7 +55,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       prog = if location.aws?
         # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ
         ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
-        create_aws_subnet_records(ps, ps_aws_resource, location)
+        create_aws_subnet_records(ps, ps_aws_resource, location, limit_to_single_az)
         "Vnet::Aws::VpcNexus"
       else
         "Vnet::Metal::SubnetNexus"
@@ -64,12 +64,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location)
-    azs = location.azs
+  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, limit_to_single_az)
     vpc_ipv4 = private_subnet.net4
 
     ipv4_prefix = 24
-
+    azs = limit_to_single_az ? [location.azs.sample] : location.azs
     azs.each_with_index do |az, idx|
       ipv4_cidr = vpc_ipv4.nth_subnet(ipv4_prefix, idx)
 
