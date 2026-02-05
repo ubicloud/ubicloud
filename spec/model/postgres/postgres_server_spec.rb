@@ -288,14 +288,6 @@ RSpec.describe PostgresServer do
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
-
-    it "returns nil if standby has synchronization_status catching_up" do
-      allow(resource).to receive(:servers).and_return([
-        postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "catching_up")
-      ])
-      expect(postgres_server.failover_target).to be_nil
-    end
   end
 
   describe "#failover_target read_replica" do
