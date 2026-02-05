@@ -55,6 +55,12 @@ module AdminModelSpecHelper
       AwsInstance.create(instance_id: "i-1234567890")
     end
 
+    def create_aws_subnet
+      ps_aws_resource = create_private_subnet_aws_resource
+      location_aws_az = create_location_aws_az
+      AwsSubnet.create(private_subnet_aws_resource_id: ps_aws_resource.id, location_aws_az_id: location_aws_az.id, ipv4_cidr: "10.0.0.0/24")
+    end
+
     def create_billing_info
       BillingInfo.create(stripe_id: "cus_test123")
     end
