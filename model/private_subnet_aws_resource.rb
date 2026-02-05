@@ -18,3 +18,5 @@ end
 #  private_subnet_aws_resource_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
 #  private_subnet_aws_resource_id_fkey | (id) REFERENCES private_subnet(id)
+# Referenced By:
+#  aws_subnet | aws_subnet_private_subnet_aws_resource_id_fkey | (private_subnet_aws_resource_id) REFERENCES private_subnet_aws_resource(id) ON DELETE CASCADE
