@@ -15,66 +15,25 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     nap 2 unless private_subnet.strand.label == "wait"
 
     register_deadline("attach_eip_network_interface", 3 * 60)
-    vpc_response = client.describe_vpcs({filters: [{name: "vpc-id", values: [vpc_id]}]}).vpcs[0]
 
-    # AWS VPCs use /56 prefix length for IPv6 CIDR blocks by default. We use /64
-    # subnets for consistency with Ubicloud's private subnet sizing, giving us
-    # 2^8 = 256 possible subnets to choose from.
-    #
-    # We randomly select a subnet rather than tracking allocations sequentially
-    # because:
-    # 1. Postgres on AWS typically provisions only up to 4 subnets concurrently
-    # 2. The collision probability is very low (4 out of 256)
-    # 3. AWS will fail the call if there's a conflict, and we can simply retry
-    ipv_6_cidr_block = NetAddr::IPv6Net.parse(vpc_response.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block).nth_subnet(64, SecureRandom.random_number(2**8))
-    subnet_response = client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]})
-    subnet_id, subnet_az = if old_subnet?
+    # Handle legacy VPCs with per-NIC subnets
+    if old_subnet?
       subnet = client.describe_subnets({filters: [{name: "vpc-id", values: [vpc_id]}]}).subnets[0]
-      [subnet.subnet_id, subnet.availability_zone]
-    elsif subnet_response.subnets.empty?
-      subnet_az = az_to_provision_subnet
-      subnet_size = [24, private_subnet.net4.netmask.prefix_len].max
-      subnet_id = client.create_subnet({
-        vpc_id:,
-        cidr_block: NetAddr::IPv4Net.new(nic.private_ipv4.network, NetAddr::Mask32.new(subnet_size)).to_s,
-        ipv_6_cidr_block: ipv_6_cidr_block.to_s,
-        availability_zone: private_subnet.location.name + subnet_az,
-        tag_specifications: Util.aws_tag_specifications("subnet", nic.name)
-      }).subnet.subnet_id
-      client.modify_subnet_attribute({
-        subnet_id:,
-        assign_ipv_6_address_on_creation: {value: true}
-      })
-      [subnet_id, subnet_az]
-    else
-      subnet = subnet_response.subnets[0]
-      [subnet.subnet_id, subnet.availability_zone]
-    end
-    nic.nic_aws_resource.update(subnet_id:, subnet_az:)
-
-    hop_wait_subnet_created
-  end
-
-  label def wait_subnet_created
-    subnet_response = if old_subnet?
-      hop_create_network_interface
-    else
-      client.describe_subnets({filters: [{name: "tag:Name", values: [nic.name]}]}).subnets[0]
-    end
-
-    if subnet_response.state == "available"
-      route_table_response = client.describe_route_tables({filters: [{name: "vpc-id", values: [vpc_id]}]})
-      route_table_id = route_table_response.route_tables[0].route_table_id
-      route_table_details = client.describe_route_tables({route_table_ids: [route_table_id]}).route_tables.first
-      if route_table_details.associations.empty?
-        client.associate_route_table({
-          route_table_id:,
-          subnet_id: nic.nic_aws_resource.subnet_id
-        })
-      end
+      nic.nic_aws_resource.update(subnet_id: subnet.subnet_id, subnet_az: subnet.availability_zone.delete_prefix(private_subnet.location.name))
       hop_create_network_interface
     end
-    nap 1
+
+    # AwsSubnet was selected at assemble time and stored in frame
+    aws_subnet = nic.private_subnet.private_subnet_aws_resource.aws_subnets_dataset.first(id: frame["aws_subnet_id"])
+    fail "No available AWS subnet found" unless aws_subnet
+
+    nic.nic_aws_resource.update(
+      subnet_id: aws_subnet.subnet_id,
+      subnet_az: aws_subnet.az_suffix,
+      aws_subnet_id: aws_subnet.id
+    )
+
+    hop_create_network_interface
   end
 
   label def create_network_interface
@@ -162,12 +121,15 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def delete_subnet
-    ignore_invalid_nic do
-      client.delete_subnet({subnet_id: nic.nic_aws_resource.subnet_id})
-    rescue Aws::EC2::Errors::DependencyViolation => e
-      raise e if private_subnet.nics.count == 1
+    # Only delete legacy per-NIC subnets, not shared AZ subnets
+    if old_subnet? || !nic.nic_aws_resource.aws_subnet_id
+      ignore_invalid_nic do
+        client.delete_subnet({subnet_id: nic.nic_aws_resource.subnet_id})
+      rescue Aws::EC2::Errors::DependencyViolation => e
+        raise e if private_subnet.nics.count == 1
 
-      Clog.emit("dependency violation for aws nic", {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)})
+        Clog.emit("dependency violation for aws nic", {ignored_aws_nic_failure: Util.exception_to_hash(e, backtrace: nil)})
+      end
     end
 
     hop_destroy_entities
@@ -189,10 +151,6 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
 
   def vpc_id
     @vpc_id ||= private_subnet.private_subnet_aws_resource.vpc_id
-  end
-
-  def az_to_provision_subnet
-    frame["availability_zone"] || (private_subnet.location.azs.map(&:az) - (frame["exclude_availability_zones"] || [])).sample || "a"
   end
 
   def get_network_interface
