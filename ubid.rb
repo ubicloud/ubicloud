@@ -106,6 +106,7 @@ class UBID
   TYPE_SSH_PUBLIC_KEY = "sk"
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
   TYPE_LOCATION_AWS_AZ = "1a"
+  TYPE_AWS_SUBNET = "as"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
