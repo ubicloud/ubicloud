@@ -72,7 +72,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Config.github_runner_service_project_id,
       location_id:,
       allow_only_ssh: true,
-      ipv4_range_size: 28
+      ipv4_range_size: 28,
+      limit_to_single_az: true
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
