@@ -60,7 +60,7 @@ class Clover
         target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
         ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
-        init_script = typecast_params.nonempty_str("init_script", pg.init_script)
+        init_script = typecast_params.nonempty_str("init_script") || pg.init_script&.init_script
 
         postgres_params = {
           "flavor" => pg.flavor,

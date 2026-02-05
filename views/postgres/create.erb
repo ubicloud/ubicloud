@@ -55,7 +55,7 @@
   end
 
   if @project.get_ff_postgres_init_script
-    form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", required: "", placeholder: "Enter script to run on database creation"}
+    form_elements << {name: "init_script", type: "textarea", label: "Initialization Script", placeholder: "Enter script to run on database creation"}
   end
 
   action = "#{@project.path}/postgres"
