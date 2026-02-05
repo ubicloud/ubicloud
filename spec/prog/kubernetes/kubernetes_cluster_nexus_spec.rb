@@ -806,7 +806,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to nap(5)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
 
     it "naps until all control plane nodes are gone" do
@@ -817,7 +817,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to nap(5)
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
 
     it "does not incr_destroy private_subnet with other resources" do
@@ -856,7 +856,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
       expect { nx.destroy }.to exit({"msg" => "kubernetes cluster is deleted"})
-      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
 
       expect(kubernetes_cluster.internal_cp_vm_firewall).to be_nil
       expect(kubernetes_cluster.internal_worker_vm_firewall).to be_nil
