@@ -29,7 +29,7 @@ class Semaphore < Sequel::Model
   end
 
   def self.get_request_ids(id, name)
-    DB.from { Sequel.lit("semaphore, unnest(request_ids)") }.get{array_agg(:unnest).distinct}
+    DB.from { Sequel.lit("semaphore, unnest(request_ids)") }.get { array_agg(:unnest).distinct }
   end
 end
 

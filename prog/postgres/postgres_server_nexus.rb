@@ -54,7 +54,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil,
+        request_ids:
       )
 
       synchronization_status = representative_at ? "ready" : "catching_up"
