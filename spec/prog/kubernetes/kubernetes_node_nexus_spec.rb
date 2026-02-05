@@ -104,6 +104,33 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       nx.incr_retire
       expect { nx.wait }.to hop("retire")
     end
+
+    it "hops to unavailable when checkup semaphore is set" do
+      nx.incr_checkup
+      expect { nx.wait }.to hop("unavailable")
+    end
+  end
+
+  describe "#unavailable" do
+    it "hops to wait when node becomes available" do
+      nx.incr_checkup
+      expect(nx).to receive(:available?).and_return(true)
+      expect { nx.unavailable }.to hop("wait")
+      expect(kd.reload.checkup_set?).to be false
+    end
+
+    it "logs, registers deadline and naps when still unavailable" do
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:register_deadline).with("wait", 90)
+      expect { nx.unavailable }.to nap(5)
+    end
+  end
+
+  describe "#available?" do
+    it "delegates to kubernetes_node.available?" do
+      expect(nx.kubernetes_node).to receive(:available?).and_return(true)
+      expect(nx.available?).to be true
+    end
   end
 
   describe "#drain" do
