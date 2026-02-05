@@ -120,6 +120,28 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
       checker.check_all_pods_connectivity
     end
+
+    it "removes stale pods that no longer exist in the cluster" do
+      checker.instance_variable_set(:@pod_status, {
+        "ubicsi-nodeplugin-old" => {ip: "10.0.0.99", reachable: true, last_check: "2026-01-01T00:00:00Z"},
+        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+      })
+
+      current_pods = [
+        {"name" => "ubicsi-nodeplugin-abc", "ip" => "10.0.0.1", "node" => "worker-1"},
+        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"}
+      ]
+      expect(Csi::KubernetesClient).to receive(:new).and_return(client)
+      expect(client).to receive(:get_nodeplugin_pods).and_return(current_pods)
+      expect(checker).to receive(:check_endpoints).with([{host: "10.0.0.2", port: 8080, name: "ubicsi-nodeplugin-xyz"}])
+        .and_yield({host: "10.0.0.2", port: 8080, name: "ubicsi-nodeplugin-xyz"}, true, nil)
+
+      checker.check_all_pods_connectivity
+
+      pod_status = checker.instance_variable_get(:@pod_status)
+      expect(pod_status.keys).to eq(["ubicsi-nodeplugin-xyz"])
+      expect(pod_status).not_to have_key("ubicsi-nodeplugin-old")
+    end
   end
 
   describe "#check_endpoints" do

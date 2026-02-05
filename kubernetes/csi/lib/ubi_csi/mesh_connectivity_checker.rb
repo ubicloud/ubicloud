@@ -92,8 +92,15 @@ module Csi
         {host: pod["ip"], port: REGISTRAR_HEALTHZ_PORT, name: pod["name"]}
       end
 
+      current_pod_names = targets.map { |t| t[:name] }.to_set
+
       check_endpoints(targets) do |target, reachable, error|
         update_pod_status(target[:name], target[:host], reachable, error:)
+      end
+
+      # Remove stale pods that no longer exist in the cluster
+      @mutex.synchronize do
+        @pod_status.keep_if { |name, _| current_pod_names.include?(name) }
       end
     end
 
