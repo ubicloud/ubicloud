@@ -46,7 +46,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         storage_size_gib: label_data["storage_size_gib"],
         storage_encrypted: true,
         storage_skip_sync: true,
-        arch: label_data["arch"]
+        arch:
       ).first
     end
 
@@ -85,7 +85,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       boot_image:,
       storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
       enable_ip4: true,
-      arch: label_data["arch"],
+      arch:,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
       exclude_availability_zones:,
@@ -99,7 +99,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
     return unless github_runner.ready_at && github_runner.workflow_job
 
-    billed_vm_size = if label_data["arch"] == "arm64"
+    billed_vm_size = if arch == "arm64"
       "#{label_data["vm_size"]}-arm"
     elsif installation.free_runner_upgrade?(github_runner.created_at)
       # If we enable free upgrades for the project, we should charge
@@ -157,8 +157,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   rescue Octokit::NotFound
   end
 
+  def arch
+    label_data["arch"]
+  end
+
   def x64?
-    label_data["arch"] == "x64"
+    arch == "x64"
   end
 
   def runners_path(suffix = nil)
@@ -207,7 +211,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     # check utilization, if it's high, wait for it to go down
-    family_utilization = VmHost.where(allocation_state: "accepting", arch: label_data["arch"])
+    family_utilization = VmHost.where(allocation_state: "accepting", arch:)
       .select_group(:family)
       .select_append { round(sum(:used_cores) * 100.0 / sum(:total_cores), 2).cast(:float).as(:utilization) }
       .to_hash(:family, :utilization)
