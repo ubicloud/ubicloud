@@ -105,6 +105,44 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       nx.incr_retire
       expect { nx.wait }.to hop("retire")
     end
+
+    it "hops to unavailable when checkup semaphore is set" do
+      nx.incr_checkup
+      expect { nx.wait }.to hop("unavailable")
+    end
+  end
+
+  describe "#unavailable" do
+    it "hops to wait when node becomes available" do
+      nx.incr_checkup
+      status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect { nx.unavailable }.to hop("wait")
+      expect(kd.reload.checkup_set?).to be false
+    end
+
+    it "logs, registers deadline and naps when still unavailable" do
+      status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => false}}, "external_endpoints" => {}})
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect { nx.unavailable }.to nap(15)
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to eq("wait")
+      expect(Time.parse(frame["deadline_at"].to_s)).to be_within(3).of(Time.now + 15 * 60)
+    end
+  end
+
+  describe "#available?" do
+    it "returns true when all pods are reachable" do
+      status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => true}}, "external_endpoints" => {}})
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.available?).to be true
+    end
+
+    it "returns false when a pod is unreachable" do
+      status_json = JSON.generate({"pods" => {"pod-1" => {"reachable" => false}}, "external_endpoints" => {}})
+      expect(nx.kubernetes_node.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      expect(nx.available?).to be false
+    end
   end
 
   describe "#drain" do
