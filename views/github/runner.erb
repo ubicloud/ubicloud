@@ -107,20 +107,39 @@
         ]
       end,
     empty_state: <<~EMPTY
-      <div class="flex flex-col gap-3">
-        <h3 class="text-xl leading-10 font-medium">No active runners</h3>
-        <p class="leading-6">
-          To use Ubicloud runners, you need to change
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ...</span>
-          line to one of our labels such as
-          <span class="text-rose-500 text-sm font-medium bg-slate-100 py-0.5 px-2 rounded font-mono whitespace-nowrap">runs-on: ubicloud-standard-2</span>
-          in your workflow file. Then, trigger your workflow to start a runner.
-          <br>
-          Check out
-          <a href="https://www.ubicloud.com/docs/github-actions-integration/quickstart" class="text-orange-500 font-medium">our documentation</a>
-          for using larger runners, using arm64, enabling GPU.
-        </p>
-        #{free_upgrade_badge}
+      <div class="text-center empty-state">
+        #{part("components/icon", name: "hero-rocket-launch", classes: "mx-auto h-12 w-12 text-gray-400")}
+        <h3 class="mt-2 text-xl font-semibold text-gray-900">No active runners</h3>
+        <div class="mt-4 mx-auto max-w-sm rounded-lg bg-gray-50 p-4 text-left text-sm">
+          <ol class="space-y-3 text-gray-600">
+            <li class="flex gap-3">
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-medium text-orange-600">1</span>
+              <span>Change <code class="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-rose-500 font-mono">runs-on</code> in your workflow file to a Ubicloud label like <code class="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-rose-500 font-mono">ubicloud-standard-2</code></span>
+            </li>
+            <li class="flex gap-3">
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-medium text-orange-600">2</span>
+              <span>Commit and push the change to your repository</span>
+            </li>
+            <li class="flex gap-3">
+              <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-medium text-orange-600">3</span>
+              <span>Trigger your workflow to start a runner</span>
+            </li>
+          </ol>
+        </div>
+        <div class="mt-4 mx-auto max-w-sm rounded-lg border border-orange-200 bg-orange-50 px-4 py-2 flex items-center justify-between gap-3">
+          <div class="text-left">
+            <span class="text-sm font-medium text-gray-900">Need more options?</span>
+            <div class="mt-1.5 flex gap-1.5">
+              <span class="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-200">More vCPU</span>
+              <span class="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-200">arm64</span>
+              <span class="rounded-full bg-white px-2 py-0.5 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-200">Premium</span>
+            </div>
+          </div>
+          <a href="https://www.ubicloud.com/docs/github-actions-integration/runner-types" target="_blank" class="text-sm font-medium text-orange-600 whitespace-nowrap">
+            Explore <span aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
+        <div class="mt-3">#{free_upgrade_badge}</div>
       </div>
     EMPTY
   ) %>
