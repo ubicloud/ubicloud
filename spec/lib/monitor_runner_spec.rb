@@ -29,6 +29,32 @@ RSpec.describe MonitorRunner do
     monitor_runner.wait_cleanup!(1)
   end
 
+  describe "#initial_scan" do
+    let(:monitor_runner_args) do
+      {
+        scan_every: 6,
+        enqueue_every: 2
+      }
+    end
+
+    it "scans both resource types and spreads found resources over first third of scan period" do
+      vm_host_with_id("90000000-0000-0000-0000-000000000000")
+      vm_host_with_id("a0000000-0000-0000-0000-000000000000")
+      t = Time.now - 2
+      monitor_runner.initial_scan
+      run_queue = monitor_resources.run_queue
+      submit_queue = monitor_resources.submit_queue
+      expect(run_queue.size).to eq 2
+      expect(submit_queue.size).to eq 0
+      expect(run_queue[0].monitor_job_finished_at).to be_within(1).of(t)
+      expect(run_queue[1].monitor_job_finished_at).to be_within(1).of(t + 2)
+
+      monitor_runner.enqueue
+      expect(run_queue.size).to eq 1
+      expect(submit_queue.size).to eq 1
+    end
+  end
+
   describe "#scan" do
     it "scans both resource types and pushes only new resources in partition to respective queues" do
       vm1 = vm_host_with_id("90000000-0000-0000-0000-000000000000")
@@ -184,69 +210,71 @@ RSpec.describe MonitorRunner do
     end
   end
 
-  describe "#run" do
-    before do
-      i = 0
-      monitor_runner_args[:enqueue_every] = 0
-      monitor_runner.define_singleton_method(:enqueue) do
-        shutdown! if i == 100
-        i += 1
-        super()
+  [true, false].each do |phased_initial_scan|
+    describe "#run(phased_initial_scan: #{phased_initial_scan})" do
+      before do
+        i = 0
+        monitor_runner_args[:enqueue_every] = 0
+        monitor_runner.define_singleton_method(:enqueue) do
+          shutdown! if i == 100
+          i += 1
+          super()
+        end
       end
-    end
 
-    it "runs scan/report/check_stuck_pulse/enqueue loop with no resources" do
-      expect(monitor_runner.run).to be_nil
-    end
-
-    it "runs scan/report/check_stuck_pulse/enqueue loop with resources" do
-      vm1 = vm_host_with_id("90000000-0000-0000-0000-000000000000")
-      msq = monitor_resources.submit_queue
-      mesq = metric_export_resources.submit_queue
-      q1 = monitor_resources.submit_queue = Queue.new
-      q2 = metric_export_resources.submit_queue = Queue.new
-
-      monitor_runner.instance_variable_set(:@report_every, 0)
-      monitor_runner.instance_variable_set(:@check_stuck_pulses_every, 0)
-      monitor_runner.run
-      expect(q1.pop(timeout: 0).resource).to eq vm1
-      expect(q2.pop(timeout: 0).resource).to eq vm1
-    ensure
-      monitor_resources.submit_queue = msq
-      metric_export_resources.submit_queue = mesq
-    end
-
-    it "handles ClosedQueueError before shutdown" do
-      vm_host_with_id("90000000-0000-0000-0000-000000000000")
-      monitor_resources.submit_queue.close
-      expect(monitor_runner.run).to be_nil
-    end
-
-    it "handles shutting down after scanning" do
-      monitor_runner.define_singleton_method(:scan) do
-        super()
-        shutdown!
+      it "runs scan/report/check_stuck_pulse/enqueue loop with no resources" do
+        expect(monitor_runner.run(phased_initial_scan:)).to be_nil
       end
-      expect(monitor_runner.run).to be_nil
-    end
 
-    it "handles shutting down before scanning when there are resources" do
-      vm_host_with_id("90000000-0000-0000-0000-000000000000")
-      monitor_runner.define_singleton_method(:scan) do
-        shutdown!
-        super()
+      it "runs scan/report/check_stuck_pulse/enqueue loop with resources" do
+        vm1 = vm_host_with_id("90000000-0000-0000-0000-000000000000")
+        msq = monitor_resources.submit_queue
+        mesq = metric_export_resources.submit_queue
+        q1 = monitor_resources.submit_queue = Queue.new
+        q2 = metric_export_resources.submit_queue = Queue.new
+
+        monitor_runner.instance_variable_set(:@report_every, 0)
+        monitor_runner.instance_variable_set(:@check_stuck_pulses_every, 0)
+        monitor_runner.run(phased_initial_scan:)
+        expect(q1.pop(timeout: 0).resource).to eq vm1
+        expect(q2.pop(timeout: 0).resource).to eq vm1
+      ensure
+        monitor_resources.submit_queue = msq
+        metric_export_resources.submit_queue = mesq
       end
-      expect(monitor_runner.run).to be_nil
-    end
 
-    it "thread prints and exits for other failures" do
-      exited = false
-      expect(ThreadPrinter).to receive(:run)
-      expect(Kernel).to receive(:exit!).and_invoke(->(_) { exited = true })
-      expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.", instance_of(Hash)).and_call_original
-      monitor_runner.define_singleton_method(:scan) { raise }
-      monitor_runner.run
-      expect(exited).to be true
+      it "handles ClosedQueueError before shutdown" do
+        vm_host_with_id("90000000-0000-0000-0000-000000000000")
+        monitor_resources.submit_queue.close
+        expect(monitor_runner.run(phased_initial_scan:)).to be_nil
+      end
+
+      it "handles shutting down after scanning" do
+        monitor_runner.define_singleton_method(:scan) do
+          super()
+          shutdown!
+        end
+        expect(monitor_runner.run(phased_initial_scan:)).to be_nil
+      end
+
+      it "handles shutting down before scanning when there are resources" do
+        vm_host_with_id("90000000-0000-0000-0000-000000000000")
+        monitor_runner.define_singleton_method(:scan) do
+          shutdown!
+          super()
+        end
+        expect(monitor_runner.run(phased_initial_scan:)).to be_nil
+      end
+
+      it "thread prints and exits for other failures" do
+        exited = false
+        expect(ThreadPrinter).to receive(:run)
+        expect(Kernel).to receive(:exit!).and_invoke(->(_) { exited = true })
+        expect(Clog).to receive(:emit).with("Pulse checking or resource scanning has failed.", instance_of(Hash)).and_call_original
+        monitor_runner.define_singleton_method(phased_initial_scan ? :initial_scan : :scan) { raise }
+        monitor_runner.run(phased_initial_scan:)
+        expect(exited).to be true
+      end
     end
   end
 end
