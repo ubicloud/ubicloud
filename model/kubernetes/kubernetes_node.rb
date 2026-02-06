@@ -66,6 +66,10 @@ class KubernetesNode < Sequel::Model
     end
   end
 
+  def install_rhizome
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.sshable.id, target_folder: "kubernetes"}])
+  end
+
   def name
     vm.name
   end
