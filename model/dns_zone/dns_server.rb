@@ -10,7 +10,9 @@ class DnsServer < Sequel::Model
 
   def run_commands_on_all_vms(commands)
     vms.each do |vm|
+      Clog.emit("Starting knotc", vm_ubid: vm.ubid, commands:)
       outputs = vm.sshable.cmd("sudo -u knot knotc", stdin: commands.join("\n")).split("\n")
+      Clog.emit("Finished knotc", vm_ubid: vm.ubid, outputs:)
 
       # Passing multiple commands to knotc via stdin is faster compared to running each
       # command one by one. However, this approach has one drawback; in stdin mode knotc
