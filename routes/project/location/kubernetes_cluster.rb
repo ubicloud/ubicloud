@@ -35,7 +35,7 @@ class Clover
       r.delete true do
         authorize("KubernetesCluster:delete", kc)
         DB.transaction do
-          kc.incr_destroy(request.get_header("X-Request-ID"))
+          kc.incr_destroy(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(kc, "destroy")
         end
 
@@ -85,7 +85,7 @@ class Clover
 
         DB.transaction do
           kn.update(node_count:)
-          kn.incr_scale_worker_count(request.get_header("X-Request-ID"))
+          kn.incr_scale_worker_count(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(kn, "update")
         end
 

@@ -10,7 +10,7 @@ class Clover
       if pg_name
         r.post api? do
           check_visible_location
-          postgres_post(pg_name, request_ids: request.get_header("X-Request-ID"))
+          postgres_post(pg_name, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -36,7 +36,7 @@ class Clover
       r.delete true do
         authorize("Postgres:delete", pg)
         DB.transaction do
-          pg.incr_destroy(request.get_header("X-Request-ID"))
+          pg.incr_destroy(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(pg, "destroy")
         end
 
@@ -117,8 +117,8 @@ class Clover
       end
 
       r.rename pg, perm: "Postgres:edit", serializer: Serializers::Postgres, template_prefix: "postgres" do
-        pg.incr_refresh_dns_record(request.get_header("X-Request-ID"))
-        pg.incr_refresh_certificates(request.get_header("X-Request-ID"))
+        pg.incr_refresh_dns_record(request.get_header("HTTP_X_REQUEST_ID"))
+        pg.incr_refresh_certificates(request.get_header("HTTP_X_REQUEST_ID"))
       end
 
       show_actions = if pg.read_replica?
@@ -131,7 +131,7 @@ class Clover
       r.post "restart" do
         authorize("Postgres:edit", pg)
         DB.transaction do
-          pg.incr_restart(request.get_header("X-Request-ID"))
+          pg.incr_restart(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(pg, "restart")
         end
 
@@ -185,10 +185,10 @@ class Clover
 
             firewall_rule = nil
             DB.transaction do
-              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:, request_ids: request.get_header("X-Request-ID"))
+              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule, "create", [fw, pg])
 
-              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:, request_ids: request.get_header("X-Request-ID"))
+              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule2, "create", [fw, pg])
             end
 
@@ -212,7 +212,7 @@ class Clover
                 cidr: new_cidr,
                 description:
               )
-              firewall.update_private_subnet_firewall_rules(request.get_header("X-Request-ID")) if current_cidr != new_cidr
+              firewall.update_private_subnet_firewall_rules(request.get_header("HTTP_X_REQUEST_ID")) if current_cidr != new_cidr
               audit_log(fwr, "update")
             end
 
@@ -222,7 +222,7 @@ class Clover
           r.delete do
             DB.transaction do
               fwr.destroy
-              firewall.update_private_subnet_firewall_rules(request.get_header("X-Request-ID"))
+              firewall.update_private_subnet_firewall_rules(request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(fwr, "destroy")
             end
 
@@ -243,7 +243,7 @@ class Clover
 
           DB.transaction do
             md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
-            pg.servers.each { it.incr_configure_metrics(request.get_header("X-Request-ID")) }
+            pg.servers.each { it.incr_configure_metrics(request.get_header("HTTP_X_REQUEST_ID")) }
             audit_log(md, "create", pg)
           end
 
@@ -261,7 +261,7 @@ class Clover
           if (md = pg.metric_destinations_dataset[id:])
             DB.transaction do
               md.destroy
-              pg.servers.each { it.incr_configure_metrics(request.get_header("X-Request-ID")) }
+              pg.servers.each { it.incr_configure_metrics(request.get_header("HTTP_X_REQUEST_ID")) }
               audit_log(md, "destroy")
             end
           else
@@ -312,7 +312,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target: nil,
-            request_ids: request.get_header("X-Request-ID")
+            request_ids: request.get_header("HTTP_X_REQUEST_ID")
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -336,7 +336,7 @@ class Clover
         end
 
         DB.transaction do
-          pg.incr_promote(request.get_header("X-Request-ID"))
+          pg.incr_promote(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(pg, "promote")
         end
 
@@ -379,7 +379,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
-            request_ids: request.get_header("X-Request-ID")
+            request_ids: request.get_header("HTTP_X_REQUEST_ID")
           ).subject
           audit_log(pg, "restore", restored)
         end
@@ -407,7 +407,7 @@ class Clover
 
         DB.transaction do
           pg.update(superuser_password: password)
-          pg.representative_server.incr_update_superuser_password(request.get_header("X-Request-ID"))
+          pg.representative_server.incr_update_superuser_password(request.get_header("HTTP_X_REQUEST_ID"))
           audit_log(pg, "reset_superuser_password")
         end
 
@@ -583,7 +583,7 @@ class Clover
           validate_postgres_config(pg.version, pg_config, pgbouncer_config)
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
-          pg.servers.each { it.incr_configure(request.get_header("X-Request-ID")) }
+          pg.servers.each { it.incr_configure(request.get_header("HTTP_X_REQUEST_ID")) }
 
           audit_log(pg, "update")
 

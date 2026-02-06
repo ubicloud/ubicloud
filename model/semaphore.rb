@@ -16,7 +16,9 @@ class Semaphore < Sequel::Model
     end
 
     if request_ids.is_a? String
-      request_ids = [request_ids]
+      request_ids = Sequel.pg_array([request_ids])
+    elsif request_ids.is_a? Array
+      request_ids = Sequel.pg_array(request_ids)
     end
 
     with(:updated_strand,

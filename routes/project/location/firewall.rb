@@ -142,7 +142,7 @@ class Clover
           DB.transaction do
             DB.ignore_duplicate_queries do
               cidrs.map! do |cidr|
-                firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:, request_ids: request.get_header("X-Request-ID"))
+                firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
                 audit_log(firewall_rule, "create", firewall)
                 firewall_rule
               end
@@ -208,7 +208,7 @@ class Clover
           r.delete true do
             authorize("Firewall:edit", firewall)
             DB.transaction do
-              firewall.remove_firewall_rule(firewall_rule, request_ids: request.get_header("X-Request-ID"))
+              firewall.remove_firewall_rule(firewall_rule, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule, "destroy", firewall)
             end
 
