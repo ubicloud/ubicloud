@@ -18,6 +18,8 @@ class PostgresServer < Sequel::Model
   include HealthMonitorMethods
   include MetricsTargetMethods
 
+  LSN_CAUGHT_UP_THRESHOLD = 80 * 1024 * 1024
+
   def self.victoria_metrics_client
     VictoriaMetricsResource.client_for_project(Config.postgres_service_project_id)
   end
@@ -190,7 +192,38 @@ class PostgresServer < Sequel::Model
       resource.representative_server
     end
 
-    !parent_server || lsn_diff(parent_server.current_lsn, current_lsn) < 80 * 1024 * 1024
+    return true unless parent_server
+
+    begin
+      parent_lsn = parent_server.current_lsn
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+      # Primary is unreachable - check if we've replayed all available WAL
+      return caught_up_to_archive?(parent_server)
+    end
+
+    lsn_diff(parent_lsn, current_lsn) < LSN_CAUGHT_UP_THRESHOLD
+  end
+
+  def caught_up_to_archive?(parent_server)
+    # Check if WAL receiver is streaming from primary
+    wal_receiver_status = run_query("SELECT status FROM pg_stat_wal_receiver").chomp
+    return false if wal_receiver_status == "streaming"
+
+    # Not streaming - check if replay has caught up to what was received
+    receive_lsn = run_query("SELECT pg_last_wal_receive_lsn()").chomp
+    last_known_lsn = parent_server.lsn_monitor_ds.get(:last_known_lsn)
+
+    # Collect all available LSNs and use the largest
+    lsns = []
+    lsns << receive_lsn unless receive_lsn.empty?
+    lsns << last_known_lsn if last_known_lsn
+
+    # If no LSN is available, assume caught up
+    return true if lsns.empty?
+
+    compare_lsn = lsns.max_by { lsn2int(it) }
+    replay_lsn = run_query("SELECT pg_last_wal_replay_lsn()").chomp
+    lsn_diff(compare_lsn, replay_lsn) < LSN_CAUGHT_UP_THRESHOLD
   end
 
   def current_lsn
