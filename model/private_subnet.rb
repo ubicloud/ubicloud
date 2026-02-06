@@ -139,7 +139,7 @@ class PrivateSubnet < Sequel::Model
     addr
   end
 
-  def incr_destroy_if_only_used_internally(ubid:, vm_ids:)
+  def incr_destroy_if_only_used_internally(ubid:, vm_ids:, request_ids: nil)
     firewalls_dataset = self.firewalls_dataset
 
     # Destroy customer firewall if it isn't used in other private subnets
@@ -155,7 +155,7 @@ class PrivateSubnet < Sequel::Model
       .exclude(vm_id: nil)
       .exclude(vm_id: Semaphore.where(name: ["destroy", "destroying"]).select(:strand_id))
     if name == "#{ubid}-subnet" && remaining_nics.empty? && firewalls_dataset.empty?
-      incr_destroy
+      incr_destroy(request_ids)
     end
   end
 
