@@ -152,6 +152,42 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     end
   end
 
+  describe ".create_aws_subnet_records" do
+    let(:aws_location) {
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredential.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
+      loc
+    }
+
+    it "raises error when VPC is too small for even a single subnet" do
+      # /30 VPC with ipv4_range_size=30 -> ipv4_prefix=min(38,28)=28
+      # Can't fit a /28 subnet in a /30 VPC
+      LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      small_ps = PrivateSubnet.create(name: "small-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/30", state: "waiting", project_id: prj.id)
+      ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
+
+      expect {
+        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, false)
+      }.to raise_error("Not enough subnet space for even a single AZ. Use a range size <= 28")
+    end
+
+    it "logs warning and skips AZs when VPC cannot fit all subnets" do
+      # /26 VPC can fit 4 /28 subnets (indices 0-3)
+      # Create 5 AZs - the 5th should be skipped with a log
+      5.times do |i|
+        LocationAwsAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
+      end
+      limited_ps = PrivateSubnet.create(name: "limited-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/26", state: "waiting", project_id: prj.id)
+      ps_aws_resource = PrivateSubnetAwsResource.create_with_id(limited_ps.id)
+
+      expect(Clog).to receive(:emit).with(/Not enough subnet space for AZ.*idx 4/)
+      described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location, 26, false)
+
+      # Should have created 4 subnets, not 5
+      expect(AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id).count).to eq(4)
+    end
+  end
+
   describe ".random_private_ipv6" do
     it "returns a random private ipv6 range" do
       expect(described_class.random_private_ipv6(Location[name: "hetzner-fsn1"], prj)).to be_a NetAddr::IPv6Net
