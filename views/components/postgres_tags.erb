@@ -4,14 +4,7 @@
 <% else %>
   <div class="flex flex-wrap gap-1 max-w-[250px]">
     <% tags.each do |tag| %>
-      <% tag_text = "#{tag["key"]}:#{tag["value"]}" %>
-      <span
-        class="tag-pill inline-block rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 cursor-pointer max-w-[120px] truncate"
-        data-content="<%= h(tag_text) %>"
-        title="Click to copy: <%= h(tag_text) %>"
-      >
-        <%= h(tag_text) %>
-      </span>
+      <%= tag["key"] %> <%== part("components/copyable_content", content: tag["value"], message: "Copied tag") %>
     <% end %>
   </div>
 <% end %>
