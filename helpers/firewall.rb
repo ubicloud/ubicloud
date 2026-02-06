@@ -14,7 +14,7 @@ class Clover
     paginated_result(dataset.eager(:firewall_rules, :location), Serializers::Firewall)
   end
 
-  def firewall_post(firewall_name)
+  def firewall_post(firewall_name, request_ids = nil)
     authorize("Firewall:create", @project)
     Validation.validate_name(firewall_name)
 
@@ -35,7 +35,7 @@ class Clover
       Serializers::Firewall.serialize(firewall)
     else
       if (private_subnet = authorized_private_subnet(perm: "PrivateSubnet:edit", location_id: @location.id))
-        firewall.associate_with_private_subnet(private_subnet)
+        firewall.associate_with_private_subnet(private_subnet, request_ids:)
       end
 
       flash["notice"] = "'#{firewall_name}' is created"

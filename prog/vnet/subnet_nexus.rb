@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, request_ids: nil)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -50,7 +50,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
           ["0.0.0.0/0", "::/0"].each { |cidr| FirewallRule.create(firewall_id: firewall.id, cidr:, port_range: Sequel.pg_range(port_range)) }
         end
       end
-      firewall.associate_with_private_subnet(ps, apply_firewalls: false)
+      firewall.associate_with_private_subnet(ps, apply_firewalls: false, request_ids:)
 
       prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Metal::SubnetNexus"
       Strand.create_with_id(id, prog:, label: "start")

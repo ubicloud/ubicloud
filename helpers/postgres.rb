@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Clover
-  def postgres_post(name)
+  def postgres_post(name, request_ids: nil)
     authorize("Postgres:create", @project)
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
@@ -52,7 +52,8 @@ class Clover
         user_config:,
         pgbouncer_user_config:,
         tags:,
-        init_script:
+        init_script:,
+        request_ids:
       ).subject
       audit_log(pg, "create")
     end

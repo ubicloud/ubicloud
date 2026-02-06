@@ -38,8 +38,8 @@ class SemSnap
     apply unless @deferred
   end
 
-  def incr(name)
-    if (semaphore = Semaphore.incr(@strand_id, name))
+  def incr(name, request_ids = nil)
+    if (semaphore = Semaphore.incr(@strand_id, name, request_ids))
       add_semaphore_instance_to_snapshot(Semaphore.with_pk(semaphore))
     end
   end
