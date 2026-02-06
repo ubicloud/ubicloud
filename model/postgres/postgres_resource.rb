@@ -22,14 +22,13 @@ class PostgresResource < Sequel::Model
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
+  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
+    :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
+    :storage_auto_scale_80_percent_action, :storage_auto_scale_85_percent_action, :storage_auto_scale_90_percent_action,
+    :storage_auto_scale_canceled
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
-
-  def self.available_flavors(include_lantern: false)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !include_lantern }
-  end
 
   def display_location
     location.display_name
@@ -238,6 +237,280 @@ class PostgresResource < Sequel::Model
 
   def ready_for_read_replica?
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
+  end
+
+  def handle_storage_auto_scale
+    return unless representative_server
+
+    disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
+
+    # Clear semaphores only when usage drops at least 3% below threshold to avoid spurious emails
+    [90, 85, 80].each {
+      Semaphore.where(strand_id: strand.id, name: "storage_auto_scale_#{it}_percent_action").destroy if disk_usage_percent <= it - 3
+    }
+
+    if disk_usage_percent <= 77
+      Page.from_tag_parts("PGStorageAutoScaleMaxSize", id)&.incr_resolve
+      Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", id)&.incr_resolve
+      Page.from_tag_parts("PGStorageAutoScaleCanceled", id)&.incr_resolve
+      Semaphore.where(strand_id: strand.id, name: "storage_auto_scale_canceled").destroy
+    end
+
+    return if disk_usage_percent < 80
+    return if disk_usage_percent < 85 && storage_auto_scale_80_percent_action_set?
+    return if disk_usage_percent < 90 && storage_auto_scale_85_percent_action_set?
+    return if storage_auto_scale_90_percent_action_set?
+
+    # target_storage_size_gib being bigger than representative server's storage
+    # size means storage auto-scale is in progress, so we should not trigger
+    # another auto-scale or send warning emails.
+    return if representative_server.storage_size_gib < target_storage_size_gib
+
+    next_option = next_storage_auto_scale_option
+
+    extra_email_content = if storage_auto_scale_canceled_set?
+      :canceled_previously
+    elsif next_option.nil?
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
+      :at_max_size
+    elsif !project.quota_available?("PostgresVCpu", vcpu_delta(next_option))
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. Quota insufficient for auto-scale.", ["PGStorageAutoScaleQuotaInsufficient", id], ubid, severity: "warning")
+      :quota_insufficient
+    end
+
+    [90, 85, 80].each {
+      send("incr_storage_auto_scale_#{it}_percent_action") if disk_usage_percent >= it
+    }
+
+    if disk_usage_percent < 90
+      send_storage_auto_scale_warning_email(disk_usage_percent, next_option, extra_email_content)
+    else
+      if next_option
+        target_vm_size = next_option["size"]
+        target_storage_size_gib = next_option["storage_size"]
+
+        unless storage_auto_scale_canceled_set?
+          update(target_vm_size:, target_storage_size_gib:)
+          read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+        end
+      end
+
+      send_storage_auto_scale_started_email(disk_usage_percent, next_option, extra_email_content)
+    end
+  end
+
+  def next_storage_auto_scale_option
+    option_tree, parents = PostgresResource.generate_postgres_options(project, flavor:, location:)
+    all_storage_size_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+    vm_size = Option::POSTGRES_SIZE_OPTIONS[representative_server.vm.display_size]
+    vcpu_count = vm_size.vcpu_count
+    family = vm_size.family
+
+    all_storage_size_options.select { it["family"] == family && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
+      .min_by { [Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count, it["storage_size"]] }
+  end
+
+  def vcpu_delta(target_option)
+    current_vcpu = Option::POSTGRES_SIZE_OPTIONS[representative_server.vm.display_size].vcpu_count
+    new_vcpu = Option::POSTGRES_SIZE_OPTIONS[target_option["size"]].vcpu_count
+    vcpu_delta = new_vcpu - current_vcpu
+
+    total_server_count = target_server_count + read_replicas.sum(&:target_server_count)
+    vcpu_delta * total_server_count
+  end
+
+  def storage_auto_scale_lock_key
+    Digest::SHA2.digest(id).unpack1("q>").abs
+  end
+
+  def can_cancel_storage_auto_scale?
+    return false if storage_auto_scale_canceled_set? || !storage_auto_scale_90_percent_action_set?
+
+    converge_strand = strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first
+    return false unless converge_strand
+
+    ["start", "provision_servers", "wait_servers_to_be_ready", "wait_for_maintenance_window"].include?(converge_strand.label)
+  end
+
+  def cancel_storage_auto_scale
+    DB.transaction do
+      # Try to acquire advisory lock to prevent race with failover
+      unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, storage_auto_scale_lock_key))
+        return false
+      end
+
+      return false unless can_cancel_storage_auto_scale?
+
+      current_vm_size = representative_server.vm.display_size
+      current_storage_size_gib = representative_server.storage_size_gib
+
+      update(target_vm_size: current_vm_size, target_storage_size_gib: current_storage_size_gib)
+      read_replicas_dataset.update(target_vm_size: current_vm_size, target_storage_size_gib: current_storage_size_gib)
+
+      incr_storage_auto_scale_canceled
+
+      Prog::PageNexus.assemble("#{ubid} storage auto-scale canceled by user", ["PGStorageAutoScaleCanceled", id], ubid, severity: "warning")
+
+      send_storage_auto_scale_canceled_email
+
+      true
+    end
+  end
+
+  def send_storage_auto_scale_warning_email(usage_percent, next_option, extra_content)
+    body = [
+      "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+    ]
+
+    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
+      body << "Automated disk scaling is normally triggered when disk usage exceeds 90%."
+      body << if extra_content == :canceled_previously
+        "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
+      elsif extra_content == :at_max_size
+        "However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed."
+      else
+        "However, your project does not have sufficient quota, so auto-scaling cannot proceed."
+      end
+      body << "Please free up disk space or contact support for assistance."
+    else
+      body << "When disk usage reaches 90%, storage will be automatically increased to #{next_option["storage_size"]} GB."
+      if next_option["size"] != representative_server.vm.display_size
+        body << "Since your current instance size does not support the new storage size, the instance will also be upgraded from #{representative_server.vm.display_size} to #{next_option["size"]}."
+      end
+      body << "Disk scaling requires a cutover to a new server, which will result in a short downtime, typically less than a minute. The scaling operation will be triggered automatically once disk usage reaches 90%."
+      body << "If you wish to scale sooner or have any questions, please contact support."
+      body << "Your database also has read replica(s), which will be scaled alongside the primary instance." if read_replicas.any?
+    end
+
+    Util.send_email(
+      project.accounts.map(&:email),
+      "PostgreSQL Storage Warning: #{name} at #{usage_percent}% capacity",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def send_storage_auto_scale_started_email(usage_percent, next_option, extra_content)
+    body = [
+      "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+    ]
+
+    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
+      body << "Auto-scaling would normally begin at this threshold"
+      body << if extra_content == :canceled_previously
+        "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
+      elsif extra_content == :at_max_size
+        "However, your database has already reached the maximum available storage size."
+      else
+        "However, your project does not have sufficient quota."
+      end
+      body << "Immediate action required. Please free up disk space or contact support."
+    else
+      body << "Auto-scaling has been initiated. Storage is being increased from #{storage_size_gib} GB to #{next_option["storage_size"]} GB."
+      if next_option["size"] != representative_server.vm.display_size
+        body << "Also, the instance is being upgraded from #{representative_server.vm.display_size} to #{next_option["size"]}."
+      end
+
+      body << "We are currently preparing a new server with increased storage. The preparation time depends on the size of your database, and you may continue using the database as usual during this process."
+      body << "Once the new server is ready, we will automatically cut over to it. If you have a maintenance window configured, the cutover will be scheduled accordingly. The expected downtime is typically less than one minute."
+      body << "If this is not a good time for the cutover, you can cancel the auto-scaling before the new server is ready. Please go to the database's settings page to cancel if needed."
+
+      body << "Your database also has read replica(s), which will be scaled alongside the primary instance." if read_replicas.any?
+    end
+
+    Util.send_email(
+      project.accounts.map(&:email),
+      "PostgreSQL Auto-Scaling: #{name}",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def send_storage_auto_scale_canceled_email
+    body = [
+      "Auto-scaling for your PostgreSQL database '#{name}' (#{ubid}) has been canceled as requested.",
+      "The target configuration has been reset to the current values:",
+      "Storage: #{representative_server.storage_size_gib} GB",
+      "Instance size: #{representative_server.vm.display_size}",
+      "Please note that if disk usage reaches to 100%, database would become unavailable.",
+      "We recommend freeing up disk space or contacting support to discuss other options."
+    ]
+
+    Util.send_email(
+      project.accounts.map(&:email),
+      "PostgreSQL Auto-Scaling Canceled: #{name}",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def self.generate_postgres_options(project, flavor: nil, location: nil)
+    options = OptionTreeGenerator.new
+
+    options.add_option(name: "name")
+
+    options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
+
+    options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
+      flavor == PostgresResource.default_flavor || location.provider != "aws"
+    end
+
+    options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
+      if location.aws?
+        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+      else
+        family == "standard" || family == "burstable"
+      end
+    end
+
+    options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
+      Option::POSTGRES_SIZE_OPTIONS[size].family == family
+    end
+
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
+    options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
+      vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
+
+      if location.aws?
+        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
+      else
+        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+        min_storage /= 2 if family == "burstable"
+        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
+      end
+    end
+
+    options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|
+      Option::POSTGRES_VERSION_OPTIONS[flavor].include?(version)
+    end
+
+    options.add_option(name: "ha_type", values: Option::POSTGRES_HA_OPTIONS.keys, parent: "storage_size")
+
+    if project.get_ff_postgres_init_script
+      options.add_option(name: "init_script")
+    end
+
+    options.serialize
+  end
+
+  def self.postgres_flavors(project)
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !project.get_ff_postgres_lantern }
+  end
+
+  def self.postgres_locations(project)
+    Location.postgres_locations + project.locations
   end
 
   module HaType
