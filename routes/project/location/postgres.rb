@@ -98,6 +98,15 @@ class Clover
         DB.transaction do
           pg.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:, ha_type:, tags:)
           pg.read_replicas_dataset.update(target_vm_size: requested_parsed_size.name, target_storage_size_gib:)
+
+          # Updating target_vm_size and target_storage_size_gib might undo what
+          # we did in auto-scaling, so we are decrementing related semaphores
+          # here to give the system another chance to auto-scale if needed
+          # after this update.
+          [90, 85, 80].each {
+            Semaphore.where(strand_id: pg.strand.id, name: "storage_auto_scale_#{it}_percent_action").destroy
+          }
+
           if init_script
             if (pg_init_script = pg.init_script)
               pg_init_script.update(init_script:)

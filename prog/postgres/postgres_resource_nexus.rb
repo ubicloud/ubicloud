@@ -267,6 +267,10 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       hop_refresh_dns_record
     end
 
+    when_check_disk_usage_set? do
+      postgres_resource.handle_storage_auto_scale
+    end
+
     refresh = false
     if postgres_resource.certificate_last_checked_at < Time.now - 60 * 60 * 24 * 30 # ~1 month
       refresh = true
