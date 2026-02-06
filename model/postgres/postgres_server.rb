@@ -314,13 +314,15 @@ class PostgresServer < Sequel::Model
     session[:export_count] ||= 0
     session[:export_count] += 1
 
-    # Check archival and metrics backlog every 12 exports (similar to pulse
-    # check frequency) We do this in metrics export rather than pulse check
-    # because the metrics export session does not use an event loop. Calling
-    # exec! on an SSH session with an active event loop is not thread-safe and
-    # leads to stuck sessions.
-    observe_archival_backlog(session) if session[:export_count] % 12 == 1
-    observe_metrics_backlog(session) if session[:export_count] % 12 == 7
+    # Check archival, metrics backlog and disk usage every 12 exports. We do
+    # this in metrics export rather than pulse check because the metrics export
+    # session does not use an event loop. Calling exec! on an SSH session with
+    # an active event loop is not thread-safe and leads to stuck sessions.
+    if session[:export_count] % 12 == 1
+      observe_archival_backlog(session)
+      observe_metrics_backlog(session)
+      observe_disk_usage(session)
+    end
 
     # Call parent implementation to export actual metrics
     super
@@ -427,6 +429,21 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def observe_disk_usage(session)
+    disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
+    if reload.primary?
+      if (disk_usage_percent >= 77 || resource.storage_auto_scale_action_performed_80_set?) && !resource.check_disk_usage_set?
+        resource.incr_check_disk_usage
+      end
+    elsif disk_usage_percent >= 95
+      Prog::PageNexus.assemble("High disk usage on non-primary PG server (#{disk_usage_percent}%)", ["PGDiskUsageHigh", id], ubid, severity: "warning", extra_data: {disk_usage_percent:})
+    else
+      Page.from_tag_parts("PGDiskUsageHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300

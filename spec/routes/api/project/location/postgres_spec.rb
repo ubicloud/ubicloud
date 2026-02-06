@@ -256,6 +256,25 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "clears storage auto-scale semaphores on update" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+        pg.incr_storage_auto_scale_action_performed_80
+        pg.incr_storage_auto_scale_action_performed_85
+        pg.incr_storage_auto_scale_action_performed_90
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          size: "standard-2",
+          storage_size: 128,
+          ha_type: "none"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        strand_id = pg.strand.id
+        expect(Semaphore.where(strand_id:, name: "storage_auto_scale_action_performed_80").count).to eq(0)
+        expect(Semaphore.where(strand_id:, name: "storage_auto_scale_action_performed_85").count).to eq(0)
+        expect(Semaphore.where(strand_id:, name: "storage_auto_scale_action_performed_90").count).to eq(0)
+      end
+
       it "preserves existing init_script when not provided in patch request" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
@@ -272,7 +291,7 @@ RSpec.describe Clover, "postgres" do
 
       it "can scale down storage if the requested size is enough for existing data" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).twice
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_return("10000000\n")
 

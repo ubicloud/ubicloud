@@ -597,6 +597,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.wait }.to nap(30)
       expect(Semaphore.where(strand_id: st.id, name: "promote")).to be_empty
     end
+
+    it "calls handle_storage_auto_scale when check_disk_usage is set and decrements the semaphore" do
+      nx.incr_check_disk_usage
+      expect(nx.postgres_resource).to receive(:handle_storage_auto_scale)
+      expect { nx.wait }.to nap(30)
+      expect(Semaphore.where(strand_id: st.id, name: "check_disk_usage")).to be_empty
+    end
   end
 
   describe "#wait", "with postgres_server" do
