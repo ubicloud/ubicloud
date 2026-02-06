@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, limit_to_single_az: false)
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -20,9 +20,9 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     name ||= PrivateSubnet.ubid_to_name(ubid)
 
     Validation.validate_name(name)
-
+    ipv4_range_size ||= (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)
     ipv6_range ||= random_private_ipv6(location, project).to_s
-    ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size || (location.aws? ? PrivateSubnet::DEFAULT_AWS_SUBNET_PREFIX_LEN : PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN)).to_s
+    ipv4_range ||= random_private_ipv4(location, project, ipv4_range_size).to_s
     DB.transaction do
       ps = PrivateSubnet.create_with_id(id, name:, location_id: location.id, net6: ipv6_range, net4: ipv4_range, state: "waiting", project_id:)
       firewall_dataset = project.firewalls_dataset.where(location_id:)
@@ -52,8 +52,48 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Metal::SubnetNexus"
+      prog = if location.aws?
+        # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ
+        ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
+        create_aws_subnet_records(ps, ps_aws_resource, location, ipv4_range_size, limit_to_single_az)
+        "Vnet::Aws::VpcNexus"
+      else
+        "Vnet::Metal::SubnetNexus"
+      end
       Strand.create_with_id(id, prog:, label: "start")
+    end
+  end
+
+  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, ipv4_range_size, limit_to_single_az)
+    vpc_ipv4 = private_subnet.net4
+
+    ipv4_prefix = [ipv4_range_size + 8, 28].min
+    limit_to_single_az = true if vpc_ipv4.netmask.prefix_len == ipv4_prefix
+
+    azs = limit_to_single_az ? [location.azs.sample] : location.azs
+    azs.each_with_index do |az, idx|
+      ipv4_cidr = vpc_ipv4.nth_subnet(ipv4_prefix, idx)
+      # if the vpc size and the subnet sizes are the same, nth_subnet will
+      # return nil. For example:
+      # NetAddr::IPv4Net.parse("10.159.0.0/16").nth_subnet(16,0)
+      # => nil
+      ipv4_cidr = vpc_ipv4 if vpc_ipv4.netmask.prefix_len == ipv4_prefix && idx == 0
+
+      # There is not enough subnet space for all of the AZs
+      if ipv4_cidr.nil? && idx == 0
+        raise "Not enough subnet space for even a single AZ. Use a range size <= 28"
+      elsif ipv4_cidr.nil?
+        Clog.emit("Not enough subnet space for AZ #{az.az} - idx #{idx}")
+        next
+      end
+
+      AwsSubnet.create(
+        private_subnet_aws_resource_id: ps_aws_resource.id,
+        location_aws_az_id: az.id,
+        ipv4_cidr: ipv4_cidr.to_s,
+        ipv6_cidr: nil,  # Will be set when VPC is created
+        subnet_id: nil   # Will be set when AWS subnet is created
+      )
     end
   end
 
