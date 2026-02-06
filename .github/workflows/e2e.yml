@@ -10,7 +10,7 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,kubernetes'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,kubernetes'
         type: string
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
@@ -86,7 +86,7 @@ jobs:
 
     - name: Add e2e script to Procfile
       run: |
-        test_cases="$(yq -r '[.[] | select(.name != "postgres_upgrade") | .name] | join(",")' config/e2e_test_cases.yml)"
+        test_cases="$(yq -r '[.[].name] | join(",")' config/e2e_test_cases.yml)"
         if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.test_cases }}" ]]; then
           test_cases="${{ inputs.test_cases }}"
         fi

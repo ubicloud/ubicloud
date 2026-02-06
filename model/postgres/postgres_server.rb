@@ -204,7 +204,7 @@ class PostgresServer < Sequel::Model
   def failover_target
     target = resource.servers
       .reject { it.representative_at }
-      .select { it.strand.label == "wait" && !it.needs_recycling? && it.synchronization_status == "ready" }
+      .select { it.strand.label == "wait" && !it.needs_recycling? }
       .map { {server: it, lsn: it.current_lsn} }
       .max_by { [it[:server].physical_slot_ready ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
 

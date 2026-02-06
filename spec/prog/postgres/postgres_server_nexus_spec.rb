@@ -68,6 +68,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.synchronization_status).to eq("catching_up")
     end
 
+    it "creates read replica server with catching_up status even when representative" do
+      postgres_timeline = PostgresTimeline.create
+      firewall
+      replica_resource = PostgresResource.create(
+        project: user_project,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "pg-replica",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        parent_id: postgres_resource.id,
+        target_version: "16"
+      )
+      Firewall.create(name: "#{replica_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.postgres_service_project_id)
+
+      st = described_class.assemble(resource_id: replica_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch", representative_at: Time.now)
+      expect(st.subject.synchronization_status).to eq("catching_up")
+    end
+
     it "attaches internal firewall to underlying VM, if postgres resource has internal firewall" do
       pg = Prog::Postgres::PostgresResourceNexus.assemble(project_id: user_project.id, location_id: Location::HETZNER_FSN1_ID, name: "pg-name-2", target_vm_size: "standard-2", target_storage_size_gib: 128).subject
       pv = pg.servers.first
@@ -823,12 +842,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
     end
 
-    it "hops to wait if replica and caught up" do
+    it "hops to wait if replica and caught up, staying in catching_up status" do
       replica_resource = create_read_replica_resource(parent: postgres_resource)
       replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
+      replica_server.update(synchronization_status: "catching_up")
       replica_nx = described_class.new(replica_server.strand)
       expect(replica_nx.postgres_server).to receive(:lsn_caught_up).and_return(true)
       expect { replica_nx.wait_catch_up }.to hop("wait")
+      expect(replica_nx.postgres_server.reload.synchronization_status).to eq("catching_up")
     end
   end
 
@@ -1329,11 +1350,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       it "updates the representative server, refreshes dns and destroys the old representative_server and hops to configure when read_replica" do
         replica_resource = create_read_replica_resource(parent: postgres_resource, with_strand: true)
         replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: true)
+        replica_server.update(synchronization_status: "catching_up")
         replica_nx = described_class.new(replica_server.strand)
         replica_server_obj = replica_nx.postgres_server
 
         expect { replica_nx.taking_over }.to hop("configure")
         expect(replica_server_obj.reload.representative_at).not_to be_nil
+        expect(replica_server_obj.synchronization_status).to eq("ready")
         expect(Semaphore.where(strand_id: replica_resource.id, name: "refresh_dns_record").count).to eq(1)
         expect(Semaphore.where(strand_id: replica_server_obj.id, name: "configure_metrics").count).to eq(1)
       end
