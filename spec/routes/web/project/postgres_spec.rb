@@ -741,6 +741,36 @@ RSpec.describe Clover, "postgres" do
         expect(page.status_code).to eq(200)
       end
 
+      it "can cancel storage auto-scale" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        pg.incr_storage_auto_scale_action_performed_90
+        Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: pg.strand.id)
+        allow(Util).to receive(:send_email)
+
+        visit "#{project.path}#{pg.path}/settings"
+        click_button "Cancel Scale-Up"
+
+        expect(page).to have_flash_notice "Storage auto-scale has been canceled. The operation will be rolled back."
+      end
+
+      it "shows error when cancel storage auto-scale fails" do
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        pg.incr_storage_auto_scale_action_performed_90
+        st = Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: pg.strand.id)
+        allow(Util).to receive(:send_email)
+
+        visit "#{project.path}#{pg.path}/settings"
+        st.update(label: "recycle_representative_server")
+        click_button "Cancel Scale-Up"
+
+        expect(page).to have_flash_error "Unable to cancel storage auto-scale. The operation may have already progressed too far."
+      end
+
+      it "does not show cancel button when auto-scale is not in progress" do
+        visit "#{project.path}#{pg.path}/settings"
+        expect(page).to have_no_content "Cancel automatic storage scale-up"
+      end
+
       it "doesn't show reset button when does not have permissions" do
         # Give permission to view, so we can see the detail page
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])

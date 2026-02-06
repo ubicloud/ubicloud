@@ -434,7 +434,7 @@ class PostgresServer < Sequel::Model
   def observe_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     if reload.primary?
-      if (disk_usage_percent >= 77 || resource.storage_auto_scale_action_performed_80_set?) && !resource.check_disk_usage_set?
+      if (disk_usage_percent >= 77 || resource.storage_auto_scale_action_performed_80_set? || resource.storage_auto_scale_canceled_set?) && !resource.check_disk_usage_set?
         resource.incr_check_disk_usage
       end
     elsif disk_usage_percent >= 95

@@ -100,7 +100,12 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def recycle_representative_server
     if (rs = postgres_resource.representative_server) && !postgres_resource.ongoing_failover?
       hop_prune_servers unless rs.needs_recycling?
+      hop_prune_servers if postgres_resource.storage_auto_scale_canceled_set?
       hop_provision_servers unless postgres_resource.has_enough_ready_servers?
+
+      # Acquire advisory lock to prevent race with cancel_storage_auto_scale
+      nap 5 unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key))
+      postgres_resource.incr_storage_auto_scale_not_cancellable
 
       register_deadline(nil, 10 * 60)
       rs.trigger_failover(mode: "planned")
@@ -110,6 +115,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def prune_servers
+    postgres_resource.decr_storage_auto_scale_not_cancellable
+
     # Below we only keep servers that does not need recycling or are of the
     # current version. If there are more such servers than required, we prefer
     # ready and recent servers (in that order)
