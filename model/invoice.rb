@@ -181,7 +181,6 @@ class Invoice < Sequel::Model
     receivers = [data.billing_email]
     receivers += project.accounts.select { Authorization.has_permission?(project, it, "Project:billing", project) }.map(&:email)
     Util.send_email(receivers.uniq, "Urgent: Action Required to Prevent Service Disruption",
-      cc: Config.mail_from,
       greeting: "Dear #{data.billing_name},",
       body: ["We hope this message finds you well.",
         "We've noticed that your credit card on file has been declined with the following errors:",
