@@ -16,24 +16,33 @@
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <!-- Restart Card -->
-    <% if edit_perm %>
-      <div class="px-4 py-5 sm:p-6">
-        <% form(action: "#{path(@vm)}/restart", method: :post) do %>
-          <div class="sm:flex sm:items-center sm:justify-between">
-            <div>
-              <h3 class="text-base font-semibold leading-6 text-gray-900">Restart virtual machine</h3>
-              <div class="mt-2 text-sm text-gray-500">
-                <p>This action will restart the virtual machine, causing it to be temporarily offline.</p>
+    <% if edit_perm && !@vm.aws? %>
+      <% [
+          ["restart", "This action will restart the virtual machine, causing it to be temporarily offline."],
+          ["start", "This action will start the virtual machine if it is currently stopped."],
+          ["stop", "This action will stop the virtual machine, causing it to be offline until it is started. Note that stopped VMs still accrue billing charges. To stop billing charges, delete the VM."]
+        ].each do |action, message| %>
+        <% if @vm.send(:"can_#{action}?") %>
+          <div class="px-4 py-5 sm:p-6">
+            <% form(action: "#{path(@vm)}/#{action}", method: :post) do %>
+              <div class="sm:flex sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold leading-6 text-gray-900"><%= action.capitalize %>
+                    virtual machine</h3>
+                  <div class="mt-2 text-sm text-gray-500">
+                    <p><%= message %></p>
+                  </div>
+                </div>
+                <div id="vm-<%= action %>-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+                  <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                    <%== part("components/form/submit_button", text: action.capitalize, extra_class: "#{action}-btn") %>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div id="vm-restart-<%= @vm.ubid %>" class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
-              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
-                <%== part("components/form/submit_button", text: "Restart", extra_class: "restart-btn") %>
-              </div>
-            </div>
+            <% end %>
           </div>
         <% end %>
-      </div>
+      <% end %>
     <% end %>
     <!-- Delete Card -->
     <% if has_permission?("Vm:delete", @vm) %>
