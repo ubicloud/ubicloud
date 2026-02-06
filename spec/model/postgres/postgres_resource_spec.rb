@@ -708,10 +708,12 @@ RSpec.describe PostgresResource do
     it "clears semaphores when usage drops below 77% and no pages exist" do
       expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  70%\n")
       postgres_resource.incr_storage_auto_scale_action_performed_80
+      postgres_resource.incr_storage_auto_scale_canceled
 
       postgres_resource.handle_storage_auto_scale
 
       expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(0)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_canceled").count).to eq(0)
     end
 
     it "clears semaphores and resolves pages when usage drops below 77%" do
@@ -866,6 +868,33 @@ RSpec.describe PostgresResource do
       )
     end
 
+    it "sends warning at 80-89% when canceled" do
+      postgres_resource.incr_storage_auto_scale_canceled
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Storage Warning: pg-name at 85% capacity",
+        hash_including(body: array_including(/you previously canceled auto-scaling/))
+      )
+    end
+
+    it "does not update targets at 90%+ when canceled but still sends email" do
+      postgres_resource.incr_storage_auto_scale_canceled
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(postgres_resource.reload.target_storage_size_gib).to eq(64)
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Auto-Scaling: pg-name",
+        hash_including(body: array_including(/you previously canceled auto-scaling/))
+      )
+    end
+
     it "updates read replicas alongside the primary when auto-scaling" do
       read_replica = described_class.create(
         name: "pg-replica", superuser_password: "dummy-password", ha_type: "none",
@@ -950,6 +979,146 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
         expect(kwargs[:body].join("\n")).to include("sufficient quota")
       end
+    end
+  end
+
+  describe "#send_storage_auto_scale_canceled_email" do
+    before do
+      account = Account.create(email: "user@example.com")
+      account.add_project(project)
+      AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+      account_with_no_access = Account.create(email: "user2@example.com")
+      account_with_no_access.add_project(project)
+      allow(Util).to receive(:send_email)
+      server
+    end
+
+    let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-canceled-email") }
+    let(:server) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    }
+
+    it "sends email with canceled info including current storage and instance size" do
+      postgres_resource.send_storage_auto_scale_canceled_email
+
+      expect(Util).to have_received(:send_email).with(
+        ["user@example.com"],
+        "PostgreSQL Auto-Scaling Canceled: pg-name",
+        hash_including(
+          greeting: "Hello,",
+          body: array_including(/has been canceled as requested/)
+        )
+      )
+    end
+  end
+
+  describe "#can_cancel_storage_auto_scale?" do
+    it "returns false if canceled semaphore is already set or 90% action is not set" do
+      # Neither set
+      expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
+
+      # 90% set but canceled also set
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      postgres_resource.incr_storage_auto_scale_canceled
+      expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
+    end
+
+    it "returns false if no converge strand exists" do
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
+    end
+
+    it "returns false if converge strand label is not in allowed list" do
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      Strand.create(
+        prog: "Postgres::ConvergePostgresResource",
+        label: "recycle_representative_server",
+        parent_id: postgres_resource.strand.id
+      )
+      expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
+    end
+
+    it "returns true when 90% action is set, not canceled, and converge strand is in an early label" do
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      %w[start provision_servers wait_servers_to_be_ready wait_for_maintenance_window].each do |label|
+        Strand.dataset.where(prog: "Postgres::ConvergePostgresResource").destroy
+        Strand.create(
+          prog: "Postgres::ConvergePostgresResource",
+          label:,
+          parent_id: postgres_resource.strand.id
+        )
+        expect(postgres_resource.can_cancel_storage_auto_scale?).to be(true), "expected true for label #{label}"
+      end
+    end
+  end
+
+  describe "#cancel_storage_auto_scale" do
+    let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-cancel") }
+    let(:server) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    }
+
+    before do
+      VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
+      server
+      account = Account.create(email: "user@example.com")
+      account.add_project(project)
+      AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+      account_with_no_access = Account.create(email: "user2@example.com")
+      account_with_no_access.add_project(project)
+      allow(Util).to receive(:send_email)
+    end
+
+    it "returns false if advisory lock cannot be acquired" do
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: postgres_resource.strand.id)
+
+      expect(DB).to receive(:get).with(Sequel.function(:pg_try_advisory_xact_lock, postgres_resource.storage_auto_scale_lock_key)).and_return(false)
+      expect(postgres_resource.cancel_storage_auto_scale).to be false
+    end
+
+    it "returns false if can_cancel_storage_auto_scale? is false" do
+      # 90% action not set, so can_cancel returns false
+      expect(postgres_resource.cancel_storage_auto_scale).to be false
+    end
+
+    it "resets targets, sets semaphore, creates page, sends email and returns true on success" do
+      postgres_resource.update(target_vm_size: "standard-4", target_storage_size_gib: 256)
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "provision_servers", parent_id: postgres_resource.strand.id)
+
+      result = postgres_resource.cancel_storage_auto_scale
+
+      expect(result).to be true
+      postgres_resource.reload
+      expect(postgres_resource.target_vm_size).to eq("standard-2")
+      expect(postgres_resource.target_storage_size_gib).to eq(64)
+      expect(postgres_resource.storage_auto_scale_canceled_set?).to be true
+      expect(Page.from_tag_parts("PGStorageAutoScaleCanceled", postgres_resource.id)).not_to be_nil
+      expect(Util).to have_received(:send_email).with(
+        ["user@example.com"],
+        "PostgreSQL Auto-Scaling Canceled: pg-name",
+        hash_including(greeting: "Hello,")
+      )
+    end
+
+    it "also resets read replica targets on success" do
+      read_replica = described_class.create(
+        name: "pg-rr-cancel", superuser_password: "dummy", ha_type: "none",
+        target_version: "17", location_id:, project_id: project.id, user_config: {},
+        pgbouncer_user_config: {}, target_vm_size: "standard-4", target_storage_size_gib: 256,
+        parent_id: postgres_resource.id
+      )
+      postgres_resource.update(target_vm_size: "standard-4", target_storage_size_gib: 256)
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: postgres_resource.strand.id)
+
+      postgres_resource.cancel_storage_auto_scale
+
+      expect(read_replica.reload.target_vm_size).to eq("standard-2")
+      expect(read_replica.reload.target_storage_size_gib).to eq(64)
     end
   end
 end
