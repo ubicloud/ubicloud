@@ -1392,13 +1392,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "returns true if the database is in crash recovery" do
       expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("redo in progress")
+      expect(sshable).to receive(:_cmd).with(a_string_matching(/awk.*redo in progress.*Consistent recovery state.*/m)).and_return("redo in progress")
       expect(nx.available?).to be(true)
     end
 
     it "returns false otherwise" do
       expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
-      expect(sshable).to receive(:_cmd).with("sudo tail -n 5 /dat/16/data/pg_log/postgresql.log").and_return("not doing redo")
+      expect(sshable).to receive(:_cmd).with(a_string_matching(/awk.*redo in progress.*Consistent recovery state.*/m)).and_return("")
       expect(nx.available?).to be(false)
     end
   end
