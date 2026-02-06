@@ -24,7 +24,8 @@ class PostgresResource < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
     :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
-    :storage_auto_scale_80_percent_action, :storage_auto_scale_85_percent_action, :storage_auto_scale_90_percent_action
+    :storage_auto_scale_80_percent_action, :storage_auto_scale_85_percent_action, :storage_auto_scale_90_percent_action,
+    :storage_auto_scale_canceled
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
@@ -252,6 +253,7 @@ class PostgresResource < Sequel::Model
       Page.from_tag_parts("PGStorageAutoScaleMaxSize", id)&.incr_resolve
       Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", id)&.incr_resolve
       Page.from_tag_parts("PGStorageAutoScaleCanceled", id)&.incr_resolve
+      Semaphore.where(strand_id: strand.id, name: "storage_auto_scale_canceled").destroy
     end
 
     return if disk_usage_percent < 80
@@ -266,7 +268,9 @@ class PostgresResource < Sequel::Model
 
     next_option = next_storage_auto_scale_option
 
-    extra_email_content = if next_option.nil?
+    extra_email_content = if storage_auto_scale_canceled_set?
+      :canceled_previously
+    elsif next_option.nil?
       Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
       :at_max_size
     elsif !project.quota_available?("PostgresVCpu", vcpu_delta(next_option))
@@ -285,8 +289,10 @@ class PostgresResource < Sequel::Model
         target_vm_size = next_option["size"]
         target_storage_size_gib = next_option["storage_size"]
 
-        update(target_vm_size:, target_storage_size_gib:)
-        read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+        unless storage_auto_scale_canceled_set?
+          update(target_vm_size:, target_storage_size_gib:)
+          read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+        end
       end
 
       send_storage_auto_scale_started_email(disk_usage_percent, next_option, extra_email_content)
@@ -314,15 +320,55 @@ class PostgresResource < Sequel::Model
     vcpu_delta * total_server_count
   end
 
+  def storage_auto_scale_lock_key
+    Digest::SHA2.digest(id).unpack1("q>").abs
+  end
+
+  def can_cancel_storage_auto_scale?
+    return false if storage_auto_scale_canceled_set? || !storage_auto_scale_90_percent_action_set?
+
+    converge_strand = strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first
+    return false unless converge_strand
+
+    ["start", "provision_servers", "wait_servers_to_be_ready", "wait_for_maintenance_window"].include?(converge_strand.label)
+  end
+
+  def cancel_storage_auto_scale
+    DB.transaction do
+      # Try to acquire advisory lock to prevent race with failover
+      unless DB.get(Sequel.function(:pg_try_advisory_xact_lock, storage_auto_scale_lock_key))
+        return false
+      end
+
+      return false unless can_cancel_storage_auto_scale?
+
+      current_vm_size = representative_server.vm.display_size
+      current_storage_size_gib = representative_server.storage_size_gib
+
+      update(target_vm_size: current_vm_size, target_storage_size_gib: current_storage_size_gib)
+      read_replicas_dataset.update(target_vm_size: current_vm_size, target_storage_size_gib: current_storage_size_gib)
+
+      incr_storage_auto_scale_canceled
+
+      Prog::PageNexus.assemble("#{ubid} storage auto-scale canceled by user", ["PGStorageAutoScaleCanceled", id], ubid, severity: "warning")
+
+      send_storage_auto_scale_canceled_email
+
+      true
+    end
+  end
+
   def send_storage_auto_scale_warning_email(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
     ]
 
-    if [:at_max_size, :quota_insufficient].include?(extra_content)
+    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
       body << "Automated disk scaling is normally triggered when disk usage exceeds 90%."
-      body << if extra_content == :at_max_size
+      body << if extra_content == :canceled_previously
+        "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
+      elsif extra_content == :at_max_size
         "However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed."
       else
         "However, your project does not have sufficient quota, so auto-scaling cannot proceed."
@@ -355,9 +401,11 @@ class PostgresResource < Sequel::Model
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
     ]
 
-    if [:at_max_size, :quota_insufficient].include?(extra_content)
+    if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
       body << "Auto-scaling would normally begin at this threshold"
-      body << if extra_content == :at_max_size
+      body << if extra_content == :canceled_previously
+        "However, you previously canceled auto-scaling, so auto-scaling will stay deactivated until disk usage drops below 80%."
+      elsif extra_content == :at_max_size
         "However, your database has already reached the maximum available storage size."
       else
         "However, your project does not have sufficient quota."
@@ -379,6 +427,27 @@ class PostgresResource < Sequel::Model
     Util.send_email(
       project.accounts.map(&:email),
       "PostgreSQL Auto-Scaling: #{name}",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def send_storage_auto_scale_canceled_email
+    body = [
+      "Auto-scaling for your PostgreSQL database '#{name}' (#{ubid}) has been canceled as requested.",
+      "The target configuration has been reset to the current values:",
+      "Storage: #{representative_server.storage_size_gib} GB",
+      "Instance size: #{representative_server.vm.display_size}",
+      "Please note that if disk usage reaches to 100%, database would become unavailable.",
+      "We recommend freeing up disk space or contacting support to discuss other options."
+    ]
+
+    Util.send_email(
+      project.accounts.map(&:email),
+      "PostgreSQL Auto-Scaling Canceled: #{name}",
       cc: Config.mail_from,
       greeting: "Hello,",
       body:,

@@ -226,6 +226,22 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.recycle_representative_server }.to hop("provision_servers")
     end
 
+    it "hops to prune_servers if storage auto-scale was canceled" do
+      server = create_server(representative: true)
+      server.incr_recycle
+      create_server(representative: false, timeline_access: "fetch")
+      pg.incr_storage_auto_scale_canceled
+      expect { nx.recycle_representative_server }.to hop("prune_servers")
+    end
+
+    it "naps if advisory lock cannot be acquired before failover" do
+      server = create_server(representative: true, timeline_access: "push")
+      server.incr_recycle
+      create_server(representative: false, timeline_access: "fetch")
+      expect(DB).to receive(:get).with(Sequel.function(:pg_try_advisory_xact_lock, pg.storage_auto_scale_lock_key)).and_return(false)
+      expect { nx.recycle_representative_server }.to nap(5)
+    end
+
     it "triggers failover when representative needs recycling and standby is ready" do
       server = create_server(representative: true, timeline_access: "push")
       server.incr_recycle

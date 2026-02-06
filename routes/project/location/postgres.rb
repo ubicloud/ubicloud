@@ -443,6 +443,19 @@ class Clover
         end
       end
 
+      r.post "cancel-storage-auto-scale" do
+        authorize("Postgres:edit", pg)
+
+        if pg.cancel_storage_auto_scale
+          audit_log(pg, "cancel_storage_auto_scale")
+          flash["notice"] = "Storage auto-scale has been canceled. The operation will be rolled back."
+        else
+          flash["error"] = "Unable to cancel storage auto-scale. The operation may have already progressed too far."
+        end
+
+        r.redirect pg, "/settings"
+      end
+
       r.get "ca-certificates" do
         authorize("Postgres:view", pg)
 

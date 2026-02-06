@@ -74,6 +74,40 @@ pre_selected_values = {
     </div>
   <% end %>
 <% end %>
+<!-- Cancel Storage Auto-Scale -->
+<% if @edit_perm && @pg.can_cancel_storage_auto_scale? %>
+  <div class="p-6">
+    <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+      <div class="min-w-0 flex-1">
+        <h3 class="text-2xl font-bold leading-7 text-orange-600 sm:truncate sm:text-2xl sm:tracking-tight">
+          Storage Auto-Scale In Progress
+        </h3>
+      </div>
+    </div>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-orange-300 bg-orange-50 divide-y divide-orange-200">
+      <div class="px-4 py-5 sm:p-6">
+        <% form(action: "#{path(@pg)}/cancel-storage-auto-scale", method: :post) do %>
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Cancel automatic storage scale-up</h3>
+              <div class="mt-2 text-sm text-gray-600">
+                <p>A storage scale-up operation was triggered due to high disk utilization. The system is currently
+                  provisioning new servers. You can cancel this operation before the failover begins.</p>
+                <p class="mt-2 font-medium text-orange-700">Warning: If you cancel, automatic scale-up will not be re-triggered until disk usage drops below 80%
+                  and rises again.</p>
+              </div>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <div class="col-span-12 sm:col-span-2 flex justify-end items-end">
+                <%== part("components/form/submit_button", text: "Cancel Scale-Up", extra_class: "bg-orange-600 hover:bg-orange-500") %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
 <!-- Danger Zone -->
 <% if @edit_perm || delete_perm %>
   <div class="p-6">
