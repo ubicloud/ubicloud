@@ -672,4 +672,284 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.ready_for_read_replica?).to be false
     end
   end
+
+  describe "#handle_storage_auto_scale" do
+    let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-auto-scale") }
+    let(:server) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    }
+
+    before do
+      VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
+      server
+      account = Account.create(email: "test@example.com")
+      account.add_project(project)
+      AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: ActionType::NAME_MAP["Postgres:view"])
+      account_with_no_access = Account.create(email: "test2@example.com")
+      account_with_no_access.add_project(project)
+      allow(Util).to receive(:send_email)
+      allow(postgres_resource).to receive(:representative_server).and_return(server)
+    end
+
+    it "returns early if representative server is nil" do
+      expect(postgres_resource).to receive(:representative_server).and_return(nil)
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "returns early and logs if disk usage check fails" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_raise(RuntimeError, "connection refused")
+      expect(Clog).to receive(:emit).with("Failed to check disk usage for #{postgres_resource.ubid}, skipping storage auto-scale check", server)
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "clears semaphores when usage drops below 77% and no pages exist" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  70%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_80
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(0)
+    end
+
+    it "clears semaphores and resolves pages when usage drops below 77%" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  70%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_80
+      postgres_resource.incr_storage_auto_scale_action_performed_85
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleMaxSize", postgres_resource.id], postgres_resource.ubid)
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleQuotaInsufficient", postgres_resource.id], postgres_resource.ubid)
+      Prog::PageNexus.assemble("test", ["PGStorageAutoScaleCanceled", postgres_resource.id], postgres_resource.ubid)
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(0)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_85").count).to eq(0)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_90").count).to eq(0)
+      expect(Semaphore.where(strand_id: Page.from_tag_parts("PGStorageAutoScaleMaxSize", postgres_resource.id).id, name: "resolve").count).to eq(1)
+      expect(Semaphore.where(strand_id: Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", postgres_resource.id).id, name: "resolve").count).to eq(1)
+      expect(Semaphore.where(strand_id: Page.from_tag_parts("PGStorageAutoScaleCanceled", postgres_resource.id).id, name: "resolve").count).to eq(1)
+    end
+
+    it "clears semaphores with hysteresis (3% below threshold)" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  78%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_80
+      postgres_resource.incr_storage_auto_scale_action_performed_85
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(1)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_85").count).to eq(0)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_90").count).to eq(0)
+    end
+
+    it "returns early when usage < 80%" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  79%\n")
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "returns early when usage 80-84% and 80% action already set" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  83%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_80
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "returns early when usage 85-89% and 85% action already set" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  88%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_85
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "returns early when 90% action already set" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  95%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_90
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "does not duplicate semaphores that are already set" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+      postgres_resource.incr_storage_auto_scale_action_performed_80
+      postgres_resource.incr_storage_auto_scale_action_performed_85
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(1)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_85").count).to eq(1)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_90").count).to eq(1)
+    end
+
+    it "returns early when auto-scale is already in progress" do
+      postgres_resource.update(target_storage_size_gib: 128)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
+      postgres_resource.handle_storage_auto_scale
+    end
+
+    it "sends warning email at 80-89% with next option available" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_80").count).to eq(1)
+      expect(Semaphore.where(strand_id: postgres_resource.strand.id, name: "storage_auto_scale_action_performed_85").count).to eq(1)
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Storage Warning: pg-name at 85% capacity",
+        hash_including(body: array_including(/When disk usage reaches 90%, storage will be automatically increased/))
+      )
+    end
+
+    it "creates page and sends warning email at 80-89% when at max size" do
+      server.vm.update(vcpus: 60, cpu_percent_limit: 6000)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 4096)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Page.from_tag_parts("PGStorageAutoScaleMaxSize", postgres_resource.id)).not_to be_nil
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Storage Warning: pg-name at 85% capacity",
+        hash_including(body: array_including(/However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed./))
+      )
+    end
+
+    it "creates page and sends warning email at 80-89% when quota insufficient" do
+      server.vm.update(vcpus: 16, cpu_percent_limit: 1600)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 2048)
+      project.add_quota(quota_id: ProjectQuota.default_quotas["PostgresVCpu"]["id"], value: 16)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", postgres_resource.id)).not_to be_nil
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Storage Warning: pg-name at 85% capacity",
+        hash_including(body: array_including(/However, your project does not have sufficient quota, so auto-scaling cannot proceed./))
+      )
+    end
+
+    it "triggers auto-scale at 90%+ with next option available and sufficient quota" do
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(postgres_resource.reload.target_vm_size).to eq("standard-2")
+      expect(postgres_resource.target_storage_size_gib).to eq(128)
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Auto-Scaling: pg-name",
+        hash_including(body: array_including(/We are currently preparing a new server with increased storage./))
+      )
+    end
+
+    it "still sends an email at 90%+ when at max size" do
+      server.vm.update(vcpus: 60, cpu_percent_limit: 6000)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 4096)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Auto-Scaling: pg-name",
+        hash_including(body: array_including(/However, your database has already reached the maximum available storage size./))
+      )
+    end
+
+    it "updates read replicas alongside the primary when auto-scaling" do
+      read_replica = described_class.create(
+        name: "pg-replica", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id:, project_id: project.id, user_config: {},
+        pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
+        parent_id: postgres_resource.id
+      )
+
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(read_replica.reload.target_vm_size).to eq("standard-2")
+      expect(read_replica.reload.target_storage_size_gib).to eq(128)
+    end
+  end
+
+  describe "#send_storage_auto_scale_warning_email" do
+    before do
+      Account.create(email: "user@example.com").add_project(project)
+      allow(Util).to receive(:send_email)
+      server
+    end
+
+    let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-email") }
+    let(:server) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    }
+
+    it "includes vm upgrade info when target size differs" do
+      next_option = {"size" => "standard-4", "storage_size" => 256}
+      postgres_resource.send_storage_auto_scale_warning_email(85, next_option, nil)
+
+      expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
+        expect(kwargs[:body].join("\n")).to include("instance will also be upgraded")
+      end
+    end
+
+    it "includes read replica info when read replicas exist" do
+      described_class.create(
+        name: "pg-rr", superuser_password: "dummy-password", ha_type: "none",
+        target_version: "17", location_id:, project_id: project.id, user_config: {},
+        pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
+        parent_id: postgres_resource.id
+      )
+
+      next_option = {"size" => "standard-2", "storage_size" => 128}
+      postgres_resource.send_storage_auto_scale_warning_email(85, next_option, nil)
+
+      expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
+        expect(kwargs[:body].join("\n")).to include("read replica(s)")
+      end
+    end
+  end
+
+  describe "#send_storage_auto_scale_started_email" do
+    before do
+      Account.create(email: "user@example.com").add_project(project)
+      allow(Util).to receive(:send_email)
+      server
+    end
+
+    let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-started-email") }
+    let(:server) {
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    }
+
+    it "includes vm upgrade info when target size differs" do
+      next_option = {"size" => "standard-4", "storage_size" => 256}
+      postgres_resource.send_storage_auto_scale_started_email(92, next_option, nil)
+
+      expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
+        expect(kwargs[:body].join("\n")).to include("instance is being upgraded")
+      end
+    end
+
+    it "includes quota_insufficient info" do
+      postgres_resource.send_storage_auto_scale_started_email(92, nil, :quota_insufficient)
+
+      expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
+        expect(kwargs[:body].join("\n")).to include("sufficient quota")
+      end
+    end
+  end
 end

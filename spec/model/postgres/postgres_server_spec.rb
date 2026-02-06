@@ -602,29 +602,22 @@ RSpec.describe PostgresServer do
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
     let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
 
-    it "calls observe_archival_backlog at export counts where count % 12 == 1" do
+    it "calls observe_archival_backlog, observe_metrics_backlog, and observe_disk_usage at export counts where count % 12 == 1" do
       session[:export_count] = 12
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
       expect(postgres_server).to receive(:observe_archival_backlog).with(session)
-      expect(postgres_server).not_to receive(:observe_metrics_backlog)
-
-      postgres_server.export_metrics(session:, tsdb_client:)
-    end
-
-    it "calls observe_metrics_backlog at export counts where count % 12 == 7" do
-      session[:export_count] = 6
-      allow(postgres_server).to receive(:scrape_endpoints).and_return([])
-      expect(postgres_server).not_to receive(:observe_archival_backlog)
       expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
+      expect(postgres_server).to receive(:observe_disk_usage).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
 
-    it "does not call observe_archival_backlog or observe_metrics_backlog on every export" do
+    it "does not call observe methods when count % 12 != 1" do
       session[:export_count] = 2
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
-      expect(postgres_server).not_to receive(:observe_archival_backlog).with(session)
-      expect(postgres_server).not_to receive(:observe_metrics_backlog).with(session)
+      expect(postgres_server).not_to receive(:observe_archival_backlog)
+      expect(postgres_server).not_to receive(:observe_metrics_backlog)
+      expect(postgres_server).not_to receive(:observe_disk_usage)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
@@ -632,6 +625,7 @@ RSpec.describe PostgresServer do
     it "increments export_count in session" do
       allow(postgres_server).to receive(:observe_archival_backlog).with(session)
       allow(postgres_server).to receive(:observe_metrics_backlog).with(session)
+      allow(postgres_server).to receive(:observe_disk_usage).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
       expect(session[:export_count]).to be_nil
@@ -767,6 +761,76 @@ RSpec.describe PostgresServer do
       expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_metrics_backlog(session)
+    end
+  end
+
+  describe "#observe_disk_usage" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+
+    it "increments check_disk_usage on the resource when primary and usage >= 77%" do
+      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  80%\n")
+      postgres_server.observe_disk_usage(session)
+      expect(Semaphore.where(strand_id: resource.strand.id, name: "check_disk_usage").count).to eq(1)
+    end
+
+    it "does nothing when primary and usage < 77% and no prior auto-scale action" do
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  50%\n")
+      expect(resource).not_to receive(:incr_check_disk_usage)
+      postgres_server.observe_disk_usage(session)
+    end
+
+    it "increments check_disk_usage when primary and usage < 77% but storage_auto_scale_action_performed_80 is set" do
+      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      resource.incr_storage_auto_scale_action_performed_80
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  50%\n")
+      postgres_server.observe_disk_usage(session)
+      expect(Semaphore.where(strand_id: resource.strand.id, name: "check_disk_usage").count).to eq(1)
+    end
+
+    it "does not duplicate check_disk_usage semaphore when already set on primary" do
+      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      resource.incr_check_disk_usage
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  80%\n")
+      postgres_server.observe_disk_usage(session)
+      expect(Semaphore.where(strand_id: resource.strand.id, name: "check_disk_usage").count).to eq(1)
+    end
+
+    it "creates a page for non-primary server with usage >= 95%" do
+      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  96%\n")
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "High disk usage on non-primary PG server (96%)",
+        ["PGDiskUsageHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {disk_usage_percent: 96}
+      )
+      postgres_server.observe_disk_usage(session)
+    end
+
+    it "resolves PGDiskUsageHigh page for non-primary server with usage < 95%" do
+      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      page = Prog::PageNexus.assemble("High disk usage on non-primary PG server", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, severity: "warning")
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+      postgres_server.observe_disk_usage(session)
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
+    it "does nothing for non-primary server with usage < 95% and no existing page" do
+      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(resource).not_to receive(:incr_check_disk_usage)
+      postgres_server.observe_disk_usage(session)
+    end
+
+    it "logs errors when checking disk usage fails" do
+      expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to observe disk usage", instance_of(Hash)).and_call_original
+      postgres_server.observe_disk_usage(session)
     end
   end
 

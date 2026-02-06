@@ -22,7 +22,9 @@ class PostgresResource < Sequel::Model
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
     encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records, :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command
+  plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
+    :destroy, :promote, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
+    :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
@@ -234,6 +236,164 @@ class PostgresResource < Sequel::Model
 
   def ready_for_read_replica?
     !needs_convergence? && !PostgresTimeline.earliest_restore_time(timeline).nil?
+  end
+
+  def handle_storage_auto_scale
+    return unless representative_server
+
+    begin
+      disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
+    rescue
+      Clog.emit("Failed to check disk usage for #{ubid}, skipping storage auto-scale check", representative_server)
+      return
+    end
+
+    # Clear semaphores only when usage drops at least 3% below threshold to avoid spurious emails
+    [90, 85, 80].each {
+      send("decr_storage_auto_scale_action_performed_#{it}") if disk_usage_percent <= it - 3
+    }
+
+    if disk_usage_percent <= 77
+      Page.from_tag_parts("PGStorageAutoScaleMaxSize", id)&.incr_resolve
+      Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", id)&.incr_resolve
+      Page.from_tag_parts("PGStorageAutoScaleCanceled", id)&.incr_resolve
+    end
+
+    return if disk_usage_percent < 80
+    return if disk_usage_percent < 85 && storage_auto_scale_action_performed_80_set?
+    return if disk_usage_percent < 90 && storage_auto_scale_action_performed_85_set?
+    return if storage_auto_scale_action_performed_90_set?
+
+    # target_storage_size_gib being bigger than representative server's storage
+    # size means storage auto-scale is in progress, so we should not trigger
+    # another auto-scale or send warning emails.
+    return if representative_server.storage_size_gib < target_storage_size_gib
+
+    next_option = next_storage_auto_scale_option
+
+    extra_email_content = if next_option.nil?
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. No further auto-scaling possible.", ["PGStorageAutoScaleMaxSize", id], ubid, severity: "warning")
+      :at_max_size
+    elsif !project.quota_available?("PostgresVCpu", vcpu_delta(next_option))
+      Prog::PageNexus.assemble("#{ubid} high disk usage #{disk_usage_percent}%. Quota insufficient for auto-scale.", ["PGStorageAutoScaleQuotaInsufficient", id], ubid, severity: "warning")
+      :quota_insufficient
+    end
+
+    [90, 85, 80].each {
+      send("incr_storage_auto_scale_action_performed_#{it}") if disk_usage_percent >= it && !send("storage_auto_scale_action_performed_#{it}_set?")
+    }
+
+    if disk_usage_percent < 90
+      send_storage_auto_scale_warning_email(disk_usage_percent, next_option, extra_email_content)
+    else
+      if next_option
+        target_vm_size = next_option["size"]
+        target_storage_size_gib = next_option["storage_size"]
+
+        update(target_vm_size:, target_storage_size_gib:)
+        read_replicas_dataset.update(target_vm_size:, target_storage_size_gib:)
+      end
+
+      send_storage_auto_scale_started_email(disk_usage_percent, next_option, extra_email_content)
+    end
+  end
+
+  def next_storage_auto_scale_option
+    option_tree, parents = PostgresResource.generate_postgres_options(project, flavor:, location:)
+    all_storage_size_options = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+    current_vm_size = Option::POSTGRES_SIZE_OPTIONS[vm_size]
+    vcpu_count = current_vm_size.vcpu_count
+    family = current_vm_size.family
+
+    all_storage_size_options.select { it["family"] == family && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
+      .min_by { [Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count, it["storage_size"]] }
+  end
+
+  def vcpu_delta(target_option)
+    current_vcpu = Option::POSTGRES_SIZE_OPTIONS[vm_size].vcpu_count
+    new_vcpu = Option::POSTGRES_SIZE_OPTIONS[target_option["size"]].vcpu_count
+    vcpu_delta = new_vcpu - current_vcpu
+
+    total_server_count = target_server_count + read_replicas.sum(&:target_server_count)
+    vcpu_delta * total_server_count
+  end
+
+  def send_storage_auto_scale_warning_email(usage_percent, next_option, extra_content)
+    body = [
+      "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+    ]
+
+    if [:at_max_size, :quota_insufficient].include?(extra_content)
+      body << "Automated disk scaling is normally triggered when disk usage exceeds 90%."
+      body << if extra_content == :at_max_size
+        "However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed."
+      else
+        "However, your project does not have sufficient quota, so auto-scaling cannot proceed."
+      end
+      body << "Please free up disk space or contact support for assistance."
+    else
+      body << "When disk usage reaches 90%, storage will be automatically increased to #{next_option["storage_size"]} GB."
+      if next_option["size"] != vm_size
+        body << "Since your current instance size does not support the new storage size, the instance will also be upgraded from #{vm_size} to #{next_option["size"]}."
+      end
+      body << "Disk scaling requires a cutover to a new server, which will result in a short downtime, typically less than a minute. The scaling operation will be triggered automatically once disk usage reaches 90%."
+      body << "If you wish to scale sooner or have any questions, please contact support."
+      body << "Your database also has read replica(s), which will be scaled alongside the primary instance." if read_replicas.any?
+    end
+
+    Util.send_email(
+      accounts_with_access.map(&:email).uniq,
+      "PostgreSQL Storage Warning: #{name} at #{usage_percent}% capacity",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def send_storage_auto_scale_started_email(usage_percent, next_option, extra_content)
+    body = [
+      "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+    ]
+
+    if [:at_max_size, :quota_insufficient].include?(extra_content)
+      body << "Auto-scaling would normally begin at this threshold."
+      body << if extra_content == :at_max_size
+        "However, your database has already reached the maximum available storage size."
+      else
+        "However, your project does not have sufficient quota."
+      end
+      body << "Immediate action required. Please free up disk space or contact support."
+    else
+      body << "Auto-scaling has been initiated. Storage is being increased from #{storage_size_gib} GB to #{next_option["storage_size"]} GB."
+      if next_option["size"] != vm_size
+        body << "Also, the instance is being upgraded from #{vm_size} to #{next_option["size"]}."
+      end
+
+      body << "We are currently preparing a new server with increased storage. The preparation time depends on the size of your database, and you may continue using the database as usual during this process."
+      body << "Once the new server is ready, we will automatically cut over to it. If you have a maintenance window configured, the cutover will be scheduled accordingly. The expected downtime is typically less than one minute."
+      body << "If this is not a good time for the cutover, you can cancel the auto-scaling before the new server is ready. Please go to the database's settings page to cancel if needed."
+
+      body << "Your database also has read replica(s), which will be scaled alongside the primary instance." if read_replicas.any?
+    end
+
+    Util.send_email(
+      accounts_with_access.map(&:email).uniq,
+      "PostgreSQL Auto-Scaling: #{name}",
+      cc: Config.mail_from,
+      greeting: "Hello,",
+      body:,
+      button_title: "View Database",
+      button_link: "#{Config.base_url}#{project.path}#{path}"
+    )
+  end
+
+  def accounts_with_access
+    project.accounts.select { Authorization.has_permission?(project, it, "Postgres:view", project) }
   end
 
   def self.generate_postgres_options(project, flavor: nil, location: nil)
