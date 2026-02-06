@@ -130,4 +130,12 @@ RSpec.describe KubernetesNode do
       expect(kn.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
     end
   end
+
+  describe "#install_rhizome" do
+    it "creates an InstallRhizome strand" do
+      st = kn.install_rhizome
+      expect(st).to have_attributes(prog: "InstallRhizome", label: "start")
+      expect(st.stack.first).to include("subject_id" => kn.vm.sshable.id, "target_folder" => "kubernetes")
+    end
+  end
 end
