@@ -147,7 +147,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
             !dns_zone.records_dataset.where(type: "AAAA", name: record_name + ".").empty?
           dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.ip6_string)
         end
+
         record_name = "private.#{record_name}"
+        dns_zone.delete_record(record_name:)
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
         dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end

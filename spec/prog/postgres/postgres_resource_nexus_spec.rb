@@ -298,12 +298,30 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
+
+      dns_zone.insert_record(record_name: "pg-test-resource.pg.example.com.", type: "A", ttl: 10, data: "2.3.4.5")
+      dns_zone.insert_record(record_name: "pg-test-resource.pg.example.com.", type: "AAAA", ttl: 10, data: "2::1")
+      dns_zone.insert_record(record_name: "private.pg-test-resource.pg.example.com.", type: "A", ttl: 10, data: "127.0.0.1")
+      dns_zone.insert_record(record_name: "private.pg-test-resource.pg.example.com.", type: "AAAA", ttl: 10, data: "::1")
+      DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 10)
+
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
-        ["A", "pg-test-resource.pg.example.com."],
-        ["A", "private.pg-test-resource.pg.example.com."],
-        ["AAAA", "pg-test-resource.pg.example.com."],
-        ["AAAA", "private.pg-test-resource.pg.example.com."]
+
+      ds = DnsRecord.where(dns_zone_id: dns_zone.id)
+        .exclude(:tombstoned)
+        .distinct(:name, :type)
+        .reverse(:name, :type, :created_at)
+      expect(ds.select_map([:type, :name, :data])).to eq [
+        ["AAAA", "private.pg-test-resource.pg.example.com.", postgres_server.vm.private_ipv6_string],
+        ["A", "private.pg-test-resource.pg.example.com.", postgres_server.vm.private_ipv4_string],
+        ["AAAA", "pg-test-resource.pg.example.com.", postgres_server.vm.ip6_string],
+        ["A", "pg-test-resource.pg.example.com.", postgres_server.vm.ip4_string]
+      ]
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).where(:tombstoned).select_order_map([:type, :name, :data])).to eq [
+        ["A", "pg-test-resource.pg.example.com.", "2.3.4.5"],
+        ["A", "private.pg-test-resource.pg.example.com.", "127.0.0.1"],
+        ["AAAA", "pg-test-resource.pg.example.com.", "2::1"],
+        ["AAAA", "private.pg-test-resource.pg.example.com.", "::1"]
       ]
     end
 
