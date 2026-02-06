@@ -72,7 +72,8 @@ class UbiCNI
     setup_ipv6(container_ula_ipv6, inner_link_local, outer_link_local, cni_netns, inner_ifname, outer_ifname)
 
     @logger.info "Setting up IPv4 configuration"
-    setup_ipv4(ipv4_container_ip, ipv4_gateway_ip, cni_netns, inner_ifname, outer_ifname)
+    subnet_ipv4_obj = IPAddr.new(subnet_ipv4)
+    setup_ipv4(ipv4_container_ip, ipv4_gateway_ip, subnet_ipv4_obj.prefix, cni_netns, inner_ifname, outer_ifname)
 
     response = build_add_response(inner_ifname, inner_mac, cni_netns, ipv4_container_ip, ipv4_gateway_ip, container_ula_ipv6, container_ipv6, outer_link_local)
     @logger.info "ADD response: #{JSON.generate(response)}"
@@ -151,11 +152,11 @@ options ndots:5
     r "ip -6 route replace #{container_ip}/#{container_ip.prefix} via #{inner_link_local} dev #{outer_ifname} mtu #{MTU}"
   end
 
-  def setup_ipv4(container_ip, gateway_ip, cni_netns, inner_ifname, outer_ifname)
-    r "ip addr replace #{gateway_ip}/24 dev #{outer_ifname}"
+  def setup_ipv4(container_ip, gateway_ip, prefix, cni_netns, inner_ifname, outer_ifname)
+    r "ip addr replace #{gateway_ip}/#{prefix} dev #{outer_ifname}"
     r "ip link set #{outer_ifname} mtu #{MTU} up"
 
-    r "ip -n #{cni_netns} addr replace #{container_ip}/24 dev #{inner_ifname}"
+    r "ip -n #{cni_netns} addr replace #{container_ip}/#{prefix} dev #{inner_ifname}"
     r "ip -n #{cni_netns} link set #{inner_ifname} mtu #{MTU} up"
     r "ip -n #{cni_netns} route replace default via #{gateway_ip}"
 
