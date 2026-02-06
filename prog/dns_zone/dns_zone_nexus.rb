@@ -26,7 +26,7 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
       records_to_rectify = dns_zone.records_dataset
         .left_join(:seen_dns_records_by_dns_servers, dns_record_id: :id, dns_server_id: dns_server.id)
         .where(Sequel[:seen_dns_records_by_dns_servers][:dns_record_id] => nil)
-        .order(:created_at).all
+        .order(:created_at, Sequel.desc(:tombstoned)).all
 
       next if records_to_rectify.empty?
 

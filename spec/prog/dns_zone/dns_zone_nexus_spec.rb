@@ -74,7 +74,7 @@ COMMANDS
     end
 
     it "ignores unimportant errors" do
-      expect(sshable).to receive(:_cmd).and_return("no active transaction\nOK\nsuch record already exists in zone\nno such record in zone found\nOK")
+      expect(sshable).to receive(:_cmd).and_return("no active transaction\nOK\nno such record in zone found\nsuch record already exists in zone\nOK\n")
       expect { nx.refresh_dns_servers }.to hop("wait")
     end
 
