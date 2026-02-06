@@ -44,6 +44,14 @@ class BillingRecord < Sequel::Model
   def billing_rate
     @billing_rate ||= BillingRate.from_id(billing_rate_id)
   end
+
+  def self.total_amount_by_rate(project_id:, billing_rate_id:, begin_time:, end_time:)
+    where(project_id:, billing_rate_id:)
+      .where(Sequel.pg_range(:span).overlaps(begin_time...end_time))
+      .select_group(:billing_rate_id)
+      .select_append { sum(:amount).as(:total_amount) }
+      .to_hash(:billing_rate_id, :total_amount)
+  end
 end
 
 # Table: billing_record

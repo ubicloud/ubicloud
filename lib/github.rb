@@ -14,6 +14,8 @@ Octokit.configure do |c|
 end
 
 module Github
+  MINUTE_BILLING_RATE_IDS = BillingRate.from_resource_type("GitHubRunnerMinutes").map { it["id"] }.freeze
+
   def self.oauth_client
     Octokit::Client.new(client_id: Config.github_app_client_id, client_secret: Config.github_app_client_secret)
   end

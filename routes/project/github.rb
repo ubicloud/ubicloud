@@ -76,6 +76,15 @@ class Clover
             .reverse(Sequel[:github_runner][:created_at])
             .all
 
+          @requested_vcpus = @runners.sum { Github.runner_labels[it.label]["vcpus"] }
+          @allocated_vcpus = @runners.sum { it.vm&.allocated_at ? it.vm.vcpus : 0 }
+          date = Date.today
+          today_begin = date.to_time
+          today_end = (date + 1).to_time
+          last_30_day = (date - 29).to_time
+          @today_usage = @project.total_github_amount(today_begin, today_end)
+          @last_30_usage = @project.total_github_amount(last_30_day, today_end)
+
           view "github/runner"
         end
 
