@@ -4,6 +4,23 @@
 
 <%== render("github/tabbar") %>
 
+<dl id="current-usages" class="mb-5 grid grid-cols-1 gap-3 md:grid-cols-2 lg:gap-5 lg:grid-cols-4">
+  <% [
+    ["Allocated vCPU", @allocated_vcpus, "vCPU"],
+    ["Requested vCPU", @requested_vcpus, "vCPU"],
+    ["Today", money(@today_usage)],
+    ["Last 30 Days", money(@last_30_usage)]
+  ].each do |title, value, subtitle| %>
+    <div class="overflow-hidden rounded-lg bg-white p-3 shadow sm:p-4">
+      <dt class="text-base/6 font-medium text-gray-500"><%= title %></dt>
+      <dl class="mt-1 flex items-baseline gap-x-2 font-mono">
+        <span class="text-3xl font-semibold tracking-tight text-gray-900"><%= value %></span>
+        <span class="text-sm text-gray-500"><%= subtitle %></span>
+      </dl>
+    </div>
+  <% end %>
+</dl>
+
 <% if @installation.project.reputation == "limited" && !@installation.project.quota_available?("GithubRunnerVCpu", 0) %>
   <div class="mb-3 -mt-2 rounded-md bg-red-50 p-4 flex items-center gap-3">
     <%== part("components/icon", name: "hero-squares-plus", classes: "h-5 w-5 text-red-400") %>
