@@ -223,7 +223,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "hops to restart if certificate finalization fails" do
       expect(@acme_order).to receive(:status).and_return("failed")
       expect(Clog).to receive(:emit).with("Certificate finalization failed", instance_of(Hash)).and_call_original
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
 
       expect { nx.wait_cert_finalization }.to hop("restart")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
@@ -232,7 +232,7 @@ RSpec.describe Prog::Vnet::CertNexus do
     it "updates the certificate when certificate is valid" do
       expect(@acme_order).to receive(:status).and_return("valid")
       expect(@acme_order).to receive(:certificate).and_return("test-certificate")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(1)
       expect(cert.reload.cert).to eq("test-certificate")
@@ -247,8 +247,8 @@ RSpec.describe Prog::Vnet::CertNexus do
       expect(order).to receive(:status).and_return("valid")
       expect(order).to receive(:certificate).and_return("test-certificate")
 
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content")
-      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.", type: "TXT", ttl: 600, data: "test-record-content-private")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test-record-name.private.cert-hostname.", type: "test-record-type", ttl: 600, data: "test-record-content-private")
       expect { nx.wait_cert_finalization }.to hop("wait")
         .and change { DnsRecord.where(:tombstoned).count }.from(0).to(2)
       expect(cert.reload.cert).to eq("test-certificate")
