@@ -187,7 +187,7 @@ class Prog::Vnet::CertNexus < Prog::Base
     each_authorization do |authorization|
       dns_challenge = authorization.dns
       record_name = dns_challenge.record_name + "." + authorization.domain
-      dns_zone.delete_record(record_name:)
+      dns_zone.delete_record(record_name:, type: dns_challenge.record_type, data: dns_challenge.record_content)
     end
   end
 
