@@ -2,6 +2,7 @@
 
 require_relative "../lib/ubi_cni"
 require "json"
+require "tempfile"
 
 RSpec.describe UbiCNI do
   subject(:ubicni) { described_class.new(input, logger) }
@@ -128,6 +129,63 @@ RSpec.describe UbiCNI do
         "fd00::2",
         "2001:db8::2"
       )
+    end
+
+    context "with /26 CIDR prefix" do
+      let(:input) do
+        {
+          "ranges" => {
+            "subnet_ula_ipv6" => "fd00::/64",
+            "subnet_ipv6" => "2001:db8::/64",
+            "subnet_ipv4" => "192.168.1.0/26"
+          }
+        }
+      end
+
+      let(:ipv4_container_ip) { IPAddr.new("192.168.1.10") }
+      let(:ipv4_gateway_ip) { IPAddr.new("192.168.1.2") }
+
+      it "uses the correct /26 prefix for IPv4 commands" do
+        temp_file = Tempfile.new("ipam_store")
+        stub_const("UbiCNI::IPAM_STORE_FILE", temp_file.path)
+
+        expect(ubicni).to receive(:check_required_env_vars).with(["CNI_CONTAINERID", "CNI_NETNS", "CNI_IFNAME"])
+        expect(ubicni).to receive(:validate_input_ranges)
+
+        expect_run = ->(cmd) { expect(ubicni).to receive(:r).with(cmd) }
+        expect_run["ip link add veth_abcdef12 addr 00:aa:bb:cc:dd:ee type veth peer name eth0 addr 00:11:22:33:44:55 netns testnetns"]
+
+        expect_run["ip -6 -n testnetns addr replace 2001:db8::2/128 dev eth0"]
+        expect_run["ip -6 -n testnetns link set eth0 mtu 1400 up"]
+        expect_run["ip -6 -n testnetns route replace default via fe80::02aa:bbff:fecc:ddee dev eth0"]
+        expect_run["ip -6 link set veth_abcdef12 mtu 1400 up"]
+        expect_run["ip -6 route replace 2001:db8::2/128 via fe80::0211:22ff:fe33:4455 dev veth_abcdef12 mtu 1400"]
+        expect_run["ip -6 -n testnetns addr replace fd00::2/128 dev eth0"]
+        expect_run["ip -6 -n testnetns link set eth0 mtu 1400 up"]
+        expect_run["ip -6 link set veth_abcdef12 mtu 1400 up"]
+        expect_run["ip -6 route replace fd00::2/128 via fe80::0211:22ff:fe33:4455 dev veth_abcdef12 mtu 1400"]
+
+        expect_run["ip addr replace 192.168.1.2/26 dev veth_abcdef12"]
+        expect_run["ip link set veth_abcdef12 mtu 1400 up"]
+        expect_run["ip -n testnetns addr replace 192.168.1.10/26 dev eth0"]
+        expect_run["ip -n testnetns link set eth0 mtu 1400 up"]
+        expect_run["ip -n testnetns route replace default via 192.168.1.2"]
+        expect_run["ip route replace 192.168.1.10/32 via 192.168.1.2 dev veth_abcdef12"]
+        expect_run["echo 1 > /proc/sys/net/ipv4/conf/veth_abcdef12/proxy_arp"]
+
+        ubicni.handle_add
+
+        ipam_store = JSON.parse(File.read(temp_file.path))
+        expect(ipam_store["allocated_ips"]["abcdef123456"]).to contain_exactly(
+          "192.168.1.10",
+          "192.168.1.2",
+          "fd00::2",
+          "2001:db8::2"
+        )
+      ensure
+        temp_file.close
+        temp_file.unlink
+      end
     end
   end
 
