@@ -6,7 +6,7 @@ class Clover
     fail Validation::ValidationFailed.new({billing_info: "Project doesn't have valid billing information"}) unless @project.has_valid_payment_method?
 
     flavor = typecast_params.nonempty_str("flavor", PostgresResource.default_flavor)
-    size = typecast_params.nonempty_str!("size")
+    size = typecast_params.nonempty_str!("size").gsub("burstable", "hobby")
     storage_size = typecast_params.pos_int("storage_size")
     ha_type = typecast_params.nonempty_str("ha_type", PostgresResource.ha_type_none)
     version = typecast_params.nonempty_str("version", PostgresResource.default_version)
