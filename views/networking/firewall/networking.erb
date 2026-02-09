@@ -33,7 +33,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @firewall.firewall_rules.sort_by { [it.cidr.version, it.cidr.to_s] }.each do |fwr| %>
+        <% @firewall.firewall_rules.sort.each do |fwr| %>
           <tr>
             <% if edit_perm %>
               <% form = "form-fw-edit-rule-#{fwr.ubid}" %>
