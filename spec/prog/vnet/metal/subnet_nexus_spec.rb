@@ -123,6 +123,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nic.update(state: "active")
       expect { nx.refresh_keys }.to nap(10)
     end
+
+    it "naps if advisory lock cannot be acquired" do
+      nic.update(state: "active")
+      expect(nx).to receive(:try_advisory_lock).and_return(false)
+      expect { nx.refresh_keys }.to nap(10)
+    end
   end
 
   describe "#wait_inbound_setup" do

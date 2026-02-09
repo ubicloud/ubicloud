@@ -39,6 +39,8 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
+    nap 10 unless try_advisory_lock
+
     nics = nics_to_rekey
     nap 10 if nics.any?(&:lock_set?)
     locked_nics = []
@@ -129,6 +131,13 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   def get_locked_nics_dataset
     Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand)
+  end
+
+  def try_advisory_lock
+    DB.select(
+      Sequel.function(:pg_try_advisory_xact_lock,
+        Sequel.function(:hashtext, private_subnet.id.to_s))
+    ).single_value
   end
 
   private
