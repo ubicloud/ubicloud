@@ -13,10 +13,10 @@ class VhostBlockBackend
       "3b4a6d3387a8da7c914d85203955c0a879168518aed76679a334070403630262"
     elsif @version == "v0.3.1" && Arch.arm64?
       "d7cd297468569a0fa197d48eb7d21b64aea9598895d1b5b97da8bec5e307d57b"
-    elsif @version == "v0.2.1" && Arch.x64?
-      "86b29835ead14b20e87a058108a13d9e71243a2e261df144f6e59e2de1e60378"
-    elsif @version == "v0.2.1" && Arch.arm64?
-      "ebf24fac90411fcc78c9383aabfea3bae9d3df936b667b7c4c0097b0cb4c6357"
+    elsif @version == "v0.2.2" && Arch.x64?
+      "f5b7b2b88fa18e5070ff319b15363aed671e496d9f6cccec3bbcc48a6f38a44a"
+    elsif @version == "v0.2.2" && Arch.arm64?
+      "7f4a5818fdab4e7524855096352d9ceaa038ff254de2b52c88d491f76a05686f"
     else
       fail "Unsupported version: #{@version}, #{Arch.sym}"
     end
