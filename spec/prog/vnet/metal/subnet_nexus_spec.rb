@@ -89,6 +89,13 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(vm.reload.update_firewall_rules_set?).to be true
     end
 
+    it "does not check periodic rekey when not the connected leader" do
+      ps.update(last_rekey_at: Time.now - 60 * 60 * 24 - 1)
+      expect(nx).to receive(:connected_leader?).and_return(false)
+      expect { nx.wait }.to nap(10 * 60)
+      expect(Semaphore.where(strand_id: ps.id, name: "refresh_keys").count).to eq(0)
+    end
+
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(10 * 60)
     end
@@ -101,6 +108,13 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     let(:nx) {
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "refresh_keys", id: ps.id))
     }
+
+    it "hops to wait if not the connected leader" do
+      expect(nx).to receive(:connected_leader?).and_return(false)
+      expect(Clog).to receive(:emit)
+      expect { nx.refresh_keys }.to hop("wait")
+      expect(Semaphore.where(strand_id: nx.private_subnet.id, name: "refresh_keys").count).to eq(1)
+    end
 
     it "refreshes keys and hops to wait_refresh_keys" do
       expect(nic.start_rekey_set?).to be false
@@ -126,6 +140,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "naps if advisory lock cannot be acquired" do
       nic.update(state: "active")
+      expect(nx).to receive(:connected_leader?).and_return(true)
       expect(nx).to receive(:try_advisory_lock).and_return(false)
       expect { nx.refresh_keys }.to nap(10)
     end
@@ -205,6 +220,24 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.encryption_key).to be_nil
       expect(nic.rekey_payload).to be_nil
       expect(nic.lock_set?).to be false
+    end
+
+    it "updates last_rekey_at on all connected subnets" do
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject.update(rekey_payload: {})
+
+      nx_with_both = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
+      nx_with_both.update_stack_locked_nics([nic.id, nic2.id])
+
+      nic.strand.update(label: "wait")
+      nic2.strand.update(label: "wait")
+      ps.update(last_rekey_at: Time.now - 100)
+      ps2.update(last_rekey_at: Time.now - 100)
+
+      expect { nx_with_both.wait_old_state_drop }.to hop("wait")
+      expect(ps.reload.last_rekey_at > Time.now - 10).to be true
+      expect(ps2.reload.last_rekey_at > Time.now - 10).to be true
     end
   end
 
