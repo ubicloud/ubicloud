@@ -47,3 +47,7 @@
     display: none;
   }
 }
+
+table#firewall-rules:has(select#fw_rule_private_subnet_id option[value^=ps]:checked) #cidr {
+  display: none;
+}
