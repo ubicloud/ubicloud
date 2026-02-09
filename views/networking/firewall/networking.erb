@@ -21,12 +21,29 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
     </div>
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-2 py-2 sm:p-6">
+      <div class="sm:flex sm:items-center sm:justify-between">
+        <div>
+          <div class="mt-2 text-sm text-gray-500">
+            <p class="mb-2">Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The default behavior for a new connection without a applicable firewall rule is to disallow access.<p>
+            <p class="mb-2">To allow access, create a firewall rule for the source IP address range that will be connecting and the desination port range that will be connected to.</p>
+            <ul class="ml-6 mb-2 list-disc">
+              <li>To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of "1.2.3.4/32").</li>
+              <li>To allow access from all IP addresses, use "0.0.0.0/0" for IPv4, or "::/0" for IPv6.</li>
+              <li>To allow access to a single port, you can enter only the port number (e.g. use "22" instead of "22..22").</li>
+              <li>You can optionally add a description for the rule, to help you remember why the access has been allowed.</li>
+            </ul>
+            <p class="mb-2">Rules added to this firewall affect access to all resources in all private subnets that the firewall is attached to.</p>
+          </div>
+        </div>
+      </div>
+    </div>
     <table class="min-w-full divide-y divide-gray-300" id="firewall-rules">
       <thead class="bg-gray-50">
         <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">CIDR</th>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Port range</th>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Description</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Source IP address range (CIDR)</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Destination port range</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Rule Description</th>
           <% if edit_perm %>
             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
           <% end %>
