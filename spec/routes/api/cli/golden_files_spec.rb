@@ -14,6 +14,7 @@ RSpec.describe Clover, "cli" do
     diff_file = "cli-golden-files.diff"
     Dir.mkdir(output_dir) unless File.directory?(output_dir)
 
+    @project.set_ff_postgres_paradedb(true)
     postgres_project = Project.create(name: "postgres")
     expect(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id).at_least(:once)
     expect(Config).to receive(:kubernetes_service_project_id).and_return(postgres_project.id).at_least(:once)

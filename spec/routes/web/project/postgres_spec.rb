@@ -73,6 +73,7 @@ RSpec.describe Clover, "postgres" do
 
     describe "list" do
       it "can list flavors when there is no pg databases" do
+        project.set_ff_postgres_paradedb(true)
         visit "#{project.path}/postgres"
 
         expect(page.title).to eq("Ubicloud - PostgreSQL Databases")
@@ -216,6 +217,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create new ParadeDB PostgreSQL database" do
+        project.set_ff_postgres_paradedb(true)
         expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
@@ -255,8 +257,27 @@ RSpec.describe Clover, "postgres" do
         expect(PostgresResource.first.project_id).to eq(project.id)
       end
 
+      it "can create new ParadeDB PostgreSQL database when the feature flag is enabled" do
+        project.set_ff_postgres_paradedb(true)
+        visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
+
+        expect(page.title).to eq("Ubicloud - Create ParadeDB PostgreSQL Database")
+        name = "new-pg-db"
+        fill_in "Name", with: name
+        choose option: Location::HETZNER_FSN1_UBID
+        choose option: "standard-2"
+        choose option: PostgresResource::HaType::NONE
+        check "Accept Terms of Service and Privacy Policy"
+
+        click_button "Create"
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(PostgresResource.count).to eq(1)
+        expect(PostgresResource.first.project_id).to eq(project.id)
+      end
+
       it "can not create new ParadeDB PostgreSQL database in a customer specific location" do
-        project
+        project.set_ff_postgres_paradedb(true)
         private_location = create_private_location(project:)
 
         visit "#{project.path}/postgres/create?flavor=#{PostgresResource::Flavor::PARADEDB}"
