@@ -127,7 +127,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
 
   label def disallow_slices
     vm_host.disallow_slices
-    Semaphore.where(strand_id: strand.id, name: "disallow_slices").destroy
+    decr_disallow_slices
 
     hop_wait
   end
