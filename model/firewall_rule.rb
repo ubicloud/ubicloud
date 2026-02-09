@@ -12,6 +12,14 @@ class FirewallRule < Sequel::Model
   def display_port_range
     port_range&.begin ? "#{port_range.begin}..#{port_range.end - 1}" : "0..65535"
   end
+
+  def <=>(other)
+    (cidr.version <=> other.cidr.version).nonzero? ||
+      (cidr.network.addr <=> other.cidr.network.addr).nonzero? ||
+      (cidr.netmask.mask <=> other.cidr.netmask.mask).nonzero? ||
+      (port_range.begin <=> other.port_range.begin).nonzero? ||
+      port_range.end <=> other.port_range.end
+  end
 end
 
 # Table: firewall_rule
