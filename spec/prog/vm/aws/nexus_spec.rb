@@ -480,7 +480,7 @@ usermod -L ubuntu
       it "clear exclude_availability_zones after 5 retry attempts" do
         refresh_frame(nx, new_values: {"retry_count" => 5})
         expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
-        expect { nx.create_instance }.to nap(60)
+        expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["exclude_availability_zones"]).to be_nil
       end
 
@@ -536,7 +536,7 @@ usermod -L ubuntu
       it "clear exclude_availability_zones after 5 retry attempts" do
         refresh_frame(nx, new_values: {"retry_count" => 5})
         expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
-        expect { nx.create_instance }.to nap(60)
+        expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["exclude_availability_zones"]).to be_nil
       end
 
