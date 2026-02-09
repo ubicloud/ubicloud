@@ -56,7 +56,7 @@ class Clover
           raise CloverError.new(400, "InvalidRequest", "Read replicas cannot be modified directly! Please modify the parent database instead.")
         end
 
-        size = typecast_params.nonempty_str("size", pg.target_vm_size)
+        size = typecast_params.nonempty_str("size", pg.target_vm_size).gsub("burstable", "hobby")
         target_storage_size_gib = typecast_params.pos_int("storage_size", pg.target_storage_size_gib)
         ha_type = typecast_params.nonempty_str("ha_type", pg.ha_type)
         tags = typecast_params.array(:Hash, "tags", pg.tags)
