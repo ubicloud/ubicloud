@@ -14,6 +14,10 @@ module SemaphoreMethods
           Semaphore.incr(id, sym)
         end
 
+        define_method :"decr_#{name}" do
+          Semaphore.where(strand_id: id, name:).destroy
+        end
+
         define_method :"#{name}_set?" do
           semaphores.any? { it.name == name }
         end
