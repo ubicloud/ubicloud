@@ -56,6 +56,28 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     end
   end
 
+  describe "#before_run" do
+    it "defers destroy while locked nics exist" do
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nic.update(state: "active")
+      strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id)
+      ps.incr_destroy
+      nx_mid_rekey = described_class.new(strand)
+      nx_mid_rekey.update_stack_locked_nics([nic.id])
+
+      nx_mid_rekey.before_run
+      expect(nx_mid_rekey.strand.label).to eq("wait_inbound_setup")
+    end
+
+    it "allows destroy when no locked nics exist" do
+      strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps.id)
+      ps.incr_destroy
+      nx_in_wait = described_class.new(strand)
+
+      expect { nx_in_wait.before_run }.to hop("destroy")
+    end
+  end
+
   describe "#start" do
     it "hops to wait if location is not aws" do
       expect { nx.start }.to hop("wait")

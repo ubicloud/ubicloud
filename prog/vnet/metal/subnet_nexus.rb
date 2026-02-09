@@ -3,6 +3,10 @@
 class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
+  def before_run
+    super unless destroy_set? && !get_locked_nics_dataset.empty?
+  end
+
   def connected_leader
     @connected_leader ||= PrivateSubnet[private_subnet.connected_leader_id]
   end
