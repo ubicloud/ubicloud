@@ -479,7 +479,7 @@ class PostgresResource < Sequel::Model
       if location.aws?
         ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
       else
-        family == "standard" || family == "burstable"
+        family == "standard" || family == "hobby"
       end
     end
 
@@ -495,7 +495,7 @@ class PostgresResource < Sequel::Model
         Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
-        min_storage /= 2 if family == "burstable"
+        min_storage /= 2 if family == "hobby"
         [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
       end
     end

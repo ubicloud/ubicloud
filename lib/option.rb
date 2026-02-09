@@ -135,7 +135,7 @@ module Option
   PostgresFamilyOption = Data.define(:name, :description)
   POSTGRES_FAMILY_OPTIONS = [
     ["standard", "Dedicated CPU"],
-    ["burstable", "Shared CPU"],
+    ["hobby", "Shared CPU"],
     ["m8gd", "General Purpose, Graviton3"],
     ["i8g", "Storage Optimized, Graviton4"],
     ["i8ge", "Storage Optimized, Graviton4"],
@@ -157,8 +157,8 @@ module Option
     ["standard", 16, 64],
     ["standard", 30, 120],
     ["standard", 60, 240],
-    ["burstable", 1, 2],
-    ["burstable", 2, 4],
+    ["hobby", 1, 2],
+    ["hobby", 2, 4],
     ["c6gd", 2, 4],
     ["c6gd", 4, 8],
     ["c6gd", 8, 16],
