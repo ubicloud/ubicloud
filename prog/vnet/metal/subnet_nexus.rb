@@ -18,8 +18,13 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   label def wait
     when_refresh_keys_set? do
-      private_subnet.update(state: "refreshing_keys")
       decr_refresh_keys
+      unless connected_leader?
+        PrivateSubnet.incr_refresh_keys(connected_leader_id)
+        nap 0
+      end
+
+      private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
     end
 

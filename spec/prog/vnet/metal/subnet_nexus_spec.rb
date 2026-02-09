@@ -89,6 +89,20 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(vm.reload.update_firewall_rules_set?).to be true
     end
 
+    it "forwards refresh_keys to connected leader when not the leader" do
+      nx # ensure ps has a strand
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      Semaphore.where(name: "refresh_keys").destroy
+
+      leader, non_leader = [ps, ps2].sort_by(&:id)
+
+      non_leader.incr_refresh_keys
+      non_leader_nx = described_class.new(Strand[non_leader.id])
+      expect { non_leader_nx.wait }.to nap(0)
+      expect(Semaphore.where(strand_id: leader.id, name: "refresh_keys").count).to eq(1)
+    end
+
     it "does not check periodic rekey when not the connected leader" do
       nx # ensure ps has a strand
       Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
