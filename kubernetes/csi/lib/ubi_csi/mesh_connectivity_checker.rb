@@ -171,7 +171,7 @@ module Csi
         :connected
       end
     rescue => e
-      "#{e.class}: #{e.message}"
+      "#{e.class}: #{e.message}\n#{e.backtrace.join("\n")}"
     end
 
     def check_socket_error(socket)
@@ -180,7 +180,7 @@ module Csi
     rescue Errno::EISCONN
       nil # Already connected - success
     rescue => e
-      "#{e.class}: #{e.message}"
+      "#{e.class}: #{e.message}\n#{e.backtrace.join("\n")}"
     end
 
     def update_pod_status(name, ip, reachable, error: nil)

@@ -172,13 +172,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields unreachable when DNS lookup fails" do
       expect(Socket).to receive(:getaddrinfo).and_raise(SocketError.new("getaddrinfo failed"))
-      expect(logger).to receive(:warn).with("[MeshConnectivity] Pod test-pod (10.0.0.1:443) unreachable: SocketError: getaddrinfo failed").and_call_original
+      expect(logger).to receive(:warn).with(/\[MeshConnectivity\] Pod test-pod \(10\.0\.0\.1:443\) unreachable: SocketError: getaddrinfo failed/).and_call_original
 
       results = []
       checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
       expect(results.first[:reachable]).to be false
-      expect(results.first[:error]).to eq("SocketError: getaddrinfo failed")
+      expect(results.first[:error]).to start_with("SocketError: getaddrinfo failed\n")
     end
 
     it "yields reachable for pending connection that succeeds after IO.select" do
@@ -221,6 +221,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       checker.check_endpoints([target]) { |t, r, e| results << {target: t, reachable: r, error: e} }
 
       expect(results.first[:reachable]).to be false
+      expect(results.first[:error]).to start_with("Errno::ECONNREFUSED:")
     end
 
     it "yields unreachable when IO.select returns nil" do
