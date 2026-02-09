@@ -226,6 +226,7 @@ class Project < Sequel::Model
     :postgres_hostname_override,
     :postgres_init_script,
     :postgres_lantern,
+    :postgres_paradedb,
     :private_locations,
     :skip_runner_pool,
     :spill_to_alien_runners,

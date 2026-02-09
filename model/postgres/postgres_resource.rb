@@ -514,7 +514,7 @@ class PostgresResource < Sequel::Model
   end
 
   def self.postgres_flavors(project)
-    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| k == Flavor::LANTERN && !project.get_ff_postgres_lantern }
+    Option::POSTGRES_FLAVOR_OPTIONS.reject { |k,| (k == Flavor::LANTERN && !project.get_ff_postgres_lantern) || (k == Flavor::PARADEDB && !project.get_ff_postgres_paradedb) }
   end
 
   def self.postgres_locations(project)

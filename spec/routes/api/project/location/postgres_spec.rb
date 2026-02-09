@@ -141,6 +141,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "sends mail to partners" do
+        project.set_ff_postgres_paradedb(true)
         expect(Config).to receive(:postgres_paradedb_notification_email).and_return("dummy@mail.com")
         expect(Util).to receive(:send_email)
 
@@ -169,6 +170,16 @@ RSpec.describe Clover, "postgres" do
           size: "standard-2",
           storage_size: 64,
           flavor: "lantern"
+        }.to_json
+        expect(last_response.status).to eq(400)
+      end
+
+      it "fails if paradedb feature flag is not enabled" do
+        project.set_ff_postgres_paradedb(false)
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-paradedb", {
+          size: "standard-2",
+          storage_size: 64,
+          flavor: "paradedb"
         }.to_json
         expect(last_response.status).to eq(400)
       end
