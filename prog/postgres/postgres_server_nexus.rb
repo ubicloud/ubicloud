@@ -20,7 +20,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       # upgrade.
       server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
 
-      arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size }.arch
+      arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
       boot_image = if postgres_resource.location.aws?
         postgres_resource.location.pg_ami(server_version, arch)
       else
@@ -40,7 +40,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         sshable_unix_user: "ubi",
         location_id: postgres_resource.location_id,
         name: ubid.to_s,
-        size: postgres_resource.target_vm_size,
+        size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
         storage_volumes: [
           {encrypted: true, size_gib: 16, vring_workers: 1},
           {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
