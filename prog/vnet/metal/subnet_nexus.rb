@@ -40,6 +40,8 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   end
 
   label def refresh_keys
+    nap 10 unless try_advisory_lock
+
     nics = nics_to_rekey
     nap 10 if nics.any?(&:lock_set?)
     locked_nics = []
@@ -58,7 +60,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_inbound_setup
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
-      nics.each(&:incr_trigger_outbound_update)
+      Nic.incr_trigger_outbound_update(nics.map(&:id))
       hop_wait_outbound_setup
     end
 
@@ -68,7 +70,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_outbound_setup
     nics = get_locked_nics
     if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
-      nics.each(&:incr_old_state_drop_trigger)
+      Nic.incr_old_state_drop_trigger(nics.map(&:id))
       hop_wait_old_state_drop
     end
 
@@ -126,6 +128,13 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
 
   def get_locked_nics_dataset
     Nic.where(id: locked_nics).eager(:strand)
+  end
+
+  def try_advisory_lock
+    DB.get(
+      Sequel.function(:pg_try_advisory_xact_lock,
+        Sequel.function(:hashtext, private_subnet.id)),
+    )
   end
 
   private
