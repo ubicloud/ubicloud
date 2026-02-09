@@ -222,7 +222,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
       storage_unit = vm.vm_storage_volumes.first.vhost_backend_systemd_unit_name
       vm_unit_path = "/etc/systemd/system/#{vm.inhost_name}.service"
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo cat /vm/#{vm.inhost_name}/prep.json").and_return({"storage_volumes" => [{"vhost_block_backend_version" => nil, "spdk_version" => "v.0.1.2"}]}.to_json)
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => "v0.2.1", "spdk_version" => nil}]}))
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo tee /vm/#{vm.inhost_name}/prep.json > /dev/null", stdin: JSON.pretty_generate({"storage_volumes" => [{"vhost_block_backend_version" => Config.vhost_block_backend_version, "spdk_version" => nil}]}))
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/After=spdk-.*\\.service/After=#{storage_unit}/' #{vm_unit_path}")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo sed -i 's/Requires=spdk-.*\\.service/Requires=#{storage_unit}/' #{vm_unit_path}")
       expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
