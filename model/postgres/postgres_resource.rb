@@ -39,7 +39,7 @@ class PostgresResource < Sequel::Model
   end
 
   def vm_size
-    representative_server&.vm&.display_size || target_vm_size
+    representative_server&.vm&.display_size&.gsub("burstable", "hobby") || target_vm_size
   end
 
   def storage_size_gib

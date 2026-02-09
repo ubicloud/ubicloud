@@ -180,7 +180,7 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    recycle_set? || vm.display_size != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
+    recycle_set? || vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
   end
 
   def lsn_caught_up
