@@ -61,7 +61,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
                   value: fwr.display_port_range,
                   handle_params_and_errors:,
                   attributes: {
-                    placeholder: "0..65536",
+                    placeholder: "0..65535",
                     form:
                   }
                 ) %>
@@ -116,7 +116,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
                 name: "port_range",
                 handle_params_and_errors:,
                 attributes: {
-                  placeholder: "0..65536",
+                  placeholder: "0..65535",
                   form: "form-fw-create-rule-#{@firewall.ubid}"
                 }
               ) %>
