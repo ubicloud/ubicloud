@@ -249,12 +249,12 @@ class PostgresResource < Sequel::Model
       return
     end
 
-    # Clear semaphores only when usage drops at least 3% below threshold to avoid spurious emails
+    # Clear semaphores only when usage drops at least 5% below threshold to avoid spurious emails
     [90, 85, 80].each {
-      send("decr_storage_auto_scale_action_performed_#{it}") if disk_usage_percent <= it - 3
+      send("decr_storage_auto_scale_action_performed_#{it}") if disk_usage_percent <= it - 5
     }
 
-    if disk_usage_percent <= 77
+    if disk_usage_percent <= 75
       Page.from_tag_parts("PGStorageAutoScaleMaxSize", id)&.incr_resolve
       Page.from_tag_parts("PGStorageAutoScaleQuotaInsufficient", id)&.incr_resolve
       Page.from_tag_parts("PGStorageAutoScaleCanceled", id)&.incr_resolve
