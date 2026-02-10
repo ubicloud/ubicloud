@@ -397,7 +397,7 @@ class PostgresServer < Sequel::Model
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
-    Clog.emit("Failed to observe archival backlog", {postgres_server_id: id, exception: Util.exception_to_hash(ex)})
+    Clog.emit("Failed to observe archival backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
   def archival_backlog_threshold
@@ -426,7 +426,7 @@ class PostgresServer < Sequel::Model
       Page.from_tag_parts("PGMetricsBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
-    Clog.emit("Failed to observe metrics backlog", {postgres_server_id: id, exception: Util.exception_to_hash(ex)})
+    Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
