@@ -1,5 +1,8 @@
 <%
-vm = @pg.representative_server.vm
+server = @pg.representative_server
+vm = server&.vm
+storage_size_gib = server&.storage_size_gib || @pg.target_storage_size_gib
+time = Time.now.to_i
 %>
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 database-overview">
@@ -7,35 +10,38 @@ vm = @pg.representative_server.vm
     if (tsdb_client = PostgresServer.victoria_metrics_client)
       query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", @pg.ubid)
       disk_usage = begin
-        tsdb_client.query_range(query:, start_ts: Time.now.to_i - 60 * 60, end_ts: Time.now.to_i)[0]
+        tsdb_client.query_range(query:, start_ts: time - 60 * 60, end_ts: time)[0]
       rescue Excon::Error::Socket => e
         Clog.emit("Failed to fetch disk usage for #{@pg.ubid} from VictoriaMetrics", Util.exception_to_hash(e))
       end
 
-      disk_usage_subtext = if disk_usage
+      if disk_usage
         disk_usage_percentage = disk_usage["values"].last[1].to_f
-        disk_usage_gib = disk_usage_percentage * @pg.representative_server.storage_size_gib / 100
-        subtext = "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
+        disk_usage_gib = disk_usage_percentage * storage_size_gib / 100
+        disk_usage_subtext = "#{disk_usage_gib.round(2)} GB is used (#{disk_usage_percentage.round(2)}%)"
 
         if disk_usage_percentage > 80
-          subtext = "<span class='text-red-600'>#{subtext}</span>"
+          disk_usage_subtext = "<span class='text-red-600'>#{disk_usage_subtext}</span>"
         end
-
-        subtext
       end
     end
 
     ha_option = Option::POSTGRES_HA_OPTIONS[@pg.ha_type]
     
-    location_details, provider = if vm.aws_instance
+    location_details, provider = if vm&.aws_instance
       [vm.aws_instance.az_id, "AWS"]
     else
       [@pg.location.ui_name, @pg.location.provider.capitalize]
     end
 
     [
-      ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"],
-      ["hero-circle-stack", "#{@pg.representative_server.storage_size_gib} GB", disk_usage_subtext],
+      if vm
+        ["hero-cpu-chip", vm.display_size, "#{vm.vcpus} vCPU, #{vm.memory_gib} GB RAM"]
+      else
+        vm_size = Option::VmSizes.find { it.name == @pg.target_vm_size }
+        ["hero-cpu-chip", @pg.target_vm_size, "#{vm_size.vcpus} vCPU, #{vm_size.memory_gib} GB RAM"]
+      end,
+      ["hero-circle-stack", "#{storage_size_gib} GB", disk_usage_subtext],
       ["hero-square-2-stack-modified", ha_option.description, ""],
       ["hero-map-pin", @pg.location.display_name, h("#{location_details} (#{provider})")],
       ["postgres-logo", "Version #{@pg.version}", ""],
