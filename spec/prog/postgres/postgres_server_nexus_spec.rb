@@ -1156,33 +1156,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       @standby_nx = create_standby_nexus
     end
 
-    it "naps if representative server is in wait_lockout_attempt state" do
+    it "hops to taking_over when representative server is in wait_locked_out state" do
+      postgres_server.strand.update(label: "wait_locked_out")
+      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
+    end
+
+    it "naps when representative server is not in wait_locked_out state" do
       postgres_server.strand.update(label: "wait_lockout_attempt")
-      expect { standby_nx.wait_representative_lockout }.to nap(5)
-    end
-
-    it "naps if representative server is in non-destroy state" do
-      postgres_server.strand.update(label: "wait")
-      expect { standby_nx.wait_representative_lockout }.to nap(5)
-    end
-
-    it "hops to taking_over when in destroy" do
-      postgres_server.strand.update(label: "destroy")
-      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
-    end
-
-    it "hops to taking_over if representative server is nil" do
-      postgres_server.update(representative_at: nil)
-      standby_nx.postgres_server.reload
-      expect(standby_nx.postgres_server.resource.representative_server).to be_nil
-
-      expect { standby_nx.wait_representative_lockout }.to hop("taking_over")
-    end
-
-    it "naps if representative server exists but strand is nil" do
-      postgres_server.strand.destroy
-
-      expect { standby_nx.wait_representative_lockout }.to nap(5)
+      expect { standby_nx.wait_representative_lockout }.to nap(1)
     end
   end
 
@@ -1216,9 +1197,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_lockout_attempt" do
-    it "hops to destroy when lockout succeeds" do
+    it "hops to wait_locked_out when lockout succeeds" do
       nx.strand.update(label: "wait_lockout_attempt", stack: [{"lockout_succeeded" => true}])
-      expect { nx.wait_lockout_attempt }.to hop("destroy")
+      expect { nx.wait_lockout_attempt }.to hop("wait_locked_out")
     end
 
     it "naps when children are still running" do
@@ -1226,19 +1207,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait_lockout_attempt }.to nap(0.5)
     end
 
-    it "updates stack when a child exits with lockout_succeeded and hops to destroy" do
+    it "updates stack when a child exits with lockout_succeeded and hops to wait_locked_out" do
       Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
       child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
       child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_succeeded"))
-      expect { nx.wait_lockout_attempt }.to hop("destroy")
+      expect { nx.wait_lockout_attempt }.to hop("wait_locked_out")
     end
 
-    it "hops to destroy when all children complete without success" do
+    it "hops to wait_locked_out when all children complete without success" do
       child1 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
       child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
       child1.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
       child2.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
-      expect { nx.wait_lockout_attempt }.to hop("destroy")
+      expect { nx.wait_lockout_attempt }.to hop("wait_locked_out")
+    end
+  end
+
+  describe "#wait_locked_out" do
+    it "naps for 24 hours" do
+      expect { nx.wait_locked_out }.to nap(24 * 60 * 60)
     end
   end
 
@@ -1260,15 +1247,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       @standby_nx = create_standby_nexus
     end
 
-    it "naps immediately if fence is set" do
-      postgres_server.strand.update(label: "fence")
-      expect { @standby_nx.wait_fencing_of_old_primary }.to nap(0)
-    end
-
-    it "destroys old primary and hops to taking_over when fence is not set" do
+    it "hops to taking_over when representative server is in wait_in_fence state" do
       postgres_server.strand.update(label: "wait_in_fence")
       expect { @standby_nx.wait_fencing_of_old_primary }.to hop("taking_over")
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+    end
+
+    it "naps when representative server is not in wait_in_fence state" do
+      postgres_server.strand.update(label: "fence")
+      expect { @standby_nx.wait_fencing_of_old_primary }.to nap(1)
     end
   end
 
@@ -1289,18 +1275,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-
+      postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, representative: false, timeline_access: "fetch")
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
 
-      expect { nx.taking_over }.to hop("configure")
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+
+      expect { standby_nx.taking_over }.to hop("configure")
 
       postgres_server.reload
-      expect(postgres_server.timeline_access).to eq("push")
-      expect(postgres_server.representative_at).not_to be_nil
-      expect(postgres_server.synchronization_status).to eq("ready")
+      expect(postgres_server.representative_until).not_to be_nil
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
 
-      expect(standby.reload.synchronization_status).to eq("catching_up")
+      standby.reload
+      expect(standby.timeline_access).to eq("push")
+      expect(standby.representative_at).not_to be_nil
+      expect(standby.synchronization_status).to eq("ready")
 
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
 
@@ -1312,23 +1303,28 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
-      page = Prog::PageNexus.assemble(
-        "#{postgres_server.ubid} promotion failed",
-        ["PGPromotionFailed", postgres_server.id],
-        postgres_server.ubid
-      ).subject
-      expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-
+      postgres_server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, representative: false, timeline_access: "fetch")
+      standby_nx = described_class.new(standby.strand)
+      standby_sshable = standby_nx.postgres_server.vm.sshable
 
-      expect { nx.taking_over }.to hop("configure")
+      page = Prog::PageNexus.assemble(
+        "#{standby.ubid} promotion failed",
+        ["PGPromotionFailed", standby.id],
+        standby.ubid
+      ).subject
+      expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
+
+      expect { standby_nx.taking_over }.to hop("configure")
 
       postgres_server.reload
-      expect(postgres_server.timeline_access).to eq("push")
-      expect(postgres_server.representative_at).not_to be_nil
-      expect(postgres_server.synchronization_status).to eq("ready")
+      expect(postgres_server.representative_until).not_to be_nil
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
 
-      expect(standby.reload.synchronization_status).to eq("catching_up")
+      standby.reload
+      expect(standby.timeline_access).to eq("push")
+      expect(standby.representative_at).not_to be_nil
+      expect(standby.synchronization_status).to eq("ready")
 
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
 
