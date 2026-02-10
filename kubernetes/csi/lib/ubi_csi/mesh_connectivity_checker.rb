@@ -5,10 +5,14 @@ require "json"
 require "tempfile"
 require "fileutils"
 require_relative "kubernetes_client"
+require_relative "service_helper"
 
 module Csi
   class MeshConnectivityChecker
+    include ServiceHelper
+
     CONNECTIVITY_CHECK_INTERVAL = 30
+    MTR_TIMEOUT = 15
     CONNECTION_TIMEOUT = 5
     REGISTRAR_HEALTHZ_PORT = 8080
     STATUS_FILE_PATH = "/var/lib/ubicsi/mesh_status.json"
@@ -17,17 +21,21 @@ module Csi
       @logger = logger
       @node_id = node_id
       @queue = Queue.new
+      @mtr_queue = Queue.new
       @shutdown = false
       @pod_status = {}
       @external_endpoints = parse_external_endpoints(ENV["EXTERNAL_ENDPOINTS"])
       @external_status = {}
+      @mtr_results = {}
       @mutex = Mutex.new
     end
 
     def shutdown!
       @shutdown = true
       @queue.close
+      @mtr_queue.close
       @thread&.join
+      @mtr_thread&.join
     end
 
     def parse_external_endpoints(env_value)
@@ -52,6 +60,7 @@ module Csi
 
     def start
       @thread = spawn_connectivity_check_thread
+      @mtr_thread = spawn_mtr_check_thread
       @logger.info("[MeshConnectivity] Started mesh connectivity checker for node #{@node_id}")
     end
 
@@ -60,7 +69,8 @@ module Csi
         {
           node_id: @node_id,
           pods: @pod_status.dup,
-          external_endpoints: @external_status.dup
+          external_endpoints: @external_status.dup,
+          mtr_results: @mtr_results.dup
         }
       end
     end
@@ -96,11 +106,17 @@ module Csi
 
       check_endpoints(targets) do |target, reachable, error|
         update_pod_status(target[:name], target[:host], reachable, error:)
+        if reachable
+          @mutex.synchronize { @mtr_results.delete(target[:name]) }
+        else
+          enqueue_mtr(target[:name], target[:host])
+        end
       end
 
       # Remove stale pods that no longer exist in the cluster
       @mutex.synchronize do
         @pod_status.keep_if { |name, _| current_pod_names.include?(name) }
+        @mtr_results.keep_if { |name, _| current_pod_names.include?(name) || name.start_with?("coredns:") }
       end
     end
 
@@ -203,6 +219,16 @@ module Csi
 
       check_endpoints(targets) do |target, reachable, error|
         update_external_status(target[:name], reachable, error:)
+        if reachable
+          @mutex.synchronize do
+            @mtr_results.delete(target[:name])
+            @mtr_results.reject! { |name, _| name.start_with?("coredns:") }
+          end
+        elsif error.include?("getaddrinfo")
+          enqueue_mtr_for_coredns
+        else
+          enqueue_mtr(target[:name], target[:host])
+        end
       end
     end
 
@@ -229,6 +255,52 @@ module Csi
       @logger.error("[MeshConnectivity] Failed to write status file: #{e.message}")
     else
       @logger.debug("[MeshConnectivity] Wrote status to #{STATUS_FILE_PATH}")
+    end
+
+    def spawn_mtr_check_thread
+      Thread.new do
+        until @shutdown
+          target = @mtr_queue.pop
+          break if target.nil? # queue closed
+          run_mtr_for_target(target)
+          write_status_file
+        end
+      end
+    end
+
+    def enqueue_mtr(name, ip)
+      @mtr_queue << {name:, ip:}
+    rescue ClosedQueueError
+      nil
+    end
+
+    def enqueue_mtr_for_coredns
+      client = KubernetesClient.new(req_id: "mtr-coredns", logger: @logger)
+      pods = client.get_coredns_pods
+      pods.each do |pod|
+        next unless pod["ip"]
+        enqueue_mtr("coredns:#{pod["name"]}", pod["ip"])
+      end
+    rescue => e
+      @logger.error("[MeshConnectivity] Failed to get CoreDNS pods for MTR: #{e.message}")
+    end
+
+    def run_mtr_for_target(target)
+      output, status = run_cmd("timeout", MTR_TIMEOUT.to_s, "mtr", "-n", "-c2", "-rw", target[:ip], req_id: "mtr-check")
+      hash = {
+        ip: target[:ip],
+        output: output.strip,
+        exit_status: status.exitstatus,
+        last_check: Time.now.utc.iso8601
+      }
+      key = target[:name]
+      @mutex.synchronize do
+        @mtr_results[key] = hash
+      end
+    rescue => e
+      @logger.error("[MeshConnectivity] MTR failed for #{target[:name]} (#{target[:ip]}): #{e.message}")
+    else
+      @logger.debug("[MeshConnectivity] MTR completed for #{target[:name]} (#{target[:ip]})")
     end
 
     private
