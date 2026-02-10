@@ -3,6 +3,8 @@
 require_relative "db"
 require "sequel/model"
 
+Overrider.setup_overrides(Sequel::Model, "spec/overrider_test") if Config.unfrozen_test?
+
 if ENV["RACK_ENV"] == "development"
   Sequel::Model.cache_associations = false
 end

@@ -3,6 +3,10 @@
 class Prog::Base
   attr_reader :strand, :subject_id
 
+  # :nocov:
+  Overrider.setup_overrides(self, "spec/overrider_test") if Config.unfrozen_test?
+  # :nocov:
+
   def initialize(strand, snap = nil)
     @snap = snap || SemSnap.new(strand.id)
     @strand = strand
