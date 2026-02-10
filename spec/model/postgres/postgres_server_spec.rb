@@ -650,36 +650,43 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_return("5\n")
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(nil)
 
       postgres_server.observe_archival_backlog(session)
+
+      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "checks archival backlog and creates a page if it is outside of limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_return("15\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} archival backlog high",
+
+      postgres_server.observe_archival_backlog(session)
+
+      page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("#{postgres_server.ubid} archival backlog high")
+      expect(page.severity).to eq("warning")
+      expect(page.details["archival_backlog"]).to eq(15)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+    end
+
+    it "checks archival backlog and resolves a page if it is back within limits" do
+      Prog::PageNexus.assemble(
+        "Archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
         extra_data: {archival_backlog: 15}
       )
-
-      postgres_server.observe_archival_backlog(session)
-    end
-
-    it "checks archival backlog and resolves a page if it is back within limits" do
-      existing_page = instance_double(Page)
+      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
       ).and_return("3\n")
-      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(existing_page)
-      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_archival_backlog(session)
+
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
 
     it "logs errors when checking archival backlog fails" do
@@ -689,6 +696,24 @@ RSpec.describe PostgresServer do
       expect(Clog).to receive(:emit).with("Failed to observe archival backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_archival_backlog(session)
+    end
+
+    it "does not resolve page if it is still high" do
+      Prog::PageNexus.assemble(
+        "Archival backlog high",
+        ["PGArchivalBacklogHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {archival_backlog: 15}
+      )
+      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("9\n")
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
   end
 
@@ -720,10 +745,10 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
-      expect(Prog::PageNexus).not_to receive(:assemble)
-      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(nil)
 
       postgres_server.observe_metrics_backlog(session)
+
+      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "checks metrics backlog and creates a page if it exceeds threshold" do
@@ -731,27 +756,34 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("30\n")
-      expect(Prog::PageNexus).to receive(:assemble).with(
-        "#{postgres_server.ubid} metrics backlog high",
+
+      postgres_server.observe_metrics_backlog(session)
+
+      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("#{postgres_server.ubid} metrics backlog high")
+      expect(page.severity).to eq("warning")
+      expect(page.details["metrics_backlog"]).to eq(30)
+      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
+    end
+
+    it "checks metrics backlog and resolves a page if it is back within limits" do
+      Prog::PageNexus.assemble(
+        "Metrics backlog high",
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
         extra_data: {metrics_backlog: 30}
       )
-
-      postgres_server.observe_metrics_backlog(session)
-    end
-
-    it "checks metrics backlog and resolves a page if it is back within limits" do
-      existing_page = instance_double(Page)
+      existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
-      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(existing_page)
-      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_metrics_backlog(session)
+
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
 
     it "logs errors when checking metrics backlog fails" do
@@ -761,6 +793,24 @@ RSpec.describe PostgresServer do
       expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_metrics_backlog(session)
+    end
+
+    it "does not resolve page if it is still high" do
+      Prog::PageNexus.assemble(
+        "Metrics backlog high",
+        ["PGMetricsBacklogHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {metrics_backlog: 30}
+      )
+      existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+      ).and_return("19\n")
+
+      postgres_server.observe_metrics_backlog(session)
+
+      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
   end
 
