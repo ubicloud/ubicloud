@@ -3,12 +3,6 @@
 class Prog::Vnet::RekeyNicTunnel < Prog::Base
   subject_is :nic
 
-  def before_run
-    if nic.destroy_set?
-      pop "nic.destroy semaphore is set"
-    end
-  end
-
   label def setup_inbound
     nic.dst_ipsec_tunnels.each do |tunnel|
       args = tunnel.src_nic.rekey_payload
