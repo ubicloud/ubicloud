@@ -41,11 +41,21 @@ RSpec.describe Prog::Vnet::RekeyNicTunnel do
     it "pops when destroy is set" do
       Strand.create_with_id(tunnel.src_nic, prog: "Vnet:NicNexus", label: "wait_vm")
       tunnel.src_nic.incr_destroy
-      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set"})
+      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set or vm is deleting"})
+    end
+
+    it "pops when vm is nil" do
+      allow(tunnel.src_nic).to receive(:vm).and_return(nil)
+      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set or vm is deleting"})
+    end
+
+    it "pops when vm is deleting" do
+      expect(tunnel.src_nic.vm).to receive(:display_state).and_return("deleting")
+      expect { nx.before_run }.to exit({"msg" => "nic.destroy semaphore is set or vm is deleting"})
     end
 
     it "doesn't do anything if destroy is not set" do
-      expect { nx.before_run }.not_to exit({"msg" => "nic.destroy semaphore is set"})
+      expect { nx.before_run }.not_to exit({"msg" => "nic.destroy semaphore is set or vm is deleting"})
     end
   end
 

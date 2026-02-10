@@ -4,8 +4,8 @@ class Prog::Vnet::RekeyNicTunnel < Prog::Base
   subject_is :nic
 
   def before_run
-    if nic.destroy_set?
-      pop "nic.destroy semaphore is set"
+    if nic.destroy_set? || !nic.vm || nic.vm.display_state == "deleting"
+      pop "nic.destroy semaphore is set or vm is deleting"
     end
   end
 
