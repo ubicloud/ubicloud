@@ -45,7 +45,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Destination port range</th>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Rule Description</th>
           <% if edit_perm %>
-            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"></th>
+            <th scope="col" class="px-3 py-3.5 pr-8 text-center text-sm font-semibold text-gray-900">Edit<hr class="mt-1 mb-1">Remove</th>
           <% end %>
         </tr>
       </thead>
@@ -103,11 +103,12 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
             <% if edit_perm %>
               <td
                 id="fwr-delete-<%= ubid %>"
-                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6"
+                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-center text-sm font-medium sm:pr-6"
               >
                 <% form(action: "#{firewall_path}/firewall-rule/#{ubid}/patch", method: :post, id: form, class: " inline-flex items-center justify-center") do %>
                   <%== part("components/form/submit_button", icon: "hero-pencil", attributes: {id: "submit-#{ubid}"}) %>
                 <% end %>
+                <hr class="mt-1 mb-1">
                 <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{ubid}", text: "") %>
               </td>
             <% end %>
