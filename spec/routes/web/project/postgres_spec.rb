@@ -359,6 +359,19 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_content "64.0 GB is used (50.0%)"
       end
 
+      it "can show details without a representative sever" do
+        pg.representative_server.update(representative_at: nil)
+
+        vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
+        expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
+
+        visit "#{project.path}#{pg.path}/overview"
+        expect(page).to have_content "standard-2"
+        expect(page).to have_content "2 vCPU, 8 GB RAM"
+        expect(page).to have_content "128 GB"
+        expect(page).to have_content "64.0 GB is used (50.0%)"
+      end
+
       it "shows the disk usage in red if usage is high" do
         pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
