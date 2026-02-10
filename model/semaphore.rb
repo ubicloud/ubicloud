@@ -5,7 +5,7 @@ require_relative "../model"
 class Semaphore < Sequel::Model
   plugin ResourceMethods
 
-  def self.incr(id, name)
+  def self.incr(id, name, request_ids = nil)
     case name
     when Symbol
       name = name.to_s
@@ -15,23 +15,35 @@ class Semaphore < Sequel::Model
       raise "invalid name given to Semaphore.incr: #{name.inspect}"
     end
 
+    if request_ids.is_a? String
+      request_ids = Sequel.pg_array([request_ids])
+    elsif request_ids.is_a? Array
+      request_ids = Sequel.pg_array(request_ids)
+    end
+
     with(:updated_strand,
       Strand
         .where(id:)
         .returning(:id)
         .with_sql(:update_sql, schedule: Sequel::CURRENT_TIMESTAMP))
-      .insert([:id, :strand_id, :name],
-        DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
+      .insert([:id, :strand_id, :name, :request_ids],
+        DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name, request_ids))
+  end
+
+  def self.get_request_ids(id, name)
+    DB.from { Sequel.lit("semaphore, unnest(request_ids)") }.get { array_agg(:unnest).distinct }
   end
 end
 
 # Table: semaphore
 # Columns:
-#  id        | uuid | PRIMARY KEY
-#  strand_id | uuid | NOT NULL
-#  name      | text | NOT NULL
+#  id          | uuid   | PRIMARY KEY
+#  strand_id   | uuid   | NOT NULL
+#  name        | text   | NOT NULL
+#  request_ids | text[] |
 # Indexes:
-#  semaphore_pkey            | PRIMARY KEY btree (id)
-#  semaphore_strand_id_index | btree (strand_id)
+#  semaphore_pkey              | PRIMARY KEY btree (id)
+#  semaphore_request_ids_index | btree (request_ids)
+#  semaphore_strand_id_index   | btree (strand_id)
 # Foreign key constraints:
 #  semaphore_strand_id_fkey | (strand_id) REFERENCES strand(id)

@@ -10,8 +10,8 @@ module SemaphoreMethods
 
       semaphore_names.each do |sym|
         name = sym.name
-        define_method :"incr_#{name}" do
-          Semaphore.incr(id, sym)
+        define_method :"incr_#{name}" do |request_ids = nil|
+          Semaphore.incr(id, sym, request_ids)
         end
 
         define_method :"decr_#{name}" do

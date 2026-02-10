@@ -13,7 +13,7 @@ class Clover
         # Skip security check to allow this, as Postgres resources perform their
         # own location validation based on option trees.
         @location ||= ::Location[typecast_params.ubid_uuid("location")]
-        postgres_post(typecast_params.nonempty_str("name"))
+        postgres_post(typecast_params.nonempty_str("name"), request_ids: request.get_header("HTTP_X_REQUEST_ID"))
       end
 
       r.get "create" do

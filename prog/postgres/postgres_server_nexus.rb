@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [], request_ids: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -54,7 +54,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("burstable") ? 4 * 1024 * 1024 * 1024 : nil,
+        request_ids:
       )
 
       synchronization_status = (representative_at && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -68,6 +69,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id,
         version: server_version
       )
+      postgres_server.incr_initial_provisioning(request_ids) if request_ids
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
@@ -491,6 +493,7 @@ SQL
 
   label def wait
     decr_initial_provisioning
+    decr_reach_wait
 
     when_fence_set? do
       hop_fence
@@ -528,12 +531,12 @@ SQL
     end
 
     when_configure_metrics_set? do
-      decr_configure_metrics
+      convert_semaphore(:configure_metrics, :reach_wait)
       hop_configure_metrics
     end
 
     when_configure_set? do
-      decr_configure
+      convert_semaphore(:configure, :reach_wait)
       hop_configure
     end
 
@@ -544,7 +547,7 @@ SQL
 
     when_promote_set? do
       postgres_server.switch_to_new_timeline
-      decr_promote
+      convert_semaphore(:promote, :reach_wait)
       hop_taking_over
     end
 

@@ -10,7 +10,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def_delegators :postgres_timeline, :blob_storage_client
 
-  def self.assemble(location_id:, parent_id: nil)
+  def self.assemble(location_id:, parent_id: nil, request_ids: nil)
     if parent_id && PostgresTimeline[parent_id].nil?
       fail "No existing parent"
     end
@@ -26,6 +26,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         secret_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(32),
         location_id: location.id
       )
+      postgres_timeline.incr_initial_provisioning(request_ids) if request_ids
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
     end
   end
@@ -45,6 +46,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     # Create bucket for the timeline
     postgres_timeline.create_bucket
     postgres_timeline.set_lifecycle_policy
+    decr_initial_provisioning
     hop_wait_leader
   end
 
