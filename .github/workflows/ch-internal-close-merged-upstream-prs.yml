@@ -1,0 +1,52 @@
+name: ch-internal-close-merged-upstream-prs
+
+on:
+  pull_request:
+    types: [labeled]
+  pull_request_target:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: close-merged-upstream-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  close-merged-upstream-pr:
+    if: github.event.label.name == 'merged-upstream'
+    runs-on: k8s-nano
+    steps:
+      - name: Generate Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.WORKFLOW_AUTH_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_AUTH_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ubicloud
+
+      - name: Close PR and delete branch
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -eo pipefail
+
+          echo "Processing PR #$PR_NUMBER (branch: $BRANCH_NAME)..."
+
+          # Close the PR
+          echo "Closing PR #$PR_NUMBER..."
+          gh pr close "$PR_NUMBER" --repo "${{ github.repository }}" --comment "Closing this PR as it has been merged upstream."
+
+          # Delete the branch
+          echo "Deleting branch $BRANCH_NAME..."
+          gh api --method DELETE "/repos/${{ github.repository }}/git/refs/heads/$BRANCH_NAME" || {
+            echo "Failed to delete branch $BRANCH_NAME (it may have already been deleted or is protected)"
+          }
+
+          echo "Successfully processed PR #$PR_NUMBER"
