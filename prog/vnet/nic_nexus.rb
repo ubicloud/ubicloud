@@ -22,7 +22,8 @@ class Prog::Vnet::NicNexus < Prog::Base
       end
 
       Nic.create_with_id(id, private_ipv6: ipv6_addr, private_ipv4: ipv4_addr, mac:, name:, private_subnet_id:, state:)
-      Strand.create_with_id(id, prog:, label: "start", stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr}])
+      label = (subnet.location_id == Location::GITHUB_RUNNERS_ID) ? "wait" : "start"
+      Strand.create_with_id(id, prog:, label:, stack: [{"exclude_availability_zones" => exclude_availability_zones, "availability_zone" => availability_zone, "ipv4_addr" => ipv4_addr}])
     end
   end
 
