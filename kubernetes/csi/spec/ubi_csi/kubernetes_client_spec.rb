@@ -236,4 +236,29 @@ RSpec.describe Csi::KubernetesClient do
       expect(result.first["node"]).to be_nil
     end
   end
+
+  describe "#get_coredns_pods" do
+    let(:pods_list) do
+      {"items" => [
+        {
+          "metadata" => {"name" => "coredns-abc123"},
+          "status" => {"phase" => "Running", "podIP" => "10.96.0.5"}
+        },
+        {
+          "metadata" => {"name" => "coredns-xyz789"},
+          "status" => {"phase" => "Running", "podIP" => "10.96.0.6"}
+        },
+        {
+          "metadata" => {"name" => "coredns-pending"},
+          "status" => {"phase" => "Pending", "podIP" => nil}
+        }
+      ]}
+    end
+
+    it "returns only running CoreDNS pods" do
+      expect(client).to receive(:run_kubectl).with("-n", "kube-system", "get", "pods", "-l", "k8s-app=kube-dns", "-oyaml").and_return(YAML.dump(pods_list))
+
+      expect(client.get_coredns_pods).to eq([{"name" => "coredns-abc123", "ip" => "10.96.0.5"}, {"name" => "coredns-xyz789", "ip" => "10.96.0.6"}])
+    end
+  end
 end

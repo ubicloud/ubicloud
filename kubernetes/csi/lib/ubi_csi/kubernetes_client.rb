@@ -116,5 +116,16 @@ module Csi
         }
       end
     end
+
+    def get_coredns_pods
+      pods_yaml = yaml_load_kubectl("-n", "kube-system", "get", "pods", "-l", "k8s-app=kube-dns")
+      pods_yaml["items"].filter_map do |pod|
+        next unless pod.dig("status", "phase") == "Running"
+        {
+          "name" => pod.dig("metadata", "name"),
+          "ip" => pod.dig("status", "podIP")
+        }
+      end
+    end
   end
 end
