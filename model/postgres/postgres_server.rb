@@ -395,7 +395,7 @@ class PostgresServer < Sequel::Model
       Prog::PageNexus.assemble("#{ubid} archival backlog high",
         ["PGArchivalBacklogHigh", id], ubid,
         severity: "warning", extra_data: {archival_backlog:})
-    else
+    elsif archival_backlog < archival_backlog_threshold * 0.8
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
@@ -424,7 +424,7 @@ class PostgresServer < Sequel::Model
       Prog::PageNexus.assemble("#{ubid} metrics backlog high",
         ["PGMetricsBacklogHigh", id], ubid,
         severity: "warning", extra_data: {metrics_backlog:})
-    else
+    elsif metrics_backlog * metrics_interval < METRICS_BACKLOG_THRESHOLD_SECONDS * 0.8
       Page.from_tag_parts("PGMetricsBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
