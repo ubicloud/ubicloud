@@ -94,7 +94,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can list PostgreSQL databases with parents" do
-        pg
         pg.update(parent_id: pg_wo_permission.id)
         visit "#{project.path}/postgres"
 
@@ -341,7 +340,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can show PostgreSQL database details even when no subpage is specified" do
-        pg
         visit "#{project.path}#{pg.path}"
 
         expect(page.title).to eq("Ubicloud - #{pg.name}")
@@ -349,7 +347,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can show disk usage details" do
-        pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
@@ -373,7 +370,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows the disk usage in red if usage is high" do
-        pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "90"]]}])
@@ -384,7 +380,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows total disk if there is no VictoriaMetricsResource" do
-        pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         expect(VictoriaMetricsResource).to receive(:client_for_project).at_least(:once).and_return(nil)
@@ -401,7 +396,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows total disk if VictoriaMetricsResource is not accessible" do
-        pg
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client)
@@ -431,7 +425,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows 404 for invalid pages for read replicas" do
-        pg
         pg.update(parent_id: pg_wo_permission.id)
         visit "#{project.path}#{pg.path}/resize"
 
@@ -440,7 +433,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "does not show delete or edit options without the appropriate permissions" do
-        pg
         pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
 
         visit "#{project.path}#{pg.path}/read-replica"
@@ -954,7 +946,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update configuration" do
-        pg
         pg.update(user_config: {"max_connections" => "120"})
         visit "#{project.path}#{pg.path}/config"
 
