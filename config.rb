@@ -176,6 +176,7 @@ module Config
   optional :postgres_lantern_notification_email, string
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
+  override :aws_vm_attach_ssm_permissions, false, bool
 
   # Logging
   optional :database_logger_level, string

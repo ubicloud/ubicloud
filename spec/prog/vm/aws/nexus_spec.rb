@@ -248,6 +248,37 @@ usermod -L ubuntu
       expect(iam_client).to receive(:attach_role_policy).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
       expect { nx.attach_role_policy }.to hop("create_instance_profile")
     end
+
+    it "attaches SSM policy when config is enabled" do
+      iam_client.stub_responses(:attach_role_policy, {})
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      allow(Config).to receive(:aws_vm_attach_ssm_permissions).and_return(true)
+
+      expect(iam_client).to receive(:attach_role_policy).with({
+        role_name: vm.name,
+        policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"
+      }).and_call_original
+
+      expect(iam_client).to receive(:attach_role_policy).with({
+        role_name: vm.name,
+        policy_arn: "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      }).and_call_original
+
+      expect { nx.attach_role_policy }.to hop("create_instance_profile")
+    end
+
+    it "does not attach SSM policy when config is disabled" do
+      iam_client.stub_responses(:attach_role_policy, {})
+      iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
+      allow(Config).to receive(:aws_vm_attach_ssm_permissions).and_return(false)
+
+      expect(iam_client).to receive(:attach_role_policy).once.with({
+        role_name: vm.name,
+        policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"
+      }).and_call_original
+
+      expect { nx.attach_role_policy }.to hop("create_instance_profile")
+    end
   end
 
   describe "#create_instance_profile" do
@@ -870,6 +901,19 @@ usermod -L ubuntu
           a_hash_including(operation_name: :delete_instance_profile, params: {instance_profile_name: "testvm-instance-profile"}),
           a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"})
         ))
+    end
+
+    it "detaches policies when SSM permissions config is enabled" do
+      allow(Config).to receive(:aws_vm_attach_ssm_permissions).and_return(true)
+      iam_client.stub_responses(:list_policies, policies: [])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:delete_role, {})
+      iam_client.stub_responses(:list_attached_role_policies, attached_policies: [])
+      iam_client.stub_responses(:detach_role_policy, {})
+
+      expect(iam_client).to receive(:list_attached_role_policies).with(role_name: vm.name).and_call_original
+      expect { nx.cleanup_roles }.to exit({"msg" => "vm destroyed"})
     end
   end
 end

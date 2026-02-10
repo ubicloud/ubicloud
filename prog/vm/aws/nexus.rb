@@ -70,7 +70,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     ignore_invalid_entity do
       iam_client.attach_role_policy({role_name:, policy_arn: cloudwatch_policy.arn})
     end
-
+    if Config.aws_vm_attach_ssm_permissions
+      ignore_invalid_entity do
+        iam_client.attach_role_policy({role_name:, policy_arn: "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"})
+      end
+    end
     hop_create_instance_profile
   end
 
@@ -347,7 +351,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       end
     end
 
-    if Config.aws_postgres_iam_access
+    if Config.aws_postgres_iam_access || Config.aws_vm_attach_ssm_permissions
       ignore_invalid_entity do
         iam_client.list_attached_role_policies(role_name:).attached_policies.each do |policy|
           ignore_invalid_entity do
