@@ -4,7 +4,11 @@ class Prog::Base
   attr_reader :strand, :subject_id
 
   # :nocov:
-  Overrider.setup_overrides(self, "spec/overrider_test") if Config.unfrozen_test?
+  if Config.override_dir
+    Overrider.setup_overrides(self, Config.override_dir)
+  elsif Config.unfrozen_test?
+    Overrider.setup_overrides(self, "spec/overrider_test")
+  end
   # :nocov:
 
   def initialize(strand, snap = nil)

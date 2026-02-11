@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 # Cannot modify existing class during frozen tests.
-unless Config.frozen_test?
+# Skip if explicit override_dir is given, since the test overrides may not be set.
+if Config.unfrozen_test? && !Config.override_dir
   RSpec.describe Overrider do
     it "considers PrependMethods before normal instance methods during method lookup" do
       expect(Sshable.allocate.override_instance_method_check).to be true
