@@ -124,10 +124,18 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       .reject { it.representative_at || it.needs_recycling? || it.version != postgres_resource.target_version }
       .sort_by { [(it.strand.label == "wait") ? 0 : 1, Time.now - it.created_at] }
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
-    (postgres_resource.servers - servers_to_keep).each.each(&:incr_destroy)
+    servers_to_destroy = (postgres_resource.servers - servers_to_keep)
+    servers_to_destroy.each(&:incr_destroy)
+    update_stack({"servers_to_destroy" => servers_to_destroy.map(&:id)})
 
     servers_to_keep.each(&:incr_configure)
     postgres_resource.incr_update_billing_records
+
+    hop_wait_prune_servers
+  end
+
+  label def wait_prune_servers
+    nap 30 unless PostgresServer.where(id: frame["servers_to_destroy"]).empty?
 
     pop "postgres resource is converged"
   end
