@@ -286,8 +286,7 @@ module Scheduling::Allocator
       @device_allocations << GpuAllocation.new(candidate_host, request) if request.gpu_count > 0
 
       if request.use_slices && candidate_host[:accepts_slices]
-        # Wrap around and replace the host allocations. That way we can control that logic from the slice POV
-        @vm_host_allocations = [VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)]
+        @slice_allocation = VmHostSliceAllocation.new(candidate_host, request, @vm_host_allocations)
       end
 
       @allocations = @vm_host_allocations + @device_allocations
@@ -295,14 +294,24 @@ module Scheduling::Allocator
     end
 
     def is_valid
-      @allocations.all? { it.is_valid }
+      if @slice_allocation&.existing_slice?
+        @device_allocations.all? { it.is_valid }
+      elsif @slice_allocation
+        @slice_allocation.is_valid && @device_allocations.all? { it.is_valid }
+      else
+        @allocations.all? { it.is_valid }
+      end
     end
 
     def update(vm)
       vm_host = VmHost[@candidate_host[:vm_host_id]]
       DB.transaction do
         Allocation.update_vm(vm_host, vm)
-        @vm_host_allocations.each { it.update(vm, vm_host) }
+        if @slice_allocation
+          @slice_allocation.update(vm, vm_host)
+        else
+          @vm_host_allocations.each { it.update(vm, vm_host) }
+        end
         @device_allocations.each { it.update(vm, vm_host) }
       end
     end
@@ -314,7 +323,11 @@ module Scheduling::Allocator
     private
 
     def calculate_score
-      util = @allocations.map { it.utilization }
+      util = if @slice_allocation&.existing_slice?
+        @vm_host_allocations.map { @request.target_host_utilization } + @device_allocations.map { it.utilization }
+      else
+        @allocations.map { it.utilization }
+      end
 
       # utilization score, in range [0, 2]
       score = @request.target_host_utilization - util.sum.fdiv(util.size)
@@ -403,6 +416,10 @@ module Scheduling::Allocator
       @vm_host_allocations = vm_host_allocations
 
       @existing_slice = select_existing_slice if @request.require_shared_slice
+    end
+
+    def existing_slice?
+      !!@existing_slice
     end
 
     def is_valid

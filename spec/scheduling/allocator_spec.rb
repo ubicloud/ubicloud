@@ -562,6 +562,46 @@ RSpec.describe Al do
       expect(score_no_preference).to be_within(0.0001).of(score_preference_met)
       expect(score_preference_not_met).to be > score_preference_met
     end
+
+    it "produces equivalent scores for slice and non-slice hosts with the same utilization" do
+      # Non-slice host (accepts_slices: false)
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      vmhds[:accepts_slices] = false
+      score_no_slice = Al::Allocation.new(vmhds, req).score
+
+      # Slice host (accepts_slices: true) — new slice case, no existing slice
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostSliceAllocation).to receive(:new).and_return(instance_double(Al::VmHostSliceAllocation, existing_slice?: false, is_valid: true))
+      vmhds[:accepts_slices] = true
+      req.use_slices = true
+      score_with_slice = Al::Allocation.new(vmhds, req).score
+
+      expect(score_no_slice).to be_within(0.0001).of(score_with_slice)
+    end
+
+    it "captures CPU vs memory imbalance in slice path" do
+      # Balanced CPU and memory
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostSliceAllocation).to receive(:new).and_return(instance_double(Al::VmHostSliceAllocation, existing_slice?: false, is_valid: true))
+      vmhds[:accepts_slices] = true
+      req.use_slices = true
+      score_balanced = Al::Allocation.new(vmhds, req).score
+
+      # Imbalanced CPU and memory
+      expect(Al::VmHostCpuAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.3, true))
+      expect(Al::VmHostAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.7, true))
+      expect(Al::StorageAllocation).to receive(:new).and_return(TestResourceAllocation.new(0.5, true))
+      expect(Al::VmHostSliceAllocation).to receive(:new).and_return(instance_double(Al::VmHostSliceAllocation, existing_slice?: false, is_valid: true))
+      score_imbalanced = Al::Allocation.new(vmhds, req).score
+
+      expect(score_imbalanced).to be > score_balanced
+    end
   end
 
   describe "VmHostAllocation" do
