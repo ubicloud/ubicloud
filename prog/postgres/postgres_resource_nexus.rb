@@ -218,8 +218,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     if postgres_resource.project.billable
       flavor = postgres_resource.flavor
-      vm_family = representative_server.vm.family
-      vcpu_count = representative_server.vm.vcpus
+      current_vm_size = Option::POSTGRES_SIZE_OPTIONS[postgres_resource.vm_size]
+      vm_family = current_vm_size.family
+      vcpu_count = current_vm_size.vcpu_count
       storage_size_gib = representative_server.storage_size_gib
       location = postgres_resource.location
 
