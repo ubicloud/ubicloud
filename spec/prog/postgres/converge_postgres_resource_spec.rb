@@ -465,7 +465,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       extra_server.update(created_at: Time.now - 120)
       keep_server.update(created_at: Time.now)
 
-      expect { nx.prune_servers }.to exit
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
 
       expect(recycling_server.reload.destroy_set?).to be true
       expect(unavailable_server.reload.destroy_set?).to be true
@@ -473,16 +473,45 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(representative.reload.configure_set?).to be true
       expect(keep_server.reload.configure_set?).to be true
       expect(keep_server.destroy_set?).to be false
+
+      servers_to_destroy_ids = strand.reload.stack.first["servers_to_destroy"]
+      expect(servers_to_destroy_ids).to contain_exactly(recycling_server.id, unavailable_server.id, extra_server.id)
     end
 
     it "destroys servers with older versions" do
       old_server = create_server(version: "16")
       new_server = create_server(version: "17", representative: true)
 
-      expect { nx.prune_servers }.to exit
+      expect { nx.prune_servers }.to hop("wait_prune_servers")
 
       expect(old_server.reload.destroy_set?).to be true
       expect(new_server.reload.configure_set?).to be true
+
+      servers_to_destroy_ids = strand.reload.stack.first["servers_to_destroy"]
+      expect(servers_to_destroy_ids).to contain_exactly(old_server.id)
+    end
+  end
+
+  describe "#wait_prune_servers" do
+    before do
+      strand.update(label: "wait_prune_servers")
+    end
+
+    it "naps if servers to destroy still exist" do
+      server_to_destroy = create_server
+      strand.stack.first["servers_to_destroy"] = [server_to_destroy.id]
+      strand.modified!(:stack)
+      strand.save_changes
+
+      expect { nx.wait_prune_servers }.to nap(30)
+    end
+
+    it "pops if all servers to destroy have been removed" do
+      strand.stack.first["servers_to_destroy"] = [SecureRandom.uuid]
+      strand.modified!(:stack)
+      strand.save_changes
+
+      expect { nx.wait_prune_servers }.to exit({"msg" => "postgres resource is converged"})
     end
   end
 
