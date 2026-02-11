@@ -8,9 +8,10 @@ module Csi
   class KubernetesClient
     include ServiceHelper
 
-    def initialize(req_id:, logger:)
+    def initialize(req_id:, logger:, log_level: :info)
       @req_id = req_id
       @logger = logger
+      @log_level = log_level
     end
 
     def run_kubectl(*args, yaml_data: nil)

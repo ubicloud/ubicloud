@@ -561,7 +561,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
         {"name" => "coredns-abc", "ip" => "10.96.0.5"},
         {"name" => "coredns-xyz", "ip" => "10.96.0.6"}
       ]
-      expect(Csi::KubernetesClient).to receive(:new).with(req_id: "mtr-coredns", logger:).and_return(client)
+      expect(Csi::KubernetesClient).to receive(:new).with(req_id: "mtr-coredns", logger:, log_level: :debug).and_return(client)
       expect(client).to receive(:get_coredns_pods).and_return(pods)
 
       checker.enqueue_mtr_for_coredns
