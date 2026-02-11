@@ -269,6 +269,7 @@ RSpec.describe VmSetup do
         CloudHypervisor::Firmware.new("202311", "sha256"))
 
       expect(vs).to receive(:r).with("systemctl daemon-reload")
+      expect(vs).to receive(:cpu_vendor).and_return("GenuineIntel")
       vs.send(:install_systemd_unit, *args)
 
       expect(vps).to have_received(:write_systemd_service) { |content|
@@ -301,6 +302,28 @@ RSpec.describe VmSetup do
         expect(content).to include("User=test")
         expect(content).to include("Group=test")
         expect(content).to include("LimitNOFILE=500000")
+      }
+    end
+
+    it "adds topoext when CPU vendor is AMD" do
+      vs.instance_variable_set(:@hypervisor, "qemu")
+
+      vps = instance_spy(VmPath,
+        serial_log: "/vm/test/serial.log",
+        cloudinit_img: "/vm/test/cloudinit.img")
+      allow(vs).to receive(:vp).and_return(vps)
+
+      vs.instance_variable_set(:@firmware_version,
+        CloudHypervisor::Firmware.new("202311", "sha256"))
+
+      expect(vs).to receive(:r).with("systemctl daemon-reload")
+      expect(vs).to receive(:cpu_vendor).and_return("AuthenticAMD")
+
+      vs.send(:install_systemd_unit, *args)
+
+      expect(vps).to have_received(:write_systemd_service) { |content|
+        expect(content).to include("-cpu host,topoext=on")
+        expect(content).not_to include("-cpu host\n")
       }
     end
   end
