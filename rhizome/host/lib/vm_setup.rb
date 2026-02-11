@@ -876,8 +876,7 @@ DNSMASQ_SERVICE
     serial_parts = [
       "-serial file:#{vp.serial_log}",
       "-display none",
-      "-vga none",
-      "-no-reboot"
+      "-vga none"
     ]
 
     kernel_parts = [

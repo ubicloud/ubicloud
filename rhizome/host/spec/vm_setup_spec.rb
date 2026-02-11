@@ -292,7 +292,6 @@ RSpec.describe VmSetup do
           -device virtio-net-pci,mac=02:aa:bb:cc:dd:01,netdev=net0,mq=on,romfile=
           -serial file:/vm/test/serial.log
           -display none
-          -no-reboot
         ].each { |frag| expect(content).to include(frag) }
 
         expect(content).to include("KillSignal=SIGTERM")
