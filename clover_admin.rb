@@ -132,6 +132,8 @@ class CloverAdmin < Roda
     classes.sort_by!(&:name)
   end
 
+  skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
+
   plugin :rodauth, route_csrf: true do
     enable :argon2, :login, :logout, :webauthn, :change_password
     accounts_table :admin_account
@@ -139,9 +141,15 @@ class CloverAdmin < Roda
     webauthn_keys_table :admin_webauthn_key
     webauthn_user_ids_table :admin_webauthn_user_id
     login_column :login
-    login_redirect do
-      uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
+
+    # :nocov:
+    unless skip_webauthn_requirement
+      # :nocov:
+      login_redirect do
+        uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
+      end
     end
+
     check_csrf? false
     require_bcrypt? false
     title_instance_variable :@page_title
@@ -507,9 +515,9 @@ class CloverAdmin < Roda
     check_csrf!
     r.rodauth
     rodauth.require_authentication
-    rodauth.require_two_factor_setup
 
     # :nocov:
+    rodauth.require_two_factor_setup unless skip_webauthn_requirement
     r.exception_page_assets if Config.development?
     # :nocov:
 
