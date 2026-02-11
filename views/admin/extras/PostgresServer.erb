@@ -1,0 +1,14 @@
+<%# locals: (obj: nil) %>
+
+<% current_lsn = obj.current_lsn rescue nil %>
+<% lsn_lag = obj.lsn_lag(current_lsn) rescue nil %>
+
+<%== part("components/table",
+  title: "WAL Lag",
+  table_class: "postgres-wal-lag",
+  data: [{
+    "Archive Backlog" => obj.primary? ? (obj.archival_backlog rescue nil) : nil,
+    "Current LSN" => current_lsn,
+    "WAL Lag (GiB)" => lsn_lag && (lsn_lag / (1024**3))
+  }.compact]
+) %>

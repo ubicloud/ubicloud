@@ -1005,7 +1005,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(replica_server).to receive(:current_lsn).and_return("1/A")
 
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/A"})
-        expect(replica_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
+        expect(PostgresServer).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
         expect { replica_nx.wait }.to nap(60)
         expect(Semaphore.where(strand_id: replica_server.id, name: "recycle").count).to eq(1)
       end
@@ -1016,7 +1016,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(replica_server).to receive(:current_lsn).and_return("1/A")
 
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/A"})
-        expect(replica_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
+        expect(PostgresServer).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
         expect { replica_nx.wait }.to nap(60)
         expect(Semaphore.where(strand_id: replica_server.id, name: "recycle").count).to eq(1)
       end
@@ -1040,7 +1040,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(replica_server).to receive(:current_lsn).and_return("1/A")
 
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/9"})
-        expect(replica_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
+        expect(PostgresServer).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
         expect(replica_nx).to receive(:decr_recycle)
         expect(replica_nx).to receive(:update_stack_lsn).with("1/A")
         expect { replica_nx.wait }.to nap(900)
