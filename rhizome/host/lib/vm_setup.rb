@@ -854,7 +854,7 @@ DNSMASQ_SERVICE
 
     cpu_parts = [
       qemu_smp(cpu_topology, max_vcpus),
-      "-cpu host",
+      qemu_cpu,
       "-enable-kvm",
       "-machine accel=kvm,type=q35"
     ]
@@ -908,5 +908,13 @@ DNSMASQ_SERVICE
     end
 
     "-smp cpus=#{max_vcpus},maxcpus=#{max_vcpus},threads=#{t},cores=#{c},dies=#{d},sockets=#{p}"
+  end
+
+  def qemu_cpu
+    (cpu_vendor == "AuthenticAMD") ? "-cpu host,topoext=on" : "-cpu host"
+  end
+
+  def cpu_vendor
+    r("/usr/bin/lscpu | grep -m1 \"Vendor ID\" | cut -d: -f2").strip
   end
 end
