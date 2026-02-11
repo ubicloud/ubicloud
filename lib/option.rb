@@ -251,6 +251,11 @@ module Option
     [name, PostgresSizeOption.new(name, *args)]
   end.freeze
 
+  POSTGRES_LEGACY_SIZE_OPTIONS = POSTGRES_SIZE_OPTIONS.merge([
+    ["burstable-1", POSTGRES_SIZE_OPTIONS["hobby-1"]],
+    ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]]
+  ].to_h).freeze
+
   POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
 
   POSTGRES_VERSION_OPTIONS = {
