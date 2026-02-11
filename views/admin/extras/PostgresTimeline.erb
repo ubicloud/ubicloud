@@ -1,0 +1,13 @@
+<%# locals: (obj: nil) %>
+
+<div>
+  Current backup status:
+  <%= obj.leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup") rescue "Unavailable" %>
+</div>
+<%== part("components/table",
+  title: "Backups",
+  table_class: "timeline-backups-table",
+  data: obj.backups.map do |backup|
+    { "Last Modified" => backup.last_modified }
+  end
+) %>

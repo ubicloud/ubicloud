@@ -1,0 +1,15 @@
+<%# locals: (obj: nil) %>
+
+<% current_lsn = obj.current_lsn rescue nil %>
+<% lsn_lag = obj.lsn_lag(current_lsn) rescue nil %>
+
+<%== part("components/table",
+  title: "WAL Lag",
+  table_class: "postgres-wal-lag",
+  data: [{
+    "Archive Backlog" => obj.primary? ? (obj.archival_backlog rescue nil) : nil,
+    "Current LSN" => current_lsn,
+    "WAL Lag (MiB)" => lsn_lag&.fdiv(1024**2)&.round(3),
+    "Replay timestamp" => (obj.standby? || obj.read_replica?) ? (obj.pg_last_xact_replay_timestamp rescue nil) : nil
+  }.compact]
+) %>
