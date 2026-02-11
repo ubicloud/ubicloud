@@ -385,21 +385,58 @@ class PostgresServer < Sequel::Model
   end
 
   def observe_archival_backlog(session)
+    oldest_pending = session[:ssh_session].exec!(
+      "sudo -u postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
+      version:
+    ).strip
+    oldest_pending = nil if oldest_pending.empty?
+
     result = session[:ssh_session].exec!(
       "sudo find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
       version:
     )
     archival_backlog = Integer(result.strip, 10)
 
+    now = Time.now
+    previous_oldest = session[:previous_oldest_pending_wal]
+    previous_time = session[:previous_archival_check_time]
+    session[:previous_oldest_pending_wal] = oldest_pending
+    session[:previous_archival_check_time] = now
+
     if archival_backlog > archival_backlog_threshold
-      Prog::PageNexus.assemble("#{ubid} archival backlog high",
-        ["PGArchivalBacklogHigh", id], ubid,
-        severity: "warning", extra_data: {archival_backlog:})
+      if should_page_for_archival_backlog?(archival_backlog, oldest_pending, previous_oldest, now, previous_time)
+        Prog::PageNexus.assemble("#{ubid} archival backlog high",
+          ["PGArchivalBacklogHigh", id], ubid,
+          severity: "warning", extra_data: {archival_backlog:})
+      end
     elsif archival_backlog < archival_backlog_threshold * 0.8
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
     end
   rescue => ex
     Clog.emit("Failed to observe archival backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def should_page_for_archival_backlog?(archival_backlog, current_oldest_pending_wal, previous_oldest_pending_wal, now, previous_time)
+    return true if archival_backlog > archival_backlog_threshold * 2
+    return true unless previous_oldest_pending_wal && current_oldest_pending_wal && previous_time
+
+    bytes_archived = lsn_diff(wal2lsn(current_oldest_pending_wal), wal2lsn(previous_oldest_pending_wal))
+    elapsed_seconds = now - previous_time
+    return true if elapsed_seconds <= 0
+
+    (bytes_archived / elapsed_seconds.to_f) < MIN_ARCHIVAL_RATE_BYTES_PER_SEC
+  end
+
+  def wal2lsn(filename)
+    # WAL filename format: TTTTTTTTXXXXXXXXYYYYYYYY.ready
+    # TTTTTTTT = timeline (ignored for LSN)
+    # XXXXXXXX = high 32 bits
+    # YYYYYYYY = segment number (multiply by 16MB segment size for byte offset)
+    name = filename.delete_suffix(".ready")
+    high = name[8, 8]
+    segment = name[16, 8].to_i(16)
+    low = format("%X", segment * 16 * 1024 * 1024)
+    "#{high}/#{low}"
   end
 
   def archival_backlog_threshold
@@ -448,6 +485,7 @@ class PostgresServer < Sequel::Model
 
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+  MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
 end
 
 # Table: postgres_server

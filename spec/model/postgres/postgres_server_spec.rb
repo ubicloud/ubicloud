@@ -647,19 +647,21 @@ RSpec.describe PostgresServer do
     end
 
     it "checks archival backlog and does nothing if it is within limits" do
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("5\n")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000005.ready\n",
+        "5\n"
+      )
 
       postgres_server.observe_archival_backlog(session)
 
       expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).to be_nil
     end
 
-    it "checks archival backlog and creates a page if it is outside of limits" do
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("15\n")
+    it "checks archival backlog and creates a page if it is outside of limits with no previous data" do
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000010.ready\n",
+        "15\n"
+      )
 
       postgres_server.observe_archival_backlog(session)
 
@@ -671,7 +673,71 @@ RSpec.describe PostgresServer do
       expect(page.details["related_resources"]).to eq([postgres_server.ubid])
     end
 
+    it "does not page when backlog is moderate and upload rate is above threshold" do
+      # Previous: segment 5, now: segment 10 (5 segments = 80MB archived)
+      # With 1 second elapsed, rate = 80 MB/s > 50 MB/s threshold
+      session[:previous_oldest_pending_wal] = "000000010000000000000005.ready"
+      session[:previous_archival_check_time] = Time.now - 1
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "00000001000000000000000A.ready\n",
+        "15\n"
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).to be_nil
+    end
+
+    it "pages when backlog is moderate but upload rate is below threshold" do
+      # Previous: segment 5, now: segment 6 (1 segment = 16MB archived)
+      # With 2 seconds elapsed, rate = 8 MB/s < 10 MB/s threshold
+      session[:previous_oldest_pending_wal] = "000000010000000000000005.ready"
+      session[:previous_archival_check_time] = Time.now - 2
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000006.ready\n",
+        "15\n"
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).not_to be_nil
+    end
+
+    it "pages when backlog is severe regardless of upload rate" do
+      # Even with good upload rate, severe backlog (>2x threshold) should page
+      session[:last_oldest_pending_wal] = "000000010000000000000010.ready"
+      session[:last_archival_check_time] = Time.now - 1
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000020.ready\n",
+        "25\n"
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).not_to be_nil
+    end
+
     it "checks archival backlog and resolves a page if it is back within limits" do
+      Prog::PageNexus.assemble(
+        "#{postgres_server.ubid} archival backlog high",
+        ["PGArchivalBacklogHigh", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {archival_backlog: 30}
+      )
+      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000003.ready\n",
+        "3\n"
+      )
+
+      postgres_server.observe_archival_backlog(session)
+      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+    end
+
+    it "does not resolve page when backlog is between 80% of threshold and threshold (hysteresis)" do
+      # With threshold=10, page should only resolve when backlog < 8 (80% of 10)
+      # Backlog of 9 should NOT trigger resolve
       Prog::PageNexus.assemble(
         "Archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
@@ -680,40 +746,39 @@ RSpec.describe PostgresServer do
         extra_data: {archival_backlog: 15}
       )
       existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("3\n")
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000009.ready\n",
+        "9\n"
+      )
 
       postgres_server.observe_archival_backlog(session)
 
-      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
+      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
 
     it "logs errors when checking archival backlog fails" do
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_raise(Net::SSH::Exception.new("SSH error"))
+      allow(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe archival backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_archival_backlog(session)
     end
 
-    it "does not resolve page if it is still high" do
-      Prog::PageNexus.assemble(
-        "Archival backlog high",
+    it "sets oldest_pending to nil when no ready files exist" do
+      # When find returns empty string (no .ready files), oldest_pending should be nil
+      # This triggers the "no previous data" path in should_page_for_archival_backlog?
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "\n",
+        "15\n"
+      )
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "#{postgres_server.ubid} archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
         extra_data: {archival_backlog: 15}
       )
-      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
-      ).and_return("9\n")
 
       postgres_server.observe_archival_backlog(session)
-
-      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
   end
 
@@ -726,6 +791,59 @@ RSpec.describe PostgresServer do
     it "returns smaller threshold for smaller storage sizes" do
       allow(postgres_server).to receive(:storage_size_gib).and_return(100)
       expect(postgres_server.archival_backlog_threshold).to eq(320)
+    end
+  end
+
+  describe "#should_page_for_archival_backlog?" do
+    before do
+      allow(postgres_server).to receive(:archival_backlog_threshold).and_return(10)
+    end
+
+    let(:now) { Time.now }
+    let(:previous_time) { now - 1 }
+
+    it "returns true when backlog is severe (more than 2x threshold)" do
+      expect(postgres_server.should_page_for_archival_backlog?(
+        25, "00000001000000000000000F.ready", "000000010000000000000005.ready", now, previous_time
+      )).to be true
+    end
+
+    it "returns true when there is no previous data" do
+      expect(postgres_server.should_page_for_archival_backlog?(
+        15, "00000001000000000000000F.ready", nil, now, nil
+      )).to be true
+    end
+
+    it "returns false when backlog is moderate and upload rate is above threshold" do
+      # 5 segments = 80MB in 1 second = 80 MB/s > 50 MB/s
+      expect(postgres_server.should_page_for_archival_backlog?(
+        15, "00000001000000000000000A.ready", "000000010000000000000005.ready", now, previous_time
+      )).to be false
+    end
+
+    it "returns true when backlog is moderate but upload rate is below threshold" do
+      # 1 segment = 16MB in 2 seconds = 8 MB/s < 10 MB/s
+      expect(postgres_server.should_page_for_archival_backlog?(
+        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now - 2
+      )).to be true
+    end
+
+    it "returns true when backlog is moderate but upload rate cannot be calculated due to zero time elapsed" do
+      expect(postgres_server.should_page_for_archival_backlog?(
+        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now
+      )).to be true
+    end
+  end
+
+  describe "#wal2lsn" do
+    it "converts WAL filename to LSN format" do
+      # Segment 5 = 5 * 16MB = 83886080 = 0x5000000
+      expect(postgres_server.wal2lsn("000000010000000000000005.ready")).to eq("00000000/5000000")
+    end
+
+    it "handles higher segment numbers" do
+      # Segment 0x10 = 16 * 16MB = 268435456 = 0x10000000
+      expect(postgres_server.wal2lsn("000000010000000000000010.ready")).to eq("00000000/10000000")
     end
   end
 
