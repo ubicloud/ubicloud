@@ -227,13 +227,15 @@ RSpec.describe KubernetesNode do
     it "returns not available with details when pods are unreachable" do
       status_json = JSON.generate({
         "pods" => {"pod-1" => {"reachable" => false, "error" => "timeout"}},
-        "external_endpoints" => {}
+        "external_endpoints" => {},
+        "mtr_results" => {"pod-1" => {"ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}}
       })
       expect(kn.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
       result = kn.check_mesh_availability
       expect(result[:available]).to be false
       expect(result[:unreachable_pods]).to eq(["pod-1"])
       expect(result[:pod_errors]).to eq({"pod-1" => "timeout"})
+      expect(result[:mtr_results]).to eq({"pod-1" => {"ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}})
     end
 
     it "returns not available when external endpoints are unreachable" do
