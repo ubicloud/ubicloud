@@ -87,7 +87,7 @@ module Csi
     end
 
     def check_all_pods_connectivity
-      client = KubernetesClient.new(req_id: "mesh-check", logger: @logger)
+      client = KubernetesClient.new(req_id: "mesh-check", logger: @logger, log_level: :debug)
       begin
         pods = client.get_nodeplugin_pods
       rescue => e
@@ -275,7 +275,7 @@ module Csi
     end
 
     def enqueue_mtr_for_coredns
-      client = KubernetesClient.new(req_id: "mtr-coredns", logger: @logger)
+      client = KubernetesClient.new(req_id: "mtr-coredns", logger: @logger, log_level: :debug)
       pods = client.get_coredns_pods
       pods.each do |pod|
         next unless pod["ip"]
