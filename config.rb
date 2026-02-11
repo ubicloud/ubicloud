@@ -66,6 +66,7 @@ module Config
   optional :operator_ssh_public_keys, string
   override :staging, false, bool
   override :clover_freeze, false, bool
+  optional :override_dir, string
 
   # :nocov:
   override :mail_driver, (production? ? :smtp : :logger), symbol
