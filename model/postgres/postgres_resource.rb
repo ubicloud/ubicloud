@@ -288,7 +288,7 @@ class PostgresResource < Sequel::Model
     }
 
     if disk_usage_percent < 90
-      send_storage_auto_scale_warning_email(disk_usage_percent, next_option, extra_email_content)
+      send_storage_auto_scale_warning_notification(disk_usage_percent, next_option, extra_email_content)
     else
       if next_option
         target_vm_size = next_option["size"]
@@ -300,7 +300,7 @@ class PostgresResource < Sequel::Model
         end
       end
 
-      send_storage_auto_scale_started_email(disk_usage_percent, next_option, extra_email_content)
+      send_storage_auto_scale_started_notification(disk_usage_percent, next_option, extra_email_content)
     end
   end
 
@@ -355,13 +355,13 @@ class PostgresResource < Sequel::Model
 
       Prog::PageNexus.assemble("#{ubid} storage auto-scale canceled by user", ["PGStorageAutoScaleCanceled", id], ubid, severity: "warning")
 
-      send_storage_auto_scale_canceled_email
+      send_storage_auto_scale_canceled_notification
 
       true
     end
   end
 
-  def send_storage_auto_scale_warning_email(usage_percent, next_option, extra_content)
+  def send_storage_auto_scale_warning_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
@@ -398,7 +398,7 @@ class PostgresResource < Sequel::Model
     )
   end
 
-  def send_storage_auto_scale_started_email(usage_percent, next_option, extra_content)
+  def send_storage_auto_scale_started_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
       "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
@@ -438,7 +438,7 @@ class PostgresResource < Sequel::Model
     )
   end
 
-  def send_storage_auto_scale_canceled_email
+  def send_storage_auto_scale_canceled_notification
     body = [
       "Auto-scaling for your PostgreSQL database '#{name}' (#{ubid}) has been canceled as requested.",
       "Automatic scale-up will not be re-triggered until disk usage drops below 80% and rises again.",

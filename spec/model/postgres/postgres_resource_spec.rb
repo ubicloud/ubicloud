@@ -927,7 +927,7 @@ RSpec.describe PostgresResource do
 
     it "includes vm upgrade info when target size differs" do
       next_option = {"size" => "standard-4", "storage_size" => 256}
-      postgres_resource.send_storage_auto_scale_warning_email(85, next_option, nil)
+      postgres_resource.send_storage_auto_scale_warning_notification(85, next_option, nil)
 
       expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
         expect(kwargs[:body].join("\n")).to include("instance will also be upgraded")
@@ -943,7 +943,7 @@ RSpec.describe PostgresResource do
       )
 
       next_option = {"size" => "standard-2", "storage_size" => 128}
-      postgres_resource.send_storage_auto_scale_warning_email(85, next_option, nil)
+      postgres_resource.send_storage_auto_scale_warning_notification(85, next_option, nil)
 
       expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
         expect(kwargs[:body].join("\n")).to include("read replica(s)")
@@ -966,7 +966,7 @@ RSpec.describe PostgresResource do
 
     it "includes vm upgrade info when target size differs" do
       next_option = {"size" => "standard-4", "storage_size" => 256}
-      postgres_resource.send_storage_auto_scale_started_email(92, next_option, nil)
+      postgres_resource.send_storage_auto_scale_started_notification(92, next_option, nil)
 
       expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
         expect(kwargs[:body].join("\n")).to include("instance is being upgraded")
@@ -974,7 +974,7 @@ RSpec.describe PostgresResource do
     end
 
     it "includes quota_insufficient info" do
-      postgres_resource.send_storage_auto_scale_started_email(92, nil, :quota_insufficient)
+      postgres_resource.send_storage_auto_scale_started_notification(92, nil, :quota_insufficient)
 
       expect(Util).to have_received(:send_email) do |_recipients, _subject, **kwargs|
         expect(kwargs[:body].join("\n")).to include("sufficient quota")
@@ -1000,7 +1000,7 @@ RSpec.describe PostgresResource do
     }
 
     it "sends email with canceled info including current storage and instance size" do
-      postgres_resource.send_storage_auto_scale_canceled_email
+      postgres_resource.send_storage_auto_scale_canceled_notification
 
       expect(Util).to have_received(:send_email).with(
         ["user@example.com"],
