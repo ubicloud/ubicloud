@@ -6,7 +6,7 @@ require "securerandom"
 module Csi
   module ServiceHelper
     def log_with_id(req_id, message)
-      @logger.info("[req_id=#{req_id}] #{message}")
+      @logger.send(@log_level || :info, "[req_id=#{req_id}] #{message}")
     end
 
     def log_request_response(req, type)
