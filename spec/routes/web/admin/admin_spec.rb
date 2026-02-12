@@ -598,6 +598,20 @@ RSpec.describe CloverAdmin do
     expect(vm.semaphores_dataset.select_map(:name)).to eq ["restart"]
   end
 
+  it "supports stopping Vms" do
+    vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
+    fill_in "UBID or UUID", with: vm.ubid
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+
+    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    click_link "Stop"
+    click_button "Stop"
+    expect(page).to have_flash_notice("Stop scheduled for Vm")
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+    expect(vm.semaphores_dataset.select_map(:name)).to eq ["stop"]
+  end
+
   it "supports restarting PostgresResource" do
     project_id = Project.create(name: "Default").id
     expect(Config).to receive(:postgres_service_project_id).and_return(project_id).at_least(:once)
