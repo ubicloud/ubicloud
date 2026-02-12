@@ -71,6 +71,12 @@ class KubernetesNode < Sequel::Model
     pods_status = status["pods"]
     external_status = status["external_endpoints"]
     mtr_results = status["mtr_results"]
+    api_error = status["api_error"]
+
+    if api_error
+      return {available: false, api_error:, mtr_results:}
+    end
+
     unreachable_pods = pods_status.select { |_, v| v["reachable"] == false }
     unreachable_external = external_status.select { |_, v| v["reachable"] == false }
 
