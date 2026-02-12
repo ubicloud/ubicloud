@@ -76,7 +76,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     sshable = cluster.sshable
     case sshable.d_check(unit_name)
     when "Succeeded"
-      hop_remove_node_from_cluster
+      hop_wait_for_copy
     when "NotStarted"
       sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
         "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
@@ -90,6 +90,16 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       register_deadline("destroy", 0)
       nap 3 * 60 * 60
     end
+  end
+
+  label def wait_for_copy
+    pending = kubernetes_node.pending_pvs
+    if pending.any?
+      pv_names = pending.map { |pv| pv.dig("metadata", "name") }
+      Clog.emit("Waiting for CSI data copy to complete", {pending_pvs: {ubid: kubernetes_node.ubid, name: kubernetes_node.name, pvs: pv_names}})
+      nap 15
+    end
+    hop_remove_node_from_cluster
   end
 
   label def remove_node_from_cluster
