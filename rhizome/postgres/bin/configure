@@ -77,9 +77,6 @@ local   replication     all                                     peer
 host    replication     all             127.0.0.1/32            scram-sha-256
 host    replication     all             ::1/128                 scram-sha-256
 
-# Allow connections from private subnet with SCRAM authentication
-#{private_subnets}
-
 # Allow replication connection using special replication user for
 # HA standbys
 hostssl replication     ubi_replication all                     cert map=standby2replication
@@ -90,6 +87,9 @@ hostssl replication     postgres        all                     scram-sha-256
 
 # Allow certificate authentication for specific users
 #{cert_auth_users}
+
+# Allow connections from private subnet with SCRAM authentication
+#{private_subnets}
 
 # Allow connections from public internet with md5 authentication
 # Note that if the password is encrypted as scram-sha-256, PostgreSQL
