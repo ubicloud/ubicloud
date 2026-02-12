@@ -29,6 +29,10 @@ RSpec.describe PgBouncerSetup do
       expect(config).to include("auth_hba_file = /etc/postgresql/17-main/main/pg_hba.conf")
     end
 
+    it "sets the pool_mode to transaction" do
+      expect(config).to include("pool_mode = transaction")
+    end
+
     it "sets peer_id based on instance_id" do
       config_1 = pgbouncer_setup.pgbouncer_ini_content(1)
       config_2 = pgbouncer_setup.pgbouncer_ini_content(2)
