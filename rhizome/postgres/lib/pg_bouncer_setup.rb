@@ -107,6 +107,8 @@ client_tls_key_file = /etc/ssl/certs/server.key
 
 user = postgres
 
+pool_mode = transaction
+
 max_client_conn = #{5000 / @num_instances.to_i}
 max_db_connections = #{@max_connections.to_i / @num_instances.to_i}
 
