@@ -238,6 +238,19 @@ RSpec.describe KubernetesNode do
       expect(result[:mtr_results]).to eq({"pod-1" => {"ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}})
     end
 
+    it "returns not available when api_error is present" do
+      status_json = JSON.generate({
+        "pods" => {"pod-1" => {"reachable" => true}},
+        "external_endpoints" => {},
+        "mtr_results" => {},
+        "api_error" => "connection refused"
+      })
+      expect(kn.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
+      result = kn.check_mesh_availability
+      expect(result[:available]).to be false
+      expect(result[:api_error]).to eq("connection refused")
+    end
+
     it "returns not available when external endpoints are unreachable" do
       status_json = JSON.generate({
         "pods" => {},
