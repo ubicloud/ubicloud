@@ -20,8 +20,8 @@ class PgBouncerSetup
     "/etc/systemd/system/#{service_template_name}.socket"
   end
 
-  def create_service_templates
-    File.write(pgbouncer_service_file_path, <<PGBOUNCER_SERVICE
+  def service_template_content
+    <<PGBOUNCER_SERVICE
 [Unit]
 Description="connection pooler for PostgreSQL (%i)"
 After=network.target
@@ -37,9 +37,10 @@ KillSignal=SIGINT
 [Install]
 WantedBy=multi-user.target
 PGBOUNCER_SERVICE
-    )
+  end
 
-    File.write(socket_service_file_path, <<PGBOUNCER_SOCKET
+  def socket_template_content
+    <<PGBOUNCER_SOCKET
 [Unit]
 Description=Sockets for PgBouncer
 
@@ -53,8 +54,11 @@ ReusePort=true
 [Install]
 WantedBy=sockets.target
 PGBOUNCER_SOCKET
-    )
+  end
 
+  def create_service_templates
+    File.write(pgbouncer_service_file_path, service_template_content)
+    File.write(socket_service_file_path, socket_template_content)
     r "systemctl daemon-reload"
   end
 
@@ -73,9 +77,8 @@ PGBOUNCER_SOCKET
 PGBOUNCER_PEER
   end
 
-  def create_pgbouncer_config
-    (1..@num_instances.to_i).each do |i|
-      File.write("/etc/pgbouncer/pgbouncer_#{port_num(i)}.ini", <<PGBOUNCER_CONFIG
+  def pgbouncer_ini_content(instance_id)
+    <<PGBOUNCER_CONFIG
 # PgBouncer configuration file
 # ============================
 [databases]
@@ -88,7 +91,7 @@ listen_addr = 0.0.0.0
 
 unix_socket_dir = /var/run/postgresql
 so_reuseport = 1
-peer_id = #{i}
+peer_id = #{instance_id}
 
 auth_type = hba
 auth_hba_file = /etc/postgresql/#{@version}/main/pg_hba.conf
@@ -112,7 +115,11 @@ max_db_connections = #{@max_connections.to_i / @num_instances.to_i}
 ; Peer configuration, to correctly forward cancellation requests.
 #{peer_config}
 PGBOUNCER_CONFIG
-      )
+  end
+
+  def create_pgbouncer_config
+    (1..@num_instances.to_i).each do |i|
+      File.write("/etc/pgbouncer/pgbouncer_#{port_num(i)}.ini", pgbouncer_ini_content(i))
     end
   end
 
