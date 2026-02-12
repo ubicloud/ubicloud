@@ -121,12 +121,14 @@ RSpec.describe Csi::MeshConnectivityChecker do
       expect(checker.instance_variable_get(:@mtr_results).keys).to eq([])
     end
 
-    it "logs error and returns early when client fails" do
+    it "sets api_error and returns early when client fails" do
       expect(Csi::KubernetesClient).to receive(:new).and_return(client)
       expect(client).to receive(:get_nodeplugin_pods).and_raise(StandardError.new("API error"))
       expect(logger).to receive(:error).with("[MeshConnectivity] Failed to get nodeplugin pods: API error").and_call_original
 
-      expect(checker.check_all_pods_connectivity).to be_nil
+      checker.check_all_pods_connectivity
+
+      expect(checker.instance_variable_get(:@api_error)).to start_with("API error")
     end
 
     it "skips pods without IP" do

@@ -27,6 +27,7 @@ module Csi
       @external_endpoints = parse_external_endpoints(ENV["EXTERNAL_ENDPOINTS"])
       @external_status = {}
       @mtr_results = {}
+      @api_error = nil
       @mutex = Mutex.new
     end
 
@@ -70,7 +71,8 @@ module Csi
           node_id: @node_id,
           pods: @pod_status.dup,
           external_endpoints: @external_status.dup,
-          mtr_results: @mtr_results.dup
+          mtr_results: @mtr_results.dup,
+          api_error: @api_error
         }
       end
     end
@@ -91,9 +93,11 @@ module Csi
       begin
         pods = client.get_nodeplugin_pods
       rescue => e
+        @mutex.synchronize { @api_error = "#{e.message}\n#{e.backtrace.join("\n")}" }
         @logger.error("[MeshConnectivity] Failed to get nodeplugin pods: #{e.message}")
         return
       end
+      @mutex.synchronize { @api_error = nil }
       @logger.debug("[MeshConnectivity] Found #{pods.size} nodeplugin pods")
 
       targets = pods.filter_map do |pod|
