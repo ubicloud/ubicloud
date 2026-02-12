@@ -245,7 +245,8 @@ class CloverAdmin < Roda
       end
     },
     "Vm" => {
-      "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart)
+      "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart),
+      "stop" => object_action("Stop", "Stop scheduled for Vm", &:incr_stop)
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", "Host allocation state changed to accepting") do |obj|
