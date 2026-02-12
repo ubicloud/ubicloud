@@ -14,10 +14,12 @@ class GithubRunner < Sequel::Model
   plugin SemaphoreMethods, :destroy, :skip_deregistration, :not_upgrade_premium, :spill_over
   include HealthMonitorMethods
 
+  NOT_VM_ALLOCATED_RUNNER_LABELS = %w[start wait_concurrency_limit apply_custom_label_quota].freeze
+
   dataset_module do
     def total_active_runner_vcpus
       left_join(:strand, id: :id)
-        .exclude(Sequel[:strand][:label] => ["start", "wait_concurrency_limit"])
+        .exclude(Sequel[:strand][:label] => NOT_VM_ALLOCATED_RUNNER_LABELS)
         .select_map(Sequel[:github_runner][:label])
         .sum { Github.runner_labels[it]["vcpus"] }
     end
