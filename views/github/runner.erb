@@ -86,6 +86,13 @@
                     "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
                   ], {}
                 ]
+            elsif runner.strand && runner.strand.label == "apply_custom_label_quota"
+              [
+                [
+                  "Checking concurrency quota for custom labels",
+                  "Waiting for #{format_time_diff(runner.created_at, Time.now)}"
+                ], {}
+              ]
             else
                 [
                   [
