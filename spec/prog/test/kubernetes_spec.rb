@@ -4,8 +4,10 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::Kubernetes do
   subject(:kubernetes_test) {
-    described_class.new(Strand.new(prog: "Test::Kubernetes", label: "start", stack: [{}]))
+    described_class.new(Strand.new(prog: "Test::Kubernetes", label: "start", stack: strand_stack))
   }
+
+  let(:strand_stack) { [{"kubernetes_cluster_id" => kubernetes_cluster.id}] }
 
   let(:kubernetes_service_project_id) { "546a1ed8-53e5-86d2-966c-fb782d2ae3aa" }
   let(:kubernetes_test_project) { Project.create(name: "Kubernetes-Test-Project") }
@@ -32,6 +34,8 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#start" do
+    let(:strand_stack) { [{}] }
+
     it "assembles kubernetes cluster and hops to update_loadbalancer_hostname" do
       expect(kubernetes_test).to receive(:frame).and_return({"kubernetes_test_project_id" => kubernetes_test_project.id})
       expect(kubernetes_test).to receive(:update_stack)
@@ -340,7 +344,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
       expect(kubernetes_test).to receive(:verify_mount)
-      expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
+      expect { kubernetes_test.verify_normal_pod_restart }.to hop("test_node_not_deleted_during_copy")
     end
 
     it "finds a mismatch in node name" do
@@ -362,6 +366,121 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:verify_mount).and_raise("some error")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "some error"})
       expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
+    end
+  end
+
+  describe "#test_node_not_deleted_during_copy" do
+    before do
+      nodepool = kubernetes_cluster.nodepools.first
+      nodepool.update(node_count: 2)
+      Firewall.create(name: "#{kubernetes_cluster.ubid}-cp-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: kubernetes_service_project.id)
+      Firewall.create(name: "#{kubernetes_cluster.ubid}-worker-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: kubernetes_service_project.id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "cp-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nil)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w1-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      Prog::Kubernetes::KubernetesNodeNexus.assemble(kubernetes_service_project_id, sshable_unix_user: "ubi", name: "w2-node", location_id: Location::HETZNER_FSN1_ID, size: "standard-2", storage_volumes: [{encrypted: true, size_gib: 40}], boot_image: "kubernetes-v1.33", private_subnet_id: private_subnet.id, enable_ip4: true, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "uncordons all nodes, retires the pod node and hops to verify_node_not_deleted_during_copy" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
+
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
+
+      pod_node = kubernetes_test.kubernetes_cluster.nodepools.first.nodes.find { |n| n.name == "w1-node" }
+
+      expect { kubernetes_test.test_node_not_deleted_during_copy }.to hop("verify_node_not_deleted_during_copy")
+      expect(kubernetes_test.strand.stack.first["drain_test_node_name"]).to eq("w1-node")
+      expect(pod_node.reload.retire_set?).to be true
+    end
+  end
+
+  describe "#verify_node_not_deleted_during_copy" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "hops to verify_data_after_drain when node record is destroyed" do
+      kubernetes_test.update_stack({"drain_test_node_name" => "gone-node"})
+      expect { kubernetes_test.verify_node_not_deleted_during_copy }.to hop("verify_data_after_drain")
+    end
+
+    it "naps when copy is pending and node still exists" do
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id)
+      kubernetes_test.update_stack({"drain_test_node_name" => "w1-node"})
+
+      pv_list = {"items" => [{
+        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
+        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}}
+      }]}
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+
+      get_node_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get node w1-node").and_return(get_node_response)
+
+      expect { kubernetes_test.verify_node_not_deleted_during_copy }.to nap(15)
+    end
+
+    it "fails when copy is pending but node is already removed" do
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id)
+      kubernetes_test.update_stack({"drain_test_node_name" => "w1-node"})
+
+      pv_list = {"items" => [{
+        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
+        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}}
+      }]}
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get node w1-node").and_raise("not found")
+
+      expect { kubernetes_test.verify_node_not_deleted_during_copy }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("Node w1-node was removed while CSI data copy was still in progress: not found")
+    end
+
+    it "naps when no copy is pending but node still exists" do
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id)
+      kubernetes_test.update_stack({"drain_test_node_name" => "w1-node"})
+
+      pv_list = {"items" => []}
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
+
+      expect { kubernetes_test.verify_node_not_deleted_during_copy }.to nap(15)
+    end
+  end
+
+  describe "#verify_data_after_drain" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "naps until pod is running" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect { kubernetes_test.verify_data_after_drain }.to nap(5)
+    end
+
+    it "verifies data hash and hops to destroy_kubernetes" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      kubernetes_test.update_stack({"read_hash" => "hash"})
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return(response)
+      expect { kubernetes_test.verify_data_after_drain }.to hop("destroy_kubernetes")
+    end
+
+    it "sets fail_message when data hash does not match" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("Running", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      kubernetes_test.update_stack({"read_hash" => "hash"})
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("wronghash", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").and_return(response)
+      expect { kubernetes_test.verify_data_after_drain }.to hop("destroy_kubernetes")
+      expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("data hash changed after node drain, expected: hash, got: wronghash")
     end
   end
 
