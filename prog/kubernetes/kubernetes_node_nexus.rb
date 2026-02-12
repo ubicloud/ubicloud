@@ -76,7 +76,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     sshable = cluster.sshable
     case sshable.d_check(unit_name)
     when "Succeeded"
-      hop_remove_node_from_cluster
+      hop_wait_for_copy
     when "NotStarted"
       sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
         "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
@@ -90,6 +90,17 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       register_deadline("destroy", 0)
       nap 3 * 60 * 60
     end
+  end
+
+  label def wait_for_copy
+    pvs = JSON.parse(cluster.client.kubectl("get pv -ojson"))["items"]
+    pending = pvs.any? do |pv|
+      pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
+        pv.dig("spec", "nodeAffinity", "required", "nodeSelectorTerms", 0,
+          "matchExpressions", 0, "values", 0) == kubernetes_node.name
+    end
+    nap 15 if pending
+    hop_remove_node_from_cluster
   end
 
   label def remove_node_from_cluster
