@@ -27,9 +27,17 @@ RSpec.describe Prog::Test::Kubernetes do
 
   describe ".assemble" do
     it "creates test and service projects and a strand" do
-      expect(Config).to receive(:kubernetes_service_project_id).and_return("4fd01c1a-f022-43e8-bd3d-6dbe214df6ed")
-      st = described_class.assemble
-      expect(st.stack.first["kubernetes_test_project_id"]).not_to be_empty
+      expect(Config).to receive(:kubernetes_service_project_id).at_least(:once).and_return("4fd01c1a-f022-43e8-bd3d-6dbe214df6ed")
+      described_class.assemble
+      expect(Project["4fd01c1a-f022-43e8-bd3d-6dbe214df6ed"]).not_to be_nil
+      expect(Project.where(name: "Kubernetes-Test-Project").count).to eq(1)
+    end
+
+    it "reuses existing service project if it already exists" do
+      project_count = Project.count
+      described_class.assemble
+      # +1 for the test project only; service project is reused
+      expect(Project.count).to eq(project_count + 1)
     end
   end
 

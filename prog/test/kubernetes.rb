@@ -9,8 +9,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
-    kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
-
+    kubernetes_service_project = Project[Config.kubernetes_service_project_id] ||
+      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
     Strand.create(
       prog: "Test::Kubernetes",
       label: "start",
