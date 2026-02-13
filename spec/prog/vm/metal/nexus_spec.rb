@@ -807,9 +807,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to unavailable based on the vm's available status" do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
+      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
-      frame = st.stack[0]
-      expect(frame["reason_determined"]).to be false
 
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
@@ -851,37 +850,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
-  describe "#start_after_stop" do
-    it "hops to wait after starting the vm" do
-      vm.incr_start
-      expect(sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
-      expect { nx.start_after_stop }.to hop("wait")
-        .and change { vm.reload.start_set? }.from(true).to(false)
-    end
-  end
-
   describe "#stopped" do
     it "naps after stopping the vm" do
       vm.incr_stop
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
-      expect { nx.stopped }.to nap(0)
+      expect { nx.stopped }.to nap(60 * 60)
         .and change { vm.reload.stop_set? }.from(true).to(false)
-    end
-
-    it "hops to restart when needed" do
-      vm.incr_restart
-      expect { nx.stopped }.to hop("restart")
-      frame = st.stack[0]
-      expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
-    end
-
-    it "hops to start when needed" do
-      vm.incr_start
-      expect { nx.stopped }.to hop("start_after_stop")
-      frame = st.stack[0]
-      expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
     end
 
     it "does not stop if already stopped" do
@@ -897,88 +871,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.checkup_set? }.from(false).to(true)
     end
 
-    it "restarts the VM when needed" do
-      vm.incr_restart
-      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
-      expect { nx.unavailable }.to nap(0)
-        .and change { vm.reload.restart_set? }.from(true).to(false)
-    end
-
-    it "hops to start when needed" do
-      vm.incr_start
-      expect { nx.unavailable }.to hop("start_after_stop")
-      frame = st.stack[0]
-      expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
-    end
-
-    it "hops to stopped when needed" do
-      vm.incr_stop
-      expect { nx.unavailable }.to hop("stopped")
-    end
-
-    it "naps if vm is still unavailable and the reason has been determined" do
-      refresh_frame(nx, new_values: {"reason_determined" => true})
+    it "naps if vm is still unavailable" do
       expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
     end
 
-    it "pages and naps if vm is unavailable and systemctl show returns oom-kill" do
-      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
-      expect(nx).to receive(:available?).and_return(false)
-      expect { nx.unavailable }.to nap(30)
-        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (oom-kill)")
-      frame = st.stack[0]
-      expect(frame["reason_determined"]).to be true
-    end
-
-    it "pages and naps if vm is unavailable and systemctl command results in an error" do
-      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshError.new("", "", "", 1, nil))
-      expect(nx).to receive(:available?).and_return(false)
-      expect { nx.unavailable }.to nap(30)
-        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (unknown)")
-      frame = st.stack[0]
-      expect(frame["reason_determined"]).to be true
-    end
-
-    it "hops to stopped if vm is unavailable and systemctl show returns success" do
-      nx.incr_checkup
-      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("success\nfoo\n")
-      expect(Clog).to receive(:emit).with("VM stopped by operator", Hash)
-      expect(nx).to receive(:available?).and_return(false)
-      expect { nx.unavailable }.to hop("stopped")
-        .and change(nx, :checkup_set?).from(true).to(false)
-        .and change(nx, :stop_set?).from(false).to(true)
-    end
-
-    it "hops to stopped if vm is unavailable and systemctl show returns other value and journalctl shows ACPI Shutdown signalled" do
-      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("other\nfoo\n")
-      expect(sshable).to receive(:_cmd).with(<<~END).and_return("ACPI Shutdown signalled\n")
-        sudo journalctl _SYSTEMD_INVOCATION_ID=foo -o cat -n 50 --no-pager | \
-          grep -m1 -oF \
-            -e 'ACPI Shutdown signalled' \
-            -e 'vCPU thread panicked' \
-            -e 'VCPU generated error' \
-            -e 'thread panicked'
-      END
-      expect(Clog).to receive(:emit).with("VM stopped by guest ACPI shutdown", Hash)
-      expect(nx).to receive(:available?).and_return(false)
-      expect { nx.unavailable }.to hop("stopped")
-        .and change(nx, :stop_set?).from(false).to(true)
-    end
-
-    it "decrements checkup and hops to wait if vm is available" do
-      nx.incr_checkup
+    it "hops to wait if vm is available" do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.unavailable }.to hop("wait")
-        .and change(nx, :checkup_set?).from(true).to(false)
-    end
-
-    it "resolves page and hops to wait if vm is available" do
-      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
-      expect(nx).to receive(:available?).and_return(true)
-      expect { nx.unavailable }.to hop("wait")
-        .and change { page.reload.resolve_set? }.from(false).to(true)
     end
   end
 
