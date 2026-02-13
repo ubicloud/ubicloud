@@ -296,88 +296,159 @@ RSpec.describe Clover, "firewall" do
     end
 
     describe "rules" do
-      it "can add" do
+      it "can add using custom address and port" do
         visit "#{project.path}#{firewall.path}/networking"
+        click_link "Add Firewall Rule"
 
-        fill_in "cidr", with: "1.1.1.1/32"
-        fill_in "port_range", with: "80"
-
-        click_button "Create"
+        within("#port-type") { select "Custom" }
+        fill_in "Start Port", with: "80"
+        fill_in "End Port (optional)", with: "82"
+        within("#source-type") { select "Custom" }
+        fill_in "Source IP Address Range (CIDR)", with: "1.1.1.1"
+        click_button "Add Firewall Rule"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.1.1.1", "80..82", "", "", ""]
+
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
         expect(rule.firewall_id).to eq firewall.id
         expect(rule.cidr.to_s).to eq "1.1.1.1/32"
-        expect(rule.port_range.to_range).to eq 80...81
+        expect(rule.port_range.to_range).to eq 80...83
+        expect(rule.description).to be_nil
+
+        find("#edit-#{rule.ubid}").click
+        fill_in "Source IP Address Range (CIDR)", with: "1234::5678/128"
+        click_button "Edit Firewall Rule"
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1234::5678", "80..82", "", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq "1234::5678/128"
+        expect(rule.port_range.to_range).to eq 80...83
         expect(rule.description).to be_nil
       end
 
       it "can add with description" do
-        visit "#{project.path}#{firewall.path}/networking"
+        visit "#{project.path}#{firewall.path}/firewall-rule"
 
-        fill_in "cidr", with: "1.1.1.1/32"
-        fill_in "port_range", with: "80"
-        fill_in "description", with: "my desc"
-
-        click_button "Create"
+        select "SSH"
+        select "All IPv6"
+        fill_in "Rule Description", with: "my desc"
+        click_button "Add Firewall Rule"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule is created")
-        expect(page.body).to include("my desc")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "SSH", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule = firewall.firewall_rules_dataset.first
         expect(rule.firewall_id).to eq firewall.id
-        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
-        expect(rule.port_range.to_range).to eq 80...81
+        expect(rule.cidr.to_s).to eq "::/0"
+        expect(rule.port_range.to_range).to eq 22...23
+        expect(rule.description).to eq "my desc"
+
+        find("#edit-#{rule.ubid}").click
+        click_button "Edit Firewall Rule"
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv6", "SSH", "my desc", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq "::/0"
+        expect(rule.port_range.to_range).to eq 22...23
         expect(rule.description).to eq "my desc"
       end
 
-      it "can add using private subnet" do
+      it "can add using private subnet IPv4" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
-        visit "#{project.path}#{firewall.path}/networking"
+        visit "#{project.path}#{firewall.path}/firewall-rule"
 
-        select "dummy-ps-1", from: "fw_rule_private_subnet_id"
-        fill_in "port_range", with: "80"
-        fill_in "description", with: "my desc"
-
-        click_button "Create"
+        select "HTTPS"
+        select "Private Subnet IPv4"
+        select "dummy-ps-1"
+        fill_in "Rule Description", with: "my desc"
+        click_button "Add Firewall Rule"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_flash_notice("Firewall rules are created")
-        expect(page.body).to match(/my desc.*my desc/m)
+        expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "HTTPS", "my desc", "", ""]
 
-        expect(firewall.firewall_rules_dataset.count).to eq(2)
-        rule1, rule2 = firewall.firewall_rules_dataset.order(:cidr).all
-        expect(rule1.firewall_id).to eq firewall.id
-        expect(rule1.cidr.to_s).to eq ps.net4.to_s
-        expect(rule1.port_range.to_range).to eq 80...81
-        expect(rule1.description).to eq "my desc"
-        expect(rule2.firewall_id).to eq firewall.id
-        expect(rule2.cidr.to_s).to eq ps.net6.to_s
-        expect(rule2.port_range.to_range).to eq 80...81
-        expect(rule2.description).to eq "my desc"
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq ps.net4.to_s
+        expect(rule.port_range.to_range).to eq 443...444
+        expect(rule.description).to eq "my desc"
+
+        find("#edit-#{rule.ubid}").click
+        click_button "Edit Firewall Rule"
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv4 Subnet: dummy-ps-1", "HTTPS", "my desc", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq ps.net4.to_s
+        expect(rule.port_range.to_range).to eq 443...444
+        expect(rule.description).to eq "my desc"
+      end
+
+      it "can add using private subnet IPv6" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
+        visit "#{project.path}#{firewall.path}/firewall-rule"
+
+        select "PostgreSQL"
+        select "Private Subnet IPv6"
+        select "dummy-ps-1"
+        click_button "Add Firewall Rule"
+
+        expect(page.title).to eq("Ubicloud - #{firewall.name}")
+        expect(page).to have_flash_notice("Firewall rule is created")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "PostgreSQL", "", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq ps.net6.to_s
+        expect(rule.port_range.to_range).to eq 5432...5433
+        expect(rule.description).to be_nil
+
+        find("#edit-#{rule.ubid}").click
+        click_button "Edit Firewall Rule"
+        expect(page).to have_flash_notice("Firewall rule updated")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["IPv6 Subnet: dummy-ps-1", "PostgreSQL", "", "", ""]
+
+        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        rule = firewall.firewall_rules_dataset.first
+        expect(rule.firewall_id).to eq firewall.id
+        expect(rule.cidr.to_s).to eq ps.net6.to_s
+        expect(rule.port_range.to_range).to eq 5432...5433
+        expect(rule.description).to be_nil
       end
 
       it "can not add rule when it is invalid" do
-        visit "#{project.path}#{firewall.path}/networking"
+        visit "#{project.path}#{firewall.path}/firewall-rule"
 
-        fill_in "cidr", with: "invalid"
-
-        click_button "Create"
+        within("#port-type") { select "Custom" }
+        fill_in "Start Port", with: "80"
+        within("#source-type") { select "Custom" }
+        fill_in "Source IP Address Range (CIDR)", with: "invalid"
+        click_button "Add Firewall Rule"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_content "Invalid CIDR"
 
-        fill_in "cidr", with: "1.1.1.1/32"
-        fill_in "port_range", with: "invalid"
-
-        click_button "Create"
+        fill_in "Start Port", with: "65536"
+        fill_in "Source IP Address Range (CIDR)", with: "1.1.1.1"
+        click_button "Add Firewall Rule"
 
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
-        expect(page).to have_content "Invalid port range"
+        expect(page).to have_flash_error "Validation failed for following fields: port_range"
 
         expect(firewall.firewall_rules_dataset.count).to eq(0)
       end
@@ -388,26 +459,27 @@ RSpec.describe Clover, "firewall" do
         ubid = rule.ubid
 
         visit "#{project.path}#{firewall.path}/networking"
+        find("#edit-#{ubid}").click
 
-        fill_in "cidr-#{ubid}", with: "1.1.1.1/32"
-        fill_in "port_range-#{ubid}", with: "a"
-        fill_in "description-#{ubid}", with: "my desc"
-        click_button "submit-#{ubid}"
-        expect(page).to have_flash_error("Validation failed for following fields: port_range")
-        expect(page).to have_content("Invalid port range")
+        select "pgBouncer"
+        within("#source-type") { select "Custom" }
+        fill_in "Source IP Address Range (CIDR)", with: "invalid"
+        fill_in "Rule Description", with: "my desc"
+        click_button "Edit Firewall Rule"
+        expect(page).to have_flash_error("Validation failed for following fields: cidr")
+        expect(page).to have_content "Invalid CIDR"
 
-        fill_in "port_range-#{ubid}", with: "8080"
-        click_button "submit-#{ubid}"
+        select "All IPv4"
+        click_button "Edit Firewall Rule"
+
         expect(page.title).to eq("Ubicloud - #{firewall.name}")
         expect(page).to have_flash_notice("Firewall rule updated")
-        expect(page.body).to include("1.1.1.1/32")
-        expect(page.body).to include("8080..8080")
-        expect(page.body).to include("my desc")
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["All IPv4", "pgBouncer", "my desc", "", ""]
 
         expect(firewall.firewall_rules_dataset.count).to eq(1)
         rule.refresh
-        expect(rule.cidr.to_s).to eq "1.1.1.1/32"
-        expect(rule.port_range.to_range).to eq 8080...8081
+        expect(rule.cidr.to_s).to eq "0.0.0.0/0"
+        expect(rule.port_range.to_range).to eq 6432...6433
         expect(rule.description).to eq "my desc"
       end
 
@@ -441,15 +513,7 @@ RSpec.describe Clover, "firewall" do
         firewall.insert_firewall_rule("1.0.0.0/8", nil)
 
         visit "#{project.path}#{firewall.path}/networking"
-
-        expect(page.body).to include "fw-create-rule"
-        expect(page.body).to include "fwr-delete"
-        expect(page.body).to include "fw-attach"
-
-        expect(page.body).to include "1.0.0.0/8"
-        expect(page.body).to include "0..65535"
-
-        expect(firewall.firewall_rules_dataset.count).to eq(1)
+        expect(page.all("#firewall-rules td").map(&:text)).to eq ["1.0.0.0/8", "0..65535", "", "", ""]
       end
 
       it "does not show actions that require edit permissions" do
@@ -463,6 +527,8 @@ RSpec.describe Clover, "firewall" do
         expect(page.title).to eq "Ubicloud - dummy-fw-2"
         expect(page.all("#fw-private-subnets a").to_a).to eq []
 
+        expect(page).to have_no_content "Add Firewall Rule"
+        expect(page.all("#firewall-rules th").map(&:text)).to eq ["Source", "Destination Ports", "Rule Description"]
         expect(page).to have_no_content "Detach"
         expect(page.body).not_to include "fw-create-rule"
         expect(page.body).not_to include "fwr-delete"

@@ -1,0 +1,122 @@
+<% firewall_path = path(@firewall)
+  if (fwr = @firewall_rule)
+    heading = "Edit"
+    action = "#{firewall_path}/firewall-rule/#{fwr.ubid}/patch"
+    start_port = fwr.port_range.begin
+    end_port = fwr.port_range.end - 1
+    cidr = fwr.cidr
+    description = fwr.description
+    port_type = fwr.port_type
+    family = fwr.cidr.version
+    ps_id = @project
+      .private_subnets_dataset
+      .where("net#{family}": fwr.cidr)
+      .get(:id)
+    source_type = if ps_id
+      ps_ubid = UBID.from_uuidish(ps_id).to_s
+      "subnet#{family}"
+    else
+      fwr.source_type
+    end
+  else
+    heading = "Add"
+    action = "#{firewall_path}/firewall-rule"
+  end
+
+  page_heading = "#{heading} Firewall Rule" %>
+
+<div class="p-6 grid gap-6">
+  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <div class="min-w-0 flex-1">
+      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+        <%= page_heading %>
+      </h3>
+    </div>
+  </div>
+  <div>
+    <% form(action:, method: :post, class: "gap-6", id: "firewall-rule-form") do %>
+      <div class="mb-2">
+        <div id="port-type">
+          <%== part(
+            "components/form/select",
+            label: "Port",
+            name: "port_type",
+            placeholder: "",
+            attributes: {required: true},
+            selected: port_type,
+            options: FirewallRule.port_options
+          ) %>
+        </div>
+        <div id="custom-ports">
+          <%== part("components/form/text", name: "start_port", label: "Start Port", type: "number", attributes: {min: 0, max: 65535}, value: start_port) %>
+          <%== part("components/form/text", name: "end_port", label: "End Port (optional)", type: "number", attributes: {min: 0, max: 65535}, value: end_port) %>
+        </div>
+      </div>
+
+      <div class="mb-2">
+        <div id="source-type">
+          <%== part(
+            "components/form/select",
+            label: "Source",
+            name: "source_type",
+            placeholder: "",
+            attributes: {required: true},
+            selected: source_type,
+            options: FirewallRule.source_options
+          ) %>
+        </div>
+        <div id="subnet-source">
+          <%== part(
+            "components/form/select",
+            name: "fw_rule_private_subnet_id",
+            label: "Private Subnet",
+            selected: ps_ubid,
+            options: @project
+              .private_subnets_dataset
+              .where(location_id: @firewall.location_id)
+              .order(:name)
+              .select_map([:id, :name])
+              .each { it[0] = UBID.from_uuidish(it[0]).to_s }
+          ) %>
+        </div>
+        <div id="custom-source">
+          <%== part("components/form/text", name: "cidr", label: "Source IP Address Range (CIDR)", attributes: {placeholder: "1.2.3.4 or 1.2.3.0/24"}, value: cidr) %>
+        </div>
+      </div>
+
+      <div class="mb-2">
+        <%== part("components/form/text", name: "description", label: "Rule Description", attributes: {placeholder: "reason rule was added"}, value: description) %>
+      </div>
+
+      <%== part("components/form/submit_button", text: page_heading) %>
+    <% end %>
+  </div>
+
+  <% unless fwr %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="px-2 py-2 sm:p-6">
+        <div class="sm:flex sm:items-center sm:justify-between">
+          <div>
+            <div class="mt-2 text-sm text-gray-500">
+              <p class="mb-2">Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The
+                default behavior for a new connection without an applicable firewall rule is to disallow access.</p>
+              <p class="mb-2">To allow access, create a firewall rule for the source IP address range that will be connecting and the
+                desination port range that will be connected to.</p>
+              <ul class="ml-6 mb-2 list-disc">
+                <li>To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of
+                  "1.2.3.4/32").</li>
+                <li>To allow access from all IP addresses, use "0.0.0.0/0" for IPv4, or "::/0" for IPv6.</li>
+                <li>To allow access to a single port, you can enter only the port number (e.g. use "22" instead of
+                  "22..22").</li>
+                <li>You can optionally add a description for the rule, to help you remember why the access has been
+                  allowed.</li>
+              </ul>
+              <p class="mb-2">Rules added to this firewall affect access to all resources in all private subnets that the firewall is
+                attached to.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

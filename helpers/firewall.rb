@@ -14,6 +14,56 @@ class Clover
     paginated_result(dataset.eager(:firewall_rules, :location), Serializers::Firewall)
   end
 
+  def firewall_rule_params
+    if web?
+      port_range = if (range = FirewallRule.range_for_port_type(typecast_params.nonempty_str("port_type")))
+        "#{range.begin}..#{range.end - 1}"
+      else
+        start_port = typecast_params.Integer!("start_port")
+        end_port = typecast_params.Integer("end_port") || start_port
+        "#{start_port}..#{end_port}"
+      end
+
+      cidr = case (source_type = typecast_params.nonempty_str("source_type"))
+      when "subnet4", "subnet6"
+        ps_meth = (source_type == "subnet4") ? :net4 : :net6
+        typecast_params.nonempty_str("fw_rule_private_subnet_id")
+      when "custom"
+        typecast_params.str!("cidr")
+      else
+        FirewallRule.cidr_for_source_type(source_type)
+      end
+    else
+      cidr = typecast_params.str!("cidr")
+      port_range = typecast_params.str("port_range")
+    end
+
+    unless cidr.include?(".") || cidr.include?(":")
+      if PrivateSubnet.ubid_format.match?(cidr)
+        key = :id
+        value = UBID.to_uuid(cidr)
+      else
+        key = :name
+        value = cidr
+      end
+
+      if (ps = authorized_private_subnet(:location_id => @location.id, key => value))
+        cidrs = if ps_meth
+          [ps.send(ps_meth)]
+        else
+          [ps.net4, ps.net6]
+        end
+      end
+    end
+
+    cidrs ||= [Validation.validate_cidr(cidr)]
+    port_range = Validation.validate_port_range(port_range)
+    pg_range = Sequel.pg_range(port_range.first..port_range.last)
+    description = typecast_params.str("description")&.strip
+
+    [cidrs, pg_range, description]
+  end
+
   def firewall_post(firewall_name)
     authorize("Firewall:create", @project)
     Validation.validate_name(firewall_name)
