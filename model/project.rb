@@ -232,7 +232,8 @@ class Project < Sequel::Model
     :spill_to_alien_runners,
     :visible_locations,
     :vm_public_ssh_keys,
-    :postgres_aws_use_different_azs_for_standbys
+    :postgres_aws_use_different_azs_for_standbys,
+    :cache_proxy_download_url
   )
 end
 
