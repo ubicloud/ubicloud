@@ -1,8 +1,6 @@
-<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil, prefix: nil, id: name, handle_params_and_errors: true) %>
-<% if handle_params_and_errors
-value = typecast_body_params.str(name) || value if name
-error = rodauth.field_error(name) || flash.dig("errors", name)
-end %>
+<%# locals: (name: nil, label: nil, type: "text", value: nil, attributes: {}, extra_class: nil, button_title: nil, prefix: nil, id: name) %>
+<% value = typecast_body_params.str(name) || value if name
+error = rodauth.field_error(name) || flash.dig("errors", name) %>
 
 <div class="space-y-2 text-gray-900">
   <% if label %>

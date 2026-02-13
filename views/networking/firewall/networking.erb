@@ -9,169 +9,66 @@
 viewable_subnet_map = dataset_authorize(@firewall.private_subnets_dataset, "PrivateSubnet:view")
   .select_hash(:id, Sequel.as(true, :v))
 
+fwrs = @firewall.firewall_rules.sort
+fwr_cidrs = fwrs.map(&:cidr)
+ps_map = {}
+@project
+  .private_subnets_dataset
+  .where(Sequel[net4: fwr_cidrs] | {net6: fwr_cidrs})
+  .select_map([:name, :net4, :net6])
+  .each do |name, net4, net6|
+    ps_map[net4.to_s] = "IPv4 Subnet: #{name}"
+    ps_map[net6.to_s] = "IPv6 Subnet: #{name}"
+  end
+
 firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
 <div class="p-6 grid gap-6">
-  <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
-    <div class="min-w-0 flex-1">
-      <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
-        Firewall Rules
-      </h3>
-    </div>
+  <div class="min-w-0 md:flex md:items-center md:justify-between pb-2 lg:pb-4">
+    <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
+      Firewall Rules
+    </h3>
+    <% if edit_perm %>
+      <div class="mt-4 flex md:ml-4 md:mt-0">
+        <%== part("components/button", text: "Add Firewall Rule", link: "#{firewall_path}/firewall-rule") %>
+      </div>
+    <% end %>
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <div class="px-2 py-2 sm:p-6">
-      <div class="sm:flex sm:items-center sm:justify-between">
-        <div>
-          <div class="mt-2 text-sm text-gray-500">
-            <p class="mb-2">Firewall rules allow connections to specific IP ports from specific IP address ranges (CIDRs). The default behavior for a new connection without a applicable firewall rule is to disallow access.<p>
-            <p class="mb-2">To allow access, create a firewall rule for the source IP address range that will be connecting and the desination port range that will be connected to.</p>
-            <ul class="ml-6 mb-2 list-disc">
-              <li>To allow access from a single IP address, you can omit the netmask (e.g. use "1.2.3.4" instead of "1.2.3.4/32").</li>
-              <li>To allow access from all IP addresses, use "0.0.0.0/0" for IPv4, or "::/0" for IPv6.</li>
-              <li>To allow access to a single port, you can enter only the port number (e.g. use "22" instead of "22..22").</li>
-              <li>You can optionally add a description for the rule, to help you remember why the access has been allowed.</li>
-            </ul>
-            <p class="mb-2">Rules added to this firewall affect access to all resources in all private subnets that the firewall is attached to.</p>
-          </div>
-        </div>
-      </div>
-    </div>
     <table class="min-w-full divide-y divide-gray-300" id="firewall-rules">
       <thead class="bg-gray-50">
         <tr>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Source IP address range (CIDR)</th>
-          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Destination port range</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Source</th>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Destination Ports</th>
           <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Rule Description</th>
           <% if edit_perm %>
-            <th scope="col" class="px-3 py-3.5 pr-8 text-center text-sm font-semibold text-gray-900">Edit<hr class="mt-1 mb-1">Remove</th>
+            <th scope="col" class="p-1 text-center text-sm font-semibold text-gray-900">Edit</th>
+            <th scope="col" class="p-1 pr-2 text-center text-sm font-semibold text-gray-900">Remove</th>
           <% end %>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-200 bg-white">
-        <% @firewall.firewall_rules.sort.each do |fwr| %>
+        <% fwrs.each do |fwr| %>
+          <% ubid = fwr.ubid %>
           <tr>
-            <% if edit_perm %>
-              <% form = "form-fw-edit-rule-#{fwr.ubid}" %>
-              <% handle_params_and_errors = @fwr_id == fwr.id %>
-              <% ubid = fwr.ubid %>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== part(
-                  "components/form/text",
-                  name: "cidr",
-                  id: "cidr-#{ubid}",
-                  value: fwr.cidr.to_s,
-                  handle_params_and_errors:,
-                  attributes: {
-                    placeholder: "0.0.0.0/0",
-                    required: true,
-                    form:
-                  }
-                ) %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== part(
-                  "components/form/text",
-                  name: "port_range",
-                  id: "port_range-#{ubid}",
-                  value: fwr.display_port_range,
-                  handle_params_and_errors:,
-                  attributes: {
-                    placeholder: "0..65535",
-                    form:
-                  }
-                ) %>
-              </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                <%== part(
-                  "components/form/text",
-                  name: "description",
-                  id: "description-#{ubid}",
-                  value: fwr.description,
-                  handle_params_and_errors:,
-                  attributes: {
-                    form:
-                  }
-                ) %>
-              </td>
-            <% else %>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.cidr %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.display_port_range %></td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.description %></td>
-            <% end %>
+            <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row"><%= fwr.web_display_cidr(ps_map) %></td>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row"><%= fwr.web_display_port_range %></td>
+            <td class="py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6 break-all" scope="row"><%= fwr.description %></td>
             <% if edit_perm %>
               <td
-                id="fwr-delete-<%= ubid %>"
-                class="relative whitespace-nowrap py-4 pl-3 pr-4 text-center text-sm font-medium sm:pr-6"
+                id="fwr-edit-<%= ubid %>"
+                class="relative whitespace-nowrap p-1 text-center text-sm font-medium"
               >
-                <% form(action: "#{firewall_path}/firewall-rule/#{ubid}/patch", method: :post, id: form, class: " inline-flex items-center justify-center") do %>
-                  <%== part("components/form/submit_button", icon: "hero-pencil", attributes: {id: "submit-#{ubid}"}) %>
-                <% end %>
-                <hr class="mt-1 mb-1">
+                <%== part("components/button", text: "", icon: "hero-pencil", link: "#{firewall_path}/firewall-rule/#{ubid}", attributes: {id: "edit-#{ubid}"}) %>
+              </td>
+              <td
+                id="fwr-delete-<%= ubid %>"
+                class="relative whitespace-nowrap p-1 text-center text-sm font-medium"
+              >
                 <%== part("components/delete_button", url: "#{firewall_path}/firewall-rule/#{ubid}", text: "") %>
               </td>
             <% end %>
-          </tr>
-        <% end %>
-        <% if edit_perm %>
-          <% handle_params_and_errors = @fwr_id == :create %>
-          <tr>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== part(
-                "components/form/text",
-                name: "cidr",
-                handle_params_and_errors:,
-                attributes: {
-                  placeholder: "0.0.0.0/0",
-                  form: "form-fw-create-rule-#{@firewall.ubid}"
-                }
-              ) %>
-            </td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== part(
-                "components/form/text",
-                name: "port_range",
-                handle_params_and_errors:,
-                attributes: {
-                  placeholder: "0..65535",
-                  form: "form-fw-create-rule-#{@firewall.ubid}"
-                }
-              ) %>
-            </td>
-            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-              <%== part(
-                "components/form/text",
-                handle_params_and_errors:,
-                name: "description",
-                attributes: {
-                  form: "form-fw-create-rule-#{@firewall.ubid}"
-                }
-              ) %>
-            </td>
-            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-              <% form(action: "#{firewall_path}/firewall-rule", method: :post, id: "form-fw-create-rule-#{@firewall.ubid}") do %>
-                <%== part("components/form/submit_button", text: "Create") %>
-              <% end %>
-            </td>
-          </tr>
-          <tr class="!border-t-white">
-            <td colspan="4" class="p-6 pt-0">
-              <%== part(
-                "components/form/select",
-                name: "fw_rule_private_subnet_id",
-                placeholder: "or select private subnet instead of using CIDR",
-                options: @project
-                  .private_subnets_dataset
-                  .where(location_id: @firewall.location_id)
-                  .order(:name)
-                  .select_map([:id, :name])
-                  .each { it[0] = UBID.from_uuidish(it[0]).to_s },
-                attributes: {
-                  form: "form-fw-create-rule-#{@firewall.ubid}"
-                }
-              ) %>
-            </td>
           </tr>
         <% end %>
       </tbody>
