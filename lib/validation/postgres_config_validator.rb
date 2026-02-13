@@ -6,15 +6,27 @@ module Validation
       case version
       when "17"
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA
+        @restart_required = Validation::PostgresConfigValidatorSchema::PG_17_RESTART_REQUIRED
       when "16"
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA
+        @restart_required = Validation::PostgresConfigValidatorSchema::PG_16_RESTART_REQUIRED
       when "18"
         @config_schema = Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA
+        @restart_required = Validation::PostgresConfigValidatorSchema::PG_18_RESTART_REQUIRED
       when "pgbouncer"
         @config_schema = Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA
+        @restart_required = Set.new.freeze
       else
         raise "Unsupported version: #{version}"
       end
+    end
+
+    def restart_required_params
+      @restart_required
+    end
+
+    def requires_restart?(key)
+      @restart_required.include?(key)
     end
 
     def validate(config)

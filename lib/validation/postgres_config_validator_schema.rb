@@ -2576,5 +2576,100 @@ module Validation
       removed.each { |key| schema.delete(key) }
       schema.merge!(added_or_modified)
     end.freeze
+
+    PG_16_RESTART_REQUIRED = Set.new(%w[
+      allow_in_place_tablespaces
+      archive_mode
+      autovacuum_freeze_max_age
+      autovacuum_max_workers
+      autovacuum_multixact_freeze_max_age
+      bonjour
+      bonjour_name
+      cron.database_name
+      cron.host
+      cron.max_running_jobs
+      cron.use_background_workers
+      data_sync_retry
+      dynamic_shared_memory_type
+      event_source
+      hot_standby
+      huge_page_size
+      huge_pages
+      icu_validation_level
+      jit_debugging_support
+      jit_dump_bitcode
+      jit_profiling_support
+      jit_provider
+      listen_addresses
+      logging_collector
+      max_connections
+      max_files_per_process
+      max_locks_per_transaction
+      max_logical_replication_workers
+      max_pred_locks_per_transaction
+      max_prepared_transactions
+      max_replication_slots
+      max_wal_senders
+      max_worker_processes
+      min_dynamic_shared_memory
+      old_snapshot_threshold
+      pg_stat_statements.max
+      port
+      recovery_target
+      recovery_target_action
+      recovery_target_inclusive
+      recovery_target_lsn
+      recovery_target_name
+      recovery_target_time
+      recovery_target_timeline
+      recovery_target_xid
+      reserved_connections
+      shared_buffers
+      shared_memory_type
+      shared_preload_libraries
+      ssl
+      superuser_reserved_connections
+      track_activity_query_size
+      track_commit_timestamp
+      unix_socket_directories
+      unix_socket_group
+      unix_socket_permissions
+      wal_buffers
+      wal_level
+      wal_log_hints
+    ]).freeze
+
+    PG_17_RESTART_REQUIRED = begin
+      set = PG_16_RESTART_REQUIRED.dup
+      set.delete("archive_mode")
+      set.delete("old_snapshot_threshold")
+      set.merge(%w[
+        allow_alter_system
+        commit_timestamp_buffers
+        io_combine_limit
+        max_notify_queue_pages
+        multixact_member_buffers
+        multixact_offset_buffers
+        notify_buffers
+        serializable_buffers
+        subtransaction_buffers
+        summarize_wal
+        trace_connection_negotiation
+        transaction_buffers
+      ])
+    end.freeze
+
+    PG_18_RESTART_REQUIRED = begin
+      set = PG_17_RESTART_REQUIRED.dup
+      set.merge(%w[
+        autovacuum_worker_slots
+        extension_control_path
+        io_max_combine_limit
+        io_method
+        io_workers
+        max_active_replication_origins
+        oauth_validator_libraries
+      ])
+    end.freeze
   end
 end
