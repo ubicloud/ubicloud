@@ -919,6 +919,8 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"max_connections" => "100"})
         expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
         expect(response_body["default_pg_config"]).to include("shared_buffers", "work_mem", "max_connections", "effective_cache_size")
+        expect(response_body["restart_required_params"]).to be_an(Array)
+        expect(response_body["restart_required_params"]).to include("max_connections", "shared_buffers", "wal_level")
       end
 
       it "read skips default_pg_config when resource has no representative_server" do
