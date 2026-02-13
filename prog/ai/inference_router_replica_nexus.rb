@@ -224,7 +224,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     Prog::PageNexus.assemble(
       format(page_details[:message], inference_router_replica.ubid.to_s[0..7], inference_router.name),
       [page_details[:tag], inference_router_replica.ubid],
-      inference_router_replica.ubid, severity: "warning", extra_data:
+      inference_router_replica.ubid, extra_data:
     )
   end
 
