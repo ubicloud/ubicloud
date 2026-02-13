@@ -111,83 +111,71 @@ class Clover
       end
 
       r.on "firewall-rule" do
-        r.post true do
-          authorize("Firewall:edit", firewall)
-          handle_validation_failure("networking/firewall/show") do
-            @fwr_id = :create
-            @page = "networking"
+        r.is do
+          r.get web? do
+            authorize("Firewall:edit", firewall)
+            @page = "firewall_rule"
+            view("networking/firewall/show")
           end
 
-          cidr = typecast_params.nonempty_str("fw_rule_private_subnet_id") if web?
-          cidr ||= typecast_params.str!("cidr")
-          unless cidr.include?(".") || cidr.include?(":")
-            if PrivateSubnet.ubid_format.match?(cidr)
-              key = :id
-              value = UBID.to_uuid(cidr)
-            else
-              key = :name
-              value = cidr
+          r.post do
+            authorize("Firewall:edit", firewall)
+            handle_validation_failure("networking/firewall/show") do
+              @fwr_id = :create
+              @page = "firewall_rule"
             end
 
-            if (ps = authorized_private_subnet(:location_id => @location.id, key => value))
-              cidrs = [ps.net4, ps.net6]
-            end
-          end
-          cidrs ||= [Validation.validate_cidr(cidr)]
+            cidrs, pg_range, description = firewall_rule_params
+            description = nil if description&.empty?
 
-          port_range = Validation.validate_port_range(typecast_params.str("port_range"))
-          description = typecast_params.nonempty_str("description")
-          pg_range = Sequel.pg_range(port_range.first..port_range.last)
-
-          DB.transaction do
-            DB.ignore_duplicate_queries do
-              cidrs.map! do |cidr|
-                firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:)
-                audit_log(firewall_rule, "create", firewall)
-                firewall_rule
+            DB.transaction do
+              DB.ignore_duplicate_queries do
+                cidrs.map! do |cidr|
+                  firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:)
+                  audit_log(firewall_rule, "create", firewall)
+                  firewall_rule
+                end
               end
             end
-          end
 
-          if api?
-            cidrs = cidrs[0] if cidrs.length == 1
-            Serializers::FirewallRule.serialize(cidrs)
-          else
-            flash["notice"] = if cidrs.length == 1
-              "Firewall rule is created"
+            if api?
+              cidrs = cidrs[0] if cidrs.length == 1
+              Serializers::FirewallRule.serialize(cidrs)
             else
-              "Firewall rules are created"
+              flash["notice"] = "Firewall rule is created"
+              r.redirect firewall, "/networking"
             end
-            r.redirect firewall, "/networking"
           end
         end
 
         r.on :ubid_uuid do |id|
-          firewall_rule = firewall.firewall_rules_dataset[id:]
+          firewall_rule = @firewall_rule = firewall.firewall_rules_dataset[id:]
           check_found_object(firewall_rule)
 
           r.patch true do
             authorize("Firewall:edit", firewall)
-            handle_validation_failure("networking/firewall/show") do
-              @fwr_id = firewall_rule.id
-              @page = "networking"
-            end
+            handle_validation_failure("networking/firewall/show") { @page = "firewall_rule" }
 
             current_cidr = firewall_rule.cidr.to_s
             current_port_range = firewall_rule.display_port_range
 
-            cidr, port_range, description = typecast_params.str(%w[cidr port_range description])
+            if web?
+              cidrs, pg_range, description = firewall_rule_params
+              cidr = cidrs[0].to_s
+              description = nil if description == ""
+            else
+              cidr, port_range, description = typecast_params.str(%w[cidr port_range description])
+              cidr = Validation.validate_cidr(cidr).to_s if cidr
 
-            if cidr
-              firewall_rule.cidr = Validation.validate_cidr(cidr).to_s
+              if port_range
+                port_range = Validation.validate_port_range(port_range)
+                pg_range = Sequel.pg_range(port_range.first..port_range.last)
+              end
             end
-            if port_range
-              port_range = Validation.validate_port_range(port_range)
-              firewall_rule.port_range = Sequel.pg_range(port_range.first..port_range.last)
-            end
-            if description
-              firewall_rule.description = description.strip
-            end
+
+            firewall_rule.cidr = cidr if cidr
+            firewall_rule.port_range = pg_range if pg_range
+            firewall_rule.description = description.strip if description
 
             DB.transaction do
               firewall_rule.save_changes
@@ -220,9 +208,15 @@ class Clover
             end
           end
 
-          r.get api? do
-            authorize("Firewall:view", firewall)
-            Serializers::FirewallRule.serialize(firewall_rule)
+          r.get true do
+            if api?
+              authorize("Firewall:view", firewall)
+              Serializers::FirewallRule.serialize(firewall_rule)
+            else
+              authorize("Firewall:edit", firewall)
+              @page = "firewall_rule"
+              view("networking/firewall/show")
+            end
           end
         end
       end
