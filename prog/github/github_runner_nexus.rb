@@ -57,7 +57,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     boot_image = label_data["boot_image"]
     location_id = Location::GITHUB_RUNNERS_ID
     size = label_data["vm_size"]
-    exclude_availability_zones = []
+    preferred_azs = []
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
     if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
@@ -65,7 +65,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
       alternative_families << "m7i" << "m6a"
-      exclude_availability_zones << "a" # eu-central-1a is usually give capacity errors
+      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample # eu-central-1a is usually give capacity errors
     end
 
     ps = Prog::Vnet::SubnetNexus.assemble(
@@ -73,7 +73,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       location_id:,
       allow_only_ssh: true,
       ipv4_range_size: 28,
-      limit_to_single_az: true
+      preferred_azs:
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -89,7 +89,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
-      exclude_availability_zones:,
       alternative_families:
     )
 
