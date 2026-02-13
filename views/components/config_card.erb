@@ -1,4 +1,4 @@
-<%# locals: (title:, config:, extra_class:, name:, errors:) %>
+<%# locals: (title:, config:, extra_class:, name:, errors:, restart_required_params: Set.new) %>
 
 <div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
   <div class="px-6 py-4 border-b border-gray-200">
@@ -35,6 +35,9 @@
                   <%= error %>
                 <% end %>
               </span>
+            <% end %>
+            <% if restart_required_params.include?(key) %>
+              <span class="restart-warning inline-block h-8 py-2 px-2 text-xs text-amber-700 bg-amber-100 rounded" title="Changing this parameter requires a database restart to take effect">Restart required</span>
             <% end %>
           </div>
           <div class="min-w-16 flex items-center ml-2">
