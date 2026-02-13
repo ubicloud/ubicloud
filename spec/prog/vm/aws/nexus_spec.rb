@@ -20,7 +20,9 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   }
 
   let(:location_credential) {
-    LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+    loc = LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    loc
   }
 
   let(:storage_volumes) {

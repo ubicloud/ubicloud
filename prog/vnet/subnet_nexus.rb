@@ -3,7 +3,7 @@
 class Prog::Vnet::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
-  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, limit_to_single_az: false)
+  def self.assemble(project_id, name: nil, location_id: Location::HETZNER_FSN1_ID, ipv6_range: nil, ipv4_range: nil, allow_only_ssh: false, firewall_id: nil, firewall_name: nil, ipv4_range_size: nil, preferred_azs: [])
     unless (project = Project[project_id])
       fail "No existing project"
     end
@@ -55,7 +55,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       prog = if location.aws?
         # Create PrivateSubnetAwsResource and pre-create AwsSubnet records for each AZ
         ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
-        create_aws_subnet_records(ps, ps_aws_resource, location, ipv4_range_size, limit_to_single_az)
+        create_aws_subnet_records(ps, ps_aws_resource, location, ipv4_range_size, preferred_azs:)
         "Vnet::Aws::VpcNexus"
       else
         "Vnet::Metal::SubnetNexus"
@@ -64,13 +64,16 @@ class Prog::Vnet::SubnetNexus < Prog::Base
     end
   end
 
-  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, ipv4_range_size, limit_to_single_az)
+  def self.create_aws_subnet_records(private_subnet, ps_aws_resource, location, ipv4_range_size, preferred_azs: [])
     vpc_ipv4 = private_subnet.net4
 
     ipv4_prefix = [ipv4_range_size + 8, 28].min
-    limit_to_single_az = true if vpc_ipv4.netmask.prefix_len == ipv4_prefix
 
-    azs = limit_to_single_az ? [location.azs.sample] : location.azs
+    available_azs = preferred_azs.empty? ? location.azs : preferred_azs
+    azs = available_azs.sample(2**(ipv4_prefix - ipv4_range_size))
+
+    raise "Not enough subnet space for even a single AZ. Use a range size <= 28" if azs.empty?
+
     azs.each_with_index do |az, idx|
       ipv4_cidr = vpc_ipv4.nth_subnet(ipv4_prefix, idx)
       # if the vpc size and the subnet sizes are the same, nth_subnet will
@@ -78,14 +81,6 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       # NetAddr::IPv4Net.parse("10.159.0.0/16").nth_subnet(16,0)
       # => nil
       ipv4_cidr = vpc_ipv4 if vpc_ipv4.netmask.prefix_len == ipv4_prefix && idx == 0
-
-      # There is not enough subnet space for all of the AZs
-      if ipv4_cidr.nil? && idx == 0
-        raise "Not enough subnet space for even a single AZ. Use a range size <= 28"
-      elsif ipv4_cidr.nil?
-        Clog.emit("Not enough subnet space for AZ #{az.az} - idx #{idx}")
-        next
-      end
 
       AwsSubnet.create(
         private_subnet_aws_resource_id: ps_aws_resource.id,
