@@ -167,11 +167,11 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
 
       expect {
-        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, false)
+        described_class.create_aws_subnet_records(small_ps, ps_aws_resource, aws_location, 30, preferred_azs: [])
       }.to raise_error("Not enough subnet space for even a single AZ. Use a range size <= 28")
     end
 
-    it "logs warning and skips AZs when VPC cannot fit all subnets" do
+    it "skips AZs when VPC cannot fit all subnets" do
       # /26 VPC can fit 4 /28 subnets (indices 0-3)
       # Create 5 AZs - the 5th should be skipped with a log
       5.times do |i|
@@ -180,8 +180,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       limited_ps = PrivateSubnet.create(name: "limited-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/26", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(limited_ps.id)
 
-      expect(Clog).to receive(:emit).with(/Not enough subnet space for AZ.*idx 4/)
-      described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location, 26, false)
+      described_class.create_aws_subnet_records(limited_ps, ps_aws_resource, aws_location, 26)
 
       # Should have created 4 subnets, not 5
       expect(AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id).count).to eq(4)
