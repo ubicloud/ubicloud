@@ -340,6 +340,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       COMMAND
     end
 
+    if (cache_proxy_url = project.get_ff_cache_proxy_download_url&.dig(label_data["arch"]))
+      command << NetSsh.command(<<~COMMAND, download_url: cache_proxy_url)
+        sudo systemctl stop cache-proxy.service
+        curl -fsSL -o /tmp/cache-proxy.tar.gz :download_url
+        sudo tar xzf /tmp/cache-proxy.tar.gz -C /usr/local/share/cache-proxy
+        sudo systemctl start cache-proxy.service
+      COMMAND
+    end
+
     begin
       # Remove comments and empty lines before sending them to the machine
       vm.sshable.cmd("bash", stdin: NetSsh.combine(*command, joiner: "").gsub(/^(\s*# .*)?\n/, ""))

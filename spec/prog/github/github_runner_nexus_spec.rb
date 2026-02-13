@@ -602,6 +602,42 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.setup_environment }.to hop("register_runner")
     end
 
+    it "hops to register_runner with cache proxy replacement" do
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      project.set_ff_cache_proxy_download_url({"x64" => "https://example.com/cache-proxy-x64.tar.gz", "arm64" => "https://example.com/cache-proxy-arm64.tar.gz"})
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND)
+        set -ueo pipefail
+        echo "image version: $ImageVersion"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="my_token"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+        sudo systemctl stop cache-proxy.service
+        curl -fsSL -o /tmp/cache-proxy.tar.gz https://example.com/cache-proxy-x64.tar.gz
+        sudo tar xzf /tmp/cache-proxy.tar.gz -C /usr/local/share/cache-proxy
+        sudo systemctl start cache-proxy.service
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
+    it "does not replace cache proxy if arch url is not set" do
+      expect(vm).to receive(:runtime_token).and_return("my_token")
+      installation.update(use_docker_mirror: false, cache_enabled: false)
+      project.set_ff_cache_proxy_download_url({"arm64" => "https://example.com/cache-proxy-arm64.tar.gz"})
+      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND)
+        set -ueo pipefail
+        echo "image version: $ImageVersion"
+        sudo usermod -a -G sudo,adm runneradmin
+        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-standard-4\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
+        echo "UBICLOUD_RUNTIME_TOKEN="my_token"
+        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
+      COMMAND
+
+      expect { nx.setup_environment }.to hop("register_runner")
+    end
+
     it "naps if ssh authentication failed" do
       expect(vm).to receive(:runtime_token).and_return("my_token")
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"))]).at_least(:once)
