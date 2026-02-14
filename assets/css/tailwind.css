@@ -47,3 +47,18 @@
     display: none;
   }
 }
+
+#firewall-rule-form {
+  #custom-ports, #subnet-source, #custom-source {
+    display: none;
+  }
+  &:has(#port_type option[value=custom]:checked) #custom-ports {
+    display: block;
+  }
+  &:has(#source_type option[value^=subnet]:checked) #subnet-source {
+    display: block;
+  }
+  &:has(#source_type option[value=custom]:checked) #custom-source {
+    display: block;
+  }
+}
