@@ -8,9 +8,10 @@ module Csi
   class KubernetesClient
     include ServiceHelper
 
-    def initialize(req_id:, logger:)
+    def initialize(req_id:, logger:, log_level: :info)
       @req_id = req_id
       @logger = logger
+      @log_level = log_level
     end
 
     def run_kubectl(*args, yaml_data: nil)
@@ -113,6 +114,17 @@ module Csi
           "name" => pod.dig("metadata", "name"),
           "ip" => pod.dig("status", "podIP"),
           "node" => pod.dig("spec", "nodeName")
+        }
+      end
+    end
+
+    def get_coredns_pods
+      pods_yaml = yaml_load_kubectl("-n", "kube-system", "get", "pods", "-l", "k8s-app=kube-dns")
+      pods_yaml["items"].filter_map do |pod|
+        next unless pod.dig("status", "phase") == "Running"
+        {
+          "name" => pod.dig("metadata", "name"),
+          "ip" => pod.dig("status", "podIP")
         }
       end
     end
