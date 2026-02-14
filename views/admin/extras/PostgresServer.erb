@@ -9,6 +9,7 @@
   data: [{
     "Archive Backlog" => obj.primary? ? (obj.archival_backlog rescue nil) : nil,
     "Current LSN" => current_lsn,
-    "WAL Lag (GiB)" => lsn_lag && (lsn_lag / (1024**3))
+    "WAL Lag (GiB)" => lsn_lag && (lsn_lag / (1024**3)),
+    "Replay timestamep" => obj.standby? || obj.read_replica? ? (obj.pg_last_xact_replay_timestamp rescue nil) : nil
   }.compact]
 ) %>

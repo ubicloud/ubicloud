@@ -183,6 +183,10 @@ class PostgresServer < Sequel::Model
     recycle_set? || vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
   end
 
+  def pg_last_xact_replay_timestamp
+    run_query("select pg_last_xact_replay_timestamp()")
+  end
+
   def lsn_lag(lsn = nil)
     parent_server = if read_replica?
       resource.parent&.representative_server
