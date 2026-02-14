@@ -984,6 +984,20 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_field "pg_config_values[]", with: "120"
       end
 
+      it "shows restart required warning for restart-required configs" do
+        pg.update(user_config: {"max_connections" => "120"})
+        visit "#{project.path}#{pg.path}/config"
+
+        expect(page).to have_css ".restart-warning", text: "Restart required"
+      end
+
+      it "does not show restart required warning for non-restart configs" do
+        pg.update(user_config: {"work_mem" => "16MB"})
+        visit "#{project.path}#{pg.path}/config"
+
+        expect(page).not_to have_css ".restart-warning"
+      end
+
       it "does not show update button when user does not have permissions" do
         pg_wo_permission.update(user_config: {"max_connections" => "120"})
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])

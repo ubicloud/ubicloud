@@ -2360,6 +2360,12 @@ components:
             type: string
           nullable: true
           readOnly: true
+        restart_required_params:
+          description: List of PostgreSQL configuration parameter names that require a database restart to take effect.
+          type: array
+          items:
+            type: string
+          readOnly: true
       additionalProperties: false
       required:
         - pg_config

@@ -593,7 +593,8 @@ class Clover
           {
             pg_config: pg.user_config,
             pgbouncer_config: pg.pgbouncer_user_config,
-            default_pg_config: pg.representative_server&.configure_hash&.[](:configs)
+            default_pg_config: pg.representative_server&.configure_hash&.[](:configs),
+            restart_required_params: Validation::PostgresConfigValidator.new(pg.version).restart_required_params.to_a
           }
         end
 
