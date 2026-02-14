@@ -9,8 +9,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
-    kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
-
+    kubernetes_service_project = Project[Config.kubernetes_service_project_id] ||
+      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
     Strand.create(
       prog: "Test::Kubernetes",
       label: "start",
@@ -194,6 +194,64 @@ STS
       verify_mount
     rescue => e
       update_stack({"fail_message" => e.message})
+      hop_destroy_kubernetes
+    end
+    hop_test_node_not_deleted_during_copy
+  end
+
+  label def test_node_not_deleted_during_copy
+    client = kubernetes_cluster.client
+    nodepool.nodes.each { |node|
+      begin
+        client.kubectl("uncordon :name", name: node.name)
+      rescue
+        # node might already be uncordoned
+      end
+    }
+
+    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    update_stack({"drain_test_node_name" => pod_node_name})
+
+    pod_node = nodepool.nodes.find { |n| n.name == pod_node_name }
+    pod_node.incr_retire
+
+    hop_verify_node_not_deleted_during_copy
+  end
+
+  label def verify_node_not_deleted_during_copy
+    drain_node_name = strand.stack.first["drain_test_node_name"]
+    drain_node = KubernetesNode.where(kubernetes_cluster_id: kubernetes_cluster.id)
+      .all.find { |n| n.name == drain_node_name }
+
+    # Node record destroyed means the nexus completed the full retire flow
+    hop_verify_data_after_drain unless drain_node
+
+    pvs = JSON.parse(kubernetes_cluster.client.kubectl("get pv -ojson"))["items"]
+    pending_copy = pvs.any? do |pv|
+      pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
+        pv.dig("spec", "nodeAffinity", "required", "nodeSelectorTerms", 0,
+          "matchExpressions", 0, "values", 0) == drain_node_name
+    end
+
+    if pending_copy
+      begin
+        kubernetes_cluster.client.kubectl("get node :drain_node_name", drain_node_name:)
+      rescue => e
+        update_stack({"fail_message" => "Node #{drain_node_name} was removed while CSI data copy was still in progress: #{e.message}"})
+        hop_destroy_kubernetes
+      end
+    end
+
+    nap 15
+  end
+
+  label def verify_data_after_drain
+    nap 5 unless pod_status == "Running"
+
+    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    expected_hash = strand.stack.first["read_hash"]
+    if new_hash != expected_hash
+      update_stack({"fail_message" => "data hash changed after node drain, expected: #{expected_hash}, got: #{new_hash}"})
     end
     hop_destroy_kubernetes
   end
