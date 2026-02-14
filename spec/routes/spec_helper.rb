@@ -120,6 +120,7 @@ RSpec.configure do |config|
         access_key: "access-key-id",
         secret_key: "secret-access-key"
       ) { it.id = loc.id }
+      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     end
   end)

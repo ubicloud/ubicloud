@@ -7,8 +7,18 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+    az_a = LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
-    PrivateSubnetAwsResource.create_with_id(ps.id, vpc_id: "vpc-0123456789abcdefg", internet_gateway_id: "igw-0123456789abcdefg", route_table_id: "rtb-0123456789abcdefg", security_group_id: "sg-0123456789abcdefg")
+    # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
+    # Update them with the test values
+    ps.private_subnet_aws_resource.update(
+      vpc_id: "vpc-0123456789abcdefg",
+      internet_gateway_id: "igw-0123456789abcdefg",
+      route_table_id: "rtb-0123456789abcdefg",
+      security_group_id: "sg-0123456789abcdefg"
+    )
+    aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
+    aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
     ps
   }
 
@@ -23,28 +33,20 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#start" do
-    it "creates PrivateSubnetAwsResource and hops to create_vpc" do
-      aws_resource.destroy
-      expect { nx.start }.to hop("create_vpc")
-      expect(ps.private_subnet_aws_resource).not_to be_nil
-    end
-  end
-
-  describe "#create_vpc" do
     before { aws_resource.update(vpc_id: nil) }
 
-    it "creates a vpc" do
+    it "creates a vpc and hops to wait_vpc_created" do
       client.stub_responses(:describe_vpcs, vpcs: [])
       client.stub_responses(:create_vpc, vpc: {vpc_id: "vpc-0123456789abcdefg"})
       expect(client).to receive(:create_vpc).with({cidr_block: ps.net4.to_s, amazon_provided_ipv_6_cidr_block: true, tag_specifications: Util.aws_tag_specifications("vpc", ps.name)}).and_call_original
-      expect { nx.create_vpc }.to hop("wait_vpc_created")
+      expect { nx.start }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-0123456789abcdefg")
     end
 
     it "reuses existing vpc" do
       client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-existing"}])
       expect(client).not_to receive(:create_vpc)
-      expect { nx.create_vpc }.to hop("wait_vpc_created")
+      expect { nx.start }.to hop("wait_vpc_created")
         .and change { aws_resource.reload.vpc_id }.from(nil).to("vpc-existing")
     end
   end
@@ -103,7 +105,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to hop("wait")
+      expect { nx.create_route_table }.to hop("create_az_subnets")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-0123456789abcdefg")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
     end
@@ -118,7 +120,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-existing", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
-      expect { nx.create_route_table }.to hop("wait")
+      expect { nx.create_route_table }.to hop("create_az_subnets")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-existing")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
     end
@@ -132,7 +134,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).not_to receive(:attach_internet_gateway)
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-existing"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-existing"}).and_call_original
-      expect { nx.create_route_table }.to hop("wait")
+      expect { nx.create_route_table }.to hop("create_az_subnets")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-existing")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
     end
@@ -146,7 +148,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).to receive(:describe_route_tables).with({filters: [{name: "vpc-id", values: ["vpc-0123456789abcdefg"]}]}).and_call_original
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to hop("wait")
+      expect { nx.create_route_table }.to hop("create_az_subnets")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-0123456789abcdefg")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
     end
@@ -161,9 +163,70 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(client).to receive(:attach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_ipv_6_cidr_block: "::/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
       expect(client).to receive(:create_route).with({route_table_id: "rtb-0123456789abcdefg", destination_cidr_block: "0.0.0.0/0", gateway_id: "igw-0123456789abcdefg"}).and_call_original
-      expect { nx.create_route_table }.to hop("wait")
+      expect { nx.create_route_table }.to hop("create_az_subnets")
         .and change { aws_resource.reload.internet_gateway_id }.from(nil).to("igw-0123456789abcdefg")
         .and change { aws_resource.reload.route_table_id }.from(nil).to("rtb-0123456789abcdefg")
+    end
+  end
+
+  describe "#create_az_subnets" do
+    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
+    let(:az_b) { LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
+
+    before do
+      # Reset the AWS subnets to pre-creation state (no subnet_id, no ipv6_cidr)
+      AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).update(subnet_id: nil, ipv6_cidr: nil)
+      # Add AZ b and create its AwsSubnet record (simulating what assemble does for all AZs)
+      az_b
+      AwsSubnet.create(
+        private_subnet_aws_resource_id: aws_resource.id,
+        location_aws_az_id: az_b.id,
+        ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s
+      )
+      client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}]}])
+      client.stub_responses(:create_subnet, ->(context) {
+        az = context.params[:availability_zone]
+        {subnet: {subnet_id: "subnet-#{az}", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: context.params[:ipv_6_cidr_block]}]}}
+      })
+      client.stub_responses(:modify_subnet_attribute)
+    end
+
+    it "creates AWS subnets, updates records, and hops to associate_az_route_tables" do
+      expect(client).to receive(:create_subnet).twice.and_call_original
+      expect(client).to receive(:modify_subnet_attribute).twice.and_call_original
+      expect { nx.create_az_subnets }.to hop("associate_az_route_tables")
+      expect(AwsSubnet.count).to eq(2)
+      expect(AwsSubnet.where(location_aws_az_id: az_a.id).first.subnet_id).to eq("subnet-us-west-2a")
+      expect(AwsSubnet.where(location_aws_az_id: az_b.id).first.subnet_id).to eq("subnet-us-west-2b")
+    end
+
+    it "describes existing subnets and creates new ones" do
+      AwsSubnet.where(location_aws_az_id: az_a.id).update(subnet_id: "subnet-existing-a", ipv6_cidr: "2600:1f14:1000::/64")
+      client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing-a", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]}])
+      expect(client).to receive(:describe_subnets).and_call_original
+      expect(client).to receive(:create_subnet).once.and_call_original
+      expect(client).to receive(:modify_subnet_attribute).twice.and_call_original
+      expect { nx.create_az_subnets }.to hop("associate_az_route_tables")
+      expect(AwsSubnet.count).to eq(2)
+      expect(AwsSubnet.where(location_aws_az_id: az_a.id).first.subnet_id).to eq("subnet-existing-a")
+    end
+  end
+
+  describe "#associate_az_route_tables" do
+    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
+
+    it "associates route tables for all subnets and hops to wait" do
+      expect(client).to receive(:associate_route_table).with({
+        route_table_id: "rtb-0123456789abcdefg",
+        subnet_id: "subnet-0123456789abcdefg"
+      }).and_call_original
+      client.stub_responses(:associate_route_table)
+      expect { nx.associate_az_route_tables }.to hop("wait")
+    end
+
+    it "ignores ResourceAlreadyAssociated errors" do
+      client.stub_responses(:associate_route_table, Aws::EC2::Errors::ResourceAlreadyAssociated.new(nil, nil))
+      expect { nx.associate_az_route_tables }.to hop("wait")
     end
   end
 
@@ -180,7 +243,6 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   describe "#destroy" do
     before {
       allow(Clog).to receive(:emit).and_call_original
-      client.stub_responses(:describe_subnets, subnets: [{state: "available"}])
     }
 
     it "extends deadline if a vm prevents destroy" do
@@ -230,18 +292,48 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     end
 
     describe "#delete_internet_gateway" do
-      it "deletes the internet gateway and hops to delete_vpc" do
+      it "deletes the internet gateway and hops to delete_az_subnets" do
         client.stub_responses(:delete_internet_gateway)
         client.stub_responses(:detach_internet_gateway)
         expect(client).to receive(:delete_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg"}).and_call_original
         expect(client).to receive(:detach_internet_gateway).with({internet_gateway_id: "igw-0123456789abcdefg", vpc_id: "vpc-0123456789abcdefg"}).and_call_original
-        expect { nx.delete_internet_gateway }.to hop("delete_vpc")
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
       end
 
-      it "hops to delete_vpc if internet gateway is not found" do
+      it "hops to delete_az_subnets if internet gateway is not found" do
         client.stub_responses(:delete_internet_gateway, Aws::EC2::Errors::InvalidInternetGatewayIDNotFound.new(nil, nil))
         client.stub_responses(:detach_internet_gateway)
-        expect { nx.delete_internet_gateway }.to hop("delete_vpc")
+        expect { nx.delete_internet_gateway }.to hop("delete_az_subnets")
+      end
+    end
+
+    describe "#delete_az_subnets" do
+      it "deletes all aws subnets from AWS and hops to delete_vpc" do
+        client.stub_responses(:delete_subnet)
+        expect(client).to receive(:delete_subnet).with({subnet_id: "subnet-0123456789abcdefg"}).and_call_original
+        aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).first
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+        # DB records are kept — cleaned up via CASCADE in #finish
+        expect(AwsSubnet[aws_subnet.id]).not_to be_nil
+      end
+
+      it "hops to delete_vpc if no subnets exist" do
+        AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).destroy
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+      end
+
+      it "continues if subnet not found in AWS" do
+        client.stub_responses(:delete_subnet, Aws::EC2::Errors::InvalidSubnetIDNotFound.new(nil, nil))
+        aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).first
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+        expect(AwsSubnet[aws_subnet.id]).not_to be_nil
+      end
+
+      it "handles subnets without subnet_id via ignore_invalid_id" do
+        AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).update(subnet_id: nil)
+        client.stub_responses(:delete_subnet)
+        expect { nx.delete_az_subnets }.to hop("delete_vpc")
+        expect(AwsSubnet.where(private_subnet_aws_resource_id: aws_resource.id).count).to eq(1)
       end
     end
 
@@ -255,6 +347,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       it "hops if vpc is not found" do
         client.stub_responses(:delete_vpc, Aws::EC2::Errors::InvalidVpcIDNotFound.new(nil, nil))
         expect { nx.delete_vpc }.to hop("finish")
+      end
+
+      it "raises DependencyViolation for strand retry" do
+        client.stub_responses(:delete_vpc, Aws::EC2::Errors::DependencyViolation.new(nil, "VPC has dependencies"))
+        expect(Clog).to receive(:emit).with("VPC has dependencies, retrying subnet cleanup", instance_of(Hash)).and_call_original
+        expect { nx.delete_vpc }.to raise_error(Aws::EC2::Errors::DependencyViolation)
       end
     end
 

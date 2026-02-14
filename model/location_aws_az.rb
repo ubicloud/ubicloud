@@ -18,3 +18,5 @@ end
 #  location_aws_az_location_id_zone_id_index | UNIQUE btree (location_id, zone_id)
 # Foreign key constraints:
 #  location_aws_az_location_id_fkey | (location_id) REFERENCES location(id) ON DELETE CASCADE
+# Referenced By:
+#  aws_subnet | aws_subnet_location_aws_az_id_fkey | (location_aws_az_id) REFERENCES location_aws_az(id)

@@ -702,6 +702,7 @@ RSpec.describe Clover, "postgres" do
             name: "us-west-2", provider: "aws", display_name: "aws-us-west-2",
             ui_name: "AWS US West 2", visible: true
           )
+          LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
           pg_aws = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: project.id,
             location_id: aws_location.id,
