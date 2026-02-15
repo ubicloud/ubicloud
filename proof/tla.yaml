@@ -1,0 +1,19 @@
+# tla.yaml — TLA+ proof assemblies for proof-tool
+#
+# Each proof specifies:
+#   dir:     working directory for TLC
+#   config:  TLC configuration file
+#   sources: ordered list of input files (.tla and .rb)
+#   configs: named constant overrides (e.g. proof/tla check -c quick NAME)
+
+SubnetRekey:
+  dir: proof/subnet_rekey
+  config: proof/subnet_rekey/SubnetRekey.cfg
+  sources:
+    - proof/subnet_rekey/header.tla
+    - proof/subnet_rekey/spec.tla
+  configs:
+    3subnet:
+      config: proof/subnet_rekey/SubnetRekey-3subnet.cfg
+    liveness:
+      config: proof/subnet_rekey/SubnetRekey-liveness.cfg
