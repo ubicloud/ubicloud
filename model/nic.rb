@@ -43,17 +43,19 @@ end
 
 # Table: nic
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  |
-#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
-#  private_ipv4      | cidr                     | NOT NULL
-#  private_ipv6      | cidr                     | NOT NULL
-#  vm_id             | uuid                     |
-#  encryption_key    | text                     |
-#  name              | text                     | NOT NULL
-#  rekey_payload     | jsonb                    |
-#  state             | text                     | NOT NULL
+#  id                   | uuid                     | PRIMARY KEY
+#  private_subnet_id    | uuid                     | NOT NULL
+#  mac                  | macaddr                  |
+#  created_at           | timestamp with time zone | NOT NULL DEFAULT now()
+#  private_ipv4         | cidr                     | NOT NULL
+#  private_ipv6         | cidr                     | NOT NULL
+#  vm_id                | uuid                     |
+#  encryption_key       | text                     |
+#  name                 | text                     | NOT NULL
+#  rekey_payload        | jsonb                    |
+#  state                | text                     | NOT NULL
+#  rekey_phase          | nic_rekey_phase          | NOT NULL DEFAULT 'idle'::nic_rekey_phase
+#  rekey_coordinator_id | uuid                     |
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
 # Check constraints:
