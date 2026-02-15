@@ -3,8 +3,11 @@
 class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
+  # TLA:module SubnetRekey
+  # TLA \* Destroy guard: subnet cannot be destroyed while heldLocks[s] ≠ {}.
+  # TLA \* Proof-critical for NoOrphanedLocks invariant.
   def before_run
-    super unless destroy_set? && !get_locked_nics_dataset.empty?
+    super unless destroy_set? && !locked_nics_dataset.empty?
   end
 
   def connected_leader
@@ -19,10 +22,29 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     hop_wait
   end
 
+  # TLA \* ForwardRefreshKeys: non-leader forwards refreshNeeded to leader.
+  # TLA \* Models wait: decr_refresh_keys + connected_leader.incr_refresh_keys.
+  # TLA ForwardRefreshKeys(s) ==
+  # TLA   ∧ pc[s] = "idle"
   label def wait
+    fail "BUG: locks held while in wait (NoOrphanedLocks)" unless locked_nics_dataset.empty?
+
+    # TLA   ∧ refreshNeeded[s] > 0
     when_refresh_keys_set? do
+      remaining_refresh = private_subnet.semaphores.count { it.name == "refresh_keys" }
+      Clog.emit("SubnetNexus entering refresh_keys",
+        {subnet_rekey_entry: {
+          subnet_id: private_subnet.id,
+          last_rekey_at: private_subnet.last_rekey_at.iso8601,
+          remaining_refresh_keys_semaphores: remaining_refresh,
+          connected_leader: connected_leader?.to_s
+        }})
       decr_refresh_keys
+      # TLA   ∧ ConnectedLeader(s) ≠ s
       unless connected_leader?
+        # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0, ![ConnectedLeader(s)] = @ + 1]
+        # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, nicPhase, activeNics⟩
+        # TLA
         connected_leader.incr_refresh_keys
         nap 0
       end
@@ -55,65 +77,180 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     SecureRandom.random_number(1...100000)
   end
 
+  # TLA \* EnterAndLock: idle → phase_inbound.  Atomic read + lock.
+  # TLA \* Leader election ensures one coordinator per component (liveness).
+  # TLA \* FOR UPDATE + coordinator check: row locks serialize the read-check-claim.
+  # TLA \* Note: refreshNeeded' consumed earlier in wait:decr_refresh_keys.
+  # TLA EnterAndLock(s) ==
+  # TLA   ∧ pc[s] = "idle"
+  # TLA   ∧ ConnectedLeader(s) = s
+  # TLA   ∧ refreshNeeded[s] > 0
   label def refresh_keys
+    fail "BUG: locks held at idle" unless locked_nics_dataset.empty?
+
     unless connected_leader?
       Clog.emit("No longer the connected leader", {not_connected_leader: {private_subnet:, connected_leader:}})
+      # Proof-critical: re-enqueue the signal consumed by decr_refresh_keys in wait,
+      # so ForwardRefreshKeys will deliver it to the actual leader.
       private_subnet.incr_refresh_keys
       hop_wait
     end
 
-    nap 10 unless try_advisory_lock
+    # TLA   ∧ LET nics == AllConnectedNics(s)
+    # Proof-critical: FOR UPDATE provides atomicity for EnterAndLock.
+    # Removing this breaks MutualExclusion (see skip-write-recheck mutation).
+    nics = nics_to_rekey.order(:id).for_update.all
 
-    nics = nics_to_rekey
-    nap 10 if nics.any?(&:lock_set?)
-    locked_nics = []
+    # Re-check leadership after acquiring row locks — topology may have
+    # changed between the initial check and FOR UPDATE.
+    @connected_leader = nil
+    unless connected_leader?
+      Clog.emit("No longer connected leader after FOR UPDATE",
+        {leader_changed_after_lock: {private_subnet_id: private_subnet.id}})
+      private_subnet.incr_refresh_keys
+      hop_wait
+    end
+
+    if nics.empty?
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+
+    # TLA     IN ∧ ∀ n ∈ nics : ¬IsLocked(n)
+    if nics.any?(&:rekey_coordinator_id)
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+
+    # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
+    claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
+      .update(rekey_coordinator_id: private_subnet.id)
+    # :nocov:
+    # Structurally unreachable: line 89 checks the same predicate (rekey_coordinator_id
+    # == nil) on the same set, within the same transaction, under FOR UPDATE row locks.
+    # Collapsing lines 89+95 into a single conditional UPDATE would make this branch
+    # reachable and testable, but the in-memory check on 89 avoids write amplification
+    # in the expected contention case (previous rekey in progress, leader flap): bail
+    # with zero writes vs. partial UPDATE + rollback or explicit cleanup. Testing the
+    # current structure requires mocking the UPDATE return value or injecting writes
+    # between two sequential lines with no hookable seam — neither is worth the cost
+    # for a checksum on a FOR UPDATE guarantee.
+    fail "BUG: locked #{claimed}/#{nics.count} NICs" unless claimed == nics.count
+    # :nocov:
+
+    bad_phase = nics.reject { |n| n.rekey_phase == "idle" }
+    fail "BUG: freshly locked NICs should all be idle: #{bad_phase.map { "#{it.id}=#{it.rekey_phase}" }}" if bad_phase.any?
+
     nics.each do |nic|
-      nic.update(encryption_key: gen_encryption_key, rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
+      nic.update(encryption_key: gen_encryption_key,
+        rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
       nic.incr_start_rekey
-      nic.incr_lock
-      locked_nics << nic.id
       private_subnet.create_tunnels(nics, nic)
     end
 
-    update_stack_locked_nics(locked_nics)
+    # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0]
+    # TLA   ∧ pc' = [pc EXCEPT ![s] = "phase_inbound"]
+    # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
+    # TLA
     hop_wait_inbound_setup
   end
 
+  # TLA \* AdvanceInbound: all locked NICs at "inbound" → advance to outbound.
+  # TLA \* Models wait_inbound_setup: checks rekey_phase, triggers outbound.
+  # TLA AdvanceInbound(s) ==
+  # TLA   ∧ pc[s] = "phase_inbound"
   label def wait_inbound_setup
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait_rekey_outbound_trigger" }
+    nics = locked_nics
+    # TLA   ∧ heldLocks[s] ≠ {}
+    if nics.empty?
+      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
+      Clog.emit("All locked NICs destroyed during rekey, aborting")
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+    bad = nics.reject { |n| %w[idle inbound].include?(n.rekey_phase) }
+    fail "BUG: phase monotonicity at phase_inbound: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
+    # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "inbound"
+    if nics.all? { |nic| nic.rekey_phase == "inbound" }
       nics.each(&:incr_trigger_outbound_update)
+      # TLA   ∧ pc' = [pc EXCEPT ![s] = "phase_outbound"]
+      # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait_outbound_setup
     end
 
     nap 5
   end
 
+  # TLA \* AdvanceOutbound: all locked NICs at "outbound" → advance to old_drop.
+  # TLA \* Models wait_outbound_setup: checks rekey_phase, triggers old_drop.
+  # TLA AdvanceOutbound(s) ==
+  # TLA   ∧ pc[s] = "phase_outbound"
   label def wait_outbound_setup
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait_rekey_old_state_drop_trigger" }
+    nics = locked_nics
+    # TLA   ∧ heldLocks[s] ≠ {}
+    if nics.empty?
+      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
+      Clog.emit("All locked NICs destroyed during rekey, aborting")
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+    bad = nics.reject { |n| %w[inbound outbound].include?(n.rekey_phase) }
+    fail "BUG: phase monotonicity at phase_outbound: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
+    # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "outbound"
+    if nics.all? { |nic| nic.rekey_phase == "outbound" }
       nics.each(&:incr_old_state_drop_trigger)
+      # TLA   ∧ pc' = [pc EXCEPT ![s] = "phase_old_drop"]
+      # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait_old_state_drop
     end
 
     nap 5
   end
 
+  # TLA \* FinishRekey: phase_old_drop → idle.  Barrier + release all held locks.
+  # TLA \* Resets nicPhase to "idle" for all locked NICs, then releases locks.
+  # TLA FinishRekey(s) ==
+  # TLA   ∧ pc[s] = "phase_old_drop"
   label def wait_old_state_drop
-    nics = get_locked_nics
-    if nics.all? { |nic| nic.strand.label == "wait" }
+    nics = locked_nics
+    # TLA   ∧ heldLocks[s] ≠ {}
+    if nics.empty?
+      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
+      Clog.emit("All locked NICs destroyed during rekey, aborting")
+      private_subnet.update(state: "waiting")
+      hop_wait
+    end
+    bad = nics.reject { |n| %w[outbound old_drop].include?(n.rekey_phase) }
+    fail "BUG: phase monotonicity at phase_old_drop: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
+    # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "old_drop"
+    if nics.all? { |nic| nic.rekey_phase == "old_drop" }
       PrivateSubnet.where(id: nics.map(&:private_subnet_id).uniq).update(last_rekey_at: Time.now)
       private_subnet.update(state: "waiting")
-      get_locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil)
-      Semaphore.where(strand_id: nics.map(&:id), name: "lock").delete(force: true)
-      update_stack_locked_nics(nil)
+      # TLA   ∧ nicPhase' = [n ∈ AllNics ↦ IF n ∈ heldLocks[s] THEN "idle" ELSE nicPhase[n]]
+      # TLA   ∧ heldLocks' = [heldLocks EXCEPT ![s] = {}]
+      released = locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
+        rekey_coordinator_id: nil, rekey_phase: "idle")
+      # TLA   ∧ pc' = [pc EXCEPT ![s] = "idle"]
+      # TLA   ∧ UNCHANGED ⟨edges, ops, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait
     end
 
     nap 5
   end
 
+  # TLA \* Destroy: remove all edges of s, signal neighbors (must be idle with no locks).
+  # TLA \* Models destroy: disconnect_subnet (incr_refresh_keys on both sides) + destroy.
+  # TLA Destroy(s) ==
+  # TLA   ∧ pc[s] = "idle"
+  # TLA   ∧ heldLocks[s] = {}
+  # TLA   ∧ ops < MaxOps
+  # TLA   ∧ LET nbrs == Neighbors(s)
   label def destroy
+    fail "BUG: locks held at destroy" unless locked_nics_dataset.empty?
+
     if private_subnet.nics.any?(&:vm_id)
       unless Semaphore.where(strand_id: private_subnet.nics.filter_map(&:vm_id), name: "prevent_destroy").empty?
         register_deadline(nil, 10 * 60, allow_extension: true)
@@ -127,11 +264,17 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     decr_destroy
     private_subnet.remove_all_firewalls
 
+    # TLA     IN ∧ edges' = {e ∈ edges : e[1] ≠ s ∧ e[2] ≠ s}
     private_subnet.connected_subnets.each do |subnet|
       private_subnet.disconnect_subnet(subnet)
     end
 
     if private_subnet.nics.empty? && private_subnet.load_balancers.empty?
+      # TLA        ∧ refreshNeeded' = [t ∈ Subnets ↦
+      # TLA            IF t ∈ nbrs THEN refreshNeeded[t] + 1 ELSE refreshNeeded[t]]
+      # TLA        ∧ ops' = ops + 1
+      # TLA        ∧ UNCHANGED ⟨pc, heldLocks, nicPhase, activeNics⟩
+      # TLA
       private_subnet.destroy
       pop "subnet destroyed"
     else
@@ -141,27 +284,20 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     end
   end
 
+  # Proof: corresponds to TLA+ activeNics. Adding new NIC states here
+  # requires updating the proof's InitActiveNics and CreateNic.
+  REKEY_ACTIVE_STATES = %w[active creating].freeze
+
   def nics_to_rekey
-    nics_with_state(%w[active creating]).all
+    nics_with_state(REKEY_ACTIVE_STATES)
   end
 
-  def update_stack_locked_nics(locked_nics)
-    update_stack({"locked_nics" => locked_nics})
+  def locked_nics
+    locked_nics_dataset.all
   end
 
-  def get_locked_nics
-    get_locked_nics_dataset.all
-  end
-
-  def get_locked_nics_dataset
-    Nic.where(id: strand.stack.first["locked_nics"]).eager(:strand)
-  end
-
-  def try_advisory_lock
-    DB.select(
-      Sequel.function(:pg_try_advisory_xact_lock,
-        Sequel.function(:hashtext, private_subnet.id.to_s))
-    ).single_value
+  def locked_nics_dataset
+    Nic.where(rekey_coordinator_id: private_subnet.id)
   end
 
   private

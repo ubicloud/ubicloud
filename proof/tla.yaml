@@ -11,6 +11,9 @@ SubnetRekey:
   config: proof/subnet_rekey/SubnetRekey.cfg
   sources:
     - proof/subnet_rekey/header.tla
+    - model/metal/private_subnet.rb
+    - prog/vnet/metal/subnet_nexus.rb
+    - prog/vnet/metal/nic_nexus.rb
     - proof/subnet_rekey/spec.tla
   configs:
     3subnet:

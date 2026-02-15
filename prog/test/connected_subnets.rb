@@ -38,9 +38,21 @@ ExecStart=nc -l 8080 -6
       update_stack({"vm_to_be_connected_id" => vm_to_be_connected.id})
     end
 
-    unless ps_multiple.strand.label == "wait" && ps_single.strand.label == "wait" &&
-        !ps_multiple.refresh_keys_set? && !ps_single.refresh_keys_set? &&
-        !ps_multiple.update_firewall_rules_set? && !ps_single.update_firewall_rules_set?
+    multi_strand = ps_multiple.strand
+    single_strand = ps_single.strand
+    multi_sems = ps_multiple.semaphores.map(&:name)
+    single_sems = ps_single.semaphores.map(&:name)
+    Clog.emit("ConnectedSubnets poll",
+      {connected_subnets_poll: {
+        multi_label: multi_strand.label, multi_sems:,
+        single_label: single_strand.label, single_sems:,
+        multi_last_rekey: ps_multiple.last_rekey_at.iso8601,
+        single_last_rekey: ps_single.last_rekey_at.iso8601
+      }})
+
+    unless multi_strand.label == "wait" && single_strand.label == "wait" &&
+        !multi_sems.include?("refresh_keys") && !single_sems.include?("refresh_keys") &&
+        !multi_sems.include?("update_firewall_rules") && !single_sems.include?("update_firewall_rules")
       nap 5
     end
 

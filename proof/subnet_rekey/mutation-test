@@ -53,8 +53,8 @@ MUTATIONS = [
     name: "skip-leader-check",
     description: "Remove leader election — atomicity alone handles safety",
     type: :replace,
-    find: "  /\\ ConnectedLeader(s) = s\n  /\\ LET nics == AllConnectedNics(s)",
-    replace: "  /\\ LET nics == AllConnectedNics(s)",
+    find: "  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
+    replace: "  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
     expect: :pass
   },
   {
@@ -111,7 +111,7 @@ MUTATIONS = [
     type: :replace,
     find: "  /\\ heldLocks' = [s \\in Subnets |-> heldLocks[s] \\ {n}]\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"idle\"]",
     replace: "  /\\ heldLocks' = [s \\in Subnets |-> heldLocks[s] \\ {n}]\n  /\\ UNCHANGED nicPhase",
-    expect: "NoPhaseWithoutLock"
+    expect: "InactiveNicsIdle"
   },
   {
     name: "skip-nic-pc-guard",
@@ -133,9 +133,9 @@ MUTATIONS = [
     name: "skip-idle-guard",
     description: "Remove pc=idle guard from EnterAndLock — re-entry overwrites heldLocks",
     type: :replace,
-    find: "  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s\n  /\\ LET nics == AllConnectedNics(s)",
-    replace: "  /\\ ConnectedLeader(s) = s\n  /\\ LET nics == AllConnectedNics(s)",
-    cfg: {"InitActiveNics" => "{1, 3}", "MaxOps" => "3"},
+    find: "  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
+    replace: "  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
+    cfg: {"InitActiveNics" => "{1, 3}", "MaxOps" => "3", "MaxRefresh" => "7"},
     expect: "NoPhaseWithoutLock"
   },
   {

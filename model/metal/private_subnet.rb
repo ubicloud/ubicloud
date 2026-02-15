@@ -2,23 +2,46 @@
 
 class PrivateSubnet < Sequel::Model
   module Metal
+    # TLA:module SubnetRekey
+    #
+    # TLA \* ConnectSubnets: add edge — unrestricted, can happen mid-rekey.
+    # TLA \* Sets refreshNeeded on both subnets (Ruby: subnet.incr_refresh_keys).
+    # TLA ConnectSubnets(a, b) ==
+    # TLA   ∧ a ∈ Subnets ∧ b ∈ Subnets ∧ a < b
+    # TLA   ∧ ⟨a, b⟩ ∉ edges
+    # TLA   ∧ ops < MaxOps
     def connect_subnet(subnet)
+      # TLA   ∧ edges' = edges ∪ {⟨a, b⟩}
       ConnectedSubnet.create(subnet_hash(subnet))
       nics.each do |nic|
         create_tunnels(subnet.nics, nic)
       end
+      # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![a] = @ + 1, ![b] = @ + 1]
       subnet.incr_refresh_keys
+      incr_refresh_keys
+      # TLA   ∧ ops' = ops + 1
+      # TLA   ∧ UNCHANGED ⟨pc, heldLocks, nicPhase, activeNics⟩
+      # TLA
     end
 
+    # TLA \* DisconnectSubnets: remove edge.  Both sides get refreshNeeded.
+    # TLA DisconnectSubnets(a, b) ==
+    # TLA   ∧ ⟨a, b⟩ ∈ edges
+    # TLA   ∧ ops < MaxOps
     def disconnect_subnet(subnet)
       nics(eager: {src_ipsec_tunnels: [:src_nic, :dst_nic]}, dst_ipsec_tunnels: [:src_nic, :dst_nic]).each do |nic|
         (nic.src_ipsec_tunnels + nic.dst_ipsec_tunnels).each do |tunnel|
           tunnel.destroy if tunnel.src_nic.private_subnet_id == subnet.id || tunnel.dst_nic.private_subnet_id == subnet.id
         end
       end
+      # TLA   ∧ edges' = edges \ {⟨a, b⟩}
       ConnectedSubnet.where(subnet_hash(subnet)).destroy
+      # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![a] = @ + 1, ![b] = @ + 1]
       subnet.incr_refresh_keys
       incr_refresh_keys
+      # TLA   ∧ ops' = ops + 1
+      # TLA   ∧ UNCHANGED ⟨pc, heldLocks, nicPhase, activeNics⟩
+      # TLA
     end
 
     def create_tunnels(nics, src_nic)

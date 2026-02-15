@@ -13,7 +13,7 @@ class Nic < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated,
+    :old_state_drop_trigger, :setup_nic, :repopulate, :vm_allocated,
     :migrate_to_separate_prog
 
   def self.ubid_to_name(ubid)
@@ -34,10 +34,6 @@ class Nic < Sequel::Model
 
   def private_ipv4_gateway
     private_subnet.net4.nth(1).to_s + private_subnet.net4.netmask.to_s
-  end
-
-  def unlock
-    Semaphore.where(strand_id: id, name: "lock").delete(force: true)
   end
 end
 

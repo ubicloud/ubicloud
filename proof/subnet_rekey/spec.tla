@@ -17,7 +17,7 @@ Init ==
   /\ ops = 0
   /\ nicPhase = [n \in AllNics |-> "idle"]
   /\ activeNics = InitActiveNics
-  /\ refreshNeeded = [s \in Subnets |-> FALSE]
+  /\ refreshNeeded = [s \in Subnets |-> 0]
 
 Next ==
   \/ \E a, b \in Subnets : ConnectSubnets(a, b)
@@ -69,7 +69,7 @@ TypeOK ==
   /\ ops \in 0..MaxOps
   /\ nicPhase \in [AllNics -> {"idle", "inbound", "outbound", "old_drop"}]
   /\ activeNics \subseteq AllNics
-  /\ refreshNeeded \in [Subnets -> BOOLEAN]
+  /\ refreshNeeded \in [Subnets -> 0..MaxRefresh]
 
 \* MutualExclusion: no NIC is locked by two subnets simultaneously.
 MutualExclusion ==
@@ -117,9 +117,17 @@ InactiveNicsIdle ==
 \* RekeyCompletes: every rekey eventually finishes.
 RekeyCompletes == \A s \in Subnets : pc[s] /= "idle" ~> pc[s] = "idle"
 
-\* RefreshEventuallyConsumed: every refresh request eventually gets processed.
+\* RefreshEventuallyConsumed: every refresh request eventually gets fully consumed.
 RefreshEventuallyConsumed ==
-  \A s \in Subnets : refreshNeeded[s] ~> ~refreshNeeded[s]
+  \A s \in Subnets : refreshNeeded[s] > 0 ~> refreshNeeded[s] = 0
+
+\* EventualQuiescence: after all topology/lifecycle impulses, system settles.
+\* Impulses (connect, disconnect, create, destroy) can arrive at any time
+\* and interleave freely with rekey processing.  MaxOps bounds the total
+\* impulse count for TLC; the convergence is structural (drain semantics +
+\* no derivative signals from FinishRekey) and independent of MaxOps.
+EventualQuiescence ==
+  ops = MaxOps ~> (\A s \in Subnets : pc[s] = "idle" /\ refreshNeeded[s] = 0)
 
 \* NicPhaseProgress: every NIC with pending crypto eventually settles.
 \* NIC-level complement to RekeyCompletes (coordinator-level): a NIC in
