@@ -84,7 +84,8 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
     let(:nic) {
       Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:1::",
         private_ipv4: "10.0.0.3", mac: "00:00:00:00:00:02",
-        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-rekey", state: "active")
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579", name: "test-nic-rekey", state: "active",
+        rekey_coordinator_id: ps.id)
     }
 
     before do
@@ -100,50 +101,93 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nx).to receive(:retval).and_return({"msg" => "inbound_setup is complete"})
       expect(nx).to receive(:decr_start_rekey)
       expect { nx.start_rekey }.to hop("wait_rekey_outbound_trigger")
+      expect(nic.reload.rekey_phase).to eq("inbound")
+    end
+
+    it "fails if NIC not locked at start_rekey entry" do
+      nic.update(rekey_coordinator_id: nil)
+      expect { nx.start_rekey }.to raise_error RuntimeError, /NIC not locked at start_rekey entry/
+    end
+
+    it "fails if NIC not locked when advancing to inbound" do
+      nic.update(rekey_coordinator_id: nil)
+      expect(nx).to receive(:retval).and_return({"msg" => "inbound_setup is complete"})
+      expect(nx).to receive(:decr_start_rekey)
+      expect { nx.start_rekey }.to raise_error RuntimeError, /NIC not locked for rekey/
+    end
+
+    it "fails if NIC phase is not idle when advancing to inbound" do
+      nic.update(rekey_phase: "inbound")
+      expect(nx).to receive(:retval).and_return({"msg" => "inbound_setup is complete"})
+      expect(nx).to receive(:decr_start_rekey)
+      expect { nx.start_rekey }.to raise_error RuntimeError, /phase should be idle before advancing to inbound/
     end
 
     it "if outbound setup is not triggered, just naps" do
+      nic.update(rekey_phase: "inbound")
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_return(false)
       expect { nx.wait_rekey_outbound_trigger }.to nap(5)
     end
 
     it "if outbound setup is triggered, pushes setup_outbound and naps" do
+      nic.update(rekey_phase: "inbound")
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_yield
       expect(nx).to receive(:decr_trigger_outbound_update)
       expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound)
       expect { nx.wait_rekey_outbound_trigger }.to nap(5)
     end
 
+    it "fails if NIC not locked in wait_rekey_outbound_trigger" do
+      nic.update(rekey_coordinator_id: nil, rekey_phase: "inbound")
+      expect { nx.wait_rekey_outbound_trigger }.to raise_error RuntimeError, /NIC not locked in wait_rekey_outbound_trigger/
+    end
+
+    it "fails if NIC phase is not inbound when advancing to outbound" do
+      nic.update(rekey_phase: "idle")
+      expect(nx).to receive(:retval).and_return({"msg" => "outbound_setup is complete"})
+      expect { nx.wait_rekey_outbound_trigger }.to raise_error RuntimeError, /phase should be inbound before advancing to outbound/
+    end
+
     it "hops to wait_rekey_old_state_drop_trigger if outbound_setup is completed" do
+      nic.update(rekey_phase: "inbound")
       expect(nx).to receive(:retval).and_return({"msg" => "outbound_setup is complete"})
       expect { nx.wait_rekey_outbound_trigger }.to hop("wait_rekey_old_state_drop_trigger")
+      expect(nic.reload.rekey_phase).to eq("outbound")
     end
 
     it "wait_rekey_old_state_drop_trigger naps if trigger is not set" do
+      nic.update(rekey_phase: "outbound")
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_return(false)
 
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
     it "wait_rekey_old_state_drop_trigger pushes drop_old_state and naps if trigger is set" do
+      nic.update(rekey_phase: "outbound")
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_yield
       expect(nx).to receive(:decr_old_state_drop_trigger)
       expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state)
       expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
     end
 
-    it "hops to wait if drop_old_state is completed, updates state if it's not active yet" do
-      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
-      nic.update(state: "creating")
-      expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
-      expect(nic.reload.state).to eq("active")
+    it "fails if NIC not locked in wait_rekey_old_state_drop_trigger" do
+      nic.update(rekey_coordinator_id: nil, rekey_phase: "outbound")
+      expect { nx.wait_rekey_old_state_drop_trigger }.to raise_error RuntimeError, /NIC not locked in wait_rekey_old_state_drop_trigger/
     end
 
-    it "hops to wait if drop_old_state is completed, doesn't update state if it's already active" do
+    it "fails if NIC phase is not outbound when advancing to old_drop" do
+      nic.update(rekey_phase: "inbound")
       expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
-      nic.update(state: "active")
+      expect { nx.wait_rekey_old_state_drop_trigger }.to raise_error RuntimeError, /phase should be outbound before advancing to old_drop/
+    end
+
+    it "hops to wait if drop_old_state is completed, updates state and rekey_phase" do
+      expect(nx).to receive(:retval).and_return({"msg" => "drop_old_state is complete"})
+      nic.update(state: "creating", rekey_phase: "outbound")
       expect { nx.wait_rekey_old_state_drop_trigger }.to hop("wait")
-      expect(nic.reload.state).to eq("active")
+      nic.reload
+      expect(nic.state).to eq("active")
+      expect(nic.rekey_phase).to eq("old_drop")
     end
   end
 
