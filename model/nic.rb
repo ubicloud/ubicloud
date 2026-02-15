@@ -59,8 +59,9 @@ end
 # Check constraints:
 #  state | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
 # Foreign key constraints:
-#  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
-#  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)
+#  nic_private_subnet_id_fkey    | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic_rekey_coordinator_id_fkey | (rekey_coordinator_id) REFERENCES private_subnet(id)
+#  nic_vm_id_fkey                | (vm_id) REFERENCES vm(id)
 # Referenced By:
 #  ipsec_tunnel     | ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
 #  ipsec_tunnel     | ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)

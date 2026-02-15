@@ -1,0 +1,190 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Always operate from the project root so relative paths in tla.yaml work.
+Dir.chdir(File.expand_path("..", __dir__))
+
+require_relative "lib/proof_extract"
+require "tempfile"
+
+$stdout.sync = true
+
+PROOFFILE = File.join("proof", "tla.yaml")
+
+def usage
+  warn <<~USAGE
+    usage: #{$0} list                           show available proofs
+           #{$0} pretty NAME                    pretty-print in unicode
+           #{$0} check [-c CONFIG] [K=V ...] NAME  run TLC model checker
+           #{$0} trace NAME LINE                map TLC line to source
+           #{$0} assemble NAME                  assemble .tla + .map
+  USAGE
+  exit 1
+end
+
+def resolve_proof(name)
+  proofs = ProofExtract.load_prooffile(PROOFFILE)
+  proofs[name] || abort("error: proof '#{name}' not found in tla.yaml (have: #{proofs.keys.join(", ")})")
+end
+
+def run_tlc(name, spec, config_name: nil, overrides: {})
+  # Assemble
+  tla_path = File.join(spec[:dir], "#{name}.tla")
+  output_lines, source_map = ProofExtract.assemble(spec[:sources], mod: name)
+  File.write(tla_path, output_lines.join("\n") + "\n")
+  map_path = "#{tla_path}.map"
+  File.write(map_path, ProofExtract.source_map_to_json(source_map) + "\n")
+  warn "wrote #{tla_path} (#{output_lines.size} lines)"
+
+  # Config — start from named config or base, then layer inline overrides
+  all_overrides = {}
+  base_cfg = spec[:config]
+  if config_name
+    named = spec[:configs][config_name]
+    unless named
+      available = spec[:configs].keys.join(", ")
+      abort "error: config '#{config_name}' not found (available: #{available})"
+    end
+    # Per-config base .cfg override (e.g. core configs with VIEW)
+    base_cfg = named["config"] || base_cfg
+    all_overrides.merge!(named.except("config"))
+  end
+  all_overrides.merge!(overrides)
+
+  if all_overrides.empty?
+    cfg_path = base_cfg
+  else
+    patched = ProofExtract.override_cfg(base_cfg, all_overrides)
+    tmp = Tempfile.new(["#{name}_check", ".cfg"])
+    tmp.write(patched)
+    tmp.close
+    cfg_path = tmp.path
+    label = config_name ? "config '#{config_name}'" : "overrides"
+    warn "#{label}: #{all_overrides.map { |k, v| "#{k}=#{v}" }.join(", ")}"
+  end
+
+  # Run TLC — stream output live, capture for annotation on failure
+  output = +""
+  IO.popen("tlc -deadlock -config #{cfg_path} #{tla_path} 2>&1") do |io|
+    io.each_line do |line|
+      $stdout.puts line
+      output << line
+    end
+  end
+  unless $?.success?
+    warn ProofExtract.annotate_tlc_output(output, map_path)
+    exit($?.exitstatus)
+  end
+end
+
+args = ARGV.dup
+subcmd = args.shift
+usage unless subcmd
+
+case subcmd
+when "list"
+  proofs = ProofExtract.load_prooffile(PROOFFILE)
+  proofs.each do |name, spec|
+    configs = spec[:configs].keys
+    config_info = configs.empty? ? "" : "  configs: #{configs.join(", ")}"
+    puts "#{name}  (#{spec[:sources].size} sources, config: #{spec[:config]})#{config_info}"
+  end
+
+when "pretty"
+  usage if args.empty?
+  name = args[0]
+  spec = resolve_proof(name)
+  output_lines, = ProofExtract.assemble(spec[:sources], mod: name, unicode: true, backrefs: true)
+  $stdout.write(output_lines.join("\n") + "\n")
+
+when "check"
+  config_name = nil
+  if (idx = args.index("-c") || args.index("--config"))
+    args.delete_at(idx)
+    config_name = args.delete_at(idx)
+    abort "error: -c requires a config name" unless config_name
+  end
+  overrides = {}
+  args.reject! do |arg|
+    if arg.include?("=")
+      k, v = arg.split("=", 2)
+      overrides[k] = v
+      true
+    end
+  end
+  usage if args.size != 1
+  name = args[0]
+  spec = resolve_proof(name)
+  run_tlc(name, spec, config_name:, overrides:)
+
+when "trace"
+  usage if args.size != 2
+  name_or_map = args[0]
+  line = Integer(args[1])
+
+  if File.extname(name_or_map).empty?
+    spec = resolve_proof(name_or_map)
+    map_path = File.join(spec[:dir], "#{name_or_map}.tla.map")
+  else
+    map_path = name_or_map
+  end
+
+  puts ProofExtract.trace(map_path, line)
+
+when "assemble"
+  if args.first == "--help"
+    warn <<~HELP
+      usage: #{$0} assemble NAME                  assemble from tla.yaml
+             #{$0} assemble FILE... [-o OUT]       assemble raw files
+             #{$0} assemble -m MODULE FILE...      scope to module
+    HELP
+    exit 1
+  end
+
+  output_path = nil
+  mod = nil
+  input_paths = []
+  i = 0
+  while i < args.size
+    case args[i]
+    when "-o"
+      i += 1
+      abort "error: -o requires an argument" if i >= args.size
+      output_path = args[i]
+    when "-m"
+      i += 1
+      abort "error: -m requires a module name" if i >= args.size
+      mod = args[i]
+    else
+      input_paths << args[i]
+    end
+    i += 1
+  end
+
+  usage if input_paths.empty?
+
+  # Resolve proof name via tla.yaml
+  if input_paths.size == 1 && File.extname(input_paths[0]).empty?
+    name = input_paths[0]
+    spec = resolve_proof(name)
+    input_paths = spec[:sources]
+    mod ||= name
+    output_path ||= File.join(spec[:dir], "#{name}.tla")
+  end
+
+  output_lines, source_map = ProofExtract.assemble(input_paths, mod:)
+  tla_content = output_lines.join("\n") + "\n"
+
+  if output_path
+    File.write(output_path, tla_content)
+    map_path = "#{output_path}.map"
+    File.write(map_path, ProofExtract.source_map_to_json(source_map) + "\n")
+    warn "wrote #{output_path} (#{output_lines.size} lines)"
+    warn "wrote #{map_path}"
+  else
+    $stdout.write(tla_content)
+  end
+
+else
+  usage
+end
