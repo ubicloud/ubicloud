@@ -1,0 +1,75 @@
+name: TLA+ Proof Check
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'proof/**'
+    - 'model/metal/private_subnet.rb'
+    - 'prog/vnet/metal/subnet_nexus.rb'
+    - 'prog/vnet/metal/nic_nexus.rb'
+    - '.github/workflows/tla.yml'
+  workflow_dispatch:
+
+jobs:
+  model-check:
+    name: "TLC (${{ matrix.proof }}${{ matrix.config && format(' / {0}', matrix.config) || '' }})"
+    runs-on: ubicloud-standard-30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - proof: SubnetRekey
+        - proof: SubnetRekey
+          config: 3subnet
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 17
+
+    - name: Install tla2tools
+      run: |
+        sudo wget -nv -O /usr/local/lib/tla2tools.jar \
+          https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+        printf '#!/bin/sh\nexec java -XX:+UseParallelGC -Dtlc2.TLC.stopAfter=600 -cp /usr/local/lib/tla2tools.jar tlc2.TLC "$@"\n' | sudo tee /usr/local/bin/tlc > /dev/null
+        sudo chmod +x /usr/local/bin/tlc
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+
+    - name: Run TLC
+      run: |
+        if [ -n "${{ matrix.config }}" ]; then
+          ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+        else
+          ruby proof/tla check "${{ matrix.proof }}"
+        fi
+
+  proof-tool-spec:
+    name: proof-tool specs
+    runs-on: ubicloud
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+        bundler-cache: true
+      env:
+        BUNDLE_GEMFILE: proof/Gemfile
+
+    - name: Run specs
+      run: cd proof && bundle exec rspec spec
