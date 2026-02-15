@@ -102,6 +102,10 @@ end
     fail Nap.new(seconds)
   end
 
+  def hibernate
+    nap(60 * 60 * 24 * 365 * 1000)
+  end
+
   def pop(arg)
     outval = Sequel.pg_jsonb_wrap(
       case arg

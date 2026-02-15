@@ -9,7 +9,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     when_vm_allocated_set? do
       hop_wait_setup
     end
-    nap 5
+    hibernate
   end
 
   # TLA \* CreateNic: activate an inactive NIC.  Sets refreshNeeded on owner.
@@ -34,7 +34,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     when_start_rekey_set? do
       hop_start_rekey
     end
-    nap 5
+    hibernate
   end
 
   label def wait
@@ -47,7 +47,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       hop_start_rekey
     end
 
-    nap 6 * 60 * 60
+    hibernate
   end
 
   label def start_rekey
@@ -104,7 +104,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       push Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound
     end
 
-    nap 5
+    hibernate
   end
 
   label def wait_rekey_old_state_drop_trigger
@@ -132,7 +132,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       push Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state
     end
 
-    nap 5
+    hibernate
   end
 
   # TLA \* DestroyNic: deactivate an active NIC.  Removes from heldLocks (FK cascade).
