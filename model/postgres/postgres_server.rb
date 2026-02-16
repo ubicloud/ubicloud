@@ -462,9 +462,11 @@ end
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
 #  version                | text                     | NOT NULL
 #  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
+#  is_representative      | boolean                  | NOT NULL DEFAULT false
 # Indexes:
-#  postgres_server_pkey1             | PRIMARY KEY btree (id)
-#  postgres_server_resource_id_index | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
+#  postgres_server_pkey1                             | PRIMARY KEY btree (id)
+#  postgres_server_resource_id_index                 | UNIQUE btree (resource_id) WHERE representative_at IS NOT NULL
+#  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
 # Check constraints:
 #  version_check | (version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 # Foreign key constraints:
