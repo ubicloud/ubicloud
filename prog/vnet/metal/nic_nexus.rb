@@ -54,12 +54,10 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     decr_start_rekey
 
     # TLA \* NicAdvanceInbound: idle → inbound (after setup_inbound).
-    # TLA \* pc[s] = "phase_inbound" is structurally guaranteed: a locked idle NIC's
-    # TLA \* coordinator must be at phase_inbound (EnterAndLock sets both atomically).
     # TLA NicAdvanceInbound(n) ==
     # TLA   ∧ n ∈ activeNics
     # TLA   ∧ nicPhase[n] = "idle"
-    # TLA   ∧ IsLocked(n)
+    # TLA   ∧ ∃ s ∈ Subnets : n ∈ heldLocks[s] ∧ pc[s] = "phase_inbound"
     if retval&.dig("msg") == "inbound_setup is complete"
       fail "BUG: NIC not locked for rekey" unless nic.rekey_coordinator_id
       fail "BUG: NIC phase should be idle before advancing to inbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "idle"
@@ -70,8 +68,8 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       hop_wait_rekey_outbound_trigger
     end
 
-    # Guard: n ∈ heldLocks[s] ∧ nicPhase[n] = "idle" (NicAdvanceInbound precondition).
-    # pc[s] = "phase_inbound" guaranteed by semaphore ordering (mutation: skip-nic-pc-guard).
+    # Guard: n ∈ heldLocks[s] ∧ pc[s] = "phase_inbound" ∧ nicPhase[n] = "idle".
+    # pc[s] = "phase_inbound" guaranteed by semaphore ordering (mutation: skip-nic-inbound-pc-guard).
     fail "BUG: unexpected start_rekey signal (phase=#{nic.rekey_phase}, locked=#{!nic.rekey_coordinator_id.nil?})" unless nic.rekey_coordinator_id && nic.rekey_phase == "idle"
 
     # Proof boundary: RekeyNicTunnel is unmodeled (idempotent infrastructure).

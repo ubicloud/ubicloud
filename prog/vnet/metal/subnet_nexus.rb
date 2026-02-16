@@ -10,12 +10,8 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     super unless destroy_set? && !locked_nics_dataset.empty?
   end
 
-  def connected_leader
-    @connected_leader ||= PrivateSubnet[private_subnet.connected_leader_id]
-  end
-
   def connected_leader?
-    connected_leader.id == private_subnet.id
+    private_subnet.connected_leader_id == private_subnet.id
   end
 
   label def start
@@ -45,11 +41,10 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
         # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0, ![ConnectedLeader(s)] = @ + 1]
         # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, nicPhase, activeNics⟩
         # TLA
-        connected_leader.incr_refresh_keys
+        PrivateSubnet[private_subnet.connected_leader_id].incr_refresh_keys
         nap 0
       end
 
-      private_subnet.update(state: "refreshing_keys")
       hop_refresh_keys
     end
 
@@ -77,64 +72,62 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     SecureRandom.random_number(1...100000)
   end
 
-  # TLA \* EnterAndLock: idle → phase_inbound.  Atomic read + lock.
-  # TLA \* Leader election ensures one coordinator per component (liveness).
-  # TLA \* FOR UPDATE + coordinator check: row locks serialize the read-check-claim.
+  # TLA \* ReadAndLock: idle → refresh_keys.  Acquire NIC row locks (FOR UPDATE).
+  # TLA \* FOR UPDATE does not lock topology tables; ConnectedLeader can change
+  # TLA \* before ClaimOrBail re-checks leadership.
   # TLA \* Note: refreshNeeded' consumed earlier in wait:decr_refresh_keys.
-  # TLA EnterAndLock(s) ==
+  # TLA ReadAndLock(s) ==
   # TLA   ∧ pc[s] = "idle"
   # TLA   ∧ ConnectedLeader(s) = s
   # TLA   ∧ refreshNeeded[s] > 0
+  # TLA   ∧ LET nics == AllConnectedNics(s)
+  # TLA     IN ∧ ∀ n ∈ nics : ¬IsLocked(n)
+  # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
+  # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0]
+  # TLA   ∧ pc' = [pc EXCEPT ![s] = "refresh_keys"]
+  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
+  # TLA
+  # TLA \* ClaimOrBail: refresh_keys → phase_inbound (proceed) or idle (bail).
+  # TLA \* Re-checks leadership post-lock; topology may have changed since ReadAndLock.
+  # TLA ClaimOrBail(s) ==
+  # TLA   ∧ pc[s] = "refresh_keys"
+  # TLA   ∧ IF ConnectedLeader(s) = s ∧ heldLocks[s] ≠ {}
+  # TLA     THEN ∧ pc' = [pc EXCEPT ![s] = "phase_inbound"]
+  # TLA          ∧ UNCHANGED ⟨heldLocks, refreshNeeded⟩
+  # TLA     ELSE ∧ heldLocks' = [heldLocks EXCEPT ![s] = {}]
+  # TLA          ∧ pc' = [pc EXCEPT ![s] = "idle"]
+  # TLA          ∧ refreshNeeded' = IF ConnectedLeader(s) ≠ s
+  # TLA                              THEN [refreshNeeded EXCEPT ![s] = @ + 1]
+  # TLA                              ELSE refreshNeeded
+  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
+  # TLA
   label def refresh_keys
     fail "BUG: locks held at idle" unless locked_nics_dataset.empty?
 
-    unless connected_leader?
-      Clog.emit("No longer the connected leader", {not_connected_leader: {private_subnet:, connected_leader:}})
-      # Proof-critical: re-enqueue the signal consumed by decr_refresh_keys in wait,
-      # so ForwardRefreshKeys will deliver it to the actual leader.
-      private_subnet.incr_refresh_keys
-      hop_wait
-    end
-
-    # TLA   ∧ LET nics == AllConnectedNics(s)
-    # Proof-critical: FOR UPDATE provides atomicity for EnterAndLock.
+    # Proof: ReadAndLock — FOR UPDATE provides atomicity.
     # Removing this breaks MutualExclusion (see skip-write-recheck mutation).
     nics = nics_to_rekey.order(:id).for_update.all
 
-    # Re-check leadership after acquiring row locks — topology may have
-    # changed between the initial check and FOR UPDATE.
-    @connected_leader = nil
+    # Proof: ClaimOrBail — re-check leadership post-lock.
+    # Topology may have changed since wait; re-enqueue for the actual leader.
     unless connected_leader?
-      Clog.emit("No longer connected leader after FOR UPDATE",
-        {leader_changed_after_lock: {private_subnet_id: private_subnet.id}})
       private_subnet.incr_refresh_keys
       hop_wait
     end
 
     if nics.empty?
-      private_subnet.update(state: "waiting")
       hop_wait
     end
 
-    # TLA     IN ∧ ∀ n ∈ nics : ¬IsLocked(n)
     if nics.any?(&:rekey_coordinator_id)
-      private_subnet.update(state: "waiting")
       hop_wait
     end
 
-    # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
     claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
       .update(rekey_coordinator_id: private_subnet.id)
     # :nocov:
-    # Structurally unreachable: line 89 checks the same predicate (rekey_coordinator_id
-    # == nil) on the same set, within the same transaction, under FOR UPDATE row locks.
-    # Collapsing lines 89+95 into a single conditional UPDATE would make this branch
-    # reachable and testable, but the in-memory check on 89 avoids write amplification
-    # in the expected contention case (previous rekey in progress, leader flap): bail
-    # with zero writes vs. partial UPDATE + rollback or explicit cleanup. Testing the
-    # current structure requires mocking the UPDATE return value or injecting writes
-    # between two sequential lines with no hookable seam — neither is worth the cost
-    # for a checksum on a FOR UPDATE guarantee.
+    # Structurally unreachable: the lock check above verifies rekey_coordinator_id is nil
+    # on the same set, within the same transaction, under FOR UPDATE row locks.
     fail "BUG: locked #{claimed}/#{nics.count} NICs" unless claimed == nics.count
     # :nocov:
 
@@ -148,10 +141,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       private_subnet.create_tunnels(nics, nic)
     end
 
-    # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0]
-    # TLA   ∧ pc' = [pc EXCEPT ![s] = "phase_inbound"]
-    # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
-    # TLA
+    private_subnet.update(state: "refreshing_keys")
     hop_wait_inbound_setup
   end
 

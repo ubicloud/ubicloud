@@ -8,8 +8,6 @@ AbortRekey(s) ==
 
 ----
 
-ASSUME MaxRefresh >= 2 * MaxOps + 1
-
 Init ==
   /\ edges = {}
   /\ pc = [s \in Subnets |-> "idle"]
@@ -22,7 +20,8 @@ Init ==
 Next ==
   \/ \E a, b \in Subnets : ConnectSubnets(a, b)
   \/ \E a, b \in Subnets : DisconnectSubnets(a, b)
-  \/ \E s \in Subnets : EnterAndLock(s)
+  \/ \E s \in Subnets : ReadAndLock(s)
+  \/ \E s \in Subnets : ClaimOrBail(s)
   \/ \E n \in AllNics : NicAdvanceInbound(n)
   \/ \E n \in AllNics : NicAdvanceOutbound(n)
   \/ \E n \in AllNics : NicAdvanceOldDrop(n)
@@ -38,12 +37,12 @@ Next ==
 Spec == Init /\ [][Next]_vars
 
 \* ProgressSpec: the system makes progress under contention.
-\* SF on EnterAndLock and ForwardRefreshKeys — both have guards that
+\* SF on ReadAndLock and ForwardRefreshKeys — both have guards that
 \* flicker under contention (another coordinator repeatedly locks/unlocks
 \* shared NICs, topology changes under signal forwarding).  WF does not
 \* guarantee progress when enablement is intermittent; SF does.
-\* All other actions are continuously enabled once their pc guard holds,
-\* so WF suffices.
+\* ClaimOrBail is continuously enabled once pc = "refresh_keys" (only
+\* ClaimOrBail itself changes that pc), so WF suffices.
 ProgressSpec == Spec
   /\ \A n \in AllNics :
        /\ WF_vars(NicAdvanceInbound(n))
@@ -54,7 +53,8 @@ ProgressSpec == Spec
        /\ WF_vars(AdvanceOutbound(s))
        /\ WF_vars(FinishRekey(s))
        /\ WF_vars(AbortRekey(s))
-       /\ SF_vars(EnterAndLock(s))
+       /\ WF_vars(ClaimOrBail(s))
+       /\ SF_vars(ReadAndLock(s))
        /\ SF_vars(ForwardRefreshKeys(s))
 
 ----
@@ -63,13 +63,13 @@ ProgressSpec == Spec
 
 TypeOK ==
   /\ edges \subseteq Edge
-  /\ pc \in [Subnets -> {"idle", "phase_inbound",
+  /\ pc \in [Subnets -> {"idle", "refresh_keys", "phase_inbound",
                           "phase_outbound", "phase_old_drop"}]
   /\ \A s \in Subnets : heldLocks[s] \subseteq AllNics
   /\ ops \in 0..MaxOps
   /\ nicPhase \in [AllNics -> {"idle", "inbound", "outbound", "old_drop"}]
   /\ activeNics \subseteq AllNics
-  /\ refreshNeeded \in [Subnets -> 0..MaxRefresh]
+  /\ refreshNeeded \in [Subnets -> Nat]
 
 \* MutualExclusion: no NIC is locked by two subnets simultaneously.
 MutualExclusion ==
@@ -95,7 +95,8 @@ NoPhaseWithoutLock ==
 PhaseCoordinatorAlignment ==
   \A n \in AllNics : \A s \in Subnets :
     n \in heldLocks[s] =>
-      nicPhase[n] \in CASE pc[s] = "phase_inbound"  -> {"idle", "inbound"}
+      nicPhase[n] \in CASE pc[s] = "refresh_keys"   -> {"idle"}
+                        [] pc[s] = "phase_inbound"   -> {"idle", "inbound"}
                         [] pc[s] = "phase_outbound"  -> {"inbound", "outbound"}
                         [] pc[s] = "phase_old_drop"  -> {"outbound", "old_drop"}
                         [] OTHER                     -> {"idle"}

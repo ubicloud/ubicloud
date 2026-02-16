@@ -91,7 +91,6 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "hops to refresh_keys if when_refresh_keys_set?" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
-      expect(ps.reload.state).to eq("refreshing_keys")
     end
 
     it "increments refresh_keys if it passed more than a day" do
@@ -155,7 +154,6 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "hops to wait if not the connected leader" do
       expect(nx).to receive(:connected_leader?).and_return(false)
-      expect(Clog).to receive(:emit)
       expect { nx.refresh_keys }.to hop("wait")
       expect(Semaphore.where(strand_id: nx.private_subnet.id, name: "refresh_keys").count).to eq(1)
     end
@@ -174,6 +172,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.start_rekey_set?).to be true
       expect(nic.rekey_coordinator_id).to eq(ps.id)
       expect(nic.rekey_phase).to eq("idle")
+      expect(ps.reload.state).to eq("refreshing_keys")
     end
 
     it "hops to wait if the nics are locked by another coordinator" do

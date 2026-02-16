@@ -3,7 +3,12 @@
 \*
 \* Models subnet_nexus.rb#refresh_keys: multiple subnets in a
 \* connected mesh can attempt lock acquisition concurrently.
-\* Lock acquisition is atomic (FOR UPDATE row locks on coordinator FK).
+\* FOR UPDATE row locks prevent double-locking (MutualExclusion),
+\* but do not lock the topology tables — ConnectedLeader(s) can
+\* change between lock acquisition and the leadership re-check.
+\* This seam is modeled as two steps: ReadAndLock (acquire locks,
+\* pc "idle" → "refresh_keys") and ClaimOrBail (validate leadership,
+\* "refresh_keys" → "phase_inbound" or bail to "idle").
 \*
 \* Additionally models:
 \*   - NIC creation and destruction during rekey cycles
@@ -21,8 +26,7 @@ CONSTANTS
   AllNics,          \* Set of all possible NIC IDs (universe for TLC)
   NicOwner,         \* [AllNics -> Subnets] — static ownership (NICs never migrate between subnets)
   InitActiveNics,   \* SUBSET AllNics — initially active NICs
-  MaxOps,           \* Nat — bounds topology/lifecycle operations
-  MaxRefresh        \* Nat — bounds refreshNeeded counter (for TLC)
+  MaxOps            \* Nat — bounds topology/lifecycle operations
 
 VARIABLES
   edges,            \* SUBSET Edge — connected_subnet graph

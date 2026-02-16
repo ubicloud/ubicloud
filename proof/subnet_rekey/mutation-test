@@ -13,9 +13,10 @@
 #   - Removing outbound barrier → PhaseCoordinatorAlignment violated
 #   - Removing old_drop barrier (FinishRekey) → pass (semantic guard only)
 #   - DestroyNic not resetting nicPhase → InactiveNicsIdle violated
+#   - NicAdvanceInbound without pc guard → PhaseCoordinatorAlignment violated
 #   - NicAdvanceOutbound without pc guard → PhaseCoordinatorAlignment violated
 #   - NicAdvanceOldDrop without pc guard → PhaseCoordinatorAlignment violated
-#   - Removing idle guard from EnterAndLock → NoPhaseWithoutLock violated
+#   - Removing idle guard from ReadAndLock  → NoPhaseWithoutLock violated
 #   - ForwardRefreshKeys not clearing sender → RefreshBounded violated
 #   - AbortRekey without empty heldLocks check → NoOrphanedLocks violated
 #   - Destroy without pc=idle check → pass (heldLocks={} sufficient)
@@ -36,8 +37,7 @@ MUTATION_CFG = {
   "Subnets" => "{1, 2}",
   "AllNics" => "{1, 2, 3, 4}",
   "InitActiveNics" => "{1, 2, 3}",
-  "MaxOps" => "2",
-  "MaxRefresh" => "5"
+  "MaxOps" => "2"
 }.freeze
 
 MUTATIONS = [
@@ -114,6 +114,14 @@ MUTATIONS = [
     expect: "InactiveNicsIdle"
   },
   {
+    name: "skip-nic-inbound-pc-guard",
+    description: "NicAdvanceInbound without coordinator pc check — NIC advances during refresh_keys validation",
+    type: :replace,
+    find: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s] /\\ pc[s] = \"phase_inbound\"\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"inbound\"]",
+    replace: "  /\\ IsLocked(n)\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"inbound\"]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
     name: "skip-nic-pc-guard",
     description: "NicAdvanceOutbound without coordinator pc check — spurious signal advances NIC past barrier",
     type: :replace,
@@ -131,11 +139,11 @@ MUTATIONS = [
   },
   {
     name: "skip-idle-guard",
-    description: "Remove pc=idle guard from EnterAndLock — re-entry overwrites heldLocks",
+    description: "Remove pc=idle guard from ReadAndLock — re-entry overwrites heldLocks",
     type: :replace,
     find: "  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
     replace: "  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
-    cfg: {"InitActiveNics" => "{1, 3}", "MaxOps" => "3", "MaxRefresh" => "7"},
+    cfg: {"InitActiveNics" => "{1, 3}", "MaxOps" => "3"},
     expect: "NoPhaseWithoutLock"
   },
   {
