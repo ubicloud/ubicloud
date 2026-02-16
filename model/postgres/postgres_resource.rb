@@ -8,7 +8,7 @@ class PostgresResource < Sequel::Model
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
   many_to_one :parent, class: self
   one_to_many :servers, class: :PostgresServer, key: :resource_id, read_only: true
-  one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: Sequel.~(representative_at: nil), read_only: true
+  one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: {is_representative: true}, read_only: true
   one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, read_only: true
   one_to_many :metric_destinations, class: :PostgresMetricDestination, remover: nil, clearer: nil
   many_to_one :private_subnet, read_only: true

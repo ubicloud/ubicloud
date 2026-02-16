@@ -141,7 +141,7 @@ class PostgresServer < Sequel::Model
   end
 
   def trigger_failover(mode:)
-    unless representative_at
+    unless is_representative
       Clog.emit("Cannot trigger failover on a non-representative server", {ubid:})
       return false
     end
@@ -203,7 +203,7 @@ class PostgresServer < Sequel::Model
 
   def failover_target
     target = resource.servers
-      .reject { it.representative_at }
+      .reject { it.is_representative }
       .select { it.strand.label == "wait" && !it.needs_recycling? }
       .map { {server: it, lsn: it.current_lsn} }
       .max_by { [it[:server].physical_slot_ready ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers

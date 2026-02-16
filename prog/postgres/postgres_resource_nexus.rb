@@ -84,7 +84,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         ])
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, representative_at: Time.now)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
 

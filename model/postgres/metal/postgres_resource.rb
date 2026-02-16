@@ -6,7 +6,7 @@ class PostgresResource < Sequel::Model
 
     def metal_upgrade_candidate_server
       servers
-        .reject(&:representative_at)
+        .reject(&:is_representative)
         .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[target_version] } }
         .max_by(&:created_at)
     end

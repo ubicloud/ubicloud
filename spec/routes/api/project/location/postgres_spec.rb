@@ -524,7 +524,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "recycle fails without representative_server" do
-        pg.representative_server.update(representative_at: nil)
+        pg.representative_server.update(is_representative: false)
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/recycle"
 
         expect(last_response.status).to eq(400)
@@ -922,7 +922,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "read skips default_pg_config when resource has no representative_server" do
-        pg.representative_server.update(representative_at: nil)
+        pg.representative_server.update(is_representative: false)
         pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"

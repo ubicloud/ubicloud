@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, representative_at: nil, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -57,13 +57,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
       )
 
-      synchronization_status = (representative_at && !postgres_resource.read_replica?) ? "ready" : "catching_up"
+      synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
       postgres_server = PostgresServer.create_with_id(
         ubid.to_uuid,
         resource_id:,
         timeline_id:,
         timeline_access:,
-        representative_at:,
+        is_representative:,
         synchronization_status:,
         vm_id: vm_st.id,
         version: server_version
@@ -667,10 +667,9 @@ SQL
   end
 
   label def wait_representative_lockout
-    representative_server = postgres_server.resource.representative_server
-    nap 5 unless representative_server.nil? || representative_server.strand&.label == "destroy"
+    hop_taking_over if postgres_server.resource.representative_server.strand.label == "wait_locked_out"
 
-    hop_taking_over
+    nap 1
   end
 
   label def lockout
@@ -692,10 +691,14 @@ SQL
       end
     end
 
-    reap(:destroy, fallthrough: true, reaper:)
-    hop_destroy if strand.stack.first["lockout_succeeded"]
+    reap(:wait_locked_out, fallthrough: true, reaper:)
+    hop_wait_locked_out if strand.stack.first["lockout_succeeded"]
 
     nap 0.5
+  end
+
+  label def wait_locked_out
+    nap 24 * 60 * 60
   end
 
   label def prepare_for_planned_take_over
@@ -706,15 +709,15 @@ SQL
   end
 
   label def wait_fencing_of_old_primary
-    nap 0 if postgres_server.resource.representative_server.strand.label != "wait_in_fence"
+    hop_taking_over if postgres_server.resource.representative_server.strand.label == "wait_in_fence"
 
-    postgres_server.resource.representative_server.incr_destroy
-    hop_taking_over
+    nap 1
   end
 
   label def taking_over
     if postgres_server.read_replica?
-      postgres_server.update(representative_at: Time.now, synchronization_status: "ready")
+      postgres_server.resource.representative_server.update(is_representative: false)
+      postgres_server.reload.update(is_representative: true, synchronization_status: "ready")
       postgres_server.resource.servers.each(&:incr_configure_metrics)
       postgres_server.resource.incr_refresh_dns_record
       hop_configure
@@ -723,7 +726,9 @@ SQL
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
       Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
-      postgres_server.update(timeline_access: "push", representative_at: Time.now, synchronization_status: "ready")
+      postgres_server.resource.representative_server.update(is_representative: false)
+      postgres_server.resource.representative_server.incr_destroy
+      postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
       postgres_server.resource.incr_refresh_dns_record
       postgres_server.resource.servers.each(&:incr_configure)
       postgres_server.resource.servers.each(&:incr_configure_metrics)

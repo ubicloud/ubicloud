@@ -9,7 +9,7 @@ class PostgresResource < Sequel::Model
       # the pg_aws_ami table. We can optimize this to consider more AMIs by tracking
       # the creation times in the pg_aws_ami table.
       servers
-        .reject(&:representative_at)
+        .reject(&:is_representative)
         .select { |server| PgAwsAmi.where(aws_ami_id: server.vm.boot_image).count > 0 }
         .max_by(&:created_at)
     end

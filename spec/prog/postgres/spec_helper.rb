@@ -51,7 +51,7 @@ RSpec.configure do |config|
       pr
     end
 
-    def create_postgres_server(resource:, timeline: create_postgres_timeline, timeline_access: "push", representative: true, version: "16")
+    def create_postgres_server(resource:, timeline: create_postgres_timeline, timeline_access: "push", is_representative: true, version: "16")
       vm = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: private_subnet.id,
         location_id:, unix_user: "ubi"
@@ -61,7 +61,7 @@ RSpec.configure do |config|
         timeline:,
         resource:,
         vm_id: vm.id,
-        representative_at: representative ? Time.now : nil,
+        is_representative:,
         synchronization_status: "ready",
         timeline_access:,
         version:
@@ -74,7 +74,7 @@ RSpec.configure do |config|
       server
       standby_record = create_postgres_server(
         resource: postgres_resource, timeline: postgres_timeline,
-        representative: false, timeline_access: "fetch", version: "16"
+        is_representative: false, timeline_access: "fetch", version: "16"
       )
       standby_nx = described_class.new(standby_record.strand)
       ps = standby_nx.postgres_server

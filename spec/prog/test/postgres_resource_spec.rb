@@ -42,7 +42,7 @@ RSpec.describe Prog::Test::PostgresResource do
     ).subject
     server = PostgresServer.create(
       timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17"
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17"
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
     server
