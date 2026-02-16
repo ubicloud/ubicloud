@@ -212,9 +212,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
-    it "naps 5 if state creation is ongoing" do
+    it "hibernates if state creation is ongoing" do
       nic
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to hibernate
     end
 
     it "hibernates when some NICs haven't reached target phase (barrier)" do
@@ -282,9 +282,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
-    it "donates if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to hibernate
     end
 
     it "hops to wait_old_state_drop if policy update is done" do
@@ -316,9 +316,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
 
-    it "donates if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to hibernate
     end
 
     it "hops to wait if all is done" do

@@ -63,6 +63,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       fail "BUG: NIC phase should be idle before advancing to inbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "idle"
       # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "inbound"]
       nic.update(rekey_phase: "inbound")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
       # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
       # TLA
       hop_wait_rekey_outbound_trigger
@@ -89,6 +90,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       fail "BUG: NIC phase should be inbound before advancing to outbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "inbound"
       # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "outbound"]
       nic.update(rekey_phase: "outbound")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
       # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
       # TLA
       hop_wait_rekey_old_state_drop_trigger
@@ -117,6 +119,7 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
       fail "BUG: NIC phase should be outbound before advancing to old_drop, got #{nic.rekey_phase}" unless nic.rekey_phase == "outbound"
       # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "old_drop"]
       nic.update(state: "active", rekey_phase: "old_drop")
+      PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
       # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
       # TLA
       hop_wait
