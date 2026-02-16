@@ -854,6 +854,23 @@ RSpec.describe PostgresResource do
       )
     end
 
+    it "allows hobby instances to upgrade to standard family during auto-scale" do
+      postgres_resource.update(target_vm_size: "hobby-2", target_storage_size_gib: 128)
+      server.vm.update(family: "burstable", cpu_percent_limit: 100)
+      server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 128)
+      expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
+
+      postgres_resource.handle_storage_auto_scale
+
+      expect(postgres_resource.reload.target_vm_size).to eq("standard-2")
+      expect(postgres_resource.target_storage_size_gib).to eq(256)
+      expect(Util).to have_received(:send_email).with(
+        ["test@example.com"],
+        "PostgreSQL Auto-Scaling: pg-name",
+        hash_including(body: array_including(/instance is being upgraded from hobby-2 to standard-2/))
+      )
+    end
+
     it "still sends an email at 90%+ when at max size" do
       server.vm.update(vcpus: 60, cpu_percent_limit: 6000)
       server.vm.vm_storage_volumes.find { !it.boot }.update(size_gib: 4096)
