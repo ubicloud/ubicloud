@@ -18,6 +18,10 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
     end
 
+    if (url = Config.e2e_cache_proxy_download_url) && !url.empty?
+      github_test_project.set_ff_cache_proxy_download_url({x64: url})
+    end
+
     GithubInstallation.create(
       installation_id: Config.e2e_github_installation_id,
       name: "TestUser",
