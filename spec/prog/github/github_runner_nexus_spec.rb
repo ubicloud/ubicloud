@@ -914,6 +914,33 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       nx.collect_final_telemetry
     end
 
+    it "Logs docker limits and JSON cache proxy log if workflow_job is successful" do
+      runner.update(workflow_job: {"conclusion" => "success"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
+        TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
+        {"time":"2026-02-16T16:20:55.11602513Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"GET","url_path":"/random_token/_apis/artifactcache/cache","host":"10.67.229.168:51123"}
+        {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":204}
+        {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":500}
+        {"time":"2026-02-16T16:20:55.146956456Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"POST","url_path":"/random_token/_apis/artifactcache/caches","host":"10.67.229.168:51123"}
+        {"time":"2026-02-16T16:20:55.730648373Z","level":"WARN","msg":"Retrying request","version":"0.7.0","error_type":"r2","retry_count":1,"max_retries":3,"error":"write tcp: connection reset by peer","status_code":0}
+        {"time":"2026-02-16T16:20:55.730648373Z","level":"ERROR","msg":"Request failed","version":"0.7.0","error_type":"backend","function_name":"ReserveCache","status_code":409}
+        invalid json line
+      LOG
+
+      [
+        {"time" => "2026-02-16T16:20:55.146469774Z", "level" => "ERROR", "msg" => "Request failed with unexpected status code", "version" => "0.7.0", "error_type" => "backend", "function_name" => "GetCacheEntry", "status_code" => 500},
+        {"time" => "2026-02-16T16:20:55.730648373Z", "level" => "WARN", "msg" => "Retrying request", "version" => "0.7.0", "error_type" => "r2", "retry_count" => 1, "max_retries" => 3, "error" => "write tcp: connection reset by peer", "status_code" => 0},
+        "invalid json line"
+      ].each do |message|
+        expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message:, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      end
+
+      nx.collect_final_telemetry
+    end
+
     it "Logs docker limits and empty cache proxy log if workflow_job is successful" do
       runner.update(workflow_job: {"conclusion" => "success"})
       expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false).and_return("ratelimit-limit: 100;w=21600\nratelimit-remaining: 98;w=21600\ndocker-ratelimit-source: 192.168.1.1\n")

@@ -496,9 +496,23 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
       cache_proxy_log.each_line do |line|
         line.strip!
-        next if !line.include?("Error") && (!line.include?("failed") || line.match?(/code:\s*204/))
-        line.gsub!(/ host: \S+/, "")
-        Clog.emit("Cache proxy error", {cache_proxy_error: {message: line, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
+        next if line.empty?
+        message = if cache_proxy_log.start_with?("{")
+          # New cache proxy log format
+          begin
+            parsed = JSON.parse(line)
+            next if parsed["level"] == "INFO" || (parsed["error_type"] == "backend" && [204, 409].include?(parsed["status_code"]))
+            parsed
+          rescue JSON::ParserError
+            line
+          end
+        else
+          # Old cache proxy log format
+          next if !line.include?("Error") && (!line.include?("failed") || line.match?(/code:\s*204/))
+          line.gsub!(/ host: \S+/, "")
+          line
+        end
+        Clog.emit("Cache proxy error", {cache_proxy_error: {message:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
       end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
