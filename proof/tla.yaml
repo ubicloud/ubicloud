@@ -32,5 +32,5 @@ SubnetRekey:
       config: proof/subnet_rekey/SubnetRekey-6s4n.cfg
     8s10n:
       config: proof/subnet_rekey/SubnetRekey-8s10n.cfg
-    progress:
-      config: proof/subnet_rekey/SubnetRekey-progress.cfg
+    liveness:
+      config: proof/subnet_rekey/SubnetRekey-liveness.cfg

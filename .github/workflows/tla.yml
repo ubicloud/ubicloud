@@ -115,9 +115,9 @@ jobs:
     - name: Run TLC
       run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
 
-  # ── Progress: liveness temporal checking (2S/4N, MaxOps=3) ─────────
-  progress:
-    name: "progress · ${{ matrix.proof }} · ${{ matrix.config }}"
+  # ── Liveness: temporal checking (2S/4N, MaxOps=3) ──────────────────
+  liveness:
+    name: "liveness · ${{ matrix.proof }} · ${{ matrix.config }}"
     needs: assemble
     if: needs.assemble.outputs.cached != 'true'
     runs-on: ubicloud-standard-30
@@ -127,7 +127,7 @@ jobs:
       matrix:
         include:
         - proof: SubnetRekey
-          config: progress
+          config: liveness
     steps:
     - uses: actions/checkout@v6
     - uses: actions/setup-java@v4
@@ -196,7 +196,7 @@ jobs:
   # ── Finalize: save cache on full success ────────────────────────────
   finalize:
     name: save cache
-    needs: [assemble, safety, progress, mutation-test]
+    needs: [assemble, safety, liveness, mutation-test]
     if: needs.assemble.outputs.cached != 'true'
     runs-on: ubicloud
     steps:

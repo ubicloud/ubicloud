@@ -40,6 +40,23 @@ Spec == Init /\ [][Next]_vars
 
 \* ProgressSpec: the system makes progress under contention.
 \*
+\* ── WF disjunction technique ──────────────────────────────────────────
+\*
+\* When two actions A and B have complementary guards (exactly one is
+\* always enabled at a given pc state), their disjunction A \/ B is
+\* continuously enabled.  WF_vars(A \/ B) then guarantees the step is
+\* eventually taken — sufficient to prove "eventually leave this state,"
+\* which is all the leads-to liveness properties need.  SF_vars(A) /\
+\* SF_vars(B) would also suffice, but each SF condition can double the
+\* Buchi automaton's acceptance pairs (O(2^k) for k SF conditions vs
+\* O(k) for k WF conditions), exceeding TLC's hardcoded DNF limit.
+\*
+\* Requirement: no action other than A or B can leave the pc state.
+\* The individual guards may toggle freely (e.g. ConnectedLeader changes
+\* via topology actions) — only the *disjunction* must stay enabled.
+\*
+\* ── Application here ──────────────────────────────────────────────────
+\*
 \* IdleRefreshProgress: at pc="idle" with refreshNeeded>0, exactly one of
 \* ConsumeRefresh (leader) or ForwardRefreshKeys (non-leader) is enabled.
 \* The disjunction is continuously enabled (only they can zero refreshNeeded
