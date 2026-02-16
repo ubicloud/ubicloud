@@ -498,14 +498,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if (cache_proxy_log = vm.sshable.cmd("sudo cat /var/log/cacheproxy.log", log: false))
-      cache_proxy_log.lines
-        .each(&:strip!)
-        .select { it.include?("Error") || (it.include?("failed") && !it.include?("code: 204")) }
-        .each { it.gsub!(/ host: \S+/, "") }
-        .tally
-        .each do |message, count|
-          Clog.emit("Cache proxy error", {cache_proxy_error: {message:, count:, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
-        end
+      cache_proxy_log.each_line do |line|
+        line.strip!
+        next if !line.include?("Error") && (!line.include?("failed") || line.match?(/code:\s*204/))
+        line.gsub!(/ host: \S+/, "")
+        Clog.emit("Cache proxy error", {cache_proxy_error: {message: line, label: github_runner.label, repository_name: github_runner.repository_name, conclusion: github_runner.workflow_job&.dig("conclusion"), vm_host_ubid: vm_host&.ubid, data_center: vm_host&.data_center}})
+      end
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry", github_runner)

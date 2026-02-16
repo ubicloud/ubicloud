@@ -860,7 +860,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
 
       nx.collect_final_telemetry
     end
@@ -874,7 +874,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -889,7 +889,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -915,9 +915,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       LOG
 
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 2, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "PUT request failed with status code: 500", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}}).twice
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "PUT request failed with status code: 500", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
