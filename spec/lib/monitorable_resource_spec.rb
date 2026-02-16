@@ -37,7 +37,7 @@ RSpec.describe MonitorableResource do
       timeline: postgres_timeline,
       resource_id: postgres_resource.id,
       vm_id: vm.id,
-      representative_at: Time.now,
+      is_representative: true,
       synchronization_status: "ready",
       timeline_access: "push",
       version: "16"

@@ -32,7 +32,7 @@ RSpec.describe Serializers::Postgres do
     vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
     server = PostgresServer.create(
       timeline:, resource_id: pg.id, vm_id: vm.id,
-      representative_at: Time.now,
+      is_representative: true,
       synchronization_status: "ready",
       timeline_access: primary ? "push" : "fetch",
       version: "17"
@@ -86,7 +86,7 @@ RSpec.describe Serializers::Postgres do
     vm = create_hosted_vm(project, private_subnet, "pg-vm-nonrep")
     PostgresServer.create(
       timeline:, resource_id: pg.id, vm_id: vm.id,
-      representative_at: nil,
+      is_representative: false,
       synchronization_status: "ready",
       timeline_access: "push",
       version: "17"

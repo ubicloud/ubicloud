@@ -48,7 +48,7 @@ RSpec.describe PostgresResource do
 
   it "returns connection string with ip address if config is not set" do
     vm = create_hosted_vm(project, private_subnet, "pg-vm")
-    PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?channel_binding=require")
   end
@@ -71,7 +71,7 @@ RSpec.describe PostgresResource do
 
   it "returns replication_connection_string with ip when no dns_zone exists" do
     vm = create_hosted_vm(project, private_subnet, "pg-vm")
-    PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+    PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
     expect(postgres_resource.dns_zone).to be_nil
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
@@ -192,7 +192,7 @@ RSpec.describe PostgresResource do
       ps1
       vm_host = create_vm_host
       vm1.update(vm_host_id: vm_host.id)
-      ps1.update(representative_at: Time.now)
+      ps1.update(is_representative: true)
 
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [vm_host.id])).and_call_original
 
@@ -235,7 +235,7 @@ RSpec.describe PostgresResource do
     # Create representative server with version 16 so version returns "16"
     vm_rep = create_hosted_vm(project, private_subnet, "pg-vm-rep")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_rep.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
 
     # Set target_version to trigger upgrade path (version < target_version)
     postgres_resource.update(target_version: "17")
@@ -260,7 +260,7 @@ RSpec.describe PostgresResource do
       )
     }
 
-    def create_server_with_boot_image(boot_image_version:, representative: false, created_offset: 0)
+    def create_server_with_boot_image(boot_image_version:, is_representative: false, created_offset: 0)
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
       boot_image = BootImage.create(
         name: "postgres-ubuntu-#{SecureRandom.hex(4)}", version: boot_image_version,
@@ -272,7 +272,7 @@ RSpec.describe PostgresResource do
       )
       PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: representative ? Time.now : nil,
+        is_representative:,
         created_at: Time.now + created_offset,
         synchronization_status: "ready", timeline_access: "push", version: "17"
       )
@@ -280,7 +280,7 @@ RSpec.describe PostgresResource do
 
     it "returns candidate when available and location is not aws" do
       # Primary server
-      create_server_with_boot_image(boot_image_version: "20240801", representative: true)
+      create_server_with_boot_image(boot_image_version: "20240801", is_representative: true)
       # Standby servers with valid boot image
       create_server_with_boot_image(boot_image_version: "20240801", created_offset: -3600)
       standby2 = create_server_with_boot_image(boot_image_version: "20240801", created_offset: 0)
@@ -291,7 +291,7 @@ RSpec.describe PostgresResource do
 
     it "returns nil when candidate is not available and location is not aws" do
       # Primary server
-      create_server_with_boot_image(boot_image_version: "20240801", representative: true)
+      create_server_with_boot_image(boot_image_version: "20240801", is_representative: true)
       # Standby servers with old boot image (< 20240801)
       create_server_with_boot_image(boot_image_version: "20240729", created_offset: -3600)
       create_server_with_boot_image(boot_image_version: "20240729", created_offset: 0)
@@ -339,19 +339,19 @@ RSpec.describe PostgresResource do
       # Primary
       PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm3.id,
-        representative_at: Time.now, synchronization_status: "ready",
+        is_representative: true, synchronization_status: "ready",
         timeline_access: "push", version: "17"
       )
       # Standby with valid AMI (older)
       standby1 = PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm1.id,
-        representative_at: nil, created_at: Time.now - 3600,
+        is_representative: false, created_at: Time.now - 3600,
         synchronization_status: "ready", timeline_access: "push", version: "17"
       )
       # Standby with invalid AMI (newer)
       PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm2.id,
-        representative_at: nil, created_at: Time.now,
+        is_representative: false, created_at: Time.now,
         synchronization_status: "ready", timeline_access: "push", version: "17"
       )
 
@@ -379,7 +379,7 @@ RSpec.describe PostgresResource do
     # Create representative server with version 16
     vm_rep = create_hosted_vm(project, private_subnet, "pg-vm-rep-no-candidate")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_rep.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     postgres_resource.update(target_version: "17")
 
     # No upgrade_candidate_server exists (would need specific boot image setup)
@@ -391,7 +391,7 @@ RSpec.describe PostgresResource do
     # Create representative server with version 16
     vm_rep = create_hosted_vm(project, private_subnet, "pg-vm-rep-not-ready")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_rep.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     postgres_resource.update(target_version: "17")
 
     vm = create_hosted_vm(project, private_subnet, "pg-vm-candidate-not-ready")
@@ -407,7 +407,7 @@ RSpec.describe PostgresResource do
     # Create representative server with version 16
     vm_rep = create_hosted_vm(project, private_subnet, "pg-vm-rep-ready")
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm_rep.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     postgres_resource.update(target_version: "17")
 
     vm = create_hosted_vm(project, private_subnet, "pg-vm-candidate-ready")
@@ -462,7 +462,7 @@ RSpec.describe PostgresResource do
     storage_device = StorageDevice.create(name: "nvme0", vm_host_id: vm_host.id, total_storage_gib: 100, available_storage_gib: 80)
     VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1, storage_device_id: storage_device.id)
     server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
     # version 16, target 17 -> needs upgrade
@@ -481,7 +481,7 @@ RSpec.describe PostgresResource do
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
       server = PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready",
+        is_representative: true, synchronization_status: "ready",
         timeline_access: "push", version: "17"
       )
       Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: strand_label)
@@ -636,7 +636,7 @@ RSpec.describe PostgresResource do
       postgres_resource.update(target_version: "17")
       # version returns representative_server.version or target_version, so create server with version 16
       vm = create_hosted_vm(project, private_subnet, "pg-vm-upgrade")
-      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, representative_at: Time.now,
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id, is_representative: true,
         synchronization_status: "ready", timeline_access: "push", version: "16")
       expect(postgres_resource.upgrade_status).to eq("running")
     end
@@ -677,7 +677,7 @@ RSpec.describe PostgresResource do
     let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-auto-scale") }
     let(:server) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     }
 
     before do
@@ -939,7 +939,7 @@ RSpec.describe PostgresResource do
     let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-email") }
     let(:server) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     }
 
     it "includes vm upgrade info when target size differs" do
@@ -978,7 +978,7 @@ RSpec.describe PostgresResource do
     let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-started-email") }
     let(:server) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     }
 
     it "includes vm upgrade info when target size differs" do
@@ -1013,7 +1013,7 @@ RSpec.describe PostgresResource do
     let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-canceled-email") }
     let(:server) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     }
 
     it "sends email with canceled info including current storage and instance size" do
@@ -1074,7 +1074,7 @@ RSpec.describe PostgresResource do
     let(:vm) { create_hosted_vm(project, private_subnet, "pg-vm-cancel") }
     let(:server) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        representative_at: Time.now, synchronization_status: "ready", timeline_access: "push", version: "17")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     }
 
     before do

@@ -5,7 +5,7 @@ require_relative "../spec_helper"
 RSpec.describe PostgresServer do
   subject(:postgres_server) {
     described_class.create(
-      timeline:, resource:, vm_id: vm.id, representative_at: Time.now,
+      timeline:, resource:, vm_id: vm.id, is_representative: true,
       synchronization_status: "ready", timeline_access: "push", version: "16"
     )
   }
@@ -119,11 +119,11 @@ RSpec.describe PostgresServer do
       resource.update(ha_type: PostgresResource::HaType::SYNC)
 
       described_class.create(
-        timeline:, resource: create_standby_resource("1"), vm_id: create_hosted_vm(project, private_subnet, "standby1").id, representative_at: Time.now,
+        timeline:, resource: create_standby_resource("1"), vm_id: create_hosted_vm(project, private_subnet, "standby1").id, is_representative: true,
         synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
       )
       described_class.create(
-        timeline:, resource: create_standby_resource("2"), vm_id: create_hosted_vm(project, private_subnet, "standby2").id, representative_at: Time.now,
+        timeline:, resource: create_standby_resource("2"), vm_id: create_hosted_vm(project, private_subnet, "standby2").id, is_representative: true,
         synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
       )
 
@@ -176,13 +176,13 @@ RSpec.describe PostgresServer do
 
   describe "#trigger_failover" do
     it "logs error when server is not primary" do
-      expect(postgres_server).to receive(:representative_at).and_return(nil)
+      expect(postgres_server).to receive(:is_representative).and_return(false)
       expect(Clog).to receive(:emit).with("Cannot trigger failover on a non-representative server", instance_of(Hash))
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
 
     it "logs error when no suitable standby found" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      expect(postgres_server).to receive(:is_representative).and_return(true)
       expect(postgres_server).to receive(:failover_target).and_return(nil)
       expect(Clog).to receive(:emit).with("No suitable standby found for failover", instance_of(Hash))
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
@@ -208,13 +208,13 @@ RSpec.describe PostgresServer do
 
   describe "#failover_target" do
     before do
-      postgres_server.representative_at = Time.now
+      postgres_server.is_representative = true
       allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready")
       ])
     end
 
@@ -224,10 +224,10 @@ RSpec.describe PostgresServer do
     end
 
     it "returns nil if there is no fresh standby" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      expect(postgres_server).to receive(:is_representative).and_return(true)
       standby_server = described_class.new { it.id = "c068cac7-ed45-82db-bf38-a003582b36ef" }
       expect(standby_server).to receive(:resource).at_least(:once).and_return(resource)
-      expect(standby_server).to receive(:representative_at).and_return(nil).at_least(:once)
+      expect(standby_server).to receive(:is_representative).and_return(false).at_least(:once)
       expect(standby_server).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(standby_server).to receive(:vm).and_return(instance_double(Vm, display_size: "standard-4", sshable: Sshable.new))
 
@@ -237,7 +237,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns the standby with highest lsn in sync replication" do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      expect(postgres_server).to receive(:is_representative).and_return(true)
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
@@ -273,7 +273,7 @@ RSpec.describe PostgresServer do
     it "returns standby with physical_slot_ready false as fallback" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -282,8 +282,8 @@ RSpec.describe PostgresServer do
     it "prefers standby with physical_slot_ready true over higher lsn without" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -292,14 +292,14 @@ RSpec.describe PostgresServer do
 
   describe "#failover_target read_replica" do
     before do
-      expect(postgres_server).to receive(:representative_at).and_return(Time.now)
+      expect(postgres_server).to receive(:is_representative).and_return(true)
       allow(postgres_server).to receive(:read_replica?).and_return(true)
 
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", representative_at: nil, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready")
       ])
     end
 
@@ -325,7 +325,7 @@ RSpec.describe PostgresServer do
     it "returns the replica even if physical_slot_ready is false" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", representative_at: nil, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false, synchronization_status: "ready")
       ])
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
@@ -358,7 +358,7 @@ RSpec.describe PostgresServer do
       )
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
       described_class.create(
-        timeline:, resource: parent_resource, vm_id: parent_vm.id, representative_at: Time.now,
+        timeline:, resource: parent_resource, vm_id: parent_vm.id, is_representative: true,
         synchronization_status: "ready", timeline_access: "push", version: "16"
       )
 
@@ -373,7 +373,7 @@ RSpec.describe PostgresServer do
     end
 
     it "returns true if read replica and the parent representative server is nil" do
-      postgres_server.resource.representative_server.update(representative_at: nil)
+      postgres_server.resource.representative_server.update(is_representative: false)
       postgres_server.resource.update(restore_target: Time.now)
       expect(postgres_server.resource.representative_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
@@ -401,7 +401,7 @@ RSpec.describe PostgresServer do
 
     it "returns true when no representative server" do
       expect(postgres_server).to receive(:read_replica?).and_return(false)
-      postgres_server.update(representative_at: nil)
+      postgres_server.update(is_representative: false)
       expect(postgres_server.lsn_caught_up).to be(true)
     end
   end
@@ -799,7 +799,7 @@ RSpec.describe PostgresServer do
     end
 
     it "creates a page for non-primary server with usage >= 95%" do
-      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      postgres_server.update(is_representative: false, timeline_access: "fetch")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  96%\n")
       expect(Prog::PageNexus).to receive(:assemble).with(
         "High disk usage on non-primary PG server (96%)",
@@ -812,7 +812,7 @@ RSpec.describe PostgresServer do
     end
 
     it "resolves PGDiskUsageHigh page for non-primary server with usage < 95%" do
-      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      postgres_server.update(is_representative: false, timeline_access: "fetch")
       page = Prog::PageNexus.assemble("High disk usage on non-primary PG server", ["PGDiskUsageHigh", postgres_server.id], postgres_server.ubid, severity: "warning")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
       postgres_server.observe_disk_usage(session)
@@ -820,7 +820,7 @@ RSpec.describe PostgresServer do
     end
 
     it "does nothing for non-primary server with usage < 95% and no existing page" do
-      postgres_server.update(representative_at: nil, timeline_access: "fetch")
+      postgres_server.update(is_representative: false, timeline_access: "fetch")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  85%\n")
       expect(Prog::PageNexus).not_to receive(:assemble)
       expect(resource).not_to receive(:incr_check_disk_usage)

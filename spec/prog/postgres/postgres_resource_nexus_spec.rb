@@ -50,7 +50,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     pr
   end
 
-  def create_postgres_server(resource:, location_id: self.location_id, timeline: create_postgres_timeline(location_id:), timeline_access: "push", representative: true, version: "16", private_subnet: self.private_subnet, vm_name: "pg-vm-#{resource.name}", server_index: 0)
+  def create_postgres_server(resource:, location_id: self.location_id, timeline: create_postgres_timeline(location_id:), timeline_access: "push", is_representative: true, version: "16", private_subnet: self.private_subnet, vm_name: "pg-vm-#{resource.name}", server_index: 0)
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: vm_name, private_subnet_id: private_subnet.id,
       location_id:, unix_user: "ubi"
@@ -62,7 +62,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       timeline:,
       resource:,
       vm_id: vm.id,
-      representative_at: representative ? Time.now : nil,
+      is_representative:,
       timeline_access:,
       version:
     )

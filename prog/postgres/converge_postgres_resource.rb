@@ -121,7 +121,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     # current version. If there are more such servers than required, we prefer
     # ready and recent servers (in that order)
     servers_to_keep = postgres_resource.servers
-      .reject { it.representative_at || it.needs_recycling? || it.version != postgres_resource.target_version }
+      .reject { it.is_representative || it.needs_recycling? || it.version != postgres_resource.target_version }
       .sort_by { [(it.strand.label == "wait") ? 0 : 1, Time.now - it.created_at] }
       .take(postgres_resource.target_standby_count) + [postgres_resource.representative_server]
     servers_to_destroy = (postgres_resource.servers - servers_to_keep)

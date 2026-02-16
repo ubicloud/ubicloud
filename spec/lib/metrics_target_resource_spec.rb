@@ -9,7 +9,7 @@ RSpec.describe MetricsTargetResource do
 
   let(:postgres_server) {
     PostgresServer.create(
-      timeline:, resource: postgres_resource, vm_id: vm.id, representative_at: Time.now,
+      timeline:, resource: postgres_resource, vm_id: vm.id, is_representative: true,
       synchronization_status: "ready", timeline_access: "push", version: "16"
     )
   }

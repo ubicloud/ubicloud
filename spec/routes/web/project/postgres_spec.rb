@@ -666,7 +666,7 @@ RSpec.describe Clover, "postgres" do
 
         it "does not show button if there is no representative server" do
           pg.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
-          pg.representative_server.update(representative_at: nil)
+          pg.representative_server.update(is_representative: false)
 
           visit "#{project.path}#{pg.path}/settings"
           expect(page).to have_no_content "Add IPv6 (AAAA) DNS record"
