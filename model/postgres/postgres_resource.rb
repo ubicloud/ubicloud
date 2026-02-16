@@ -311,8 +311,10 @@ class PostgresResource < Sequel::Model
     current_vm_size = Option::POSTGRES_SIZE_OPTIONS[vm_size]
     vcpu_count = current_vm_size.vcpu_count
     family = current_vm_size.family
+    allowed_families = [family]
+    allowed_families << "standard" if family == "hobby"
 
-    all_storage_size_options.select { it["family"] == family && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
+    all_storage_size_options.select { allowed_families.include?(it["family"]) && Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count >= vcpu_count && it["storage_size"] > representative_server.storage_size_gib }
       .min_by { [Option::POSTGRES_SIZE_OPTIONS[it["size"]].vcpu_count, it["storage_size"]] }
   end
 
