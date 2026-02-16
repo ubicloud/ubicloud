@@ -319,9 +319,9 @@ class PostgresServer < Sequel::Model
     # session does not use an event loop. Calling exec! on an SSH session with
     # an active event loop is not thread-safe and leads to stuck sessions.
     if session[:export_count] % 12 == 1
+      observe_disk_usage(session)
       observe_archival_backlog(session)
       observe_metrics_backlog(session)
-      observe_disk_usage(session)
     end
 
     # Call parent implementation to export actual metrics
@@ -405,9 +405,11 @@ class PostgresServer < Sequel::Model
 
     if archival_backlog > archival_backlog_threshold
       if should_page_for_archival_backlog?(archival_backlog, oldest_pending, previous_oldest, now, previous_time)
+        disk_usage_percent = session[:disk_usage_percent] || 0
+        severity = (disk_usage_percent >= 85) ? "error" : "warning"
         Prog::PageNexus.assemble("#{ubid} archival backlog high",
           ["PGArchivalBacklogHigh", id], ubid,
-          severity: "warning", extra_data: {archival_backlog:})
+          severity:, extra_data: {archival_backlog:, disk_usage_percent:})
       end
     elsif archival_backlog < archival_backlog_threshold * 0.8
       Page.from_tag_parts("PGArchivalBacklogHigh", id)&.incr_resolve
@@ -470,6 +472,7 @@ class PostgresServer < Sequel::Model
 
   def observe_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
+    session[:disk_usage_percent] = disk_usage_percent
     if reload.primary?
       if (disk_usage_percent >= 77 || resource.storage_auto_scale_action_performed_80_set? || resource.storage_auto_scale_canceled_set?) && !resource.check_disk_usage_set?
         resource.incr_check_disk_usage
