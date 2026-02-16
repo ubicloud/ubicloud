@@ -75,4 +75,22 @@ NicOwner_2S == [n \in {1, 2, 3, 4} |-> IF n <= 2 THEN 1 ELSE 2]
 \* 3-subnet, 5 NICs: NIC 1 -> subnet 1; NICs 2,3 -> subnet 2; NICs 4,5 -> subnet 3
 NicOwner_3S == [n \in {1, 2, 3, 4, 5} |-> IF n = 1 THEN 1 ELSE IF n <= 3 THEN 2 ELSE 3]
 
+\* 4-subnet, 8 NICs: 2 per subnet
+NicOwner_4S8 == [n \in 1..8 |-> IF n <= 2 THEN 1 ELSE IF n <= 4 THEN 2 ELSE IF n <= 6 THEN 3 ELSE 4]
+
+\* 5-subnet, 8 NICs: subnets 1-3 get 2 NICs, subnets 4,5 get 1
+NicOwner_5S == [n \in 1..8 |-> IF n <= 2 THEN 1 ELSE IF n <= 4 THEN 2 ELSE IF n <= 6 THEN 3 ELSE n - 3]
+
+\* 3-subnet, 6 NICs: 2 per subnet — moderate width stress
+NicOwner_3S6 == [n \in 1..6 |-> IF n <= 2 THEN 1 ELSE IF n <= 4 THEN 2 ELSE 3]
+
+\* 3-subnet dense, 9 NICs: 3 per subnet — barrier stress + 3-way contention
+NicOwner_3Sd == [n \in 1..9 |-> IF n <= 3 THEN 1 ELSE IF n <= 6 THEN 2 ELSE 3]
+
+\* 6-subnet sparse, 4 NICs: 2 subnets with NICs, 4 empty — topology stress
+NicOwner_6Sp == [n \in 1..4 |-> IF n <= 2 THEN 1 ELSE 2]
+
+\* 8-subnet, 10 NICs: 1 per subnet + extras on subnets 1,2
+NicOwner_8S == [n \in 1..10 |-> IF n <= 2 THEN 1 ELSE IF n <= 4 THEN 2 ELSE n - 2]
+
 ----

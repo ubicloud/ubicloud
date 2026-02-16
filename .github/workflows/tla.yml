@@ -1,0 +1,207 @@
+name: TLA+ Proof Check
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    paths:
+    - 'proof/**'
+    - 'model/metal/private_subnet.rb'
+    - 'prog/vnet/metal/subnet_nexus.rb'
+    - 'prog/vnet/metal/nic_nexus.rb'
+    - '.github/workflows/tla.yml'
+  workflow_dispatch:
+
+env:
+  TLA2TOOLS_URL: https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+  TLA2TOOLS_JAR: /usr/local/lib/tla2tools.jar
+  # JVM: OffHeapDiskFPSet stores fingerprints in direct memory (off-heap),
+  # eliminating GC pressure.  BAQueue reduces state queue contention for
+  # many-core throughput.  ParallelGC is recommended by TLA+ docs (G1GC
+  # does not work well with model checking).
+  JVM_ARGS: >-
+    -XX:+UseParallelGC
+    -XX:+UseNUMA
+    -XX:+UseTransparentHugePages
+    -XX:+AlwaysPreTouch
+    -Xmx16g
+    -XX:MaxDirectMemorySize=90g
+    -Dtlc2.tool.fp.FPSet.impl=tlc2.tool.fp.OffHeapDiskFPSet
+    -Dtlc2.tool.ModelChecker.BAQueue=true
+
+jobs:
+  # ── Assemble: build proof and check cache ───────────────────────────
+  # Hashes the assembled spec (without source map) plus all configs.
+  # Heavy jobs are skipped entirely when the hash matches a prior
+  # successful run.  workflow_dispatch always forces a full re-run.
+  assemble:
+    name: assemble
+    runs-on: ubicloud
+    outputs:
+      proof-hash: ${{ steps.hash.outputs.hash }}
+      cached: ${{ steps.cache.outputs.cache-hit }}
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+    - name: Assemble and hash
+      id: hash
+      run: |
+        ruby proof/tla assemble SubnetRekey
+        hash=$(echo "$TLA2TOOLS_URL" \
+               | cat - proof/subnet_rekey/SubnetRekey.tla \
+                       proof/subnet_rekey/*.cfg \
+                       proof/subnet_rekey/mutation-test \
+               | sha256sum | cut -d' ' -f1)
+        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+    - uses: actions/cache/restore@v4
+      id: cache
+      if: github.event_name != 'workflow_dispatch'
+      with:
+        key: tlc-v3-${{ steps.hash.outputs.hash }}
+        path: .tlc-pass
+        lookup-only: true
+
+  # ── Safety: invariant checking across depth and breadth ─────────────
+  #
+  # 2s4n  (2S/4N):   MaxOps=60 — long histories, NIC thrashing
+  # 3s5n  (3S/5N):   MaxOps=12 — transitive connectivity, 3-way contention
+  # 3s9n  (3S/9N):   MaxOps=6  — many NICs per subnet, 3-way barrier stress
+  # 4s8n  (4S/8N):   MaxOps=5  — 4-way contention, uniform 2 NICs/subnet
+  # 5s8n  (5S/8N):   MaxOps=4  — 5-way contention, full chain coverage
+  # 6s4n  (6S/4N):   MaxOps=2  — wide topology, few NICs, leader forwarding
+  # 8s10n (8S/10N):  MaxOps=3  — wide topology stress test
+  safety:
+    name: "safety · ${{ matrix.proof }} · ${{ matrix.config }}"
+    needs: assemble
+    if: needs.assemble.outputs.cached != 'true'
+    runs-on: ubicloud-standard-30
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - proof: SubnetRekey
+          config: 2s4n
+        - proof: SubnetRekey
+          config: 3s5n
+        - proof: SubnetRekey
+          config: 3s9n
+        - proof: SubnetRekey
+          config: 4s8n
+        - proof: SubnetRekey
+          config: 5s8n
+        - proof: SubnetRekey
+          config: 6s4n
+        - proof: SubnetRekey
+          config: 8s10n
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+    - name: Install tla2tools
+      run: |
+        sudo wget -nv -O $TLA2TOOLS_JAR "$TLA2TOOLS_URL"
+        printf '#!/bin/sh\nexec java %s -cp %s tlc2.TLC -workers 28 -fpmem 0.9 "$@"\n' \
+          "$JVM_ARGS" "$TLA2TOOLS_JAR" | sudo tee /usr/local/bin/tlc > /dev/null
+        sudo chmod +x /usr/local/bin/tlc
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+    - name: Run TLC
+      run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+
+  # ── Progress: SF temporal checking (2S/4N, MaxOps=3) ───────────────
+  progress:
+    name: "progress · ${{ matrix.proof }} · ${{ matrix.config }}"
+    needs: assemble
+    if: needs.assemble.outputs.cached != 'true'
+    runs-on: ubicloud-standard-30
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - proof: SubnetRekey
+          config: progress
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+    - name: Install tla2tools
+      run: |
+        sudo wget -nv -O $TLA2TOOLS_JAR "$TLA2TOOLS_URL"
+        printf '#!/bin/sh\nexec java %s -cp %s tlc2.TLC -workers 28 -fpmem 0.9 "$@"\n' \
+          "$JVM_ARGS" "$TLA2TOOLS_JAR" | sudo tee /usr/local/bin/tlc > /dev/null
+        sudo chmod +x /usr/local/bin/tlc
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+    - name: Run TLC
+      run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+
+  # ── Mutation testing: invariant sensitivity ─────────────────────────
+  mutation-test:
+    name: "mutation · ${{ matrix.proof }}"
+    needs: assemble
+    if: needs.assemble.outputs.cached != 'true'
+    runs-on: ubicloud-standard-30
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - proof: SubnetRekey
+          dir: proof/subnet_rekey
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+    - name: Install tla2tools
+      run: |
+        sudo wget -nv -O $TLA2TOOLS_JAR "$TLA2TOOLS_URL"
+        printf '#!/bin/sh\nexec java %s -cp %s tlc2.TLC -workers 28 -fpmem 0.9 "$@"\n' \
+          "$JVM_ARGS" "$TLA2TOOLS_JAR" | sudo tee /usr/local/bin/tlc > /dev/null
+        sudo chmod +x /usr/local/bin/tlc
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+    - name: Run mutation tests
+      run: ruby ${{ matrix.dir }}/mutation-test
+
+  # ── Proof tool specs ────────────────────────────────────────────────
+  proof-tool-spec:
+    name: proof-tool specs
+    runs-on: ubicloud
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v6
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: 3.4
+        bundler-cache: true
+      env:
+        BUNDLE_GEMFILE: proof/Gemfile
+    - name: Run specs
+      run: cd proof && bundle exec rspec spec
+
+  # ── Finalize: save cache on full success ────────────────────────────
+  finalize:
+    name: save cache
+    needs: [assemble, safety, progress, mutation-test]
+    if: needs.assemble.outputs.cached != 'true'
+    runs-on: ubicloud
+    steps:
+    - run: mkdir -p .tlc-pass && touch .tlc-pass/done
+    - uses: actions/cache/save@v4
+      with:
+        key: tlc-v3-${{ needs.assemble.outputs.proof-hash }}
+        path: .tlc-pass

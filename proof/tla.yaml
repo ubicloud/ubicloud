@@ -16,7 +16,21 @@ SubnetRekey:
     - prog/vnet/metal/nic_nexus.rb
     - proof/subnet_rekey/spec.tla
   configs:
-    3subnet:
-      config: proof/subnet_rekey/SubnetRekey-3subnet.cfg
-    liveness:
-      config: proof/subnet_rekey/SubnetRekey-liveness.cfg
+    2s4n:
+      config: proof/subnet_rekey/SubnetRekey-2s4n.cfg
+    3s5n:
+      config: proof/subnet_rekey/SubnetRekey-3s5n.cfg
+    3s6n:
+      config: proof/subnet_rekey/SubnetRekey-3s6n.cfg
+    3s9n:
+      config: proof/subnet_rekey/SubnetRekey-3s9n.cfg
+    4s8n:
+      config: proof/subnet_rekey/SubnetRekey-4s8n.cfg
+    5s8n:
+      config: proof/subnet_rekey/SubnetRekey-5s8n.cfg
+    6s4n:
+      config: proof/subnet_rekey/SubnetRekey-6s4n.cfg
+    8s10n:
+      config: proof/subnet_rekey/SubnetRekey-8s10n.cfg
+    progress:
+      config: proof/subnet_rekey/SubnetRekey-progress.cfg
