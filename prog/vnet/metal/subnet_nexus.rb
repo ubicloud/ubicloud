@@ -85,75 +85,67 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     SecureRandom.random_number(1...100000)
   end
 
-  # TLA \* ReadAndLock: consumed → refresh_keys.  Acquire NIC row locks (FOR UPDATE).
-  # TLA \* FOR UPDATE does not lock topology tables; ConnectedLeader can change
-  # TLA \* before ClaimOrBail re-checks leadership.
-  # TLA ReadAndLock(s) ==
-  # TLA   ∧ pc[s] = "consumed"
-  # TLA   ∧ ConnectedLeader(s) = s
-  # TLA   ∧ LET nics == AllConnectedNics(s)
-  # TLA     IN ∧ nics ≠ {}
-  # TLA        ∧ ∀ n ∈ nics : ¬IsLocked(n)
-  # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
-  # TLA   ∧ pc' = [pc EXCEPT ![s] = "refresh_keys"]
-  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics, refreshNeeded⟩
-  # TLA
-  # TLA \* BailRefresh: consumed → idle.  Bail from refresh_keys label.
-  # TLA \* Re-enqueues refreshNeeded unless leader with empty component (nothing to rekey).
-  # TLA \* Models three bail paths: not leader, no NICs, NICs already locked.
-  # TLA BailRefresh(s) ==
-  # TLA   ∧ pc[s] = "consumed"
-  # TLA   ∧ ∨ ConnectedLeader(s) ≠ s
-  # TLA     ∨ AllConnectedNics(s) = {}
-  # TLA     ∨ ∃ n ∈ AllConnectedNics(s) : IsLocked(n)
-  # TLA   ∧ pc' = [pc EXCEPT ![s] = "idle"]
-  # TLA   ∧ refreshNeeded' = IF ConnectedLeader(s) = s ∧ AllConnectedNics(s) = {}
-  # TLA                      THEN refreshNeeded
-  # TLA                      ELSE [refreshNeeded EXCEPT ![s] = @ + 1]
-  # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics⟩
-  # TLA
-  # TLA \* ClaimOrBail: refresh_keys → phase_inbound (proceed) or idle (bail).
-  # TLA \* Re-checks leadership post-lock; topology may have changed since ReadAndLock.
-  # TLA ClaimOrBail(s) ==
-  # TLA   ∧ pc[s] = "refresh_keys"
-  # TLA   ∧ IF ConnectedLeader(s) = s ∧ heldLocks[s] ≠ {}
-  # TLA     THEN ∧ pc' = [pc EXCEPT ![s] = "phase_inbound"]
-  # TLA          ∧ UNCHANGED ⟨heldLocks, refreshNeeded⟩
-  # TLA     ELSE ∧ heldLocks' = [heldLocks EXCEPT ![s] = {}]
-  # TLA          ∧ pc' = [pc EXCEPT ![s] = "idle"]
-  # TLA          ∧ refreshNeeded' = IF ConnectedLeader(s) ≠ s
-  # TLA                              THEN [refreshNeeded EXCEPT ![s] = @ + 1]
-  # TLA                              ELSE refreshNeeded
-  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
-  # TLA
+  # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
+  def abort_rekey_if_no_nics(nics)
+    return unless nics.empty?
+    Clog.emit("All locked NICs destroyed during rekey, aborting")
+    private_subnet.update(state: "waiting")
+    hop_wait
+  end
+
   label def refresh_keys
     fail "BUG: locks held at idle" unless locked_nics_dataset.empty?
-
-    # Proof: ReadAndLock — FOR UPDATE provides atomicity.
-    # Removing this breaks MutualExclusion (see skip-write-recheck mutation).
     nics = nics_to_rekey.order(:id).for_update.all
 
-    # Proof: BailRefresh — not leader after topology change since ConsumeRefresh.
+    # TLA \* BailRefresh: consumed → idle.  Bail from refresh_keys label.
+    # TLA \* Re-enqueues refreshNeeded unless leader with empty component (nothing to rekey).
+    # TLA \* Three bail paths below map to the three guard disjuncts.
+    # TLA BailRefresh(s) ==
+    # TLA   ∧ pc[s] = "consumed"
+    # TLA   ∧ ∨ ConnectedLeader(s) ≠ s
+    # TLA     ∨ AllConnectedNics(s) = {}
+    # TLA     ∨ ∃ n ∈ AllConnectedNics(s) : IsLocked(n)
+    # TLA   ∧ pc' = [pc EXCEPT ![s] = "idle"]
+    # TLA   ∧ refreshNeeded' = IF ConnectedLeader(s) = s ∧ AllConnectedNics(s) = {}
+    # TLA                      THEN refreshNeeded
+    # TLA                      ELSE [refreshNeeded EXCEPT ![s] = @ + 1]
+    # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics⟩
+    # TLA
+
+    # ConnectedLeader(s) ≠ s — topology changed since ConsumeRefresh.
     # Re-enqueue so ForwardRefreshKeys can forward to the actual leader.
     unless connected_leader?
       private_subnet.incr_refresh_keys
       hop_wait
     end
 
-    # Proof: BailRefresh — leader but no NICs in component.
-    # No re-enqueue: nothing to rekey. CreateNic will signal when a NIC appears.
+    # AllConnectedNics(s) = {} — leader but no NICs in component.
+    # No re-enqueue: nothing to rekey.  CreateNic will signal when a NIC appears.
     if nics.empty?
       hop_wait
     end
 
-    # Proof: BailRefresh — another coordinator holds these NICs.
-    # Re-enqueue: the signal was consumed by ConsumeRefresh in wait but ReadAndLock
-    # can't fire (IsLocked guard), so refreshNeeded must stay positive.
+    # ∃ n ∈ AllConnectedNics(s) : IsLocked(n) — another coordinator holds these NICs.
+    # Re-enqueue: signal was consumed by ConsumeRefresh but ReadAndLock can't fire.
     if nics.any?(&:rekey_coordinator_id)
       private_subnet.incr_refresh_keys
       hop_wait
     end
 
+    # TLA \* ReadAndLock: consumed → refresh_keys.  Acquire NIC row locks (FOR UPDATE).
+    # TLA \* All bail paths above have exited; guards all passed.
+    # TLA \* FOR UPDATE does not lock topology tables; ConnectedLeader can change
+    # TLA \* before ClaimOrBail re-checks leadership.
+    # TLA ReadAndLock(s) ==
+    # TLA   ∧ pc[s] = "consumed"
+    # TLA   ∧ ConnectedLeader(s) = s
+    # TLA   ∧ LET nics == AllConnectedNics(s)
+    # TLA     IN ∧ nics ≠ {}
+    # TLA        ∧ ∀ n ∈ nics : ¬IsLocked(n)
+    # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
+    # TLA   ∧ pc' = [pc EXCEPT ![s] = "refresh_keys"]
+    # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics, refreshNeeded⟩
+    # TLA
     claimed = Nic.where(id: nics.map(&:id), rekey_coordinator_id: nil)
       .update(rekey_coordinator_id: private_subnet.id)
     # :nocov:
@@ -165,6 +157,22 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     bad_phase = nics.reject { |n| n.rekey_phase == "idle" }
     fail "BUG: freshly locked NICs should all be idle: #{bad_phase.map { "#{it.id}=#{it.rekey_phase}" }}" if bad_phase.any?
 
+    # TLA \* ClaimOrBail: refresh_keys → phase_inbound (proceed) or idle (bail).
+    # TLA \* Re-checks leadership post-lock; topology may have changed since ReadAndLock.
+    # TLA \* ELSE branch is an over-approximation: in Ruby, all bails above have exited
+    # TLA \* and the claim always succeeds within this transaction.
+    # TLA ClaimOrBail(s) ==
+    # TLA   ∧ pc[s] = "refresh_keys"
+    # TLA   ∧ IF ConnectedLeader(s) = s ∧ heldLocks[s] ≠ {}
+    # TLA     THEN ∧ pc' = [pc EXCEPT ![s] = "phase_inbound"]
+    # TLA          ∧ UNCHANGED ⟨heldLocks, refreshNeeded⟩
+    # TLA     ELSE ∧ heldLocks' = [heldLocks EXCEPT ![s] = {}]
+    # TLA          ∧ pc' = [pc EXCEPT ![s] = "idle"]
+    # TLA          ∧ refreshNeeded' = IF ConnectedLeader(s) ≠ s
+    # TLA                              THEN [refreshNeeded EXCEPT ![s] = @ + 1]
+    # TLA                              ELSE refreshNeeded
+    # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
+    # TLA
     nics.each do |nic|
       nic.update(encryption_key: gen_encryption_key,
         rekey_payload: {spi4: gen_spi, spi6: gen_spi, reqid: gen_reqid})
@@ -183,12 +191,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_inbound_setup
     nics = locked_nics
     # TLA   ∧ heldLocks[s] ≠ {}
-    if nics.empty?
-      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
-      Clog.emit("All locked NICs destroyed during rekey, aborting")
-      private_subnet.update(state: "waiting")
-      hop_wait
-    end
+    abort_rekey_if_no_nics(nics)
     bad = nics.reject { |n| %w[idle inbound].include?(n.rekey_phase) }
     fail "BUG: phase monotonicity at phase_inbound: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
     # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "inbound"
@@ -210,12 +213,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_outbound_setup
     nics = locked_nics
     # TLA   ∧ heldLocks[s] ≠ {}
-    if nics.empty?
-      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
-      Clog.emit("All locked NICs destroyed during rekey, aborting")
-      private_subnet.update(state: "waiting")
-      hop_wait
-    end
+    abort_rekey_if_no_nics(nics)
     bad = nics.reject { |n| %w[inbound outbound].include?(n.rekey_phase) }
     fail "BUG: phase monotonicity at phase_outbound: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
     # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "outbound"
@@ -237,12 +235,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
   label def wait_old_state_drop
     nics = locked_nics
     # TLA   ∧ heldLocks[s] ≠ {}
-    if nics.empty?
-      # AbortRekey: all locked NICs destroyed mid-rekey → abort to idle.
-      Clog.emit("All locked NICs destroyed during rekey, aborting")
-      private_subnet.update(state: "waiting")
-      hop_wait
-    end
+    abort_rekey_if_no_nics(nics)
     bad = nics.reject { |n| %w[outbound old_drop].include?(n.rekey_phase) }
     fail "BUG: phase monotonicity at phase_old_drop: #{bad.map { "#{it.id}=#{it.rekey_phase}" }}" if bad.any?
     # TLA   ∧ ∀ n ∈ heldLocks[s] : nicPhase[n] = "old_drop"
