@@ -775,10 +775,25 @@ RSpec.describe PostgresServer do
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {archival_backlog: 15}
+        extra_data: {archival_backlog: 15, disk_usage_percent: 0}
       )
 
       postgres_server.observe_archival_backlog(session)
+    end
+
+    it "escalates severity to error when disk usage is high" do
+      session[:disk_usage_percent] = 90
+      allow(session[:ssh_session]).to receive(:_exec!).and_return(
+        "000000010000000000000010.ready\n",
+        "15\n"
+      )
+
+      postgres_server.observe_archival_backlog(session)
+
+      page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
+      expect(page).not_to be_nil
+      expect(page.severity).to eq("error")
+      expect(page.details["disk_usage_percent"]).to eq(90)
     end
   end
 
