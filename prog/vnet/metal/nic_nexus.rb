@@ -152,8 +152,10 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     # TLA   ∧ heldLocks' = [s ∈ Subnets ↦ heldLocks[s] \ {n}]
     # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "idle"]
     # Proof-critical: row deletion implicitly clears rekey_coordinator_id (heldLocks)
-    # and rekey_phase (nicPhase). FK is RESTRICT — coordinator subnet cannot be
-    # destroyed while NICs reference it. Changing to soft-delete breaks the proof.
+    # and rekey_phase (nicPhase), guaranteeing InactiveNicsIdle and LocksEventuallyReleased.
+    # FK is NO ACTION — coordinator subnet cannot be destroyed while NICs reference it.
+    # Changing to soft-delete breaks the proof.
+    subnet = nic.private_subnet
     nic.destroy
     # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![NicOwner[n]] = @ + 1]
     subnet.incr_refresh_keys

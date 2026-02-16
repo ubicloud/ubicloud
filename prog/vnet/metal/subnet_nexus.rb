@@ -230,7 +230,9 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
       private_subnet.update(state: "waiting")
       # TLA   ∧ nicPhase' = [n ∈ AllNics ↦ IF n ∈ heldLocks[s] THEN "idle" ELSE nicPhase[n]]
       # TLA   ∧ heldLocks' = [heldLocks EXCEPT ![s] = {}]
-      released = locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
+      # Proof-critical for NicPhaseProgress and LocksEventuallyReleased:
+      # resets phase to idle and clears coordinator FK in one atomic UPDATE.
+      locked_nics_dataset.update(encryption_key: nil, rekey_payload: nil,
         rekey_coordinator_id: nil, rekey_phase: "idle")
       # TLA   ∧ pc' = [pc EXCEPT ![s] = "idle"]
       # TLA   ∧ UNCHANGED ⟨edges, ops, activeNics, refreshNeeded⟩
