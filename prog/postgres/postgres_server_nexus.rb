@@ -16,9 +16,14 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       ubid = PostgresServer.generate_ubid
 
       postgres_resource = PostgresResource[resource_id]
-      # For read replicas, we upgrade by replacing servers instead of in-place
-      # upgrade.
-      server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
+      # For read replicas and representative servers (initial creation), use
+      # target_version. For standbys, match the representative server's version
+      # so in-place upgrades work correctly.
+      server_version = if is_representative || postgres_resource.read_replica?
+        postgres_resource.target_version
+      else
+        postgres_resource.version
+      end
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
       boot_image = if postgres_resource.location.aws?
@@ -660,8 +665,7 @@ SQL
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
 
-    representative_server = postgres_server.resource.representative_server
-    representative_server.incr_lockout
+    postgres_server.resource.representative_server.incr_lockout
 
     hop_wait_representative_lockout
   end

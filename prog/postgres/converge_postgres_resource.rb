@@ -98,8 +98,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def recycle_representative_server
-    if (rs = postgres_resource.representative_server) && !postgres_resource.ongoing_failover?
-      hop_prune_servers unless rs.needs_recycling?
+    unless postgres_resource.ongoing_failover?
+      hop_prune_servers unless postgres_resource.representative_server.needs_recycling?
       hop_prune_servers if postgres_resource.storage_auto_scale_canceled_set?
       hop_provision_servers unless postgres_resource.has_enough_ready_servers?
 
@@ -108,7 +108,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable
 
       register_deadline(nil, 10 * 60)
-      rs.trigger_failover(mode: "planned")
+      postgres_resource.representative_server.trigger_failover(mode: "planned")
     end
 
     nap 60

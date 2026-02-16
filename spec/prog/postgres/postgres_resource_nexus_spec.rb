@@ -567,6 +567,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#wait" do
+    before { postgres_server }
+
     it "hops to update_billing_records when update_billing_records is set" do
       nx.incr_update_billing_records
       expect { nx.wait }.to hop("update_billing_records")
