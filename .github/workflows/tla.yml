@@ -115,7 +115,7 @@ jobs:
     - name: Run TLC
       run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
 
-  # ── Progress: SF temporal checking (2S/4N, MaxOps=3) ───────────────
+  # ── Progress: liveness temporal checking (2S/4N, MaxOps=3) ─────────
   progress:
     name: "progress · ${{ matrix.proof }} · ${{ matrix.config }}"
     needs: assemble

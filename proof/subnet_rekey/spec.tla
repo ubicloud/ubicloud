@@ -20,7 +20,9 @@ Init ==
 Next ==
   \/ \E a, b \in Subnets : ConnectSubnets(a, b)
   \/ \E a, b \in Subnets : DisconnectSubnets(a, b)
+  \/ \E s \in Subnets : ConsumeRefresh(s)
   \/ \E s \in Subnets : ReadAndLock(s)
+  \/ \E s \in Subnets : BailRefresh(s)
   \/ \E s \in Subnets : ClaimOrBail(s)
   \/ \E n \in AllNics : NicAdvanceInbound(n)
   \/ \E n \in AllNics : NicAdvanceOutbound(n)
@@ -37,12 +39,20 @@ Next ==
 Spec == Init /\ [][Next]_vars
 
 \* ProgressSpec: the system makes progress under contention.
-\* SF on ReadAndLock and ForwardRefreshKeys — both have guards that
-\* flicker under contention (another coordinator repeatedly locks/unlocks
-\* shared NICs, topology changes under signal forwarding).  WF does not
-\* guarantee progress when enablement is intermittent; SF does.
-\* ClaimOrBail is continuously enabled once pc = "refresh_keys" (only
-\* ClaimOrBail itself changes that pc), so WF suffices.
+\*
+\* IdleRefreshProgress: at pc="idle" with refreshNeeded>0, exactly one of
+\* ConsumeRefresh (leader) or ForwardRefreshKeys (non-leader) is enabled.
+\* The disjunction is continuously enabled (only they can zero refreshNeeded
+\* or move pc from "idle"), so WF suffices.
+\*
+\* ConsumedProgress: at pc="consumed", ReadAndLock and BailRefresh are
+\* complementary (guards are exact negations).  The disjunction is
+\* continuously enabled (no other action changes pc from "consumed"), WF.
+\*
+\* ClaimOrBail is continuously enabled at pc="refresh_keys", WF.
+IdleRefreshProgress(s) == ConsumeRefresh(s) \/ ForwardRefreshKeys(s)
+ConsumedProgress(s)    == ReadAndLock(s) \/ BailRefresh(s)
+
 ProgressSpec == Spec
   /\ \A n \in AllNics :
        /\ WF_vars(NicAdvanceInbound(n))
@@ -54,8 +64,8 @@ ProgressSpec == Spec
        /\ WF_vars(FinishRekey(s))
        /\ WF_vars(AbortRekey(s))
        /\ WF_vars(ClaimOrBail(s))
-       /\ SF_vars(ReadAndLock(s))
-       /\ SF_vars(ForwardRefreshKeys(s))
+       /\ WF_vars(IdleRefreshProgress(s))
+       /\ WF_vars(ConsumedProgress(s))
 
 ----
 
@@ -63,7 +73,7 @@ ProgressSpec == Spec
 
 TypeOK ==
   /\ edges \subseteq Edge
-  /\ pc \in [Subnets -> {"idle", "refresh_keys", "phase_inbound",
+  /\ pc \in [Subnets -> {"idle", "consumed", "refresh_keys", "phase_inbound",
                           "phase_outbound", "phase_old_drop"}]
   /\ \A s \in Subnets : heldLocks[s] \subseteq AllNics
   /\ ops \in 0..MaxOps
@@ -77,10 +87,10 @@ MutualExclusion ==
     \A s1, s2 \in Subnets :
       (n \in heldLocks[s1] /\ n \in heldLocks[s2]) => s1 = s2
 
-\* NoOrphanedLocks: subnet in idle has no locked NICs.
+\* NoOrphanedLocks: subnet in idle or consumed has no locked NICs.
 NoOrphanedLocks ==
   \A s \in Subnets :
-    pc[s] = "idle" => heldLocks[s] = {}
+    pc[s] \in {"idle", "consumed"} => heldLocks[s] = {}
 
 \* LockedNicsActive: destroyed NICs cannot remain locked.
 LockedNicsActive ==

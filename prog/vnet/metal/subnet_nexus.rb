@@ -18,33 +18,46 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     hop_wait
   end
 
-  # TLA \* ForwardRefreshKeys: non-leader forwards refreshNeeded to leader.
-  # TLA \* Models wait: decr_refresh_keys + connected_leader.incr_refresh_keys.
-  # TLA ForwardRefreshKeys(s) ==
-  # TLA   ∧ pc[s] = "idle"
   label def wait
     fail "BUG: locks held while in wait (NoOrphanedLocks)" unless locked_nics_dataset.empty?
 
+    # TLA \* ForwardRefreshKeys: non-leader forwards refreshNeeded to leader.
+    # TLA \* Models wait: decr_refresh_keys + connected_leader.incr_refresh_keys.
+    # TLA ForwardRefreshKeys(s) ==
+    # TLA   ∧ pc[s] = "idle"
+    # TLA   ∧ refreshNeeded[s] > 0
+    # TLA   ∧ ConnectedLeader(s) ≠ s
+    if refresh_keys_set? && !connected_leader?
+      Clog.emit("SubnetNexus forwarding refresh_keys to leader",
+        {subnet_rekey_forward: {subnet_id: private_subnet.id,
+                                connected_leader_id: private_subnet.connected_leader_id}})
+      # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0, ![ConnectedLeader(s)] = @ + 1]
+      decr_refresh_keys
+      PrivateSubnet[private_subnet.connected_leader_id].incr_refresh_keys
+      # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, nicPhase, activeNics⟩
+      # TLA
+      nap 0
+    end
+
+    # TLA \* ConsumeRefresh: idle → consumed.  Drain refreshNeeded (wait:decr_refresh_keys).
+    # TLA \* Models the wait label consuming the semaphore before hop_refresh_keys.
+    # TLA \* At "consumed", the signal is consumed but no locks are held.
+    # TLA ConsumeRefresh(s) ==
+    # TLA   ∧ pc[s] = "idle"
+    # TLA   ∧ ConnectedLeader(s) = s
     # TLA   ∧ refreshNeeded[s] > 0
     when_refresh_keys_set? do
-      remaining_refresh = private_subnet.semaphores.count { it.name == "refresh_keys" }
-      Clog.emit("SubnetNexus entering refresh_keys",
+      Clog.emit("SubnetNexus consuming refresh_keys as leader",
         {subnet_rekey_entry: {
           subnet_id: private_subnet.id,
           last_rekey_at: private_subnet.last_rekey_at.iso8601,
-          remaining_refresh_keys_semaphores: remaining_refresh,
           connected_leader: connected_leader?.to_s
         }})
+      # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0]
       decr_refresh_keys
-      # TLA   ∧ ConnectedLeader(s) ≠ s
-      unless connected_leader?
-        # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0, ![ConnectedLeader(s)] = @ + 1]
-        # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, nicPhase, activeNics⟩
-        # TLA
-        PrivateSubnet[private_subnet.connected_leader_id].incr_refresh_keys
-        nap 0
-      end
-
+      # TLA   ∧ pc' = [pc EXCEPT ![s] = "consumed"]
+      # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics⟩
+      # TLA
       hop_refresh_keys
     end
 
@@ -72,20 +85,32 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     SecureRandom.random_number(1...100000)
   end
 
-  # TLA \* ReadAndLock: idle → refresh_keys.  Acquire NIC row locks (FOR UPDATE).
+  # TLA \* ReadAndLock: consumed → refresh_keys.  Acquire NIC row locks (FOR UPDATE).
   # TLA \* FOR UPDATE does not lock topology tables; ConnectedLeader can change
   # TLA \* before ClaimOrBail re-checks leadership.
-  # TLA \* Note: refreshNeeded' consumed earlier in wait:decr_refresh_keys.
   # TLA ReadAndLock(s) ==
-  # TLA   ∧ pc[s] = "idle"
+  # TLA   ∧ pc[s] = "consumed"
   # TLA   ∧ ConnectedLeader(s) = s
-  # TLA   ∧ refreshNeeded[s] > 0
   # TLA   ∧ LET nics == AllConnectedNics(s)
-  # TLA     IN ∧ ∀ n ∈ nics : ¬IsLocked(n)
+  # TLA     IN ∧ nics ≠ {}
+  # TLA        ∧ ∀ n ∈ nics : ¬IsLocked(n)
   # TLA        ∧ heldLocks' = [heldLocks EXCEPT ![s] = nics]
-  # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0]
   # TLA   ∧ pc' = [pc EXCEPT ![s] = "refresh_keys"]
-  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics⟩
+  # TLA   ∧ UNCHANGED ⟨edges, ops, nicPhase, activeNics, refreshNeeded⟩
+  # TLA
+  # TLA \* BailRefresh: consumed → idle.  Bail from refresh_keys label.
+  # TLA \* Re-enqueues refreshNeeded unless leader with empty component (nothing to rekey).
+  # TLA \* Models three bail paths: not leader, no NICs, NICs already locked.
+  # TLA BailRefresh(s) ==
+  # TLA   ∧ pc[s] = "consumed"
+  # TLA   ∧ ∨ ConnectedLeader(s) ≠ s
+  # TLA     ∨ AllConnectedNics(s) = {}
+  # TLA     ∨ ∃ n ∈ AllConnectedNics(s) : IsLocked(n)
+  # TLA   ∧ pc' = [pc EXCEPT ![s] = "idle"]
+  # TLA   ∧ refreshNeeded' = IF ConnectedLeader(s) = s ∧ AllConnectedNics(s) = {}
+  # TLA                      THEN refreshNeeded
+  # TLA                      ELSE [refreshNeeded EXCEPT ![s] = @ + 1]
+  # TLA   ∧ UNCHANGED ⟨edges, heldLocks, ops, nicPhase, activeNics⟩
   # TLA
   # TLA \* ClaimOrBail: refresh_keys → phase_inbound (proceed) or idle (bail).
   # TLA \* Re-checks leadership post-lock; topology may have changed since ReadAndLock.
@@ -108,18 +133,24 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     # Removing this breaks MutualExclusion (see skip-write-recheck mutation).
     nics = nics_to_rekey.order(:id).for_update.all
 
-    # Proof: ClaimOrBail — re-check leadership post-lock.
-    # Topology may have changed since wait; re-enqueue for the actual leader.
+    # Proof: BailRefresh — not leader after topology change since ConsumeRefresh.
+    # Re-enqueue so ForwardRefreshKeys can forward to the actual leader.
     unless connected_leader?
       private_subnet.incr_refresh_keys
       hop_wait
     end
 
+    # Proof: BailRefresh — leader but no NICs in component.
+    # No re-enqueue: nothing to rekey. CreateNic will signal when a NIC appears.
     if nics.empty?
       hop_wait
     end
 
+    # Proof: BailRefresh — another coordinator holds these NICs.
+    # Re-enqueue: the signal was consumed by ConsumeRefresh in wait but ReadAndLock
+    # can't fire (IsLocked guard), so refreshNeeded must stay positive.
     if nics.any?(&:rekey_coordinator_id)
+      private_subnet.incr_refresh_keys
       hop_wait
     end
 

@@ -16,7 +16,7 @@
 #   - NicAdvanceInbound without pc guard → PhaseCoordinatorAlignment violated
 #   - NicAdvanceOutbound without pc guard → PhaseCoordinatorAlignment violated
 #   - NicAdvanceOldDrop without pc guard → PhaseCoordinatorAlignment violated
-#   - Removing idle guard from ReadAndLock  → NoPhaseWithoutLock violated
+#   - Removing idle guard from ConsumeRefresh → NoOrphanedLocks violated
 #   - ForwardRefreshKeys not clearing sender → RefreshBounded violated
 #   - AbortRekey without empty heldLocks check → NoOrphanedLocks violated
 #   - Destroy without pc=idle check → pass (heldLocks={} sufficient)
@@ -45,16 +45,16 @@ MUTATIONS = [
     name: "skip-write-recheck",
     description: "Remove atomic lock check — allows double-locking",
     type: :replace,
-    find: "    IN /\\ \\A n \\in nics : ~IsLocked(n)\n       /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
-    replace: "    IN /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
+    find: "    IN /\\ nics # {}\n       /\\ \\A n \\in nics : ~IsLocked(n)\n       /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
+    replace: "    IN /\\ nics # {}\n       /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
     expect: "MutualExclusion"
   },
   {
     name: "skip-leader-check",
-    description: "Remove leader election — atomicity alone handles safety",
+    description: "Remove leader election from ReadAndLock — atomicity alone handles safety",
     type: :replace,
-    find: "  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
-    replace: "  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
+    find: "  /\\ pc[s] = \"consumed\"\n  /\\ ConnectedLeader(s) = s\n  /\\ LET nics == AllConnectedNics(s)",
+    replace: "  /\\ pc[s] = \"consumed\"\n  /\\ LET nics == AllConnectedNics(s)",
     expect: :pass
   },
   {
@@ -138,13 +138,12 @@ MUTATIONS = [
     expect: "PhaseCoordinatorAlignment"
   },
   {
-    name: "skip-idle-guard",
-    description: "Remove pc=idle guard from ReadAndLock — re-entry overwrites heldLocks",
+    name: "skip-consume-pc-guard",
+    description: "Remove pc=idle guard from ConsumeRefresh — mid-rekey re-entry orphans locks",
     type: :replace,
-    find: "  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
-    replace: "  /\\ ConnectedLeader(s) = s\n  /\\ refreshNeeded[s] > 0\n  /\\ LET nics == AllConnectedNics(s)",
-    cfg: {"InitActiveNics" => "{1, 3}", "MaxOps" => "3"},
-    expect: "NoPhaseWithoutLock"
+    find: "ConsumeRefresh(s) ==\n  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s",
+    replace: "ConsumeRefresh(s) ==\n  /\\ ConnectedLeader(s) = s",
+    expect: "NoOrphanedLocks"
   },
   {
     name: "skip-forward-drain",
