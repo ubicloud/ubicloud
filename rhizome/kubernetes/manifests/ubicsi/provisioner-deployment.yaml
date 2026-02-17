@@ -18,18 +18,20 @@ spec:
     spec:
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - ubicsi
-                  - key: component
-                    operator: In
-                    values:
-                      - provisioner
-              topologyKey: "kubernetes.io/hostname"
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - ubicsi
+                    - key: component
+                      operator: In
+                      values:
+                        - provisioner
+                topologyKey: "kubernetes.io/hostname"
       serviceAccountName: ubicsi-provisioner
       priorityClassName: system-cluster-critical
       containers:
