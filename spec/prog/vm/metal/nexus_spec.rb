@@ -935,6 +935,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.unavailable }.to nap(30)
     end
 
+    it "pages and naps if vm is unavailable but vm process is running" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\ninactive\n")
+      expect { nx.unavailable }.to nap(30)
+        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} unavailable but main process running")
+      frame = st.stack[0]
+      expect(frame["reason_determined"]).to be true
+    end
+
     it "pages and naps if vm is unavailable and systemctl show returns oom-kill" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
