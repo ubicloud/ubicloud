@@ -22,7 +22,8 @@ module Validation
       "allow_in_place_tablespaces" => {
         description: "Allows tablespaces directly inside pg_tblspc, for testing.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "allow_system_table_mods" => {
         description: "Allows modifications of the structure of system tables.",
@@ -51,7 +52,8 @@ module Validation
         description: 'Allows archiving of WAL files using "archive_command".',
         type: :enum,
         allowed_values: ["always", "on", "off"],
-        default: "on"
+        default: "on",
+        requires_restart: true
       },
       "archive_timeout" => {
         description: "Sets the amount of time to wait before forcing a switch to the next WAL file.",
@@ -94,21 +96,24 @@ module Validation
         type: :integer,
         default: 200000000,
         min: 100000,
-        max: 2000000000
+        max: 2000000000,
+        requires_restart: true
       },
       "autovacuum_max_workers" => {
         description: "Sets the maximum number of simultaneously running autovacuum worker processes.",
         type: :integer,
         default: 3,
         min: 1,
-        max: 262143
+        max: 262143,
+        requires_restart: true
       },
       "autovacuum_multixact_freeze_max_age" => {
         description: "Multixact age at which to autovacuum a table to prevent multixact wraparound.",
         type: :integer,
         default: 400000000,
         min: 10000,
-        max: 2000000000
+        max: 2000000000,
+        requires_restart: true
       },
       "autovacuum_naptime" => {
         description: "Time to sleep between autovacuum runs.",
@@ -207,11 +212,13 @@ module Validation
       "bonjour" => {
         description: "Enables advertising the server via Bonjour.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "bonjour_name" => {
         description: "Sets the Bonjour service name.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "bytea_output" => {
         description: "Sets the output format for bytea.",
@@ -321,7 +328,8 @@ module Validation
       "cron.database_name" => {
         description: "Database in which pg_cron metadata is kept.",
         type: :string,
-        default: "postgres"
+        default: "postgres",
+        requires_restart: true
       },
       "cron.enable_superuser_jobs" => {
         description: "Allow jobs to be scheduled as superuser",
@@ -332,7 +340,8 @@ module Validation
       "cron.host" => {
         description: "Hostname to connect to postgres.",
         type: :string,
-        default: "localhost"
+        default: "localhost",
+        requires_restart: true
       },
       "cron.launch_active_jobs" => {
         description: "Launch jobs that are defined as active.",
@@ -362,7 +371,8 @@ module Validation
         type: :integer,
         default: 32,
         min: 1,
-        max: 32
+        max: 32,
+        requires_restart: true
       },
       "cron.timezone" => {
         description: "Specify timezone used for cron schedule.",
@@ -373,7 +383,8 @@ module Validation
         description: "Use background workers instead of client sessions.",
         type: :enum,
         allowed_values: ["on", "off"],
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "cursor_tuple_fraction" => {
         description: "Sets the planner's estimate of the fraction of a cursor's rows that will be retrieved.",
@@ -385,7 +396,8 @@ module Validation
       "data_sync_retry" => {
         description: "Whether to continue running after a failure to sync data files.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "db_user_namespace" => {
         description: "Enables per-database user names.",
@@ -493,7 +505,8 @@ module Validation
         description: "Selects the dynamic shared memory implementation used.",
         type: :enum,
         allowed_values: ["posix", "sysv", "mmap"],
-        default: "posix"
+        default: "posix",
+        requires_restart: true
       },
       "effective_cache_size" => {
         description: "Sets the planner's assumption about the total size of the data caches.",
@@ -621,7 +634,8 @@ module Validation
       "event_source" => {
         description: "Sets the application name used to identify PostgreSQL messages in the event log.",
         type: :string,
-        default: "PostgreSQL"
+        default: "PostgreSQL",
+        requires_restart: true
       },
       "exit_on_error" => {
         description: "Terminate session on any error.",
@@ -725,7 +739,8 @@ module Validation
       "hot_standby" => {
         description: "Allows connections and queries during recovery.",
         type: :bool,
-        default: "on"
+        default: "on",
+        requires_restart: true
       },
       "hot_standby_feedback" => {
         description: "Allows feedback from a hot standby to the primary that will avoid query conflicts.",
@@ -737,14 +752,16 @@ module Validation
         type: :string,
         pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "0",
-        deny: true
+        deny: true,
+        requires_restart: true
       },
       "huge_pages" => {
         description: "Use of huge pages on Linux or Windows.",
         type: :enum,
         allowed_values: ["try", "on", "off"],
         default: "on",
-        deny: true
+        deny: true,
+        requires_restart: true
       },
       "icu_validation_level" => {
         description: "Log level for reporting invalid ICU locale strings.",
@@ -796,12 +813,14 @@ module Validation
       "jit_debugging_support" => {
         description: "Register JIT-compiled functions with debugger.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "jit_dump_bitcode" => {
         description: "Write out LLVM bitcode to facilitate JIT debugging.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "jit_expressions" => {
         description: "Allow JIT compilation of expressions.",
@@ -825,12 +844,14 @@ module Validation
       "jit_profiling_support" => {
         description: "Register JIT-compiled functions with perf profiler.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "jit_provider" => {
         description: "JIT provider to use.",
         type: :string,
-        default: "llvmjit"
+        default: "llvmjit",
+        requires_restart: true
       },
       "jit_tuple_deforming" => {
         description: "Allow JIT compilation of tuple deforming.",
@@ -875,7 +896,8 @@ module Validation
       "listen_addresses" => {
         description: "Sets the host name or IP address(es) to listen to.",
         type: :string,
-        default: "*"
+        default: "*",
+        requires_restart: true
       },
       "lo_compat_privileges" => {
         description: "Enables backward compatibility mode for privilege checks on large objects.",
@@ -1090,7 +1112,8 @@ module Validation
       "logging_collector" => {
         description: "Start a subprocess to capture stderr output and/or csvlogs into log files.",
         type: :bool,
-        default: "on"
+        default: "on",
+        requires_restart: true
       },
       "logical_decoding_work_mem" => {
         description: "Sets the maximum memory to be used for logical decoding.",
@@ -1116,28 +1139,32 @@ module Validation
         type: :integer,
         default: 500,
         min: 1,
-        max: 10000
+        max: 10000,
+        requires_restart: true
       },
       "max_files_per_process" => {
         description: "Sets the maximum number of simultaneously open files for each server process.",
         type: :integer,
         min: 64,
         max: 2147483647,
-        default: 1000
+        default: 1000,
+        requires_restart: true
       },
       "max_locks_per_transaction" => {
         description: "Sets the maximum number of locks per transaction.",
         type: :integer,
         min: 10,
         max: 2147483647,
-        default: 64
+        default: 64,
+        requires_restart: true
       },
       "max_logical_replication_workers" => {
         description: "Maximum number of logical replication worker processes.",
         type: :integer,
         min: 0,
         max: 262143,
-        default: 4
+        default: 4,
+        requires_restart: true
       },
       "max_parallel_apply_workers_per_subscription" => {
         description: "Maximum number of parallel apply workers per subscription.",
@@ -1186,21 +1213,24 @@ module Validation
         type: :integer,
         min: 10,
         max: 2147483647,
-        default: 64
+        default: 64,
+        requires_restart: true
       },
       "max_prepared_transactions" => {
         description: "Sets the maximum number of simultaneously prepared transactions.",
         type: :integer,
         min: 0,
         max: 262143,
-        default: 0
+        default: 0,
+        requires_restart: true
       },
       "max_replication_slots" => {
         description: "Sets the maximum number of simultaneously defined replication slots.",
         type: :integer,
         min: 0,
         max: 262143,
-        default: 10
+        default: 10,
+        requires_restart: true
       },
       "max_slot_wal_keep_size" => {
         description: "Sets the maximum WAL size that can be reserved by replication slots.",
@@ -1238,7 +1268,8 @@ module Validation
         type: :integer,
         min: 0,
         max: 262143,
-        default: 10
+        default: 10,
+        requires_restart: true
       },
       "max_wal_size" => {
         description: "Sets the WAL size that triggers a checkpoint.",
@@ -1251,13 +1282,15 @@ module Validation
         type: :integer,
         min: 0,
         max: 262143,
-        default: 8
+        default: 8,
+        requires_restart: true
       },
       "min_dynamic_shared_memory" => {
         description: "Amount of dynamic shared memory reserved at startup.",
         type: :string,
         pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-        default: "0"
+        default: "0",
+        requires_restart: true
       },
       "min_parallel_index_scan_size" => {
         description: "Sets the minimum amount of index data for a parallel scan.",
@@ -1282,7 +1315,8 @@ module Validation
         type: :integer,
         max: 86400,
         min: -1,
-        default: -1
+        default: -1,
+        requires_restart: true
       },
       "parallel_leader_participation" => {
         description: "Controls whether Gather and Gather Merge also run subplans.",
@@ -1314,7 +1348,8 @@ module Validation
         type: :integer,
         default: 5000,
         min: 100,
-        max: 2147483647
+        max: 2147483647,
+        requires_restart: true
       },
       "pg_stat_statements.save" => {
         description: "Save pg_stat_statements statistics across server shutdowns.",
@@ -1350,7 +1385,8 @@ module Validation
         type: :integer,
         min: 1,
         max: 65535,
-        default: 5432
+        default: 5432,
+        requires_restart: true
       },
       "post_auth_delay" => {
         description: "Sets the amount of time to wait after authentication on connection startup.",
@@ -1411,39 +1447,47 @@ module Validation
       },
       "recovery_target" => {
         description: 'Set to "immediate" to end recovery as soon as a consistent state is reached.',
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "recovery_target_action" => {
         description: "Sets the action to perform upon reaching the recovery target.",
         type: :enum,
         allowed_values: ["pause", "promote", "shutdown"],
-        default: "pause"
+        default: "pause",
+        requires_restart: true
       },
       "recovery_target_inclusive" => {
         description: "Sets whether to include or exclude transaction with recovery target.",
         type: :bool,
-        default: "on"
+        default: "on",
+        requires_restart: true
       },
       "recovery_target_lsn" => {
         description: "Sets the LSN of the write-ahead log location up to which recovery will proceed.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "recovery_target_name" => {
         description: "Sets the named restore point up to which recovery will proceed.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "recovery_target_time" => {
         description: "Sets the time stamp up to which recovery will proceed.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "recovery_target_timeline" => {
         description: "Specifies the timeline to recover into.",
         type: :string,
-        default: "latest"
+        default: "latest",
+        requires_restart: true
       },
       "recovery_target_xid" => {
         description: "Sets the transaction ID up to which recovery will proceed.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "recursive_worktable_factor" => {
         description: "Sets the planner's estimate of the average size of a recursive query's working table.",
@@ -1462,7 +1506,8 @@ module Validation
         type: :integer,
         min: 0,
         max: 262143,
-        default: 0
+        default: 0,
+        requires_restart: true
       },
       "restart_after_crash" => {
         description: "Reinitialize server after backend crash.",
@@ -1526,18 +1571,21 @@ module Validation
         type: :string,
         pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
         default: "(25% of total memory)",
-        deny: true
+        deny: true,
+        requires_restart: true
       },
       "shared_memory_type" => {
         description: "Selects the shared memory implementation used for the main shared memory region.",
         type: :enum,
         allowed_values: ["mmap", "sysv"],
-        default: "mmap"
+        default: "mmap",
+        requires_restart: true
       },
       "shared_preload_libraries" => {
         description: "Lists shared libraries to preload into server.",
         type: :string,
-        default: "pg_cron,pg_stat_statements"
+        default: "pg_cron,pg_stat_statements",
+        requires_restart: true
       },
       "ssl" => {
         description: "Enables SSL connections.",
@@ -1630,7 +1678,8 @@ module Validation
         type: :integer,
         min: 0,
         max: 262143,
-        default: 3
+        default: 3,
+        requires_restart: true
       },
       "synchronize_seqscans" => {
         description: "Enable synchronized sequential scans.",
@@ -1740,12 +1789,14 @@ module Validation
         description: "Sets the size reserved for pg_stat_activity.query, in bytes.",
         type: :string,
         pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-        default: "1kB"
+        default: "1kB",
+        requires_restart: true
       },
       "track_commit_timestamp" => {
         description: "Collects transaction commit time.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "track_counts" => {
         description: "Collects statistics on database activity.",
@@ -1792,18 +1843,21 @@ module Validation
       "unix_socket_directories" => {
         description: "Sets the directories where Unix-domain sockets will be created.",
         type: :string,
-        default: "/var/run/postgresql"
+        default: "/var/run/postgresql",
+        requires_restart: true
       },
       "unix_socket_group" => {
         description: "Sets the owning group of the Unix-domain socket.",
-        type: :string
+        type: :string,
+        requires_restart: true
       },
       "unix_socket_permissions" => {
         description: "Sets the access permissions of the Unix-domain socket.",
         type: :integer,
         min: 0,
         max: 511,
-        default: 777
+        default: 777,
+        requires_restart: true
       },
       "update_process_title" => {
         description: "Updates the process title to show the active SQL command.",
@@ -1895,7 +1949,8 @@ module Validation
         description: "Sets the number of disk-page buffers in shared memory for WAL.",
         type: :string,
         pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-        default: "16MB"
+        default: "16MB",
+        requires_restart: true
       },
       "wal_compression" => {
         description: "Compresses full-page writes written in WAL file with specified method.",
@@ -1928,12 +1983,14 @@ module Validation
         description: "Sets the level of information written to the WAL.",
         type: :enum,
         allowed_values: ["minimal", "replica", "logical"],
-        default: "replica"
+        default: "replica",
+        requires_restart: true
       },
       "wal_log_hints" => {
         description: "Writes full pages to WAL when first modified after a checkpoint, even for a non-critical modification.",
         type: :bool,
-        default: "off"
+        default: "off",
+        requires_restart: true
       },
       "wal_receiver_create_temp_slot" => {
         description: "Sets whether a WAL receiver should create a temporary replication slot if no permanent slot is configured.",
@@ -2310,7 +2367,8 @@ module Validation
           description: "Sets the size of the dedicated buffer pool used for the commit timestamp cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "4MB"
+          default: "4MB",
+          requires_restart: true
         },
         "enable_group_by_reordering" => {
           description: "Enables reordering of GROUP BY keys.",
@@ -2333,37 +2391,43 @@ module Validation
           type: :integer,
           max: 2147483647,
           min: 64,
-          default: 1048576
+          default: 1048576,
+          requires_restart: true
         },
         "multixact_member_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the MultiXact member cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "256kB"
+          default: "256kB",
+          requires_restart: true
         },
         "multixact_offset_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the MultiXact offset cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "128kB"
+          default: "128kB",
+          requires_restart: true
         },
         "notify_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the LISTEN/NOTIFY message cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "128kB"
+          default: "128kB",
+          requires_restart: true
         },
         "serializable_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the serializable transaction cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "256kB"
+          default: "256kB",
+          requires_restart: true
         },
         "subtransaction_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the subtransaction cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "4MB"
+          default: "4MB",
+          requires_restart: true
         },
         "summarize_wal" => {
           description: "Starts the WAL summarizer process to enable incremental backup.",
@@ -2382,13 +2446,15 @@ module Validation
         "trace_connection_negotiation" => {
           description: "Logs details of pre-authentication connection handshake.",
           type: :bool,
-          default: "off"
+          default: "off",
+          requires_restart: true
         },
         "transaction_buffers" => {
           description: "Sets the size of the dedicated buffer pool used for the transaction status cache.",
           type: :string,
           pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
-          default: "4MB"
+          default: "4MB",
+          requires_restart: true
         },
         "transaction_timeout" => {
           description: "Sets the maximum allowed duration of any transaction within a session (not a prepared transaction).",
@@ -2425,7 +2491,8 @@ module Validation
           type: :integer,
           default: 16,
           min: 1,
-          max: 2147483647
+          max: 2147483647,
+          requires_restart: true
         },
         "effective_io_concurrency" => {
           description: "Number of simultaneous requests that can be handled efficiently by the disk subsystem.",
@@ -2472,13 +2539,15 @@ module Validation
           type: :integer,
           default: 16,
           min: 1,
-          max: 128
+          max: 128,
+          requires_restart: true
         },
         "io_method" => {
           description: "Selects the method for executing asynchronous I/O.",
           type: :enum,
           allowed_values: ["sync", "worker", "io_uring"],
-          default: "worker"
+          default: "worker",
+          requires_restart: true
         },
         "io_workers" => {
           description: "Number of IO worker processes, for io_method=worker.",
@@ -2520,14 +2589,16 @@ module Validation
           type: :integer,
           default: 10,
           min: 0,
-          max: 262143
+          max: 262143,
+          requires_restart: true
         },
         "max_files_per_process" => {
           description: "Sets the maximum number of simultaneously open files for each server process.",
           type: :integer,
           min: 64,
           max: 2147483647,
-          default: 1000
+          default: 1000,
+          requires_restart: true
         },
         "md5_password_warnings" => {
           description: "Controls whether a WARNING about MD5 password deprecation is produced when a CREATE ROLE or ALTER ROLE statement sets an MD5-encrypted password.",

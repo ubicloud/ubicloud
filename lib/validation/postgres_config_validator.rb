@@ -17,6 +17,14 @@ module Validation
       end
     end
 
+    def restart_required_params
+      @restart_required_params ||= @config_schema.select { |_, v| v[:requires_restart] }.keys.to_set.freeze
+    end
+
+    def requires_restart?(key)
+      restart_required_params.include?(key)
+    end
+
     def validate(config)
       errors = validation_errors(config)
 
