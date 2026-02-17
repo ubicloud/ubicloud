@@ -1,4 +1,4 @@
-<%# locals: (title:, config:, extra_class:, name:, errors:) %>
+<%# locals: (title:, config:, extra_class:, name:, errors:, config_validator: nil) %>
 
 <div class="bg-white rounded-lg shadow overflow-hidden mb-6 <%= extra_class %>">
   <div class="px-6 py-4 border-b border-gray-200">
@@ -34,6 +34,11 @@
                 <% else %>
                   <%= error %>
                 <% end %>
+              </span>
+            <% end %>
+            <% if config_validator&.requires_restart?(key) %>
+              <span class="restart-warning ml-1 cursor-help" title="Changes to this parameter take effect after a database restart">
+                <%== part("components/icon", name: "hero-information-circle", classes: "h-4 w-4 text-orange-600") %>
               </span>
             <% end %>
           </div>

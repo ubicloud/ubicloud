@@ -2360,6 +2360,10 @@ components:
             type: string
           nullable: true
           readOnly: true
+        message:
+          description: 'Informational message about the configuration update, such as restart requirements.'
+          type: string
+          readOnly: true
       additionalProperties: false
       required:
         - pg_config

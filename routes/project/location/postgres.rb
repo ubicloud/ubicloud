@@ -621,19 +621,32 @@ class Clover
           end
 
           validate_postgres_config(pg.version, pg_config, pgbouncer_config)
+          old_pg_config = pg.user_config
           pg.update(user_config: pg_config, pgbouncer_user_config: pgbouncer_config)
 
           pg.servers.each(&:incr_configure)
 
           audit_log(pg, "update")
 
+          validator = Validation::PostgresConfigValidator.new(pg.version)
+          restart_requiring_changed_params = (pg_config.keys | old_pg_config.keys).select { |k|
+            validator.requires_restart?(k) && pg_config[k] != old_pg_config[k]
+          }
+
           if api?
-            {
+            response = {
               pg_config: pg.user_config,
               pgbouncer_config: pg.pgbouncer_user_config
             }
+            response[:message] = "The changes in the following parameters require a database restart to take effect: #{restart_requiring_changed_params.join(", ")}. You can restart the database by using the restart endpoint." unless restart_requiring_changed_params.empty?
+            response
           else
-            flash["notice"] = "Configuration updated successfully"
+            flash["notice"] = if restart_requiring_changed_params.any?
+              "Configuration updated successfully. The changes in the following parameters require a database restart to take effect: #{restart_requiring_changed_params.join(", ")}. You can restart the database by clicking the 'Restart' button in the 'Settings' page."
+            else
+              "Configuration updated successfully."
+            end
+
             r.redirect pg, "/config"
           end
         end
