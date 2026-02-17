@@ -1,0 +1,301 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Mutation testing for SubnetRekey proof.
+#
+# Validates invariant sensitivity:
+#   - Removing atomic lock check → MutualExclusion violated
+#   - Removing leader election → still safe (atomicity sufficient)
+#   - Removing lock release in FinishRekey → NoOrphanedLocks violated
+#   - Removing nicPhase reset in FinishRekey → NoPhaseWithoutLock violated
+#   - DestroyNic not removing from heldLocks → LockedNicsActive violated
+#   - Removing inbound barrier → PhaseCoordinatorAlignment violated
+#   - Removing outbound barrier → PhaseCoordinatorAlignment violated
+#   - Removing old_drop barrier (FinishRekey) → pass (semantic guard only)
+#   - DestroyNic not resetting nicPhase → InactiveNicsIdle violated
+#   - NicAdvanceInbound without pc guard → PhaseCoordinatorAlignment violated
+#   - NicAdvanceOutbound without pc guard → PhaseCoordinatorAlignment violated
+#   - NicAdvanceOldDrop without pc guard → PhaseCoordinatorAlignment violated
+#   - Removing idle guard from ConsumeRefresh → NoOrphanedLocks violated
+#   - ForwardRefreshKeys not clearing sender → RefreshBounded violated
+#   - AbortRekey without empty heldLocks check → NoOrphanedLocks violated
+#   - Destroy without pc=idle check → pass (heldLocks={} sufficient)
+#
+# Usage: proof/subnet_rekey/mutation-test [NAME]
+#   Run all mutations, or a single named mutation.
+
+Dir.chdir(File.expand_path("../..", __dir__))
+
+require_relative "../lib/proof_extract"
+
+PROOF_NAME = "SubnetRekey"
+PROOFFILE = File.join("proof", "tla.yaml")
+
+# Config for mutation testing: 2 subnets, 4 NICs (1 inactive), small bound.
+# NicOwner uses <- override in .cfg (not =), so override_cfg leaves it alone.
+MUTATION_CFG = {
+  "Subnets" => "{1, 2}",
+  "AllNics" => "{1, 2, 3, 4}",
+  "InitActiveNics" => "{1, 2, 3}",
+  "MaxOps" => "2"
+}.freeze
+
+MUTATIONS = [
+  {
+    name: "skip-write-recheck",
+    description: "Remove atomic lock check — allows double-locking",
+    type: :replace,
+    find: "    IN /\\ nics # {}\n       /\\ \\A n \\in nics : ~IsLocked(n)\n       /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
+    replace: "    IN /\\ nics # {}\n       /\\ heldLocks' = [heldLocks EXCEPT ![s] = nics]",
+    expect: "MutualExclusion"
+  },
+  {
+    name: "skip-leader-check",
+    description: "Remove leader election from ReadAndLock — atomicity alone handles safety",
+    type: :replace,
+    find: "  /\\ pc[s] = \"consumed\"\n  /\\ ConnectedLeader(s) = s\n  /\\ LET nics == AllConnectedNics(s)",
+    replace: "  /\\ pc[s] = \"consumed\"\n  /\\ LET nics == AllConnectedNics(s)",
+    expect: :pass
+  },
+  {
+    name: "skip-unlock",
+    description: "Remove lock release in FinishRekey",
+    type: :replace,
+    find: "  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"old_drop\"\n  /\\ nicPhase' = [n \\in AllNics |-> IF n \\in heldLocks[s] THEN \"idle\" ELSE nicPhase[n]]\n  /\\ heldLocks' = [heldLocks EXCEPT ![s] = {}]\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    replace: "  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"old_drop\"\n  /\\ nicPhase' = [n \\in AllNics |-> IF n \\in heldLocks[s] THEN \"idle\" ELSE nicPhase[n]]\n  /\\ UNCHANGED heldLocks\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    expect: "NoOrphanedLocks"
+  },
+  {
+    name: "skip-phase-reset",
+    description: "Remove nicPhase reset in FinishRekey — leaves stale phase",
+    type: :replace,
+    find: "  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"old_drop\"\n  /\\ nicPhase' = [n \\in AllNics |-> IF n \\in heldLocks[s] THEN \"idle\" ELSE nicPhase[n]]\n  /\\ heldLocks' = [heldLocks EXCEPT ![s] = {}]\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    replace: "  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"old_drop\"\n  /\\ UNCHANGED nicPhase\n  /\\ heldLocks' = [heldLocks EXCEPT ![s] = {}]\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    expect: "NoPhaseWithoutLock"
+  },
+  {
+    name: "skip-destroy-nic-unlock",
+    description: "DestroyNic doesn't remove from heldLocks — orphaned lock on dead NIC",
+    type: :replace,
+    find: "  /\\ heldLocks' = [s \\in Subnets |-> heldLocks[s] \\ {n}]\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"idle\"]",
+    replace: "  /\\ UNCHANGED heldLocks\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"idle\"]",
+    expect: "LockedNicsActive"
+  },
+  {
+    name: "skip-inbound-barrier",
+    description: "Remove barrier from AdvanceInbound — coordinator advances before NICs ready",
+    type: :replace,
+    find: "  /\\ pc[s] = \"phase_inbound\"\n  /\\ heldLocks[s] # {}\n  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"inbound\"\n  /\\ pc' = [pc EXCEPT ![s] = \"phase_outbound\"]",
+    replace: "  /\\ pc[s] = \"phase_inbound\"\n  /\\ heldLocks[s] # {}\n  /\\ pc' = [pc EXCEPT ![s] = \"phase_outbound\"]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
+    name: "skip-outbound-barrier",
+    description: "Remove barrier from AdvanceOutbound — coordinator advances before NICs ready",
+    type: :replace,
+    find: "  /\\ pc[s] = \"phase_outbound\"\n  /\\ heldLocks[s] # {}\n  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"outbound\"\n  /\\ pc' = [pc EXCEPT ![s] = \"phase_old_drop\"]",
+    replace: "  /\\ pc[s] = \"phase_outbound\"\n  /\\ heldLocks[s] # {}\n  /\\ pc' = [pc EXCEPT ![s] = \"phase_old_drop\"]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
+    name: "skip-old-drop-barrier",
+    description: "Remove barrier from FinishRekey — semantic guard only, structurally safe",
+    type: :replace,
+    find: "  /\\ pc[s] = \"phase_old_drop\"\n  /\\ heldLocks[s] # {}\n  /\\ \\A n \\in heldLocks[s] : nicPhase[n] = \"old_drop\"\n  /\\ nicPhase' = [n \\in AllNics |-> IF n \\in heldLocks[s] THEN \"idle\" ELSE nicPhase[n]]",
+    replace: "  /\\ pc[s] = \"phase_old_drop\"\n  /\\ heldLocks[s] # {}\n  /\\ nicPhase' = [n \\in AllNics |-> IF n \\in heldLocks[s] THEN \"idle\" ELSE nicPhase[n]]",
+    expect: :pass
+  },
+  {
+    name: "skip-destroy-nic-phase-reset",
+    description: "DestroyNic doesn't reset nicPhase — stale phase on inactive NIC",
+    type: :replace,
+    find: "  /\\ heldLocks' = [s \\in Subnets |-> heldLocks[s] \\ {n}]\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"idle\"]",
+    replace: "  /\\ heldLocks' = [s \\in Subnets |-> heldLocks[s] \\ {n}]\n  /\\ UNCHANGED nicPhase",
+    expect: "InactiveNicsIdle"
+  },
+  {
+    name: "skip-nic-inbound-pc-guard",
+    description: "NicAdvanceInbound without coordinator pc check — NIC advances during refresh_keys validation",
+    type: :replace,
+    find: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s] /\\ pc[s] = \"phase_inbound\"\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"inbound\"]",
+    replace: "  /\\ IsLocked(n)\n  /\\ nicPhase' = [nicPhase EXCEPT ![n] = \"inbound\"]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
+    name: "skip-nic-pc-guard",
+    description: "NicAdvanceOutbound without coordinator pc check — spurious signal advances NIC past barrier",
+    type: :replace,
+    find: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s] /\\ pc[s] = \"phase_outbound\"",
+    replace: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
+    name: "skip-nic-old-drop-pc-guard",
+    description: "NicAdvanceOldDrop without coordinator pc check — spurious signal advances NIC past barrier",
+    type: :replace,
+    find: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s] /\\ pc[s] = \"phase_old_drop\"",
+    replace: "  /\\ \\E s \\in Subnets : n \\in heldLocks[s]",
+    expect: "PhaseCoordinatorAlignment"
+  },
+  {
+    name: "skip-consume-pc-guard",
+    description: "Remove pc=idle guard from ConsumeRefresh — mid-rekey re-entry orphans locks",
+    type: :replace,
+    find: "ConsumeRefresh(s) ==\n  /\\ pc[s] = \"idle\"\n  /\\ ConnectedLeader(s) = s",
+    replace: "ConsumeRefresh(s) ==\n  /\\ ConnectedLeader(s) = s",
+    expect: "NoOrphanedLocks"
+  },
+  {
+    name: "skip-forward-drain",
+    description: "ForwardRefreshKeys doesn't clear sender — signals duplicated, violates bound",
+    type: :replace,
+    find: "  /\\ refreshNeeded' = [refreshNeeded EXCEPT ![s] = 0, ![ConnectedLeader(s)] = @ + 1]",
+    replace: "  /\\ refreshNeeded' = [refreshNeeded EXCEPT ![ConnectedLeader(s)] = @ + 1]",
+    expect: "RefreshBounded"
+  },
+  {
+    name: "skip-abort-empty-guard",
+    description: "AbortRekey without empty heldLocks check — aborts with locks held",
+    type: :replace,
+    find: "  /\\ pc[s] \\in {\"phase_inbound\", \"phase_outbound\", \"phase_old_drop\"}\n  /\\ heldLocks[s] = {}\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    replace: "  /\\ pc[s] \\in {\"phase_inbound\", \"phase_outbound\", \"phase_old_drop\"}\n  /\\ pc' = [pc EXCEPT ![s] = \"idle\"]",
+    expect: "NoOrphanedLocks"
+  },
+  {
+    name: "skip-destroy-idle-guard",
+    description: "Destroy without pc=idle check — heldLocks={} sufficient for safety",
+    type: :replace,
+    find: "  /\\ pc[s] = \"idle\"\n  /\\ heldLocks[s] = {}\n  /\\ ops < MaxOps\n  /\\ LET nbrs == Neighbors(s)",
+    replace: "  /\\ heldLocks[s] = {}\n  /\\ ops < MaxOps\n  /\\ LET nbrs == Neighbors(s)",
+    expect: :pass
+  }
+].freeze
+
+def assemble_spec
+  proofs = ProofExtract.load_prooffile(PROOFFILE)
+  spec = proofs[PROOF_NAME]
+  abort "error: proof '#{PROOF_NAME}' not found" unless spec
+
+  output_lines, = ProofExtract.assemble(spec[:sources], mod: PROOF_NAME)
+  cfg_text = ProofExtract.override_cfg(spec[:config], MUTATION_CFG)
+
+  [output_lines.join("\n") + "\n", cfg_text]
+end
+
+def apply_mutation(tla_text, cfg_text, mutation)
+  case mutation[:type]
+  when :replace
+    unless tla_text.include?(mutation[:find])
+      abort "error: mutation '#{mutation[:name]}' — anchor string not found in assembled spec:\n  #{mutation[:find].inspect}"
+    end
+    mutated = tla_text.sub(mutation[:find], mutation[:replace])
+    [mutated, cfg_text]
+
+  when :override
+    patched = cfg_text.dup
+    mutation[:overrides].each do |key, value|
+      patched = patched.gsub(/^(\s*#{Regexp.escape(key)}\s*=\s*).*$/, "\\1#{value}")
+    end
+    [tla_text, patched]
+
+  else
+    abort "error: unknown mutation type '#{mutation[:type]}'"
+  end
+end
+
+def run_mutation(mutation)
+  tla_text, cfg_text = assemble_spec
+  mutated_tla, mutated_cfg = apply_mutation(tla_text, cfg_text, mutation)
+
+  # Per-mutation config overrides (e.g., larger MaxOps for specific mutations)
+  mutation[:cfg]&.each do |key, value|
+    mutated_cfg = mutated_cfg.gsub(/^(\s*#{Regexp.escape(key)}\s*=\s*).*$/, "\\1#{value}")
+  end
+
+  # Write temp files in proof dir (TLC needs sibling modules)
+  proof_dir = "proof/subnet_rekey"
+  tla_path = File.join(proof_dir, "_mutation_test.tla")
+  cfg_path = File.join(proof_dir, "_mutation_test.cfg")
+
+  # Module name must match filename
+  mutated_tla = mutated_tla.sub("MODULE #{PROOF_NAME}", "MODULE _mutation_test")
+  File.write(tla_path, mutated_tla)
+  File.write(cfg_path, mutated_cfg)
+
+  # Run TLC — suppress trace generation, expect violation
+  output = `tlc -deadlock -noGenerateSpecTE -config #{cfg_path} #{tla_path} 2>&1`
+  status = $?
+
+  # Check result
+  violated = output.include?("is violated")
+  expected_violated = mutation[:expect].is_a?(String) && output.include?(mutation[:expect])
+
+  {
+    output:,
+    exit_code: status.exitstatus,
+    violated:,
+    expected_violated:
+  }
+ensure
+  File.delete(tla_path) if tla_path && File.exist?(tla_path)
+  File.delete(cfg_path) if cfg_path && File.exist?(cfg_path)
+end
+
+# --- Main ---
+
+selected = ARGV.first
+mutations = if selected
+  m = MUTATIONS.find { |m| m[:name] == selected }
+  abort "error: unknown mutation '#{selected}' (available: #{MUTATIONS.map { it[:name] }.join(", ")})" unless m
+  [m]
+else
+  MUTATIONS
+end
+
+puts "Running #{mutations.size} mutation test(s)...\n\n"
+
+results = mutations.map do |mutation|
+  $stderr.write "  #{mutation[:name]}: #{mutation[:description]}..."
+  $stderr.flush
+
+  result = run_mutation(mutation)
+
+  if mutation[:expect] == :pass
+    if !result[:violated] && result[:exit_code] == 0
+      warn " PASS (no violation)"
+      :pass
+    elsif result[:violated]
+      warn " FAIL (unexpected violation)"
+      result[:output].lines.select { |l| l.include?("violated") }.first(3).each { |l| warn "      #{l.chomp}" }
+      :fail
+    else
+      warn " FAIL (TLC exit code #{result[:exit_code]})"
+      result[:output].lines.select { |l| l =~ /[Ee]rror|[Cc]annot/ }.first(5).each { |l| warn "      #{l.chomp}" }
+      :fail
+    end
+  elsif result[:expected_violated]
+    warn " PASS (#{mutation[:expect]} violated)"
+    :pass
+  elsif result[:exit_code] != 0 && !result[:violated]
+    warn " ERROR (TLC exit code #{result[:exit_code]})"
+    result[:output].lines.select { |l| l =~ /[Ee]rror|[Cc]annot/ }.first(5).each { |l| warn "      #{l.chomp}" }
+    :fail
+  elsif result[:violated]
+    warn " FAIL (wrong invariant violated)"
+    warn "    expected: #{mutation[:expect]}"
+    warn "    output (last 5 lines):"
+    result[:output].lines.last(5).each { |l| warn "      #{l}" }
+    :fail
+  else
+    warn " FAIL (no violation found)"
+    warn "    expected: #{mutation[:expect]} to be violated"
+    warn "    TLC exit code: #{result[:exit_code]}"
+    :fail
+  end
+end
+
+puts
+passed = results.count(:pass)
+failed = results.count(:fail)
+puts "#{passed} passed, #{failed} failed"
+exit((failed > 0) ? 1 : 0)

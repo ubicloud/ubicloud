@@ -81,7 +81,8 @@ class PrivateSubnet < Sequel::Model
     (state == "waiting") ? "available" : state
   end
 
-  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate
+  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate,
+    :nic_phase_done
 
   def self.random_subnet(cidr_size)
     subnets = PRIVATE_SUBNET_RANGES.select { |_, (prefix, _)|
@@ -189,5 +190,6 @@ end
 #  load_balancer               | load_balancer_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
 #  minio_cluster               | minio_cluster_private_subnet_id_fkey             | (private_subnet_id) REFERENCES private_subnet(id)
 #  nic                         | nic_private_subnet_id_fkey                       | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic                         | nic_rekey_coordinator_id_fkey                    | (rekey_coordinator_id) REFERENCES private_subnet(id)
 #  private_subnet_aws_resource | private_subnet_aws_resource_id_fkey              | (id) REFERENCES private_subnet(id)
 #  victoria_metrics_resource   | victoria_metrics_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)

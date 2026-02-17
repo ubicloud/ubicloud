@@ -242,6 +242,23 @@ RSpec.configure do |config|
     end
   end
 
+  RSpec::Matchers.define :hibernate do
+    supports_block_expectations
+
+    match do |block|
+      block.call
+      false
+    rescue Prog::Base::Nap => nap
+      @nap = nap
+      nap.seconds == 60 * 60 * 24 * 365 * 1000
+    end
+
+    failure_message do
+      "expected: ".rjust(16) + "hibernate (#{60 * 60 * 24 * 365 * 1000} seconds)\n" +
+        "got: ".rjust(16) + (@nap.nil? ? "not nap" : "nap #{@nap.seconds} seconds") + "\n "
+    end
+  end
+
   if Config.frozen_test?
     require_relative "thawed_mock"
 

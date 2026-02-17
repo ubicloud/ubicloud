@@ -69,6 +69,20 @@ class Strand < Sequel::Model
     respirate_metrics.old_strand = true
   end
 
+  # TLA:module StrandBackoff
+  #
+  # TLA \* Wake: dispatcher picks up the strand (schedule <= 0).
+  # TLA \* TAKE_LEASE_PS (autocommit): pre-increment try, set schedule = Backoff(try').
+  # TLA \* SemSnap: snapshot all pending semaphores within the new transaction.
+  # TLA Wake ==
+  # TLA   ∧ phase = "idle"
+  # TLA   ∧ schedule <= 0
+  # TLA   ∧ phase' = "active"
+  # TLA   ∧ try' = IF try < MaxTry THEN try + 1 ELSE try
+  # TLA   ∧ schedule' = Backoff(try')
+  # TLA   ∧ visible' = pending
+  # TLA   ∧ UNCHANGED ⟨pending, totalSigs⟩
+  # TLA
   # :nocov:
   ps_sch = if Config.development?
     Sequel.function(:least, 5, :try)
@@ -134,10 +148,17 @@ SQL
             # the case where this is not called by the last exiting child, as
             # that otherwise can result in up to 120s delay in parent strand
             # execution.
+            #
+            # TLA \* ChildExit: a child strand exits, scheduling the parent.
+            # TLA \* Uses LEAST(schedule, NOW()=0) — same monotonicity as Signal.
+            # TLA ChildExit ==
+            # TLA   ∧ schedule' = Least0(schedule)
+            # TLA   ∧ UNCHANGED ⟨phase, try, pending, visible, totalSigs⟩
+            # TLA
             Strand
               .where(id: parent_id)
               .exclude(active_siblings_ds.exists)
-              .update(schedule: Sequel::CURRENT_TIMESTAMP)
+              .update(schedule: Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP))
           end
         end
       end
@@ -205,18 +226,41 @@ SQL
       modified!(:stack)
     end
 
+    # TLA \* Crash: transaction rolls back, TAKE_LEASE_PS effects persist.
+    # TLA \*   try stays incremented (backoff accumulates across crashes).
+    # TLA \*   schedule stays at Backoff(try) or Signal/ChildExit's value.
+    # TLA \*   Semaphores NOT consumed (SemSnap deletions rolled back).
+    # TLA Crash ==
+    # TLA   ∧ phase = "active"
+    # TLA   ∧ phase' = "idle"
+    # TLA   ∧ UNCHANGED ⟨schedule, try, pending, visible, totalSigs⟩
+    # TLA
     DB.transaction do
       SemSnap.use(id) do |snap|
         prg = load(snap)
         prg.public_send(:before_run)
         prg.public_send(label)
       end
+    # TLA \* NapCommit(napTime): label raised Nap(napTime), nap handler runs.
+    # TLA \*   Conditional schedule update: only set napTime if no concurrent
+    # TLA \*   Signal/ChildExit changed schedule from the Backoff(try) value.
+    # TLA \*   Atomic: row lock blocks Signal during UPDATE+COMMIT.
+    # TLA NapCommit(napTime) ==
+    # TLA   ∧ phase = "active"
+    # TLA   ∧ try' = 0
+    # TLA   ∧ pending' = pending - visible
+    # TLA   ∧ schedule' = IF schedule = Backoff(try) THEN napTime ELSE schedule
+    # TLA   ∧ phase' = "idle"
+    # TLA   ∧ UNCHANGED ⟨visible, totalSigs⟩
+    # TLA
     rescue Prog::Base::Nap => e
       save_changes
 
-      scheduled = DB[<<SQL, e.seconds, id].get
+      scheduled = DB[<<SQL, schedule, e.seconds, id].get
 UPDATE strand
-SET try = 0, schedule = now() + (? * '1 second'::interval)
+SET try = 0,
+    schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
+                    ELSE schedule END
 WHERE id = ?
 RETURNING schedule
 SQL
@@ -226,6 +270,17 @@ SQL
       self.schedule = scheduled
       changed_columns.delete(:schedule)
       e
+    # TLA \* HopAndDeadline: label raised Hop, inner loop continued, deadline expired.
+    # TLA \*   Hop's transaction committed (semaphores consumed, try reset to 0).
+    # TLA \*   Schedule stays at TAKE_LEASE_PS value (or Signal/ChildExit's value).
+    # TLA \*   Models the collapsed sequence: Hop -> commit -> [loop] -> deadline.
+    # TLA HopAndDeadline ==
+    # TLA   ∧ phase = "active"
+    # TLA   ∧ try' = 0
+    # TLA   ∧ pending' = pending - visible
+    # TLA   ∧ phase' = "idle"
+    # TLA   ∧ UNCHANGED ⟨schedule, totalSigs, visible⟩
+    # TLA
     rescue Prog::Base::Hop => hp
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
       Clog.emit("hopped", {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})

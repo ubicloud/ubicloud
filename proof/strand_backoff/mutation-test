@@ -1,0 +1,185 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Mutation testing for StrandBackoff proof.
+#
+# Validates invariant and property sensitivity:
+#   - Unconditional nap (remove CASE guard) -> NoLostWake violated
+#   - Signal without LEAST (always set 0) -> pass (LEAST is optimization)
+#   - Signal without schedule update -> NoLostWake violated
+#   - Disable Tick -> CrashRecovery violated
+#   - Crash preserves try reset (try'=0) -> pass (weaker backoff, but safe)
+#   - No try pre-increment -> NapDetectsAllInterference violated
+#     (Backoff(0)=0 collides with Signal's LEAST value)
+#   - ChildExit unconditional zero -> pass (LEAST is optimization)
+#
+# Usage: proof/strand_backoff/mutation-test [NAME]
+#   Run all mutations, or a single named mutation.
+
+Dir.chdir(File.expand_path("../..", __dir__))
+
+require_relative "../lib/proof_extract"
+
+PROOF_NAME = "StrandBackoff"
+PROOFFILE = File.join("proof", "tla.yaml")
+PROOF_DIR = "proof/strand_backoff"
+SAFETY_CFG = File.join(PROOF_DIR, "StrandBackoff.cfg")
+LIVENESS_CFG = File.join(PROOF_DIR, "StrandBackoff-liveness.cfg")
+
+MUTATIONS = [
+  {
+    name: "unconditional-nap",
+    description: "Nap handler always sets schedule to napTime — the original bug",
+    find: "  /\\ schedule' = IF schedule = Backoff(try) THEN napTime ELSE schedule\n",
+    replace: "  /\\ schedule' = napTime\n",
+    cfg: SAFETY_CFG,
+    expect: "NoLostWake"
+  },
+  {
+    name: "signal-no-schedule",
+    description: "Semaphore.incr inserts row but doesn't set schedule — broken incr CTE",
+    find: "  /\\ schedule' = Least0(schedule)\n  /\\ UNCHANGED <<phase, try, visible>>",
+    replace: "  /\\ UNCHANGED <<phase, try, visible, schedule>>",
+    cfg: SAFETY_CFG,
+    expect: "NoLostWake"
+  },
+  {
+    name: "signal-unconditional-zero",
+    description: "Signal always sets schedule=0 (no LEAST, loses overdue priority)",
+    find: "  /\\ schedule' = Least0(schedule)\n  /\\ UNCHANGED <<phase, try, visible>>",
+    replace: "  /\\ schedule' = 0\n  /\\ UNCHANGED <<phase, try, visible>>",
+    cfg: SAFETY_CFG,
+    expect: :pass
+  },
+  {
+    name: "no-tick",
+    description: "Disable Tick — strands can't wake from backoff without Signal",
+    find: "  /\\ schedule > MinSchedule\n  /\\ schedule # Hibernate\n",
+    replace: "  /\\ FALSE\n",
+    cfg: LIVENESS_CFG,
+    expect: "CrashRecovery"
+  },
+  {
+    name: "crash-resets-try",
+    description: "Crash resets try to 0 — no backoff accumulation across crashes",
+    find: "  /\\ UNCHANGED <<schedule, try, pending, visible, totalSigs>>\n",
+    replace: "  /\\ try' = 0\n  /\\ UNCHANGED <<schedule, pending, visible, totalSigs>>\n",
+    cfg: SAFETY_CFG,
+    expect: :pass
+  },
+  {
+    name: "no-try-preincrement",
+    description: "Wake doesn't increment try — Backoff(0)=0 makes canary invisible to Signal",
+    find: "  /\\ try' = IF try < MaxTry THEN try + 1 ELSE try\n",
+    replace: "  /\\ try' = try\n",
+    cfg: SAFETY_CFG,
+    expect: "NapDetectsAllInterference"
+  },
+  {
+    name: "child-exit-unconditional-zero",
+    description: "ChildExit always sets schedule=0 (no LEAST, loses overdue priority)",
+    find: "  /\\ schedule' = Least0(schedule)\n  /\\ UNCHANGED <<phase, try, pending, visible, totalSigs>>",
+    replace: "  /\\ schedule' = 0\n  /\\ UNCHANGED <<phase, try, pending, visible, totalSigs>>",
+    cfg: SAFETY_CFG,
+    expect: :pass
+  }
+].freeze
+
+def assemble_spec
+  proofs = ProofExtract.load_prooffile(PROOFFILE)
+  spec = proofs[PROOF_NAME]
+  abort "error: proof '#{PROOF_NAME}' not found" unless spec
+
+  output_lines, = ProofExtract.assemble(spec[:sources], mod: PROOF_NAME)
+  [output_lines.join("\n") + "\n"]
+end
+
+def run_mutation(mutation)
+  tla_text, = assemble_spec
+  cfg_text = File.read(mutation[:cfg])
+
+  unless tla_text.include?(mutation[:find])
+    abort "error: mutation '#{mutation[:name]}' — anchor string not found in assembled spec:\n  #{mutation[:find].inspect}"
+  end
+
+  mutated_tla = tla_text.sub(mutation[:find], mutation[:replace])
+
+  # Write temp files in proof dir
+  tmp_tla = File.join(PROOF_DIR, "_mutation_test.tla")
+  tmp_cfg = File.join(PROOF_DIR, "_mutation_test.cfg")
+
+  mutated_tla = mutated_tla.sub("MODULE #{PROOF_NAME}", "MODULE _mutation_test")
+  File.write(tmp_tla, mutated_tla)
+  File.write(tmp_cfg, cfg_text)
+
+  output = `tlc -deadlock -noGenerateSpecTE -config #{tmp_cfg} #{tmp_tla} 2>&1`
+  status = $?
+
+  violated = output.include?("is violated") || output.include?("were violated")
+  expected_violated = mutation[:expect].is_a?(String) &&
+    (output.include?(mutation[:expect]) || output.include?("were violated"))
+
+  {output:, exit_code: status.exitstatus, violated:, expected_violated:}
+ensure
+  File.delete(tmp_tla) if tmp_tla && File.exist?(tmp_tla)
+  File.delete(tmp_cfg) if tmp_cfg && File.exist?(tmp_cfg)
+end
+
+# --- Main ---
+
+selected = ARGV.first
+mutations = if selected
+  m = MUTATIONS.find { |m| m[:name] == selected }
+  abort "error: unknown mutation '#{selected}' (available: #{MUTATIONS.map { it[:name] }.join(", ")})" unless m
+  [m]
+else
+  MUTATIONS
+end
+
+puts "Running #{mutations.size} mutation test(s)...\n\n"
+
+results = mutations.map do |mutation|
+  $stderr.write "  #{mutation[:name]}: #{mutation[:description]}..."
+  $stderr.flush
+
+  result = run_mutation(mutation)
+
+  if mutation[:expect] == :pass
+    if !result[:violated] && result[:exit_code] == 0
+      warn " PASS (no violation)"
+      :pass
+    elsif result[:violated]
+      warn " FAIL (unexpected violation)"
+      result[:output].lines.select { |l| l.include?("violated") }.first(3).each { |l| warn "      #{l.chomp}" }
+      :fail
+    else
+      warn " FAIL (TLC exit code #{result[:exit_code]})"
+      result[:output].lines.select { |l| l =~ /[Ee]rror|[Cc]annot/ }.first(5).each { |l| warn "      #{l.chomp}" }
+      :fail
+    end
+  elsif result[:expected_violated]
+    warn " PASS (#{mutation[:expect]} violated)"
+    :pass
+  elsif result[:exit_code] != 0 && !result[:violated]
+    warn " ERROR (TLC exit code #{result[:exit_code]})"
+    result[:output].lines.select { |l| l =~ /[Ee]rror|[Cc]annot/ }.first(5).each { |l| warn "      #{l.chomp}" }
+    :fail
+  elsif result[:violated]
+    warn " FAIL (wrong invariant violated)"
+    warn "    expected: #{mutation[:expect]}"
+    warn "    output (last 5 lines):"
+    result[:output].lines.last(5).each { |l| warn "      #{l}" }
+    :fail
+  else
+    warn " FAIL (no violation found)"
+    warn "    expected: #{mutation[:expect]} to be violated"
+    warn "    TLC exit code: #{result[:exit_code]}"
+    :fail
+  end
+end
+
+puts
+passed = results.count(:pass)
+failed = results.count(:fail)
+puts "#{passed} passed, #{failed} failed"
+exit((failed > 0) ? 1 : 0)

@@ -48,7 +48,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "returns nics that need rekeying" do
       nic1 = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
       nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
-      expect(nx.nics_to_rekey).to eq([])
+      expect(nx.nics_to_rekey.all).to eq([])
       nic1.update(state: "creating")
       expect(nx.nics_to_rekey.map(&:name)).to eq(["a"])
       nic2.update(state: "active")
@@ -59,11 +59,10 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
   describe "#before_run" do
     it "defers destroy while locked nics exist" do
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
-      nic.update(state: "active")
+      nic.update(state: "active", rekey_coordinator_id: ps.id)
       strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id)
       ps.incr_destroy
       nx_mid_rekey = described_class.new(strand)
-      nx_mid_rekey.update_stack_locked_nics([nic.id])
 
       nx_mid_rekey.before_run
       expect(nx_mid_rekey.strand.label).to eq("wait_inbound_setup")
@@ -92,7 +91,6 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "hops to refresh_keys if when_refresh_keys_set?" do
       nx.incr_refresh_keys
       expect { nx.wait }.to hop("refresh_keys")
-      expect(ps.reload.state).to eq("refreshing_keys")
     end
 
     it "increments refresh_keys if it passed more than a day" do
@@ -138,6 +136,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
     it "naps if nothing to do" do
       expect { nx.wait }.to nap(10 * 60)
     end
+
+    it "fails if locks are held while in wait" do
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nic.update(state: "active", rekey_coordinator_id: ps.id)
+      expect { nx.wait }.to raise_error RuntimeError, /locks held while in wait/
+    end
   end
 
   describe "#refresh_keys" do
@@ -150,14 +154,12 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
     it "hops to wait if not the connected leader" do
       expect(nx).to receive(:connected_leader?).and_return(false)
-      expect(Clog).to receive(:emit)
       expect { nx.refresh_keys }.to hop("wait")
       expect(Semaphore.where(strand_id: nx.private_subnet.id, name: "refresh_keys").count).to eq(1)
     end
 
-    it "refreshes keys and hops to wait_refresh_keys" do
+    it "refreshes keys and hops to wait_inbound_setup" do
       expect(nic.start_rekey_set?).to be false
-      expect(nic.lock_set?).to be false
       nic.update(state: "active")
       expect(SecureRandom).to receive(:bytes).with(36).and_return("\x0a\x0b\x0c\x0d" * 9).ordered
       expect(SecureRandom).to receive(:bytes).with(4).and_return("\xe3\xaf\x3a\x04").ordered
@@ -168,88 +170,159 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect(nic.encryption_key).to eq "0x" + "0a0b0c0d" * 9
       expect(nic.rekey_payload).to eq("spi4" => "0xe3af3a04", "spi6" => "0xe3af3a04", "reqid" => 86879)
       expect(nic.start_rekey_set?).to be true
-      expect(nic.lock_set?).to be true
+      expect(nic.rekey_coordinator_id).to eq(ps.id)
+      expect(nic.rekey_phase).to eq("idle")
+      expect(ps.reload.state).to eq("refreshing_keys")
     end
 
-    it "naps if the nics are locked" do
-      nic.incr_lock
-      nic.update(state: "active")
-      expect { nx.refresh_keys }.to nap(10)
+    it "hops to wait if the nics are locked by another coordinator" do
+      nic.update(state: "active", rekey_coordinator_id: ps2.id)
+      expect { nx.refresh_keys }.to hop("wait")
+      expect(ps.reload.state).to eq("waiting")
     end
 
-    it "naps if advisory lock cannot be acquired" do
+    it "hops to wait without claiming when another coordinator holds some nics" do
       nic.update(state: "active")
-      expect(nx).to receive(:connected_leader?).and_return(true)
-      expect(nx).to receive(:try_advisory_lock).and_return(false)
-      expect { nx.refresh_keys }.to nap(10)
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").update(label: "wait").subject
+      nic2.update(state: "active", rekey_coordinator_id: ps2.id)
+
+      expect { nx.refresh_keys }.to hop("wait")
+      expect(nic.reload.rekey_coordinator_id).to be_nil
+    end
+
+    it "fails if freshly locked NICs have non-idle phase" do
+      nic.update(state: "active", rekey_phase: "inbound")
+      expect { nx.refresh_keys }.to raise_error RuntimeError, /freshly locked NICs should all be idle/
+    end
+
+    it "fails if locks are held at refresh_keys entry" do
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
+      nic2.update(state: "active", rekey_coordinator_id: ps.id)
+      expect { nx.refresh_keys }.to raise_error RuntimeError, /locks held at idle/
     end
   end
 
   describe "#wait_inbound_setup" do
     let(:nic) {
-      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+      n = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      n.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "idle")
+      n
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
-    it "naps 5 if state creation is ongoing" do
+    it "hibernates if state creation is ongoing" do
       nic
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to hibernate
+    end
+
+    it "hibernates when some NICs haven't reached target phase (barrier)" do
+      nic  # at idle
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
+      nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "inbound")
+      expect { nx.wait_inbound_setup }.to hibernate
     end
 
     it "hops to wait_outbound_setup if state creation is done" do
-      nic.strand.update(label: "wait_rekey_outbound_trigger")
+      nic.update(rekey_phase: "inbound")
       expect(nic.trigger_outbound_update_set?).to be false
       expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
       nic.refresh
       expect(nic.trigger_outbound_update_set?).to be true
     end
+
+    it "continues with remaining NIC when one is destroyed mid-rekey" do
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
+      nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "inbound")
+      nic.update(rekey_phase: "inbound")
+      nic2.destroy
+      expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
+      nic.refresh
+      expect(nic.trigger_outbound_update_set?).to be true
+    end
+
+    it "aborts to wait if all locked NICs are destroyed" do
+      expect { nx.wait_inbound_setup }.to hop("wait")
+      expect(ps.reload.state).to eq("waiting")
+    end
+
+    it "coordinator proceeds despite subnet connect mid-rekey" do
+      nic.update(rekey_phase: "inbound")
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject
+      nic2.update(state: "active")
+      ps.connect_subnet(ps2)
+      expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
+    end
+
+    it "coordinator proceeds despite subnet disconnect mid-rekey" do
+      Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
+      ps.connect_subnet(ps2)
+      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject
+      nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "inbound")
+      nic.update(rekey_phase: "inbound")
+      ps.disconnect_subnet(ps2)
+      expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
+    end
+
+    it "fails on phase monotonicity violation" do
+      nic.update(rekey_phase: "outbound")
+      expect { nx.wait_inbound_setup }.to raise_error RuntimeError, /phase monotonicity at phase_inbound/
+    end
   end
 
   describe "#wait_outbound_setup" do
     let(:nic) {
-      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+      n = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      n.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "inbound")
+      n
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
-    it "donates if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to hibernate
     end
 
-    it "hops to wait_state_dropped if policy update is done" do
-      nic.strand.update(label: "wait_rekey_old_state_drop_trigger")
+    it "hops to wait_old_state_drop if policy update is done" do
+      nic.update(rekey_phase: "outbound")
       expect(nic.old_state_drop_trigger_set?).to be false
       expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")
       nic.refresh
       expect(nic.old_state_drop_trigger_set?).to be true
     end
+
+    it "aborts to wait if all locked NICs are destroyed" do
+      expect { nx.wait_outbound_setup }.to hop("wait")
+      expect(ps.reload.state).to eq("waiting")
+    end
+
+    it "fails on phase monotonicity violation" do
+      nic.update(rekey_phase: "old_drop")
+      expect { nx.wait_outbound_setup }.to raise_error RuntimeError, /phase monotonicity at phase_outbound/
+    end
   end
 
   describe "#wait_old_state_drop" do
     let(:nic) {
-      Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject.update(rekey_payload: {})
+      n = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      n.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "outbound")
+      n
     }
     let(:nx) {
-      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
-      nx.update_stack_locked_nics([nic.id])
-      nx
+      described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
 
-    it "donates if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to hibernate
     end
 
     it "hops to wait if all is done" do
-      nic.strand.update(label: "wait")
+      nic.update(rekey_phase: "old_drop")
       ps.update(last_rekey_at: Time.now - 100)
       expect { nx.wait_old_state_drop }.to hop("wait")
       ps.refresh
@@ -258,25 +331,95 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nic.refresh
       expect(nic.encryption_key).to be_nil
       expect(nic.rekey_payload).to be_nil
-      expect(nic.lock_set?).to be false
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq("idle")
+    end
+
+    it "aborts to wait if all locked NICs are destroyed" do
+      expect { nx.wait_old_state_drop }.to hop("wait")
+      expect(ps.reload.state).to eq("waiting")
+    end
+
+    it "fails on phase monotonicity violation" do
+      nic.update(rekey_phase: "idle")
+      expect { nx.wait_old_state_drop }.to raise_error RuntimeError, /phase monotonicity at phase_old_drop/
+    end
+
+    it "tolerates concurrent NIC destruction between read and release" do
+      nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
+      nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "old_drop")
+      nic.update(rekey_phase: "old_drop")
+      ps.update(last_rekey_at: Time.now - 100)
+
+      expect(nx).to receive(:locked_nics).and_wrap_original do |m|
+        result = m.call
+        # Simulate concurrent NIC destruction (FK cascade clears coordinator)
+        Nic.where(id: result.last.id).update(rekey_coordinator_id: nil)
+        result
+      end
+
+      expect { nx.wait_old_state_drop }.to hop("wait")
     end
 
     it "updates last_rekey_at on all connected subnets" do
       Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait", id: ps2.id)
       ps.connect_subnet(ps2)
-      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject.update(rekey_payload: {})
+      nic2 = Prog::Vnet::NicNexus.assemble(ps2.id, name: "b").subject
+      nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "old_drop")
 
       nx_with_both = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
-      nx_with_both.update_stack_locked_nics([nic.id, nic2.id])
 
-      nic.strand.update(label: "wait")
-      nic2.strand.update(label: "wait")
+      nic.update(rekey_phase: "old_drop")
       ps.update(last_rekey_at: Time.now - 100)
       ps2.update(last_rekey_at: Time.now - 100)
 
       expect { nx_with_both.wait_old_state_drop }.to hop("wait")
       expect(ps.reload.last_rekey_at > Time.now - 10).to be true
       expect(ps2.reload.last_rekey_at > Time.now - 10).to be true
+    end
+  end
+
+  describe "end-to-end rekey flow" do
+    it "drives coordinator through all phases with NIC phase transitions" do
+      nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "a").subject
+      nic.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "idle", state: "creating")
+      ps.update(last_rekey_at: Time.now - 100)
+
+      nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
+
+      # Phase inbound: NIC still idle → hibernate (barrier)
+      expect { nx.wait_inbound_setup }.to hibernate
+
+      # NIC advances to inbound → coordinator advances
+      nic.update(rekey_phase: "inbound")
+      expect { nx.wait_inbound_setup }.to hop("wait_outbound_setup")
+      expect(Semaphore.where(strand_id: nic.id, name: "trigger_outbound_update").count).to eq(1)
+
+      # Phase outbound: NIC still inbound → hibernate (barrier)
+      nic.refresh
+      expect { nx.wait_outbound_setup }.to hibernate
+
+      # NIC advances to outbound → coordinator advances
+      nic.update(rekey_phase: "outbound")
+      expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")
+      expect(Semaphore.where(strand_id: nic.id, name: "old_state_drop_trigger").count).to eq(1)
+
+      # Phase old_drop: NIC still outbound → hibernate (barrier)
+      nic.refresh
+      expect { nx.wait_old_state_drop }.to hibernate
+
+      # NIC advances to old_drop → coordinator finishes
+      nic.update(rekey_phase: "old_drop")
+      expect { nx.wait_old_state_drop }.to hop("wait")
+
+      # Verify full cleanup
+      nic.refresh
+      expect(nic.rekey_coordinator_id).to be_nil
+      expect(nic.rekey_phase).to eq("idle")
+      expect(nic.encryption_key).to be_nil
+      expect(nic.rekey_payload).to be_nil
+      expect(ps.reload.state).to eq("waiting")
+      expect(ps.last_rekey_at > Time.now - 10).to be true
     end
   end
 
@@ -298,6 +441,11 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       Strand.create_with_id(n, prog: "Vnet::NicNexus", label: "wait")
       n
     }
+
+    it "fails if locks are held at destroy" do
+      nic.update(rekey_coordinator_id: ps.id)
+      expect { nx.destroy }.to raise_error RuntimeError, /locks held at destroy/
+    end
 
     it "extends deadline if a vm prevents destroy" do
       nic.update(vm_id: vm.id)

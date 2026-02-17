@@ -17,6 +17,11 @@ module SemaphoreMethods
         define_method :"#{name}_set?" do
           semaphores.any? { it.name == name }
         end
+
+        # Class method for signaling by ID without loading the model.
+        define_singleton_method :"incr_#{name}" do |strand_id|
+          Semaphore.incr(strand_id, sym)
+        end
       end
     end
   end

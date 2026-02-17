@@ -13,7 +13,7 @@ class Nic < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated,
+    :old_state_drop_trigger, :setup_nic, :repopulate, :vm_allocated,
     :migrate_to_separate_prog
 
   def self.ubid_to_name(ubid)
@@ -35,32 +35,31 @@ class Nic < Sequel::Model
   def private_ipv4_gateway
     private_subnet.net4.nth(1).to_s + private_subnet.net4.netmask.to_s
   end
-
-  def unlock
-    Semaphore.where(strand_id: id, name: "lock").delete(force: true)
-  end
 end
 
 # Table: nic
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  |
-#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
-#  private_ipv4      | cidr                     | NOT NULL
-#  private_ipv6      | cidr                     | NOT NULL
-#  vm_id             | uuid                     |
-#  encryption_key    | text                     |
-#  name              | text                     | NOT NULL
-#  rekey_payload     | jsonb                    |
-#  state             | text                     | NOT NULL
+#  id                   | uuid                     | PRIMARY KEY
+#  private_subnet_id    | uuid                     | NOT NULL
+#  mac                  | macaddr                  |
+#  created_at           | timestamp with time zone | NOT NULL DEFAULT now()
+#  private_ipv4         | cidr                     | NOT NULL
+#  private_ipv6         | cidr                     | NOT NULL
+#  vm_id                | uuid                     |
+#  encryption_key       | text                     |
+#  name                 | text                     | NOT NULL
+#  rekey_payload        | jsonb                    |
+#  state                | text                     | NOT NULL
+#  rekey_phase          | nic_rekey_phase          | NOT NULL DEFAULT 'idle'::nic_rekey_phase
+#  rekey_coordinator_id | uuid                     |
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
 # Check constraints:
 #  state | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
 # Foreign key constraints:
-#  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
-#  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)
+#  nic_private_subnet_id_fkey    | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic_rekey_coordinator_id_fkey | (rekey_coordinator_id) REFERENCES private_subnet(id)
+#  nic_vm_id_fkey                | (vm_id) REFERENCES vm(id)
 # Referenced By:
 #  ipsec_tunnel     | ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
 #  ipsec_tunnel     | ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)
