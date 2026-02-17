@@ -24,6 +24,7 @@ spec:
         - name: ubicsi
           image: ubicloud/ubicsi:v0.4.2
           imagePullPolicy: IfNotPresent
+          args: ["node"]
           env:
             - name: NODE_ID
               valueFrom:
