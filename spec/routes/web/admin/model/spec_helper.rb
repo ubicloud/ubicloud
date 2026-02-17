@@ -426,15 +426,6 @@ module AdminModelSpecHelper
       PostgresInitScript.create_with_id(pg, init_script: "#!/bin/bash\necho 'Hello, World!'")
     end
 
-    def create_postgres_server
-      project = Project.create(name: "test-project")
-      pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
-      timeline = create_postgres_timeline(location_id: pg.location_id)
-      vm = Prog::Vm::Nexus.assemble_with_sshable(pg.project_id, name: "pg-vm", location_id: pg.location_id, unix_user: "ubi").subject
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1)
-      PostgresServer.create(timeline_id: timeline.id, resource_id: pg.id, vm_id: vm.id, version: "18")
-    end
-
     def create_private_subnet
       project = Project.create(name: "test-project")
       PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")

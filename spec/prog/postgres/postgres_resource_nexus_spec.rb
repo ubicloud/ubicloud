@@ -19,26 +19,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     )
   }
 
-  def create_postgres_server(resource:, location_id: self.location_id, timeline: create_postgres_timeline(location_id:), timeline_access: "push", is_representative: true, version: "16", private_subnet: self.private_subnet, vm_name: "pg-vm-#{resource.name}", server_index: 0)
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
-      project.id, name: vm_name, private_subnet_id: private_subnet.id,
-      location_id:, unix_user: "ubi"
-    ).subject
-    VmStorageVolume.create(vm:, boot: false, size_gib: 64, disk_index: 1)
-    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.#{server_index + 1}/32")
-    vm.update(ephemeral_net6: "fd10:9b0b:6b4b:#{server_index}::/79")
-    server = PostgresServer.create(
-      timeline:,
-      resource:,
-      vm_id: vm.id,
-      is_representative:,
-      timeline_access:,
-      version:
-    )
-    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "start")
-    server
-  end
-
   before do
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_project.id)
   end
@@ -240,7 +220,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
       postgres_server.vm.strand.update(label: "wait")
       parent = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource: parent, server_index: 1)
+      create_postgres_server(resource: parent)
       postgres_resource.update(parent:)
       expect { nx.start }.to hop("refresh_dns_record")
       expect(st.children.count).to eq(1)
@@ -251,7 +231,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#trigger_pg_current_xact_id_on_parent" do
     it "triggers pg_current_xact_id and pops" do
       parent = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource: parent, server_index: 1)
+      create_postgres_server(resource: parent)
       postgres_resource.update(parent:)
 
       fresh_nx = described_class.new(st)
@@ -601,7 +581,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "if read_replica and promote is set, promotes and naps" do
       parent = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource: parent, server_index: 1)
+      create_postgres_server(resource: parent)
       postgres_resource.update(parent:)
       nx.incr_promote
       expect { nx.wait }.to nap(30)
