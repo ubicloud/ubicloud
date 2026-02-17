@@ -67,6 +67,7 @@ class LoadBalancer < Sequel::Model
         add_port_with_stack(port, lb_vm.id)
       end
       incr_update_load_balancer
+      incr_rewrite_dns_records
     end
   end
 
@@ -80,6 +81,7 @@ class LoadBalancer < Sequel::Model
       vm_ports_dataset.where(load_balancer_port_id: port.id).destroy
       ports_dataset.where(id: port.id).destroy
       incr_update_load_balancer
+      incr_rewrite_dns_records
     end
   end
 
