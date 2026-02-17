@@ -52,7 +52,13 @@ class Prog::Vnet::SubnetNexus < Prog::Base
       end
       firewall.associate_with_private_subnet(ps, apply_firewalls: false)
 
-      prog = location.aws? ? "Vnet::Aws::VpcNexus" : "Vnet::Metal::SubnetNexus"
+      prog = if location.aws?
+        "Vnet::Aws::VpcNexus"
+      elsif location.gcp?
+        "Vnet::Gcp::SubnetNexus"
+      else
+        "Vnet::Metal::SubnetNexus"
+      end
       Strand.create_with_id(id, prog:, label: "start")
     end
   end

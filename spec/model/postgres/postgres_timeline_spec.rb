@@ -48,6 +48,20 @@ PGDATA=/dat/17/data
     expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
+  it "returns walg_config_region for metal" do
+    expect(postgres_timeline.walg_config_region).to eq("us-east-1")
+  end
+
+  it "returns walg_config_region for aws" do
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", aws?: true, provider_name: "aws")).at_least(:once)
+    expect(postgres_timeline.walg_config_region).to eq("us-west-2")
+  end
+
+  it "returns false for aws? when location is nil" do
+    tl = described_class.new
+    expect(tl.aws?).to be_nil
+  end
+
   describe "#need_backup?" do
     let(:sshable) { Sshable.new }
     let(:leader) {

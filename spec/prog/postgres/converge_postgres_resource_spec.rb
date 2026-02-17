@@ -183,6 +183,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.vm.update(vm_host_id: nil)
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
+
+    it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
+      location.update(provider: "gcp")
+      server = create_server(representative: true)
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
   end
 
   describe "#wait_servers_to_be_ready" do

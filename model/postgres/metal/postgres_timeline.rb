@@ -4,6 +4,24 @@ class PostgresTimeline < Sequel::Model
   module Metal
     private
 
+    def metal_generate_walg_config(version)
+      walg_credentials = if access_key
+        <<-WALG_CONF
+AWS_ACCESS_KEY_ID=#{access_key}
+AWS_SECRET_ACCESS_KEY=#{secret_key}
+        WALG_CONF
+      end
+      <<-WALG_CONF
+WALG_S3_PREFIX=s3://#{ubid}
+AWS_ENDPOINT=#{blob_storage_endpoint}
+#{walg_credentials}
+AWS_REGION=us-east-1
+AWS_S3_FORCE_PATH_STYLE=true
+PGHOST=/var/run/postgresql
+PGDATA=/dat/#{version}/data
+      WALG_CONF
+    end
+
     def metal_walg_config_region
       "us-east-1"
     end

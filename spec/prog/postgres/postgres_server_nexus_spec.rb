@@ -149,6 +149,32 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
     end
 
+    it "picks correct base image for GCP" do
+      gcp_location = Location.create(
+        name: "us-central1",
+        display_name: "gcp-us-central1",
+        ui_name: "gcp-us-central1",
+        visible: true,
+        provider: "gcp",
+        project_id: user_project.id
+      )
+      gcp_resource = PostgresResource.create(
+        project: user_project,
+        location: gcp_location,
+        name: "pg-gcp16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "16"
+      )
+      Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+      postgres_timeline = PostgresTimeline.create
+      allow(Validation).to receive(:validate_billing_rate)
+
+      st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
+      expect(st.subject.vm.boot_image).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64")
+    end
+
     it "raises error if the version is not supported for AWS" do
       # Use an AWS location that doesn't have any AMI records
       new_aws_location = Location.create(
@@ -276,7 +302,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.mount_data_disk }.to nap(5)
     end
 
-    it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
+    it "mounts data disk if format disk is succeeded and hops to run_init_script" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
       expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/vdb -r 838848").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
@@ -308,7 +334,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   describe "#run_init_script" do
     it "skips running the init script if not provided" do
       expect(sshable).not_to receive(:_cmd).with("sudo tee /tmp/init_script.sql > /dev/null", anything)
-      expect { nx.run_init_script }.to hop("configure_walg_credentials")
+      expect { nx.run_init_script }.to hop("setup_blob_storage")
     end
 
     it "runs the init script if provided and is not running already" do
@@ -326,28 +352,34 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.run_init_script }.to nap(5)
     end
 
-    it "hops to configure_walg_credentials if init script is succeeded" do
+    it "hops to setup_blob_storage if init script is succeeded" do
       PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
       expect(sshable).to receive(:d_check).with("run_init_script").and_return("Succeeded")
-      expect { nx.run_init_script }.to hop("configure_walg_credentials")
+      expect { nx.run_init_script }.to hop("setup_blob_storage")
     end
   end
 
-  describe "#configure_walg_credentials" do
+  describe "#setup_blob_storage" do
     it "hops to initialize_empty_database if the server is primary" do
-      expect(server).to receive(:refresh_walg_credentials)
       expect(server).to receive(:attach_s3_policy_if_needed)
 
-      expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
+      expect { nx.setup_blob_storage }.to hop("initialize_empty_database")
     end
 
     it "hops to initialize_database_from_backup if the server is not primary" do
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, timeline_access: "fetch", representative: false)
       standby_nx = described_class.new(standby.strand)
-      expect(standby_nx.postgres_server).to receive(:refresh_walg_credentials)
       expect(standby_nx.postgres_server).to receive(:attach_s3_policy_if_needed)
 
-      expect { standby_nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
+      expect { standby_nx.setup_blob_storage }.to hop("initialize_database_from_backup")
+    end
+  end
+
+  describe "#configure_walg_credentials" do
+    it "refreshes walg credentials and hops to refresh_certificates" do
+      expect(server).to receive(:refresh_walg_credentials)
+
+      expect { nx.configure_walg_credentials }.to hop("refresh_certificates")
     end
   end
 
@@ -364,9 +396,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_empty_database }.to nap(5)
     end
 
-    it "hops to refresh_certificates if initialize_empty_database command is succeeded" do
+    it "hops to configure_walg_credentials if initialize_empty_database command is succeeded" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_empty_database").and_return("Succeeded")
-      expect { nx.initialize_empty_database }.to hop("refresh_certificates")
+      expect { nx.initialize_empty_database }.to hop("configure_walg_credentials")
     end
 
     it "naps if script return unknown status" do
@@ -390,9 +422,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
-    it "hops to refresh_certificates if initialize_database_from_backup command is succeeded" do
+    it "hops to configure_walg_credentials if initialize_database_from_backup command is succeeded" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
-      expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
+      expect { nx.initialize_database_from_backup }.to hop("configure_walg_credentials")
     end
 
     it "naps if script return unknown status" do
@@ -1212,6 +1244,25 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
       expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
       expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
+    end
+
+    it "skips host_routing lockout on GCP" do
+      gcp_location = Location.create(
+        name: "us-central1",
+        display_name: "gcp-us-central1",
+        ui_name: "gcp-us-central1",
+        visible: true,
+        provider: "gcp",
+        project_id: project.id
+      )
+      gcp_resource = create_postgres_resource(location_id: gcp_location.id)
+      gcp_server = create_postgres_server(resource: gcp_resource, timeline: postgres_timeline)
+      gcp_nx = described_class.new(gcp_server.strand)
+
+      expect(gcp_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(gcp_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(gcp_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { gcp_nx.lockout }.to hop("wait_lockout_attempt")
     end
   end
 

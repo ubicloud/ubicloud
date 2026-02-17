@@ -30,6 +30,9 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       family = "m8gd"
       vcpus = 2
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+    elsif frame["provider"] == "gcp"
+      location = Location[provider: "gcp", project_id: nil]
+      [location.id, "standard-2", 128]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
     end
@@ -41,6 +44,12 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       target_vm_size:,
       target_storage_size_gib:
     )
+
+    # GCP uses plain Ubuntu image without walg-daemon-client,
+    # so use the old-style direct wal-g invocation.
+    if frame["provider"] == "gcp"
+      PostgresResource[st.id].incr_use_old_walg_command
+    end
 
     update_stack({"postgres_resource_id" => st.id})
     hop_wait_postgres_resource

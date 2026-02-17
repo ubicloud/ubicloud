@@ -22,8 +22,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     DB.transaction do
       postgres_timeline = PostgresTimeline.create(
         parent_id:,
-        access_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(16),
-        secret_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(32),
+        access_key: (location.gcp? || (location.aws? && Config.aws_postgres_iam_access)) ? nil : SecureRandom.hex(16),
+        secret_key: (location.gcp? || (location.aws? && Config.aws_postgres_iam_access)) ? nil : SecureRandom.hex(32),
         location_id: location.id
       )
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
@@ -103,9 +103,29 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def destroy_blob_storage
     return destroy_aws_s3 if postgres_timeline.aws?
+    return destroy_gcp_gcs if postgres_timeline.location.gcp?
 
     admin_client.admin_remove_user(postgres_timeline.access_key)
     admin_client.admin_policy_remove(postgres_timeline.ubid)
+  end
+
+  def destroy_gcp_gcs
+    bucket = postgres_timeline.blob_storage_client.bucket(postgres_timeline.ubid)
+    if bucket
+      bucket.files.each(&:delete)
+      bucket.delete
+    end
+
+    if postgres_timeline.access_key
+      credential = postgres_timeline.location.location_credential_gcp
+      begin
+        credential.iam_client.delete_project_service_account(
+          "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
+        )
+      rescue Google::Apis::ClientError
+        # SA may already be deleted
+      end
+    end
   end
 
   def destroy_aws_s3
@@ -126,6 +146,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
 
   def setup_blob_storage
     return setup_aws_s3 if postgres_timeline.aws?
+    return if postgres_timeline.location.gcp?
 
     # Setup user keys and policy for the timeline
     admin_client.admin_add_user(postgres_timeline.access_key, postgres_timeline.secret_key)

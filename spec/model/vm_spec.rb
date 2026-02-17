@@ -182,6 +182,26 @@ RSpec.describe Vm do
       expect(vm.ip6).to be_nil
     end
 
+    it "can compute the ipv6 addresses for gcp location" do
+      gcp_location = Location.create(name: "us-central1", display_name: "GCP Test", visible: false, provider: "gcp", ui_name: "gcp")
+      vm = create_vm(project_id: project.id, location_id: gcp_location.id, ephemeral_net6: "2001:db8::/128")
+      expect(vm.ip6_string).to eq("2001:db8::")
+
+      vm.update(ephemeral_net6: nil)
+      expect(vm.ip6).to be_nil
+    end
+
+    it "returns the gcp update_firewall_rules_prog for gcp location" do
+      gcp_location = Location.create(name: "us-central1-fw", display_name: "GCP Test FW", visible: false, provider: "gcp", ui_name: "gcp-fw")
+      vm = create_vm(project_id: project.id, location_id: gcp_location.id)
+      expect(vm.update_firewall_rules_prog).to eq(Prog::Vnet::Gcp::UpdateFirewallRules)
+    end
+
+    it "#aws? returns whether the vm location is aws" do
+      vm = create_vm(project_id: project.id)
+      expect(vm.aws?).to be false
+    end
+
     it "returns the right private_ipv4 based on the netmask" do
       ps = PrivateSubnet.create(name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fd10::/64", net4: "192.168.12.0/24", project_id: project.id)
       nic = Prog::Vnet::NicNexus.assemble(ps.id, name: "test-nic-1", ipv4_addr: "192.168.12.13").subject

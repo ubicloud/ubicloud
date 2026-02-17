@@ -19,24 +19,6 @@ class PostgresTimeline < Sequel::Model
     ubid
   end
 
-  def generate_walg_config(version)
-    walg_credentials = if access_key
-      <<-WALG_CONF
-AWS_ACCESS_KEY_ID=#{access_key}
-AWS_SECRET_ACCESS_KEY=#{secret_key}
-      WALG_CONF
-    end
-    <<-WALG_CONF
-WALG_S3_PREFIX=s3://#{ubid}
-AWS_ENDPOINT=#{blob_storage_endpoint}
-#{walg_credentials}
-AWS_REGION=#{walg_config_region}
-AWS_S3_FORCE_PATH_STYLE=true
-PGHOST=/var/run/postgresql
-PGDATA=/dat/#{version}/data
-    WALG_CONF
-  end
-
   def need_backup?
     return false if blob_storage.nil?
     return false if leader.nil?

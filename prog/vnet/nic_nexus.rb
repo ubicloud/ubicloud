@@ -17,6 +17,8 @@ class Prog::Vnet::NicNexus < Prog::Base
     DB.transaction do
       prog, ipv4_addr, mac, state = if subnet.location.aws?
         ["Vnet::Aws::NicNexus", (ipv4_addr || subnet.random_private_ipv4.nth_subnet(32, 4) || subnet.random_private_ipv4).to_s, nil, "active"]
+      elsif subnet.location.gcp?
+        ["Vnet::Gcp::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, nil, "active"]
       else
         ["Vnet::Metal::NicNexus", (ipv4_addr || subnet.random_private_ipv4).to_s, gen_mac, "initializing"]
       end

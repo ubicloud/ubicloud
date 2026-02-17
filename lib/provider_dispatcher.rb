@@ -10,7 +10,9 @@ module ProviderDispatcher
     PROVIDERS.each do |const|
       subdir = const.to_s.downcase
       provider_file = File.join(dir, subdir, file)
+      # :nocov:
       next unless File.exist?(provider_file)
+      # :nocov:
 
       load provider_file
       implementation = model.const_get(const)

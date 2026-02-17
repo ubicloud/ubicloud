@@ -120,7 +120,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       bud self.class, frame, :trigger_pg_current_xact_id_on_parent
       register_deadline("wait", 120 * 60)
     else
-      register_deadline("wait", 10 * 60)
+      register_deadline("wait", representative_server.vm.location.gcp? ? 30 * 60 : 10 * 60)
     end
     hop_refresh_dns_record
   end

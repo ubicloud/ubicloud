@@ -15,8 +15,8 @@ RSpec.describe Location do
   it ".for_project filters dataset to given project and non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
-    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
+    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["gcp-us-central1", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
+    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["gcp-us-central1", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
   end
 
   it ".visible_or_for_project filters dataset to given project and visible non-project-specific locations" do
@@ -43,6 +43,11 @@ RSpec.describe Location do
     p1_loc.update(provider: "hetzner")
     expect { p1_loc.azs }.to raise_error("azs is only valid for aws locations")
     expect(LocationAwsAz.count).to eq(0)
+  end
+
+  it "#azs raises for gcp location" do
+    gcp_loc = described_class.create(name: "gcp-azs-test", display_name: "gcp-azs-test", ui_name: "gcp-azs-test", visible: false, provider: "gcp")
+    expect { gcp_loc.azs }.to raise_error("azs is only valid for aws locations")
   end
 
   it "returns the aws azs for an aws location" do
