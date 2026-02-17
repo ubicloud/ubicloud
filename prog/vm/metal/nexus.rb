@@ -354,17 +354,30 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     begin
-      running = running?
+      running_map = vm_process_running_map
     rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
       # VM unreachable, should stay in unavailable
       nap 30
     end
 
-    if running
+    if running_map.values.all?
       decr_checkup
       Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
       hop_wait
     elsif !frame["reason_determined"]
+      if running_map[vm_name]
+        # Page due to weird situation, where VM process (generally cloud-hypervisor)
+        # is running, but dnsmasq or storage process isn't. We explicitly check this,
+        # because we never want to check for a shutdown reason if the VM is still running.
+        Prog::PageNexus.assemble(
+          "#{vm.ubid} unavailable but main process running",
+          ["VmExit", vm.ubid], vm.ubid,
+          extra_data: {vm_host: host.ubid}
+        )
+        update_stack("reason_determined" => true)
+        nap 30
+      end
+
       begin
         result, invocation_id = host.sshable.cmd("systemctl show -p Result -p InvocationID --value :vm_name", vm_name:).strip.split("\n")
 
@@ -542,13 +555,17 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     hop_wait
   end
 
-  def running?
-    host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n").all?("active")
+  def vm_is_active
+    host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n")
   end
 
   def available?
-    running?
+    vm_is_active.all?("active")
   rescue
     false
+  end
+
+  def vm_process_running_map
+    vm.healthcheck_systemd_units.zip(vm_is_active).to_h { |k, v| [k, v == "active"] }
   end
 end
