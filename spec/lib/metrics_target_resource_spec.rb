@@ -19,20 +19,7 @@ RSpec.describe MetricsTargetResource do
 
   let(:timeline) { create_postgres_timeline(location_id: location.id) }
 
-  let(:postgres_resource) {
-    PostgresResource.create(
-      name: "postgres-resource",
-      project:,
-      location:,
-      ha_type: PostgresResource::HaType::NONE,
-      user_config: {},
-      pgbouncer_user_config: {},
-      target_version: "16",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      superuser_password: "super"
-    )
-  }
+  let(:postgres_resource) { create_postgres_resource(project:, location_id: location.id) }
 
   let(:private_subnet) {
     PrivateSubnet.create(

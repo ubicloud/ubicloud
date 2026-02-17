@@ -6,7 +6,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-project") }
-  let(:postgres_resource) { create_postgres_resource(location_id:) }
+  let(:postgres_resource) { create_postgres_resource(project:, location_id:) }
   let(:postgres_timeline) { create_postgres_timeline(location_id:) }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource, timeline: postgres_timeline) }
   let(:st) { postgres_server.strand }
@@ -49,15 +49,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       loc
     }
     let(:postgres_resource) {
-      PostgresResource.create(
-        project: user_project,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "pg-name",
-        target_vm_size: "hobby-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        target_version: "16"
-      )
+      create_postgres_resource(project: user_project, location_id:)
     }
 
     it "creates postgres server and vm with sshable" do
@@ -77,16 +69,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "creates read replica server with catching_up status even when representative" do
       postgres_timeline = create_postgres_timeline(location_id:)
       firewall
-      replica_resource = PostgresResource.create(
-        project: user_project,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "pg-replica",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        parent_id: postgres_resource.id,
-        target_version: "16"
-      )
+      replica_resource = create_postgres_resource(project: user_project, location_id:)
+      replica_resource.update(parent_id: postgres_resource.id)
       Firewall.create(name: "#{replica_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.postgres_service_project_id)
 
       st = described_class.assemble(resource_id: replica_resource.id, timeline_id: postgres_timeline.id, timeline_access: "fetch", is_representative: true)
@@ -100,16 +84,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "picks correct base image for Lantern" do
-      lantern_resource = PostgresResource.create(
-        project: user_project,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "pg-lantern",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        target_version: "16",
-        flavor: PostgresResource::Flavor::LANTERN
-      )
+      lantern_resource = create_postgres_resource(project: user_project, location_id:)
+      lantern_resource.update(target_version: "16", flavor: PostgresResource::Flavor::LANTERN)
       Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: service_project)
       postgres_timeline = create_postgres_timeline(location_id:)
 
@@ -120,15 +96,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "picks correct base image for AWS-pg16" do
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "16", arch: "x64"]
 
-      aws_resource = PostgresResource.create(
-        project: user_project,
-        location: aws_location,
-        name: "pg-aws16",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        target_version: "16"
-      )
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      aws_resource.update(target_version: "16")
       Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
       postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
 
@@ -139,20 +108,23 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "picks correct base image for AWS-pg17" do
       ami = PgAwsAmi[aws_location_name: "us-west-2", pg_version: "17", arch: "x64"]
 
-      aws_resource = PostgresResource.create(
-        project: user_project,
-        location: aws_location,
-        name: "pg-aws17",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        target_version: "17"
-      )
+      aws_resource = create_postgres_resource(project: user_project, location_id: aws_location.id)
+      aws_resource.update(target_version: "17")
       Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
       postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
 
       st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
+    end
+
+    it "sets swap_size_bytes for hobby vm sizes" do
+      hobby_resource = create_postgres_resource(project: user_project, location_id:)
+      hobby_resource.update(target_vm_size: "hobby-1")
+      Firewall.create(name: "#{hobby_resource.ubid}-internal-firewall", location_id:, project: service_project)
+      postgres_timeline = create_postgres_timeline(location_id:)
+
+      st = described_class.assemble(resource_id: hobby_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.strand.stack.first["swap_size_bytes"]).to eq(4 * 1024 * 1024 * 1024)
     end
 
     it "raises error if the version is not supported for AWS" do
@@ -165,15 +137,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         provider: "aws",
         project_id: user_project.id
       )
-      aws_resource = PostgresResource.create(
-        project_id: user_project.id,
-        location_id: new_aws_location.id,
-        name: "pg-aws-noami",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "dummy-password",
-        target_version: "16"
-      )
+      aws_resource = create_postgres_resource(project: user_project, location_id: new_aws_location.id)
+      aws_resource.update(target_version: "16")
       postgres_timeline = create_postgres_timeline(location_id: new_aws_location.id)
 
       expect {
@@ -673,17 +638,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait_recovery_completion if configure command is succeeded during the initial provisioning and if the server is doing pitr" do
-      pitr_resource = PostgresResource.create(
-        name: "pg-pitr-#{SecureRandom.hex(4)}",
-        superuser_password: "dummy-password",
-        ha_type: "none",
-        target_version: "16",
-        location_id:,
-        project:,
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        restore_target: Time.now
-      )
+      pitr_resource = create_postgres_resource(project:, location_id:)
+      pitr_resource.update(restore_target: Time.now)
       pitr_server = create_postgres_server(resource: pitr_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
       pitr_nx = described_class.new(pitr_server.strand)
       pitr_sshable = pitr_nx.postgres_server.vm.sshable
@@ -1186,7 +1142,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         provider: "aws",
         project_id: project.id
       )
-      aws_resource = create_postgres_resource(location_id: aws_location.id)
+      aws_resource = create_postgres_resource(project:, location_id: aws_location.id)
       aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
       aws_nx = described_class.new(aws_server.strand)
 
@@ -1343,7 +1299,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     describe "read_replica" do
       it "updates the representative server, refreshes dns and destroys the old representative_server and hops to configure when read_replica" do
-        replica_resource = create_read_replica_resource(parent: postgres_resource, with_strand: true)
+        replica_resource = create_read_replica_resource(parent: postgres_resource)
         replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
         replica_server.update(synchronization_status: "catching_up")
         replica_nx = described_class.new(replica_server.strand)

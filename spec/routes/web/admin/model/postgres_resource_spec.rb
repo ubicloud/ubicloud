@@ -6,7 +6,7 @@ RSpec.describe CloverAdmin, "PostgresResource" do
   include AdminModelSpecHelper
 
   before do
-    @instance = create_postgres_resource
+    @instance = create_postgres_resource(project: Project.create(name: "test-project"), location_id: Location::HETZNER_FSN1_ID)
     admin_account_setup_and_login
   end
 

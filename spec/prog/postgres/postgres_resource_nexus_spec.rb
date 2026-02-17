@@ -6,7 +6,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-project") }
-  let(:postgres_resource) { create_postgres_resource }
+  let(:postgres_resource) { create_postgres_resource(project:, location_id:) }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource) }
   let(:st) { postgres_resource.strand }
   let(:postgres_project) { Project.create(name: "postgres-service-project") }
@@ -18,27 +18,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
     )
   }
-
-  def create_postgres_resource(location_id: self.location_id, project: self.project, with_strand: true, with_certs: true, private_subnet: self.private_subnet, name: "pg-test-resource")
-    certs = if with_certs
-      cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
-      {root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem}
-    end
-
-    pr = PostgresResource.create(
-      name:,
-      superuser_password: "dummy-password",
-      target_version: "16",
-      location_id:,
-      project:,
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      private_subnet_id: private_subnet.id,
-      **certs
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "start") if with_strand
-    pr
-  end
 
   def create_postgres_server(resource:, location_id: self.location_id, timeline: create_postgres_timeline(location_id:), timeline_access: "push", is_representative: true, version: "16", private_subnet: self.private_subnet, vm_name: "pg-vm-#{resource.name}", server_index: 0)
     vm = Prog::Vm::Nexus.assemble_with_sshable(
@@ -260,7 +239,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     it "buds trigger_pg_current_xact_id_on_parent if it has parent" do
       postgres_server.vm.strand.update(label: "wait")
-      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent, server_index: 1)
       postgres_resource.update(parent:)
       expect { nx.start }.to hop("refresh_dns_record")
@@ -271,7 +250,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#trigger_pg_current_xact_id_on_parent" do
     it "triggers pg_current_xact_id and pops" do
-      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent, server_index: 1)
       postgres_resource.update(parent:)
 
@@ -284,16 +263,18 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#refresh_dns_record" do
+    let(:name) { postgres_resource.name }
+
     it "creates dns records and hops" do
       postgres_server
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
 
-      dns_zone.insert_record(record_name: "pg-test-resource.pg.example.com.", type: "A", ttl: 10, data: "2.3.4.5")
-      dns_zone.insert_record(record_name: "pg-test-resource.pg.example.com.", type: "AAAA", ttl: 10, data: "2::1")
-      dns_zone.insert_record(record_name: "private.pg-test-resource.pg.example.com.", type: "A", ttl: 10, data: "127.0.0.1")
-      dns_zone.insert_record(record_name: "private.pg-test-resource.pg.example.com.", type: "AAAA", ttl: 10, data: "::1")
+      dns_zone.insert_record(record_name: "#{name}.pg.example.com.", type: "A", ttl: 10, data: "2.3.4.5")
+      dns_zone.insert_record(record_name: "#{name}.pg.example.com.", type: "AAAA", ttl: 10, data: "2::1")
+      dns_zone.insert_record(record_name: "private.#{name}.pg.example.com.", type: "A", ttl: 10, data: "127.0.0.1")
+      dns_zone.insert_record(record_name: "private.#{name}.pg.example.com.", type: "AAAA", ttl: 10, data: "::1")
       DnsRecord.where(dns_zone_id: dns_zone.id).update(created_at: Time.now - 10)
 
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
@@ -303,16 +284,16 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         .distinct(:name, :type)
         .reverse(:name, :type, :created_at)
       expect(ds.select_map([:type, :name, :data])).to eq [
-        ["AAAA", "private.pg-test-resource.pg.example.com.", postgres_server.vm.private_ipv6_string],
-        ["A", "private.pg-test-resource.pg.example.com.", postgres_server.vm.private_ipv4_string],
-        ["AAAA", "pg-test-resource.pg.example.com.", postgres_server.vm.ip6_string],
-        ["A", "pg-test-resource.pg.example.com.", postgres_server.vm.ip4_string]
+        ["AAAA", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv6_string],
+        ["A", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv4_string],
+        ["AAAA", "#{name}.pg.example.com.", postgres_server.vm.ip6_string],
+        ["A", "#{name}.pg.example.com.", postgres_server.vm.ip4_string]
       ]
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).where(:tombstoned).select_order_map([:type, :name, :data])).to eq [
-        ["A", "pg-test-resource.pg.example.com.", "2.3.4.5"],
-        ["A", "private.pg-test-resource.pg.example.com.", "127.0.0.1"],
-        ["AAAA", "pg-test-resource.pg.example.com.", "2::1"],
-        ["AAAA", "private.pg-test-resource.pg.example.com.", "::1"]
+        ["A", "#{name}.pg.example.com.", "2.3.4.5"],
+        ["A", "private.#{name}.pg.example.com.", "127.0.0.1"],
+        ["AAAA", "#{name}.pg.example.com.", "2::1"],
+        ["AAAA", "private.#{name}.pg.example.com.", "::1"]
       ]
     end
 
@@ -323,9 +304,9 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
-        ["A", "pg-test-resource.pg.example.com."],
-        ["A", "private.pg-test-resource.pg.example.com."],
-        ["AAAA", "private.pg-test-resource.pg.example.com."]
+        ["A", "#{name}.pg.example.com."],
+        ["A", "private.#{name}.pg.example.com."],
+        ["AAAA", "private.#{name}.pg.example.com."]
       ]
     end
 
@@ -339,10 +320,10 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
       DnsRecord.where(dns_zone_id: dns_zone.id).where { created_at < Time.now - 10 }.destroy
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
-        ["A", "pg-test-resource.pg.example.com."],
-        ["A", "private.pg-test-resource.pg.example.com."],
-        ["AAAA", "pg-test-resource.pg.example.com."],
-        ["AAAA", "private.pg-test-resource.pg.example.com."]
+        ["A", "#{name}.pg.example.com."],
+        ["A", "private.#{name}.pg.example.com."],
+        ["AAAA", "#{name}.pg.example.com."],
+        ["AAAA", "private.#{name}.pg.example.com."]
       ]
     end
 
@@ -354,7 +335,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
       nx.incr_initial_provisioning
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
-      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "pg-test-resource.pg.example.com."]]
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "#{name}.pg.example.com."]]
     end
 
     it "hops even if dns zone is not configured" do
@@ -372,7 +353,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#initialize_certificates" do
     it "hops to wait_servers after creating certificates" do
-      pr = create_postgres_resource(with_certs: false)
+      pr = create_postgres_resource(project:, location_id:)
+      pr.update(root_cert_1: nil, root_cert_key_1: nil, root_cert_2: nil, root_cert_key_2: nil, server_cert: nil, server_cert_key: nil)
       Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project: postgres_project)
       expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
       DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
@@ -395,6 +377,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#refresh_certificates" do
+    before do
+      cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem)
+    end
+
     it "rotates root certificate if root_cert_1 is close to expiration" do
       postgres_server
       short_cert_pem, short_key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 30 * 4)
@@ -407,6 +394,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
   describe "#refresh_certificates", "with dns_zone" do
     before do
+      cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
+      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem)
       DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
       allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
     end
@@ -611,7 +600,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
     end
 
     it "if read_replica and promote is set, promotes and naps" do
-      parent = create_postgres_resource(project:, name: "pg-parent-resource")
+      parent = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource: parent, server_index: 1)
       postgres_resource.update(parent:)
       nx.incr_promote
@@ -642,6 +631,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
     context "with internal firewall" do
       before do
+        postgres_resource.update(private_subnet_id: private_subnet.id)
         Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id:, project: postgres_project)
       end
 

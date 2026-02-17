@@ -18,22 +18,7 @@ RSpec.describe Prog::Test::PostgresResource do
 
   let(:timeline) { create_postgres_timeline(location_id:) }
 
-  let(:postgres_resource) {
-    pr = PostgresResource.create(
-      name: "pg-test",
-      superuser_password: "dummy-password",
-      ha_type: "none",
-      target_version: "17",
-      location_id:,
-      project_id: test_project.id,
-      user_config: {},
-      pgbouncer_user_config: {},
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
-    pr
-  }
+  let(:postgres_resource) { create_postgres_resource(project: test_project, location_id:) }
 
   def create_postgres_server
     vm = Prog::Vm::Nexus.assemble_with_sshable(
@@ -50,6 +35,7 @@ RSpec.describe Prog::Test::PostgresResource do
 
   def setup_postgres_resource(with_server: true)
     postgres_resource
+    postgres_resource.strand.update(label: "wait")
     create_postgres_server if with_server
     refresh_frame(pgr_test, new_values: {"postgres_resource_id" => postgres_resource.id})
   end

@@ -13,18 +13,7 @@ RSpec.describe MonitorableResource do
     )
   }
 
-  let(:postgres_resource) {
-    PostgresResource.create(
-      name: "pg-test",
-      superuser_password: "dummy",
-      ha_type: "none",
-      target_version: "16",
-      location_id:,
-      project_id: project.id,
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64
-    )
-  }
+  let(:postgres_resource) { create_postgres_resource(project:, location_id:) }
 
   let(:postgres_timeline) { create_postgres_timeline(location_id:) }
 
