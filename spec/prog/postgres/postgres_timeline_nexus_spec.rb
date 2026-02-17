@@ -27,27 +27,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     mc
   end
 
-  def create_postgres_resource(location_id: self.location_id)
-    pr = PostgresResource.create(
-      name: "pg-test-resource",
-      superuser_password: "dummy-password",
-      ha_type: "none",
-      target_version: "16",
-      location_id:,
-      project:,
-      user_config: {},
-      pgbouncer_user_config: {},
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      root_cert_1: "root_cert_1",
-      root_cert_2: "root_cert_2",
-      server_cert: "server_cert",
-      server_cert_key: "server_cert_key"
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
-    pr
-  end
-
   def create_postgres_server(resource:, timeline:, timeline_access: "push", is_representative: true, version: "16", strand_label: "wait", vm: nil, location_id: self.location_id, subnet: private_subnet)
     vm ||= Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "pg-vm-test", private_subnet_id: subnet.id,
@@ -168,7 +147,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       it "creates user and policies and hops" do
         aws_location = create_aws_location
         postgres_timeline.update(location_id: aws_location.id)
-        resource = create_postgres_resource(location_id: aws_location.id)
+        resource = create_postgres_resource(project:, location_id: aws_location.id)
         aws_private_subnet = create_private_subnet(
           name: "aws-pg-subnet",
           location_id: aws_location.id,
@@ -267,7 +246,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#wait_leader" do
     it "naps if leader not ready" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "start")
 
       expect { nx.wait_leader }.to nap(5)
@@ -275,7 +254,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "hops if leader is ready" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
 
       expect { nx.wait_leader }.to hop("wait")
@@ -285,7 +264,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   describe "#wait" do
     it "naps if blob storage is not configured" do
       # No minio cluster exists for the timeline's location, so blob_storage is nil
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
 
       expect(nx.postgres_timeline.blob_storage).to be_nil
@@ -294,7 +273,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "self-destructs if there's no leader, no backups and the timeline is old enough" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       server = create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
       server.destroy
       postgres_timeline.update(created_at: Time.now - 11 * 24 * 60 * 60)
@@ -307,7 +286,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "hops to take_backup if backup is needed" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
 
       backup = backup_fixture(days_ago: 3)
@@ -320,7 +299,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "creates a missing backup page if last completed backup is older than 2 days" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
       # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
       postgres_timeline.update(latest_backup_started_at: Time.now)
@@ -336,7 +315,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "resolves the missing page if last completed backup is more recent than 2 days" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
       # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
       postgres_timeline.update(latest_backup_started_at: Time.now)
@@ -356,7 +335,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
     it "naps if there is nothing to do" do
       create_minio_cluster
-      resource = create_postgres_resource
+      resource = create_postgres_resource(project:, location_id:)
       create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait")
       # Set latest_backup_started_at to avoid need_backup? returning true due to nil check
       postgres_timeline.update(latest_backup_started_at: Time.now)
@@ -372,7 +351,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
   describe "#take_backup" do
     let(:minio_cluster) { create_minio_cluster }
-    let(:resource) { create_postgres_resource }
+    let(:resource) { create_postgres_resource(project:, location_id:) }
     let(:server) { create_postgres_server(resource:, timeline: postgres_timeline, strand_label: "wait") }
 
     before do
