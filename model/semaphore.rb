@@ -19,7 +19,7 @@ class Semaphore < Sequel::Model
       Strand
         .where(id:)
         .returning(:id)
-        .with_sql(:update_sql, schedule: Sequel::CURRENT_TIMESTAMP))
+        .with_sql(:update_sql, schedule: Sequel.function(:least, Sequel[:schedule], Sequel::CURRENT_TIMESTAMP)))
       .insert([:id, :strand_id, :name],
         DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
   end

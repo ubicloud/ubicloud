@@ -93,6 +93,18 @@ RSpec.describe Strand do
     }.to change { [st.label, st.exitval] }.from(["hop_entry", nil]).to(["hop_exit", {msg: "hop finished"}])
   end
 
+  it "child exit preserves overdue parent schedule via LEAST" do
+    parent_st = described_class.create(prog: "Test", label: "start")
+    past = Time.now - 3600
+    parent_st.this.update(schedule: past)
+
+    child_st = described_class.create(prog: "Test", label: "hop_exit", parent_id: parent_st.id)
+    child_st.run
+
+    parent_st.refresh
+    expect(parent_st.schedule).to be_within(2).of(past)
+  end
+
   it "nap handler preserves signal schedule when concurrent incr detected" do
     st.label = "napper"
     st.save_changes

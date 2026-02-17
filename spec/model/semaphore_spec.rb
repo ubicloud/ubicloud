@@ -14,4 +14,12 @@ RSpec.describe Semaphore do
   it ".incr raises if invalid name is given" do
     expect { described_class.incr(st.id, nil) }.to raise_error(RuntimeError)
   end
+
+  it ".incr preserves overdue schedule via LEAST" do
+    past = Time.now - 3600
+    st.this.update(schedule: past)
+    described_class.incr(st.id, "test")
+    st.refresh
+    expect(st.schedule).to be_within(2).of(past)
+  end
 end
