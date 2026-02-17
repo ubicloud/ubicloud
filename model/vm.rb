@@ -40,7 +40,7 @@ class Vm < Sequel::Model
   plugin ResourceMethods, redacted_columns: :public_key
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop, :migrate_to_separate_progs
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
@@ -121,6 +121,7 @@ class Vm < Sequel::Model
     return "deleting" if destroying_set? || destroy_set?
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
+    return "unavailable" if label == "unavailable"
 
     if waiting_for_capacity_set?
       return "no capacity available" if Time.now - created_at > 15 * 60
@@ -128,6 +129,18 @@ class Vm < Sequel::Model
       return "waiting for capacity"
     end
     super
+  end
+
+  def can_restart?
+    display_state == "running"
+  end
+
+  def can_stop?
+    %w[running restarting unavailable rebooting].include?(display_state)
+  end
+
+  def can_start?
+    %w[unavailable stopped].include?(display_state)
   end
 
   # cloud-hypervisor takes topology information in this format:
