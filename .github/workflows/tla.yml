@@ -10,6 +10,8 @@ on:
     - 'model/metal/private_subnet.rb'
     - 'prog/vnet/metal/subnet_nexus.rb'
     - 'prog/vnet/metal/nic_nexus.rb'
+    - 'model/strand.rb'
+    - 'model/semaphore.rb'
     - '.github/workflows/tla.yml'
   workflow_dispatch:
 
@@ -31,16 +33,25 @@ env:
     -Dtlc2.tool.ModelChecker.BAQueue=true
 
 jobs:
-  # ── Assemble: build proof and check cache ───────────────────────────
-  # Hashes the assembled spec (without source map) plus all configs.
-  # Heavy jobs are skipped entirely when the hash matches a prior
-  # successful run.  workflow_dispatch always forces a full re-run.
+  # ── Assemble: build proofs and check per-proof caches ────────────────
+  # Each proof gets its own cache key (tlc-v3-{Name}-{sha256}).  The hash
+  # covers the TLC version pin, assembled .tla, all .cfg files, and the
+  # mutation-test script.  Downstream matrices are generated dynamically
+  # from proof/tla.yaml, skipping any proof whose cache already hit.
   assemble:
     name: assemble
     runs-on: ubicloud
     outputs:
-      proof-hash: ${{ steps.hash.outputs.hash }}
-      cached: ${{ steps.cache.outputs.cache-hit }}
+      assembled: ${{ steps.hash.outputs.assembled }}
+      SubnetRekey-hash: ${{ steps.hash.outputs.SubnetRekey-hash }}
+      StrandSchedule-hash: ${{ steps.hash.outputs.StrandSchedule-hash }}
+      StrandBackoff-hash: ${{ steps.hash.outputs.StrandBackoff-hash }}
+      SubnetRekey-cached: ${{ steps.cache-SubnetRekey.outputs.cache-hit }}
+      StrandSchedule-cached: ${{ steps.cache-StrandSchedule.outputs.cache-hit }}
+      StrandBackoff-cached: ${{ steps.cache-StrandBackoff.outputs.cache-hit }}
+      safety-matrix: ${{ steps.matrix.outputs.safety-matrix }}
+      liveness-matrix: ${{ steps.matrix.outputs.liveness-matrix }}
+      mutation-matrix: ${{ steps.matrix.outputs.mutation-matrix }}
     steps:
     - uses: actions/checkout@v6
     - uses: ruby/setup-ruby@v1
@@ -49,54 +60,121 @@ jobs:
     - name: Assemble and hash
       id: hash
       run: |
-        ruby proof/tla assemble SubnetRekey
-        hash=$(echo "$TLA2TOOLS_URL" \
-               | cat - proof/subnet_rekey/SubnetRekey.tla \
-                       proof/subnet_rekey/*.cfg \
-                       proof/subnet_rekey/mutation-test \
-               | sha256sum | cut -d' ' -f1)
-        echo "hash=$hash" >> "$GITHUB_OUTPUT"
+        ruby -ryaml -rdigest -rjson <<'RUBY'
+        proofs = YAML.load_file("proof/tla.yaml")
+        assembled = []
+        proofs.each do |name, spec|
+          missing = (spec["sources"] || []).reject { |s| File.exist?(s) }
+          unless missing.empty?
+            warn "#{name}: skipping (missing sources: #{missing.join(", ")})"
+            next
+          end
+          system("ruby", "proof/tla", "assemble", name, exception: true)
+          dir = spec["dir"]
+          sha = Digest::SHA256.new
+          sha.update(ENV.fetch("TLA2TOOLS_URL"))
+          sha.update(File.read("#{dir}/#{name}.tla"))
+          Dir["#{dir}/*.cfg"].sort.each { |f| sha.update(File.read(f)) }
+          mt = "#{dir}/mutation-test"
+          sha.update(File.read(mt)) if File.exist?(mt)
+          assembled << name
+          File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |f|
+            f.puts "#{name}-hash=#{sha.hexdigest}"
+          end
+        end
+        File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |f|
+          f.puts "assembled=#{JSON.generate(assembled)}"
+        end
+        RUBY
     - uses: actions/cache/restore@v4
-      id: cache
+      id: cache-SubnetRekey
       if: github.event_name != 'workflow_dispatch'
       with:
-        key: tlc-v3-${{ steps.hash.outputs.hash }}
+        key: tlc-v3-SubnetRekey-${{ steps.hash.outputs.SubnetRekey-hash }}
         path: .tlc-pass
         lookup-only: true
+    - uses: actions/cache/restore@v4
+      id: cache-StrandSchedule
+      if: github.event_name != 'workflow_dispatch'
+      with:
+        key: tlc-v3-StrandSchedule-${{ steps.hash.outputs.StrandSchedule-hash }}
+        path: .tlc-pass
+        lookup-only: true
+    - uses: actions/cache/restore@v4
+      id: cache-StrandBackoff
+      if: github.event_name != 'workflow_dispatch'
+      with:
+        key: tlc-v3-StrandBackoff-${{ steps.hash.outputs.StrandBackoff-hash }}
+        path: .tlc-pass
+        lookup-only: true
+    - name: Build matrices
+      id: matrix
+      env:
+        ASSEMBLED: ${{ steps.hash.outputs.assembled }}
+        CACHED_SubnetRekey: ${{ steps.cache-SubnetRekey.outputs.cache-hit }}
+        CACHED_StrandSchedule: ${{ steps.cache-StrandSchedule.outputs.cache-hit }}
+        CACHED_StrandBackoff: ${{ steps.cache-StrandBackoff.outputs.cache-hit }}
+      run: |
+        ruby -ryaml -rjson <<'RUBY'
+        proofs = YAML.load_file("proof/tla.yaml")
+        assembled = JSON.parse(ENV.fetch("ASSEMBLED", "[]"))
+        safety = []
+        liveness = []
+        mutation = []
 
-  # ── Safety: invariant checking across depth and breadth ─────────────
+        proofs.each do |name, spec|
+          next unless assembled.include?(name)
+          next if ENV["CACHED_#{name}"] == "true"
+          dir = spec["dir"]
+          configs = spec["configs"] || {}
+
+          # Base config -> safety
+          safety << {"proof" => name, "config" => ""}
+
+          configs.each do |config_name, _|
+            entry = {"proof" => name, "config" => config_name}
+            if config_name == "liveness"
+              liveness << entry
+            else
+              safety << entry
+            end
+          end
+
+          # Mutation test
+          mutation << {"proof" => name, "dir" => dir} if File.exist?("#{dir}/mutation-test")
+        end
+
+        File.open(ENV.fetch("GITHUB_OUTPUT"), "a") do |f|
+          f.puts "safety-matrix=#{JSON.generate(safety)}"
+          f.puts "liveness-matrix=#{JSON.generate(liveness)}"
+          f.puts "mutation-matrix=#{JSON.generate(mutation)}"
+        end
+        RUBY
+
+  # ── Safety: invariant checking across depth and breadth ───────────────
   #
-  # 2s4n  (2S/4N):   MaxOps=60 — long histories, NIC thrashing
-  # 3s5n  (3S/5N):   MaxOps=12 — transitive connectivity, 3-way contention
-  # 3s9n  (3S/9N):   MaxOps=6  — many NICs per subnet, 3-way barrier stress
-  # 4s8n  (4S/8N):   MaxOps=5  — 4-way contention, uniform 2 NICs/subnet
-  # 5s8n  (5S/8N):   MaxOps=4  — 5-way contention, full chain coverage
-  # 6s4n  (6S/4N):   MaxOps=2  — wide topology, few NICs, leader forwarding
-  # 8s10n (8S/10N):  MaxOps=3  — wide topology stress test
+  # SubnetRekey configs (generated from tla.yaml):
+  #   base         default topology verification
+  #   2s4n  2S/4N  MaxOps=60 — long histories, NIC thrashing
+  #   3s5n  3S/5N  MaxOps=12 — transitive connectivity, 3-way contention
+  #   3s6n  3S/6N  intermediate topology
+  #   3s9n  3S/9N  MaxOps=6  — many NICs per subnet, 3-way barrier stress
+  #   4s8n  4S/8N  MaxOps=5  — 4-way contention, uniform 2 NICs/subnet
+  #   5s8n  5S/8N  MaxOps=4  — 5-way contention, full chain coverage
+  #   6s4n  6S/4N  MaxOps=2  — wide topology, few NICs, leader forwarding
+  #   8s10n 8S/10N MaxOps=3  — wide topology stress test
+  #
+  # StrandSchedule, StrandBackoff: base config only (plus signal for Backoff)
   safety:
-    name: "safety · ${{ matrix.proof }} · ${{ matrix.config }}"
+    name: "safety · ${{ matrix.proof }} · ${{ matrix.config || 'base' }}"
     needs: assemble
-    if: needs.assemble.outputs.cached != 'true'
+    if: needs.assemble.outputs.safety-matrix != '[]'
     runs-on: ubicloud-standard-30
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - proof: SubnetRekey
-          config: 2s4n
-        - proof: SubnetRekey
-          config: 3s5n
-        - proof: SubnetRekey
-          config: 3s9n
-        - proof: SubnetRekey
-          config: 4s8n
-        - proof: SubnetRekey
-          config: 5s8n
-        - proof: SubnetRekey
-          config: 6s4n
-        - proof: SubnetRekey
-          config: 8s10n
+        include: ${{ fromJSON(needs.assemble.outputs.safety-matrix) }}
     steps:
     - uses: actions/checkout@v6
     - uses: actions/setup-java@v4
@@ -113,21 +191,24 @@ jobs:
       with:
         ruby-version: 3.4
     - name: Run TLC
-      run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+      run: |
+        if [ -n "${{ matrix.config }}" ]; then
+          ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+        else
+          ruby proof/tla check "${{ matrix.proof }}"
+        fi
 
-  # ── Liveness: temporal checking (2S/4N, MaxOps=3) ──────────────────
+  # ── Liveness: temporal property checking ──────────────────────────────
   liveness:
-    name: "liveness · ${{ matrix.proof }} · ${{ matrix.config }}"
+    name: "liveness · ${{ matrix.proof }}"
     needs: assemble
-    if: needs.assemble.outputs.cached != 'true'
+    if: needs.assemble.outputs.liveness-matrix != '[]'
     runs-on: ubicloud-standard-30
     timeout-minutes: 360
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - proof: SubnetRekey
-          config: liveness
+        include: ${{ fromJSON(needs.assemble.outputs.liveness-matrix) }}
     steps:
     - uses: actions/checkout@v6
     - uses: actions/setup-java@v4
@@ -144,21 +225,19 @@ jobs:
       with:
         ruby-version: 3.4
     - name: Run TLC
-      run: ruby proof/tla check -c "${{ matrix.config }}" "${{ matrix.proof }}"
+      run: ruby proof/tla check -c liveness "${{ matrix.proof }}"
 
-  # ── Mutation testing: invariant sensitivity ─────────────────────────
+  # ── Mutation testing: invariant sensitivity ───────────────────────────
   mutation-test:
     name: "mutation · ${{ matrix.proof }}"
     needs: assemble
-    if: needs.assemble.outputs.cached != 'true'
+    if: needs.assemble.outputs.mutation-matrix != '[]'
     runs-on: ubicloud-standard-30
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-        - proof: SubnetRekey
-          dir: proof/subnet_rekey
+        include: ${{ fromJSON(needs.assemble.outputs.mutation-matrix) }}
     steps:
     - uses: actions/checkout@v6
     - uses: actions/setup-java@v4
@@ -177,7 +256,7 @@ jobs:
     - name: Run mutation tests
       run: ruby ${{ matrix.dir }}/mutation-test
 
-  # ── Proof tool specs ────────────────────────────────────────────────
+  # ── Proof tool specs ──────────────────────────────────────────────────
   proof-tool-spec:
     name: proof-tool specs
     runs-on: ubicloud
@@ -193,15 +272,35 @@ jobs:
     - name: Run specs
       run: cd proof && bundle exec rspec spec
 
-  # ── Finalize: save cache on full success ────────────────────────────
+  # ── Finalize: save per-proof caches on success ────────────────────────
   finalize:
     name: save cache
     needs: [assemble, safety, liveness, mutation-test]
-    if: needs.assemble.outputs.cached != 'true'
+    if: >-
+      always() &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     runs-on: ubicloud
     steps:
     - run: mkdir -p .tlc-pass && touch .tlc-pass/done
     - uses: actions/cache/save@v4
+      if: >-
+        contains(fromJSON(needs.assemble.outputs.assembled), 'SubnetRekey') &&
+        needs.assemble.outputs.SubnetRekey-cached != 'true'
       with:
-        key: tlc-v3-${{ needs.assemble.outputs.proof-hash }}
+        key: tlc-v3-SubnetRekey-${{ needs.assemble.outputs.SubnetRekey-hash }}
+        path: .tlc-pass
+    - uses: actions/cache/save@v4
+      if: >-
+        contains(fromJSON(needs.assemble.outputs.assembled), 'StrandSchedule') &&
+        needs.assemble.outputs.StrandSchedule-cached != 'true'
+      with:
+        key: tlc-v3-StrandSchedule-${{ needs.assemble.outputs.StrandSchedule-hash }}
+        path: .tlc-pass
+    - uses: actions/cache/save@v4
+      if: >-
+        contains(fromJSON(needs.assemble.outputs.assembled), 'StrandBackoff') &&
+        needs.assemble.outputs.StrandBackoff-cached != 'true'
+      with:
+        key: tlc-v3-StrandBackoff-${{ needs.assemble.outputs.StrandBackoff-hash }}
         path: .tlc-pass
