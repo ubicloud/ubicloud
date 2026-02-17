@@ -85,4 +85,8 @@ class StorageKeyEncryption
     decipher.auth_tag = auth_tag
     decipher.update(encrypted_key[0]) + decipher.final
   end
+
+  def toml_str(value)
+    "\"#{value.gsub("\\", "\\\\\\\\").gsub("\"", "\\\"")}\""
+  end
 end

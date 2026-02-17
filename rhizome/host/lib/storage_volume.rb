@@ -16,6 +16,7 @@ require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
 require_relative "vhost_block_backend"
+require_relative "vhost_backend_config_v2"
 
 KEK_PIPE_WRITE_TIMEOUT_SEC = 5
 
