@@ -34,3 +34,26 @@ SubnetRekey:
       config: proof/subnet_rekey/SubnetRekey-8s10n.cfg
     liveness:
       config: proof/subnet_rekey/SubnetRekey-liveness.cfg
+
+StrandSchedule:
+  dir: proof/strand_schedule
+  config: proof/strand_schedule/StrandSchedule.cfg
+  sources:
+    - proof/strand_schedule/StrandSchedule.tla
+  configs:
+    liveness:
+      config: proof/strand_schedule/StrandSchedule-liveness.cfg
+
+StrandBackoff:
+  dir: proof/strand_backoff
+  config: proof/strand_backoff/StrandBackoff.cfg
+  sources:
+    - proof/strand_backoff/header.tla
+    - model/strand.rb
+    - model/semaphore.rb
+    - proof/strand_backoff/spec.tla
+  configs:
+    liveness:
+      config: proof/strand_backoff/StrandBackoff-liveness.cfg
+    signal:
+      config: proof/strand_backoff/StrandBackoff-signal.cfg

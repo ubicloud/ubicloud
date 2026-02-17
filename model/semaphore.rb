@@ -5,6 +5,18 @@ require_relative "../model"
 class Semaphore < Sequel::Model
   plugin ResourceMethods
 
+  # TLA:module StrandBackoff
+  #
+  # TLA \* Signal: Semaphore.incr from another strand/transaction.
+  # TLA \* Uses LEAST(schedule, NOW()=0) — never increases schedule.
+  # TLA \* Atomically inserts semaphore row and updates schedule (CTE).
+  # TLA Signal ==
+  # TLA   ∧ totalSigs < MaxSignals
+  # TLA   ∧ pending' = pending + 1
+  # TLA   ∧ totalSigs' = totalSigs + 1
+  # TLA   ∧ schedule' = Least0(schedule)
+  # TLA   ∧ UNCHANGED ⟨phase, try, visible⟩
+  # TLA
   def self.incr(id, name)
     case name
     when Symbol
