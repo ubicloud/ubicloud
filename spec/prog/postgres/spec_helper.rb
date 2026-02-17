@@ -4,16 +4,6 @@ require_relative "../../model/spec_helper"
 
 RSpec.configure do |config|
   config.include(Module.new do
-    def create_postgres_timeline
-      tl_id = PostgresTimeline.generate_uuid
-      tl = PostgresTimeline.create_with_id(tl_id,
-        location_id:,
-        access_key: "dummy-access-key",
-        secret_key: "dummy-secret-key")
-      Strand.create_with_id(tl_id, prog: "Postgres::PostgresTimelineNexus", label: "wait")
-      tl
-    end
-
     def create_postgres_resource(location_id:, target_version: "16")
       pr = PostgresResource.create(
         name: "pg-test-#{SecureRandom.hex(4)}",
@@ -51,7 +41,7 @@ RSpec.configure do |config|
       pr
     end
 
-    def create_postgres_server(resource:, timeline: create_postgres_timeline, timeline_access: "push", is_representative: true, version: "16")
+    def create_postgres_server(resource:, timeline: create_postgres_timeline(location_id:), timeline_access: "push", is_representative: true, version: "16")
       vm = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: private_subnet.id,
         location_id:, unix_user: "ubi"

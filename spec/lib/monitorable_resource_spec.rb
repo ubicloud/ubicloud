@@ -26,7 +26,7 @@ RSpec.describe MonitorableResource do
     )
   }
 
-  let(:postgres_timeline) { PostgresTimeline.create(location_id:) }
+  let(:postgres_timeline) { create_postgres_timeline(location_id:) }
 
   let(:postgres_server) {
     vm = Prog::Vm::Nexus.assemble_with_sshable(

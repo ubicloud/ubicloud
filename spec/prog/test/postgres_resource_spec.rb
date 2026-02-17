@@ -16,7 +16,7 @@ RSpec.describe Prog::Test::PostgresResource do
     )
   }
 
-  let(:timeline) { PostgresTimeline.create(location_id:) }
+  let(:timeline) { create_postgres_timeline(location_id:) }
 
   let(:postgres_resource) {
     pr = PostgresResource.create(

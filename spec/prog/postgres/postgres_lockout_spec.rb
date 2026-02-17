@@ -7,7 +7,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
 
   let(:project) { Project.create(name: "test-project") }
   let(:postgres_resource) { create_postgres_resource(location_id:) }
-  let(:postgres_timeline) { create_postgres_timeline }
+  let(:postgres_timeline) { create_postgres_timeline(location_id:) }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource, timeline: postgres_timeline) }
   let(:st) { postgres_server.strand }
   let(:server) { nx.postgres_server }

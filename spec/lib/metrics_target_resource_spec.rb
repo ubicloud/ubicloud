@@ -17,7 +17,7 @@ RSpec.describe MetricsTargetResource do
   let(:project) { Project.create(name: "postgres-server") }
   let(:project_service) { Project.create(name: "postgres-service") }
 
-  let(:timeline) { PostgresTimeline.create(location:) }
+  let(:timeline) { create_postgres_timeline(location_id: location.id) }
 
   let(:postgres_resource) {
     PostgresResource.create(

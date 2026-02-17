@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require_relative "../../model/spec_helper"
+require_relative "spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresResourceNexus do
   subject(:nx) { described_class.new(st) }
@@ -18,16 +18,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
     )
   }
-
-  def create_postgres_timeline(location_id: self.location_id)
-    tl = PostgresTimeline.create(
-      location_id:,
-      access_key: "dummy-access-key",
-      secret_key: "dummy-secret-key"
-    )
-    Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
-    tl
-  end
 
   def create_postgres_resource(location_id: self.location_id, project: self.project, with_strand: true, with_certs: true, private_subnet: self.private_subnet, name: "pg-test-resource")
     certs = if with_certs

@@ -13,7 +13,7 @@ RSpec.describe PostgresServer do
   let(:project) { Project.create(name: "postgres-server") }
   let(:project_service) { Project.create(name: "postgres-service") }
 
-  let(:timeline) { PostgresTimeline.create(location:) }
+  let(:timeline) { create_postgres_timeline(location_id: location.id) }
 
   let(:resource) {
     PostgresResource.create(
@@ -856,10 +856,11 @@ RSpec.describe PostgresServer do
         iam_client = Aws::IAM::Client.new(stub_responses: true)
         LocationCredential.create(location:, assume_role: "role")
 
-        parent = PostgresTimeline.create(location:)
+        parent = create_postgres_timeline(location_id: location.id)
         timeline.update(parent:)
         expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_server.timeline.parent.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
         expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed

@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require_relative "../../model/spec_helper"
+require_relative "spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-project") }
-  let(:postgres_timeline) { create_postgres_timeline }
+  let(:postgres_timeline) { create_postgres_timeline(location_id:) }
   let(:st) { postgres_timeline.strand }
   let(:service_project) { Project.create(name: "postgres-service-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
@@ -25,16 +25,6 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     )
     Strand.create_with_id(mc, prog: "Minio::MinioClusterNexus", label: "wait")
     mc
-  end
-
-  def create_postgres_timeline(location_id: self.location_id)
-    tl = PostgresTimeline.create(
-      location_id:,
-      access_key: "dummy-access-key",
-      secret_key: "dummy-secret-key"
-    )
-    Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "start")
-    tl
   end
 
   def create_postgres_resource(location_id: self.location_id)
