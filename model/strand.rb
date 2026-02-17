@@ -214,9 +214,11 @@ SQL
     rescue Prog::Base::Nap => e
       save_changes
 
-      scheduled = DB[<<SQL, e.seconds, id].get
+      scheduled = DB[<<SQL, schedule, e.seconds, id].get
 UPDATE strand
-SET try = 0, schedule = now() + (? * '1 second'::interval)
+SET try = 0,
+    schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
+                    ELSE schedule END
 WHERE id = ?
 RETURNING schedule
 SQL
