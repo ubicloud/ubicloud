@@ -945,9 +945,36 @@ RSpec.describe Clover, "postgres" do
         response_body = JSON.parse(last_response.body)
         expect(response_body["pg_config"]).to eq({"archive_mode" => "on"})
         expect(response_body["pgbouncer_config"]).to eq({"admin_users" => "postgres"})
+        expect(response_body["message"]).to include("require a database restart to take effect")
+        expect(response_body["message"]).to include("max_connections")
 
         expect(pg.reload.user_config).to eq({"archive_mode" => "on"})
         expect(pg.reload.pgbouncer_user_config).to eq({"admin_users" => "postgres"})
+      end
+
+      it "full update without restart-requiring changes does not include restart message" do
+        pg.update(user_config: {"work_mem" => "8MB"}, pgbouncer_user_config: {})
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {"work_mem" => "16MB"},
+          pgbouncer_config: {}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["message"]).to be_nil
+      end
+
+      it "full update with only pgbouncer changes does not include restart message" do
+        pg.update(user_config: {}, pgbouncer_user_config: {"max_client_conn" => "100"})
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
+          pg_config: {},
+          pgbouncer_config: {"max_client_conn" => "200"}
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "200"})
+        expect(response_body["message"]).to be_nil
       end
 
       it "partial update" do
@@ -961,6 +988,7 @@ RSpec.describe Clover, "postgres" do
         response_body = JSON.parse(last_response.body)
         expect(response_body["pg_config"]).to eq({"max_connections" => "120", "archive_mode" => "on"})
         expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})
+        expect(response_body["message"]).to include("require a database restart to take effect: max_connections")
 
         expect(pg.reload.user_config).to eq({"max_connections" => "120", "archive_mode" => "on"})
         expect(pg.reload.pgbouncer_user_config).to eq({"max_client_conn" => "100", "admin_users" => "postgres"})

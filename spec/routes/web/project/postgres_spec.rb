@@ -984,6 +984,29 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_field "pg_config_values[]", with: "120"
       end
 
+      it "shows restart required warning for restart-required configs" do
+        pg.update(user_config: {"max_connections" => "120"})
+        visit "#{project.path}#{pg.path}/config"
+
+        expect(page).to have_css ".restart-warning"
+      end
+
+      it "does not show restart required warning for non-restart configs" do
+        pg.update(user_config: {"work_mem" => "16MB"})
+        visit "#{project.path}#{pg.path}/config"
+
+        expect(page).to have_no_css ".restart-warning"
+      end
+
+      it "does not show restart required warning for pgbouncer configs" do
+        pg.update(pgbouncer_user_config: {"max_client_conn" => "200"})
+        visit "#{project.path}#{pg.path}/config"
+
+        within ".pgbouncer-config-card" do
+          expect(page).to have_no_css ".restart-warning"
+        end
+      end
+
       it "does not show update button when user does not have permissions" do
         pg_wo_permission.update(user_config: {"max_connections" => "120"})
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Postgres:view"])
@@ -1016,8 +1039,22 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_field "pg_config_keys[]", with: "max_connections"
         expect(page).to have_field "pg_config_values[]", with: "240"
-        expect(page).to have_flash_notice "Configuration updated successfully"
-        expect(pg.reload.user_config).to eq({"max_connections" => "240"})
+        expect(page).to have_flash_notice "Configuration updated successfully. The changes in the following parameters require a database restart to take effect: max_connections. You can restart the database by clicking the 'Restart' button in the 'Settings' page."
+      end
+
+      it "does not show restart message for non-restart configs" do
+        pg
+        visit "#{project.path}#{pg.path}/config"
+
+        within ".pg-config-card .new-config" do
+          fill_in "pg_config_keys[]", with: "work_mem"
+          fill_in "pg_config_values[]", with: "16MB"
+        end
+        click_button "Save"
+
+        expect(page).to have_flash_notice "Configuration updated successfully."
+        expect(page).to have_no_content "restart to take effect"
+        expect(pg.reload.user_config).to eq({"work_mem" => "16MB"})
       end
 
       it "shows errors when an unknown configuration is provided" do

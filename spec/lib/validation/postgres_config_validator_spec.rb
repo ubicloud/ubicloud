@@ -174,4 +174,46 @@ RSpec.describe Validation::PostgresConfigValidator do
       end
     end
   end
+
+  describe "#restart_required_params" do
+    it "returns restart-required params for PG 16" do
+      v = described_class.new("16")
+      params = v.restart_required_params
+      expect(params).to include("max_connections", "shared_buffers", "wal_level", "max_worker_processes")
+      expect(params).to include("archive_mode")
+      expect(params).not_to include("work_mem", "log_statement")
+    end
+
+    it "returns restart-required params for PG 17 with new params" do
+      v = described_class.new("17")
+      params = v.restart_required_params
+      expect(params).to include("max_connections", "shared_buffers", "commit_timestamp_buffers", "archive_mode")
+      expect(params).not_to include("old_snapshot_threshold")
+      expect(params).not_to include("io_combine_limit", "summarize_wal", "allow_alter_system")
+    end
+
+    it "returns restart-required params for PG 18 with new params" do
+      v = described_class.new("18")
+      params = v.restart_required_params
+      expect(params).to include("max_connections", "io_method", "autovacuum_worker_slots", "max_active_replication_origins")
+      expect(params).not_to include("io_workers", "io_combine_limit", "extension_control_path")
+    end
+
+    it "returns empty set for pgbouncer" do
+      v = described_class.new("pgbouncer")
+      expect(v.restart_required_params).to be_empty
+    end
+  end
+
+  describe "#requires_restart?" do
+    it "returns true for restart-required params" do
+      expect(validator.requires_restart?("max_connections")).to be true
+      expect(validator.requires_restart?("shared_buffers")).to be true
+    end
+
+    it "returns false for non-restart params" do
+      expect(validator.requires_restart?("work_mem")).to be false
+      expect(validator.requires_restart?("log_statement")).to be false
+    end
+  end
 end
