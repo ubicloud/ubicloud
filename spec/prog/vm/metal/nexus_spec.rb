@@ -925,13 +925,19 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "naps if vm is still unavailable and the reason has been determined" do
       refresh_frame(nx, new_values: {"reason_determined" => true})
-      expect(nx).to receive(:available?).and_return(false)
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "naps if vm is unreachable" do
+      refresh_frame(nx, new_values: {"reason_determined" => true})
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_raise(Errno::ECONNRESET)
       expect { nx.unavailable }.to nap(30)
     end
 
     it "pages and naps if vm is unavailable and systemctl show returns oom-kill" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
-      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (oom-kill)")
       frame = st.stack[0]
@@ -939,8 +945,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "pages and naps if vm is unavailable and systemctl command results in an error" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshError.new("", "", "", 1, nil))
-      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to nap(30)
         .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (unknown)")
       frame = st.stack[0]
@@ -949,15 +955,16 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "hops to stopped if vm is unavailable and systemctl show returns success" do
       nx.incr_checkup
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("success\nfoo\n")
       expect(Clog).to receive(:emit).with("VM stopped by operator", Hash)
-      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to hop("stopped")
         .and change(nx, :checkup_set?).from(true).to(false)
         .and change(nx, :stop_set?).from(false).to(true)
     end
 
     it "hops to stopped if vm is unavailable and systemctl show returns other value and journalctl shows ACPI Shutdown signalled" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("other\nfoo\n")
       expect(sshable).to receive(:_cmd).with(<<~END).and_return("ACPI Shutdown signalled\n")
         sudo journalctl _SYSTEMD_INVOCATION_ID=foo -o cat -n 50 --no-pager | \
@@ -968,21 +975,20 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             -e 'thread panicked'
       END
       expect(Clog).to receive(:emit).with("VM stopped by guest ACPI shutdown", Hash)
-      expect(nx).to receive(:available?).and_return(false)
       expect { nx.unavailable }.to hop("stopped")
         .and change(nx, :stop_set?).from(false).to(true)
     end
 
     it "decrements checkup and hops to wait if vm is available" do
       nx.incr_checkup
-      expect(nx).to receive(:available?).and_return(true)
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
         .and change(nx, :checkup_set?).from(true).to(false)
     end
 
     it "resolves page and hops to wait if vm is available" do
       page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
-      expect(nx).to receive(:available?).and_return(true)
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
         .and change { page.reload.resolve_set? }.from(false).to(true)
     end
