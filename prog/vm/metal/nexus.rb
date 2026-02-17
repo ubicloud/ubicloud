@@ -409,7 +409,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         end
         Clog.emit(msg, {vm_exit: {vm: vm.ubid}})
         decr_checkup
-        incr_stop
         hop_stopped
       else
         # Unexpected exit: signal, crash, unknown cause.

@@ -968,7 +968,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Clog).to receive(:emit).with("VM stopped by operator", Hash)
       expect { nx.unavailable }.to hop("stopped")
         .and change(nx, :checkup_set?).from(true).to(false)
-        .and change(nx, :stop_set?).from(false).to(true)
     end
 
     it "hops to stopped if vm is unavailable and systemctl show returns other value and journalctl shows ACPI Shutdown signalled" do
@@ -984,7 +983,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       END
       expect(Clog).to receive(:emit).with("VM stopped by guest ACPI shutdown", Hash)
       expect { nx.unavailable }.to hop("stopped")
-        .and change(nx, :stop_set?).from(false).to(true)
     end
 
     it "decrements checkup and hops to wait if vm is available" do
