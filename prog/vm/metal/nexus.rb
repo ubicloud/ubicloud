@@ -325,7 +325,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_restart
     end
 
-    nap 60 * 60
+    if available?
+      hop_wait
+    end
+
+    nap 15 * 60
   end
 
   # Unavailable label is for cases where VM was not manually stopped, and is
