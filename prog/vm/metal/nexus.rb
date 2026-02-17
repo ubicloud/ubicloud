@@ -353,7 +353,14 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_stopped
     end
 
-    if available?
+    begin
+      running = running?
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+      # VM unreachable, should stay in unavailable
+      nap 30
+    end
+
+    if running
       decr_checkup
       Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
       hop_wait
@@ -535,8 +542,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     hop_wait
   end
 
-  def available?
+  def running?
     host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n").all?("active")
+  end
+
+  def available?
+    running?
   rescue
     false
   end
