@@ -36,6 +36,7 @@ spec:
         - name: ubicsi
           image: ubicloud/ubicsi:v0.4.2
           imagePullPolicy: IfNotPresent
+          args: ["controller"]
           env:
             - name: NODE_ID
               valueFrom:

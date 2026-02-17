@@ -38,30 +38,37 @@ raise "NODE_ID environment variable is not set" if node_id.nil?
 node_id.strip!
 raise "NODE_ID cannot be nil" if node_id.empty?
 
-logger.debug("Creating gRPC server")
+role = ARGV[0]
+raise "Usage: ubi-csi-server <controller|node>" unless %w[controller node].include?(role)
+
+logger.debug("Creating gRPC server in #{role} mode")
 server = GRPC::RpcServer.new
 socket_path = endpoint.sub("unix://", "")
 logger.debug("Socket path: #{socket_path}")
 File.delete(socket_path) if File.exist?(socket_path)
 server.add_http2_port("unix:#{socket_path}", :this_port_is_insecure)
 
-Csi::V1::NodeService.mkdir_p
-
 logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
-server.handle(Csi::V1::ControllerService.new(logger:))
-node_service = Csi::V1::NodeService.new(logger:, node_id:)
-server.handle(node_service)
+
+node_service = nil
+if role == "controller"
+  server.handle(Csi::V1::ControllerService.new(logger:))
+else
+  Csi::V1::NodeService.mkdir_p
+  node_service = Csi::V1::NodeService.new(logger:, node_id:)
+  server.handle(node_service)
+end
 
 %w[TERM INT].each do |signal|
   Signal.trap(signal) do
     logger.info("Received #{signal}, shutting down gracefully...")
-    node_service.shutdown!
+    node_service&.shutdown!
     server.stop
   end
 end
 
-logger.debug("Starting UbiCSI server on #{endpoint}")
+logger.debug("Starting UbiCSI #{role} server on #{endpoint}")
 begin
   server.run_till_terminated
 rescue => e
