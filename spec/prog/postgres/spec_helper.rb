@@ -4,40 +4,10 @@ require_relative "../../model/spec_helper"
 
 RSpec.configure do |config|
   config.include(Module.new do
-    def create_postgres_resource(location_id:, target_version: "16")
-      pr = PostgresResource.create(
-        name: "pg-test-#{SecureRandom.hex(4)}",
-        superuser_password: "dummy-password",
-        ha_type: "none",
-        target_version:,
-        location_id:,
-        project_id: project.id,
-        user_config: {},
-        pgbouncer_user_config: {},
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        root_cert_1: "root_cert_1",
-        root_cert_2: "root_cert_2",
-        server_cert: "server_cert",
-        server_cert_key: "server_cert_key"
-      )
-      Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      pr
-    end
-
-    def create_read_replica_resource(parent:, with_strand: false)
-      pr = PostgresResource.create(
-        name: "pg-replica-#{SecureRandom.hex(4)}",
-        superuser_password: "dummy-password",
-        ha_type: "none",
-        target_version: "16",
-        location_id:,
-        project:,
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        parent:
-      )
-      Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait") if with_strand
+    def create_read_replica_resource(parent:)
+      pr = create_postgres_resource(project:, location_id:)
+      pr.update(parent_id: parent.id)
+      pr.strand.update(label: "wait")
       pr
     end
 
