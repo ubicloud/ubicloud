@@ -262,6 +262,12 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
     # /sys/class/net/vethi#{@vm_name}/address at two points in time.  The
     # result is a race condition that *sometimes* worked.
     r "ip", "link", "add", "vetho#{@vm_name}", "addr", gen_mac, "type", "veth", "peer", "name", "vethi#{@vm_name}", "addr", gen_mac, "netns", @vm_name
+    # Enable GRO on veth interfaces to improve XFRM ESP tunnel throughput.
+    # GRO is off by default on veth; enabling it allows the receive path to
+    # coalesce packets before they enter the XFRM stack, yielding ~80%
+    # higher throughput on native ESP tunnels (5.14+, all target distros).
+    r "ethtool", "-K", "vetho#{@vm_name}", "gro", "on"
+    r "ip", "netns", "exec", @vm_name, "ethtool", "-K", "vethi#{@vm_name}", "gro", "on"
     nics.each do |nic|
       cmd = ["ip", "-n", @vm_name, "tuntap", "add", "dev", nic.tap, "mode", "tap", "user", @vm_name]
       cmd.push("multi_queue", "vnet_hdr") if multiqueue

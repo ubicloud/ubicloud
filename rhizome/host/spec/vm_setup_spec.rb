@@ -1500,6 +1500,8 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
+      expect(vs).to receive(:_run_command).with("ethtool", "-K", "vethotest", "gro", "on")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "ethtool", "-K", "vethitest", "gro", "on")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
@@ -1513,10 +1515,23 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
+      expect(vs).to receive(:_run_command).with("ethtool", "-K", "vethotest", "gro", "on")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "ethtool", "-K", "vethitest", "gro", "on")
       nics = [VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")]
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "tuntap", "add", "dev", "nctest", "mode", "tap", "user", "test", "multi_queue", "vnet_hdr")
       expect(vs).to receive(:_run_command).with("ip", "-n", "test", "addr", "replace", "1.1.1.1", "dev", "nctest")
       vs.interfaces(nics, true)
+    end
+
+    it "fails if veth GRO enablement fails" do
+      expect(vs).to receive(:_run_command).with("ip", "netns", "del", "test")
+      expect(File).to receive(:exist?).with("/sys/class/net/vethotest").and_return(false)
+
+      expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
+      expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
+      expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
+      expect(vs).to receive(:_run_command).with("ethtool", "-K", "vethotest", "gro", "on").and_raise(CommandFail.new("", "", "Cannot get device settings"))
+      expect { vs.interfaces([VmSetup::Nic.new(nil, nil, "nctest", nil, "1.1.1.1")], false) }.to raise_error(CommandFail)
     end
 
     it "fails if network namespace can not be deleted" do
@@ -1532,6 +1547,8 @@ NFTABLES_CONF
       expect(vs).to receive(:_run_command).with("ip", "netns", "add", "test")
       expect(vs).to receive(:gen_mac).and_return("00:00:00:00:00:00").at_least(:once)
       expect(vs).to receive(:_run_command).with("ip", "link", "add", "vethotest", "addr", "00:00:00:00:00:00", "type", "veth", "peer", "name", "vethitest", "addr", "00:00:00:00:00:00", "netns", "test")
+      expect(vs).to receive(:_run_command).with("ethtool", "-K", "vethotest", "gro", "on")
+      expect(vs).to receive(:_run_command).with("ip", "netns", "exec", "test", "ethtool", "-K", "vethitest", "gro", "on")
       vs.interfaces([], false)
     end
   end
