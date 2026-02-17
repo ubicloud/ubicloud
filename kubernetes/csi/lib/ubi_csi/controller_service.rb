@@ -15,7 +15,7 @@ module Csi
       def max_volume_size
         @max_volume_size ||= begin
           limit_gb_str = ENV.fetch("DISK_LIMIT_GB", "10")
-          limit_gb = limit_gb_str.to_i
+          limit_gb = limit_gb_str.to_f
           limit_gb * OneGB
         end
       end
@@ -67,7 +67,7 @@ module Csi
           raise GRPC::InvalidArgument.new("Volume name is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.name.nil? || req.name.empty?
           raise GRPC::InvalidArgument.new("Capacity range is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.capacity_range.nil?
           raise GRPC::InvalidArgument.new("Required bytes must be positive", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.capacity_range.required_bytes <= 0
-          raise GRPC::InvalidArgument.new("Volume size exceeds maximum allowed size of #{max_volume_size / OneGB}GB", GRPC::Core::StatusCodes::OUT_OF_RANGE) if req.capacity_range.required_bytes > max_volume_size
+          raise GRPC::OutOfRange.new("Requested volume size #{format("%g", req.capacity_range.required_bytes.to_f / OneGB)}GB exceeds maximum allowed size of #{format("%g", max_volume_size.to_f / OneGB)}GB") if req.capacity_range.required_bytes > max_volume_size
           raise GRPC::InvalidArgument.new("Volume capabilities are required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.volume_capabilities.nil? || req.volume_capabilities.empty?
           raise GRPC::InvalidArgument.new("Topology requirement is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.accessibility_requirements.nil? || req.accessibility_requirements.requisite.empty?
 
