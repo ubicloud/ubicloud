@@ -3,10 +3,65 @@
 require_relative "../../common/lib/util"
 require "openssl"
 require "base64"
+require "securerandom"
 
 class StorageKeyEncryption
   def initialize(key_encryption_cipher)
     @key_encryption_cipher = key_encryption_cipher
+  end
+
+  # Wrap a plaintext with AES-256-GCM using the v2 format:
+  # [12-byte nonce || ciphertext || 16-byte tag]
+  # AAD is the secret name.
+  def self.aes256gcm_encrypt(kek_bytes, aad, plaintext)
+    cipher = OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.encrypt
+    cipher.key = kek_bytes
+    nonce = SecureRandom.random_bytes(12)
+    cipher.iv = nonce
+    cipher.auth_data = aad
+    ciphertext = cipher.update(plaintext) + cipher.final
+    tag = cipher.auth_tag
+    nonce + ciphertext + tag
+  end
+
+  # Return the raw 32-byte KEK for v2 pipe delivery.
+  def kek_bytes
+    Base64.decode64(@key_encryption_cipher["key"])
+  end
+
+  # Generate v2 encryption TOML section.
+  def v2_encryption_toml
+    lines = ["[encryption]"]
+    lines << 'xts_key.ref = "xts-key"'
+    lines.join("\n") + "\n"
+  end
+
+  # Generate v2 secrets TOML section.
+  def v2_secrets_toml(encryption_key, kek_pipe)
+    # Combine the two 32-byte key halves into a single 64-byte XTS key
+    key1_bytes = [encryption_key[:key]].pack("H*")
+    key2_bytes = [encryption_key[:key2]].pack("H*")
+    xts_plaintext = key1_bytes + key2_bytes
+
+    # Encrypt using v2 format: [nonce || ciphertext || tag] with secret name as AAD
+    wrapped_xts = self.class.aes256gcm_encrypt(kek_bytes, "xts-key", xts_plaintext)
+    wrapped_xts_b64 = Base64.strict_encode64(wrapped_xts)
+
+    lines = []
+
+    # The XTS key secret: inline base64-encoded ciphertext, decrypted by kek
+    lines << "[secrets.xts-key]"
+    lines << "source.inline = #{toml_str(wrapped_xts_b64)}"
+    lines << 'encoding = "base64"'
+    lines << 'encrypted_by.ref = "kek"'
+    lines << ""
+
+    # The KEK secret: read from a named pipe at runtime
+    lines << "[secrets.kek]"
+    lines << "source.file = #{toml_str(kek_pipe)}"
+    lines << 'encoding = "base64"'
+    lines.join("\n") + "\n"
   end
 
   def write_encrypted_dek(key_file, data_encryption_key)
@@ -70,5 +125,9 @@ class StorageKeyEncryption
 
     decipher.auth_tag = auth_tag
     decipher.update(encrypted_key[0]) + decipher.final
+  end
+
+  def toml_str(value)
+    "\"#{value.gsub("\\", "\\\\\\\\").gsub("\"", "\\\"")}\""
   end
 end

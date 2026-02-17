@@ -16,6 +16,7 @@ require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
 require_relative "vhost_block_backend"
+require_relative "vhost_backend_config_v2"
 
 class StorageVolume
   attr_reader :image_path, :read_only
@@ -47,6 +48,12 @@ class StorageVolume
 
   def rpc_client
     @rpc_client ||= SpdkRpc.new(SpdkPath.rpc_sock(@spdk_version))
+  end
+
+  # ubiblk >= 0.4.0 uses config v2 (TOML with structured secrets)
+  def use_config_v2?
+    return false unless @vhost_backend_version
+    Gem::Version.new(@vhost_backend_version.delete_prefix("v")) >= Gem::Version.new("0.4.0")
   end
 
   def prep(key_wrapping_secrets)
@@ -100,11 +107,40 @@ class StorageVolume
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     config_path = sp.vhost_backend_config
-    config = vhost_backend_config(encryption_key, key_wrapping_secrets)
 
-    write_new_file(config_path, @vm_name) do |file|
-      file.write(config.to_yaml)
-      fsync_or_fail(file)
+    if use_config_v2?
+      config_v2 = vhost_backend_config_v2(encryption_key, key_wrapping_secrets)
+
+      # Write stripe source config if present
+      if (stripe_source = config_v2.stripe_source_toml)
+        write_new_file(sp.vhost_backend_stripe_source_config, @vm_name) do |file|
+          file.write(stripe_source)
+          fsync_or_fail(file)
+        end
+      end
+
+      # Write secrets config with restrictive permissions
+      if (secrets = config_v2.secrets_toml)
+        secrets_path = sp.vhost_backend_secrets_config
+        rm_if_exists(secrets_path)
+        File.open(secrets_path, "w", 0o600, flags: File::CREAT | File::EXCL) do |file|
+          FileUtils.chown @vm_name, @vm_name, secrets_path
+          file.write(secrets)
+          fsync_or_fail(file)
+        end
+      end
+
+      # Write main config (includes references to the other files)
+      write_new_file(config_path, @vm_name) do |file|
+        file.write(config_v2.main_toml)
+        fsync_or_fail(file)
+      end
+    else
+      config = vhost_backend_config(encryption_key, key_wrapping_secrets)
+      write_new_file(config_path, @vm_name) do |file|
+        file.write(config.to_yaml)
+        fsync_or_fail(file)
+      end
     end
 
     sync_parent_dir(config_path)
@@ -114,25 +150,68 @@ class StorageVolume
     vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
     metadata_path = sp.vhost_backend_metadata
     config_path = sp.vhost_backend_config
+
+    if @encrypted && use_config_v2?
+      vhost_backend_create_encrypted_metadata_v2(key_wrapping_secrets)
+      return
+    end
+
     if @encrypted
-      kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
+      kek_stdin = vhost_backend_kek(key_wrapping_secrets).to_yaml
       kek_arg = "--kek /dev/stdin"
     else
-      kek_yaml = ""
+      kek_stdin = ""
     end
 
     write_new_file(metadata_path, @vm_name) do |file|
       file.truncate(8 * 1024 * 1024)
     end
 
-    r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift}  --config #{config_path.shellescape} #{kek_arg}", stdin: kek_yaml
+    r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift}  --config #{config_path.shellescape} #{kek_arg}", stdin: kek_stdin
     sync_parent_dir(metadata_path)
+  end
+
+  def vhost_backend_create_encrypted_metadata_v2(key_wrapping_secrets)
+    vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
+    config_path = sp.vhost_backend_config
+    kek_pipe = sp.kek_pipe
+    kek = key_wrapping_secrets.fetch("key")
+
+    rm_if_exists(kek_pipe)
+    File.mkfifo(kek_pipe, 0o600)
+    FileUtils.chown(@vm_name, @vm_name, kek_pipe)
+
+    cmd = [
+      "sudo", "-u", @vm_name,
+      vhost_backend.init_metadata_path,
+      "-s", @stripe_sector_count_shift.to_s,
+      "--config", config_path.to_s
+    ]
+
+    # Start backend (it should open the FIFO for reading)
+    pid = Process.spawn(*cmd)
+
+    begin
+      Timeout.timeout(10) do
+        # Open FIFO for writing (blocks until reader opens)
+        File.open(kek_pipe, File::WRONLY) do |f|
+          f.write(kek)
+          f.flush
+        end
+      end
+
+      _, status = Process.wait2(pid)
+      raise "init_metadata failed" unless status.success?
+    ensure
+      FileUtils.rm_f(kek_pipe)
+    end
   end
 
   def vhost_backend_create_service_file
     vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
 
-    kek_arg = if @encrypted
+    # v2 config embeds the kek pipe path in the TOML, so no --kek CLI arg needed
+    kek_arg = if @encrypted && !use_config_v2?
       "--kek #{sp.kek_pipe}"
     end
 
@@ -274,6 +353,29 @@ class StorageVolume
     config
   end
 
+  def vhost_backend_config_v2(encryption_key, key_wrapping_secrets)
+    VhostBackendConfigV2.new(
+      disk_file: disk_file,
+      vhost_sock: vhost_sock,
+      rpc_socket_path: sp.rpc_socket_path,
+      device_id: @device_id,
+      num_queues: @cpus ? @cpus.count : @num_queues,
+      queue_size: @queue_size,
+      copy_on_read: @copy_on_read,
+      write_through: write_through_device?,
+      skip_sync: @skip_sync,
+      image_path: @image_path,
+      metadata_path: @image_path ? sp.vhost_backend_metadata : nil,
+      cpus: @cpus,
+      encrypted: @encrypted,
+      encryption_key: encryption_key,
+      kek: key_wrapping_secrets,
+      kek_pipe: sp.kek_pipe,
+      stripe_source_config_path: sp.vhost_backend_stripe_source_config,
+      secrets_config_path: sp.vhost_backend_secrets_config
+    )
+  end
+
   def vhost_backend_kek(key_wrapping_secrets)
     {
       "method" => "aes256-gcm",
@@ -335,8 +437,14 @@ class StorageVolume
       r "systemctl start #{q_vhost_user_block_service}"
 
       Timeout.timeout(5) do
-        kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
-        File.write(kek_pipe, kek_yaml)
+        if use_config_v2?
+          kek = key_wrapping_secrets["key"]
+          File.write(kek_pipe, kek)
+        else
+          # v1: write KEK as YAML struct
+          kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
+          File.write(kek_pipe, kek_yaml)
+        end
       end
     ensure
       FileUtils.rm_f(kek_pipe)
