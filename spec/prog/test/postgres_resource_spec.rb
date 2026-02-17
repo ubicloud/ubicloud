@@ -20,23 +20,10 @@ RSpec.describe Prog::Test::PostgresResource do
 
   let(:postgres_resource) { create_postgres_resource(project: test_project, location_id:) }
 
-  def create_postgres_server
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
-      test_project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: private_subnet.id,
-      location_id:, unix_user: "ubi"
-    ).subject
-    server = PostgresServer.create(
-      timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17"
-    )
-    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
-    server
-  end
-
   def setup_postgres_resource(with_server: true)
     postgres_resource
     postgres_resource.strand.update(label: "wait")
-    create_postgres_server if with_server
+    create_postgres_server(resource: postgres_resource, timeline:).strand.update(label: "wait") if with_server
     refresh_frame(pgr_test, new_values: {"postgres_resource_id" => postgres_resource.id})
   end
 

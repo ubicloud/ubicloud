@@ -30,6 +30,28 @@ module PostgresTestHelpers
     Strand.create_with_id(pg, prog: "Postgres::PostgresResourceNexus", label: "start")
     pg
   end
+
+  def create_postgres_server(
+    resource:,
+    timeline: create_postgres_timeline(location_id: resource.location_id),
+    is_representative: true,
+    timeline_access: is_representative ? "push" : "fetch"
+  )
+    vm = Prog::Vm::Nexus.assemble_with_sshable(resource.project_id, location_id: resource.location_id).subject
+    VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
+
+    ip_rand = SecureRandom.random_number(0xFFFFFF)
+    AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.#{(ip_rand >> 16) & 0xFF}.#{(ip_rand >> 8) & 0xFF}.#{ip_rand & 0xFF}/32")
+    vm.update(ephemeral_net6: "fd10:9b0b:6b4b:#{SecureRandom.hex(2)}::/79")
+
+    s = PostgresServer.create(
+      timeline:, resource:, vm_id: vm.id,
+      is_representative:, synchronization_status: "ready",
+      timeline_access:, version: PostgresResource::DEFAULT_VERSION
+    )
+    Strand.create_with_id(s, prog: "Postgres::PostgresServerNexus", label: "start")
+    s
+  end
 end
 
 RSpec.configure do |config|

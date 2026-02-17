@@ -40,7 +40,7 @@ RSpec.describe Prog::Postgres::Restart do
   describe "#restart" do
     it "runs restart command when not started" do
       expect(sshable).to receive(:d_check).with("postgres_restart").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", "16")
+      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", "17")
       expect { nx.restart }.to nap(5)
     end
 

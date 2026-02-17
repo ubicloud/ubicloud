@@ -36,7 +36,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
     it "returns false for failed lockout" do
       refresh_frame(nx, new_frame: {"mechanism" => "pg_stop"})
       expect(sshable).to receive(:_cmd).with(
-        "timeout 10 sudo pg_ctlcluster 16 main stop -m immediate",
+        "timeout 10 sudo pg_ctlcluster 17 main stop -m immediate",
         timeout: 15
       ).and_raise(Sshable::SshError.new("", "", "", "", ""))
       expect { nx.start }.to exit({"msg" => "lockout_failed"})
@@ -46,7 +46,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
   describe "#lockout_with_pg_stop" do
     it "stops postgres and returns true on success" do
       expect(sshable).to receive(:_cmd).with(
-        "timeout 10 sudo pg_ctlcluster 16 main stop -m immediate",
+        "timeout 10 sudo pg_ctlcluster 17 main stop -m immediate",
         timeout: 15
       ).and_return(true)
       expect { nx.lockout_with_pg_stop }.not_to raise_error
@@ -56,7 +56,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
   describe "#lockout_with_hba" do
     it "applies lockout pg_hba.conf and returns true on success" do
       expect(sshable).to receive(:_cmd).with(
-        "timeout 10 sudo postgres/bin/lockout-hba 16",
+        "timeout 10 sudo postgres/bin/lockout-hba 17",
         timeout: 15
       ).and_return(true)
       expect { nx.lockout_with_hba }.not_to raise_error
