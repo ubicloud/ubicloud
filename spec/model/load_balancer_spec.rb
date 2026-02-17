@@ -51,21 +51,23 @@ RSpec.describe LoadBalancer do
       lb.add_cert(cert)
     end
 
-    it "adds the new port and increments update_load_balancer" do
+    it "adds the new port and increments update_load_balancer and rewrite_dns_records" do
       expect {
         lb.add_port(443, 8443)
       }.to change { lb.reload.vm_ports.count }.from(2).to(4)
         .and change { lb.ports.count }.from(1).to(2)
         .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+        .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(1).to(2)
     end
 
-    it "adds the new port and increments update_load_balancer for ipv6 load balancer" do
+    it "adds the new port and increments update_load_balancer and rewrite_dns_records for ipv6 load balancer" do
       lb.update(stack: "ipv6")
       expect {
         lb.add_port(443, 8443)
       }.to change { lb.reload.vm_ports.count }.from(2).to(3)
         .and change { lb.ports.count }.from(1).to(2)
         .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(0).to(1)
+        .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(1).to(2)
 
       expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv4" }).to eq(1)
       expect(lb.vm_ports.count { |vm_port| vm_port.stack == "ipv6" }).to eq(2)
@@ -81,7 +83,7 @@ RSpec.describe LoadBalancer do
       lb.add_cert(cert)
     end
 
-    it "removes the new port and increments update_load_balancer" do
+    it "removes the new port and increments update_load_balancer and rewrite_dns_records" do
       lb.add_port(443, 8443)
       lb.reload
 
@@ -90,6 +92,7 @@ RSpec.describe LoadBalancer do
       }.to change { lb.reload.ports.count }.from(2).to(1)
         .and change { lb.vm_ports.count }.from(4).to(2)
         .and change { Semaphore.where(strand_id: lb.id, name: "update_load_balancer").count }.from(1).to(2)
+        .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(2).to(3)
     end
   end
 
