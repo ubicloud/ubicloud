@@ -178,7 +178,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: {required_bytes: 11 * 1024 * 1024 * 1024} # 11GB > 10GB max
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 10GB")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 11GB exceeds maximum allowed size of 10GB")
       end
 
       it "raises OUT_OF_RANGE when volume size exceeds maximum when a dynamic value is set" do
@@ -189,7 +189,22 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: {required_bytes: 45 * 1024 * 1024 * 1024}
         )
-        expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume size exceeds maximum allowed size of 40GB")
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 45GB exceeds maximum allowed size of 40GB")
+      ensure
+        ENV.delete("DISK_LIMIT_GB")
+      end
+
+      it "displays fractional GB values correctly in the error message" do
+        ENV["DISK_LIMIT_GB"] = "4.5"
+        service = described_class.new(logger:)
+
+        request = Csi::V1::CreateVolumeRequest.new(
+          name: "test",
+          capacity_range: {required_bytes: 5 * 1024 * 1024 * 1024}
+        )
+        expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 5GB exceeds maximum allowed size of 4.5GB")
+      ensure
+        ENV.delete("DISK_LIMIT_GB")
       end
 
       it "raises InvalidArgument when volume_capabilities is nil" do
