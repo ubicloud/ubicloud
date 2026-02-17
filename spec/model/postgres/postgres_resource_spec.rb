@@ -26,7 +26,7 @@ RSpec.describe PostgresResource do
   let(:project) { Project.create(name: "pg-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
-  let(:timeline) { PostgresTimeline.create(location_id:) }
+  let(:timeline) { create_postgres_timeline(location_id:) }
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
@@ -165,7 +165,7 @@ RSpec.describe PostgresResource do
     it "provisions a new server with the correct timeline for a read replica" do
       ps1
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
-      parent_timeline = PostgresTimeline.create(location_id:)
+      parent_timeline = create_postgres_timeline(location_id:)
       parent_resource = instance_double(described_class, timeline: parent_timeline)
       allow(postgres_resource).to receive_messages(read_replica?: true, parent: parent_resource)
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
@@ -287,7 +287,7 @@ RSpec.describe PostgresResource do
         name: "aws-subnet", project_id: project.id, location_id: aws_location.id,
         net4: "172.0.1.0/26", net6: "fdfa:b5aa:14a3:4a3e::/64"
       )
-      aws_timeline = PostgresTimeline.create(location_id: aws_location.id)
+      aws_timeline = create_postgres_timeline(location_id: aws_location.id)
       aws_resource = described_class.create(
         name: "pg-aws", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id: aws_location.id, project_id: project.id,
