@@ -20,6 +20,7 @@ module ProofExtract
     "\u222A" => "\\union",      # ∪ → \union
     "\u2229" => "\\intersect",  # ∩ → \intersect
     "\u2286" => "\\subseteq",   # ⊆ → \subseteq
+    "\u219D" => "~>",           # ↝ → ~>
     "\u00AC" => "~",            # ¬ → ~
     "\u2260" => "#",            # ≠ → #
     "\u2227" => "/\\",          # ∧ → /\
@@ -56,6 +57,7 @@ module ProofExtract
     [">>", "\u27E9"],           # ⟩
     ["=>", "\u21D2"],           # ⇒
     [" # ", " \u2260 "],        # ≠ (space-padded to avoid comments)
+    ["~>", "\u219D"],           # ↝
     ["~", "\u00AC"]            # ¬
   ].freeze
 
