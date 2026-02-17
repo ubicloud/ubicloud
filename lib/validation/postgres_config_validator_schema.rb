@@ -934,7 +934,7 @@ module Validation
       "log_destination" => {
         description: "Sets the destination for server log output.",
         type: :string,
-        default: "stderr"
+        default: "'stderr, jsonlog'"
       },
       "log_directory" => {
         description: "Sets the destination directory for log files.",

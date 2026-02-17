@@ -9,6 +9,7 @@ lc_monetary='C.UTF-8'
 lc_numeric='C.UTF-8'
 lc_time='C.UTF-8'
 listen_addresses='*'
+log_destination='stderr, jsonlog'
 log_directory='pg_log'
 log_filename='postgresql-%a.log'
 log_rotation_age=1440

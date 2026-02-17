@@ -62,6 +62,7 @@ class PostgresServer < Sequel::Model
       "log_timezone" => "'UTC'",
       "log_directory" => "'pg_log'",
       "log_filename" => "'postgresql-%a.log'",
+      "log_destination" => "'stderr, jsonlog'",
       "log_truncate_on_rotation" => "true",
       "log_rotation_age" => "1440",
       "logging_collector" => "on",
