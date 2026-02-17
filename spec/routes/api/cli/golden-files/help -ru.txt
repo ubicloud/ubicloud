@@ -113,3 +113,5 @@ ubi vm (location/vm-name | vm-id) [options] scp [scp-options] (local-path :remot
 ubi vm (location/vm-name | vm-id) [options] sftp [sftp-options]
 ubi vm (location/vm-name | vm-id) show [options]
 ubi vm (location/vm-name | vm-id) [options] ssh [ssh-options --] [remote-cmd [remote-cmd-arg ...]]
+ubi vm (location/vm-name | vm-id) start
+ubi vm (location/vm-name | vm-id) stop
