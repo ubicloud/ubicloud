@@ -9,7 +9,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   let(:project) { Project.create(name: "converge-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
-  let(:timeline) { PostgresTimeline.create(location_id:) }
+  let(:timeline) { create_postgres_timeline(location_id:) }
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
@@ -82,7 +82,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "registers a deadline and hops to provision_servers if read replica parent is ready" do
-      parent_timeline = PostgresTimeline.create(location_id:, cached_earliest_backup_at: Time.now)
+      parent_timeline = create_postgres_timeline(location_id:).tap { it.update(cached_earliest_backup_at: Time.now) }
       parent = PostgresResource.create(
         name: "pg-parent2", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id:, project_id: project.id,
@@ -159,7 +159,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "provisions a new server with the correct timeline for a read replica" do
-      parent_timeline = PostgresTimeline.create(location_id:)
+      parent_timeline = create_postgres_timeline(location_id:)
       parent = PostgresResource.create(
         name: "pg-parent3", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id:, project_id: project.id,

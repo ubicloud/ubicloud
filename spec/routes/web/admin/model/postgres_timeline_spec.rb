@@ -6,7 +6,7 @@ RSpec.describe CloverAdmin, "PostgresTimeline" do
   include AdminModelSpecHelper
 
   before do
-    @instance = create_postgres_timeline
+    @instance = create_postgres_timeline(location_id: Location::HETZNER_FSN1_ID)
     admin_account_setup_and_login
   end
 

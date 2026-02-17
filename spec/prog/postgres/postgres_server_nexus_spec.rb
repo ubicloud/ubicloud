@@ -7,7 +7,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   let(:project) { Project.create(name: "test-project") }
   let(:postgres_resource) { create_postgres_resource(location_id:) }
-  let(:postgres_timeline) { create_postgres_timeline }
+  let(:postgres_timeline) { create_postgres_timeline(location_id:) }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource, timeline: postgres_timeline) }
   let(:st) { postgres_server.strand }
   let(:server) { nx.postgres_server }
@@ -61,7 +61,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     }
 
     it "creates postgres server and vm with sshable" do
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id:)
       firewall
 
       st = described_class.assemble(resource_id: postgres_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
@@ -75,7 +75,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "creates read replica server with catching_up status even when representative" do
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id:)
       firewall
       replica_resource = PostgresResource.create(
         project: user_project,
@@ -111,7 +111,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         flavor: PostgresResource::Flavor::LANTERN
       )
       Firewall.create(name: "#{lantern_resource.ubid}-internal-firewall", location_id: Location::HETZNER_FSN1_ID, project: service_project)
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id:)
 
       st = described_class.assemble(resource_id: lantern_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
       expect(st.subject.vm.boot_image).to eq("postgres16-lantern-ubuntu-2204")
@@ -130,7 +130,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_version: "16"
       )
       Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
 
       st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
@@ -149,7 +149,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_version: "17"
       )
       Firewall.create(name: "#{aws_resource.ubid}-internal-firewall", location: aws_location, project: service_project)
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id: aws_location.id)
 
       st = described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
       expect(st.subject.vm.boot_image).to eq(ami.aws_ami_id)
@@ -174,7 +174,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         superuser_password: "dummy-password",
         target_version: "16"
       )
-      postgres_timeline = PostgresTimeline.create
+      postgres_timeline = create_postgres_timeline(location_id: new_aws_location.id)
 
       expect {
         described_class.assemble(resource_id: aws_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
@@ -485,12 +485,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         visible: true,
         provider: "aws"
       )
-      aws_timeline = PostgresTimeline.create(
-        location: aws_location,
-        access_key: "dummy-access-key",
-        secret_key: "dummy-secret-key"
-      )
-      Strand.create_with_id(aws_timeline, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      aws_timeline = create_postgres_timeline(location_id: aws_location.id)
       server.update(timeline: aws_timeline)
 
       nx.incr_initial_provisioning
