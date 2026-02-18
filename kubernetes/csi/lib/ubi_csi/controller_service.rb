@@ -62,14 +62,40 @@ module Csi
         selected
       end
 
+      def validate_create_volume_request(req)
+        if req.name.nil? || req.name.empty?
+          raise GRPC::InvalidArgument.new("Volume name is required")
+        end
+
+        if req.capacity_range.nil?
+          raise GRPC::InvalidArgument.new("Capacity range is required")
+        end
+
+        if req.capacity_range.required_bytes <= 0
+          raise GRPC::InvalidArgument.new("Required bytes must be positive")
+        end
+
+        if req.capacity_range.required_bytes > max_volume_size
+          requested = format("%g", req.capacity_range.required_bytes.to_f / OneGB)
+          maximum = format("%g", max_volume_size.to_f / OneGB)
+          raise GRPC::OutOfRange.new(
+            "Requested volume size #{requested}GB exceeds " \
+            "maximum allowed size of #{maximum}GB"
+          )
+        end
+
+        if req.volume_capabilities.nil? || req.volume_capabilities.empty?
+          raise GRPC::InvalidArgument.new("Volume capabilities are required")
+        end
+
+        if req.accessibility_requirements.nil? || req.accessibility_requirements.requisite.empty?
+          raise GRPC::InvalidArgument.new("Topology requirement is required")
+        end
+      end
+
       def create_volume(req, _call)
         log_request_response(req, "create_volume") do |req_id|
-          raise GRPC::InvalidArgument.new("Volume name is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.name.nil? || req.name.empty?
-          raise GRPC::InvalidArgument.new("Capacity range is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.capacity_range.nil?
-          raise GRPC::InvalidArgument.new("Required bytes must be positive", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.capacity_range.required_bytes <= 0
-          raise GRPC::OutOfRange.new("Requested volume size #{format("%g", req.capacity_range.required_bytes.to_f / OneGB)}GB exceeds maximum allowed size of #{format("%g", max_volume_size.to_f / OneGB)}GB") if req.capacity_range.required_bytes > max_volume_size
-          raise GRPC::InvalidArgument.new("Volume capabilities are required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.volume_capabilities.nil? || req.volume_capabilities.empty?
-          raise GRPC::InvalidArgument.new("Topology requirement is required", GRPC::Core::StatusCodes::INVALID_ARGUMENT) if req.accessibility_requirements.nil? || req.accessibility_requirements.requisite.empty?
+          validate_create_volume_request(req)
 
           existing = nil
           new_volume_id = nil
