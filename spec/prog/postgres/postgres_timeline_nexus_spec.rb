@@ -108,7 +108,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       visible: true,
       provider: "gcp"
     )
-    LocationCredentialGcp.create_with_id(loc,
+    LocationCredential.create_with_id(loc,
       project_id: "test-gcp-project",
       service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-gcp-project"}')
@@ -504,7 +504,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(file2).to receive(:delete)
         expect(bucket).to receive(:delete)
 
-        allow_any_instance_of(LocationCredentialGcp).to receive(:iam_client).and_return(iam_service)
+        allow_any_instance_of(LocationCredential).to receive(:iam_client).and_return(iam_service)
         expect(iam_service).to receive(:delete_project_service_account).with(
           "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
         )
@@ -521,7 +521,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(nx.postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
 
-        allow_any_instance_of(LocationCredentialGcp).to receive(:iam_client).and_return(iam_service)
+        allow_any_instance_of(LocationCredential).to receive(:iam_client).and_return(iam_service)
         allow(iam_service).to receive(:delete_project_service_account)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})

@@ -21,15 +21,15 @@ RSpec.describe PostgresTimeline do
     )
   }
 
-  let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location.id,
+  let(:location_credential) {
+    LocationCredential.create_with_id(location.id,
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')
   }
 
   before do
-    location_credential_gcp
+    location_credential
   end
 
   context "with GCP provider" do
@@ -63,8 +63,8 @@ PGDATA=/dat/17/data
     describe "#blob_storage_client" do
       it "returns the storage client from the location credential" do
         storage_client = instance_double(Google::Cloud::Storage::Project)
-        lcg = instance_double(LocationCredentialGcp, storage_client:)
-        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential_gcp: lcg, name: "us-central1", provider_name: "gcp")).at_least(:once)
+        lcg = instance_double(LocationCredential, storage_client:)
+        expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, location_credential: lcg, name: "us-central1", provider_name: "gcp")).at_least(:once)
         expect(postgres_timeline.blob_storage_client).to eq(storage_client)
       end
     end

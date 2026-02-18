@@ -11,7 +11,7 @@ class Location < Sequel::Model
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
 
-  plugin :association_dependencies, location_credential: :destroy, location_credential_gcp: :destroy
+  plugin :association_dependencies, location_credential: :destroy
 
   HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
   HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
@@ -97,7 +97,6 @@ end
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
 #  location_aws_az           | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
-#  location_credential_gcp   | location_credential_gcp_id_fkey            | (id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)

@@ -12,7 +12,14 @@ class PostgresResource < Sequel::Model
     end
 
     def gcp_new_server_exclusion_filters
-      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil)
+      exclude_availability_zones = Strand
+        .join(:nic, Sequel[:strand][:id] => Sequel[:nic][:id])
+        .where(Sequel[:nic][:vm_id] => servers_dataset.select(:vm_id))
+        .select_map(Sequel.lit("stack->0->>'gcp_zone_suffix'"))
+        .compact
+        .uniq
+
+      ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone: nil)
     end
   end
 end

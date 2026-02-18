@@ -186,6 +186,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
       location.update(provider: "gcp")
+      LocationCredential.create_with_id(location.id,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
       server = create_server(representative: true)
       server.incr_recycle
       server.vm.update(vm_host_id: nil)

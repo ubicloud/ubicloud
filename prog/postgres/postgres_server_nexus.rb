@@ -24,7 +24,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       boot_image = if postgres_resource.location.aws?
         postgres_resource.location.pg_ami(server_version, arch)
       elsif postgres_resource.location.gcp?
-        "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+        postgres_resource.location.pg_gce_image(server_version, arch)
       else
         flavor_suffix = case postgres_resource.flavor
         when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
@@ -103,12 +103,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   label def bootstrap_rhizome
     if postgres_server.primary?
-      register_deadline("wait", vm.location.gcp? ? 30 * 60 : 10 * 60)
+      register_deadline("wait", 10 * 60)
     else
       register_deadline("wait", 120 * 60)
     end
 
-    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => !vm.location.gcp?}
+    bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => true}
     hop_wait_bootstrap_rhizome
   end
 

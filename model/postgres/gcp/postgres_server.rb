@@ -23,7 +23,7 @@ class PostgresServer < Sequel::Model
     def gcp_attach_s3_policy_if_needed
       return if timeline.access_key # SA already exists for this timeline
 
-      credential = resource.location.location_credential_gcp
+      credential = resource.location.location_credential
       sa_name = "pg-tl-#{timeline.ubid[0..7].downcase}"
 
       sa_email = "#{sa_name}@#{credential.project_id}.iam.gserviceaccount.com"
@@ -73,7 +73,7 @@ class PostgresServer < Sequel::Model
     end
 
     def gcp_increment_s3_new_timeline
-      credential = resource.location.location_credential_gcp
+      credential = resource.location.location_credential
 
       # Create SA and bind to new timeline's bucket
       gcp_attach_s3_policy_if_needed

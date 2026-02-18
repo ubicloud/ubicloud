@@ -67,4 +67,13 @@ RSpec.describe Location do
       p2_loc.pg_ami("16", "x64")
     }.to raise_error("No AMI found for PostgreSQL 16 (x64) in l2")
   end
+
+  it "#pg_gce_image returns image family path for GCP location" do
+    gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
+    LocationCredential.create_with_id(gcp_loc,
+      project_id: "my-gcp-project",
+      service_account_email: "test@my-gcp-project.iam.gserviceaccount.com",
+      credentials_json: "{}")
+    expect(gcp_loc.pg_gce_image("16", "x64")).to eq("projects/my-gcp-project/global/images/family/postgres-ubuntu-2204")
+  end
 end

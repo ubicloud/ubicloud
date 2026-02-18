@@ -45,12 +45,6 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       target_storage_size_gib:
     )
 
-    # GCP uses plain Ubuntu image without walg-daemon-client,
-    # so use the old-style direct wal-g invocation.
-    if frame["provider"] == "gcp"
-      PostgresResource[st.id].incr_use_old_walg_command
-    end
-
     update_stack({"postgres_resource_id" => st.id})
     hop_wait_postgres_resource
   end

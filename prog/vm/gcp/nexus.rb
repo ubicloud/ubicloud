@@ -61,12 +61,15 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       disks:,
       network_interfaces: [
         Google::Cloud::Compute::V1::NetworkInterface.new(
-          network: "global/networks/default",
+          network: "projects/#{gcp_project_id}/global/networks/#{gce_network_name}",
+          subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gce_subnet_name}",
+          network_i_p: nic&.private_ipv4&.network&.to_s,
           access_configs: [
             Google::Cloud::Compute::V1::AccessConfig.new(
               name: "External NAT",
               type: "ONE_TO_ONE_NAT",
-              network_tier: "STANDARD"
+              network_tier: "STANDARD",
+              nat_i_p: nic&.nic_gcp_resource&.static_ip
             )
           ]
         )
@@ -84,7 +87,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         ]
       ),
       tags: Google::Cloud::Compute::V1::Tags.new(
-        items: ["ubicloud-vm", "allow-ssh"]
+        items: ["ubicloud-vm", "allow-ssh", vm.name]
       )
     )
 
@@ -124,9 +127,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def wait_sshable
-    unless vm.update_firewall_rules_set?
+    if retval&.dig("msg") == "firewall rule is added"
+      decr_update_firewall_rules
+    elsif !vm.update_firewall_rules_set?
       vm.incr_update_firewall_rules
-      nap 6
+    end
+
+    when_update_firewall_rules_set? do
+      push vm.update_firewall_rules_prog, {}, :update_firewall_rules
     end
 
     addr = vm.ip4
@@ -193,6 +201,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
+    # Clean up GCE firewall rules targeting this VM
+    cleanup_gce_firewall_rules
+
     begin
       op = compute_client.delete(
         project: gcp_project_id,
@@ -218,7 +229,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def credential
-    @credential ||= vm.location.location_credential_gcp
+    @credential ||= vm.location.location_credential
   end
 
   def compute_client
@@ -230,15 +241,69 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def gcp_zone
-    @gcp_zone ||= "#{vm.location.name.delete_prefix("gcp-")}-a"
+    @gcp_zone ||= begin
+      region = vm.location.name.delete_prefix("gcp-")
+      zone_suffix = nic&.strand&.stack&.dig(0, "gcp_zone_suffix") || "a"
+      "#{region}-#{zone_suffix}"
+    end
   end
 
+  def gcp_region
+    @gcp_region ||= vm.location.name.delete_prefix("gcp-")
+  end
+
+  def gce_network_name
+    @gce_network_name ||= begin
+      ps = nic&.private_subnet
+      project = ps ? ps.project : vm.project
+      Prog::Vnet::Gcp::SubnetNexus.vpc_name(project)
+    end
+  end
+
+  def gce_subnet_name
+    ps = nic&.private_subnet
+    ps ? "ubicloud-#{ps.ubid}" : "default"
+  end
+
+  GCE_E2_STANDARD_VCPUS = [2, 4, 8, 16, 32].freeze
+  GCE_N2_STANDARD_VCPUS = [2, 4, 8, 16, 32, 48, 64, 80, 96, 128].freeze
+
   def gce_machine_type
-    vcpus = vm.vcpus
-    "e2-standard-#{(vcpus < 2) ? 2 : vcpus}"
+    case vm.family
+    when "burstable"
+      (vm.vcpus <= 1) ? "e2-small" : "e2-medium"
+    else
+      vcpus = [vm.vcpus, 2].max
+      if vcpus <= 32
+        gce_vcpus = GCE_E2_STANDARD_VCPUS.find { |n| n >= vcpus }
+        "e2-standard-#{gce_vcpus}"
+      else
+        gce_vcpus = GCE_N2_STANDARD_VCPUS.find { |n| n >= vcpus } || 128
+        "n2-standard-#{gce_vcpus}"
+      end
+    end
   end
 
   def gce_source_image
-    "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+    if vm.boot_image&.start_with?("projects/")
+      vm.boot_image
+    else
+      "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
+    end
+  end
+
+  def cleanup_gce_firewall_rules
+    fw_client = credential.firewalls_client
+    ["ubicloud-fw-#{vm.name}", "ubicloud-fw6-#{vm.name}"].each do |prefix|
+      fw_client.list(project: gcp_project_id, filter: "name:#{prefix}").each do |fw|
+        next unless fw.name.start_with?(prefix)
+        op = fw_client.delete(project: gcp_project_id, firewall: fw.name)
+        op.wait_until_done!
+      rescue Google::Cloud::NotFoundError
+        # Already deleted
+      end
+    end
+  rescue Google::Cloud::Error => e
+    Clog.emit("Failed to clean up GCE firewall rules") { {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}} }
   end
 end

@@ -18,24 +18,27 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       display_name: "gcp-us-central1", ui_name: "GCP US Central 1", visible: true)
   }
 
-  let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location,
+  let(:location_credential) {
+    LocationCredential.create_with_id(location,
       project_id: "test-gcp-project",
       service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
       credentials_json: "{}")
   }
 
   let(:vm) {
-    location_credential_gcp
+    location_credential
     Prog::Vm::Nexus.assemble_with_sshable(project.id,
       location_id: location.id, unix_user: "test-user", boot_image: "ubuntu-2404",
       name: "testvm", size: "standard-2", arch: "x64").subject
   }
 
   let(:compute_client) { instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client) }
+  let(:fw_client) { instance_double(Google::Cloud::Compute::V1::Firewalls::Rest::Client) }
 
   before do
-    allow_any_instance_of(LocationCredentialGcp).to receive(:compute_client).and_return(compute_client)
+    allow_any_instance_of(LocationCredential).to receive(:compute_client).and_return(compute_client)
+    allow_any_instance_of(LocationCredential).to receive(:firewalls_client).and_return(fw_client)
+    allow(fw_client).to receive(:list).and_return([])
   end
 
   describe ".assemble" do
@@ -85,6 +88,27 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(args[:instance_resource]).to be_a(Google::Cloud::Compute::V1::Instance)
         expect(args[:instance_resource].name).to eq("testvm")
         expect(args[:instance_resource].machine_type).to include("e2-standard-2")
+
+        ni = args[:instance_resource].network_interfaces.first
+        expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-proj-#{project.ubid}")
+        expect(ni.subnetwork).to include("subnetworks/ubicloud-")
+        expect(ni.network_i_p).to eq(vm.nic.private_ipv4.network.to_s)
+        op
+      end
+
+      expect { nx.start }.to hop("wait_instance_created")
+    end
+
+    it "uses reserved static IP in AccessConfig when NicGcpResource exists" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.99")
+
+      op = instance_double(Gapic::GenericLRO::Operation, error?: false)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:insert) do |args|
+        ac = args[:instance_resource].network_interfaces.first.access_configs.first
+        expect(ac.nat_i_p).to eq("35.192.0.99")
         op
       end
 
@@ -196,13 +220,20 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#wait_sshable" do
-    it "naps 6 seconds if it's the first time we execute wait_sshable" do
-      expect { nx.wait_sshable }.to nap(6)
+    it "increments update_firewall_rules semaphore and hops to create_billing_record on first run" do
+      expect { nx.wait_sshable }.to hop("create_billing_record")
         .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
+    end
+
+    it "pushes update_firewall_rules when semaphore is already set" do
+      vm.incr_update_firewall_rules
+      expect(nx).to receive(:push).with(Prog::Vnet::Gcp::UpdateFirewallRules, {}, :update_firewall_rules).and_call_original
+      expect { nx.wait_sshable }.to hop(:update_firewall_rules, "Vnet::Gcp::UpdateFirewallRules")
     end
 
     it "naps if not sshable" do
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
+      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1).and_raise Errno::ECONNREFUSED
       expect { nx.wait_sshable }.to nap(1)
@@ -210,12 +241,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "hops to create_billing_record if sshable" do
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.0.0.1/32")
+      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       vm.incr_update_firewall_rules
       expect(Socket).to receive(:tcp).with("10.0.0.1", 22, connect_timeout: 1)
       expect { nx.wait_sshable }.to hop("create_billing_record")
     end
 
     it "hops to create_billing_record if ipv4 is not available" do
+      st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       vm.incr_update_firewall_rules
       expect(vm.ip4).to be_nil
       expect { nx.wait_sshable }.to hop("create_billing_record")
@@ -307,21 +340,76 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "helper methods" do
-    it "returns correct GCE machine type for standard sizes" do
+    it "returns e2-standard for standard family with various vcpu counts" do
       expect(nx.send(:gce_machine_type)).to eq("e2-standard-2")
+    end
+
+    it "rounds up to nearest e2-standard for non-power-of-2 vcpus" do
+      vm.update(vcpus: 30)
+      vm.reload
+      expect(nx.send(:gce_machine_type)).to eq("e2-standard-32")
+    end
+
+    it "uses n2-standard for vcpus above 32" do
+      vm.update(vcpus: 60)
+      vm.reload
+      expect(nx.send(:gce_machine_type)).to eq("n2-standard-64")
     end
 
     it "returns e2-standard-2 minimum for single vcpu" do
       vm.update(vcpus: 1)
+      vm.reload
       expect(nx.send(:gce_machine_type)).to eq("e2-standard-2")
     end
 
-    it "returns correct GCE source image" do
+    it "returns e2-small for burstable family with 1 vcpu" do
+      vm.update(family: "burstable", vcpus: 1)
+      vm.reload
+      expect(nx.send(:gce_machine_type)).to eq("e2-small")
+    end
+
+    it "returns e2-medium for burstable family with 2 vcpus" do
+      vm.update(family: "burstable", vcpus: 2)
+      vm.reload
+      expect(nx.send(:gce_machine_type)).to eq("e2-medium")
+    end
+
+    it "returns correct GCE source image for default boot image" do
       expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64")
     end
 
-    it "returns correct GCP zone" do
+    it "returns custom GCE image when boot_image starts with projects/" do
+      vm.update(boot_image: "projects/test-gcp-project/global/images/family/postgres-ubuntu-2204")
+      expect(nx.send(:gce_source_image)).to eq("projects/test-gcp-project/global/images/family/postgres-ubuntu-2204")
+    end
+
+    it "returns correct GCP zone defaulting to suffix a" do
       expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-a")
+    end
+
+    it "reads GCP zone suffix from NIC strand frame" do
+      vm.nic.strand.stack.first["gcp_zone_suffix"] = "b"
+      vm.nic.strand.modified!(:stack)
+      vm.nic.strand.save_changes
+      expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-b")
+    end
+
+    it "returns per-project VPC name as the network name" do
+      expect(nx.send(:gce_network_name)).to eq("ubicloud-proj-#{project.ubid}")
+    end
+
+    it "returns subnet name based on private subnet ubid" do
+      expect(nx.send(:gce_subnet_name)).to start_with("ubicloud-")
+    end
+
+    it "returns default subnet name when nic is nil" do
+      nic_double = instance_double(Nic, private_subnet: nil)
+      nx.instance_variable_set(:@nic, nic_double)
+      expect(nx.send(:gce_subnet_name)).to eq("default")
+    end
+
+    it "returns the GCP region from location name" do
+      expect(nx.send(:gcp_region)).to eq("hetzner-fsn1")
     end
   end
 end

@@ -22,8 +22,8 @@ RSpec.describe PostgresServer do
     )
   }
 
-  let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location.id,
+  let(:location_credential) {
+    LocationCredential.create_with_id(location.id,
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')
@@ -65,7 +65,7 @@ RSpec.describe PostgresServer do
   let(:storage_client) { instance_double(Google::Cloud::Storage::Project) }
 
   before do
-    location_credential_gcp
+    location_credential
     allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
   end
 
@@ -109,7 +109,7 @@ RSpec.describe PostgresServer do
 
     describe "#attach_s3_policy_if_needed" do
       it "skips when timeline already has an access_key" do
-        expect(location_credential_gcp).not_to receive(:iam_client)
+        expect(location_credential).not_to receive(:iam_client)
         postgres_server.attach_s3_policy_if_needed
       end
 
@@ -123,7 +123,7 @@ RSpec.describe PostgresServer do
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
           private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
 
-        allow_any_instance_of(LocationCredentialGcp).to receive_messages(iam_client:, storage_client:)
+        allow_any_instance_of(LocationCredential).to receive_messages(iam_client:, storage_client:)
 
         expect(iam_client).to receive(:get_project_service_account).and_raise(
           Google::Apis::ClientError.new("Not Found")
@@ -179,7 +179,7 @@ RSpec.describe PostgresServer do
       }
 
       before do
-        allow_any_instance_of(LocationCredentialGcp).to receive_messages(iam_client:, storage_client:)
+        allow_any_instance_of(LocationCredential).to receive_messages(iam_client:, storage_client:)
 
         bucket = instance_double(Google::Cloud::Storage::Bucket)
         policy = instance_double(Google::Cloud::Storage::PolicyV3)

@@ -158,6 +158,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         provider: "gcp",
         project_id: user_project.id
       )
+      LocationCredential.create_with_id(gcp_location,
+        project_id: "test-gcp-project",
+        service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
       gcp_resource = PostgresResource.create(
         project: user_project,
         location: gcp_location,
@@ -172,7 +176,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       allow(Validation).to receive(:validate_billing_rate)
 
       st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", representative_at: Time.now)
-      expect(st.subject.vm.boot_image).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64")
+      expect(st.subject.vm.boot_image).to eq("projects/test-gcp-project/global/images/family/postgres-ubuntu-2204")
     end
 
     it "raises error if the version is not supported for AWS" do

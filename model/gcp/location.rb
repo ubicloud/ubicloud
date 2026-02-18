@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
 class Location < Sequel::Model
-  one_to_one :location_credential_gcp, key: :id, read_only: true
-
   module Gcp
+    def pg_gce_image(_pg_version, _arch)
+      project_id = location_credential.project_id
+      "projects/#{project_id}/global/images/family/postgres-ubuntu-2204"
+    end
+
     private
 
     def gcp_azs
@@ -38,7 +41,6 @@ end
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
 #  location_aws_az           | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
-#  location_credential_gcp   | location_credential_gcp_id_fkey            | (id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)

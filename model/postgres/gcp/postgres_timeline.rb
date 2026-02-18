@@ -24,7 +24,7 @@ PGDATA=/dat/#{version}/data
     end
 
     def gcp_blob_storage_client
-      @blob_storage_client ||= location.location_credential_gcp.storage_client
+      @blob_storage_client ||= location.location_credential.storage_client
     end
 
     def gcp_list_objects(prefix, delimiter: "")

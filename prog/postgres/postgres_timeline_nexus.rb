@@ -117,7 +117,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
     end
 
     if postgres_timeline.access_key
-      credential = postgres_timeline.location.location_credential_gcp
+      credential = postgres_timeline.location.location_credential
       begin
         credential.iam_client.delete_project_service_account(
           "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
