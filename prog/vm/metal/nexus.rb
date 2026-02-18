@@ -558,17 +558,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     hop_wait
   end
 
-  def vm_is_active
-    host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n")
-  end
-
   def available?
-    vm_is_active.all?("active")
+    vm_process_running_map.all? { |_, v| v }
   rescue
     false
   end
 
   def vm_process_running_map
-    vm.healthcheck_systemd_units.zip(vm_is_active).to_h { |k, v| [k, v == "active"] }
+    units = vm.healthcheck_systemd_units
+    states = host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n")
+    units.zip(states).to_h { |k, v| [k, v == "active"] }
   end
 end
