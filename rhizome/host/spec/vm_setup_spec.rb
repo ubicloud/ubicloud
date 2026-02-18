@@ -43,22 +43,31 @@ RSpec.describe VmSetup do
   describe "#write_user_data" do
     let(:vps) { instance_spy(VmPath) }
 
-    before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
+    before { allow(vs).to receive(:vp).and_return(vps) }
 
-    it "templates user YAML with no swap" do
+    def parse_user_data(raw)
+      expect(raw).to start_with("#cloud-config\n")
+      YAML.safe_load(raw)
+    end
+
+    it "generates valid cloud-config with no swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
-      expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["name"]).to eq("some_user")
+        expect(config["users"].first["ssh_authorized_keys"]).to eq(["some_ssh_key"])
+        expect(config["ssh_pwauth"]).to eq(false)
+        expect(config["runcmd"]).to include(%w[systemctl daemon-reload])
+        expect(config["bootcmd"].length).to eq(3)
+        expect(config).not_to have_key("swap")
       }
     end
 
-    it "templates user YAML with swap" do
+    it "generates valid cloud-config with swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], 123, "")
-      expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
-        expect(_1).to match(/size: 123/)
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["swap"]).to eq({"filename" => "/swapfile", "size" => 123})
       }
     end
 
@@ -66,6 +75,64 @@ RSpec.describe VmSetup do
       expect {
         vs.write_user_data("some_user", ["some_ssh_key"], "123", "")
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
+    end
+
+    it "includes install commands for debian boot images" do
+      vs.write_user_data("user", ["key"], nil, "debian-12")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"]).to include(%w[apt-get update])
+        expect(config["runcmd"]).to include(%w[apt-get install -y nftables])
+      }
+    end
+
+    it "includes install commands for almalinux boot images" do
+      vs.write_user_data("user", ["key"], nil, "almalinux-9")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"]).to include(%w[dnf install -y nftables])
+      }
+    end
+
+    it "includes no install commands for ubuntu boot images" do
+      vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"]).to eq([%w[systemctl daemon-reload]])
+      }
+    end
+
+    it "includes init_script as a string in runcmd" do
+      vs.write_user_data("user", ["key"], nil, "", init_script: "#!/bin/bash\necho hello")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"].last).to eq("#!/bin/bash\necho hello")
+      }
+    end
+
+    it "safely handles YAML-special usernames" do
+      vs.write_user_data("NO", ["key"], nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["name"]).to eq("NO")
+      }
+    end
+
+    it "handles multiple SSH keys" do
+      keys = ["ssh-ed25519 AAAAC3Nz... user@host", "ssh-rsa AAAAB3Nz... other@host"]
+      vs.write_user_data("user", keys, nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["ssh_authorized_keys"]).to eq(keys)
+      }
+    end
+
+    it "handles empty public keys" do
+      vs.write_user_data("user", [], nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["ssh_authorized_keys"]).to eq([])
+      }
     end
   end
 

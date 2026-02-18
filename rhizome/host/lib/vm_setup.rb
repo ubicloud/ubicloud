@@ -580,57 +580,49 @@ EOS
     FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
-  def generate_swap_config(swap_size_bytes)
-    return unless swap_size_bytes
-    fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
+    require "yaml"
 
-    <<~SWAP_CONFIG
-    swap:
-      filename: /swapfile
-      size: #{yq(swap_size_bytes)}
-    SWAP_CONFIG
+    runcmd = [%w[systemctl daemon-reload]]
+    runcmd.concat(install_commands(boot_image))
+    runcmd << init_script if init_script
+
+    config = {
+      "users" => [{
+        "name" => unix_user,
+        "sudo" => "ALL=(ALL) NOPASSWD:ALL",
+        "shell" => "/bin/bash",
+        "ssh_authorized_keys" => public_keys
+      }],
+      "ssh_pwauth" => false,
+      "runcmd" => runcmd,
+      "bootcmd" => nft_bootcmd
+    }
+
+    if swap_size_bytes
+      fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+      config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
+    vp.write_user_data("#cloud-config\n" + YAML.dump(config, line_width: -1))
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
-    install_cmd = if boot_image.include?("almalinux")
-      "  - [dnf, install, '-y', nftables]\n"
+  private def install_commands(boot_image)
+    if boot_image.include?("almalinux")
+      [%w[dnf install -y nftables]]
     elsif boot_image.include?("debian")
-      <<YAML
-  - [apt-get, update]
-  - [apt-get, install, -y, nftables]
-YAML
+      [%w[apt-get update], %w[apt-get install -y nftables]]
     else
-      ""
+      []
     end
-    nft_safe_sudo_allow = <<NFT_ADD_COMMS
-  - [nft, add, table, ip6, filter]
-  - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
-  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/64', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
-NFT_ADD_COMMS
+  end
 
-    init_script_cmd = "  - #{yq(init_script)}\n" if init_script
-
-    vp.write_user_data(<<EOS)
-#cloud-config
-users:
-  - name: #{yq(unix_user)}
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    ssh_authorized_keys:
-#{public_keys.map { "      - #{yq(_1)}" }.join("\n")}
-
-ssh_pwauth: False
-
-runcmd:
-  - [systemctl, daemon-reload]
-#{install_cmd}
-#{init_script_cmd}
-
-bootcmd:
-#{nft_safe_sudo_allow}
-
-#{generate_swap_config(swap_size_bytes)}
-EOS
+  private def nft_bootcmd
+    [
+      %w[nft add table ip6 filter],
+      ["nft", "add", "chain", "ip6", "filter", "output", "{", "type", "filter", "hook", "output", "priority", "0", ";", "}"],
+      ["nft", "add", "rule", "ip6", "filter", "output", "ip6", "daddr", "fd00:0b1c:100d:5AFE::/64", "meta", "skuid", "!=", "0", "tcp", "flags", "syn", "reject", "with", "tcp", "reset"]
+    ]
   end
 
   def storage(storage_params, storage_secrets, prep)
