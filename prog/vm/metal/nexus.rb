@@ -243,6 +243,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait
+    when_stop_set? do
+      hop_stopped
+    end
+
     when_start_after_host_reboot_set? do
       register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
@@ -261,10 +265,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     when_restart_set? do
       register_deadline("wait", 5 * 60)
       hop_restart
-    end
-
-    when_stop_set? do
-      hop_stopped
     end
 
     when_checkup_set? do
@@ -306,6 +306,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     hop_wait
   end
 
+  label def stopped_by_admin
+    nap 315360000 # 10 years
+  end
+
   # Stopped label is for cases where VM was manually stopped and should not
   # automatically restart.
   label def stopped
@@ -313,6 +317,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_stop
       host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
       nap 0
+    end
+
+    when_admin_stop_set? do
+      decr_admin_stop
+      hop_stopped_by_admin
     end
 
     when_start_set? do
@@ -335,6 +344,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   # Unavailable label is for cases where VM was not manually stopped, and is
   # expected to become available.
   label def unavailable
+    when_stop_set? do
+      hop_stopped
+    end
+
     # If the VM become unavailable due to host unavailability, it first needs to
     # go through start_after_host_reboot state to be able to recover.
     when_start_after_host_reboot_set? do
@@ -351,10 +364,6 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_restart
       host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
       nap 0
-    end
-
-    when_stop_set? do
-      hop_stopped
     end
 
     begin

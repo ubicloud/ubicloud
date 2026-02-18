@@ -40,7 +40,7 @@ class Vm < Sequel::Model
   plugin ResourceMethods, redacted_columns: :public_key
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
-    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs
+    :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :start, :stop, :migrate_to_separate_progs, :admin_stop
   include HealthMonitorMethods
 
   include ObjectTag::Cleanup
@@ -119,6 +119,7 @@ class Vm < Sequel::Model
   def display_state
     label = strand&.label
     return "deleting" if destroying_set? || destroy_set?
+    return "stopped by admin" if admin_stop_set? || label == "stopped_by_admin"
     return "restarting" if restart_set? || label == "restart"
     return "stopped" if stop_set? || label == "stopped"
     return "unavailable" if label == "unavailable"
