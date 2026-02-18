@@ -5,10 +5,11 @@ require_relative "../../lib/util"
 class Prog::Test::HaPostgresResource < Prog::Test::Base
   semaphore :destroy
 
-  def self.assemble
+  def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
 
     frame = {
+      "provider" => provider,
       "postgres_test_project_id" => postgres_test_project.id,
       "failover_wait_started" => false
     }
@@ -21,12 +22,27 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def start
+    location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
+      location = Location[provider: "aws", project_id: nil, name: "us-east-1"]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      end
+      family = "m8gd"
+      vcpus = 2
+      [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+    elsif frame["provider"] == "gcp"
+      location = Location[provider: "gcp", project_id: nil]
+      [location.id, "standard-2", 128]
+    else
+      [Location::HETZNER_FSN1_ID, "standard-2", 128]
+    end
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id: Location::HETZNER_FSN1_ID,
+      location_id:,
       name: "postgres-test-ha",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 128,
+      target_vm_size:,
+      target_storage_size_gib:,
       ha_type: "async"
     )
 
@@ -107,6 +123,10 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
+    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
+      Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
     if frame["timeline_ids"]&.any? { PostgresTimeline[it] }
       Clog.emit("Waiting for postgres timelines to be destroyed")
       nap 5

@@ -21,15 +21,48 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
       expect(Project[name: "Postgres-HA-Test-Project"]).not_to be_nil
+      expect(st.stack.first["provider"]).to eq("metal")
+    end
+
+    it "accepts a provider parameter" do
+      st = described_class.assemble(provider: "gcp")
+      expect(st.stack.first["provider"]).to eq("gcp")
     end
   end
 
   describe "#start" do
-    it "creates a postgres resource and hops to wait_postgres_resource" do
+    it "creates a postgres resource on metal and hops to wait_postgres_resource" do
       expect { pgr_test.start }.to hop("wait_postgres_resource")
       postgres_resource_id = frame_value(pgr_test, "postgres_resource_id")
       expect(postgres_resource_id).not_to be_nil
       expect(PostgresResource[postgres_resource_id]).not_to be_nil
+    end
+
+    it "creates a postgres resource on aws and hops to wait_postgres_resource" do
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      aws_strand = described_class.assemble(provider: "aws")
+      aws_pgr_test = described_class.new(aws_strand)
+      expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
+      location = Location[provider: "aws", project_id: nil, name: "us-east-1"]
+      expect(LocationCredential[location.id].access_key).to eq("access_key")
+    end
+
+    it "creates a postgres resource on gcp and hops to wait_postgres_resource" do
+      gcp_location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[gcp_location.id]
+        LocationCredential.create_with_id(gcp_location.id,
+          project_id: "test-gcp-project",
+          service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+          credentials_json: "{}")
+      end
+      PgGceImage.create_with_id(PgGceImage.generate_uuid,
+        gcp_project_id: "test-gcp-project",
+        gce_image_name: "postgres-ubuntu-2204-x64-20260218",
+        pg_version: "17", arch: "x64")
+      gcp_strand = described_class.assemble(provider: "gcp")
+      gcp_pgr_test = described_class.new(gcp_strand)
+      expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
     end
   end
 

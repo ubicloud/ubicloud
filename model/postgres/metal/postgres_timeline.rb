@@ -52,5 +52,32 @@ PGDATA=/dat/#{version}/data
     def metal_set_lifecycle_policy
       blob_storage_client.set_lifecycle_policy(ubid, ubid, BACKUP_BUCKET_EXPIRATION_DAYS)
     end
+
+    def metal_destroy_blob_storage
+      admin_client = Minio::Client.new(
+        endpoint: blob_storage_endpoint,
+        access_key: blob_storage.admin_user,
+        secret_key: blob_storage.admin_password,
+        ssl_ca_data: blob_storage.root_certs
+      )
+      admin_client.admin_remove_user(access_key)
+      admin_client.admin_policy_remove(ubid)
+    end
+
+    def metal_setup_blob_storage
+      admin_client = Minio::Client.new(
+        endpoint: blob_storage_endpoint,
+        access_key: blob_storage.admin_user,
+        secret_key: blob_storage.admin_password,
+        ssl_ca_data: blob_storage.root_certs
+      )
+      admin_client.admin_add_user(access_key, secret_key)
+      admin_client.admin_policy_add(ubid, blob_storage_policy)
+      admin_client.admin_policy_set(ubid, access_key)
+    end
+
+    def metal_generate_blob_storage_credentials?
+      true
+    end
   end
 end

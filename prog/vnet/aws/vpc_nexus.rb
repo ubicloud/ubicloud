@@ -100,6 +100,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   label def wait
+    when_refresh_keys_set? do
+      # AWS has no IPsec tunnels — nothing to rekey, just clear the semaphore
+      decr_refresh_keys
+    end
+
     when_update_firewall_rules_set? do
       private_subnet.vms.each(&:incr_update_firewall_rules)
       decr_update_firewall_rules

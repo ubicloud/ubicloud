@@ -21,21 +21,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
-      boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(server_version, arch)
-      elsif postgres_resource.location.gcp?
-        postgres_resource.location.pg_gce_image(server_version, arch)
-      else
-        flavor_suffix = case postgres_resource.flavor
-        when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
-        when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
-        # :nocov: flavor is a DB enum, unknown values are impossible
-        else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
-          # :nocov:
-        end
-
-        "postgres#{flavor_suffix}-ubuntu-2204"
-      end
+      boot_image = postgres_resource.location.pg_boot_image(server_version, arch, postgres_resource.flavor)
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
@@ -169,6 +155,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def setup_blob_storage
     postgres_server.attach_s3_policy_if_needed
     hop_initialize_empty_database if postgres_server.primary?
+    # Standbys need WAL-G credentials before backup-fetch can run.
+    # Primary gets credentials after initialize_empty_database since
+    # that step doesn't use WAL-G.
+    postgres_server.refresh_walg_credentials
     hop_initialize_database_from_backup
   end
 
@@ -682,10 +672,8 @@ SQL
   label def lockout
     decr_lockout
 
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless postgres_server.resource.location.aws? || postgres_server.resource.location.gcp?
-      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    postgres_server.lockout_mechanisms.each do |mechanism|
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 
     hop_wait_lockout_attempt

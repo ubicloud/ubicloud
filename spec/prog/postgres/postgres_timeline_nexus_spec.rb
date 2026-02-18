@@ -170,7 +170,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     end
 
     it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
-      expect(Config).to receive(:aws_postgres_iam_access).and_return(true).twice
+      expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
 
       tl = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
       expect(tl.access_key).not_to be_nil
@@ -231,14 +231,14 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         gcp_location = create_gcp_location
         postgres_timeline.update(location_id: gcp_location.id)
 
-        expect(nx).to receive(:setup_blob_storage).and_call_original
+        expect(nx.postgres_timeline).to receive(:setup_blob_storage).and_call_original
         expect { nx.start }.to hop("setup_bucket")
       end
     end
 
     it "hops without creating bucket if blob storage is not configured" do
       # No minio cluster created, so blob_storage is nil
-      expect(nx).not_to receive(:setup_blob_storage)
+      expect(nx.postgres_timeline).not_to receive(:setup_blob_storage)
       expect { nx.start }.to hop("wait_leader")
     end
   end
@@ -259,23 +259,23 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:create_policy, {policy: {arn: "policy-arn"}})
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
-      nx.setup_aws_s3
+      postgres_timeline.setup_blob_storage
     end
 
-    it "#destroy_aws_s3 detach policy to vm role when aws_postgres_iam_access configured" do
+    it "destroys AWS S3 blob storage when aws_postgres_iam_access configured" do
       expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
       aws_location = create_aws_location
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
+      expect(postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
 
       expect(iam_client).to receive(:delete_policy).with(policy_arn: "arn:aws:iam::123456789012:policy/#{postgres_timeline.ubid}")
 
-      nx.destroy_aws_s3
+      postgres_timeline.destroy_blob_storage
     end
 
     it "naps if aws and the key is not available" do

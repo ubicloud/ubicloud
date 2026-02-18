@@ -7,6 +7,18 @@ RSpec.describe Prog::Test::VmGroup do
 
   let(:st) { described_class.assemble(boot_images: ["ubuntu-noble", "debian-12"]) }
 
+  describe ".assemble" do
+    it "defaults to metal provider" do
+      st = described_class.assemble(boot_images: ["ubuntu-noble"])
+      expect(st.stack.first["provider"]).to eq("metal")
+    end
+
+    it "accepts a provider parameter" do
+      st = described_class.assemble(boot_images: ["ubuntu-noble"], provider: "gcp")
+      expect(st.stack.first["provider"]).to eq("gcp")
+    end
+  end
+
   describe "#start" do
     it "hops to setup_vms" do
       expect { vg_test.start }.to hop("setup_vms")
@@ -24,6 +36,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "provisions at least one vm for each boot image" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect(vg_test).to receive(:frame).and_return({
+        "provider" => "metal",
         "test_slices" => true,
         "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
       }).at_least(:once)
@@ -35,6 +48,7 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_children_ready if test_slices" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect(vg_test).to receive(:frame).and_return({
+        "provider" => "metal",
         "storage_encrypted" => true,
         "test_reboot" => true,
         "test_slices" => true,
@@ -42,6 +56,24 @@ RSpec.describe Prog::Test::VmGroup do
         "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
       }).at_least(:once)
       expect { vg_test.setup_vms }.to hop("wait_vms")
+    end
+
+    it "sets up aws location and credentials" do
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      aws_st = described_class.assemble(boot_images: ["ubuntu-noble"], provider: "aws")
+      aws_vg_test = described_class.new(aws_st)
+      expect(aws_vg_test).to receive(:update_stack).and_call_original
+      expect { aws_vg_test.setup_vms }.to hop("wait_vms")
+      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
+      expect(LocationCredential[location.id].access_key).to eq("access_key")
+    end
+
+    it "sets up gcp location" do
+      gcp_st = described_class.assemble(boot_images: ["ubuntu-noble"], provider: "gcp")
+      gcp_vg_test = described_class.new(gcp_st)
+      expect(gcp_vg_test).to receive(:update_stack).and_call_original
+      expect { gcp_vg_test.setup_vms }.to hop("wait_vms")
     end
   end
 
@@ -98,12 +130,18 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true, "provider" => "metal"})
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
 
     it "skips if verify_host_capacity is not set" do
-      expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false})
+      expect(vg_test).to receive(:frame).and_return({"verify_host_capacity" => false, "provider" => "metal"})
+      expect(vg_test).not_to receive(:vm_host)
+      expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
+    end
+
+    it "skips on cloud providers" do
+      allow(vg_test).to receive(:frame).and_return({"verify_host_capacity" => true, "provider" => "aws"})
       expect(vg_test).not_to receive(:vm_host)
       expect { vg_test.verify_host_capacity }.to hop("verify_vm_host_slices")
     end
@@ -116,7 +154,7 @@ RSpec.describe Prog::Test::VmGroup do
         vms: [instance_double(Vm, cores: 2), instance_double(Vm, cores: 0)],
         slices: [instance_double(VmHostSlice, cores: 1)],
         cpus: [])
-      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
+      expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true, "provider" => "metal"})
 
       strand = instance_double(Strand)
       allow(vg_test).to receive_messages(strand:)
@@ -128,7 +166,7 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_vm_host_slices" do
     it "runs tests on vm host slices" do
-      expect(vg_test).to receive(:frame).and_return({"test_slices" => true, "vms" => ["111", "222", "333"]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({"test_slices" => true, "provider" => "metal", "vms" => ["111", "222", "333"]}).at_least(:once)
       slice1 = instance_double(VmHostSlice, id: "456")
       slice2 = instance_double(VmHostSlice, id: "789")
       expect(Vm).to receive(:[]).with("111").and_return(instance_double(Vm, vm_host_slice: slice1))
@@ -138,9 +176,14 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
 
-    it "hops to verify_firewall_rules if tests are done" do
-      expect(vg_test).to receive(:frame).and_return({"test_slices" => true})
+    it "hops to verify_storage_rpc if tests are done" do
+      allow(vg_test).to receive(:frame).and_return({"test_slices" => true, "provider" => "metal"})
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM Host Slices!"})
+      expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
+    end
+
+    it "skips on cloud providers" do
+      allow(vg_test).to receive(:frame).and_return({"test_slices" => true, "provider" => "gcp"})
       expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
     end
   end
@@ -153,7 +196,7 @@ RSpec.describe Prog::Test::VmGroup do
       allow(vg_test).to receive(:vm_host).and_return(vm_host)
       vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
       vm2 = instance_double(Vm, id: "vm2", inhost_name: "vm234567")
-      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1", "vm2"]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({"provider" => "metal", "vms" => ["vm1", "vm2"]}).at_least(:once)
       expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
       expect(Vm).to receive(:[]).with("vm2").and_return(vm2)
 
@@ -169,13 +212,19 @@ RSpec.describe Prog::Test::VmGroup do
       vm_host = instance_double(VmHost, sshable:)
       allow(vg_test).to receive(:vm_host).and_return(vm_host)
       vm1 = instance_double(Vm, id: "vm1", inhost_name: "vm123456")
-      expect(vg_test).to receive(:frame).and_return({"vms" => ["vm1"]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({"provider" => "metal", "vms" => ["vm1"]}).at_least(:once)
       expect(Vm).to receive(:[]).with("vm1").and_return(vm1)
 
       expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return("{\"error\": \"some error\"}\n")
 
       expect(vg_test.strand).to receive(:update).with(exitval: {msg: "Failed to get vhost-block-backend version for VM vm1 using RPC"})
       expect { vg_test.verify_storage_rpc }.to hop("failed")
+    end
+
+    it "skips RPC verification on cloud providers" do
+      expect(vg_test).to receive(:frame).and_return({"provider" => "aws"}).at_least(:once)
+      expect(vg_test).not_to receive(:vm_host)
+      expect { vg_test.verify_storage_rpc }.to hop("verify_firewall_rules")
     end
   end
 
@@ -194,9 +243,15 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#verify_connected_subnets" do
-    it "hops to test_reboot if tests are done" do
+    it "hops to test_reboot if tests are done on metal" do
       expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
       expect { vg_test.verify_connected_subnets }.to hop("test_reboot")
+    end
+
+    it "hops to destroy_resources if tests are done on cloud provider" do
+      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
+      allow(vg_test).to receive(:frame).and_return({"test_reboot" => true, "first_boot" => true, "provider" => "aws"})
+      expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
     end
 
     it "runs tests for the first connected subnet" do

@@ -81,10 +81,40 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       raise "Subnet creation failed: #{op.results.error}" if op.error?
     end
 
+    hop_create_subnet_allow_rules
+  end
+
+  label def create_subnet_allow_rules
+    # Allow same-subnet egress (overrides the VPC-wide deny-egress at 65534)
+    # Uses subnet-specific tag so only VMs in this subnet match, not all VMs in VPC
+    ensure_allow_rule(
+      name: subnet_allow_rule_name("egress"),
+      direction: "EGRESS",
+      source_ranges: nil,
+      destination_ranges: [private_subnet.net4.to_s],
+      target_tags: [subnet_tag],
+      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
+    )
+
+    # Allow same-subnet ingress (overrides the VPC-wide deny-ingress at 65534)
+    ensure_allow_rule(
+      name: subnet_allow_rule_name("ingress"),
+      direction: "INGRESS",
+      source_ranges: [private_subnet.net4.to_s],
+      destination_ranges: nil,
+      target_tags: [subnet_tag],
+      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
+    )
+
     hop_wait
   end
 
   label def wait
+    when_refresh_keys_set? do
+      # GCP has no IPsec tunnels — nothing to rekey, just clear the semaphore
+      decr_refresh_keys
+    end
+
     when_update_firewall_rules_set? do
       private_subnet.vms.each(&:incr_update_firewall_rules)
       decr_update_firewall_rules
@@ -125,6 +155,26 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       priority: 65534,
       target_tags: ["ubicloud-vm"],
       denied: [Google::Cloud::Compute::V1::Denied.new(I_p_protocol: "all")]
+    }
+    attrs[:source_ranges] = source_ranges if source_ranges
+    attrs[:destination_ranges] = destination_ranges if destination_ranges
+
+    fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
+    op = credential.firewalls_client.insert(project: gcp_project_id, firewall_resource: fw)
+    op.wait_until_done!
+    raise "Firewall rule #{name} creation failed: #{op.results.error}" if op.error?
+  end
+
+  def ensure_allow_rule(name:, direction:, source_ranges:, destination_ranges:, allowed:, target_tags: ["ubicloud-vm"])
+    credential.firewalls_client.get(project: gcp_project_id, firewall: name)
+  rescue Google::Cloud::NotFoundError
+    attrs = {
+      name:,
+      network: "projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}",
+      direction:,
+      priority: 1000,
+      target_tags:,
+      allowed:
     }
     attrs[:source_ranges] = source_ranges if source_ranges
     attrs[:destination_ranges] = destination_ranges if destination_ranges
@@ -182,6 +232,15 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     op.wait_until_done!
   rescue Google::Cloud::NotFoundError
     # Already deleted
+  end
+
+  def subnet_allow_rule_name(direction)
+    # GCP firewall rule names max 63 chars; use short prefix + subnet ubid
+    "ubicloud-allow-#{direction}-#{private_subnet.ubid}"[0, 63]
+  end
+
+  def subnet_tag
+    "ps-#{private_subnet.ubid}"
   end
 
   def gcp_vpc_name

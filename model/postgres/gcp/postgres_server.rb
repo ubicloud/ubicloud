@@ -72,6 +72,10 @@ class PostgresServer < Sequel::Model
       timeline.update(access_key: sa.email, secret_key: key_json)
     end
 
+    def gcp_lockout_mechanisms
+      ["pg_stop", "hba"]
+    end
+
     def gcp_increment_s3_new_timeline
       credential = resource.location.location_credential
 

@@ -201,7 +201,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         subnetwork: "ubicloud-#{ps.ubid}"
       ).and_return(Google::Cloud::Compute::V1::Subnetwork.new)
 
-      expect { nx.create_subnet }.to hop("wait")
+      expect { nx.create_subnet }.to hop("create_subnet_allow_rules")
     end
 
     it "creates subnet if not found" do
@@ -220,7 +220,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op
       end
 
-      expect { nx.create_subnet }.to hop("wait")
+      expect { nx.create_subnet }.to hop("create_subnet_allow_rules")
     end
 
     it "raises if subnet creation fails" do

@@ -87,5 +87,38 @@ PGDATA=/dat/#{version}/data
         }
       })
     end
+
+    def aws_destroy_blob_storage
+      iam_client = location.location_credential.iam_client
+      if Config.aws_postgres_iam_access
+        iam_client.delete_policy(policy_arn: aws_s3_policy_arn)
+      else
+        iam_client.list_attached_user_policies(user_name: ubid).attached_policies.each do
+          iam_client.detach_user_policy(user_name: ubid, policy_arn: it.policy_arn)
+          iam_client.delete_policy(policy_arn: it.policy_arn)
+        end
+
+        iam_client.list_access_keys(user_name: ubid).access_key_metadata.each do
+          iam_client.delete_access_key(user_name: ubid, access_key_id: it.access_key_id)
+        end
+        iam_client.delete_user(user_name: ubid)
+      end
+    end
+
+    def aws_setup_blob_storage
+      iam_client = location.location_credential.iam_client
+      policy = iam_client.create_policy(policy_name: aws_s3_policy_name, policy_document: blob_storage_policy.to_json)
+      unless Config.aws_postgres_iam_access
+        iam_client.create_user(user_name: ubid)
+        iam_client.attach_user_policy(user_name: ubid, policy_arn: policy.policy.arn)
+        response = iam_client.create_access_key(user_name: ubid)
+        update(access_key: response.access_key.access_key_id, secret_key: response.access_key.secret_access_key)
+        leader.incr_refresh_walg_credentials
+      end
+    end
+
+    def aws_generate_blob_storage_credentials?
+      !Config.aws_postgres_iam_access
+    end
   end
 end

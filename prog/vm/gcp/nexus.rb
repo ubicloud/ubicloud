@@ -87,7 +87,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         ]
       ),
       tags: Google::Cloud::Compute::V1::Tags.new(
-        items: ["ubicloud-vm", "allow-ssh", vm.name]
+        items: ["ubicloud-vm", "allow-ssh", vm.name, subnet_tag]
       )
     )
 
@@ -287,6 +287,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def gce_subnet_name
     ps = nic&.private_subnet
     ps ? "ubicloud-#{ps.ubid}" : "default"
+  end
+
+  def subnet_tag
+    ps = nic&.private_subnet
+    ps ? "ps-#{ps.ubid}" : "ubicloud-vm"
   end
 
   GCE_E2_STANDARD_VCPUS = [2, 4, 8, 16, 32].freeze

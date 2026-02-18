@@ -1,7 +1,75 @@
 # frozen_string_literal: true
 
+require "google/cloud/compute/v1"
+
 class PrivateSubnet < Sequel::Model
   module Gcp
+    private
+
+    def gcp_connect_subnet(subnet)
+      ConnectedSubnet.create(subnet_hash(subnet))
+      create_cross_subnet_rules(subnet)
+    end
+
+    def gcp_disconnect_subnet(subnet)
+      ConnectedSubnet.where(subnet_hash(subnet)).destroy
+      delete_cross_subnet_rules(subnet)
+    end
+
+    def create_cross_subnet_rules(other)
+      cred = location.location_credential
+      project_id = cred.project_id
+      vpc = Prog::Vnet::Gcp::SubnetNexus.vpc_name(project)
+
+      directions = %w[egress ingress]
+      [self, other].each do |src|
+        dst = (src == self) ? other : self
+        directions.each do |dir|
+          name = cross_subnet_rule_name(src, dst, dir)
+          begin
+            cred.firewalls_client.get(project: project_id, firewall: name)
+          rescue Google::Cloud::NotFoundError
+            attrs = {
+              name:,
+              network: "projects/#{project_id}/global/networks/#{vpc}",
+              direction: dir.upcase,
+              priority: 1000,
+              target_tags: ["ps-#{src.ubid}"],
+              allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
+            }
+            if dir == "egress"
+              attrs[:destination_ranges] = [dst.net4.to_s]
+            else
+              attrs[:source_ranges] = [dst.net4.to_s]
+            end
+            fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
+            op = cred.firewalls_client.insert(project: project_id, firewall_resource: fw)
+            op.wait_until_done!
+          end
+        end
+      end
+    end
+
+    def delete_cross_subnet_rules(other)
+      cred = location.location_credential
+      project_id = cred.project_id
+
+      directions = %w[egress ingress]
+      [self, other].each do |src|
+        dst = (src == self) ? other : self
+        directions.each do |dir|
+          name = cross_subnet_rule_name(src, dst, dir)
+          op = cred.firewalls_client.delete(project: project_id, firewall: name)
+          op.wait_until_done!
+        rescue Google::Cloud::NotFoundError
+          # Already deleted
+        end
+      end
+    end
+
+    def cross_subnet_rule_name(src, dst, direction)
+      "ubi-xsub-#{direction}-#{src.ubid[0, 8]}-#{dst.ubid[0, 8]}"
+    end
   end
 end
 

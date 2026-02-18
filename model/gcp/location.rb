@@ -11,6 +11,10 @@ class Location < Sequel::Model
 
     private
 
+    def gcp_pg_boot_image(pg_version, arch, flavor)
+      pg_gce_image(pg_version, arch)
+    end
+
     def gcp_azs
       raise "azs is only valid for aws locations"
     end

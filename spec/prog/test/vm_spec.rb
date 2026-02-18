@@ -19,6 +19,8 @@ RSpec.describe Prog::Test::Vm do
     main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0")
     extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1")
 
+    location = instance_double(Location, provider: "metal")
+
     nic1 = instance_double(Nic,
       private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"),
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
@@ -27,6 +29,7 @@ RSpec.describe Prog::Test::Vm do
       ip4: "1.1.1.1",
       ip6: "2001:db8:85a1::2",
       nics: [nic1],
+      location:,
       vm_storage_volumes: [main_storage_volume, extra_storage_volume])
 
     nic2 = instance_double(Nic,
@@ -268,17 +271,17 @@ RSpec.describe Prog::Test::Vm do
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
       expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip4 of a vm in different subnet"
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
+      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful connection to private ip4 of a vm in different subnet"
     end
 
     it "raises error if pinging private ipv9 of vms in other subnets succeed" do
       expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2")
-      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip6 of a vm in different subnet"
+      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful connection to private ip6 of a vm in different subnet"
     end
   end
 

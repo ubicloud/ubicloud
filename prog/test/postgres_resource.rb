@@ -26,7 +26,9 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   label def start
     location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      end
       family = "m8gd"
       vcpus = 2
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]

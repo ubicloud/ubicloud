@@ -55,6 +55,33 @@ PGDATA=/dat/#{version}/data
         l.add_delete_rule(age: BACKUP_BUCKET_EXPIRATION_DAYS)
       end
     end
+
+    def gcp_destroy_blob_storage
+      bucket = blob_storage_client.bucket(ubid)
+      if bucket
+        bucket.files.each(&:delete)
+        bucket.delete
+      end
+
+      if access_key
+        credential = location.location_credential
+        begin
+          credential.iam_client.delete_project_service_account(
+            "projects/-/serviceAccounts/#{access_key}"
+          )
+        rescue Google::Apis::ClientError
+          # SA may already be deleted
+        end
+      end
+    end
+
+    def gcp_setup_blob_storage
+      # GCS setup is automatic via SA credentials — no-op
+    end
+
+    def gcp_generate_blob_storage_credentials?
+      false
+    end
   end
 
   GcsFileWrapper = Struct.new(:key, :last_modified)

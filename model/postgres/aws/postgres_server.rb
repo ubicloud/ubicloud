@@ -40,6 +40,10 @@ class PostgresServer < Sequel::Model
       incr_configure_s3_new_timeline
     end
 
+    def aws_lockout_mechanisms
+      ["pg_stop", "hba"]
+    end
+
     def client
       @client ||= timeline.location.location_credential.iam_client
     end
