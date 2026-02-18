@@ -114,6 +114,9 @@ code {
     text-align: center;
     padding-top: 0;
     margin-top: 0;
+    & a {
+      font-size: 75%;
+    }
   }
 
   & ul {
