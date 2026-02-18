@@ -135,6 +135,13 @@ RSpec.describe Prog::Test::PostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
+    it "naps if timelines are not destroyed yet" do
+      tl = PostgresTimeline.create(location_id:)
+      Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      refresh_frame(pgr_test, new_values: {"timeline_ids" => [tl.id]})
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
     it "hops to destroy if the postgres resource destroyed" do
       expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
     end

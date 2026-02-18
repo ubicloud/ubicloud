@@ -2,9 +2,11 @@
 
 class Location < Sequel::Model
   module Gcp
-    def pg_gce_image(_pg_version, _arch)
+    def pg_gce_image(pg_version, arch)
       project_id = location_credential.project_id
-      "projects/#{project_id}/global/images/family/postgres-ubuntu-2204"
+      image = PgGceImage.find(gcp_project_id: project_id, pg_version:, arch:)
+      raise "No GCE image found for PostgreSQL #{pg_version} (#{arch}) in project #{project_id}" unless image
+      "projects/#{project_id}/global/images/#{image.gce_image_name}"
     end
 
     private

@@ -99,6 +99,21 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_instance_created")
     end
 
+    it "persists gcp_zone_suffix in VM strand frame" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      nic.strand.stack.first["gcp_zone_suffix"] = "c"
+      nic.strand.modified!(:stack)
+      nic.strand.save_changes
+
+      op = instance_double(Gapic::GenericLRO::Operation, error?: false)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:insert).and_return(op)
+
+      expect { nx.start }.to hop("wait_instance_created")
+      expect(st.reload.stack.first["gcp_zone_suffix"]).to eq("c")
+    end
+
     it "uses reserved static IP in AccessConfig when NicGcpResource exists" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
@@ -123,6 +138,76 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_return(op)
 
       expect { nx.start }.to raise_error(RuntimeError, /GCE instance creation failed/)
+    end
+
+    it "retries on ResourceExhaustedError with backoff" do
+      vm.nics.first.strand.update(label: "wait")
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+    end
+
+    it "retries on UnavailableError with backoff" do
+      vm.nics.first.strand.update(label: "wait")
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::UnavailableError.new("service unavailable"))
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+    end
+
+    it "retries on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
+      vm.nics.first.strand.update(label: "wait")
+      error_entry = Struct.new(:code).new("ZONE_RESOURCE_POOL_EXHAUSTED")
+      error_info = Struct.new(:errors).new([error_entry])
+      error_result = Struct.new(:error).new(error_info)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:insert).and_return(op)
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+    end
+
+    it "retries on QUOTA_EXCEEDED operation error" do
+      vm.nics.first.strand.update(label: "wait")
+      error_entry = Struct.new(:code).new("QUOTA_EXCEEDED")
+      error_info = Struct.new(:errors).new([error_entry])
+      error_result = Struct.new(:error).new(error_info)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:insert).and_return(op)
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+    end
+
+    it "raises after 5 zone retries" do
+      vm.nics.first.strand.update(label: "wait")
+      st.stack.first["zone_retries"] = 4
+      st.modified!(:stack)
+      st.save_changes
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+
+      expect { nx.start }.to raise_error(RuntimeError, /GCE instance creation failed after 5 zone retries/)
+    end
+
+    it "increments zone retry counter on successive retries" do
+      vm.nics.first.strand.update(label: "wait")
+      st.stack.first["zone_retries"] = 2
+      st.modified!(:stack)
+      st.save_changes
+
+      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(3)
     end
   end
 
@@ -208,7 +293,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(vm.assigned_vm_address).to be_nil
     end
 
-    it "naps if the instance is not running" do
+    it "naps if the instance is in STAGING state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "STAGING",
         network_interfaces: []
@@ -216,6 +301,36 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect(compute_client).to receive(:get).and_return(instance)
       expect { nx.wait_instance_created }.to nap(5)
+    end
+
+    it "naps if the instance is in PROVISIONING state" do
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "PROVISIONING",
+        network_interfaces: []
+      )
+
+      expect(compute_client).to receive(:get).and_return(instance)
+      expect { nx.wait_instance_created }.to nap(5)
+    end
+
+    it "raises if the instance enters TERMINATED state" do
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "TERMINATED",
+        network_interfaces: []
+      )
+
+      expect(compute_client).to receive(:get).and_return(instance)
+      expect { nx.wait_instance_created }.to raise_error(RuntimeError, /GCE instance entered terminal state: TERMINATED/)
+    end
+
+    it "raises if the instance enters SUSPENDED state" do
+      instance = Google::Cloud::Compute::V1::Instance.new(
+        status: "SUSPENDED",
+        network_interfaces: []
+      )
+
+      expect(compute_client).to receive(:get).and_return(instance)
+      expect { nx.wait_instance_created }.to raise_error(RuntimeError, /GCE instance entered terminal state: SUSPENDED/)
     end
   end
 
@@ -337,6 +452,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
     end
+
+    it "uses zone from VM strand frame when NIC is already destroyed" do
+      st.stack.first["gcp_zone_suffix"] = "c"
+      st.modified!(:stack)
+      st.save_changes
+
+      # Simulate NIC already destroyed
+      nx.instance_variable_set(:@nic, nil)
+      allow(vm).to receive(:nic).and_return(nil)
+
+      op = instance_double(Gapic::GenericLRO::Operation)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:delete).with(
+        project: "test-gcp-project",
+        zone: "hetzner-fsn1-c",
+        instance: "testvm"
+      ).and_return(op)
+
+      expect { nx.destroy }.to exit({"msg" => "vm destroyed"})
+    end
   end
 
   describe "helper methods" do
@@ -379,15 +514,25 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "returns custom GCE image when boot_image starts with projects/" do
-      vm.update(boot_image: "projects/test-gcp-project/global/images/family/postgres-ubuntu-2204")
-      expect(nx.send(:gce_source_image)).to eq("projects/test-gcp-project/global/images/family/postgres-ubuntu-2204")
+      vm.update(boot_image: "projects/test-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
+      expect(nx.send(:gce_source_image)).to eq("projects/test-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
     end
 
     it "returns correct GCP zone defaulting to suffix a" do
       expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-a")
     end
 
-    it "reads GCP zone suffix from NIC strand frame" do
+    it "reads GCP zone suffix from VM strand frame first" do
+      st.stack.first["gcp_zone_suffix"] = "c"
+      st.modified!(:stack)
+      st.save_changes
+      vm.nic.strand.stack.first["gcp_zone_suffix"] = "b"
+      vm.nic.strand.modified!(:stack)
+      vm.nic.strand.save_changes
+      expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-c")
+    end
+
+    it "falls back to NIC strand frame when VM strand has no zone suffix" do
       vm.nic.strand.stack.first["gcp_zone_suffix"] = "b"
       vm.nic.strand.modified!(:stack)
       vm.nic.strand.save_changes

@@ -91,13 +91,32 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
     )
 
-    op = compute_client.insert(
-      project: gcp_project_id,
-      zone: gcp_zone,
-      instance_resource:
-    )
-    op.wait_until_done!
-    raise "GCE instance creation failed: #{op.results.error}" if op.error?
+    # Persist zone suffix in VM strand so it survives NIC destruction
+    zone_suffix = nic&.strand&.stack&.dig(0, "gcp_zone_suffix") || "a"
+    strand.stack.first["gcp_zone_suffix"] = zone_suffix
+    strand.modified!(:stack)
+    strand.save_changes
+
+    begin
+      op = compute_client.insert(
+        project: gcp_project_id,
+        zone: gcp_zone,
+        instance_resource:
+      )
+      op.wait_until_done!
+      if op.error?
+        op_error = op.results&.error
+        error_code = op_error.respond_to?(:errors) && op_error.errors&.first&.code
+        if %w[ZONE_RESOURCE_POOL_EXHAUSTED QUOTA_EXCEEDED].include?(error_code)
+          retry_zone_capacity("GCE operation error: #{error_code}")
+        end
+        raise "GCE instance creation failed: #{op_error}"
+      end
+    rescue Google::Cloud::ResourceExhaustedError => e
+      retry_zone_capacity(e.message)
+    rescue Google::Cloud::UnavailableError => e
+      retry_zone_capacity(e.message)
+    end
 
     hop_wait_instance_created
   end
@@ -109,7 +128,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       instance: vm.name
     )
 
-    unless instance.status == "RUNNING"
+    case instance.status
+    when "RUNNING"
+      # proceed
+    when "TERMINATED", "SUSPENDED"
+      raise "GCE instance entered terminal state: #{instance.status}"
+    else
       nap 5
     end
 
@@ -243,7 +267,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def gcp_zone
     @gcp_zone ||= begin
       region = vm.location.name.delete_prefix("gcp-")
-      zone_suffix = nic&.strand&.stack&.dig(0, "gcp_zone_suffix") || "a"
+      zone_suffix = strand.stack.dig(0, "gcp_zone_suffix") || nic&.strand&.stack&.dig(0, "gcp_zone_suffix") || "a"
       "#{region}-#{zone_suffix}"
     end
   end
@@ -290,6 +314,16 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     else
       "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
     end
+  end
+
+  def retry_zone_capacity(error_message)
+    retries = (frame["zone_retries"] || 0) + 1
+    if retries >= 5
+      raise "GCE instance creation failed after #{retries} zone retries: #{error_message}"
+    end
+    Clog.emit("GCE zone capacity exhausted") { {zone_exhausted: {zone: gcp_zone, retries:, error: error_message}} }
+    update_stack({"zone_retries" => retries})
+    nap 30
   end
 
   def cleanup_gce_firewall_rules

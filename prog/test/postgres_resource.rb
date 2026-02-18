@@ -67,6 +67,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
+    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -75,6 +76,10 @@ class Prog::Test::PostgresResource < Prog::Test::Base
     nap 5 if postgres_resource
     if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
       Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
+    if frame["timeline_ids"]&.any? { PostgresTimeline[it] }
+      Clog.emit("Waiting for postgres timelines to be destroyed")
       nap 5
     end
 

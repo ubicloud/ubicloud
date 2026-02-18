@@ -19,7 +19,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
   before do
     nx.instance_variable_set(:@vm, vm)
-    allow(vm).to receive_messages(location:, project: ubicloud_project)
+    allow(vm).to receive_messages(location:, project: ubicloud_project, nics: [])
   end
 
   describe "#before_run" do

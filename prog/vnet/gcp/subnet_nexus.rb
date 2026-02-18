@@ -94,11 +94,15 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def destroy
+    register_deadline("destroy", 5 * 60)
     decr_destroy
     private_subnet.remove_all_firewalls
 
     if private_subnet.nics.empty? && private_subnet.load_balancers.empty?
-      delete_gcp_subnet
+      unless delete_gcp_subnet
+        # GCE subnet still in use by a terminating instance — retry
+        nap 5
+      end
       maybe_delete_vpc
       private_subnet.destroy
       pop "subnet destroyed"
@@ -139,8 +143,14 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       subnetwork: subnet_name
     )
     op.wait_until_done!
+    raise "GCP subnet delete failed: #{op.results.error}" if op.error?
+    true
   rescue Google::Cloud::NotFoundError
-    # Already deleted
+    true # Already deleted
+  rescue Google::Cloud::InvalidArgumentError => e
+    raise unless e.message.include?("being used by")
+    Clog.emit("GCP subnet still in use, retrying", {gcp_subnet_in_use: {subnet: subnet_name, error: e.message}})
+    false
   end
 
   def maybe_delete_vpc
@@ -150,14 +160,24 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     ).count
     return if remaining > 0
 
-    # Last GCP subnet in this project — clean up VPC firewall rules and VPC
-    ["#{gcp_vpc_name}-deny-ingress", "#{gcp_vpc_name}-deny-egress"].each do |rule_name|
-      op = credential.firewalls_client.delete(project: gcp_project_id, firewall: rule_name)
+    # Last GCP subnet in this project — clean up all firewall rules and VPC
+    delete_all_vpc_firewall_rules
+    delete_vpc_network
+  end
+
+  def delete_all_vpc_firewall_rules
+    rules = credential.firewalls_client.list(project: gcp_project_id, filter: "network=\"https://www.googleapis.com/compute/v1/projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}\"")
+    rules.each do |rule|
+      op = credential.firewalls_client.delete(project: gcp_project_id, firewall: rule.name)
       op.wait_until_done!
     rescue Google::Cloud::NotFoundError
       # Already deleted
     end
+  rescue Google::Cloud::NotFoundError
+    # VPC or rules already gone
+  end
 
+  def delete_vpc_network
     op = credential.networks_client.delete(project: gcp_project_id, network: gcp_vpc_name)
     op.wait_until_done!
   rescue Google::Cloud::NotFoundError

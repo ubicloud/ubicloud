@@ -120,7 +120,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       bud self.class, frame, :trigger_pg_current_xact_id_on_parent
       register_deadline("wait", 120 * 60)
     else
-      register_deadline("wait", representative_server.vm.location.gcp? ? 30 * 60 : 10 * 60)
+      register_deadline("wait", 10 * 60)
     end
     hop_refresh_dns_record
   end
@@ -319,10 +319,23 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       postgres_resource.internal_firewall.destroy
 
+      # Collect timeline IDs before destroying servers/resource, so we can
+      # trigger timeline cleanup for timelines with no remaining dependents.
+      timeline_ids = servers.map(&:timeline_id).uniq
+
       servers.each(&:incr_destroy)
 
       postgres_resource.dns_zone&.delete_record(record_name: postgres_resource.hostname)
       postgres_resource.destroy
+
+      timeline_ids.each do |tid|
+        timeline = PostgresTimeline[tid]
+        next unless timeline
+        # Only destroy if no other servers still reference this timeline
+        # (e.g. read replicas from another resource).
+        next if PostgresServer.where(timeline_id: tid).exclude(resource_id: postgres_resource.id).any?
+        timeline.incr_destroy
+      end
 
       pop "postgres resource is deleted"
     end

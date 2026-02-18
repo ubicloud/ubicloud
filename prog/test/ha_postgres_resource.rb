@@ -100,12 +100,17 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
+    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
+    if frame["timeline_ids"]&.any? { PostgresTimeline[it] }
+      Clog.emit("Waiting for postgres timelines to be destroyed")
+      nap 5
+    end
     hop_destroy
   end
 

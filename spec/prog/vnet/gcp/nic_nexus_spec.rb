@@ -142,7 +142,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "releases static IP, destroys NicGcpResource, and pops" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1")
 
-      op = instance_double(Gapic::GenericLRO::Operation)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: false)
       expect(op).to receive(:wait_until_done!)
       expect(addresses_client).to receive(:delete)
         .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
@@ -159,6 +159,17 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+    end
+
+    it "raises when static IP release fails with non-NotFound error" do
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1")
+
+      error_result = Struct.new(:error).new("quota exceeded")
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      expect(op).to receive(:wait_until_done!)
+      expect(addresses_client).to receive(:delete).and_return(op)
+
+      expect { nx.destroy }.to raise_error(RuntimeError, /GCP static IP release failed/)
     end
 
     it "destroys nic even without NicGcpResource" do

@@ -257,7 +257,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
-      op = instance_double(Gapic::GenericLRO::Operation)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: false)
       expect(op).to receive(:wait_until_done!)
       expect(subnetworks_client).to receive(:delete).with(
         project: "test-gcp-project",
@@ -279,6 +279,37 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
 
+    it "raises when GCP subnet delete fails with non-NotFound error" do
+      expect(ps).to receive(:nics).and_return([]).at_least(:once)
+      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
+      expect(ps).to receive(:remove_all_firewalls)
+      error_result = Struct.new(:error).new("resource in use")
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      expect(op).to receive(:wait_until_done!)
+      expect(subnetworks_client).to receive(:delete).and_return(op)
+      expect { nx.destroy }.to raise_error(RuntimeError, /GCP subnet delete failed/)
+    end
+
+    it "naps when GCE subnet is still in use by a terminating instance" do
+      expect(ps).to receive(:nics).and_return([]).at_least(:once)
+      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
+      expect(ps).to receive(:remove_all_firewalls)
+      expect(subnetworks_client).to receive(:delete).and_raise(
+        Google::Cloud::InvalidArgumentError.new("The subnetwork resource is already being used by 'projects/test/instances/vm-1'")
+      )
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "re-raises InvalidArgumentError when not about subnet being used" do
+      expect(ps).to receive(:nics).and_return([]).at_least(:once)
+      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
+      expect(ps).to receive(:remove_all_firewalls)
+      expect(subnetworks_client).to receive(:delete).and_raise(
+        Google::Cloud::InvalidArgumentError.new("Invalid CIDR range")
+      )
+      expect { nx.destroy }.to raise_error(Google::Cloud::InvalidArgumentError)
+    end
+
     it "destroys nics and load balancers first" do
       nic = instance_double(Nic)
       lb = instance_double(LoadBalancer)
@@ -293,12 +324,23 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#maybe_delete_vpc" do
-    it "deletes VPC and firewall rules when no other GCP subnets remain in project" do
-      # The current ps is the only subnet, so maybe_delete_vpc should clean up
-      allow(ps).to receive(:project).and_return(project)
+    let(:ps_dataset) {
       dataset = instance_double(Sequel::Dataset)
       allow(project).to receive(:private_subnets_dataset).and_return(dataset)
-      allow(dataset).to receive_messages(where: dataset, count: 0)
+      allow(dataset).to receive_messages(where: dataset)
+      dataset
+    }
+
+    before do
+      allow(ps).to receive(:project).and_return(project)
+    end
+
+    it "deletes VPC and firewall rules when no other GCP subnets remain in project" do
+      allow(ps_dataset).to receive(:count).and_return(0)
+
+      deny_ingress = Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-ingress")
+      deny_egress = Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-egress")
+      expect(firewalls_client).to receive(:list).and_return([deny_ingress, deny_egress])
 
       fw_op = instance_double(Gapic::GenericLRO::Operation)
       expect(fw_op).to receive(:wait_until_done!).twice
@@ -319,11 +361,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "does not delete VPC when other GCP subnets remain in project" do
-      allow(ps).to receive(:project).and_return(project)
-      dataset = instance_double(Sequel::Dataset)
-      allow(project).to receive(:private_subnets_dataset).and_return(dataset)
-      allow(dataset).to receive_messages(where: dataset, count: 1)
+      allow(ps_dataset).to receive(:count).and_return(1)
 
+      expect(firewalls_client).not_to receive(:list)
       expect(firewalls_client).not_to receive(:delete)
       expect(networks_client).not_to receive(:delete)
 
@@ -331,15 +371,29 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "handles already-deleted VPC gracefully" do
-      allow(ps).to receive(:project).and_return(project)
-      dataset = instance_double(Sequel::Dataset)
-      allow(project).to receive(:private_subnets_dataset).and_return(dataset)
-      allow(dataset).to receive_messages(where: dataset, count: 0)
+      allow(ps_dataset).to receive(:count).and_return(0)
 
-      expect(firewalls_client).to receive(:delete).twice
+      expect(firewalls_client).to receive(:list)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(networks_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
+
+      nx.send(:maybe_delete_vpc)
+    end
+
+    it "handles already-deleted firewall rules during list iteration" do
+      allow(ps_dataset).to receive(:count).and_return(0)
+
+      rule = Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-ingress")
+      expect(firewalls_client).to receive(:list).and_return([rule])
+      expect(firewalls_client).to receive(:delete)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+
+      vpc_op = instance_double(Gapic::GenericLRO::Operation)
+      expect(vpc_op).to receive(:wait_until_done!)
+      expect(networks_client).to receive(:delete)
+        .with(project: "test-gcp-project", network: vpc_name)
+        .and_return(vpc_op)
 
       nx.send(:maybe_delete_vpc)
     end

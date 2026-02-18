@@ -89,6 +89,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
 
     op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
     op.wait_until_done!
+    raise "GCP static IP release failed: #{op.results.error}" if op.error?
   rescue Google::Cloud::NotFoundError
     # Already released
   end
