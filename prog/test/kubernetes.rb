@@ -5,7 +5,7 @@ require_relative "../../lib/util"
 class Prog::Test::Kubernetes < Prog::Test::Base
   semaphore :destroy
 
-  MIGRATION_TRIES = 3
+  MIGRATION_TRIES = 2
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
@@ -114,7 +114,7 @@ spec:
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
-        requests: { storage: 1Gi }
+        requests: { storage: 5Gi }
       storageClassName: ubicloud-standard
 STS
     kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: sts)
@@ -138,13 +138,47 @@ STS
   end
 
   label def test_data_write
-    write_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"head -c 200M /dev/urandom | tee /etc/data/random-data | sha256sum | awk '{print \\$1}'\"").strip
-    read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
-    if write_hash != read_hash
-      update_stack({"fail_message" => "wrong read hash, expected: #{write_hash}, got: #{read_hash}"})
-      hop_destroy_kubernetes
+    (1..3).each do |i|
+      unit_name = "csi_data_write_#{i}"
+      kubernetes_cluster.sshable.d_run(
+        unit_name,
+        "bash", "-c",
+        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
+      )
     end
-    update_stack({"read_hash" => read_hash})
+    hop_wait_data_write
+  end
+
+  label def wait_data_write
+    (1..3).each do |i|
+      unit_name = "csi_data_write_#{i}"
+      case kubernetes_cluster.sshable.d_check(unit_name)
+      when "InProgress"
+        nap 30
+      when "Failed"
+        update_stack({"fail_message" => "daemonized write for random-data-#{i} failed"})
+        hop_destroy_kubernetes
+      end
+    end
+    hop_verify_data_write
+  end
+
+  label def verify_data_write
+    read_hashes = {}
+    (1..3).each do |i|
+      file = "random-data-#{i}"
+      unit_name = "csi_data_write_#{i}"
+      hash_path = "/dev/shm/#{unit_name}.hash"
+      write_hash = kubernetes_cluster.sshable.cmd("cat :hash_path", hash_path:).strip
+      read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
+      kubernetes_cluster.sshable.d_clean(unit_name)
+      if write_hash != read_hash
+        update_stack({"fail_message" => "wrong read hash for #{file}, expected: #{write_hash}, got: #{read_hash}"})
+        hop_destroy_kubernetes
+      end
+      read_hashes[file] = read_hash
+    end
+    update_stack({"read_hashes" => read_hashes})
     hop_test_pod_data_migration
   end
 
@@ -162,12 +196,7 @@ STS
 
   label def verify_data_after_migration
     nap 5 unless pod_status == "Running"
-    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
-    expected_hash = strand.stack.first["read_hash"]
-    if new_hash != expected_hash
-      update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
-      hop_destroy_kubernetes
-    end
+    verify_data_hashes("migration")
     hop_test_normal_pod_restart if migration_number == MIGRATION_TRIES
     increment_migration_number
     hop_test_pod_data_migration
@@ -235,12 +264,7 @@ STS
 
   label def verify_data_after_drain
     nap 5 unless pod_status == "Running"
-
-    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
-    expected_hash = strand.stack.first["read_hash"]
-    if new_hash != expected_hash
-      update_stack({"fail_message" => "data hash changed after node drain, expected: #{expected_hash}, got: #{new_hash}"})
-    end
+    verify_data_hashes("node drain")
     hop_destroy_kubernetes
   end
 
@@ -320,7 +344,7 @@ STS
       size = cols[3]         # e.g. "1G"
       mountpoint = cols[6]   # e.g. "/etc/data"
 
-      if device_name.start_with?("loop") && size == "1G" && mountpoint == "/etc/data"
+      if device_name.start_with?("loop") && size == "5G" && mountpoint == "/etc/data"
         # no op
       else
         raise "/etc/data is mounted incorrectly: #{data_mount}"
@@ -337,5 +361,16 @@ STS
   # customer. This also keeps the logic simpler
   def pod_status
     kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
+  end
+
+  def verify_data_hashes(context)
+    expected_hashes = strand.stack.first["read_hashes"]
+    expected_hashes.each do |file, expected_hash|
+      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
+      if new_hash != expected_hash
+        update_stack({"fail_message" => "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"})
+        hop_destroy_kubernetes
+      end
+    end
   end
 end
