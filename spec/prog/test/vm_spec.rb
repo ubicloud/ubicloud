@@ -263,7 +263,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
+      expect { vm_test.ping_vms_not_in_subnet }.to hop("stop_semaphore")
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
@@ -279,6 +279,115 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2")
       expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip6 of a vm in different subnet"
+    end
+  end
+
+  describe "#stop_semaphore" do
+    it "increments stop semaphore and hops" do
+      expect(vm_test.vm).to receive(:incr_stop)
+      expect { vm_test.stop_semaphore }.to hop("check_stopped_by_stop_semaphore")
+    end
+  end
+
+  describe "#check_stopped_by_stop_semaphore" do
+    it "naps if strand not at expected label" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect { vm_test.check_stopped_by_stop_semaphore }.to nap(5)
+    end
+
+    it "naps if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
+      expect { vm_test.check_stopped_by_stop_semaphore }.to nap(5)
+    end
+
+    it "hops if VM is down" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
+      expect { vm_test.check_stopped_by_stop_semaphore }.to hop("start_semaphore_after_stop")
+    end
+  end
+
+  describe "#start_semaphore_after_stop" do
+    it "increments semaphore and hops" do
+      expect(vm_test.vm).to receive(:incr_start)
+      expect { vm_test.start_semaphore_after_stop }.to hop("check_started_by_start_semaphore")
+    end
+  end
+
+  describe "#check_started_by_start_semaphore" do
+    it "naps if strand not at expected label" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect { vm_test.check_started_by_start_semaphore }.to nap(5)
+    end
+
+    it "naps if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
+      expect { vm_test.check_started_by_start_semaphore }.to nap(5)
+    end
+
+    it "hops if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
+      expect { vm_test.check_started_by_start_semaphore }.to hop("shutdown_command")
+    end
+  end
+
+  describe "#shutdown_command" do
+    it "shuts down VM via SSH and hops" do
+      expect(vm_test.sshable).to receive(:_cmd).with("sudo shutdown now").and_return("")
+      expect { vm_test.shutdown_command }.to hop("check_stopped_by_shutdown_command")
+    end
+
+    it "handles Errno::ECONNRESET while executing command" do
+      expect(vm_test.sshable).to receive(:_cmd).with("sudo shutdown now").and_raise(Errno::ECONNRESET)
+      expect { vm_test.shutdown_command }.to hop("check_stopped_by_shutdown_command")
+    end
+  end
+
+  describe "#check_stopped_by_shutdown_command" do
+    it "naps if strand not at expected label" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect { vm_test.check_stopped_by_shutdown_command }.to nap(5)
+    end
+
+    it "naps if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
+      expect { vm_test.check_stopped_by_shutdown_command }.to nap(5)
+    end
+
+    it "hops if VM is down" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
+      expect { vm_test.check_stopped_by_shutdown_command }.to hop("start_semaphore_after_shutdown")
+    end
+  end
+
+  describe "#start_semaphore_after_shutdown" do
+    it "increments semaphore and hops" do
+      expect(vm_test.vm).to receive(:incr_start)
+      expect { vm_test.start_semaphore_after_shutdown }.to hop("check_started_after_shutdown")
+    end
+  end
+
+  describe "#check_started_after_shutdown" do
+    it "naps if strand not at expected label" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      expect { vm_test.check_started_after_shutdown }.to nap(5)
+    end
+
+    it "naps if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
+      expect { vm_test.check_started_after_shutdown }.to nap(5)
+    end
+
+    it "hops if VM is up" do
+      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
+      expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
+      expect { vm_test.check_started_after_shutdown }.to hop("finish")
     end
   end
 
