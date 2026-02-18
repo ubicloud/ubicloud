@@ -375,7 +375,7 @@ RSpec.describe Clover, "Kubernetes" do
         fill_in "name", with: "new-name%"
         click_button "Rename"
         expect(page).to have_flash_error("Validation failed for following fields: name")
-        expect(page).to have_content("Kubernetes cluster name must only contain lowercase letters, numbers, spaces, and hyphens and have max length 40.")
+        expect(page).to have_content("Kubernetes cluster name must only contain lowercase letters, numbers, and hyphens and have max length 40.")
         expect(kc.reload.name).to eq old_name
 
         fill_in "name", with: "new-name"
