@@ -96,7 +96,7 @@ RSpec.describe CloverAdmin do
     vm = Prog::Vm::Nexus.assemble("dummy key", project.id, name: "my-vm").subject
     click_link "Vm"
     expect(page.title).to eq "Ubicloud Admin - Vm - Browse"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "", "hetzner-fsn1", "x64", "ubuntu-jammy", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["my-vm", "creating", "Default", "", "hetzner-fsn1", "x64", "ubuntu-jammy", "standard", "2", vm.created_at.to_s]
 
     click_link vm.name
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
@@ -165,7 +165,7 @@ RSpec.describe CloverAdmin do
     select "x64", from: "Arch"
     fill_in "Created at", with: vm.created_at.strftime("%Y-%m")
     click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
 
     GithubInstallation.create(name: "ins1", installation_id: 1, type: "Organization", allocator_preferences: {family_filter: nil})
     ins2 = GithubInstallation.create(name: "ins2", installation_id: 2, type: "Organization", allocator_preferences: {"family_filter" => ["standard", "premium"]})
@@ -252,6 +252,28 @@ RSpec.describe CloverAdmin do
     select "unpaid", from: "Status"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [invoice.invoice_number, "Test", "unpaid", "$2.65", "$1.65"]
+  end
+
+  it "allows navigating from object to assoc table" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-inst", type: "User", allocator_preferences: {})
+    runner = Prog::Github::GithubRunnerNexus.assemble(ins, repository_name: "ubicloud/test", label: "ubicloud").subject
+
+    visit "/model/GithubInstallation/#{ins.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
+
+    within(".association", text: "runners") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [runner.ubid, "ubicloud/test", "ubicloud", "start", runner.created_at.to_s]
+
+    project = Project.create(name: "assoc-table-test")
+    vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "assoc-table-vm").subject
+
+    visit "/model/Project/#{project.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
+
+    within(".association", text: "vms") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - Vm - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-jammy", "standard", "2", vm.created_at.to_s]
   end
 
   it "handles basic pagination when browsing by class" do

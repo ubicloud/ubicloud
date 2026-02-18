@@ -274,6 +274,11 @@ class CloverAdmin < Roda
     .each_with_object({}) { |name, h| h[name] = true }
     .freeze
 
+  OBJECT_ASSOC_TABLE_PARAMS = {
+    ["GithubInstallation", :runners] => "installation",
+    ["Project", :vms] => "project"
+  }.freeze
+
   plugin :autoforme do
     # :nocov:
     register_by_name if Config.development?
@@ -380,8 +385,10 @@ class CloverAdmin < Roda
     model GithubRunner do
       order Sequel.desc(:created_at)
       eager_graph [:strand]
+      eager [:installation]
       columns do |type_symbol, request|
         cs = [:repository_name, :label, :strand_label, :created_at]
+        cs.prepend(:installation) if type_symbol == :search_form
         cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
@@ -471,8 +478,8 @@ class CloverAdmin < Roda
 
     model Vm do
       order Sequel.desc(:created_at)
-      eager [:location, :vm_host]
-      columns [:name, :display_state, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :created_at]
+      eager [:location, :vm_host, :project]
+      columns [:name, :display_state, :project, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :created_at]
       column_options display_state: {type: "select", options: ["running", "creating", "starting", "rebooting", "deleting"], add_blank: true},
         arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
         family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},

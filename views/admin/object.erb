@@ -59,7 +59,12 @@
     %>
 
     <div class="association">
-      <h3><%= assoc %></h3>
+      <h3>
+        <%= assoc %>
+        <% if table_param = OBJECT_ASSOC_TABLE_PARAMS[[@klass.name, assoc]] %>
+          <a href="/autoforme/<%= associated_class %>/search/1?<%= table_param %>=<%= @obj.id %>">(table)</a>
+        <% end %>
+      </h3>
       <ul>
       <% assoc_objs.each do %>
         <li><a href="/model/<%= associated_class %>/<%= it.ubid %>" title="<%= it.ubid %>"><%= it.admin_label %></a></li>
