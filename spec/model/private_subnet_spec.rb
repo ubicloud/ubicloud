@@ -314,6 +314,36 @@ RSpec.describe PrivateSubnet do
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
     end
+
+    it "incr_destroys private subnet if remaining nics belong to vms marked for destroy" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
+      vm.incr_destroy
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
+    end
+
+    it "incr_destroys private subnet if remaining nics belong to vms marked as destroying" do
+      ubid = described_class.generate_ubid
+      fw = ps.firewalls.first
+      fw.update(name: "#{ubid}-firewall")
+      ps.update(name: "#{ubid}-subnet")
+      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
+      vm.incr_destroying
+
+      ps.incr_destroy_if_only_used_internally(
+        ubid:,
+        vm_ids: []
+      )
+      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
+    end
   end
 
   describe "connected subnets related methods" do
