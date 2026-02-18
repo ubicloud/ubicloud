@@ -252,6 +252,11 @@ RSpec.describe CloverAdmin do
     select "unpaid", from: "Status"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [invoice.invoice_number, "Test", "unpaid", "$2.65", "$1.65"]
+
+    click_link "Search"
+    fill_in "Project", with: "a" * 30
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq []
   end
 
   it "allows navigating from object to assoc table" do

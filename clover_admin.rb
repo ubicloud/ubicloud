@@ -46,21 +46,21 @@ class CloverAdmin < Roda
     cookie_options: {secure: !(Config.development? || Config.test?)},
     secret: OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-site")
 
+  UBID_REGEXP = /\A[a-tv-z0-9]{26}\z/
+  UUID_REGEXP = /\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\z/i
+
   plugin :typecast_params_sized_integers, sizes: [64], default_size: 64
   plugin :typecast_params do
-    ubid_regexp = /\A[a-tv-z0-9]{26}\z/
-    uuid_regexp = /\A[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\z/i
-
     handle_type(:ubid) do
-      it if ubid_regexp.match?(it)
+      it if UBID_REGEXP.match?(it)
     end
 
     handle_type(:uuid) do
-      it if uuid_regexp.match?(it)
+      it if UUID_REGEXP.match?(it)
     end
 
     handle_type(:ubid_uuid) do
-      UBID.to_uuid(it) if ubid_regexp.match?(it)
+      UBID.to_uuid(it) if UBID_REGEXP.match?(it)
     end
   end
 
@@ -310,6 +310,19 @@ class CloverAdmin < Roda
       ds.where(Sequel.cast(column, :text).ilike("%#{ds.escape_like(value)}%"))
     end
 
+    ubid_uuid_grep = lambda do |ds, column, value|
+      uuid = if UBID_REGEXP.match?(value)
+        UBID.to_uuid(value)
+      elsif UUID_REGEXP.match?(value)
+        value
+      end
+      ds.where(column => uuid)
+    end
+
+    ubid_input = lambda do |name|
+      {type: "text", placeholder: "#{name} UBID/UUID", maxlength: 36, minlength: 26}
+    end
+
     model Firewall do
       eager [:project, :location]
       columns [:name, :project, :location, :description]
@@ -345,13 +358,13 @@ class CloverAdmin < Roda
         cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
-      column_options project: {type: "text", placeholder: "Project UBID", maxlength: 26, minlength: 26},
+      column_options project: ubid_input.call("Project"),
         created_at: {type: "text"}
 
       column_search_filter do |ds, column, value|
         case column
         when :project
-          column_grep.call(ds, Sequel[:project][:id], UBID.parse(value).to_uuid)
+          ubid_uuid_grep.call(ds, Sequel[:project][:id], value)
         when :created_at
           column_grep.call(ds, Sequel[:billing_info][:created_at], value)
         end
@@ -417,12 +430,12 @@ class CloverAdmin < Roda
         end
       end
       column_options status: {type: "select", options: %w[unpaid paid fraud waiting_transfer below_minimum_threshold], add_blank: true},
-        project: {type: "text", placeholder: "Project UBID", maxlength: 26, minlength: 26}
+        project: ubid_input.call("Project")
 
       column_search_filter do |ds, column, value|
         case column
         when :project
-          column_grep.call(ds, Sequel[:project][:id], UBID.parse(value).to_uuid)
+          ubid_uuid_grep.call(ds, Sequel[:project][:id], value)
         end
       end
     end
