@@ -750,7 +750,7 @@ RSpec.describe CloverAdmin do
     click_button "Stop"
     expect(page).to have_flash_notice("Stop scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
-    expect(vm.semaphores_dataset.select_map(:name)).to eq ["stop"]
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
   end
 
   it "supports restarting PostgresResource" do

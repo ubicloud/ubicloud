@@ -866,6 +866,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#stopped_by_admin" do
+    it "naps for 10 years" do
+      expect { nx.stopped_by_admin }.to nap(315360000)
+    end
+  end
+
   describe "#stopped" do
     it "naps after stopping the vm" do
       vm.incr_stop
@@ -880,6 +886,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
       expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
+    it "hops to stopped_by_admin with admin_stop semaphore" do
+      vm.incr_admin_stop
+      expect { nx.stopped }.to hop("stopped_by_admin")
     end
 
     it "hops to start when needed" do

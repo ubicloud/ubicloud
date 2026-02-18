@@ -32,6 +32,11 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("stopped")
     end
 
+    it "returns stopped by admin if admin_stop semaphore increased" do
+      vm.incr_admin_stop
+      expect(vm.display_state).to eq("stopped by admin")
+    end
+
     it "returns unavailable if strand is at unavailable label" do
       vm.strand.update(label: "unavailable")
       expect(vm.display_state).to eq("unavailable")
