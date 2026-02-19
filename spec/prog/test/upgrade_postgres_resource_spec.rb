@@ -186,6 +186,84 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       end
       expect { pgr_test.check_upgrade_progress }.to hop("test_postgres_after_upgrade")
     end
+
+    it "logs blob storage URL when blob storage is configured" do
+      resource = pgr_test.postgres_resource
+      server = resource.servers.first
+      allow(server.timeline).to receive_messages(blob_storage: double(url: "http://minio.example.com"), backups: [])
+      allow(resource).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "logs journalctl output for a server stuck in initialize_database_from_backup" do
+      resource = pgr_test.postgres_resource
+      server = resource.servers.first
+      server.strand.update(label: "initialize_database_from_backup")
+      sshable = Sshable.new
+      allow(server).to receive(:vm).and_return(instance_double(Vm, sshable:))
+      allow(resource).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      allow(sshable).to receive(:_cmd).with("journalctl -u postgres-server -n 100 --no-pager").and_return("Journal output")
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "handles errors when fetching initialize_database_from_backup logs" do
+      resource = pgr_test.postgres_resource
+      server = resource.servers.first
+      server.strand.update(label: "initialize_database_from_backup")
+      sshable = Sshable.new
+      allow(sshable).to receive(:_cmd).and_raise(RuntimeError, "SSH connection failed")
+      allow(server).to receive(:vm).and_return(instance_double(Vm, sshable:))
+      allow(resource).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      allow(sshable).to receive(:_cmd).with("journalctl -u postgres-server -n 100 --no-pager").and_return("Journal output")
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "logs LSN info for a non-read-replica server in wait_catch_up" do
+      resource = pgr_test.postgres_resource
+      server = resource.servers.first
+      server.strand.update(label: "wait_catch_up")
+      rep_server = resource.representative_server
+      allow(server).to receive_messages(resource:, current_lsn: "0/1000000")
+      allow(rep_server).to receive(:current_lsn).and_return("0/2000000")
+      allow(resource).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "logs LSN info for a read-replica server in wait_catch_up" do
+      resource = pgr_test.postgres_resource
+      rep_server = resource.representative_server
+      replica = pgr_test.read_replica
+      server = replica.servers.first
+      server.strand.update(label: "wait_catch_up")
+      allow(server).to receive_messages(resource: double(read_replica?: true, parent: resource), current_lsn: "0/1000000")
+      allow(rep_server).to receive(:current_lsn).and_return("0/2000000")
+      allow(replica).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "logs no parent server found when read-replica resource has no parent" do
+      replica = pgr_test.read_replica
+      server = replica.servers.first
+      server.strand.update(label: "wait_catch_up")
+      allow(server).to receive(:resource).and_return(double(read_replica?: true, parent: nil))
+      allow(replica).to receive(:servers).and_return([server])
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
+
+    it "handles an exception when fetching LSN info for a server in wait_catch_up" do
+      resource = pgr_test.postgres_resource
+      server = resource.servers.first
+      server.strand.update(label: "wait_catch_up")
+      allow(server).to receive(:current_lsn).and_raise(RuntimeError, "connection refused")
+      allow(resource).to receive(:servers).and_return([server])
+      allow(pgr_test).to receive(:postgres_resource).and_return(resource)
+      expect { pgr_test.check_upgrade_progress }.to nap(60)
+    end
   end
 
   describe "#test_postgres_after_upgrade" do
