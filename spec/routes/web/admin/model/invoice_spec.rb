@@ -15,7 +15,6 @@ RSpec.describe CloverAdmin, "Invoice" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - Invoice - Browse"
 
-    expect(Aws::S3::Client).to receive(:new).and_return(Aws::S3::Client.new(stub_responses: true))
     click_link @instance.admin_label
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - Invoice #{@instance.ubid}"
