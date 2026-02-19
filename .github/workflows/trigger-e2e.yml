@@ -26,10 +26,14 @@ jobs:
               const contributorIds = contributors.data.map(c => c.id);
               const isContributor = contributorIds.includes(context.payload.comment.user.id);
 
-              // Check if the given test cases string is secure or empty
-              const testCases = (context.payload.comment.body.trim().split(/\s+/)[1]) || '';
+              // Parse arguments: /run-e2e [providers] [test_cases]
+              const args = context.payload.comment.body.trim().split(/\s+/);
+              const providers = args[1] || '';
+              const testCases = args[2] || '';
+              console.log(`providers: ${providers}`);
               console.log(`testCases: ${testCases}`);
-              const isValid = testCases ? /^[a-zA-Z0-9_,-]+$/.test(testCases) : true;
+              const inputPattern = /^[a-zA-Z0-9_,-]+$/;
+              const isValid = (!providers || inputPattern.test(providers)) && (!testCases || inputPattern.test(testCases));
               console.log(`Is valid: ${isValid}`);
 
               const allowedToRun = isContributor && isValid;
@@ -55,7 +59,9 @@ jobs:
               });
 
               // Create a workflow dispatch event
-              const inputs = testCases ? { test_cases: testCases } : {}
+              const inputs = {}
+              if (providers) inputs.providers = providers;
+              if (testCases) inputs.test_cases = testCases;
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
