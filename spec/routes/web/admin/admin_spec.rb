@@ -829,6 +829,25 @@ RSpec.describe CloverAdmin do
       .to eq ["id", "60587328050", "name", "ubicloud-standard-2", "status", "in_progress"]
   end
 
+  it "supports showing job log for GithubRepository" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    visit "/model/GithubRepository/#{repo.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+
+    click_link "Show Job Log"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+
+    client = double
+    expect(Github).to receive(:installation_client).and_return(client)
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345.zip")
+
+    fill_in "job_id", with: "12345"
+    click_button "Show Job Log"
+    expect(page).to have_link("Download Job Log", href: "https://example.com/logs/12345.zip")
+  end
+
   it "supports suspending Accounts" do
     account = create_account(with_project: false)
     fill_in "UBID or UUID", with: account.ubid

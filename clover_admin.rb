@@ -194,6 +194,12 @@ class CloverAdmin < Roda
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", confirmation: false, &:provision_spare_runner)
     },
+    "GithubRepository" => {
+      "show_job_log" => object_action("Show Job Log", nil, {job_id: :pos_int!}) do |obj, job_id|
+        url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
+        "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
+      end
+    },
     "Page" => {
       "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
     },
