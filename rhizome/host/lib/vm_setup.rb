@@ -9,7 +9,6 @@ require "json"
 require "openssl"
 require "base64"
 require "uri"
-require "yaml"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
@@ -475,8 +474,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
-    meta = {"instance-id" => @vm_name, "local-hostname" => @vm_name}
-    vp.write_meta_data(YAML.dump(meta, line_width: -1))
+    vp.write_meta_data({"instance-id" => @vm_name, "local-hostname" => @vm_name})
 
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
     guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
@@ -541,8 +539,7 @@ DNSMASQ_CONF
       ["enx" + nic.mac.tr(":", "").downcase,
        {"match" => {"macaddress" => nic.mac}, "dhcp6" => true, "dhcp4" => true}]
     end
-    network = {"version" => 2, "ethernets" => ethernets}
-    vp.write_network_config(YAML.dump(network, line_width: -1))
+    vp.write_network_config({"version" => 2, "ethernets" => ethernets})
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
@@ -576,7 +573,7 @@ DNSMASQ_CONF
       config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
     end
 
-    vp.write_user_data("#cloud-config\n" + YAML.dump(config, line_width: -1))
+    vp.write_user_data(config, prefix: "#cloud-config")
   end
 
   private def install_commands(boot_image)
@@ -592,8 +589,8 @@ DNSMASQ_CONF
   private def nft_bootcmd
     [
       %w[nft add table ip6 filter],
-      ["nft", "add", "chain", "ip6", "filter", "output", "{", "type", "filter", "hook", "output", "priority", "0", ";", "}"],
-      ["nft", "add", "rule", "ip6", "filter", "output", "ip6", "daddr", "fd00:0b1c:100d:5AFE::/64", "meta", "skuid", "!=", "0", "tcp", "flags", "syn", "reject", "with", "tcp", "reset"]
+      %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }],
+      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset]
     ]
   end
 
