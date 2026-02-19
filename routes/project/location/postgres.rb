@@ -334,7 +334,7 @@ class Clover
         end
       end
 
-      r.post "promote" do
+      r.post "promote-read-replica" do
         authorize("Postgres:edit", pg)
         handle_validation_failure("postgres/show") { @page = "settings" }
 
@@ -349,7 +349,7 @@ class Clover
           pg.servers.each(&:incr_configure)
           pg.servers.each(&:incr_configure_metrics)
 
-          audit_log(pg, "promote")
+          audit_log(pg, "promote_read_replica")
         end
 
         if api?
