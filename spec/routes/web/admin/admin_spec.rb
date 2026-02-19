@@ -812,7 +812,6 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
 
     expect(GithubRunner.count).to eq 1
-    click_link "Provision Spare Runner"
     click_button "Provision Spare Runner"
     expect(page).to have_flash_notice("Spare runner provisioned")
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"

@@ -167,9 +167,9 @@ class CloverAdmin < Roda
     end
   end
 
-  ObjectAction = Data.define(:label, :flash, :params, :action) do
-    def self.define(label, flash, params = {}, &action)
-      new(label, flash, params.dup.freeze, action)
+  ObjectAction = Data.define(:label, :flash, :params, :confirmation, :action) do
+    def self.define(label, flash, params = {}, confirmation: true, &action)
+      new(label, flash, params.dup.freeze, confirmation, action)
     end
 
     def call(...)
@@ -186,7 +186,7 @@ class CloverAdmin < Roda
       "suspend" => object_action("Suspend", "Account suspended", &:suspend)
     },
     "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", &:provision_spare_runner)
+      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", confirmation: false, &:provision_spare_runner)
     },
     "Page" => {
       "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
@@ -245,7 +245,7 @@ class CloverAdmin < Roda
       end
     },
     "Strand" => {
-      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately") do |obj|
+      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately", confirmation: false) do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
       end,
       "extend" => object_action("Extend Schedule", "Extended schedule", {minutes: :pos_int!}) do |obj, minutes|
