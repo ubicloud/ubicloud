@@ -163,6 +163,7 @@ RSpec.describe CloverAdmin do
     click_link "Search"
 
     select "x64", from: "Arch"
+    fill_in "Project", with: project.ubid
     fill_in "Created at", with: vm.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["vm1", "creating", "Test", "", "hetzner-fsn1", "x64", "github-ubuntu-2204", "standard", "2", vm.created_at.to_s]
@@ -194,6 +195,7 @@ RSpec.describe CloverAdmin do
 
     fill_in "Repository name", with: "ubicloud"
     fill_in "Strand label", with: "start"
+    fill_in "Installation", with: ins2.ubid
     fill_in "Created at", with: ins2.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [runner.ubid, "ubicloud/test", "ubicloud", "start", runner.created_at.to_s]
