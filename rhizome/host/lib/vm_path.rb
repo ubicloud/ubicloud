@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "shellwords"
+require "yaml"
 
 class VmPath
   def initialize(vm_name)
@@ -89,6 +90,16 @@ class VmPath
 
     define_method write_method_name do |s|
       write(home(file_name), s)
+    end
+
+    # Method serializing data to YAML and writing, e.g. #write_yaml_user_data
+    yaml_write_method_name = "write_yaml_" + method_name
+    fail "BUG" if method_defined?(yaml_write_method_name)
+
+    define_method yaml_write_method_name do |data, prefix: nil|
+      s = YAML.dump(data, line_width: -1)
+      s.sub!(/\A---/, prefix) if prefix
+      send(write_method_name, s)
     end
   end
 end
