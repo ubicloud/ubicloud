@@ -91,6 +91,29 @@ def test_aws(options, test_cases)
   tests_to_wait.each { |st| wait_until(st) }
 end
 
+def test_gcp(options, test_cases)
+  location = Location[provider: "gcp", project_id: nil]
+  unless LocationCredential[location.id]
+    LocationCredential.create_with_id(location.id,
+      credentials_json: Config.e2e_gcp_credentials_json,
+      project_id: Config.e2e_gcp_project_id,
+      service_account_email: Config.e2e_gcp_service_account_email)
+  end
+
+  tests_to_wait = []
+  if options[:test_cases].include?("postgres_standard")
+    tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp")
+  end
+  if options[:test_cases].include?("postgres_ha")
+    tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "gcp")
+  end
+  if options[:test_cases].include?("postgres_upgrade")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(provider: "gcp")
+  end
+
+  tests_to_wait.each { |st| wait_until(st) }
+end
+
 def wait_until(st, label = nil)
   while (loaded_st = Strand[st.id]) && loaded_st.label != label
     if loaded_st.label == "failed"
@@ -121,7 +144,7 @@ end
 options = {test_cases: ["vm"]}
 OptionParser.new do |opts|
   opts.on("--vm-host-id VM_HOST_ID", "Use existing vm host") { |v| options[:vm_host_id] = (v.length == 26) ? UBID.to_uuid(v) : v }
-  opts.on("--provider PROVIDER", String, "Provider to run tests on (metal, aws)") { |v| options[:provider] = v }
+  opts.on("--provider PROVIDER", String, "Provider to run tests on (metal, aws, gcp)") { |v| options[:provider] = v }
   opts.on("--test-cases TEST_CASES", Array, "List of test cases to run separated by comma") { |v| options[:test_cases] = v }
 end.parse!
 

@@ -15,7 +15,7 @@ on:
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
         required: true
-        default: 'metal,aws'
+        default: 'metal,aws,gcp'
         type: string
 
   schedule:
@@ -31,7 +31,7 @@ jobs:
       - name: Set provider matrix
         id: set-providers
         run: |
-          providers="metal,aws"
+          providers="metal,aws,gcp"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
             providers="${{ inputs.providers }}"
           fi
@@ -105,6 +105,9 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -346,3 +349,75 @@ jobs:
             aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
           done
         done
+
+    - name: Cleanup GCP resources
+      if: always() && matrix.provider == 'gcp'
+      env:
+        GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+      run: |
+        if [ -z "$GCP_CREDENTIALS_JSON" ] || [ -z "$GCP_PROJECT_ID" ]; then
+          echo "GCP credentials not configured, skipping cleanup"
+          exit 0
+        fi
+
+        echo "$GCP_CREDENTIALS_JSON" > /tmp/gcp-sa-key.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-sa-key.json --project="$GCP_PROJECT_ID"
+
+        echo "=== Cleaning up GCP instances ==="
+        instance_names=$(grep -oh '"instance_name":"[^"]*"' foreman.log 2>/dev/null | cut -d'"' -f4 | sort -u || true)
+        if [ -n "$instance_names" ]; then
+          for instance in $instance_names; do
+            zone=$(gcloud compute instances list --project="$GCP_PROJECT_ID" --filter="name=$instance" --format="value(zone)" 2>/dev/null || true)
+            if [ -n "$zone" ]; then
+              echo "Deleting instance: $instance in $zone"
+              gcloud compute instances delete "$instance" --zone="$zone" --project="$GCP_PROJECT_ID" --quiet || true
+            fi
+          done
+        else
+          echo "No instance names found in logs, checking for all running instances"
+          gcloud compute instances list --project="$GCP_PROJECT_ID" --format="table(name,zone,status)" || true
+        fi
+
+        echo "=== Cleaning up GCP firewall rules ==="
+        for fw in $(gcloud compute firewall-rules list --project="$GCP_PROJECT_ID" --format="value(name)" --filter="name~'^ubi-'" 2>/dev/null || true); do
+          echo "Deleting firewall rule: $fw"
+          gcloud compute firewall-rules delete "$fw" --project="$GCP_PROJECT_ID" --quiet || true
+        done
+
+        echo "=== Cleaning up GCP subnetworks ==="
+        for subnet in $(gcloud compute networks subnets list --project="$GCP_PROJECT_ID" --format="csv[no-heading](name,region)" --filter="name~'^ubi-'" 2>/dev/null || true); do
+          subnet_name=$(echo "$subnet" | cut -d',' -f1)
+          region=$(echo "$subnet" | cut -d',' -f2)
+          echo "Deleting subnetwork: $subnet_name in $region"
+          gcloud compute networks subnets delete "$subnet_name" --region="$region" --project="$GCP_PROJECT_ID" --quiet || true
+        done
+
+        echo "=== Cleaning up GCP VPC networks ==="
+        for vpc in $(gcloud compute networks list --project="$GCP_PROJECT_ID" --format="value(name)" --filter="name~'^ubi-'" 2>/dev/null || true); do
+          echo "Deleting VPC network: $vpc"
+          gcloud compute networks delete "$vpc" --project="$GCP_PROJECT_ID" --quiet || true
+        done
+
+        echo "=== Cleaning up GCP static addresses ==="
+        for addr in $(gcloud compute addresses list --project="$GCP_PROJECT_ID" --format="csv[no-heading](name,region)" --filter="name~'^ubi-'" 2>/dev/null || true); do
+          addr_name=$(echo "$addr" | cut -d',' -f1)
+          region=$(echo "$addr" | cut -d',' -f2)
+          echo "Releasing address: $addr_name in $region"
+          gcloud compute addresses delete "$addr_name" --region="$region" --project="$GCP_PROJECT_ID" --quiet || true
+        done
+
+        echo "=== Cleaning up GCP storage buckets ==="
+        for bucket in $(gcloud storage ls --project="$GCP_PROJECT_ID" 2>/dev/null | grep -v "ubicloud-gce-images" || true); do
+          echo "Deleting bucket: $bucket"
+          gcloud storage rm -r "$bucket" --quiet || true
+        done
+
+        echo "=== Cleaning up GCP service accounts ==="
+        for sa in $(gcloud iam service-accounts list --project="$GCP_PROJECT_ID" --format="value(email)" --filter="email~'^ubi-'" 2>/dev/null || true); do
+          echo "Deleting service account: $sa"
+          gcloud iam service-accounts delete "$sa" --project="$GCP_PROJECT_ID" --quiet || true
+        done
+
+        rm -f /tmp/gcp-sa-key.json
+        echo "GCP cleanup complete"

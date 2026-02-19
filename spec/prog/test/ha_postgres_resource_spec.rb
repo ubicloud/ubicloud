@@ -99,9 +99,28 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run test queries")
     end
 
-    it "hops to trigger_failover if the postgres test passes" do
+    it "hops to verify_wal_archiving if the postgres test passes" do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1")
-      expect { pgr_test.test_postgres }.to hop("trigger_failover")
+      expect { pgr_test.test_postgres }.to hop("verify_wal_archiving")
+    end
+  end
+
+  describe "#verify_wal_archiving" do
+    before do
+      pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async")
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id})
+    end
+
+    it "hops to trigger_failover if wal files are found" do
+      primary = pgr_test.postgres_resource.servers.find { it.timeline_access == "push" }
+      allow(primary.timeline).to receive(:list_objects).with("wal_005/").and_return([instance_double(Aws::S3::Types::Object)])
+      expect { pgr_test.verify_wal_archiving }.to hop("trigger_failover")
+    end
+
+    it "naps if no wal files are found yet" do
+      primary = pgr_test.postgres_resource.servers.find { it.timeline_access == "push" }
+      allow(primary.timeline).to receive(:list_objects).with("wal_005/").and_return([])
+      expect { pgr_test.verify_wal_archiving }.to nap(15)
     end
   end
 

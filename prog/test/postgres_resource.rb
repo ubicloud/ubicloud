@@ -34,6 +34,12 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     elsif frame["provider"] == "gcp"
       location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id,
+          credentials_json: Config.e2e_gcp_credentials_json,
+          project_id: Config.e2e_gcp_project_id,
+          service_account_email: Config.e2e_gcp_service_account_email)
+      end
       [location.id, "standard-2", 128]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
@@ -63,6 +69,27 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   label def test_postgres
     unless representative_server.run_query(test_queries_sql) == "DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1"
       update_stack({"fail_message" => "Failed to run test queries"})
+    end
+
+    hop_verify_ipv6_connectivity
+  end
+
+  label def verify_ipv6_connectivity
+    vm = representative_server.vm
+    if vm.ip6
+      Clog.emit("Verifying IPv6 connectivity on #{vm.ip6_string}")
+      # Verify the VM can reach the internet over IPv6
+      vm.sshable.cmd("curl -6 -sf --max-time 10 https://ipv6.google.com > /dev/null")
+      Clog.emit("IPv6 internet connectivity verified")
+
+      # Verify psql accepts connections over IPv6 loopback
+      result = vm.sshable.cmd("psql -U postgres -h ::1 -t --csv -c 'SELECT 1'").chomp
+      unless result == "1"
+        update_stack({"fail_message" => "Failed to connect to PostgreSQL over IPv6"})
+      end
+      Clog.emit("PostgreSQL IPv6 connectivity verified")
+    else
+      Clog.emit("VM has no IPv6 address, skipping IPv6 verification")
     end
 
     hop_destroy_postgres

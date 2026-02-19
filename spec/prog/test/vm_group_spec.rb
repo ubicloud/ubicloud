@@ -70,6 +70,9 @@ RSpec.describe Prog::Test::VmGroup do
     end
 
     it "sets up gcp location" do
+      expect(Config).to receive(:e2e_gcp_credentials_json).and_return("{}")
+      expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
+      expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       gcp_st = described_class.assemble(boot_images: ["ubuntu-noble"], provider: "gcp")
       gcp_vg_test = described_class.new(gcp_st)
       expect(gcp_vg_test).to receive(:update_stack).and_call_original
@@ -258,7 +261,7 @@ RSpec.describe Prog::Test::VmGroup do
       prj = Project.create(name: "project-1")
       ps1 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps1", location_id: Location::HETZNER_FSN1_ID).subject
       ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID).subject
-      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id], "provider" => "metal"}).at_least(:once)
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
     end
 
@@ -268,8 +271,13 @@ RSpec.describe Prog::Test::VmGroup do
       expect(ps1).to receive(:vms).and_return([instance_double(Vm, id: "vm1"), instance_double(Vm, id: "vm2")]).at_least(:once)
       ps2 = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID).subject
       expect(PrivateSubnet).to receive(:[]).and_return(ps1, ps2)
-      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id]}).at_least(:once)
+      expect(vg_test).to receive(:frame).and_return({"subnets" => [ps1.id, ps2.id], "provider" => "metal"}).at_least(:once)
       expect { vg_test.verify_connected_subnets }.to hop("start", "Test::ConnectedSubnets")
+    end
+
+    it "skips connected subnet tests on cloud providers" do
+      allow(vg_test).to receive(:frame).and_return({"provider" => "gcp"})
+      expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
     end
 
     it "hops to destroy_resources if tests are done and reboot is not set" do

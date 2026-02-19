@@ -31,6 +31,12 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     elsif frame["provider"] == "gcp"
       location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id,
+          credentials_json: Config.e2e_gcp_credentials_json,
+          project_id: Config.e2e_gcp_project_id,
+          service_account_email: Config.e2e_gcp_service_account_email)
+      end
       [location.id, "standard-2", 128]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]

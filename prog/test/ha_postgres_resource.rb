@@ -32,6 +32,12 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     elsif frame["provider"] == "gcp"
       location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id,
+          credentials_json: Config.e2e_gcp_credentials_json,
+          project_id: Config.e2e_gcp_project_id,
+          service_account_email: Config.e2e_gcp_service_account_email)
+      end
       [location.id, "standard-2", 128]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
@@ -62,7 +68,21 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       hop_destroy_postgres
     end
 
-    hop_trigger_failover
+    hop_verify_wal_archiving
+  end
+
+  label def verify_wal_archiving
+    primary = postgres_resource.servers.find { it.timeline_access == "push" }
+    timeline = primary.timeline
+
+    wal_files = timeline.list_objects("wal_005/")
+    if wal_files.any?
+      Clog.emit("WAL archiving verified: found #{wal_files.count} WAL files in blob storage")
+      hop_trigger_failover
+    else
+      Clog.emit("No WAL files found yet, waiting for archiving to start")
+      nap 15
+    end
   end
 
   label def trigger_failover

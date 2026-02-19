@@ -80,6 +80,21 @@ RSpec.describe Prog::Test::PostgresResource do
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
       expect(LocationCredential[location.id].access_key).to eq("access_key")
     end
+
+    it "creates resource on gcp and hops to wait_postgres_resource" do
+      expect(Config).to receive(:e2e_gcp_credentials_json).and_return("{}")
+      expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
+      expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
+      gcp_location = Location[provider: "gcp", project_id: nil]
+      PgGceImage.create_with_id(PgGceImage.generate_uuid,
+        gcp_project_id: "test-project",
+        gce_image_name: "postgres-ubuntu-2204-x64-20260218",
+        pg_version: "17", arch: "x64")
+      gcp_strand = described_class.assemble(provider: "gcp")
+      gcp_pgr_test = described_class.new(gcp_strand)
+      expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
+      expect(LocationCredential[gcp_location.id].credentials_json).to eq("{}")
+    end
   end
 
   describe "#wait_postgres_resource" do
@@ -105,12 +120,39 @@ RSpec.describe Prog::Test::PostgresResource do
 
     it "fails if the basic connectivity test fails" do
       expect(sshable).to receive(:_cmd).and_return("\n")
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("verify_ipv6_connectivity")
     end
 
-    it "hops to destroy_postgres if the basic connectivity test passes" do
+    it "hops to verify_ipv6_connectivity if the basic connectivity test passes" do
       expect(sshable).to receive(:_cmd).and_return("DROP TABLE\nCREATE TABLE\nINSERT 0 10\n4159.90\n415.99\n4.1\n")
-      expect { pgr_test.test_postgres }.to hop("destroy_postgres")
+      expect { pgr_test.test_postgres }.to hop("verify_ipv6_connectivity")
+    end
+  end
+
+  describe "#verify_ipv6_connectivity" do
+    before { setup_postgres_resource }
+
+    let(:sshable) { pgr_test.representative_server.vm.sshable }
+    let(:vm) { pgr_test.representative_server.vm }
+
+    it "skips if vm has no ipv6 and hops to destroy_postgres" do
+      allow(vm).to receive(:ip6).and_return(nil)
+      expect { pgr_test.verify_ipv6_connectivity }.to hop("destroy_postgres")
+    end
+
+    it "verifies ipv6 connectivity and hops to destroy_postgres" do
+      allow(vm).to receive_messages(ip6: "2001:db8::1", ip6_string: "2001:db8::1")
+      expect(sshable).to receive(:_cmd).ordered.and_return("")
+      expect(sshable).to receive(:_cmd).ordered.and_return("1\n")
+      expect { pgr_test.verify_ipv6_connectivity }.to hop("destroy_postgres")
+    end
+
+    it "sets fail_message if psql over ipv6 fails" do
+      allow(vm).to receive_messages(ip6: "2001:db8::1", ip6_string: "2001:db8::1")
+      expect(sshable).to receive(:_cmd).ordered.and_return("")
+      expect(sshable).to receive(:_cmd).ordered.and_return("error\n")
+      expect { pgr_test.verify_ipv6_connectivity }.to hop("destroy_postgres")
+      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to connect to PostgreSQL over IPv6")
     end
   end
 

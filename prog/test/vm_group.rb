@@ -39,6 +39,12 @@ class Prog::Test::VmGroup < Prog::Test::Base
       [location.id, [Option.aws_instance_type_name(family, vcpus)], "arm64"]
     elsif provider == "gcp"
       location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id,
+          credentials_json: Config.e2e_gcp_credentials_json,
+          project_id: Config.e2e_gcp_project_id,
+          service_account_email: Config.e2e_gcp_service_account_email)
+      end
       [location.id, ["standard-2"], "x64"]
     else
       [Location::HETZNER_FSN1_ID, test_slices ? ["standard-2", "burstable-1"] : ["standard-2"], "x64"]
@@ -146,8 +152,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
       end
     end
 
-    # AWS uses separate VPCs per subnet — no cross-VPC private routing without peering
-    hop_destroy_resources if frame["provider"] == "aws"
+    # AWS and GCP use separate VPCs per subnet — no cross-VPC private routing without peering
+    hop_destroy_resources if frame["provider"] != "metal"
 
     ps1, ps2 = frame["subnets"].map { PrivateSubnet[it] }
     push Prog::Test::ConnectedSubnets, {subnet_id_multiple: ((ps1.vms.count > 1) ? ps1.id : ps2.id), subnet_id_single: ((ps1.vms.count > 1) ? ps2.id : ps1.id)}
