@@ -321,15 +321,42 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   # Stopped label is for cases where VM was manually stopped and should not
   # automatically restart.
   label def stopped
-    when_stop_set? do
-      decr_stop
-      host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
-      nap 0
-    end
-
     when_admin_stop_set? do
       decr_admin_stop
+      decr_stop
+      decr_stopping
+      hard_stop
       hop_stopped_by_admin
+    end
+
+    when_stop_set? do
+      decr_stop
+
+      when_stopping_set? do
+        nap 0
+      end
+
+      if vm_process_running_map[vm_name]
+        incr_stopping
+        soft_stop
+        nap 10
+      else
+        nap 0
+      end
+    end
+
+    when_stopping_set? do
+      if vm_process_running_map[vm_name] == false
+        decr_stopping
+        nap 0
+      elsif @snap.set_at(:stopping) + 60 < Time.now
+        hard_stop
+        decr_stopping
+        nap 0
+      else
+        soft_stop
+        nap 10
+      end
     end
 
     when_start_set? do
@@ -585,5 +612,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     units = vm.healthcheck_systemd_units
     states = host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n")
     units.zip(states).to_h { |k, v| [k, v == "active"] }
+  end
+
+  def soft_stop
+    host.sshable.cmd("sudo host/bin/stop-vm :vm_name", vm_name:)
+  end
+
+  def hard_stop
+    host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
   end
 end

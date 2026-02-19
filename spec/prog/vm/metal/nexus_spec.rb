@@ -883,13 +883,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#stopped" do
-    it "naps after stopping the vm" do
-      vm.incr_stop
-      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
-      expect { nx.stopped }.to nap(0)
-        .and change { vm.reload.stop_set? }.from(true).to(false)
-    end
-
     it "hops to restart when needed" do
       vm.incr_restart
       expect { nx.stopped }.to hop("restart")
@@ -898,9 +891,62 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
     end
 
-    it "hops to stopped_by_admin with admin_stop semaphore" do
+    it "stops the vm and hops to stopped_by_admin with admin_stop semaphore" do
       vm.incr_admin_stop
+      vm.incr_stop
+      vm.incr_stopping
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
       expect { nx.stopped }.to hop("stopped_by_admin")
+        .and change { vm.reload.admin_stop_set? }.from(true).to(false)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and change { vm.reload.stopping_set? }.from(true).to(false)
+    end
+
+    it "decrements stop semaphore with stop and stopping semaphores" do
+      vm.incr_stop
+      vm.incr_stopping
+      expect { nx.stopped }.to nap(0)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and not_change { vm.reload.stopping_set? }
+    end
+
+    it "naps if not running with stop semaphore" do
+      vm.incr_stop
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.stopped }.to nap(0)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+    end
+
+    it "does a soft stop if running with stop semaphore" do
+      vm.incr_stop
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm #{vm.inhost_name}")
+      expect { nx.stopped }.to nap(10)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and change { vm.reload.stopping_set? }.from(false).to(true)
+    end
+
+    it "decrements stopping semaphore when stopping semaphore if vm not running" do
+      vm.incr_stopping
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.stopped }.to nap(0)
+        .and change { vm.reload.stopping_set? }.from(true).to(false)
+    end
+
+    it "attempts nice shutdown with stopping semaphore and vm is running" do
+      vm.incr_stopping
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm vm4hjdwr").and_return("")
+      expect { nx.stopped }.to nap(10)
+    end
+
+    it "does hard stop with stopping semaphore and vm is running when stopping was set over 1 minute ago" do
+      Semaphore.create(name: "stopping", strand_id: st.id) do |sem|
+        sem.id = UBID.generate_from_time(UBID::TYPE_SEMAPHORE, Time.now - 65).to_uuid
+      end
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}").and_return("")
+      expect { nx.stopped }.to nap(0)
     end
 
     it "hops to start when needed" do
