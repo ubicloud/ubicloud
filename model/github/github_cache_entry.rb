@@ -50,7 +50,7 @@ class GithubCacheEntry < Sequel::Model
 
     begin
       repository.blob_storage_client.delete_object(bucket:, key:)
-    rescue Aws::S3::Errors::NoSuchKey
+    rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::Unauthorized
     end
   end
 end
