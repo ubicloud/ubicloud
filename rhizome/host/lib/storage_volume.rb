@@ -27,7 +27,6 @@ class StorageVolume
     @encrypted = params["encrypted"]
     @disk_size_gib = params["size_gib"]
     @use_bdev_ubi = params["use_bdev_ubi"] || false
-    @skip_sync = params["skip_sync"] || false
     @image_path = BootImage.new(params["image"], params["image_version"]).image_path if params["image"]
     @device = params["storage_device"] || DEFAULT_STORAGE_DEVICE
     @spdk_version = params["spdk_version"]
@@ -251,7 +250,6 @@ class StorageVolume
       "copy_on_read" => @copy_on_read,
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
-      "skip_sync" => @skip_sync,
       "write_through" => write_through_device?,
       "rpc_socket_path" => sp.rpc_socket_path
     }
@@ -534,7 +532,7 @@ class StorageVolume
     end
 
     if @use_bdev_ubi
-      rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path, @skip_sync)
+      rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path)
     end
   end
 

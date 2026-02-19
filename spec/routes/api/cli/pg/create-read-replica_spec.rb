@@ -15,7 +15,7 @@ RSpec.describe Clover, "cli pg create-read-replica" do
     pg = PostgresResource.first(name: "test-pg")
     server = pg.representative_server
     server.vm.update(family: "standard", vcpus: 2, memory_gib: 8, arch: "x64")
-    VmStorageVolume.create(vm_id: server.vm_id, size_gib: 64, boot: false, use_bdev_ubi: false, skip_sync: false, disk_index: 1)
+    VmStorageVolume.create(vm_id: server.vm_id, size_gib: 64, boot: false, use_bdev_ubi: false, disk_index: 1)
     pg.timeline.update(cached_earliest_backup_at: Time.now)
 
     body = cli(%w[pg eu-central-h1/test-pg create-read-replica -c max_connections=99 -u max_client_conn=99 -t foo=bar,baz=quux test-pg-rr])

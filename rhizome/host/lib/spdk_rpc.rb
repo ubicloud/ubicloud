@@ -41,7 +41,6 @@ class SpdkRpc
   end
 
   def bdev_ubi_create(name, base_bdev_name, image_path,
-    skip_sync = false,
     stripe_size_kb = 1024,
     copy_on_read = false,
     directio = true)
@@ -50,7 +49,7 @@ class SpdkRpc
       base_bdev: base_bdev_name,
       image_path: image_path,
       stripe_size_kb: stripe_size_kb,
-      no_sync: skip_sync,
+      no_sync: false,
       copy_on_read: copy_on_read,
       directio: directio
     }

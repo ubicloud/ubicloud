@@ -220,8 +220,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         bi = BootImage.create(name: "my-image", version: "20230303", size_gib: 15, vm_host_id: vm_host.id)
         dev1 = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
         dev2 = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
-        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
-        VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, skip_sync: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, spdk_installation_id: si.id, storage_device_id: dev1.id, key_encryption_key_1_id: kek.id)
+        VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: true, spdk_installation_id: si.id, storage_device_id: dev2.id, boot_image_id: bi.id)
 
         st.stack = [frame_update]
         vm.ephemeral_net6 = "fe80::/64"
@@ -282,7 +282,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     let(:storage_volumes) {
       [{
         "use_bdev_ubi" => false,
-        "skip_sync" => true,
         "size_gib" => 11,
         "boot" => true
       }]
@@ -707,7 +706,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "creates billing records when storage volumes are present" do
       2.times {
         dev = StorageDevice.create(name: "disk_#{it}", total_storage_gib: it * 1000, available_storage_gib: it * 500)
-        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: it, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id)
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: it, use_bdev_ubi: false, storage_device_id: dev.id)
       }
 
       expect { nx.create_billing_record }.to hop("prep")
@@ -936,7 +935,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "updates storage devices" do
       dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 1000, available_storage_gib: 500)
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id)
 
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
@@ -1082,7 +1081,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can start a vm after reboot" do
       kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
       dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
 
       expect(sshable).to receive(:_cmd).with(
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,

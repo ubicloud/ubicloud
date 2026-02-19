@@ -328,12 +328,12 @@ RSpec.describe Vm do
       VmStorageVolume.create(
         vm_id: vm.id, disk_index: 0, size_gib: 1, boot: true,
         boot_image_id: boot_image.id, key_encryption_key_1_id: kek.id,
-        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false, skip_sync: false,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
         storage_device_id: storage_device.id
       )
       VmStorageVolume.create(
         vm_id: vm.id, disk_index: 1, size_gib: 100, boot: false,
-        spdk_installation_id: spdk_installation.id, use_bdev_ubi: true, skip_sync: true,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: true,
         storage_device_id: storage_device.id, max_read_mbytes_per_sec: 200,
         max_write_mbytes_per_sec: 300, vhost_block_backend_id: vbb.id, vring_workers: 4
       )
@@ -353,7 +353,7 @@ RSpec.describe Vm do
       expect(vm.storage_volumes).to eq([
         {"boot" => true, "image" => "boot_image", "image_version" => "1", "size_gib" => 1,
          "device_id" => expected_device_id_0, "disk_index" => 0, "encrypted" => true,
-         "spdk_version" => "spdk1", "use_bdev_ubi" => false, "skip_sync" => false,
+         "spdk_version" => "spdk1", "use_bdev_ubi" => false,
          "storage_device" => "default", "read_only" => false,
          "max_read_mbytes_per_sec" => nil,
          "max_write_mbytes_per_sec" => nil,
@@ -361,7 +361,7 @@ RSpec.describe Vm do
          "copy_on_read" => false, "slice_name" => "system.slice"},
         {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
          "device_id" => expected_device_id_1, "disk_index" => 1, "encrypted" => false,
-         "spdk_version" => "spdk1", "use_bdev_ubi" => true, "skip_sync" => true,
+         "spdk_version" => "spdk1", "use_bdev_ubi" => true,
          "storage_device" => "default", "read_only" => false,
          "max_read_mbytes_per_sec" => 200,
          "max_write_mbytes_per_sec" => 300,

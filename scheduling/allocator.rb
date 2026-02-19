@@ -707,7 +707,6 @@ module Scheduling::Allocator
           size_gib: volume["size_gib"],
           use_bdev_ubi:,
           boot_image_id: image_id,
-          skip_sync: volume["skip_sync"],
           disk_index:,
           key_encryption_key_1_id: key_encryption_key&.id,
           spdk_installation_id:,

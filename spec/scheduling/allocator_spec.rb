@@ -49,12 +49,10 @@ RSpec.describe Al do
     let(:storage_volumes) {
       [{
         "use_bdev_ubi" => false,
-        "skip_sync" => true,
         "size_gib" => 11,
         "boot" => true
       }, {
         "use_bdev_ubi" => true,
-        "skip_sync" => false,
         "size_gib" => 22,
         "boot" => false
       }]
@@ -109,8 +107,8 @@ RSpec.describe Al do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
+        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
+          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
         "standard", 400, true, false, false, []
       )
@@ -421,8 +419,8 @@ RSpec.describe Al do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 16, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
+        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
+          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
         "standard", 400
       )
@@ -587,8 +585,8 @@ RSpec.describe Al do
     let(:req) {
       Al::Request.new(
         "2464de61-7501-8374-9ab0-416caebe31da", 4, 8, 33,
-        [[1, {"use_bdev_ubi" => true, "skip_sync" => false, "size_gib" => 22, "boot" => false}],
-          [0, {"use_bdev_ubi" => false, "skip_sync" => true, "size_gib" => 11, "boot" => true}]],
+        [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
+          [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [],
         "standard", 200
       )
@@ -653,7 +651,7 @@ RSpec.describe Al do
 
   describe "update" do
     let(:vol) {
-      [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
+      [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false}]
     }
 
     before do
@@ -671,8 +669,8 @@ RSpec.describe Al do
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -691,8 +689,8 @@ RSpec.describe Al do
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 1)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 1)
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -712,8 +710,8 @@ RSpec.describe Al do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(2, 3)
     end
@@ -726,8 +724,8 @@ RSpec.describe Al do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 2, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: nil, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 5)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 5)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4, 5)
     end
@@ -740,8 +738,8 @@ RSpec.describe Al do
       PciDevice.create(vm_host_id: vmh.id, slot: "03:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 0, iommu_group: 3)
       PciDevice.create(vm_host_id: vmh.id, slot: "04:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 4)
       PciDevice.create(vm_host_id: vmh.id, slot: "05:00.0", device_class: "0302", vendor: "vd", device: "27b0", numa_node: 1, iommu_group: 5)
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 2)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 3)
     end
@@ -767,7 +765,7 @@ RSpec.describe Al do
         DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp.id, pci_device_id: pci.id)
       end
 
-      described_class.allocate(vm, [{"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 4)
+      described_class.allocate(vm, [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 4)
       vmh.reload
       expect(vm.pci_devices.map(&:iommu_group)).to contain_exactly(1, 2, 3, 4)
       expect(vm.gpu_partition.id).to eq(gp.id)
@@ -796,7 +794,7 @@ RSpec.describe Al do
         DB[:gpu_partitions_pci_devices].insert(gpu_partition_id: gp_4.id, pci_device_id: pci.id)
       end
 
-      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}]
+      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
 
       expect {
         described_class.allocate(vm, vol, gpu_count: 2)
@@ -853,7 +851,7 @@ RSpec.describe Al do
     it "fails concurrent allocations if storage constraints are violated" do
       vm1 = create_vm
       vm2 = create_vm
-      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}]
+      vol = [{"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
       al1 = Al::Allocation.best_allocation(create_req(vm, vol))
       al2 = Al::Allocation.best_allocation(create_req(vm, vol))
       al1.update(vm1)
@@ -893,7 +891,7 @@ RSpec.describe Al do
     it "creates volume with rate limits" do
       vm = create_vm
       vol = [{
-        "size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false,
+        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
         "boot" => false, "max_read_mbytes_per_sec" => 200,
         "max_write_mbytes_per_sec" => 300, "rate_limit_bytes_write" => 400
       }]
@@ -925,7 +923,7 @@ RSpec.describe Al do
 
     it "creates volume with encryption key if storage is encrypted" do
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       expect(StorageKeyEncryptionKey.count).to eq(1)
       expect(vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
       expect(vm.storage_secrets.count).to eq(1)
@@ -935,7 +933,7 @@ RSpec.describe Al do
       vmh = VmHost.first
       vhost_backend = VhostBlockBackend.create(vm_host_id: vmh.id, version: "v0.1-5", allocation_weight: 100)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to eq(vhost_backend.id)
       expect(volume.spdk_installation_id).to be_nil
@@ -946,7 +944,7 @@ RSpec.describe Al do
       vmh = VmHost.first
       VhostBlockBackend.create(vm_host_id: vmh.id, version: "v0.1-5", allocation_weight: 0)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to be_nil
       expect(volume.spdk_installation_id).to eq(vmh.spdk_installations.first.id)
@@ -960,7 +958,7 @@ RSpec.describe Al do
       BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: nil, activated_at: Time.now, size_gib: 3)
       BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil, size_gib: 3)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}])
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}])
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
     end
 
@@ -969,7 +967,7 @@ RSpec.describe Al do
       BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
       vm = create_vm
       expect {
-        described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}])
+        described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}])
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
@@ -980,7 +978,7 @@ RSpec.describe Al do
       mi = BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240406", activated_at: Time.now, size_gib: 3)
       BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240404", activated_at: Time.now, size_gib: 3)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => true}, {"size_gib" => 0, "read_only" => true, "image" => "ai-model-test-model", "boot" => false, "skip_sync" => true, "encrypted" => false, "use_bdev_ubi" => false}])
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}, {"size_gib" => 0, "read_only" => true, "image" => "ai-model-test-model", "boot" => false, "encrypted" => false, "use_bdev_ubi" => false}])
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
       expect(vm.vm_storage_volumes.last.boot_image_id).to eq(mi.id)
     end
@@ -1021,8 +1019,8 @@ RSpec.describe Al do
       used_memory = vmh.used_hugepages_1g
 
       vm = create_vm_from_size("standard-gpu-6", "x64")
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}], gpu_count: 1, gpu_device: "27b0")
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 1, gpu_device: "27b0")
       vmh.reload
       vm.reload
 
@@ -1048,8 +1046,8 @@ RSpec.describe Al do
       used_memory = vmh.used_hugepages_1g
 
       vm = create_vm_from_size("standard-2", "arm64")
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
       vm.reload
 
@@ -1069,15 +1067,15 @@ RSpec.describe Al do
 
       vm = create_vm
       expect {
-        described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-          {"size_gib" => 95, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+        described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+          {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
   end
 
   describe "project and host selection with slices" do
     let(:vol) {
-      [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
+      [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false}]
     }
 
     before do
@@ -1145,7 +1143,7 @@ RSpec.describe Al do
 
   describe "slice selection" do
     let(:vol) {
-      [{"size_gib" => 5, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => false, "boot" => false}]
+      [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false}]
     }
 
     before do
@@ -1427,8 +1425,8 @@ RSpec.describe Al do
 
       # Create a standard VM in a slice
       vm = create_vm_from_size("standard-2", "arm64")
-      described_class.allocate(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 40, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm, [{"size_gib" => 40, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 40, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
       vm.reload
 
@@ -1449,8 +1447,8 @@ RSpec.describe Al do
 
       # Create a burstable VM in a slice
       vm_b1 = create_vm_from_size("burstable-1", "arm64")
-      described_class.allocate(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm_b1, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
       vm_b1.reload
 
@@ -1472,8 +1470,8 @@ RSpec.describe Al do
 
       # Create a second burstable VM in a slice. It should go to the same slice
       vm_b2 = create_vm_from_size("burstable-2", "arm64")
-      described_class.allocate(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 20, "use_bdev_ubi" => false, "skip_sync" => false, "encrypted" => true, "boot" => false}])
+      described_class.allocate(vm_b2, [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       vmh.reload
       vm_b2.reload
       slice_b.reload

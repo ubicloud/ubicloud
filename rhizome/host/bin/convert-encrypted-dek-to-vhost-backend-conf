@@ -97,7 +97,6 @@ def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
     "copy_on_read" => false,
     "poll_queue_timeout_us" => 1000,
     "device_id" => "#{vm_name}_0",
-    "skip_sync" => false,
     "write_through" => write_through
   }
   key1 = [plain_keys["key"]].pack("H*")

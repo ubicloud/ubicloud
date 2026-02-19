@@ -319,7 +319,6 @@ class Vm < Sequel::Model
         "spdk_version" => s.spdk_version,
         "vhost_block_backend_version" => s.vhost_block_backend_version,
         "use_bdev_ubi" => s.use_bdev_ubi,
-        "skip_sync" => s.skip_sync,
         "storage_device" => s.storage_device.name,
         "read_only" => s.size_gib == 0,
         "max_read_mbytes_per_sec" => s.max_read_mbytes_per_sec,

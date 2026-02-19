@@ -58,8 +58,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
-      storage_encrypted: true,
-      storage_skip_sync: true
+      storage_encrypted: true
     ).subject
     update_stack({"vm_pool_id" => pool.id})
 

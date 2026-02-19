@@ -33,7 +33,6 @@ class Prog::Vm::Nexus < Prog::Base
     # allow missing fields to make testing during development more convenient.
     storage_volumes.each_with_index do |volume, disk_index|
       volume[:size_gib] ||= vm_size.storage_size_options.first
-      volume[:skip_sync] ||= false
       volume[:max_read_mbytes_per_sec] ||= vm_size.io_limits.max_read_mbytes_per_sec
       volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:vring_workers] ||= vm_size.vring_workers
@@ -43,7 +42,6 @@ class Prog::Vm::Nexus < Prog::Base
       if volume[:read_only]
         volume[:size_gib] = 0
         volume[:encrypted] = false
-        volume[:skip_sync] = true
         volume[:boot] = false
       end
     end
