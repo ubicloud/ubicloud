@@ -276,7 +276,9 @@ class CloverAdmin < Roda
 
   OBJECT_ASSOC_TABLE_PARAMS = {
     ["GithubInstallation", :runners] => "installation",
-    ["Project", :vms] => "project"
+    ["Project", :vms] => "project",
+    ["Project", :postgres_resources] => "project",
+    ["PostgresResource", :servers] => "resource"
   }.freeze
 
   plugin :autoforme do
@@ -299,8 +301,10 @@ class CloverAdmin < Roda
       case column
       when :name, :ubid, :invoice_number
         link.call(obj, label: column)
-      when :project, :location, :vm_host, :billing_info
+      when :project, :location, :vm_host, :billing_info, :resource, :parent
         link.call(obj.send(column))
+      when :vm
+        link.call(obj.send(column), label: :ubid)
       when :subtotal, :cost
         "$%0.02f" % (obj.send(column) || 0)
       end
@@ -460,6 +464,57 @@ class CloverAdmin < Roda
         case column
         when :fraud
           ds.where(fraud: value == "t")
+        when :created_at
+          column_grep.call(ds, column, value)
+        end
+      end
+    end
+
+    model PostgresResource do
+      order Sequel.desc(:created_at)
+      eager do |type, _request|
+        [:location, :parent, :project] unless type == :association
+      end
+      columns [:name, :project, :location, :flavor, :target_vm_size, :target_storage_size_gib, :ha_type, :target_version, :parent, :created_at]
+      column_options flavor: {type: "select", options: %w[standard paradedb lantern], add_blank: true},
+        ha_type: {type: "select", options: %w[none async sync], add_blank: true},
+        target_version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
+        target_storage_size_gib: {type: "number"},
+        project: ubid_input.call("Project"),
+        parent: ubid_input.call("Parent"),
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :project, :parent
+          ubid_uuid_grep.call(ds, :"#{column}_id", value)
+        when :created_at
+          column_grep.call(ds, :created_at, value)
+        end
+      end
+    end
+
+    model PostgresServer do
+      order Sequel.desc(:created_at)
+      eager [:resource, :vm]
+      columns do |type_symbol, request|
+        cs = [:resource, :timeline_access, :synchronization_status, :version, :is_representative, :created_at]
+        unless type_symbol == :search_form
+          cs.prepend(:vm)
+          cs.prepend(:ubid)
+        end
+        cs
+      end
+      column_options resource: ubid_input.call("Resource"),
+        timeline_access: {type: "select", options: %w[push fetch], add_blank: true},
+        synchronization_status: {type: "select", options: %w[ready catching_up], add_blank: true},
+        version: {type: "select", options: Option::POSTGRES_VERSION_OPTIONS[PostgresResource::Flavor::STANDARD], add_blank: true},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :resource
+          ubid_uuid_grep.call(ds, :resource_id, value)
         when :created_at
           column_grep.call(ds, column, value)
         end
