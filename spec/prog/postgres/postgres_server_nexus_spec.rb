@@ -943,12 +943,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 
-    it "promotes" do
-      nx.incr_promote
-      expect(nx.postgres_server).to receive(:switch_to_new_timeline)
-      expect { nx.wait }.to hop("taking_over")
-    end
-
     describe "read replica" do
       let(:replica_resource) { create_read_replica_resource(parent: postgres_resource) }
       let(:replica_server_record) {

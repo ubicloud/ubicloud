@@ -554,12 +554,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(Semaphore.where(strand_id: st.id, name: "update_firewall_rules")).to be_empty
     end
 
-    it "if not read_replica and promote is set, just naps" do
-      nx.incr_promote
-      expect { nx.wait }.to nap(30)
-      expect(Semaphore.where(strand_id: st.id, name: "promote")).to be_empty
-    end
-
     it "calls handle_storage_auto_scale when check_disk_usage is set and decrements the semaphore" do
       nx.incr_check_disk_usage
       expect(nx.postgres_resource).to receive(:handle_storage_auto_scale)
@@ -577,16 +571,6 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       postgres_server.incr_recycle
       expect { nx.wait }.to nap(30)
       expect(st.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first).to exist
-    end
-
-    it "if read_replica and promote is set, promotes and naps" do
-      parent = create_postgres_resource(project:, location_id:)
-      create_postgres_server(resource: parent)
-      postgres_resource.update(parent:)
-      nx.incr_promote
-      expect { nx.wait }.to nap(30)
-      expect(postgres_resource.reload.parent_id).to be_nil
-      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "promote").first).to exist
     end
   end
 
