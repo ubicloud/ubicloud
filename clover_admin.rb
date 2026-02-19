@@ -651,9 +651,14 @@ class CloverAdmin < Roda
 
             r.post do
               params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
-              action.call(@obj, *params)
-              flash["notice"] = action.flash
-              r.redirect("/model/#{@obj.class}/#{ubid}")
+              result = action.call(@obj, *params)
+              case result
+              when /\A\s*</
+                view(content: result)
+              else
+                flash["notice"] = action.flash
+                r.redirect("/model/#{@obj.class}/#{ubid}")
+              end
             end
           end
         end
