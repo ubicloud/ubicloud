@@ -193,8 +193,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         end
         runner.provision_spare_runner
         runner.incr_destroy
-        vm.incr_destroy
-        nap 0
+        nap 60
       end
 
       retry_in_different_az(e)

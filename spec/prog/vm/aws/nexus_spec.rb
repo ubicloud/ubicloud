@@ -416,12 +416,12 @@ usermod -L ubuntu
 
       it "recreates runner when alternative_families is nil" do
         set_alternative_families(nil)
-        expect { nx.create_instance }.to nap(0).and change(GithubRunner, :count).by(1)
+        expect { nx.create_instance }.to nap(60).and change(GithubRunner, :count).by(1)
       end
 
       it "recreates runner when alternative_families is empty" do
         set_alternative_families([])
-        expect { nx.create_instance }.to nap(0).and change(GithubRunner, :count).by(1)
+        expect { nx.create_instance }.to nap(60).and change(GithubRunner, :count).by(1)
       end
 
       it "creates runner with the first alternative when current_family is the initial family" do
@@ -442,7 +442,7 @@ usermod -L ubuntu
       it "recreates runner when current_family is the last family" do
         vm.update(family: "m6a")
         set_alternative_families(["m7i", "m6a"])
-        expect { nx.create_instance }.to nap(0).and change(GithubRunner, :count).by(1)
+        expect { nx.create_instance }.to nap(60).and change(GithubRunner, :count).by(1)
       end
     end
 
