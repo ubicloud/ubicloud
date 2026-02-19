@@ -281,6 +281,30 @@ RSpec.describe CloverAdmin do
     within(".association", text: "vms") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - Vm - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["assoc-table-vm", "creating", "assoc-table-test", "", "hetzner-fsn1", "x64", "ubuntu-jammy", "standard", "2", vm.created_at.to_s]
+
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    pg = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "assoc-table-pg",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    ).subject
+
+    visit "/model/Project/#{project.ubid}"
+    within(".association", text: "postgres_resources") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+    ]
+
+    server = pg.servers.first
+    visit "/model/PostgresResource/#{pg.ubid}"
+    within(".association", text: "servers") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s
+    ]
   end
 
   it "handles basic pagination when browsing by class" do
@@ -394,6 +418,74 @@ RSpec.describe CloverAdmin do
 
     click_link payment_method.ubid
     expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
+  end
+
+  it "allows browsing and searching PostgresResource" do
+    project = Project.create(name: "PgTest")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    pg = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "test-pg",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    ).subject
+
+    click_link "PostgresResource"
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+    ]
+
+    click_link pg.name
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
+
+    click_link "Ubicloud Admin"
+    click_link "PostgresResource"
+    click_link "Search"
+    fill_in "Project", with: project.ubid
+    select "standard", from: "Flavor"
+    fill_in "Created at", with: pg.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+    ]
+  end
+
+  it "allows browsing and searching PostgresServer" do
+    project = Project.create(name: "PgTest")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    pg = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      name: "test-pg",
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    ).subject
+    server = pg.servers.first
+
+    click_link "PostgresServer"
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+    ]
+
+    click_link server.ubid, match: :first
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer #{server.ubid}"
+
+    click_link "Ubicloud Admin"
+    click_link "PostgresServer"
+    click_link "Search"
+    fill_in "resource", with: pg.ubid
+    fill_in "Created at", with: server.created_at.strftime("%Y-%m")
+    select "push", from: "Timeline access"
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+    ]
+
+    click_link "test-pg"
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
   end
 
   it "shows download PDF button for the invoice as extra" do

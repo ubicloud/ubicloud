@@ -13,7 +13,7 @@ RSpec.describe CloverAdmin, "PostgresServer" do
   it "displays the PostgresServer instance page correctly" do
     click_link "PostgresServer"
     expect(page.status_code).to eq 200
-    expect(page.title).to eq "Ubicloud Admin - PostgresServer"
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
 
     click_link @instance.admin_label
     expect(page.status_code).to eq 200
