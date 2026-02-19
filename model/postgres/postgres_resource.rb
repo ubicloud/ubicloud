@@ -392,7 +392,7 @@ class PostgresResource < Sequel::Model
     Util.send_email(
       accounts_with_access.map(&:email).uniq,
       "PostgreSQL Storage Warning: #{name} at #{usage_percent}% capacity",
-      cc: Config.mail_from,
+      bcc: Config.postgres_notification_email,
       greeting: "Hello,",
       body:,
       button_title: "View Database",
@@ -432,7 +432,7 @@ class PostgresResource < Sequel::Model
     Util.send_email(
       accounts_with_access.map(&:email).uniq,
       "PostgreSQL Auto-Scaling: #{name}",
-      cc: Config.mail_from,
+      bcc: Config.postgres_notification_email,
       greeting: "Hello,",
       body:,
       button_title: "View Database",
@@ -454,7 +454,7 @@ class PostgresResource < Sequel::Model
     Util.send_email(
       accounts_with_access.map(&:email).uniq,
       "PostgreSQL Auto-Scaling Canceled: #{name}",
-      cc: Config.mail_from,
+      bcc: Config.postgres_notification_email,
       greeting: "Hello,",
       body:,
       button_title: "View Database",
