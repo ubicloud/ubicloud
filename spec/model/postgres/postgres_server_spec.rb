@@ -404,6 +404,60 @@ RSpec.describe PostgresServer do
       postgres_server.update(is_representative: false)
       expect(postgres_server.lsn_caught_up).to be(true)
     end
+
+    it "falls back to caught_up_to_archive? when parent server is unreachable" do
+      expect(resource.parent.representative_server).to receive(:current_lsn).and_raise(Errno::ECONNREFUSED)
+      expect(postgres_server).to receive(:caught_up_to_archive?).with(resource.parent.representative_server).and_return(true)
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+  end
+
+  describe "caught_up_to_archive?" do
+    before do
+      postgres_server.update(timeline_access: "fetch")
+    end
+
+    it "returns false if WAL receiver is streaming" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("streaming")
+      expect(postgres_server.caught_up_to_archive?(nil)).to be(false)
+    end
+
+    it "uses parent's last known lsn if receive_lsn is empty (never connected to primary)" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_receive_lsn()").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:lsn_monitor_ds).and_return(instance_double(Sequel::Dataset, get: "F/F"))
+      expect(postgres_server.caught_up_to_archive?(postgres_server)).to be(true)
+    end
+
+    it "returns true if replay has caught up to received" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_receive_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:lsn_monitor_ds).and_return(instance_double(Sequel::Dataset, get: ""))
+      expect(postgres_server.caught_up_to_archive?(postgres_server)).to be(true)
+    end
+
+    it "returns false if replay is behind received" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_receive_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("1/00000000")
+      expect(postgres_server.caught_up_to_archive?(postgres_server)).to be(false)
+    end
+
+    it "returns true if receive_lsn is behind but server is caught up to last_known_lsn" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_receive_lsn()").and_return("1/00000000")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
+      expect(postgres_server).to receive(:lsn_monitor_ds).and_return(instance_double(Sequel::Dataset, get: "F/F"))
+      expect(postgres_server.caught_up_to_archive?(postgres_server)).to be(true)
+    end
+
+    it "returns true if no LSN is available to compare" do
+      expect(postgres_server).to receive(:_run_query).with("SELECT status FROM pg_stat_wal_receiver").and_return("")
+      expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_receive_lsn()").and_return("")
+      expect(postgres_server.caught_up_to_archive?(postgres_server)).to be(true)
+    end
   end
 
   it "initiates a new health monitor session" do
