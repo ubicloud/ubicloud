@@ -219,18 +219,16 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
   end
 
   label def install_cni
-    cni_config = <<CONFIG
-{
-  "cniVersion": "1.0.0",
-  "name": "ubicni-network",
-  "type": "ubicni",
-  "ranges":{
-      "subnet_ipv6": "#{NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(80))}",
-      "subnet_ula_ipv6": "#{vm.nics.first.private_ipv6}",
-      "subnet_ipv4": "#{vm.nics.first.private_ipv4}"
-  }
-}
-CONFIG
+    cni_config = JSON.pretty_generate({
+      cniVersion: "1.0.0",
+      name: "ubicni-network",
+      type: "ubicni",
+      ranges: {
+        subnet_ipv6: NetAddr::IPv6Net.new(vm.ephemeral_net6.network, NetAddr::Mask128.new(80)).to_s,
+        subnet_ula_ipv6: vm.nics.first.private_ipv6.to_s,
+        subnet_ipv4: vm.nics.first.private_ipv4.to_s
+      }
+    })
     vm.sshable.cmd("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: cni_config)
     hop_approve_new_csr
   end

@@ -160,14 +160,9 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect(prog.sshable).to receive(:_cmd).with("true").and_return(true)
 
       dzs
-      zone_conf = <<-CONF
-  - domain: "k8s.ubicloud.com."
-  - domain: "zone1.domain.io."
-  - domain: "zone2.domain.io."
-      CONF
 
       expect(prog.sshable).to receive(:_cmd).with(/sudo apt-get -y install knot/)
-      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /#{zone_conf}/)
+      expect(prog.sshable).to receive(:_cmd).with("sudo tee /etc/knot/knot.conf > /dev/null", stdin: /domain: k8s\.ubicloud\.com\..*domain: zone1\.domain\.io\..*domain: zone2\.domain\.io\./m)
 
       expect { prog.setup_knot }.to hop("sync_zones")
     end

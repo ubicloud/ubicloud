@@ -108,37 +108,35 @@ sudo apt-get -y install knot
 echo "KNOTD_ARGS="-C /var/lib/knot/confdb"" | sudo tee -a /etc/default/knot
     SH
 
-    knot_config = <<-CONF
-server:
-    rundir: "/run/knot"
-    user: "knot:knot"
-    listen: [ "0.0.0.0@53", "::@53" ]
-
-log:
-  - target: "syslog"
-    any: "info"
-
-database:
-    storage: "/var/lib/knot"
-
-acl:
-  - id: "allow_dynamic_updates"
-    address: "127.0.0.1/32"
-    action: "update"
-
-template:
-  - id: "default"
-    storage: "/var/lib/knot"
-    file: "%s.zone"
-    acl: "allow_dynamic_updates"
-    zonefile-sync: "60"
-    zonefile-load: "difference"
-    journal-content: "all"
-
-
-zone:
-  #{ds.dns_zones.map { |dz| "- domain: \"#{dz.name}.\"" }.join("\n  ")}
-    CONF
+    knot_config_data = {
+      "server" => {
+        "rundir" => "/run/knot",
+        "user" => "knot:knot",
+        "listen" => ["0.0.0.0@53", "::@53"]
+      },
+      "log" => [
+        {"target" => "syslog", "any" => "info"}
+      ],
+      "database" => {
+        "storage" => "/var/lib/knot"
+      },
+      "acl" => [
+        {"id" => "allow_dynamic_updates", "address" => "127.0.0.1/32", "action" => "update"}
+      ],
+      "template" => [
+        {
+          "id" => "default",
+          "storage" => "/var/lib/knot",
+          "file" => "%s.zone",
+          "acl" => "allow_dynamic_updates",
+          "zonefile-sync" => "60",
+          "zonefile-load" => "difference",
+          "journal-content" => "all"
+        }
+      ],
+      "zone" => ds.dns_zones.map { |dz| {"domain" => "#{dz.name}."} }
+    }
+    knot_config = YAML.dump(knot_config_data, line_width: -1)
 
     sshable.write_file("/etc/knot/knot.conf", knot_config)
 
