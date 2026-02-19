@@ -129,7 +129,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, storage_encrypted: true,
-        storage_skip_sync: false, arch: "x64").subject
+        arch: "x64").subject
       expect(VmPool).to receive(:[]).and_return(pool)
       expect { gr_test.clean_resources }.to nap(15)
     end

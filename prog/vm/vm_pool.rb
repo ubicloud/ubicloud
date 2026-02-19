@@ -6,7 +6,7 @@ class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool
 
   def self.assemble(size:, vm_size:, boot_image:, location_id:, storage_size_gib:,
-    storage_encrypted:, storage_skip_sync:, arch:)
+    storage_encrypted:, arch:)
     DB.transaction do
       vm_pool = VmPool.create(
         size:,
@@ -15,7 +15,6 @@ class Prog::Vm::VmPool < Prog::Base
         location_id:,
         storage_size_gib:,
         storage_encrypted:,
-        storage_skip_sync:,
         arch:
       )
       Strand.create_with_id(vm_pool, prog: "Vm::VmPool", label: "create_new_vm")
@@ -25,8 +24,7 @@ class Prog::Vm::VmPool < Prog::Base
   label def create_new_vm
     storage_params = {
       size_gib: vm_pool.storage_size_gib,
-      encrypted: vm_pool.storage_encrypted,
-      skip_sync: vm_pool.storage_skip_sync
+      encrypted: vm_pool.storage_encrypted
     }
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.vm_pool_project_id,

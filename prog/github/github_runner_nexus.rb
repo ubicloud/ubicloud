@@ -45,7 +45,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         location_id: Location::GITHUB_RUNNERS_ID,
         storage_size_gib: label_data["storage_size_gib"],
         storage_encrypted: true,
-        storage_skip_sync: true,
         arch: label_data["arch"]
       ).first
     end
@@ -84,7 +83,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       size:,
       location_id:,
       boot_image:,
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true, skip_sync: true}],
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true}],
       enable_ip4: true,
       arch: label_data["arch"],
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
