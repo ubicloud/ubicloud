@@ -508,7 +508,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
   end
 
-  it "shows download PDF button for the invoice as extra" do
+  it "supports downloading invoice PDF" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
       invoice_number: "invoice-number-378",
@@ -517,22 +517,22 @@ RSpec.describe CloverAdmin do
       end_time: "2024-12-01 00:00:00"
     )
 
-    # No download link if download link generation fails
-    expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
-    click_link "Invoice"
-    click_link invoice.invoice_number
+    visit "/model/Invoice/#{invoice.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_no_content "Download PDF"
+    expect(page).to have_link "Download PDF"
 
-    # Shows download link if it's generated
+    # Redirects to presigned URL when download link is available
     presigner = instance_double(Aws::S3::Presigner)
     expect(Invoice).to receive(:blob_storage_client).and_return(instance_double(Aws::S3::Client))
     expect(Aws::S3::Presigner).to receive(:new).and_return(presigner)
     expect(presigner).to receive(:presigned_url).and_return("https://ubicloud.com/download/invoice/link.pdf")
+    page.driver.get "/model/Invoice/#{invoice.ubid}/download_pdf"
+    expect(page.driver.response.status).to eq 302
+    expect(page.driver.response.headers["Location"]).to eq "https://ubicloud.com/download/invoice/link.pdf"
 
-    visit "/model/Invoice/#{invoice.ubid}"
-    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_content "Download PDF"
+    # Raises error when download link generation fails
+    expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
+    expect { visit "/model/Invoice/#{invoice.ubid}/download_pdf" }.to raise_error(CloverError, "Action link is not available")
   end
 
   it "shows quotas for project as extra" do

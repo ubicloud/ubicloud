@@ -185,6 +185,11 @@ class CloverAdmin < Roda
     "Account" => {
       "suspend" => object_action("Suspend", "Account suspended", &:suspend)
     },
+    "Invoice" => {
+      "download_pdf" => object_action("Download PDF", "Download link is not available", type: :direct) do |obj|
+        obj.generate_download_link
+      end
+    },
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", type: :form, &:provision_spare_runner)
     },
