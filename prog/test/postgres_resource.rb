@@ -80,8 +80,13 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
-    if frame["timeline_ids"]&.any? { PostgresTimeline[it] }
-      Clog.emit("Waiting for postgres timelines to be destroyed")
+    # Timelines are retained for 10 days after resource destruction for
+    # customer recovery. Verify they still exist, then explicitly destroy
+    # them to test timeline cleanup.
+    remaining_timelines = frame["timeline_ids"]&.filter_map { PostgresTimeline[it] } || []
+    if remaining_timelines.any?
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
+      remaining_timelines.each(&:incr_destroy)
       nap 5
     end
 

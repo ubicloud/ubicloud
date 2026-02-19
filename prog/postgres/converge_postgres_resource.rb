@@ -72,6 +72,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     ).id
     upgrade_candidate.update(version: postgres_resource.target_version, timeline_id: new_timeline_id, timeline_access: "push")
 
+    hop_setup_upgrade_credentials
+  end
+
+  label def setup_upgrade_credentials
+    upgrade_candidate.increment_s3_new_timeline
     upgrade_candidate.incr_refresh_walg_credentials
     upgrade_candidate.incr_configure
     upgrade_candidate.incr_restart

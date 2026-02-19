@@ -666,14 +666,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         Firewall.create(name: "#{postgres_resource.ubid}-internal-firewall", location_id:, project: postgres_project)
       end
 
-      it "triggers server and timeline deletion and waits until it is deleted" do
+      it "triggers server deletion and waits until it is deleted" do
         postgres_server
         expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
         DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
 
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
         expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "destroy").first).to exist
-        expect(Semaphore.where(strand_id: postgres_server.timeline.strand.id, name: "destroy").first).to exist
         expect(postgres_resource).not_to exist
       end
 
@@ -681,19 +680,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         postgres_server
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
         expect(postgres_resource).not_to exist
-        expect(Semaphore.where(strand_id: postgres_server.timeline.strand.id, name: "destroy").first).to exist
       end
 
-      it "does not destroy timeline if other servers reference it" do
-        timeline = create_postgres_timeline
+      it "does not destroy timelines (retained for 10-day recovery)" do
         postgres_server
-        other_resource = create_postgres_resource(name: "other-pg-resource", with_strand: true)
-        create_postgres_server(resource: other_resource, timeline:, timeline_access: "fetch", is_representative: true, vm_name: "pg-vm-other", server_index: 1)
-        # Replace our server's timeline with the shared one
-        postgres_server.update(timeline_id: timeline.id)
-
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
-        expect(Semaphore.where(strand_id: timeline.strand.id, name: "destroy").count).to eq(0)
+        expect(Semaphore.where(strand_id: postgres_server.timeline.strand.id, name: "destroy").count).to eq(0)
       end
     end
   end

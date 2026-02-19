@@ -16,11 +16,17 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   end
 
   describe ".assemble" do
-    it "creates a strand and a test project" do
+    it "creates a strand and a test project with default provider" do
       st = described_class.assemble
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
+      expect(st.stack.first["provider"]).to eq("metal")
       expect(Project[name: "Postgres-Upgrade-Test-Project"]).not_to be_nil
+    end
+
+    it "creates a strand with the given provider" do
+      st = described_class.assemble(provider: "gcp")
+      expect(st.stack.first["provider"]).to eq("gcp")
     end
   end
 
@@ -33,6 +39,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(pg).not_to be_nil
       expect(pg.version).to eq("17")
       expect(pg.ha_type).to eq("async")
+      expect(frame_value(pgr_test, "location_id")).to eq(Location::HETZNER_FSN1_ID)
     end
   end
 
@@ -76,7 +83,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#create_read_replica" do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id})
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "location_id" => Location::HETZNER_FSN1_ID})
     end
 
     it "creates a read replica and hops to wait_read_replica" do
@@ -262,10 +269,11 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       @replica_strand = replica_strand
     end
 
-    it "increments the destroy count and hops to wait_resources_destroyed" do
+    it "increments the destroy count, tracks timeline_ids, and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@replica_strand.subject.destroy_set?).to be true
+      expect(frame_value(pgr_test, "timeline_ids")).not_to be_empty
     end
   end
 
@@ -283,8 +291,24 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
-    it "hops to destroy if all resources are destroyed" do
+    it "naps if private subnet still exists" do
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
+      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(instance_double(PrivateSubnet))
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "verifies timelines are retained and explicitly destroys them" do
+      timeline_id = SecureRandom.uuid
+      timeline = instance_double(PostgresTimeline)
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => [timeline_id]})
+      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(nil)
+      expect(PostgresTimeline).to receive(:[]).with(timeline_id).and_return(timeline)
+      expect(timeline).to receive(:incr_destroy)
+      expect { pgr_test.wait_resources_destroyed }.to nap(5)
+    end
+
+    it "hops to destroy if all resources and timelines are destroyed" do
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => []})
       expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
     end
   end

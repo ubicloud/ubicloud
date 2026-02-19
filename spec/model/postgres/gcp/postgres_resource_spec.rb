@@ -60,7 +60,7 @@ RSpec.describe PostgresResource do
 
   context "with GCP provider" do
     describe "#upgrade_candidate_server" do
-      it "returns the most recent non-representative server with a valid boot image" do
+      it "returns the most recent non-representative server" do
         timeline = PostgresTimeline.create(location_id: location.id)
         vm = create_vm(
           project_id: project.id,
@@ -69,21 +69,37 @@ RSpec.describe PostgresResource do
           memory_gib: 8
         )
 
-        boot_image = instance_double(BootImage, version: "20260101")
-        boot_vol = instance_double(VmStorageVolume, boot: true, boot_image:)
-
         server = PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
           synchronization_status: "ready", timeline_access: "push", version: "17"
         )
 
         expect(postgres_resource.reload).to receive(:servers).and_return([server])
-        expect(server.vm).to receive(:vm_storage_volumes).and_return([boot_vol])
 
         expect(postgres_resource.upgrade_candidate_server).to eq(server)
       end
 
       it "returns nil when no eligible servers exist" do
+        expect(postgres_resource.upgrade_candidate_server).to be_nil
+      end
+
+      it "excludes representative servers" do
+        timeline = PostgresTimeline.create(location_id: location.id)
+        vm = create_vm(
+          project_id: project.id,
+          location_id: location.id,
+          name: "gcp-pg-vm",
+          memory_gib: 8
+        )
+
+        server = PostgresServer.create(
+          timeline:, resource: postgres_resource, vm_id: vm.id,
+          synchronization_status: "ready", timeline_access: "push", version: "17",
+          representative_at: Time.now
+        )
+
+        expect(postgres_resource.reload).to receive(:servers).and_return([server])
+
         expect(postgres_resource.upgrade_candidate_server).to be_nil
       end
     end

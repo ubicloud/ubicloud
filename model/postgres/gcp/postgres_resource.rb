@@ -5,9 +5,11 @@ class PostgresResource < Sequel::Model
     private
 
     def gcp_upgrade_candidate_server
+      # GCP VMs don't track boot_image on storage volumes. GCE Postgres
+      # images always include all supported PG versions (16/17/18), so
+      # any non-representative server is a valid upgrade candidate.
       servers
         .reject(&:representative_at)
-        .select { |server| server.vm.vm_storage_volumes.filter { it.boot }.any? { it.boot_image.version >= UPGRADE_IMAGE_MIN_VERSIONS[target_version] } }
         .max_by(&:created_at)
     end
 

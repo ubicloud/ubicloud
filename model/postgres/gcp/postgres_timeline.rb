@@ -38,7 +38,7 @@ PGDATA=/dat/#{version}/data
         all_files.concat(files.to_a)
       end
 
-      all_files.map { |f| GcsFileWrapper.new(f.name, f.updated_at) }
+      all_files.map { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
     end
 
     def gcp_create_bucket

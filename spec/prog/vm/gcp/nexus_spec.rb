@@ -186,6 +186,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.reload.stack.first["zone_retries"]).to eq(1)
     end
 
+    it "retries on QUOTA_EXCEEDED when results does not respond to error" do
+      vm.nics.first.strand.update(label: "wait")
+      error_entry = Struct.new(:code).new("QUOTA_EXCEEDED")
+      generic_error = Struct.new(:errors).new([error_entry])
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: generic_error)
+      expect(op).to receive(:wait_until_done!)
+      expect(compute_client).to receive(:insert).and_return(op)
+      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted")
+
+      expect { nx.start }.to nap(30)
+      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+    end
+
     it "raises after 5 zone retries" do
       vm.nics.first.strand.update(label: "wait")
       st.stack.first["zone_retries"] = 4

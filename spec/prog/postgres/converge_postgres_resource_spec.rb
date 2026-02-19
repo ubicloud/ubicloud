@@ -363,14 +363,30 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "update_metadata")
-      candidate # force lazy let to create the candidate
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
     end
 
-    it "creates new timeline and updates candidate server metadata" do
-      expect { nx.update_metadata }.to hop("wait_upgrade_candidate").and change(PostgresTimeline, :count).by(1)
+    it "creates new timeline, updates candidate server metadata, and hops to setup_upgrade_credentials" do
+      expect { nx.update_metadata }.to hop("setup_upgrade_credentials").and change(PostgresTimeline, :count).by(1)
       expect(candidate.reload).to have_attributes(
         version: "17",
-        timeline_access: "push",
+        timeline_access: "push"
+      )
+    end
+  end
+
+  describe "#setup_upgrade_credentials" do
+    let(:candidate) { create_server(version: "17", upgrade_candidate: true) }
+
+    before do
+      strand.update(label: "setup_upgrade_credentials")
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+    end
+
+    it "sets up blob storage credentials and hops to wait_upgrade_candidate" do
+      expect(candidate).to receive(:increment_s3_new_timeline)
+      expect { nx.setup_upgrade_credentials }.to hop("wait_upgrade_candidate")
+      expect(candidate.reload).to have_attributes(
         refresh_walg_credentials_set?: true,
         configure_set?: true,
         restart_set?: true

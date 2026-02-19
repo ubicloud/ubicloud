@@ -105,13 +105,16 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
       op.wait_until_done!
       if op.error?
-        op_error = op.results&.error
+        op_error = op.results
+        op_error = op_error.error if op_error.respond_to?(:error)
         error_code = op_error.respond_to?(:errors) && op_error.errors&.first&.code
         if %w[ZONE_RESOURCE_POOL_EXHAUSTED QUOTA_EXCEEDED].include?(error_code)
           retry_zone_capacity("GCE operation error: #{error_code}")
         end
         raise "GCE instance creation failed: #{op_error}"
       end
+    rescue Google::Cloud::AlreadyExistsError
+      # Instance already exists from a prior attempt — proceed to wait
     rescue Google::Cloud::ResourceExhaustedError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::UnavailableError => e

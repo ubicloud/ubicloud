@@ -70,14 +70,14 @@ PGDATA=/dat/17/data
     end
 
     describe "#list_objects" do
-      it "returns wrapped GCS file objects with key and last_modified" do
+      it "returns wrapped GCS file objects with key and last_modified converted to Time" do
         bucket = instance_double(Google::Cloud::Storage::Bucket)
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
-        updated_time = Time.now
-        file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_time)
-        file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_time)
+        updated_datetime = DateTime.now
+        file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime)
+        file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime)
         file_list = instance_double(Google::Cloud::Storage::File::List, to_a: [file1, file2], token: nil)
 
         expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
@@ -86,7 +86,8 @@ PGDATA=/dat/17/data
         objects = postgres_timeline.list_objects("basebackups_005/")
         expect(objects.length).to eq(2)
         expect(objects.first.key).to eq("basebackups_005/0001_backup_stop_sentinel.json")
-        expect(objects.first.last_modified).to eq(updated_time)
+        expect(objects.first.last_modified).to be_a(Time)
+        expect(objects.first.last_modified).to eq(updated_datetime.to_time)
       end
 
       it "returns empty array when bucket does not exist" do
