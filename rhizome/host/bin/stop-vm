@@ -1,0 +1,33 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+unless ARGV.length == 1
+  warn "usage: stop-vm vm-name"
+  exit 1
+end
+
+vm_name = ARGV[0]
+
+unless vm_name.start_with?("vm") && vm_name.bytesize == 8
+  warn "unexpected vm name format, should start with vm and be 8 characters"
+  exit 1
+end
+
+require "json"
+require_relative "../lib/vm_path"
+require_relative "../lib/cloud_hypervisor"
+
+vm_path = VmPath.new(vm_name)
+params = JSON.parse(File.read(vm_path.prep_json))
+
+unless params.fetch("hypervisor", "ch") == "ch"
+  warn "stop-vm is only supported for VMs using cloud-hypervisor"
+  exit 1
+end
+
+unless (ch = CloudHypervisor::Version[params["ch_version"]])
+  warn "supported cloud hypervisor version not found"
+  exit 1
+end
+
+Process.exec(ch.ch_remote_bin, "--api-socket", vm_path.ch_api_sock, "power-button")
