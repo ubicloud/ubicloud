@@ -407,7 +407,8 @@ class CloverAdmin < Roda
       end
 
       column_options strand_label: {type: "text"},
-        created_at: {type: "text"}
+        created_at: {type: "text"},
+        installation: ubid_input.call("Installation")
 
       column_search_filter do |ds, column, value|
         case column
@@ -415,6 +416,8 @@ class CloverAdmin < Roda
           column_grep.call(ds, Sequel[:strand][:label], value)
         when :created_at
           column_grep.call(ds, column, value)
+        when :installation
+          ubid_uuid_grep.call(ds, :installation_id, value)
         end
       end
     end
@@ -497,11 +500,15 @@ class CloverAdmin < Roda
         arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
         family: {type: "select", options: Option::VmFamilies.map(&:name), add_blank: true},
         vcpus: {type: "number"},
-        created_at: {type: "text"}
+        created_at: {type: "text"},
+        project: ubid_input.call("Project")
 
       column_search_filter do |ds, column, value|
-        if column == :created_at
-          column_grep.call(ds, column, value)
+        case column
+        when :created_at
+          column_grep.call(ds, :created_at, value)
+        when :project
+          ubid_uuid_grep.call(ds, :project_id, value)
         end
       end
     end
