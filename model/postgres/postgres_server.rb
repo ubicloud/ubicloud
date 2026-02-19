@@ -368,7 +368,8 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
-      timeline_access: "push"
+      timeline_access: "push",
+      synchronization_status: "ready"
     )
 
     increment_s3_new_timeline

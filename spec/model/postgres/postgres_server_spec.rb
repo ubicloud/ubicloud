@@ -507,20 +507,20 @@ RSpec.describe PostgresServer do
   describe "#switch_to_new_timeline" do
     it "switches to new timeline with current parent" do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
+      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push", synchronization_status: "ready")
       expect { postgres_server.switch_to_new_timeline }.not_to raise_error
     end
 
     it "switches to new timeline without current parent" do
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "98637404-a37b-4991-a70f-1b7e3ffcbf31"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push")
+      expect(postgres_server).to receive(:update).with(timeline_id: "98637404-a37b-4991-a70f-1b7e3ffcbf31", timeline_access: "push", synchronization_status: "ready")
       expect { postgres_server.switch_to_new_timeline(parent_id: nil) }.not_to raise_error
     end
 
     it "configure new timeline on AWS" do
       location.update(provider: "aws")
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
-      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push")
+      expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push", synchronization_status: "ready")
       expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl stop wal-g")
       expect(postgres_server).to receive(:refresh_walg_credentials)
