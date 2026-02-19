@@ -5,7 +5,7 @@ REPL = true
 
 require_relative "../loader"
 
-if Config.production? && ENV["INGEST_KEY"].nil?
+if Config.production? && !Config.is_e2e && ENV["INGEST_KEY"].nil?
   puts "INGEST_KEY is not set in production environment. This is not allowed for auditing purposes."
   exit(1)
 end
