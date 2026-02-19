@@ -134,6 +134,83 @@ RSpec.describe VmSetup do
         expect(config["users"].first["ssh_authorized_keys"]).to eq([])
       }
     end
+
+    %w[yes no true false null ~].each do |special_name|
+      it "preserves YAML-special username #{special_name.inspect} as a string" do
+        vs.write_user_data(special_name, ["key"], nil, "")
+        expect(vps).to have_received(:write_user_data) { |raw|
+          config = parse_user_data(raw)
+          expect(config["users"].first["name"]).to eq(special_name)
+          expect(config["users"].first["name"]).to be_a(String)
+        }
+      end
+    end
+
+    it "preserves SSH key with spaces in comment" do
+      key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ John Doe's key"
+      vs.write_user_data("user", [key], nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["ssh_authorized_keys"]).to eq([key])
+      }
+    end
+
+    it "preserves SSH key with no comment" do
+      key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKtestkeywithnocomment"
+      vs.write_user_data("user", [key], nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["users"].first["ssh_authorized_keys"]).to eq([key])
+      }
+    end
+
+    it "does not line-wrap a long RSA 4096 key" do
+      long_key = "ssh-rsa " + "A" * 700 + " user@host"
+      vs.write_user_data("user", [long_key], nil, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        # The raw YAML must contain the full key on a single line (no folding/wrapping)
+        expect(raw).to include(long_key)
+        config = parse_user_data(raw)
+        expect(config["users"].first["ssh_authorized_keys"]).to eq([long_key])
+      }
+    end
+
+    it "preserves init script with YAML special characters" do
+      script = "key: value\n- list item\n# comment line"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"].last).to eq(script)
+      }
+    end
+
+    it "preserves init script with shell metacharacters" do
+      script = "echo 'hello \"world\"' && exit 0"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"].last).to eq(script)
+      }
+    end
+
+    it "preserves multi-line init script as a single string" do
+      script = "#!/bin/bash\nset -euo pipefail\necho hello\nexit 0"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["runcmd"].last).to eq(script)
+        expect(config["runcmd"].last).to be_a(String)
+      }
+    end
+
+    it "stores swap size as an integer, not a string" do
+      vs.write_user_data("user", ["key"], 1073741824, "")
+      expect(vps).to have_received(:write_user_data) { |raw|
+        config = parse_user_data(raw)
+        expect(config["swap"]["size"]).to eq(1073741824)
+        expect(config["swap"]["size"]).to be_a(Integer)
+      }
+    end
   end
 
   describe "#cloudinit" do
