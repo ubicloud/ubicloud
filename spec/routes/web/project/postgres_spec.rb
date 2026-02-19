@@ -610,7 +610,6 @@ RSpec.describe Clover, "postgres" do
 
         visit "#{project.path}#{pg.read_replicas.first.path}/settings"
         find(".promote-btn").click
-        expect(PostgresResource[name: "my-read-replica"].semaphores.count).to eq(1)
         expect(page).to have_content "'my-read-replica' will be promoted in a few minutes, please refresh the page"
       end
 

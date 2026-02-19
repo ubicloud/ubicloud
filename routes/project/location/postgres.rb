@@ -344,7 +344,11 @@ class Clover
         end
 
         DB.transaction do
-          pg.incr_promote
+          pg.update(restore_target: Time.now)
+          pg.representative_server.switch_to_new_timeline
+          pg.servers.each(&:incr_configure)
+          pg.servers.each(&:incr_configure_metrics)
+
           audit_log(pg, "promote")
         end
 
