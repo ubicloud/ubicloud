@@ -88,13 +88,17 @@ class VmPath
     write_method_name = "write_" + method_name
     fail "BUG" if method_defined?(write_method_name)
 
-    define_method write_method_name do |s, prefix: nil|
-      unless s.is_a?(String)
-        s = YAML.dump(s, line_width: -1)
-      end
-      if prefix
-        s.sub!(/\A---/, prefix)
-      end
+    define_method write_method_name do |s|
+      write(home(file_name), s)
+    end
+
+    # Method serializing data to YAML and writing, e.g. #write_yaml_user_data
+    yaml_write_method_name = "write_yaml_" + method_name
+    fail "BUG" if method_defined?(yaml_write_method_name)
+
+    define_method yaml_write_method_name do |data, prefix: nil|
+      s = YAML.dump(data, line_width: -1)
+      s.sub!(/\A---/, prefix) if prefix
       write(home(file_name), s)
     end
   end

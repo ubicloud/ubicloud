@@ -475,7 +475,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
-    vp.write_meta_data({"instance-id" => @vm_name, "local-hostname" => @vm_name})
+    vp.write_yaml_meta_data({"instance-id" => @vm_name, "local-hostname" => @vm_name})
 
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
     guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
@@ -540,7 +540,7 @@ DNSMASQ_CONF
       ["enx" + nic.mac.tr(":", "").downcase,
        {"match" => {"macaddress" => nic.mac}, "dhcp6" => true, "dhcp4" => true}]
     end
-    vp.write_network_config({"version" => 2, "ethernets" => ethernets})
+    vp.write_yaml_network_config({"version" => 2, "ethernets" => ethernets})
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
@@ -574,7 +574,7 @@ DNSMASQ_CONF
       config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
     end
 
-    vp.write_user_data(config, prefix: "#cloud-config")
+    vp.write_yaml_user_data(config, prefix: "#cloud-config")
   end
 
   private def install_commands(boot_image)
