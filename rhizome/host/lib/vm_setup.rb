@@ -9,6 +9,7 @@ require "json"
 require "openssl"
 require "base64"
 require "uri"
+require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
@@ -34,22 +35,6 @@ class VmSetup
 
   def q_vm
     @q_vm ||= @vm_name.shellescape
-  end
-
-  # YAML quoting
-  def yq(s)
-    require "yaml"
-    # I don't see a better way to quote a string meant for embedding
-    # in literal YAML other than to generate a full YAML document and
-    # then stripping out headers and footers.  Consider the special
-    # string "NO" (parses as boolean, unless quoted):
-    #
-    # > YAML.dump('NO')
-    # => "--- 'NO'\n"
-    #
-    # > YAML.dump('NO')[4..-2]
-    # => "'NO'"
-    YAML.dump(s, line_width: -1)[4..-2]
   end
 
   def vp
@@ -490,10 +475,7 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
-    vp.write_meta_data(<<EOS)
-instance-id: #{yq(@vm_name)}
-local-hostname: #{yq(@vm_name)}
-EOS
+    vp.write_yaml_meta_data({"instance-id" => @vm_name, "local-hostname" => @vm_name})
 
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
     guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
@@ -554,21 +536,11 @@ dns-forward-max=10000
 #{ip_config}
 DNSMASQ_CONF
 
-    ethernets = nics.map do |nic|
-      <<ETHERNETS
-  #{yq("enx" + nic.mac.tr(":", "").downcase)}:
-    match:
-      macaddress: "#{nic.mac}"
-    dhcp6: true
-    dhcp4: true
-ETHERNETS
-    end.join("\n")
-
-    vp.write_network_config(<<EOS)
-version: 2
-ethernets:
-#{ethernets}
-EOS
+    ethernets = nics.to_h do |nic|
+      ["enx" + nic.mac.tr(":", "").downcase,
+        {"match" => {"macaddress" => nic.mac}, "dhcp6" => true, "dhcp4" => true}]
+    end
+    vp.write_yaml_network_config({"version" => 2, "ethernets" => ethernets})
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
@@ -580,57 +552,47 @@ EOS
     FileUtils.chown @vm_name, @vm_name, vp.cloudinit_img
   end
 
-  def generate_swap_config(swap_size_bytes)
-    return unless swap_size_bytes
-    fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
+    runcmd = [%w[systemctl daemon-reload].shelljoin]
+    runcmd.concat(install_commands(boot_image))
+    runcmd << init_script if init_script
 
-    <<~SWAP_CONFIG
-    swap:
-      filename: /swapfile
-      size: #{yq(swap_size_bytes)}
-    SWAP_CONFIG
+    config = {
+      "users" => [{
+        "name" => unix_user,
+        "sudo" => "ALL=(ALL) NOPASSWD:ALL",
+        "shell" => "/bin/bash",
+        "ssh_authorized_keys" => public_keys
+      }],
+      "ssh_pwauth" => false,
+      "runcmd" => runcmd,
+      "bootcmd" => nft_bootcmd
+    }
+
+    if swap_size_bytes
+      fail "BUG: swap_size_bytes must be an integer" unless swap_size_bytes.instance_of?(Integer)
+      config["swap"] = {"filename" => "/swapfile", "size" => swap_size_bytes}
+    end
+
+    vp.write_yaml_user_data(config, prefix: "#cloud-config")
   end
 
-  def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
-    install_cmd = if boot_image.include?("almalinux")
-      "  - [dnf, install, '-y', nftables]\n"
+  private def install_commands(boot_image)
+    if boot_image.include?("almalinux")
+      [%w[dnf install -y nftables].shelljoin]
     elsif boot_image.include?("debian")
-      <<YAML
-  - [apt-get, update]
-  - [apt-get, install, -y, nftables]
-YAML
+      [%w[apt-get update].shelljoin, %w[apt-get install -y nftables].shelljoin]
     else
-      ""
+      []
     end
-    nft_safe_sudo_allow = <<NFT_ADD_COMMS
-  - [nft, add, table, ip6, filter]
-  - [nft, add, chain, ip6, filter, output, "{", type, filter, hook, output, priority, 0, ";", "}"]
-  - [nft, add, rule, ip6, filter, output, ip6, daddr, 'fd00:0b1c:100d:5AFE::/64', meta, skuid, "!=", 0, tcp, flags, syn, reject, with, tcp, reset]
-NFT_ADD_COMMS
+  end
 
-    init_script_cmd = "  - #{yq(init_script)}\n" if init_script
-
-    vp.write_user_data(<<EOS)
-#cloud-config
-users:
-  - name: #{yq(unix_user)}
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    shell: /bin/bash
-    ssh_authorized_keys:
-#{public_keys.map { "      - #{yq(_1)}" }.join("\n")}
-
-ssh_pwauth: False
-
-runcmd:
-  - [systemctl, daemon-reload]
-#{install_cmd}
-#{init_script_cmd}
-
-bootcmd:
-#{nft_safe_sudo_allow}
-
-#{generate_swap_config(swap_size_bytes)}
-EOS
+  private def nft_bootcmd
+    [
+      %w[nft add table ip6 filter],
+      %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }],
+      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset]
+    ].map(&:shelljoin)
   end
 
   def storage(storage_params, storage_secrets, prep)

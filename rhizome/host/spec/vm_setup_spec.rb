@@ -5,8 +5,21 @@ require "openssl"
 require "base64"
 
 RSpec.describe VmSetup do
+  mock_vm_path = Class.new(VmPath) do
+    attr_reader :writes
+    def initialize(vm_name)
+      super
+      @writes = {}
+    end
+
+    def write(path, s)
+      s += "\n" unless s.end_with?("\n")
+      @writes[File.basename(path)] = s
+    end
+  end
+
   subject(:vs) {
-    vs = Class.new(described_class) do
+    Class.new(described_class) do
       def no_valid_ch_version
         nil
       end
@@ -15,7 +28,6 @@ RSpec.describe VmSetup do
         nil
       end
     end.new("test")
-    vs
   }
 
   def key_wrapping_secrets
@@ -41,31 +53,202 @@ RSpec.describe VmSetup do
   end
 
   describe "#write_user_data" do
-    let(:vps) { instance_spy(VmPath) }
+    let(:vps) { mock_vm_path.new("test") }
 
-    before { expect(vs).to receive(:vp).and_return(vps).at_least(:once) }
+    before { allow(vs).to receive(:vp).and_return(vps) }
 
-    it "templates user YAML with no swap" do
-      vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
-      expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
-      }
+    def written_user_data
+      vps.writes["user-data"]
     end
 
-    it "templates user YAML with swap" do
+    def parse_user_data
+      raw = written_user_data
+      expect(raw).to start_with("#cloud-config\n")
+      YAML.safe_load(raw)
+    end
+
+    it "generates valid cloud-config with no swap" do
+      vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
+      expect(written_user_data).to eq <<~'YAML'
+        #cloud-config
+        users:
+        - name: some_user
+          sudo: ALL=(ALL) NOPASSWD:ALL
+          shell: "/bin/bash"
+          ssh_authorized_keys:
+          - some_ssh_key
+        ssh_pwauth: false
+        runcmd:
+        - systemctl daemon-reload
+        bootcmd:
+        - nft add table ip6 filter
+        - nft add chain ip6 filter output \{ type filter hook output priority 0 \; \}
+        - nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid \!\= 0 tcp flags syn reject with tcp reset
+      YAML
+    end
+
+    it "generates valid cloud-config with swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], 123, "")
-      expect(vps).to have_received(:write_user_data) {
-        expect(_1).to match(/some_user/)
-        expect(_1).to match(/some_ssh_key/)
-        expect(_1).to match(/size: 123/)
-      }
+      config = parse_user_data
+      expect(config["swap"]).to eq({"filename" => "/swapfile", "size" => 123})
+      expect(written_user_data).to include("swap:\n  filename: \"/swapfile\"\n  size: 123\n")
     end
 
     it "fails if the swap is not an integer" do
       expect {
         vs.write_user_data("some_user", ["some_ssh_key"], "123", "")
       }.to raise_error RuntimeError, "BUG: swap_size_bytes must be an integer"
+    end
+
+    it "includes install commands for debian boot images" do
+      vs.write_user_data("user", ["key"], nil, "debian-12")
+      config = parse_user_data
+      expect(config["runcmd"]).to include("apt-get update")
+      expect(config["runcmd"]).to include("apt-get install -y nftables")
+    end
+
+    it "includes install commands for almalinux boot images" do
+      vs.write_user_data("user", ["key"], nil, "almalinux-9")
+      config = parse_user_data
+      expect(config["runcmd"]).to include("dnf install -y nftables")
+    end
+
+    it "includes no install commands for ubuntu boot images" do
+      vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
+      config = parse_user_data
+      expect(config["runcmd"]).to eq(["systemctl daemon-reload"])
+    end
+
+    it "includes init_script as a string in runcmd" do
+      vs.write_user_data("user", ["key"], nil, "", init_script: "#!/bin/bash\necho hello")
+      config = parse_user_data
+      expect(config["runcmd"].last).to eq("#!/bin/bash\necho hello")
+    end
+
+    it "safely handles YAML-special usernames" do
+      vs.write_user_data("NO", ["key"], nil, "")
+      config = parse_user_data
+      expect(config["users"].first["name"]).to eq("NO")
+    end
+
+    it "handles multiple SSH keys" do
+      keys = ["ssh-ed25519 AAAAC3Nz... user@host", "ssh-rsa AAAAB3Nz... other@host"]
+      vs.write_user_data("user", keys, nil, "")
+      config = parse_user_data
+      expect(config["users"].first["ssh_authorized_keys"]).to eq(keys)
+    end
+
+    it "handles empty public keys" do
+      vs.write_user_data("user", [], nil, "")
+      config = parse_user_data
+      expect(config["users"].first["ssh_authorized_keys"]).to eq([])
+    end
+
+    %w[yes no true false null ~].each do |special_name|
+      it "preserves YAML-special username #{special_name.inspect} as a string" do
+        vs.write_user_data(special_name, ["key"], nil, "")
+        config = parse_user_data
+        expect(config["users"].first["name"]).to eq(special_name)
+        expect(config["users"].first["name"]).to be_a(String)
+      end
+    end
+
+    it "preserves SSH key with spaces in comment" do
+      key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ John Doe's key"
+      vs.write_user_data("user", [key], nil, "")
+      config = parse_user_data
+      expect(config["users"].first["ssh_authorized_keys"]).to eq([key])
+    end
+
+    it "preserves SSH key with no comment" do
+      key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKtestkeywithnocomment"
+      vs.write_user_data("user", [key], nil, "")
+      config = parse_user_data
+      expect(config["users"].first["ssh_authorized_keys"]).to eq([key])
+    end
+
+    it "does not line-wrap a long RSA 4096 key" do
+      long_key = "ssh-rsa " + "A" * 700 + " user@host"
+      vs.write_user_data("user", [long_key], nil, "")
+      expect(written_user_data).to include(long_key)
+      config = parse_user_data
+      expect(config["users"].first["ssh_authorized_keys"]).to eq([long_key])
+    end
+
+    it "preserves init script with YAML special characters" do
+      script = "key: value\n- list item\n# comment line"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      config = parse_user_data
+      expect(config["runcmd"].last).to eq(script)
+    end
+
+    it "preserves init script with shell metacharacters" do
+      script = "echo 'hello \"world\"' && exit 0"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      config = parse_user_data
+      expect(config["runcmd"].last).to eq(script)
+    end
+
+    it "preserves multi-line init script as a single string" do
+      script = "#!/bin/bash\nset -euo pipefail\necho hello\nexit 0"
+      vs.write_user_data("user", ["key"], nil, "", init_script: script)
+      config = parse_user_data
+      expect(config["runcmd"].last).to eq(script)
+      expect(config["runcmd"].last).to be_a(String)
+    end
+
+    it "stores swap size as an integer, not a string" do
+      vs.write_user_data("user", ["key"], 1073741824, "")
+      config = parse_user_data
+      expect(config["swap"]["size"]).to eq(1073741824)
+      expect(config["swap"]["size"]).to be_a(Integer)
+    end
+  end
+
+  describe "#cloudinit" do
+    let(:vps) { mock_vm_path.new("test") }
+    let(:nics) { [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest", "3e:bd:a5:96:f7:b9", "10.0.0.254/32")] }
+
+    before do
+      allow(vs).to receive(:vp).and_return(vps)
+      allow(vs).to receive(:write_user_data)
+      allow(vs).to receive(:r)
+      allow(FileUtils).to receive(:rm_rf)
+      allow(FileUtils).to receive(:chmod)
+      allow(FileUtils).to receive(:chown)
+    end
+
+    it "generates valid YAML meta-data with instance-id and local-hostname" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      expect(vps.writes["meta-data"]).to eq <<~YAML
+        ---
+        instance-id: test
+        local-hostname: test
+      YAML
+    end
+
+    it "generates valid YAML network-config with ethernets" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      expect(vps.writes["network-config"]).to eq <<~YAML
+        ---
+        version: 2
+        ethernets:
+          enx3ebda596f7b9:
+            match:
+              macaddress: 3e:bd:a5:96:f7:b9
+            dhcp6: true
+            dhcp4: true
+      YAML
+    end
+
+    it "generates network-config with multiple NICs" do
+      multi_nics = [
+        VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest1", "3e:bd:a5:96:f7:b9", "10.0.0.254/32"),
+        VmSetup::Nic.new("fddf:53d2:4c89:2305:46a0::/79", "10.10.10.10/32", "nctest2", "fb:55:dd:ba:21:0a", "10.0.0.253/32")
+      ]
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", multi_nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      config = YAML.safe_load(vps.writes["network-config"])
+      expect(config["ethernets"].keys).to contain_exactly("enx3ebda596f7b9", "enxfb55ddba210a")
     end
   end
 
