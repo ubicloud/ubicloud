@@ -31,6 +31,7 @@ RSpec.describe Clover, "postgres" do
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/read-replica"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/promote-read-replica"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/promote"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule"],
         [:delete, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/foo_ubid"],
@@ -414,7 +415,16 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Parent server is not ready for read replicas. There are no backups, yet.")
       end
 
-      it "promote" do
+      it "promote-read-replica" do
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        pg.update(parent_id: pg.id)
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "promote-read-replica via deprecated promote endpoint" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         pg.update(parent_id: pg.id)
@@ -427,7 +437,7 @@ RSpec.describe Clover, "postgres" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
 
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote"
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/promote-read-replica"
 
         expect(last_response).to have_api_error(400, "Non read replica servers cannot be promoted.")
       end

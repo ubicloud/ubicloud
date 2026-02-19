@@ -1338,6 +1338,22 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: promotePostgresDatabase
+      summary: 'Promote a PostgreSQL read replica (deprecated, use promote-read-replica)'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      deprecated: true
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: promoteReadReplicaPostgresDatabase
       summary: Promote a PostgreSQL read replica
       responses:
         '200':

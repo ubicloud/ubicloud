@@ -123,7 +123,7 @@ module Ubicloud
 
     # Promote this database from a read replica to a primary.
     def promote_read_replica
-      merge_into_values(adapter.post(_path("/promote")))
+      merge_into_values(adapter.post(_path("/promote-read-replica")))
     end
 
     # Set the start hour (0-23) for the maintenance window, or nil
