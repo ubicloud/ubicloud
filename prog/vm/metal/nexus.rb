@@ -301,9 +301,17 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def start_after_stop
-    decr_start
-    host.sshable.cmd("sudo systemctl start :vm_name", vm_name:)
-    hop_wait
+    when_start_set? do
+      decr_start
+      host.sshable.cmd("sudo systemctl start :vm_name", vm_name:)
+      nap 5
+    end
+
+    if available?
+      hop_wait
+    end
+
+    nap 5
   end
 
   label def stopped_by_admin
