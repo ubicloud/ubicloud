@@ -9,6 +9,7 @@ require "json"
 require "openssl"
 require "base64"
 require "uri"
+require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
@@ -552,7 +553,7 @@ DNSMASQ_CONF
   end
 
   def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
-    runcmd = [%w[systemctl daemon-reload]]
+    runcmd = [%w[systemctl daemon-reload].shelljoin]
     runcmd.concat(install_commands(boot_image))
     runcmd << init_script if init_script
 
@@ -578,9 +579,9 @@ DNSMASQ_CONF
 
   private def install_commands(boot_image)
     if boot_image.include?("almalinux")
-      [%w[dnf install -y nftables]]
+      [%w[dnf install -y nftables].shelljoin]
     elsif boot_image.include?("debian")
-      [%w[apt-get update], %w[apt-get install -y nftables]]
+      [%w[apt-get update].shelljoin, %w[apt-get install -y nftables].shelljoin]
     else
       []
     end
@@ -591,7 +592,7 @@ DNSMASQ_CONF
       %w[nft add table ip6 filter],
       %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }],
       %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset]
-    ]
+    ].map(&:shelljoin)
   end
 
   def storage(storage_params, storage_secrets, prep)

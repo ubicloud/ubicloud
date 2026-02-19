@@ -69,7 +69,7 @@ RSpec.describe VmSetup do
 
     it "generates valid cloud-config with no swap" do
       vs.write_user_data("some_user", ["some_ssh_key"], nil, "")
-      expect(written_user_data).to eq <<~YAML
+      expect(written_user_data).to eq <<~'YAML'
         #cloud-config
         users:
         - name: some_user
@@ -79,49 +79,11 @@ RSpec.describe VmSetup do
           - some_ssh_key
         ssh_pwauth: false
         runcmd:
-        - - systemctl
-          - daemon-reload
+        - systemctl daemon-reload
         bootcmd:
-        - - nft
-          - add
-          - table
-          - ip6
-          - filter
-        - - nft
-          - add
-          - chain
-          - ip6
-          - filter
-          - output
-          - "{"
-          - type
-          - filter
-          - hook
-          - output
-          - priority
-          - '0'
-          - ";"
-          - "}"
-        - - nft
-          - add
-          - rule
-          - ip6
-          - filter
-          - output
-          - ip6
-          - daddr
-          - fd00:0b1c:100d:5AFE::/64
-          - meta
-          - skuid
-          - "!="
-          - '0'
-          - tcp
-          - flags
-          - syn
-          - reject
-          - with
-          - tcp
-          - reset
+        - nft add table ip6 filter
+        - nft add chain ip6 filter output \{ type filter hook output priority 0 \; \}
+        - nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid \!\= 0 tcp flags syn reject with tcp reset
       YAML
     end
 
@@ -141,20 +103,20 @@ RSpec.describe VmSetup do
     it "includes install commands for debian boot images" do
       vs.write_user_data("user", ["key"], nil, "debian-12")
       config = parse_user_data
-      expect(config["runcmd"]).to include(%w[apt-get update])
-      expect(config["runcmd"]).to include(%w[apt-get install -y nftables])
+      expect(config["runcmd"]).to include("apt-get update")
+      expect(config["runcmd"]).to include("apt-get install -y nftables")
     end
 
     it "includes install commands for almalinux boot images" do
       vs.write_user_data("user", ["key"], nil, "almalinux-9")
       config = parse_user_data
-      expect(config["runcmd"]).to include(%w[dnf install -y nftables])
+      expect(config["runcmd"]).to include("dnf install -y nftables")
     end
 
     it "includes no install commands for ubuntu boot images" do
       vs.write_user_data("user", ["key"], nil, "ubuntu-noble")
       config = parse_user_data
-      expect(config["runcmd"]).to eq([%w[systemctl daemon-reload]])
+      expect(config["runcmd"]).to eq(["systemctl daemon-reload"])
     end
 
     it "includes init_script as a string in runcmd" do
