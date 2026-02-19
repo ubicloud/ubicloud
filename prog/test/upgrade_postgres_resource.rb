@@ -110,6 +110,33 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       Clog.emit("Replica server #{server.ubid}: version=#{server.version}, target=#{read_replica.target_version}, access=#{server.timeline_access}, state=#{server.strand.label}")
     end
 
+    # Log timeline and backup information for debugging
+    all_servers = postgres_resource.servers + read_replica.servers
+    all_servers.map(&:timeline).uniq.each do |timeline|
+      backup_count = timeline.backups.count
+      Clog.emit("Timeline #{timeline.ubid}: backups_count=#{backup_count}, blob_storage=#{timeline.blob_storage&.url || "none"}")
+    end
+
+    # Log LSN catch-up details for servers stuck in wait_catch_up
+    all_servers.each do |server|
+      next unless server.strand.label == "wait_catch_up"
+
+      begin
+        parent_server = if server.read_replica?
+          server.resource.parent.representative_server
+        else
+          server.resource.representative_server
+        end
+
+        server_lsn = server.current_lsn
+        parent_lsn = parent_server.current_lsn
+        diff_bytes = server.lsn_diff(parent_lsn, server_lsn)
+        Clog.emit("Server #{server.ubid} in wait_catch_up: server_lsn=#{server_lsn.chomp}, parent_lsn=#{parent_lsn.chomp}, diff_bytes=#{diff_bytes}, threshold=#{80 * 1024 * 1024}, parent_server=#{parent_server.ubid}, parent_state=#{parent_server.strand.label}")
+      rescue => ex
+        Clog.emit("Failed to fetch LSN info for server #{server.ubid} in wait_catch_up: #{ex.message}")
+      end
+    end
+
     # Check if all servers have been upgraded to version 18
     primary_upgraded = postgres_resource.servers.all? { |s| s.version == "18" && s.strand.label == "wait" }
     replica_upgraded = read_replica.servers.all? { |s| s.version == "18" && s.strand.label == "wait" }
