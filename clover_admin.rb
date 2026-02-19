@@ -185,6 +185,12 @@ class CloverAdmin < Roda
     "Account" => {
       "suspend" => object_action("Suspend", "Account suspended", &:suspend)
     },
+    "Invoice" => {
+      "download_pdf" => object_action("Download PDF", "Download link is not available", confirmation: false) do |obj|
+        url = obj.generate_download_link || fail(CloverError.new(400, "InvalidRequest", "Download link is not available"))
+        "<a href=\"#{Erubi.h(url)}\">Download PDF</a>"
+      end
+    },
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", confirmation: false, &:provision_spare_runner)
     },
