@@ -6,7 +6,7 @@ RSpec.describe Serializers::Postgres do
   let(:project) { Project.create(name: "pg-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
-  let(:timeline) { PostgresTimeline.create(location_id:) }
+  let(:timeline) { create_postgres_timeline(location_id:) }
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
@@ -20,12 +20,9 @@ RSpec.describe Serializers::Postgres do
   }
 
   let(:pg) {
-    PostgresResource.create(
-      name: "pg-name", superuser_password: "dummy-password", ha_type: "none",
-      target_version: "17", location_id:, project_id: project.id,
-      user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-      target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-    )
+    pr = create_postgres_resource(project:, location_id:)
+    pr.update(private_subnet_id: private_subnet.id)
+    pr
   }
 
   def create_representative_server(primary: true)

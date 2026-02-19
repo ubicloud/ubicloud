@@ -35,6 +35,7 @@ Warning.ignore(/URI::RFC3986_PARSER.make_regexp is obsolete/, /.*lib\/capybara\/
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
 
 require_relative "coverage_helper"
+require_relative "common/postgres"
 require_relative "../loader"
 require "rspec"
 require "logger"

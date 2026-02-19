@@ -9,7 +9,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   let(:project) { Project.create(name: "converge-test-project") }
   let(:location_id) { Location::HETZNER_FSN1_ID }
   let(:location) { Location[location_id] }
-  let(:timeline) { PostgresTimeline.create(location_id:) }
+  let(:timeline) { create_postgres_timeline(location_id:) }
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
@@ -18,13 +18,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   }
 
   let(:pg) {
-    pr = PostgresResource.create(
-      name: "pg-test", superuser_password: "dummy-password", ha_type: "none",
-      target_version: "17", location_id:, project_id: project.id,
-      user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-      target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-    )
-    Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
+    pr = create_postgres_resource(project:, location_id:)
     Firewall.create(name: "#{pr.ubid}-internal-firewall", location_id:, project_id: postgres_service_project.id)
     pr
   }
@@ -41,40 +35,36 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     allow(Config).to receive(:postgres_service_project_id).and_return(postgres_service_project.id)
   end
 
-  def create_server(version: "17", is_representative: false, vm_host_data_center: nil, timeline: self.timeline, timeline_access: "fetch", resource: pg, subnet_az: nil, upgrade_candidate: false)
-    vm_host = create_vm_host(location_id: resource.location_id, data_center: vm_host_data_center)
-    vm = Prog::Vm::Nexus.assemble_with_sshable(
-      project.id, name: "pg-vm-#{SecureRandom.hex(4)}", private_subnet_id: resource.private_subnet_id,
-      location_id: resource.location_id, unix_user: "ubi"
-    ).subject
-    vm.update(vm_host_id: vm_host.id)
+  def create_server(vm_host_data_center: "default-dc", timeline: self.timeline, resource: pg, is_representative: false, version: nil, subnet_az: nil, upgrade_candidate: false)
+    server = create_postgres_server(resource:, timeline:, is_representative:)
+    server.strand.update(label: "wait")
+    server.update(version:) if version
+    vm = server.vm
+
+    if vm_host_data_center
+      vm_host = create_vm_host(location_id: resource.location_id, data_center: vm_host_data_center)
+      vm.update(vm_host_id: vm_host.id)
+    end
+
     if subnet_az
       NicAwsResource.create_with_id(vm.nic.id, subnet_az:)
     end
+
     if upgrade_candidate
-      boot_image = BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
+      unless vm.vm_host_id
+        vm_host = create_vm_host(location_id: resource.location_id)
+        vm.update(vm_host_id: vm_host.id)
+      end
+      boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
       VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: true, disk_index: 0, boot_image_id: boot_image.id)
-    else
-      VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: false, disk_index: 1)
     end
-    server = PostgresServer.create(
-      timeline:, resource_id: resource.id, vm_id: vm.id,
-      is_representative:,
-      synchronization_status: "ready", timeline_access:, version:
-    )
-    Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
+
     server
   end
 
   describe "#start" do
     it "naps if read replica parent is not ready" do
-      parent = PostgresResource.create(
-        name: "pg-parent", superuser_password: "dummy-password", ha_type: "none",
-        target_version: "17", location_id:, project_id: project.id,
-        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-        target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-      )
-      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      parent = create_postgres_resource(project:, location_id:)
       create_server(resource: parent, is_representative: true)
       pg.update(parent_id: parent.id)
 
@@ -82,15 +72,9 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "registers a deadline and hops to provision_servers if read replica parent is ready" do
-      parent_timeline = PostgresTimeline.create(location_id:, cached_earliest_backup_at: Time.now)
-      parent = PostgresResource.create(
-        name: "pg-parent2", superuser_password: "dummy-password", ha_type: "none",
-        target_version: "17", location_id:, project_id: project.id,
-        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-        target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-      )
-      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      create_server(timeline: parent_timeline, is_representative: true, timeline_access: "push", resource: parent)
+      parent_timeline = create_postgres_timeline(location_id:).tap { it.update(cached_earliest_backup_at: Time.now) }
+      parent = create_postgres_resource(project:, location_id:)
+      create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
 
       expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
@@ -131,6 +115,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server but excludes currently used az for aws" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
+      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "az2")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server1 = create_server(is_representative: true, subnet_az: "a")
       server2 = create_server(subnet_az: "b")
@@ -143,6 +129,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
@@ -159,15 +146,9 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "provisions a new server with the correct timeline for a read replica" do
-      parent_timeline = PostgresTimeline.create(location_id:)
-      parent = PostgresResource.create(
-        name: "pg-parent3", superuser_password: "dummy-password", ha_type: "none",
-        target_version: "17", location_id:, project_id: project.id,
-        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-        target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-      )
-      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      create_server(timeline: parent_timeline, is_representative: true, timeline_access: "push", resource: parent)
+      parent_timeline = create_postgres_timeline(location_id:)
+      parent = create_postgres_resource(project:, location_id:)
+      create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
       server = create_server(is_representative: true, vm_host_data_center: "dc1")
       server.incr_recycle
@@ -178,6 +159,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
+      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
@@ -235,23 +217,23 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     it "hops to prune_servers if storage auto-scale was canceled" do
       server = create_server(is_representative: true)
       server.incr_recycle
-      create_server(is_representative: false, timeline_access: "fetch")
+      create_server(is_representative: false)
       pg.incr_storage_auto_scale_canceled
       expect { nx.recycle_representative_server }.to hop("prune_servers")
     end
 
     it "naps if advisory lock cannot be acquired before failover" do
-      server = create_server(is_representative: true, timeline_access: "push")
+      server = create_server(is_representative: true)
       server.incr_recycle
-      create_server(is_representative: false, timeline_access: "fetch")
+      create_server(is_representative: false)
       expect(DB).to receive(:get).with(Sequel.function(:pg_try_advisory_xact_lock, pg.storage_auto_scale_lock_key)).and_return(false)
       expect { nx.recycle_representative_server }.to nap(5)
     end
 
     it "triggers failover when representative needs recycling and standby is ready" do
-      server = create_server(is_representative: true, timeline_access: "push")
+      server = create_server(is_representative: true)
       server.incr_recycle
-      standby = create_server(is_representative: false, timeline_access: "fetch")
+      standby = create_server(is_representative: false)
       standby.update(physical_slot_ready: true)
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
       expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
@@ -285,13 +267,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to recycle_representative_server if in maintenance window and upgrading for read replicas" do
-      parent = PostgresResource.create(
-        name: "pg-parent-maint", superuser_password: "dummy-password", ha_type: "none",
-        target_version: "17", location_id:, project_id: project.id,
-        user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-        target_storage_size_gib: 64, private_subnet_id: private_subnet.id
-      )
-      Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      parent = create_postgres_resource(project:, location_id:)
       pg.update(parent_id: parent.id)
       create_server(is_representative: true, version: "16")
       create_server(version: "16", upgrade_candidate: true)

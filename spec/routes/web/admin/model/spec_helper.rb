@@ -416,48 +416,14 @@ module AdminModelSpecHelper
         target_storage_size_gib: 100
       )
       VictoriaMetricsServer.create(victoria_metrics_resource_id: vmr.id, vm_id: vm.id)
-      pg = PostgresResource.create(
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "test-pg",
-        superuser_password: "test-pass",
-        ha_type: "none",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 100,
-        target_version: "16"
-      )
+      pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
       PostgresMetricDestination.create_with_id(pg, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
     end
 
     def create_postgres_init_script
-      pg = create_postgres_resource
-      PostgresInitScript.create_with_id(pg, init_script: "#!/bin/bash\necho 'Hello, World!'")
-    end
-
-    def create_postgres_resource
       project = Project.create(name: "test-project")
-      PostgresResource.create(
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        name: "test-pg",
-        superuser_password: "test-pass",
-        ha_type: "none",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 100,
-        target_version: "16"
-      )
-    end
-
-    def create_postgres_server
-      pg = create_postgres_resource
-      timeline = PostgresTimeline.create(location_id: pg.location_id, access_key: "test-key", secret_key: "test-secret")
-      vm = Prog::Vm::Nexus.assemble_with_sshable(pg.project_id, name: "pg-vm", location_id: pg.location_id, unix_user: "ubi").subject
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1)
-      PostgresServer.create(timeline_id: timeline.id, resource_id: pg.id, vm_id: vm.id, version: "18")
-    end
-
-    def create_postgres_timeline
-      PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID, access_key: "test-key", secret_key: "test-secret")
+      pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
+      PostgresInitScript.create_with_id(pg, init_script: "#!/bin/bash\necho 'Hello, World!'")
     end
 
     def create_private_subnet

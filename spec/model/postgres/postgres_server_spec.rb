@@ -13,22 +13,9 @@ RSpec.describe PostgresServer do
   let(:project) { Project.create(name: "postgres-server") }
   let(:project_service) { Project.create(name: "postgres-service") }
 
-  let(:timeline) { PostgresTimeline.create(location:) }
+  let(:timeline) { create_postgres_timeline(location_id: location.id) }
 
-  let(:resource) {
-    PostgresResource.create(
-      name: "postgres-resource",
-      project:,
-      location:,
-      ha_type: PostgresResource::HaType::NONE,
-      user_config: {},
-      pgbouncer_user_config: {},
-      target_version: "16",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      superuser_password: "super"
-    )
-  }
+  let(:resource) { create_postgres_resource(project:, location_id: location.id) }
 
   let(:private_subnet) {
     PrivateSubnet.create(
@@ -64,18 +51,9 @@ RSpec.describe PostgresServer do
     end
 
     def create_standby_resource(suffix)
-      PostgresResource.create(
-        name: "postgres-standby-#{suffix}",
-        project:,
-        location:,
-        ha_type: PostgresResource::HaType::SYNC,
-        user_config: {},
-        pgbouncer_user_config: {},
-        target_version: "16",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "super"
-      )
+      pr = create_postgres_resource(project:, location_id: location.id)
+      pr.update(ha_type: PostgresResource::HaType::SYNC)
+      pr
     end
 
     it "does not set archival related configs if blob storage is not configured" do
@@ -344,18 +322,7 @@ RSpec.describe PostgresServer do
 
   describe "lsn_caught_up" do
     before do
-      parent_resource = PostgresResource.create(
-        project:,
-        name: "postgres-resource-parent",
-        ha_type: PostgresResource::HaType::NONE,
-        user_config: {},
-        pgbouncer_user_config: {},
-        location:,
-        target_version: "16",
-        target_vm_size: "standard-2",
-        target_storage_size_gib: 64,
-        superuser_password: "super"
-      )
+      parent_resource = create_postgres_resource(project:, location_id: location.id)
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
       described_class.create(
         timeline:, resource: parent_resource, vm_id: parent_vm.id, is_representative: true,
@@ -770,7 +737,6 @@ RSpec.describe PostgresServer do
     }
 
     it "increments check_disk_usage on the resource when primary and usage >= 77%" do
-      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  80%\n")
       postgres_server.observe_disk_usage(session)
       expect(Semaphore.where(strand_id: resource.strand.id, name: "check_disk_usage").count).to eq(1)
@@ -783,7 +749,6 @@ RSpec.describe PostgresServer do
     end
 
     it "increments check_disk_usage when primary and usage < 77% but storage_auto_scale_action_performed_80 is set" do
-      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
       resource.incr_storage_auto_scale_action_performed_80
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  50%\n")
       postgres_server.observe_disk_usage(session)
@@ -791,7 +756,6 @@ RSpec.describe PostgresServer do
     end
 
     it "does not duplicate check_disk_usage semaphore when already set on primary" do
-      Strand.create_with_id(resource, prog: "Postgres::PostgresResourceNexus", label: "wait")
       resource.incr_check_disk_usage
       expect(session[:ssh_session]).to receive(:_exec!).with("df --output=pcent /dat | tail -n 1").and_return("  80%\n")
       postgres_server.observe_disk_usage(session)
@@ -856,10 +820,11 @@ RSpec.describe PostgresServer do
         iam_client = Aws::IAM::Client.new(stub_responses: true)
         LocationCredential.create(location:, assume_role: "role")
 
-        parent = PostgresTimeline.create(location:)
+        parent = create_postgres_timeline(location_id: location.id)
         timeline.update(parent:)
         expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_server.timeline.parent.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
         expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed
