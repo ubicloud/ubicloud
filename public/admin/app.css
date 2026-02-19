@@ -145,14 +145,24 @@ code {
   display: inline-block;
 }
 
-#action-list a {
-  display: inline-block;
-  border-left: 1px solid black;
-  padding-left: 10px;
-  padding-right: 5px;
-  &:first-child {
-    padding-left: 0;
-    border-left: none;
+#action-list {
+  margin: 10px 0px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+
+  & > :not(:first-child) { border-left: 1px solid black; padding-left: 10px; }
+
+  input[type=submit] {
+    background: none;
+    border: none;
+    padding: 0;
+    color: #b04209;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+    font-weight: inherit;
+    &:hover { text-decoration: underline; }
   }
 }
 
