@@ -9,7 +9,7 @@ class Clover
         vm_list_api_response(dataset)
       else
         @vms = dataset
-          .eager(:semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
+          .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
           .reverse(:created_at)
           .all
         view "vm/index"
