@@ -78,7 +78,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to nap(1)
     end
 
-    it "creates a GCE instance and hops to wait_instance_created" do
+    it "creates a dual-stack GCE instance and hops to wait_instance_created" do
       vm.nics.first.strand.update(label: "wait")
       op = instance_double(Gapic::GenericLRO::Operation, error?: false)
       expect(op).to receive(:wait_until_done!)
@@ -93,6 +93,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-proj-#{project.ubid}")
         expect(ni.subnetwork).to include("subnetworks/ubicloud-")
         expect(ni.network_i_p).to eq(vm.nic.private_ipv4.network.to_s)
+        expect(ni.stack_type).to eq("IPV4_IPV6")
+        expect(ni.ipv6_access_configs.first.name).to eq("External IPv6")
+        expect(ni.ipv6_access_configs.first.type).to eq("DIRECT_IPV6")
         op
       end
 
@@ -225,13 +228,16 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#wait_instance_created" do
-    it "updates the vm when instance is RUNNING" do
+    it "updates the vm with IPv4 and IPv6 when instance is RUNNING" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "RUNNING",
         network_interfaces: [
           Google::Cloud::Compute::V1::NetworkInterface.new(
             access_configs: [
               Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")
+            ],
+            ipv6_access_configs: [
+              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1")
             ]
           )
         ]
@@ -251,6 +257,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(vm.cores).to eq(1)
       expect(vm.allocated_at).to eq(now)
       expect(vm.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
+      expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
     end
 
     it "updates the sshable host" do
@@ -260,6 +267,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
           Google::Cloud::Compute::V1::NetworkInterface.new(
             access_configs: [
               Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")
+            ],
+            ipv6_access_configs: [
+              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1")
             ]
           )
         ]
@@ -285,6 +295,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       vm.reload
       expect(vm.cores).to eq(1)
       expect(vm.assigned_vm_address).to be_nil
+      expect(vm.ephemeral_net6).to be_nil
     end
 
     it "updates the vm when instance is RUNNING with empty access_configs" do
@@ -304,6 +315,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       vm.reload
       expect(vm.cores).to eq(1)
       expect(vm.assigned_vm_address).to be_nil
+      expect(vm.ephemeral_net6).to be_nil
     end
 
     it "naps if the instance is in STAGING state" do

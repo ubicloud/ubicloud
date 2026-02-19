@@ -6,6 +6,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   subject_is :private_subnet
 
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
+  # GCE internal IPv6 ranges used by dual-stack subnets (ULA space)
+  GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
 
   def self.vpc_name(project)
     "ubicloud-proj-#{project.ubid}"
@@ -55,6 +57,20 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       destination_ranges: RFC1918_RANGES
     )
 
+    ensure_deny_rule(
+      name: "#{gcp_vpc_name}-deny-ingress-ipv6",
+      direction: "INGRESS",
+      source_ranges: GCE_INTERNAL_IPV6_RANGES,
+      destination_ranges: nil
+    )
+
+    ensure_deny_rule(
+      name: "#{gcp_vpc_name}-deny-egress-ipv6",
+      direction: "EGRESS",
+      source_ranges: nil,
+      destination_ranges: GCE_INTERNAL_IPV6_RANGES
+    )
+
     hop_create_subnet
   end
 
@@ -74,7 +90,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           name: subnet_name,
           ip_cidr_range: private_subnet.net4.to_s,
           network: "projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}",
-          private_ip_google_access: true
+          private_ip_google_access: true,
+          stack_type: "IPV4_IPV6",
+          ipv6_access_type: "EXTERNAL"
         )
       )
       op.wait_until_done!
@@ -101,6 +119,26 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       name: subnet_allow_rule_name("ingress"),
       direction: "INGRESS",
       source_ranges: [private_subnet.net4.to_s],
+      destination_ranges: nil,
+      target_tags: [subnet_tag],
+      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
+    )
+
+    # Allow same-subnet IPv6 egress (overrides VPC-wide deny-egress-ipv6)
+    ensure_allow_rule(
+      name: subnet_allow_rule_name("egress-ipv6"),
+      direction: "EGRESS",
+      source_ranges: nil,
+      destination_ranges: [private_subnet.net6.to_s],
+      target_tags: [subnet_tag],
+      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
+    )
+
+    # Allow same-subnet IPv6 ingress (overrides VPC-wide deny-ingress-ipv6)
+    ensure_allow_rule(
+      name: subnet_allow_rule_name("ingress-ipv6"),
+      direction: "INGRESS",
+      source_ranges: [private_subnet.net6.to_s],
       destination_ranges: nil,
       target_tags: [subnet_tag],
       allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]

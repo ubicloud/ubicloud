@@ -366,7 +366,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "pg-test-resource.pg.example.com."]]
     end
 
-    it "skips public and private AAAA records for GCP instances" do
+    it "skips public AAAA but creates private AAAA for GCP instances without ephemeral_net6" do
       postgres_server
       postgres_server.vm.update(ephemeral_net6: nil)
       postgres_resource.location.update(provider: "gcp")
@@ -376,7 +376,8 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.refresh_dns_record }.to hop("initialize_certificates")
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
         ["A", "pg-test-resource.pg.example.com."],
-        ["A", "private.pg-test-resource.pg.example.com."]
+        ["A", "private.pg-test-resource.pg.example.com."],
+        ["AAAA", "private.pg-test-resource.pg.example.com."]
       ]
     end
 

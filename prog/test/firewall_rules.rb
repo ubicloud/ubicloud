@@ -73,7 +73,7 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_public_ipv6
-    # GCP VMs have no public IPv6 — skip this test
+    # Skip if VM has no public IPv6 (e.g. older VMs without dual-stack)
     hop_perform_tests_private_ipv4 unless vm1.ip6
 
     update_firewall_rules(config: :perform_tests_public_ipv6) unless frame["firewalls"] == "public_ipv6"

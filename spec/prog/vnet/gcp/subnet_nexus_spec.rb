@@ -85,19 +85,18 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#create_vpc_firewall_rules" do
-    it "creates both deny rules when they do not exist" do
-      expect(firewalls_client).to receive(:get)
-        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(firewalls_client).to receive(:get)
-        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-egress")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+    it "creates all deny rules (IPv4 and IPv6) when they do not exist" do
+      %w[deny-ingress deny-egress deny-ingress-ipv6 deny-egress-ipv6].each do |suffix|
+        expect(firewalls_client).to receive(:get)
+          .with(project: "test-gcp-project", firewall: "#{vpc_name}-#{suffix}")
+          .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      end
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: false)
-      expect(op).to receive(:wait_until_done!).twice
+      expect(op).to receive(:wait_until_done!).exactly(4).times
 
       created_rules = []
-      expect(firewalls_client).to receive(:insert).twice do |args|
+      expect(firewalls_client).to receive(:insert).exactly(4).times do |args|
         fw = args[:firewall_resource]
         created_rules << {
           name: fw.name,
@@ -122,15 +121,22 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(egress_rule[:priority]).to eq(65534)
       expect(egress_rule[:target_tags]).to eq(["ubicloud-vm"])
       expect(egress_rule[:denied]).to eq(["all"])
+
+      ingress_ipv6_rule = created_rules.find { |r| r[:name] == "#{vpc_name}-deny-ingress-ipv6" }
+      expect(ingress_ipv6_rule[:direction]).to eq("INGRESS")
+      expect(ingress_ipv6_rule[:priority]).to eq(65534)
+
+      egress_ipv6_rule = created_rules.find { |r| r[:name] == "#{vpc_name}-deny-egress-ipv6" }
+      expect(egress_ipv6_rule[:direction]).to eq("EGRESS")
+      expect(egress_ipv6_rule[:priority]).to eq(65534)
     end
 
     it "skips creation when deny rules already exist" do
-      expect(firewalls_client).to receive(:get)
-        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
-        .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-ingress"))
-      expect(firewalls_client).to receive(:get)
-        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-egress")
-        .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-egress"))
+      %w[deny-ingress deny-egress deny-ingress-ipv6 deny-egress-ipv6].each do |suffix|
+        expect(firewalls_client).to receive(:get)
+          .with(project: "test-gcp-project", firewall: "#{vpc_name}-#{suffix}")
+          .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-#{suffix}"))
+      end
 
       expect(firewalls_client).not_to receive(:insert)
 
@@ -150,13 +156,16 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_vpc_firewall_rules }.to raise_error(RuntimeError, /Firewall rule #{Regexp.escape(vpc_name)}-deny-ingress creation failed/)
     end
 
-    it "sets correct source_ranges for ingress deny rule" do
+    it "sets correct source_ranges for IPv4 ingress deny rule" do
       expect(firewalls_client).to receive(:get)
         .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(firewalls_client).to receive(:get)
-        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-egress")
-        .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-egress"))
+      # Other rules already exist
+      %w[deny-egress deny-ingress-ipv6 deny-egress-ipv6].each do |suffix|
+        expect(firewalls_client).to receive(:get)
+          .with(project: "test-gcp-project", firewall: "#{vpc_name}-#{suffix}")
+          .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-#{suffix}"))
+      end
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: false)
       expect(op).to receive(:wait_until_done!)
@@ -171,13 +180,19 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_vpc_firewall_rules }.to hop("create_subnet")
     end
 
-    it "sets correct destination_ranges for egress deny rule" do
+    it "sets correct destination_ranges for IPv4 egress deny rule" do
       expect(firewalls_client).to receive(:get)
         .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
         .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-ingress"))
       expect(firewalls_client).to receive(:get)
         .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-egress")
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      # IPv6 rules already exist
+      %w[deny-ingress-ipv6 deny-egress-ipv6].each do |suffix|
+        expect(firewalls_client).to receive(:get)
+          .with(project: "test-gcp-project", firewall: "#{vpc_name}-#{suffix}")
+          .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-#{suffix}"))
+      end
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: false)
       expect(op).to receive(:wait_until_done!)
@@ -186,6 +201,33 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         fw = args[:firewall_resource]
         expect(fw.destination_ranges.to_a).to eq(["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"])
         expect(fw.source_ranges.to_a).to be_empty
+        op
+      end
+
+      expect { nx.create_vpc_firewall_rules }.to hop("create_subnet")
+    end
+
+    it "sets correct source_ranges for IPv6 ingress deny rule" do
+      # IPv4 rules already exist
+      %w[deny-ingress deny-egress].each do |suffix|
+        expect(firewalls_client).to receive(:get)
+          .with(project: "test-gcp-project", firewall: "#{vpc_name}-#{suffix}")
+          .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-#{suffix}"))
+      end
+      expect(firewalls_client).to receive(:get)
+        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress-ipv6")
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(firewalls_client).to receive(:get)
+        .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-egress-ipv6")
+        .and_return(Google::Cloud::Compute::V1::Firewall.new(name: "#{vpc_name}-deny-egress-ipv6"))
+
+      op = instance_double(Gapic::GenericLRO::Operation, error?: false)
+      expect(op).to receive(:wait_until_done!)
+
+      expect(firewalls_client).to receive(:insert) do |args|
+        fw = args[:firewall_resource]
+        expect(fw.source_ranges.to_a).to eq(["fd20::/20"])
+        expect(fw.destination_ranges.to_a).to be_empty
         op
       end
 
@@ -204,7 +246,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_subnet }.to hop("create_subnet_allow_rules")
     end
 
-    it "creates subnet if not found" do
+    it "creates dual-stack subnet if not found" do
       expect(subnetworks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: false)
@@ -217,6 +259,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(sr.ip_cidr_range).to eq("10.0.0.0/26")
         expect(sr.network).to eq("projects/test-gcp-project/global/networks/#{vpc_name}")
         expect(sr.private_ip_google_access).to be(true)
+        expect(sr.stack_type).to eq("IPV4_IPV6")
+        expect(sr.ipv6_access_type).to eq("EXTERNAL")
         op
       end
 

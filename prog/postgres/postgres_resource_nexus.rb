@@ -152,7 +152,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         record_name = "private.#{record_name}"
         dns_zone.delete_record(record_name:)
         dns_zone.insert_record(record_name:, type: "A", ttl: 10, data: vm.private_ipv4_string)
-        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string) unless vm.location.gcp?
+        dns_zone.insert_record(record_name:, type: "AAAA", ttl: 10, data: vm.private_ipv6_string)
       end
     end
 

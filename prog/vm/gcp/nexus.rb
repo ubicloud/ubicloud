@@ -64,12 +64,20 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           network: "projects/#{gcp_project_id}/global/networks/#{gce_network_name}",
           subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gce_subnet_name}",
           network_i_p: nic&.private_ipv4&.network&.to_s,
+          stack_type: "IPV4_IPV6",
           access_configs: [
             Google::Cloud::Compute::V1::AccessConfig.new(
               name: "External NAT",
               type: "ONE_TO_ONE_NAT",
               network_tier: "STANDARD",
               nat_i_p: nic&.nic_gcp_resource&.static_ip
+            )
+          ],
+          ipv6_access_configs: [
+            Google::Cloud::Compute::V1::AccessConfig.new(
+              name: "External IPv6",
+              type: "DIRECT_IPV6",
+              network_tier: "PREMIUM"
             )
           ]
         )
@@ -142,13 +150,14 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     ni = instance.network_interfaces.first
     public_ipv4 = ni && ni.access_configs.first&.nat_i_p
+    public_ipv6 = ni&.ipv6_access_configs&.first&.external_ipv6
 
     if public_ipv4
       AssignedVmAddress.create(dst_vm_id: vm.id, ip: public_ipv4)
       vm.sshable.update(host: public_ipv4)
     end
 
-    vm.update(cores: vm.vcpus / 2, allocated_at: Time.now)
+    vm.update(cores: vm.vcpus / 2, allocated_at: Time.now, ephemeral_net6: public_ipv6)
 
     hop_wait_sshable
   end
