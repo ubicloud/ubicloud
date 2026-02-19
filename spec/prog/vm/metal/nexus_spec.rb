@@ -858,11 +858,21 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#start_after_stop" do
-    it "hops to wait after starting the vm" do
+    it "starts VM if start semaphore is set" do
       vm.incr_start
       expect(sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
-      expect { nx.start_after_stop }.to hop("wait")
+      expect { nx.start_after_stop }.to nap(5)
         .and change { vm.reload.start_set? }.from(true).to(false)
+    end
+
+    it "hops to wait if vm is available" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect { nx.start_after_stop }.to hop("wait")
+    end
+
+    it "naps if vm is not yet available" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.start_after_stop }.to nap(5)
     end
   end
 
