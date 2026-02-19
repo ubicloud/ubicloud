@@ -9,6 +9,7 @@ require "json"
 require "openssl"
 require "base64"
 require "uri"
+require "yaml"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
@@ -34,22 +35,6 @@ class VmSetup
 
   def q_vm
     @q_vm ||= @vm_name.shellescape
-  end
-
-  # YAML quoting
-  def yq(s)
-    require "yaml"
-    # I don't see a better way to quote a string meant for embedding
-    # in literal YAML other than to generate a full YAML document and
-    # then stripping out headers and footers.  Consider the special
-    # string "NO" (parses as boolean, unless quoted):
-    #
-    # > YAML.dump('NO')
-    # => "--- 'NO'\n"
-    #
-    # > YAML.dump('NO')[4..-2]
-    # => "'NO'"
-    YAML.dump(s, line_width: -1)[4..-2]
   end
 
   def vp
@@ -490,10 +475,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def cloudinit(unix_user, public_keys, gua, nics, swap_size_bytes, boot_image, dns_ipv4, ipv6_disabled:, init_script: nil)
-    vp.write_meta_data(<<EOS)
-instance-id: #{yq(@vm_name)}
-local-hostname: #{yq(@vm_name)}
-EOS
+    meta = {"instance-id" => @vm_name, "local-hostname" => @vm_name}
+    vp.write_meta_data(YAML.dump(meta, line_width: -1))
 
     guest_network = subdivide_network(NetAddr.parse_net(gua)).first unless ipv6_disabled
     guest_network_dhcp = "dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}" unless ipv6_disabled
@@ -554,21 +537,12 @@ dns-forward-max=10000
 #{ip_config}
 DNSMASQ_CONF
 
-    ethernets = nics.map do |nic|
-      <<ETHERNETS
-  #{yq("enx" + nic.mac.tr(":", "").downcase)}:
-    match:
-      macaddress: "#{nic.mac}"
-    dhcp6: true
-    dhcp4: true
-ETHERNETS
-    end.join("\n")
-
-    vp.write_network_config(<<EOS)
-version: 2
-ethernets:
-#{ethernets}
-EOS
+    ethernets = nics.to_h do |nic|
+      ["enx" + nic.mac.tr(":", "").downcase,
+       {"match" => {"macaddress" => nic.mac}, "dhcp6" => true, "dhcp4" => true}]
+    end
+    network = {"version" => 2, "ethernets" => ethernets}
+    vp.write_network_config(YAML.dump(network, line_width: -1))
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
@@ -581,8 +555,6 @@ EOS
   end
 
   def write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: nil)
-    require "yaml"
-
     runcmd = [%w[systemctl daemon-reload]]
     runcmd.concat(install_commands(boot_image))
     runcmd << init_script if init_script

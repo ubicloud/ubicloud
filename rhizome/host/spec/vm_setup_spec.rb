@@ -136,6 +136,54 @@ RSpec.describe VmSetup do
     end
   end
 
+  describe "#cloudinit" do
+    let(:vps) { instance_spy(VmPath) }
+    let(:nics) { [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest", "3e:bd:a5:96:f7:b9", "10.0.0.254/32")] }
+
+    before do
+      allow(vs).to receive(:vp).and_return(vps)
+      allow(vs).to receive(:write_user_data)
+      allow(vs).to receive(:r)
+      allow(FileUtils).to receive(:rm_rf)
+      allow(FileUtils).to receive(:chmod)
+      allow(FileUtils).to receive(:chown)
+    end
+
+    it "generates valid YAML meta-data with instance-id and local-hostname" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      expect(vps).to have_received(:write_meta_data) { |raw|
+        meta = YAML.safe_load(raw)
+        expect(meta["instance-id"]).to eq("test")
+        expect(meta["local-hostname"]).to eq("test")
+      }
+    end
+
+    it "generates valid YAML network-config with ethernets" do
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      expect(vps).to have_received(:write_network_config) { |raw|
+        config = YAML.safe_load(raw)
+        expect(config["version"]).to eq(2)
+        expect(config["ethernets"]).to have_key("enx3ebda596f7b9")
+        iface = config["ethernets"]["enx3ebda596f7b9"]
+        expect(iface["match"]["macaddress"]).to eq("3e:bd:a5:96:f7:b9")
+        expect(iface["dhcp6"]).to eq(true)
+        expect(iface["dhcp4"]).to eq(true)
+      }
+    end
+
+    it "generates network-config with multiple NICs" do
+      multi_nics = [
+        VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest1", "3e:bd:a5:96:f7:b9", "10.0.0.254/32"),
+        VmSetup::Nic.new("fddf:53d2:4c89:2305:46a0::/79", "10.10.10.10/32", "nctest2", "fb:55:dd:ba:21:0a", "10.0.0.253/32")
+      ]
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", multi_nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      expect(vps).to have_received(:write_network_config) { |raw|
+        config = YAML.safe_load(raw)
+        expect(config["ethernets"].keys).to contain_exactly("enx3ebda596f7b9", "enxfb55ddba210a")
+      }
+    end
+  end
+
   describe "#purge_storage" do
     let(:vol_1_params) {
       {
