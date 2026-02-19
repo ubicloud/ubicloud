@@ -570,7 +570,7 @@ SQL
         nap 15 * 60
       end
 
-      if postgres_server.lsn_diff(lsn, previous_lsn) > 0
+      if PostgresServer.lsn_diff(lsn, previous_lsn) > 0
         update_stack_lsn(lsn)
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
