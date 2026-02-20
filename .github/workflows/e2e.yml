@@ -48,7 +48,7 @@ jobs:
     runs-on: ubicloud-standard-4
     environment: ${{ matrix.provider == 'metal' && 'E2E-metal' || 'E2E-aws' }}
     timeout-minutes: 85
-    concurrency: ${{ matrix.provider == 'metal' && 'E2E-metal' || 'E2E-cloud' }}
+    concurrency: E2E-${{ matrix.provider }}
 
     steps:
     - name: Check out code
