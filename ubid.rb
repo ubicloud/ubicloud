@@ -134,6 +134,11 @@ class UBID
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
   end
 
+  def self.generate_from_time(type, time)
+    random_value = SecureRandom.random_number(MAX_ENTROPY)
+    from_parts((time.to_f * 1000).round, type, random_value & 0b11, random_value >> 2)
+  end
+
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea
   ACTION_TYPE_PREFIX_MAP = <<~TYPES.split("\n").to_h { it.split(": ") }.freeze
     Project: pj
