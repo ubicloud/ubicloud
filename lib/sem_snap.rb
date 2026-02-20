@@ -24,6 +24,12 @@ class SemSnap
     apply
   end
 
+  def set_at(name)
+    if @extant.include?(name)
+      Semaphore.set_at(@extant[name].min)
+    end
+  end
+
   def set?(name)
     name = name.intern
     @extant.include?(name)
