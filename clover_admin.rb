@@ -291,6 +291,8 @@ class CloverAdmin < Roda
     register_by_name if Config.development?
     # :nocov:
 
+    framework = self
+
     pagination_strategy :filter
     order [:id]
     supported_actions [:browse, :search]
@@ -326,6 +328,15 @@ class CloverAdmin < Roda
         value
       end
       ds.where(column => uuid)
+    end
+
+    column_search_filter do |model, ds, column, value|
+      case column
+      when :created_at
+        column_grep.call(ds, :created_at, value)
+      when :project
+        ubid_uuid_grep.call(ds, :project_id, value)
+      end
     end
 
     ubid_input = lambda do |name|
@@ -423,10 +434,10 @@ class CloverAdmin < Roda
         case column
         when :strand_label
           column_grep.call(ds, Sequel[:strand][:label], value)
-        when :created_at
-          column_grep.call(ds, column, value)
         when :installation
           ubid_uuid_grep.call(ds, :installation_id, value)
+        else
+          framework
         end
       end
     end
@@ -469,8 +480,8 @@ class CloverAdmin < Roda
         case column
         when :fraud
           ds.where(fraud: value == "t")
-        when :created_at
-          column_grep.call(ds, column, value)
+        else
+          framework
         end
       end
     end
@@ -491,10 +502,10 @@ class CloverAdmin < Roda
 
       column_search_filter do |ds, column, value|
         case column
-        when :project, :parent
-          ubid_uuid_grep.call(ds, :"#{column}_id", value)
-        when :created_at
-          column_grep.call(ds, :created_at, value)
+        when :parent
+          ubid_uuid_grep.call(ds, :parent_id, value)
+        else
+          framework
         end
       end
     end
@@ -520,8 +531,8 @@ class CloverAdmin < Roda
         case column
         when :resource
           ubid_uuid_grep.call(ds, :resource_id, value)
-        when :created_at
-          column_grep.call(ds, column, value)
+        else
+          framework
         end
       end
     end
@@ -531,13 +542,6 @@ class CloverAdmin < Roda
       columns [:name, :reputation, :billing_info_id, :credit, :created_at]
       column_options reputation: {type: "select", options: %w[new verified limited], add_blank: true},
         created_at: {type: "text"}
-
-      column_search_filter do |ds, column, value|
-        case column
-        when :created_at
-          column_grep.call(ds, column, value)
-        end
-      end
     end
 
     model Strand do
@@ -564,15 +568,6 @@ class CloverAdmin < Roda
         vcpus: {type: "number"},
         created_at: {type: "text"},
         project: ubid_input.call("Project")
-
-      column_search_filter do |ds, column, value|
-        case column
-        when :created_at
-          column_grep.call(ds, :created_at, value)
-        when :project
-          ubid_uuid_grep.call(ds, :project_id, value)
-        end
-      end
     end
 
     model VmHost do
