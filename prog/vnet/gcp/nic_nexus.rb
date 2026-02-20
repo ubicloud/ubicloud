@@ -45,7 +45,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       address_resource:
     )
     op.wait_until_done!
-    raise "GCP static IP reservation failed: #{op.results.error}" if op.error?
+    raise "GCP static IP reservation failed: #{op.error}" if op.error?
 
     addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
     nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
@@ -89,7 +89,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
 
     op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
     op.wait_until_done!
-    raise "GCP static IP release failed: #{op.results.error}" if op.error?
+    raise "GCP static IP release failed: #{op.error}" if op.error?
   rescue Google::Cloud::NotFoundError
     # Already released
   end

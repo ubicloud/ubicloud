@@ -75,8 +75,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "raises if VPC creation fails" do
       expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      error_result = Struct.new(:error).new("operation failed")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(networks_client).to receive(:insert).and_return(op)
 
@@ -148,8 +147,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      error_result = Struct.new(:error).new("operation failed")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(firewalls_client).to receive(:insert).and_return(op)
 
@@ -270,8 +268,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "raises if subnet creation fails" do
       expect(subnetworks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      error_result = Struct.new(:error).new("operation failed")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(subnetworks_client).to receive(:insert).and_return(op)
 
@@ -327,8 +324,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
-      error_result = Struct.new(:error).new("resource in use")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "resource in use")
       expect(op).to receive(:wait_until_done!)
       expect(subnetworks_client).to receive(:delete).and_return(op)
       expect { nx.destroy }.to raise_error(RuntimeError, /GCP subnet delete failed/)

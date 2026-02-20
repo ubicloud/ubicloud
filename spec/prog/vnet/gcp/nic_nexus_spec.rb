@@ -123,8 +123,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(addresses_client).to receive(:get)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      error_result = Struct.new(:error).new("quota exceeded")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "quota exceeded")
       expect(op).to receive(:wait_until_done!)
       expect(addresses_client).to receive(:insert).and_return(op)
 
@@ -164,8 +163,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "raises when static IP release fails with non-NotFound error" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1")
 
-      error_result = Struct.new(:error).new("quota exceeded")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "quota exceeded")
       expect(op).to receive(:wait_until_done!)
       expect(addresses_client).to receive(:delete).and_return(op)
 

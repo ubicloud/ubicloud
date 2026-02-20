@@ -36,7 +36,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         )
       )
       op.wait_until_done!
-      raise "VPC creation failed: #{op.results.error}" if op.error?
+      raise "VPC creation failed: #{op.error}" if op.error?
     end
 
     hop_create_vpc_firewall_rules
@@ -96,7 +96,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         )
       )
       op.wait_until_done!
-      raise "Subnet creation failed: #{op.results.error}" if op.error?
+      raise "Subnet creation failed: #{op.error}" if op.error?
     end
 
     hop_create_subnet_allow_rules
@@ -184,7 +184,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
     op = credential.firewalls_client.insert(project: gcp_project_id, firewall_resource: fw)
     op.wait_until_done!
-    raise "Firewall rule #{name} creation failed: #{op.results.error}" if op.error?
+    raise "Firewall rule #{name} creation failed: #{op.error}" if op.error?
   end
 
   def ensure_allow_rule(name:, direction:, source_ranges:, destination_ranges:, allowed:, target_tags: ["ubicloud-vm"])
@@ -204,7 +204,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
     op = credential.firewalls_client.insert(project: gcp_project_id, firewall_resource: fw)
     op.wait_until_done!
-    raise "Firewall rule #{name} creation failed: #{op.results.error}" if op.error?
+    raise "Firewall rule #{name} creation failed: #{op.error}" if op.error?
   end
 
   def delete_gcp_subnet
@@ -215,7 +215,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       subnetwork: subnet_name
     )
     op.wait_until_done!
-    raise "GCP subnet delete failed: #{op.results.error}" if op.error?
+    raise "GCP subnet delete failed: #{op.error}" if op.error?
     true
   rescue Google::Cloud::NotFoundError
     true # Already deleted
