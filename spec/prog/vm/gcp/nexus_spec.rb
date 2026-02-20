@@ -136,11 +136,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "raises if the GCE operation fails" do
       vm.nics.first.strand.update(label: "wait")
       error_result = Struct.new(:error).new("operation failed")
-      op = instance_double(Gapic::GenericLRO::Operation, error?: true, results: error_result)
+      lro_err = Struct.new(:code, :message).new(400, "operation failed")
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: lro_err, results: error_result)
       expect(op).to receive(:wait_until_done!)
       expect(compute_client).to receive(:insert).and_return(op)
 
-      expect { nx.start }.to raise_error(RuntimeError, /GCE instance creation failed/)
+      expect { nx.start }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
     it "retries on ResourceExhaustedError with backoff" do

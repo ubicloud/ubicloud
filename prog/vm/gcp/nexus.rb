@@ -113,13 +113,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
       op.wait_until_done!
       if op.error?
-        op_error = op.results
-        op_error = op_error.error if op_error.respond_to?(:error)
-        error_code = op_error.respond_to?(:errors) && op_error.errors&.first&.code
+        error_code = gce_lro_error_code(op)
         if %w[ZONE_RESOURCE_POOL_EXHAUSTED QUOTA_EXCEEDED].include?(error_code)
           retry_zone_capacity("GCE operation error: #{error_code}")
         end
-        raise "GCE instance creation failed: #{op_error}"
+        raise "GCE instance creation failed: #{lro_error_message(op)}"
       end
     rescue Google::Cloud::AlreadyExistsError
       # Instance already exists from a prior attempt — proceed to wait
@@ -363,5 +361,17 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
   rescue Google::Cloud::Error => e
     Clog.emit("Failed to clean up GCE firewall rules") { {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}} }
+  end
+
+  def lro_error_message(op)
+    err = op.error
+    return err.to_s unless err.respond_to?(:code)
+    "#{err.message} (code: #{err.code})"
+  end
+
+  def gce_lro_error_code(op)
+    inner = op.results
+    inner = inner.error if inner.respond_to?(:error)
+    inner.respond_to?(:errors) && inner.errors&.first&.code
   end
 end
