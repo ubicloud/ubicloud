@@ -356,7 +356,7 @@ jobs:
         E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
         E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
       run: |
-        ruby -r ./loader -e '
+        ruby -r bundler/setup -e '
           creds_json = ENV["E2E_GCP_CREDENTIALS_JSON"]
           project_id = ENV["E2E_GCP_PROJECT_ID"]
           unless creds_json && project_id
