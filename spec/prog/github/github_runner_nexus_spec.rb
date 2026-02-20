@@ -852,7 +852,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: nil, data_center: nil}})
 
       nx.collect_final_telemetry
     end
@@ -866,7 +866,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "failure", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -881,7 +881,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       COMMAND
       expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return("Received request - method: GET urlPath: foo\nReserveCache request failed with status code: 409\n")
 
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: nil, vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
 
       nx.collect_final_telemetry
     end
@@ -907,9 +907,36 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       LOG
 
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 2, message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
-      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {count: 1, message: "PUT request failed with status code: 500", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "ReserveCache request failed with status code: 409", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}}).twice
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "Error copying response: readfrom tcp 10_163_176_47:51123->10_163_176_47:46162: context canceled", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message: "PUT request failed with status code: 500", label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+
+      nx.collect_final_telemetry
+    end
+
+    it "Logs docker limits and JSON cache proxy log if workflow_job is successful" do
+      runner.update(workflow_job: {"conclusion" => "success"})
+      expect(vm.sshable).to receive(:_cmd).with(<<~COMMAND, log: false)
+        TOKEN=$(curl -m 10 -s "https://auth.docker.io/token?service=registry.docker.io&scope=repository:ratelimitpreview/test:pull" | jq -r .token)
+        curl -m 10 -s --head -H "Authorization: Bearer $TOKEN" https://registry-1.docker.io/v2/ratelimitpreview/test/manifests/latest | grep ratelimit
+      COMMAND
+      expect(vm.sshable).to receive(:_cmd).with("sudo cat /var/log/cacheproxy.log", log: false).and_return(<<~LOG)
+        {"time":"2026-02-16T16:20:55.11602513Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"GET","url_path":"/random_token/_apis/artifactcache/cache","host":"10.67.229.168:51123"}
+        {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":204}
+        {"time":"2026-02-16T16:20:55.146469774Z","level":"ERROR","msg":"Request failed with unexpected status code","version":"0.7.0","error_type":"backend","function_name":"GetCacheEntry","status_code":500}
+        {"time":"2026-02-16T16:20:55.146956456Z","level":"INFO","msg":"Received request","version":"0.7.0","http_method":"POST","url_path":"/random_token/_apis/artifactcache/caches","host":"10.67.229.168:51123"}
+        {"time":"2026-02-16T16:20:55.730648373Z","level":"WARN","msg":"Retrying request","version":"0.7.0","error_type":"r2","retry_count":1,"max_retries":3,"error":"write tcp: connection reset by peer","status_code":0}
+        {"time":"2026-02-16T16:20:55.730648373Z","level":"ERROR","msg":"Request failed","version":"0.7.0","error_type":"backend","function_name":"ReserveCache","status_code":409}
+        invalid json line
+      LOG
+
+      [
+        {"time" => "2026-02-16T16:20:55.146469774Z", "level" => "ERROR", "msg" => "Request failed with unexpected status code", "version" => "0.7.0", "error_type" => "backend", "function_name" => "GetCacheEntry", "status_code" => 500},
+        {"time" => "2026-02-16T16:20:55.730648373Z", "level" => "WARN", "msg" => "Retrying request", "version" => "0.7.0", "error_type" => "r2", "retry_count" => 1, "max_retries" => 3, "error" => "write tcp: connection reset by peer", "status_code" => 0},
+        "invalid json line"
+      ].each do |message|
+        expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message:, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
+      end
 
       nx.collect_final_telemetry
     end
