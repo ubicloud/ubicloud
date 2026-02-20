@@ -245,7 +245,7 @@ SQL
       e
     rescue Prog::Base::Hop => hp
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("hopped", {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+      Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
       top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
@@ -254,7 +254,7 @@ SQL
       hp
     rescue Prog::Base::Exit => ext
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("exited", {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}})
+      Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
       update(exitval: ext.exitval, retval: nil)
       if parent_id
@@ -275,14 +275,14 @@ SQL
 
       # Wrap errors in non-pry, and emit for the strand actually causing the error.
       duration = Time.now - start_time
-      Clog.emit("exception terminates strand run", [self, Util.exception_to_hash(ex, into: {strand_error: {duration:, from: prog_label}})])
+      Clog.emit("exception terminates strand run", Util.exception_to_hash(ex, into: {strand_error: {strand: ubid, try:, duration:, from: prog_label}}))
       raise RunError.new(self)
     else
       raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
     duration = Time.now - start_time
-    Clog.emit("finished strand", [self, {strand_finished: {duration:, prog_label:}}]) if duration > 1
+    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > 1
   end
 
   def run(seconds = 0)
