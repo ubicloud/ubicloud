@@ -114,15 +114,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
     )
 
-    # Allow same-subnet ingress (overrides the VPC-wide deny-ingress at 65534)
-    ensure_allow_rule(
-      name: subnet_allow_rule_name("ingress"),
-      direction: "INGRESS",
-      source_ranges: [private_subnet.net4.to_s],
-      destination_ranges: nil,
-      target_tags: [subnet_tag],
-      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
-    )
+    # Ingress is NOT allowed at subnet level — per-VM firewall rules control
+    # all ingress. This matches metal (iptables) and AWS (security groups)
+    # where ingress is denied by default.
 
     # Allow same-subnet IPv6 egress (overrides VPC-wide deny-egress-ipv6)
     ensure_allow_rule(
@@ -130,16 +124,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       direction: "EGRESS",
       source_ranges: nil,
       destination_ranges: [private_subnet.net6.to_s],
-      target_tags: [subnet_tag],
-      allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
-    )
-
-    # Allow same-subnet IPv6 ingress (overrides VPC-wide deny-ingress-ipv6)
-    ensure_allow_rule(
-      name: subnet_allow_rule_name("ingress-ipv6"),
-      direction: "INGRESS",
-      source_ranges: [private_subnet.net6.to_s],
-      destination_ranges: nil,
       target_tags: [subnet_tag],
       allowed: [Google::Cloud::Compute::V1::Allowed.new(I_p_protocol: "all")]
     )
