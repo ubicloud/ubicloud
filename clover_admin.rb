@@ -168,7 +168,7 @@ class CloverAdmin < Roda
   end
 
   ObjectAction = Data.define(:label, :flash, :params, :type, :action) do
-    def self.define(label, flash, params = {}, type: :normal, &action)
+    def self.define(label, flash: nil, params: {}, type: :normal, &action)
       new(label, flash, params.dup.freeze, type, action)
     end
 
@@ -183,33 +183,33 @@ class CloverAdmin < Roda
 
   OBJECT_ACTIONS = {
     "Account" => {
-      "suspend" => object_action("Suspend", "Account suspended", &:suspend)
+      "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend)
     },
     "Invoice" => {
-      "download_pdf" => object_action("Download PDF", "Download link is not available", type: :direct) do |obj|
+      "download_pdf" => object_action("Download PDF", type: :direct) do |obj|
         obj.generate_download_link
       end
     },
     "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", "Spare runner provisioned", type: :form, &:provision_spare_runner)
+      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
     },
     "GithubRepository" => {
-      "show_job_log" => object_action("Show Job Log", nil, {job_id: :pos_int!}) do |obj, job_id|
+      "show_job_log" => object_action("Show Job Log", params: {job_id: :pos_int!}) do |obj, job_id|
         url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       end
     },
     "Page" => {
-      "resolve" => object_action("Resolve", "Resolve scheduled for Page", &:incr_resolve)
+      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve)
     },
     "PostgresResource" => {
-      "restart" => object_action("Restart", "Restart scheduled for PostgresResource", &:incr_restart)
+      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart)
     },
     "Project" => {
-      "add_credit" => object_action("Add credit", "Added credit", {credit: "float!"}) do |obj, credit|
+      "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: "float!"}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
       end,
-      "set_feature_flag" => object_action("Set Feature Flag", "Set feature flag", {
+      "set_feature_flag" => object_action("Set Feature Flag", flash: "Set feature flag", params: {
         name: {
           typecast: :str!,
           type: "select",
@@ -229,7 +229,7 @@ class CloverAdmin < Roda
         end
         obj.send("set_ff_#{name}", value)
       end,
-      "set_quota" => object_action("Set Quota", "Set quota", {
+      "set_quota" => object_action("Set Quota", flash: "Set quota", params: {
         resource_type: {
           typecast: :str!,
           type: "select",
@@ -256,16 +256,16 @@ class CloverAdmin < Roda
       end
     },
     "Strand" => {
-      "schedule" => object_action("Schedule Strand to Run Immediately", "Scheduled strand to run immediately", type: :form) do |obj|
+      "schedule" => object_action("Schedule Strand to Run Immediately", flash: "Scheduled strand to run immediately", type: :form) do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
       end,
-      "extend" => object_action("Extend Schedule", "Extended schedule", {minutes: :pos_int!}) do |obj, minutes|
+      "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: :pos_int!}) do |obj, minutes|
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
       end
     },
     "Vm" => {
-      "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart),
-      "stop" => object_action("Stop", "Stop scheduled for Vm") do |obj|
+      "restart" => object_action("Restart", flash: "Restart scheduled for Vm", &:incr_restart),
+      "stop" => object_action("Stop", flash: "Stop scheduled for Vm") do |obj|
         DB.transaction do
           obj.incr_admin_stop
           obj.incr_stop
@@ -273,14 +273,14 @@ class CloverAdmin < Roda
       end
     },
     "VmHost" => {
-      "accept" => object_action("Move to Accepting", "Host allocation state changed to accepting") do |obj|
+      "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
         obj.update(allocation_state: "accepting")
       end,
-      "drain" => object_action("Move to Draining", "Host allocation state changed to draining") do |obj|
+      "drain" => object_action("Move to Draining", flash: "Host allocation state changed to draining") do |obj|
         obj.update(allocation_state: "draining")
       end,
-      "reset" => object_action("Hardware Reset", "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
-      "reboot" => object_action("Reboot", "Reboot scheduled for VmHost", &:incr_reboot)
+      "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
+      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot)
     }
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
