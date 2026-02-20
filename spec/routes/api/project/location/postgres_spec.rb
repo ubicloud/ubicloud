@@ -523,13 +523,6 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
       end
 
-      it "recycle fails without representative_server" do
-        pg.representative_server.update(is_representative: false)
-        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/recycle"
-
-        expect(last_response.status).to eq(400)
-      end
-
       it "reset password" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
           password: "DummyPassword123"
@@ -919,19 +912,6 @@ RSpec.describe Clover, "postgres" do
         expect(response_body["pg_config"]).to eq({"max_connections" => "100"})
         expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
         expect(response_body["default_pg_config"]).to include("shared_buffers", "work_mem", "max_connections", "effective_cache_size")
-      end
-
-      it "read skips default_pg_config when resource has no representative_server" do
-        pg.representative_server.update(is_representative: false)
-        pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
-
-        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config"
-
-        expect(last_response.status).to eq(200)
-        response_body = JSON.parse(last_response.body)
-        expect(response_body["pg_config"]).to eq({"max_connections" => "100"})
-        expect(response_body["pgbouncer_config"]).to eq({"max_client_conn" => "100"})
-        expect(response_body["default_pg_config"]).to be_nil
       end
 
       it "full update" do

@@ -15,7 +15,7 @@ class PostgresResource < Sequel::Model
       # If the server is in leaseweb, we don't have multiple DCs, that's
       # why we return an empty list of data centers.
       return ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if Config.allow_unspread_servers
-      return ServerExclusionFilters.new(exclude_host_ids: Array(representative_server&.vm&.vm_host_id), exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
+      return ServerExclusionFilters.new(exclude_host_ids: Array(representative_server.vm.vm_host_id), exclude_data_centers: [], exclude_availability_zones: [], availability_zone: nil) if location.provider == HostProvider::LEASEWEB_PROVIDER_NAME
 
       exclude_data_centers = VmHost
         .where(data_center: VmHost

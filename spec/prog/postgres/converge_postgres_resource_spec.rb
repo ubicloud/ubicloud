@@ -75,6 +75,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
+      create_server(resource: parent, is_representative: true)
       pg.update(parent_id: parent.id)
 
       expect { nx.start }.to nap(60)
@@ -191,6 +192,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to provision_servers if there is not enough fresh servers" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
       expect { nx.wait_servers_to_be_ready }.to hop("provision_servers")
     end
 
@@ -211,8 +214,11 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       strand.update(label: "recycle_representative_server")
     end
 
-    it "waits until there is a representative server to act on it" do
-      expect { nx.recycle_representative_server }.to nap
+    it "naps if there is an ongoing failover" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      server.incr_planned_take_over
+      expect { nx.recycle_representative_server }.to nap(60)
     end
 
     it "hops to prune_servers if the representative server does not need recycling" do
@@ -261,6 +267,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to provision_servers if there are not enough fresh servers" do
+      server = create_server(is_representative: true)
+      server.incr_recycle
       expect { nx.wait_for_maintenance_window }.to hop("provision_servers")
     end
 

@@ -53,16 +53,6 @@ RSpec.describe PostgresResource do
     expect(postgres_resource.connection_string).to eq("postgres://postgres:dummy-password@1.2.3.4:5432/postgres?channel_binding=require")
   end
 
-  it "returns connection string as nil if there is no server" do
-    # No server created, no dns_zone
-    expect(postgres_resource.connection_string).to be_nil
-  end
-
-  it "returns replication connection string as nil if there is no server" do
-    # No server created, no dns_zone
-    expect(postgres_resource.replication_connection_string(application_name: "pgubidstandby")).to be_nil
-  end
-
   it "returns replication_connection_string" do
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
@@ -87,7 +77,7 @@ RSpec.describe PostgresResource do
     let(:vm2) { create_hosted_vm(project, private_subnet, "pg-vm-2") }
     let(:ps1) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm1.id,
-        synchronization_status: "ready", timeline_access: "push", version: "16")
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     }
     let(:ps2) {
       PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm2.id,
@@ -159,6 +149,7 @@ RSpec.describe PostgresResource do
     end
 
     it "provisions a new server with the correct timeline for a regular instance" do
+      ps1
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
       allow(postgres_resource).to receive_messages(read_replica?: false, timeline:)
       expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::HETZNER_PROVIDER_NAME).at_least(:once)
@@ -172,6 +163,7 @@ RSpec.describe PostgresResource do
     end
 
     it "provisions a new server with the correct timeline for a read replica" do
+      ps1
       allow(Config).to receive(:allow_unspread_servers).and_return(true)
       parent_timeline = PostgresTimeline.create(location_id:)
       parent_resource = instance_double(described_class, timeline: parent_timeline)
@@ -181,7 +173,7 @@ RSpec.describe PostgresResource do
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(timeline_id: parent_timeline.id)).and_call_original
 
       expect { postgres_resource.provision_new_standby }.to change(PostgresServer, :count).by(1)
-      new_server = PostgresServer.order(:created_at).last
+      new_server = PostgresServer.exclude(id: ps1.id).order(:created_at).last
       expect(new_server.timeline_id).to eq(parent_timeline.id)
       expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
     end
@@ -192,7 +184,6 @@ RSpec.describe PostgresResource do
       ps1
       vm_host = create_vm_host
       vm1.update(vm_host_id: vm_host.id)
-      ps1.update(is_representative: true)
 
       expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [vm_host.id])).and_call_original
 
@@ -200,19 +191,6 @@ RSpec.describe PostgresResource do
       expect(postgres_resource.reload.servers.count).to eq(2)
       new_server = PostgresServer.exclude(id: ps1.id).first
       expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([vm_host.id])
-    end
-
-    it "provisions a new server with empty exclude_host_ids for leaseweb when there is no representative server" do
-      allow(Config).to receive(:allow_unspread_servers).and_return(false)
-      allow(postgres_resource).to receive_messages(read_replica?: false, timeline:)
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::LEASEWEB_PROVIDER_NAME).at_least(:once)
-
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_host_ids: [])).and_call_original
-
-      postgres_resource.provision_new_standby
-      expect(postgres_resource.reload.servers.count).to eq(1)
-      new_server = PostgresServer.first
-      expect(new_server.vm.strand.stack[0]["exclude_host_ids"]).to eq([])
     end
   end
 
@@ -223,7 +201,7 @@ RSpec.describe PostgresResource do
     storage_device = StorageDevice.create(name: "nvme0", vm_host_id: vm_host.id, total_storage_gib: 100, available_storage_gib: 80)
     VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1, storage_device_id: storage_device.id)
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
 
     postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
     expect(postgres_resource.has_enough_fresh_servers?).to be(true)
@@ -366,7 +344,7 @@ RSpec.describe PostgresResource do
     storage_device = StorageDevice.create(name: "nvme0", vm_host_id: vm_host.id, total_storage_gib: 100, available_storage_gib: 80)
     VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1, storage_device_id: storage_device.id)
     server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
     postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
@@ -423,7 +401,7 @@ RSpec.describe PostgresResource do
     vm = create_hosted_vm(project, private_subnet, "pg-vm-needs-recycle")
     # Create server with version 16 while target_version is 17 -> needs_recycling? returns true
     server = PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "16")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "16")
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
 
     postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
@@ -436,7 +414,7 @@ RSpec.describe PostgresResource do
     storage_device = StorageDevice.create(name: "nvme0", vm_host_id: vm_host.id, total_storage_gib: 100, available_storage_gib: 80)
     VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1, storage_device_id: storage_device.id)
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
 
     # 1 server but ha_type requires 2
     postgres_resource.update(ha_type: PostgresResource::HaType::ASYNC)
@@ -449,7 +427,7 @@ RSpec.describe PostgresResource do
     storage_device = StorageDevice.create(name: "nvme0", vm_host_id: vm_host.id, total_storage_gib: 100, available_storage_gib: 80)
     VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 64, disk_index: 1, storage_device_id: storage_device.id)
     PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-      synchronization_status: "ready", timeline_access: "push", version: "17")
+      is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
 
     # 1 server, ha_type requires 1, no recycling needed
     postgres_resource.update(ha_type: PostgresResource::HaType::NONE)
@@ -529,11 +507,12 @@ RSpec.describe PostgresResource do
     end
 
     it "returns 'running' when strand label is 'wait' and has no children" do
-      # The strand already has label "wait" from subject, no children by default
+      create_representative_server(strand_label: "wait")
       expect(postgres_resource.display_state).to eq("running")
     end
 
     it "returns 'creating' when strand is 'wait_server'" do
+      create_representative_server(strand_label: "wait")
       postgres_resource.strand.update(label: "wait_server")
       expect(postgres_resource.display_state).to eq("creating")
     end
@@ -626,7 +605,10 @@ RSpec.describe PostgresResource do
     end
 
     it "returns not_running if the postgres resource does not need upgrade" do
-      # No child strands, version == target_version (default)
+      # Create representative server with matching version so version == target_version
+      vm = create_hosted_vm(project, private_subnet, "pg-vm-no-upgrade")
+      PostgresServer.create(timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
+        is_representative: true, synchronization_status: "ready", timeline_access: "push", version: "17")
       expect(postgres_resource.upgrade_status).to eq("not_running")
     end
 
@@ -690,12 +672,6 @@ RSpec.describe PostgresResource do
       account_with_no_access.add_project(project)
       allow(Util).to receive(:send_email)
       allow(postgres_resource).to receive(:representative_server).and_return(server)
-    end
-
-    it "returns early if representative server is nil" do
-      expect(postgres_resource).to receive(:representative_server).and_return(nil)
-      expect(postgres_resource).not_to receive(:next_storage_auto_scale_option)
-      postgres_resource.handle_storage_auto_scale
     end
 
     it "returns early and logs if disk usage check fails" do

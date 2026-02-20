@@ -39,17 +39,21 @@ class PostgresResource < Sequel::Model
   end
 
   def vm_size
-    representative_server&.vm&.display_size&.gsub("burstable", "hobby") || target_vm_size
+    representative_server.vm.display_size.gsub("burstable", "hobby")
   end
 
   def storage_size_gib
-    representative_server&.storage_size_gib || target_storage_size_gib
+    representative_server.storage_size_gib
+  end
+
+  def version
+    representative_server.version
   end
 
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
-    server_strand_label = representative_server&.strand&.label
+    server_strand_label = representative_server.strand.label
     return "unavailable" if server_strand_label == "unavailable"
     return "restoring_backup" if server_strand_label == "initialize_database_from_backup"
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
@@ -73,7 +77,7 @@ class PostgresResource < Sequel::Model
     !location.aws? &&
       created_at < AAAA_CUTOFF &&
       dns_zone &&
-      representative_server&.vm&.ip6_string &&
+      representative_server.vm.ip6_string &&
       dns_zone
         .records_dataset
         .where(type: "AAAA", name: hostname + ".")
@@ -86,7 +90,7 @@ class PostgresResource < Sequel::Model
 
       "#{name}.#{ubid}.#{hostname_suffix}"
     else
-      representative_server&.vm&.ip4_string
+      representative_server.vm.ip4_string
     end
   end
 
@@ -95,12 +99,10 @@ class PostgresResource < Sequel::Model
   end
 
   def connection_string
-    return nil unless (hn = hostname)
-
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
-      host: hn,
+      host: hostname,
       port: 5432,
       path: "/postgres",
       query: "channel_binding=require"
@@ -108,8 +110,6 @@ class PostgresResource < Sequel::Model
   end
 
   def replication_connection_string(application_name:)
-    return nil unless dns_zone || representative_server
-
     query_parameters = {
       sslrootcert: "/etc/ssl/certs/ca.crt",
       sslcert: "/etc/ssl/certs/server.crt",
@@ -120,10 +120,6 @@ class PostgresResource < Sequel::Model
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
-  end
-
-  def version
-    representative_server&.version || target_version
   end
 
   def provision_new_standby
@@ -240,8 +236,6 @@ class PostgresResource < Sequel::Model
   end
 
   def handle_storage_auto_scale
-    return unless representative_server
-
     begin
       disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     rescue
