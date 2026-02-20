@@ -101,6 +101,10 @@ def test_gcp(options, test_cases)
   end
 
   tests_to_wait = []
+  if options[:test_cases].include?("vm")
+    tests_to_wait << Prog::Test::VmGroup.assemble(boot_images: ["ubuntu-noble"], provider: "gcp")
+  end
+
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "gcp")
   end

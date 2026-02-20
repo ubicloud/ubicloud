@@ -325,12 +325,20 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
   end
 
+  GCE_BOOT_IMAGE_FAMILIES = {
+    "ubuntu-noble" => {project: "ubuntu-os-cloud", family: "ubuntu-2404-lts-ARCH"},
+    "ubuntu-jammy" => {project: "ubuntu-os-cloud", family: "ubuntu-2204-lts-ARCH"}
+  }.freeze
+
   def gce_source_image
-    if vm.boot_image&.start_with?("projects/")
-      vm.boot_image
-    else
-      "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64"
-    end
+    return vm.boot_image if vm.boot_image&.start_with?("projects/")
+
+    entry = GCE_BOOT_IMAGE_FAMILIES[vm.boot_image]
+    raise "Unknown boot image '#{vm.boot_image}' — expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
+
+    gce_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
+    family = entry[:family].sub("ARCH", gce_arch)
+    "projects/#{entry[:project]}/global/images/family/#{family}"
   end
 
   def retry_zone_capacity(error_message)

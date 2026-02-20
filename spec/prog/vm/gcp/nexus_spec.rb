@@ -28,7 +28,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   let(:vm) {
     location_credential
     Prog::Vm::Nexus.assemble_with_sshable(project.id,
-      location_id: location.id, unix_user: "test-user", boot_image: "ubuntu-2404",
+      location_id: location.id, unix_user: "test-user", boot_image: "ubuntu-noble",
       name: "testvm", size: "standard-2", arch: "x64").subject
   }
 
@@ -534,13 +534,33 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nx.send(:gce_machine_type)).to eq("e2-medium")
     end
 
-    it "returns correct GCE source image for default boot image" do
+    it "maps ubuntu-noble to GCE ubuntu-2404-lts-amd64 family for x64" do
       expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64")
+    end
+
+    it "maps ubuntu-noble to GCE ubuntu-2404-lts-arm64 family for arm64" do
+      vm.update(arch: "arm64")
+      expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-arm64")
+    end
+
+    it "maps ubuntu-jammy to GCE ubuntu-2204-lts-amd64 family for x64" do
+      vm.update(boot_image: "ubuntu-jammy")
+      expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts-amd64")
+    end
+
+    it "maps ubuntu-jammy to GCE ubuntu-2204-lts-arm64 family for arm64" do
+      vm.update(boot_image: "ubuntu-jammy", arch: "arm64")
+      expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts-arm64")
     end
 
     it "returns custom GCE image when boot_image starts with projects/" do
       vm.update(boot_image: "projects/test-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
       expect(nx.send(:gce_source_image)).to eq("projects/test-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
+    end
+
+    it "raises error for unknown boot image" do
+      vm.update(boot_image: "unknown-image")
+      expect { nx.send(:gce_source_image) }.to raise_error(RuntimeError, /Unknown boot image 'unknown-image'/)
     end
 
     it "returns correct GCP zone defaulting to suffix a" do
