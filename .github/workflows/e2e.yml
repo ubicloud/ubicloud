@@ -430,7 +430,7 @@ jobs:
           end
 
           puts "=== Cleaning up GCP service accounts ==="
-          iam = Google::Apis::IamV1::IAMService.new
+          iam = Google::Apis::IamV1::IamService.new
           iam.authorization = authorizer
           response = iam.list_project_service_accounts("projects/#{project_id}")
           (response.accounts || []).select { |sa| sa.email.start_with?("ubi-") }.each do |sa|

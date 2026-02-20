@@ -44,8 +44,9 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       region: gcp_region,
       address_resource:
     )
-    op.wait_until_done!
-    raise "GCP static IP reservation failed: #{op.error}" if op.error?
+    check_lro!(op, "static IP #{address_name}") {
+      addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
+    }
 
     addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
     nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)

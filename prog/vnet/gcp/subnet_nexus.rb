@@ -35,8 +35,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           )
         )
       )
-      op.wait_until_done!
-      raise "VPC creation failed: #{op.error}" if op.error?
+      check_lro!(op, "VPC #{gcp_vpc_name}") {
+        credential.networks_client.get(project: gcp_project_id, network: gcp_vpc_name)
+      }
     end
 
     hop_create_vpc_firewall_rules
@@ -95,8 +96,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           ipv6_access_type: "EXTERNAL"
         )
       )
-      op.wait_until_done!
-      raise "Subnet creation failed: #{op.error}" if op.error?
+      check_lro!(op, "subnet #{subnet_name}") {
+        credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
+      }
     end
 
     hop_create_subnet_allow_rules
@@ -183,8 +185,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
     op = credential.firewalls_client.insert(project: gcp_project_id, firewall_resource: fw)
-    op.wait_until_done!
-    raise "Firewall rule #{name} creation failed: #{op.error}" if op.error?
+    check_lro!(op, "firewall rule #{name}") {
+      credential.firewalls_client.get(project: gcp_project_id, firewall: name)
+    }
   end
 
   def ensure_allow_rule(name:, direction:, source_ranges:, destination_ranges:, allowed:, target_tags: ["ubicloud-vm"])
@@ -203,8 +206,9 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     fw = Google::Cloud::Compute::V1::Firewall.new(**attrs)
     op = credential.firewalls_client.insert(project: gcp_project_id, firewall_resource: fw)
-    op.wait_until_done!
-    raise "Firewall rule #{name} creation failed: #{op.error}" if op.error?
+    check_lro!(op, "firewall rule #{name}") {
+      credential.firewalls_client.get(project: gcp_project_id, firewall: name)
+    }
   end
 
   def delete_gcp_subnet
@@ -215,7 +219,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       subnetwork: subnet_name
     )
     op.wait_until_done!
-    raise "GCP subnet delete failed: #{op.error}" if op.error?
+    raise "GCP subnet delete failed: #{lro_error_message(op)}" if op.error?
     true
   rescue Google::Cloud::NotFoundError
     true # Already deleted
@@ -279,5 +283,24 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def gcp_region
     @gcp_region ||= private_subnet.location.name.delete_prefix("gcp-")
+  end
+
+  def check_lro!(op, resource_description)
+    op.wait_until_done!
+    return unless op.error?
+
+    # LRO reported an error — check if the resource was created anyway
+    begin
+      yield
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: resource_description, error: lro_error_message(op)}})
+    rescue Google::Cloud::NotFoundError
+      raise "GCP #{resource_description} creation failed: #{lro_error_message(op)}"
+    end
+  end
+
+  def lro_error_message(op)
+    err = op.error
+    "#{err&.message || err.inspect} (code: #{err&.code})"
   end
 end
