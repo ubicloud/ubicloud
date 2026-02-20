@@ -235,10 +235,20 @@ RSpec.describe VmSetup do
         ethernets:
           enx3ebda596f7b9:
             match:
-              macaddress: 3e:bd:a5:96:f7:b9
+              macaddress: "3e:bd:a5:96:f7:b9"
             dhcp6: true
             dhcp4: true
       YAML
+    end
+
+    it "quotes MAC addresses that YAML 1.1 would parse as sexagesimal" do
+      sexagesimal_nics = [VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest", "12:40:37:27:57:41", "10.0.0.254/32")]
+      vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", sexagesimal_nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
+      raw_yaml = vps.writes["network-config"]
+      expect(raw_yaml).to include('macaddress: "12:40:37:27:57:41"')
+      config = YAML.safe_load(raw_yaml)
+      expect(config["ethernets"]["enx124037275741"]["match"]["macaddress"]).to eq("12:40:37:27:57:41")
+      expect(config["ethernets"]["enx124037275741"]["match"]["macaddress"]).to be_a(String)
     end
 
     it "generates network-config with multiple NICs" do

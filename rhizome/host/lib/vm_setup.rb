@@ -540,7 +540,14 @@ DNSMASQ_CONF
       ["enx" + nic.mac.tr(":", "").downcase,
         {"match" => {"macaddress" => nic.mac}, "dhcp6" => true, "dhcp4" => true}]
     end
-    vp.write_yaml_network_config({"version" => 2, "ethernets" => ethernets})
+    # Cloud-init uses Python's PyYAML which defaults to YAML 1.1, where
+    # all-numeric colon-separated values like "12:40:37:27:57:41" are
+    # parsed as sexagesimal (base-60) integers.  Ruby's Psych does not
+    # quote these because YAML 1.2 has no sexagesimal type.  Force
+    # double-quoting on MAC addresses to prevent misinterpretation.
+    nc = YAML.dump({"version" => 2, "ethernets" => ethernets}, line_width: -1)
+    nics.each { |nic| nc.gsub!(/: #{Regexp.escape(nic.mac)}$/, ": \"#{nic.mac}\"") }
+    vp.write_network_config(nc)
 
     write_user_data(unix_user, public_keys, swap_size_bytes, boot_image, init_script: init_script)
 
