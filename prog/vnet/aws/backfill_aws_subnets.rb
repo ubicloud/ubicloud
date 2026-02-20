@@ -48,7 +48,11 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
 
     fail "No subnets found in VPC #{private_subnet_aws_resource.vpc_id}" if subnets.empty?
 
-    subnet = subnets.first
+    used_subnet_ids = private_subnet.nics.map { it.nic_aws_resource.subnet_id }.compact.uniq
+    subnets = subnets.select { |subnet| used_subnet_ids.include?(subnet.subnet_id) }
+
+    # this assumes there is only non-ha postgres resources
+    subnet = subnets.min_by(&:cidr_block)
     az_suffix = subnet.availability_zone.delete_prefix(location.name)
     location_aws_az = find_location_aws_az(az_suffix)
 
@@ -71,9 +75,13 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
     # Ensure AZ records exist
     location.azs
 
+    used_subnet_ids = private_subnet.nics.map { it.nic_aws_resource.subnet_id }.compact.uniq
+    subnets = subnets.select { |subnet| used_subnet_ids.include?(subnet.subnet_id) }
+
     # Group subnets by AZ suffix, keep only the first per AZ
+    # this assumes there is only non-ha postgres resources
     az_subnet_map = {}
-    subnets.each do |subnet|
+    subnets.sort_by(&:cidr_block).each do |subnet|
       az_suffix = subnet.availability_zone.delete_prefix(location.name)
       az_subnet_map[az_suffix] ||= {
         "subnet_id" => subnet.subnet_id,
