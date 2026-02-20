@@ -439,5 +439,29 @@ RSpec.describe Scheduling::Dispatcher do
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
     end
+
+    it "does not print Strand::RunError exceptions, as those are already logged" do
+      st = Strand.create(prog: "Test", label: "bud_failer", schedule: Time.now - 10, lease: Time.now - 10)
+      telemetry_db
+
+      msgs = []
+      expect(Clog).to receive(:emit) do |msg, args|
+        msgs << msg
+        if msg == "exception terminates strand run"
+          expect(args[0].parent_id).to eq st.id
+        end
+      end.twice
+
+      start_queue = Queue.new
+      finish_queue = Queue.new
+      current_strands = di.instance_variable_get(:@current_strands)
+      current_strands[st.id] = true
+      expect(di.run_strand(st, start_queue, finish_queue)).to be_a RuntimeError
+      expect(start_queue.pop(true)).to eq st.ubid
+      expect(finish_queue.pop(true)).to be true
+      expect(current_strands).to be_empty
+
+      expect(msgs).to eq ["hopped", "exception terminates strand run"]
+    end
   end
 end

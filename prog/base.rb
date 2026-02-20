@@ -86,7 +86,7 @@ end
   def before_run
     if defined?(destroy_set?)
       if !destroying_set?
-        fail "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
+        raise Strand::InternalError, "BUG: destroying semaphore not set on destroy label" if @strand.label == "destroy"
         if destroy_set?
           send(:before_destroy) if respond_to?(:before_destroy)
           if defined?(hop_destroy)
@@ -118,7 +118,7 @@ end
       when Hash
         arg
       else
-        fail "BUG: must pop with string or hash"
+        raise Strand::InternalError, "BUG: must pop with string or hash"
       end
     )
 
@@ -138,7 +138,7 @@ end
          stack: Sequel.pg_jsonb_wrap(@strand.stack[1..]),
          prog:, label:})
     else
-      fail "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
+      raise Strand::InternalError, "BUG: expect no stacks exceeding depth 1 with no back-link" if strand.stack.length > 1
 
       pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, strand.stack.first["deadline_target"])
       pg&.incr_resolve
@@ -347,8 +347,8 @@ end
 
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
-    fail "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
-    fail "BUG: not valid hop target" unless self.class.labels.include? label
+    raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
+    raise Strand::InternalError, "BUG: not valid hop target" unless self.class.labels.include? label
 
     label = label.to_s
     fail Hop.new(@strand.prog, @strand.label, {label:, retval: nil})

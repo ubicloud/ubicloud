@@ -80,6 +80,11 @@ class Prog::Test < Prog::Base
     fail "failure"
   end
 
+  label def bud_failer
+    bud self.class, frame, :failer
+    hop_reaper
+  end
+
   label def short_napper
     nap(12)
   end
