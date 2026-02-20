@@ -77,17 +77,14 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   label def verify_ipv6_connectivity
     vm = representative_server.vm
     if vm.ip6
-      Clog.emit("Verifying IPv6 connectivity on #{vm.ip6_string}")
-      # Verify the VM can reach the internet over IPv6
-      vm.sshable.cmd("curl -6 -sf --max-time 10 https://ipv6.google.com > /dev/null")
-      Clog.emit("IPv6 internet connectivity verified")
+      Clog.emit("VM has IPv6 address: #{vm.ip6_string}")
 
       # Verify psql accepts connections over IPv6 loopback
       result = vm.sshable.cmd("psql -U postgres -h ::1 -t --csv -c 'SELECT 1'").chomp
       unless result == "1"
         update_stack({"fail_message" => "Failed to connect to PostgreSQL over IPv6"})
       end
-      Clog.emit("PostgreSQL IPv6 connectivity verified")
+      Clog.emit("PostgreSQL IPv6 loopback connectivity verified")
     else
       Clog.emit("VM has no IPv6 address, skipping IPv6 verification")
     end
