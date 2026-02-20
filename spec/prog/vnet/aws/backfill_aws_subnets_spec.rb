@@ -109,6 +109,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
     describe "#backfill_old_subnet" do
       before do
         st.update(label: "backfill_old_subnet")
+        nic
       end
 
       it "creates AwsSubnet record for existing subnet" do
@@ -239,6 +240,8 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
       before do
         st.update(label: "fetch_existing_subnets")
         az_b
+        nic_a
+        nic_b
       end
 
       it "groups subnets by AZ and stores in frame" do
