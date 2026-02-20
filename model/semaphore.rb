@@ -23,6 +23,14 @@ class Semaphore < Sequel::Model
       .insert([:id, :strand_id, :name],
         DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name))
   end
+
+  def self.set_at(id)
+    Time.at((UBID.from_uuidish(id).to_i >> 80) / 1000.0).utc
+  end
+
+  def set_at
+    Semaphore.set_at(id)
+  end
 end
 
 # Table: semaphore
