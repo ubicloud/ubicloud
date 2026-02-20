@@ -165,6 +165,15 @@ jobs:
       if: always()
       run: grep -h -v -E "sleep_duration_sec|monitor.1" foreman.log
 
+    - name: Extract GitHub workflow run
+      if: always()
+      continue-on-error: true
+      run: |
+        html_url="$(grep 'github_workflow_run' foreman.log | cut -d'|' -f2 | jq -r '.github_workflow_run.html_url' | head -1)"
+        if [ -n "$html_url" ] && [ "$html_url" != "null" ]; then
+          echo "### GitHub workflow run: ${html_url}" >> $GITHUB_STEP_SUMMARY
+        fi
+
     - name: Extract image download time
       if: always() && matrix.provider == 'metal'
       id: extract_download
