@@ -121,13 +121,14 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
     it "raises if reservation fails" do
       expect(addresses_client).to receive(:get)
+        .twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "quota exceeded")
       expect(op).to receive(:wait_until_done!)
       expect(addresses_client).to receive(:insert).and_return(op)
 
-      expect { nx.allocate_static_ip }.to raise_error(RuntimeError, /GCP static IP reservation failed/)
+      expect { nx.allocate_static_ip }.to raise_error(RuntimeError, /static IP.*creation failed/)
     end
   end
 

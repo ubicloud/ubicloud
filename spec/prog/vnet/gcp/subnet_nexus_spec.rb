@@ -73,13 +73,29 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "raises if VPC creation fails" do
-      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:get)
+        .twice
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(networks_client).to receive(:insert).and_return(op)
 
-      expect { nx.create_vpc }.to raise_error(RuntimeError, /VPC creation failed/)
+      expect { nx.create_vpc }.to raise_error(RuntimeError, /VPC.*creation failed/)
+    end
+
+    it "continues if LRO errors but VPC was created" do
+      expect(networks_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+        .ordered
+      op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "transient error")
+      expect(op).to receive(:wait_until_done!)
+      expect(networks_client).to receive(:insert).and_return(op).ordered
+      expect(networks_client).to receive(:get)
+        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name))
+        .ordered
+
+      expect { nx.create_vpc }.to hop("create_vpc_firewall_rules")
     end
   end
 
@@ -146,12 +162,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(firewalls_client).to receive(:get)
         .with(project: "test-gcp-project", firewall: "#{vpc_name}-deny-ingress")
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
+        .twice
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(firewalls_client).to receive(:insert).and_return(op)
 
-      expect { nx.create_vpc_firewall_rules }.to raise_error(RuntimeError, /Firewall rule #{Regexp.escape(vpc_name)}-deny-ingress creation failed/)
+      expect { nx.create_vpc_firewall_rules }.to raise_error(RuntimeError, /firewall rule.*creation failed/)
     end
 
     it "sets correct source_ranges for IPv4 ingress deny rule" do
@@ -266,13 +283,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "raises if subnet creation fails" do
-      expect(subnetworks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(subnetworks_client).to receive(:get)
+        .twice
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       op = instance_double(Gapic::GenericLRO::Operation, error?: true, error: "operation failed")
       expect(op).to receive(:wait_until_done!)
       expect(subnetworks_client).to receive(:insert).and_return(op)
 
-      expect { nx.create_subnet }.to raise_error(RuntimeError, /Subnet creation failed/)
+      expect { nx.create_subnet }.to raise_error(RuntimeError, /subnet.*creation failed/)
     end
   end
 

@@ -90,8 +90,27 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
 
     op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
     op.wait_until_done!
-    raise "GCP static IP release failed: #{op.error}" if op.error?
+    raise "GCP static IP release failed: #{lro_error_message(op)}" if op.error?
   rescue Google::Cloud::NotFoundError
     # Already released
+  end
+
+  def check_lro!(op, resource_description)
+    op.wait_until_done!
+    return unless op.error?
+
+    begin
+      yield
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: resource_description, error: lro_error_message(op)}})
+    rescue Google::Cloud::NotFoundError
+      raise "GCP #{resource_description} creation failed: #{lro_error_message(op)}"
+    end
+  end
+
+  def lro_error_message(op)
+    err = op.error
+    return err.to_s unless err.respond_to?(:code)
+    "#{err.message} (code: #{err.code})"
   end
 end

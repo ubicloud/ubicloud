@@ -301,6 +301,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def lro_error_message(op)
     err = op.error
-    "#{err&.message || err.inspect} (code: #{err&.code})"
+    return err.to_s unless err.respond_to?(:code)
+    "#{err.message} (code: #{err.code})"
   end
 end
