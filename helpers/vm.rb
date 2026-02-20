@@ -5,13 +5,19 @@ class Clover
     authorized_object(association: :vms, key: "vm_id", perm:, location_id:)
   end
 
-  def vm_list_dataset
-    dataset_authorize(@project.vms_dataset, "Vm:view")
-  end
+  def vm_list
+    dataset = dataset_authorize(@project.vms_dataset, "Vm:view")
+      .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
 
-  def vm_list_api_response(dataset)
-    dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset.eager(:assigned_vm_address, :vm_storage_volumes, :location, :semaphores, :strand), Serializers::Vm)
+    if api?
+      dataset = dataset.where(location_id: @location.id) if @location
+      paginated_result(dataset, Serializers::Vm)
+    else
+      @vms = dataset
+        .reverse(:created_at)
+        .all
+      view "vm/index"
+    end
   end
 
   def vm_post(name)

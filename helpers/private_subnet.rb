@@ -34,12 +34,13 @@ class Clover
 
   def private_subnet_list
     dataset = dataset_authorize(@project.private_subnets_dataset, "PrivateSubnet:view")
+      .eager(:location, :semaphores)
 
     if api?
       dataset = dataset.where(location: @location) if @location
-      paginated_result(dataset.eager(:location, :semaphores, firewalls: [:location, :firewall_rules], nics: [:private_subnet, :vm]), Serializers::PrivateSubnet)
+      paginated_result(dataset.eager(firewalls: [:location, :firewall_rules], nics: [:private_subnet, :vm]), Serializers::PrivateSubnet)
     else
-      @pss = dataset.eager(:location).all
+      @pss = dataset.all
       view "networking/private_subnet/index"
     end
   end
