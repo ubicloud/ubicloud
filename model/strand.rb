@@ -24,6 +24,23 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
+  # Wrapper class used for exceptions raised while running the strand.
+  # This is used to ensure that the strand that caused the exception is
+  # the strand logged, and any parent strands running the strand through
+  # reap are not logged.
+  class RunError < StandardError
+    attr_reader :strand
+
+    def initialize(strand)
+      @strand = strand
+      super("")
+    end
+  end
+
+  # Class raised for internal errors. These aren't wrapped in RunError.
+  class InternalError < RuntimeError
+  end
+
   RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
     def scan_delay
       scan_picked_up - scheduled
@@ -110,13 +127,13 @@ SQL
     ensure
       if @deleted
         if exists?
-          fail "BUG: strand with @deleted set still exists in the database"
+          raise InternalError, "BUG: strand with @deleted set still exists in the database"
         end
       else
         begin
           unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
             Clog.emit("lease violated data", {lease_clear_debug_snapshot: this.all})
-            fail "BUG: lease violated"
+            raise InternalError, "BUG: lease violated"
           end
         ensure
           if @exited
@@ -149,7 +166,7 @@ SQL
     when /\AProg::(.*)\z/
       $1
     else
-      fail "BUG: prog must be in Prog module"
+      raise InternalError, "BUG: prog must be in Prog module"
     end
   end
 
@@ -250,8 +267,18 @@ SQL
       end
 
       ext
+    rescue RunError, InternalError
+      raise
+    rescue => ex
+      # Do not wrap errors in pry
+      raise if Sshable.repl?
+
+      # Wrap errors in non-pry, and emit for the strand actually causing the error.
+      duration = Time.now - start_time
+      Clog.emit("exception terminates strand run", [self, Util.exception_to_hash(ex, into: {strand_error: {duration:, from: prog_label}})])
+      raise RunError.new(self)
     else
-      fail "BUG: Prog #{prog}##{label} did not provide flow control"
+      raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
     duration = Time.now - start_time
@@ -259,7 +286,7 @@ SQL
   end
 
   def run(seconds = 0)
-    fail "already deleted" if @deleted
+    raise InternalError, "already deleted" if @deleted
 
     deadline = Time.now + seconds
     take_lease_and_reload do

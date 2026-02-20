@@ -470,8 +470,13 @@ class Scheduling::Dispatcher
 
     start_queue.push(strand_ubid)
     strand.run(STRAND_RUNTIME)
+  rescue Strand::RunError => ex
+    # Already logged by Strand#run
+    ex.cause
   rescue => ex
-    Clog.emit("exception terminates strand run", Util.exception_to_hash(ex, into: {prog_label: "#{strand.prog}.#{strand.label}"}))
+    # Unusual situation, where Strand#run raises after prog execution,
+    # such as while handling a nap, hop, or exit
+    Clog.emit("unusual exception terminates strand run", Util.exception_to_hash(ex, into: {prog_label: "#{strand.prog}.#{strand.label}"}))
     ex
   ensure
     Thread.current[:apoptosis_at] = nil

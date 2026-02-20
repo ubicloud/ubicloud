@@ -9,6 +9,7 @@ RSpec.describe Prog::Base do
     failer = Strand.create(parent_id: parent.id, prog: "Test", label: "failer", schedule: Time.now + 5)
     Strand.create(parent_id: parent.id, prog: "Test", label: "napper", lease: Time.now + 10)
 
+    expect(Sshable).to receive(:repl?).and_return(true).at_least(:once)
     expect { parent.run(10) }.to raise_error(RuntimeError)
     expect(popper.this.get(:exitval)).to eq("msg" => "popped")
     expect(failer.this.get(:exitval)).to be_nil
