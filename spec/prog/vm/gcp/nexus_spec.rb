@@ -543,9 +543,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-arm64")
     end
 
-    it "maps ubuntu-jammy to GCE ubuntu-2204-lts-amd64 family for x64" do
+    it "maps ubuntu-jammy to GCE ubuntu-2204-lts family for x64" do
       vm.update(boot_image: "ubuntu-jammy")
-      expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts-amd64")
+      expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts")
     end
 
     it "maps ubuntu-jammy to GCE ubuntu-2204-lts-arm64 family for arm64" do
