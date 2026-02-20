@@ -3,17 +3,7 @@
 class Clover
   hash_branch(:project_prefix, "vm") do |r|
     r.get true do
-      dataset = vm_list_dataset
-
-      if api?
-        vm_list_api_response(dataset)
-      else
-        @vms = dataset
-          .eager(:strand, :semaphores, :assigned_vm_address, :vm_storage_volumes, :location)
-          .reverse(:created_at)
-          .all
-        view "vm/index"
-      end
+      vm_list
     end
 
     r.web do
