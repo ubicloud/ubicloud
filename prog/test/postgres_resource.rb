@@ -80,7 +80,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       Clog.emit("VM has IPv6 address: #{vm.ip6_string}")
 
       # Verify psql accepts connections over IPv6 loopback
-      result = vm.sshable.cmd("psql -U postgres -h ::1 -t --csv -c 'SELECT 1'").chomp
+      result = vm.sshable.cmd("PGPASSWORD=:password psql -U postgres -h ::1 -t --csv -c 'SELECT 1'", password: postgres_resource.superuser_password).chomp
       unless result == "1"
         update_stack({"fail_message" => "Failed to connect to PostgreSQL over IPv6"})
       end
