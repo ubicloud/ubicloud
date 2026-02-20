@@ -3,9 +3,7 @@
 require_relative "../model"
 
 class AwsSubnet < Sequel::Model
-  many_to_one :private_subnet_aws_resource, read_only: true
   many_to_one :location_aws_az, read_only: true
-  one_to_many :nic_aws_resources, read_only: true
   plugin ResourceMethods
 
   def az_suffix
