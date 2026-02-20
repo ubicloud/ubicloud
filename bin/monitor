@@ -47,7 +47,10 @@ else
   monitor_models = [
     VmHost,
     PostgresServer,
-    Vm.exclude(vm_host_id: nil).exclude(unix_user: "runneradmin").eager(:vm_host, :sshable, :vm_storage_volumes),
+    Vm.exclude(vm_host_id: nil)
+      .exclude(unix_user: "runneradmin")
+      .eager(:vm_host, :sshable, :vm_storage_volumes)
+      .exclude(Strand.where(id: Sequel[:vm][:id], label: %w[stopped stopped_by_admin unavailable]).exists),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
     VmHostSlice.eager(:vm_host),

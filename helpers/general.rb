@@ -128,6 +128,8 @@ class Clover < Roda
     restore
     restrict
     set_maintenance_window
+    start
+    stop
     unrestrict
     update
     update_billing
