@@ -47,4 +47,19 @@ RSpec.describe SemSnap do
     snap = described_class.new(st.id)
     expect(snap.incr(:test)).to be_nil
   end
+
+  it ".sem_at returns nil if called for a non-extent semaphore" do
+    expect(described_class.new(st.id).set_at(:test)).to be_nil
+  end
+
+  it ".sem_at returns time earliest semaphore was created" do
+    snap = described_class.new(st.id)
+    snap.incr(:test)
+    t = Time.now - 65
+    sem = Semaphore.create(name: "test", strand_id: st.id) do |sem|
+      sem.id = UBID.generate_from_time(UBID::TYPE_SEMAPHORE, t).to_uuid
+    end
+    snap.send(:add_semaphore_instance_to_snapshot, sem)
+    expect(described_class.new(st.id).set_at(:test)).to be_within(1).of(t)
+  end
 end
