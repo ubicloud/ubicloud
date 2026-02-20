@@ -353,71 +353,89 @@ jobs:
     - name: Cleanup GCP resources
       if: always() && matrix.provider == 'gcp'
       env:
-        GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
-        GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
       run: |
-        if [ -z "$GCP_CREDENTIALS_JSON" ] || [ -z "$GCP_PROJECT_ID" ]; then
-          echo "GCP credentials not configured, skipping cleanup"
-          exit 0
-        fi
+        ruby -r ./loader -e '
+          creds_json = ENV["E2E_GCP_CREDENTIALS_JSON"]
+          project_id = ENV["E2E_GCP_PROJECT_ID"]
+          unless creds_json && project_id
+            puts "GCP credentials not configured, skipping cleanup"
+            exit 0
+          end
 
-        echo "$GCP_CREDENTIALS_JSON" > /tmp/gcp-sa-key.json
-        gcloud auth activate-service-account --key-file=/tmp/gcp-sa-key.json --project="$GCP_PROJECT_ID"
+          require "json"
+          require "google/cloud/compute/v1"
+          require "google/cloud/storage"
+          require "google/apis/iam_v1"
 
-        echo "=== Cleaning up GCP instances ==="
-        instance_names=$(grep -oh '"instance_name":"[^"]*"' foreman.log 2>/dev/null | cut -d'"' -f4 | sort -u || true)
-        if [ -n "$instance_names" ]; then
-          for instance in $instance_names; do
-            zone=$(gcloud compute instances list --project="$GCP_PROJECT_ID" --filter="name=$instance" --format="value(zone)" 2>/dev/null || true)
-            if [ -n "$zone" ]; then
-              echo "Deleting instance: $instance in $zone"
-              gcloud compute instances delete "$instance" --zone="$zone" --project="$GCP_PROJECT_ID" --quiet || true
-            fi
-          done
-        else
-          echo "No instance names found in logs, checking for all running instances"
-          gcloud compute instances list --project="$GCP_PROJECT_ID" --format="table(name,zone,status)" || true
-        fi
+          scope = ["https://www.googleapis.com/auth/cloud-platform"]
+          authorizer = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: StringIO.new(creds_json), scope: scope)
 
-        echo "=== Cleaning up GCP firewall rules ==="
-        for fw in $(gcloud compute firewall-rules list --project="$GCP_PROJECT_ID" --format="value(name)" --filter="name~'^ubi-'" 2>/dev/null || true); do
-          echo "Deleting firewall rule: $fw"
-          gcloud compute firewall-rules delete "$fw" --project="$GCP_PROJECT_ID" --quiet || true
-        done
+          # Compute clients
+          instances_client = Google::Cloud::Compute::V1::Instances::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          firewalls_client = Google::Cloud::Compute::V1::Firewalls::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          networks_client = Google::Cloud::Compute::V1::Networks::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          subnetworks_client = Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          zones_client = Google::Cloud::Compute::V1::Zones::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          regions_client = Google::Cloud::Compute::V1::Regions::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
 
-        echo "=== Cleaning up GCP subnetworks ==="
-        for subnet in $(gcloud compute networks subnets list --project="$GCP_PROJECT_ID" --format="csv[no-heading](name,region)" --filter="name~'^ubi-'" 2>/dev/null || true); do
-          subnet_name=$(echo "$subnet" | cut -d',' -f1)
-          region=$(echo "$subnet" | cut -d',' -f2)
-          echo "Deleting subnetwork: $subnet_name in $region"
-          gcloud compute networks subnets delete "$subnet_name" --region="$region" --project="$GCP_PROJECT_ID" --quiet || true
-        done
+          zones = zones_client.list(project: project_id).map(&:name)
+          regions = regions_client.list(project: project_id).map(&:name)
 
-        echo "=== Cleaning up GCP VPC networks ==="
-        for vpc in $(gcloud compute networks list --project="$GCP_PROJECT_ID" --format="value(name)" --filter="name~'^ubi-'" 2>/dev/null || true); do
-          echo "Deleting VPC network: $vpc"
-          gcloud compute networks delete "$vpc" --project="$GCP_PROJECT_ID" --quiet || true
-        done
+          puts "=== Cleaning up GCP instances ==="
+          zones.each do |zone|
+            instances_client.list(project: project_id, zone: zone).each do |inst|
+              puts "Deleting instance: #{inst.name} in #{zone}"
+              instances_client.delete(project: project_id, zone: zone, instance: inst.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
 
-        echo "=== Cleaning up GCP static addresses ==="
-        for addr in $(gcloud compute addresses list --project="$GCP_PROJECT_ID" --format="csv[no-heading](name,region)" --filter="name~'^ubi-'" 2>/dev/null || true); do
-          addr_name=$(echo "$addr" | cut -d',' -f1)
-          region=$(echo "$addr" | cut -d',' -f2)
-          echo "Releasing address: $addr_name in $region"
-          gcloud compute addresses delete "$addr_name" --region="$region" --project="$GCP_PROJECT_ID" --quiet || true
-        done
+          puts "=== Cleaning up GCP firewall rules ==="
+          firewalls_client.list(project: project_id).select { |fw| fw.name.start_with?("ubi-") }.each do |fw|
+            puts "Deleting firewall rule: #{fw.name}"
+            firewalls_client.delete(project: project_id, firewall: fw.name) rescue puts "  Failed: #{$!.message}"
+          end
 
-        echo "=== Cleaning up GCP storage buckets ==="
-        for bucket in $(gcloud storage ls --project="$GCP_PROJECT_ID" 2>/dev/null | grep -v "ubicloud-gce-images" || true); do
-          echo "Deleting bucket: $bucket"
-          gcloud storage rm -r "$bucket" --quiet || true
-        done
+          puts "=== Cleaning up GCP subnetworks ==="
+          regions.each do |region|
+            subnetworks_client.list(project: project_id, region: region).select { |s| s.name.start_with?("ubi-") }.each do |subnet|
+              puts "Deleting subnetwork: #{subnet.name} in #{region}"
+              subnetworks_client.delete(project: project_id, region: region, subnetwork: subnet.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
 
-        echo "=== Cleaning up GCP service accounts ==="
-        for sa in $(gcloud iam service-accounts list --project="$GCP_PROJECT_ID" --format="value(email)" --filter="email~'^ubi-'" 2>/dev/null || true); do
-          echo "Deleting service account: $sa"
-          gcloud iam service-accounts delete "$sa" --project="$GCP_PROJECT_ID" --quiet || true
-        done
+          puts "=== Cleaning up GCP VPC networks ==="
+          networks_client.list(project: project_id).select { |n| n.name.start_with?("ubi-") }.each do |vpc|
+            puts "Deleting VPC network: #{vpc.name}"
+            networks_client.delete(project: project_id, network: vpc.name) rescue puts "  Failed: #{$!.message}"
+          end
 
-        rm -f /tmp/gcp-sa-key.json
-        echo "GCP cleanup complete"
+          puts "=== Cleaning up GCP static addresses ==="
+          regions.each do |region|
+            addresses_client.list(project: project_id, region: region).select { |a| a.name.start_with?("ubi-") }.each do |addr|
+              puts "Releasing address: #{addr.name} in #{region}"
+              addresses_client.delete(project: project_id, region: region, address: addr.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          puts "=== Cleaning up GCP storage buckets ==="
+          storage = Google::Cloud::Storage.new(credentials: authorizer, project_id: project_id)
+          storage.buckets.select { |b| b.name != "ubicloud-gce-images" }.each do |bucket|
+            puts "Deleting bucket: #{bucket.name}"
+            bucket.files.each { |f| f.delete rescue nil }
+            bucket.delete rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "=== Cleaning up GCP service accounts ==="
+          iam = Google::Apis::IamV1::IAMService.new
+          iam.authorization = authorizer
+          response = iam.list_project_service_accounts("projects/#{project_id}")
+          (response.accounts || []).select { |sa| sa.email.start_with?("ubi-") }.each do |sa|
+            puts "Deleting service account: #{sa.email}"
+            iam.delete_project_service_account("projects/#{project_id}/serviceAccounts/#{sa.email}") rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "GCP cleanup complete"
+        '
