@@ -59,7 +59,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     preferred_azs = []
     alternative_families = []
     alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (x64? && rand < alien_ratio)
+    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
       boot_image = Config.send(:"#{boot_image.tr("-", "_")}_aws_ami_version")
       location_id = Config.github_runner_aws_location_id
       size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
@@ -164,6 +164,10 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
   end
 
+  def support_alien?
+    x64? && label_data["vcpus"] <= 16
+  end
+
   def before_destroy
     register_deadline(nil, 15 * 60)
     update_billing_record
@@ -221,7 +225,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
 
     if is_high_util
-      should_spill_over = x64? &&
+      should_spill_over = support_alien? &&
         project.get_ff_spill_to_alien_runners &&
         Time.now - github_runner.created_at > Config.github_runner_aws_spill_threshold_seconds
 
