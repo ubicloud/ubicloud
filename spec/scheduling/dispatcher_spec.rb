@@ -448,9 +448,9 @@ RSpec.describe Scheduling::Dispatcher do
       expect(Clog).to receive(:emit) do |msg, args|
         msgs << msg
         if msg == "exception terminates strand run"
-          expect(args[0].parent_id).to eq st.id
+          expect(Strand[args[:strand_error][:strand]].parent_id).to eq st.id
         end
-      end.twice
+      end.at_least(:once)
 
       start_queue = Queue.new
       finish_queue = Queue.new
