@@ -46,7 +46,7 @@ jobs:
         provider: ${{ fromJson(needs.setup.outputs.providers) }}
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
-    environment: E2E-${{ matrix.provider }}
+    environment: ${{ matrix.provider == 'metal' && 'E2E-metal' || 'E2E-aws' }}
     timeout-minutes: 85
     concurrency: E2E-${{ matrix.provider }}
 
