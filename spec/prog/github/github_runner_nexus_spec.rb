@@ -125,6 +125,14 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
     end
 
+    it "does not use alien vms for large vcpu runners" do
+      runner.update(label: "ubicloud-standard-30")
+      project.set_ff_aws_alien_runners_ratio(1.0)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("standard")
+      expect(picked_vm.location.aws?).to be(false)
+    end
+
     it "uses alien vms if spilled over" do
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
