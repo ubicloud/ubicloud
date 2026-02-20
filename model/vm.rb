@@ -121,7 +121,9 @@ class Vm < Sequel::Model
     return "deleting" if destroying_set? || destroy_set?
     return "stopped by admin" if admin_stop_set? || label == "stopped_by_admin"
     return "restarting" if restart_set? || label == "restart"
-    return "stopped" if stop_set? || label == "stopped"
+    return "starting" if start_set? || label == "start_after_stop"
+    return "stopping" if stop_set? || stopping_set?
+    return "stopped" if label == "stopped"
     return "unavailable" if label == "unavailable"
 
     if waiting_for_capacity_set?
@@ -137,7 +139,7 @@ class Vm < Sequel::Model
   end
 
   def can_stop?
-    %w[running restarting unavailable rebooting].include?(display_state)
+    %w[running starting restarting unavailable rebooting].include?(display_state)
   end
 
   def can_start?
