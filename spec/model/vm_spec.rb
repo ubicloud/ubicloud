@@ -27,8 +27,28 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("restarting")
     end
 
-    it "returns stopped if stop semaphore increased" do
+    it "returns starting if start semaphore increased" do
+      vm.incr_start
+      expect(vm.display_state).to eq("starting")
+    end
+
+    it "returns starting if at start_after_stop_label" do
+      vm.strand.update(label: "start_after_stop")
+      expect(vm.display_state).to eq("starting")
+    end
+
+    it "returns stopping if stop semaphore increased" do
       vm.incr_stop
+      expect(vm.display_state).to eq("stopping")
+    end
+
+    it "returns stopping if stopping semaphore increased" do
+      vm.incr_stopping
+      expect(vm.display_state).to eq("stopping")
+    end
+
+    it "returns stopped if at stopped label" do
+      vm.strand.update(label: "stopped")
       expect(vm.display_state).to eq("stopped")
     end
 
