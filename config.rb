@@ -162,6 +162,7 @@ module Config
   optional :postgres_monitor_database_root_certs, string
   optional :postgres_paradedb_notification_email, string
   optional :postgres_lantern_notification_email, string
+  optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
 
   # Logging
