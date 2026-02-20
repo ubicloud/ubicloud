@@ -373,13 +373,14 @@ jobs:
           authorizer = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: StringIO.new(creds_json), scope: scope)
 
           # Compute clients
-          instances_client = Google::Cloud::Compute::V1::Instances::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          firewalls_client = Google::Cloud::Compute::V1::Firewalls::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          networks_client = Google::Cloud::Compute::V1::Networks::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          subnetworks_client = Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          zones_client = Google::Cloud::Compute::V1::Zones::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
-          regions_client = Google::Cloud::Compute::V1::Regions::Rest::Client.new(credentials: authorizer) { |c| c.quota_project = project_id }
+          compute_config = proc { |c| c.credentials = authorizer; c.quota_project = project_id }
+          instances_client = Google::Cloud::Compute::V1::Instances::Rest::Client.new(&compute_config)
+          firewalls_client = Google::Cloud::Compute::V1::Firewalls::Rest::Client.new(&compute_config)
+          networks_client = Google::Cloud::Compute::V1::Networks::Rest::Client.new(&compute_config)
+          subnetworks_client = Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new(&compute_config)
+          addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client.new(&compute_config)
+          zones_client = Google::Cloud::Compute::V1::Zones::Rest::Client.new(&compute_config)
+          regions_client = Google::Cloud::Compute::V1::Regions::Rest::Client.new(&compute_config)
 
           zones = zones_client.list(project: project_id).map(&:name)
           regions = regions_client.list(project: project_id).map(&:name)
