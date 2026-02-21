@@ -1,0 +1,2 @@
+Destroying this machine image is not recoverable.
+Enter the following to confirm destruction of the machine image: test-mi

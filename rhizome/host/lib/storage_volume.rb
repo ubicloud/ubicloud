@@ -40,6 +40,13 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+
+    # Machine image archive params (for UMI-backed volumes)
+    @archive_params = params["machine_image"]
+  end
+
+  def archive?
+    !@archive_params.nil?
   end
 
   def vp
@@ -92,7 +99,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path || archive?
     vhost_backend_create_service_file
   end
 
@@ -260,7 +267,7 @@ class StorageVolume
         ProtectKernelLogs=true
         ProtectProc=invisible
         
-        RestrictAddressFamilies=AF_UNIX
+        RestrictAddressFamilies=#{archive? ? "AF_UNIX AF_INET AF_INET6" : "AF_UNIX"}
         RestrictNamespaces=true
         SystemCallArchitectures=native
         SystemCallFilter=@system-service
@@ -269,9 +276,9 @@ class StorageVolume
         RestrictSUIDSGID=yes
         RestrictRealtime=yes
         ProcSubset=pid
-        PrivateNetwork=yes
+        #{"PrivateNetwork=yes" unless archive?}
         PrivateUsers=yes
-        IPAddressDeny=any
+        #{"IPAddressDeny=any" unless archive?}
 
         [Install]
         WantedBy=multi-user.target
@@ -354,7 +361,7 @@ class StorageVolume
   end
 
   def vhost_backend_config_v2(encryption_key, key_wrapping_secrets)
-    VhostBackendConfigV2.new(
+    params = {
       disk_file: disk_file,
       vhost_sock: vhost_sock,
       rpc_socket_path: sp.rpc_socket_path,
@@ -365,7 +372,7 @@ class StorageVolume
       write_through: write_through_device?,
       skip_sync: @skip_sync,
       image_path: @image_path,
-      metadata_path: @image_path ? sp.vhost_backend_metadata : nil,
+      metadata_path: (@image_path || archive?) ? sp.vhost_backend_metadata : nil,
       cpus: @cpus,
       encrypted: @encrypted,
       encryption_key: encryption_key,
@@ -373,7 +380,16 @@ class StorageVolume
       kek_pipe: sp.kek_pipe,
       stripe_source_config_path: sp.vhost_backend_stripe_source_config,
       secrets_config_path: sp.vhost_backend_secrets_config
-    )
+    }
+
+    if archive?
+      params[:archive_params] = @archive_params
+      params[:archive_kek_pipe] = sp.archive_kek_pipe
+      params[:s3_access_key] = key_wrapping_secrets["archive_s3_access_key"]
+      params[:s3_secret_key] = key_wrapping_secrets["archive_s3_secret_key"]
+    end
+
+    VhostBackendConfigV2.new(params)
   end
 
   def vhost_backend_kek(key_wrapping_secrets)
@@ -423,31 +439,51 @@ class StorageVolume
     # Stop the service in case this is a retry.
     r "systemctl stop #{q_vhost_user_block_service}"
 
-    unless @encrypted
+    needs_disk_kek = @encrypted
+    needs_archive_kek = archive? && @archive_params["encrypted"] && use_config_v2?
+
+    unless needs_disk_kek || needs_archive_kek
       r "systemctl start #{q_vhost_user_block_service}"
       return
     end
 
+    pipes = []
     begin
-      kek_pipe = sp.kek_pipe
-      rm_if_exists(kek_pipe)
-      File.mkfifo(kek_pipe, 0o600)
-      FileUtils.chown @vm_name, @vm_name, kek_pipe
+      if needs_disk_kek
+        kek_pipe = sp.kek_pipe
+        rm_if_exists(kek_pipe)
+        File.mkfifo(kek_pipe, 0o600)
+        FileUtils.chown @vm_name, @vm_name, kek_pipe
+        pipes << kek_pipe
+      end
+
+      if needs_archive_kek
+        archive_pipe = sp.archive_kek_pipe
+        rm_if_exists(archive_pipe)
+        File.mkfifo(archive_pipe, 0o600)
+        FileUtils.chown @vm_name, @vm_name, archive_pipe
+        pipes << archive_pipe
+      end
 
       r "systemctl start #{q_vhost_user_block_service}"
 
       Timeout.timeout(5) do
-        if use_config_v2?
-          kek = key_wrapping_secrets["key"]
-          File.write(kek_pipe, kek)
-        else
-          # v1: write KEK as YAML struct
-          kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
-          File.write(kek_pipe, kek_yaml)
+        if needs_disk_kek
+          if use_config_v2?
+            File.write(kek_pipe, key_wrapping_secrets["key"])
+          else
+            kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
+            File.write(kek_pipe, kek_yaml)
+          end
+        end
+
+        if needs_archive_kek
+          archive_kek = key_wrapping_secrets.dig("archive_kek", "key")
+          File.write(archive_pipe, archive_kek)
         end
       end
     ensure
-      FileUtils.rm_f(kek_pipe)
+      pipes.each { |p| FileUtils.rm_f(p) }
     end
   end
 

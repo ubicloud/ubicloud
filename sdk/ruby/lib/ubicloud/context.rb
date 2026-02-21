@@ -7,6 +7,7 @@ module Ubicloud
   # The following instance methods are defined via metaprogramming.  All
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
+  # +machine_image+ :: Ubicloud::MachineImage
   # +firewall+ :: Ubicloud::Firewall
   # +github_cache_entry+ :: Ubicloud::GithubCacheEntry
   # +github_installation+ :: Ubicloud::GithubInstallation
@@ -27,6 +28,7 @@ module Ubicloud
     {
       vm: Vm,
       postgres: Postgres,
+      machine_image: MachineImage,
       firewall: Firewall,
       private_subnet: PrivateSubnet,
       load_balancer: LoadBalancer,
@@ -43,6 +45,7 @@ module Ubicloud
     MODEL_PREFIX_MAP = {
       "vm" => Vm,
       "pg" => Postgres,
+      "m1" => MachineImage,
       "fw" => Firewall,
       "ps" => PrivateSubnet,
       "1b" => LoadBalancer,

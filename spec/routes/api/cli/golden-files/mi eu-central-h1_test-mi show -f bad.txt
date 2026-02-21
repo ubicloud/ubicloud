@@ -1,0 +1,12 @@
+! Invalid field(s) given in mi show -f option: bad
+
+Show details for a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name location state size-gib description source-vm-id created-at

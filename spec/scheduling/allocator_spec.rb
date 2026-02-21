@@ -983,6 +983,24 @@ RSpec.describe Al do
       expect(vm.vm_storage_volumes.last.boot_image_id).to eq(mi.id)
     end
 
+    it "allocates UMI-backed VM without requiring boot_image on host" do
+      vmh = VmHost.first
+      # Remove all boot images from host
+      BootImage.where(vm_host_id: vmh.id).update(activated_at: nil)
+      # Create UMI VM (empty boot_image signals machine image mode)
+      umi_vm = create_vm(boot_image: "")
+      mi = MachineImage.create(
+        name: "test-umi", project_id: umi_vm.project_id, location_id: vmh.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/abc",
+        s3_endpoint: "https://r2.example.com", encrypted: false, size_gib: 20
+      )
+      umi_vol = [{"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "machine_image_id" => mi.id}]
+      described_class.allocate(umi_vm, umi_vol)
+      vol = umi_vm.vm_storage_volumes.first
+      expect(vol.boot_image_id).to be_nil
+      expect(vol.machine_image_id).to eq(mi.id)
+    end
+
     it "calls update_vm" do
       vm = create_vm
       expect(Al::Allocation).to receive(:update_vm).with(VmHost.first, vm)

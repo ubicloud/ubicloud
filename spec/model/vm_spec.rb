@@ -378,6 +378,114 @@ RSpec.describe Vm do
       expect(storage_volumes[0]["cpus"].count).to eq(1)
       expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
     end
+
+    it "includes machine_image archive_params for UMI-backed volumes" do
+      mi = MachineImage.create(
+        name: "test-umi", project_id: vm.project.id, location_id: vm_host.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/abc",
+        s3_endpoint: "https://r2.example.com", encrypted: false, size_gib: 20
+      )
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(
+        machine_image_id: mi.id, boot_image_id: nil
+      )
+
+      vol = vm.reload.storage_volumes.find { |v| v["disk_index"] == 0 }
+      expect(vol["image"]).to be_nil
+      expect(vol["image_version"]).to be_nil
+      expect(vol["copy_on_read"]).to be true
+      expect(vol["machine_image"]).to eq({
+        "type" => "archive",
+        "archive_bucket" => "ubi-images",
+        "archive_prefix" => "images/abc",
+        "archive_endpoint" => "https://r2.example.com",
+        "compression" => "zstd",
+        "encrypted" => false
+      })
+    end
+
+    it "does not include machine_image for boot_image-backed volumes" do
+      vol = vm.storage_volumes.find { |v| v["disk_index"] == 0 }
+      expect(vol["image"]).to eq("boot_image")
+      expect(vol["machine_image"]).to be_nil
+      expect(vol["copy_on_read"]).to be false
+    end
+  end
+
+  describe "#storage_secrets" do
+    let(:total_cpus) { 16 }
+    let(:vm_host) { create_vm_host(accepts_slices: true, total_cpus:, total_cores: 8, total_dies: 4, total_sockets: 2) }
+    let(:spdk_installation) { SpdkInstallation.create_with_id(vm_host.id, vm_host_id: vm_host.id, version: "spdk1", allocation_weight: 100, cpu_count: 2) }
+    let(:storage_device) { StorageDevice.create(vm_host_id: vm_host.id, name: "default", available_storage_gib: 200, total_storage_gib: 200) }
+    let(:kek) { StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth") }
+    let(:vm) { create_vm(vm_host_id: vm_host.id) }
+
+    before do
+      spdk_installation
+      storage_device
+    end
+
+    it "includes archive secrets for machine_image-backed volumes" do
+      mi = MachineImage.create(
+        name: "test-umi", project_id: vm.project.id, location_id: vm_host.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/abc",
+        s3_endpoint: "https://r2.example.com", encrypted: false, size_gib: 20
+      )
+      VmStorageVolume.create(
+        vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,
+        machine_image_id: mi.id,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
+        storage_device_id: storage_device.id
+      )
+
+      expect(Config).to receive(:machine_image_archive_access_key).and_return("AKID_TEST")
+      expect(Config).to receive(:machine_image_archive_secret_key).and_return("SECRET_TEST")
+
+      secrets = vm.storage_secrets
+      device_id = "#{vm.inhost_name}_0"
+      expect(secrets[device_id]).to include(
+        "archive_s3_access_key" => "AKID_TEST",
+        "archive_s3_secret_key" => "SECRET_TEST"
+      )
+      expect(secrets[device_id]).not_to have_key("archive_kek")
+    end
+
+    it "includes archive KEK for encrypted machine_image-backed volumes" do
+      archive_kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "archivekey", init_vector: "archiveiv", auth_data: "archiveauth")
+      mi = MachineImage.create(
+        name: "test-enc-umi", project_id: vm.project.id, location_id: vm_host.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/enc",
+        s3_endpoint: "https://r2.example.com", encrypted: true, size_gib: 20,
+        key_encryption_key_1_id: archive_kek.id
+      )
+      VmStorageVolume.create(
+        vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,
+        machine_image_id: mi.id, key_encryption_key_1_id: kek.id,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
+        storage_device_id: storage_device.id
+      )
+
+      expect(Config).to receive(:machine_image_archive_access_key).and_return("AKID")
+      expect(Config).to receive(:machine_image_archive_secret_key).and_return("SECRET")
+
+      secrets = vm.storage_secrets
+      device_id = "#{vm.inhost_name}_0"
+      # Disk KEK
+      expect(secrets[device_id]["key"]).to eq("testkey")
+      # Archive KEK
+      expect(secrets[device_id]["archive_kek"]).to include("key" => "archivekey")
+      # S3 creds
+      expect(secrets[device_id]["archive_s3_access_key"]).to eq("AKID")
+    end
+
+    it "returns empty hash for volumes without encryption or machine image" do
+      VmStorageVolume.create(
+        vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
+        storage_device_id: storage_device.id
+      )
+
+      expect(vm.storage_secrets).to eq({})
+    end
   end
 
   describe "#save_with_ephemeral_net6_error_retrying" do

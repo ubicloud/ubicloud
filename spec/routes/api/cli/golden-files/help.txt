@@ -14,6 +14,7 @@ Commands:
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
+    mi         Manage machine images
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
     sk         Manage SSH public keys

@@ -11,6 +11,7 @@ UbiCli.on("vm").run_on("create") do
     on("-6", "--ipv6-only", "do not enable IPv4")
     on("-b", "--boot-image=image_name", Option::BootImages.map(&:name), "boot image")
     on("-i", "--init-script=script", "use given init script")
+    on("-m", "--machine-image=image-id", "boot from a machine image (UBID)")
     on("-p", "--private-subnet-id=ps-id", "place VM into specific private subnet (also accepts ps-name)")
     on("-s", "--size=size", server_sizes, "server size")
     on("-S", "--storage-size=size", storage_sizes, "storage size")
@@ -34,6 +35,9 @@ UbiCli.on("vm").run_on("create") do
     end
     if params[:private_subnet_id]
       params[:private_subnet_id] = convert_name_to_id(sdk.private_subnet, params[:private_subnet_id])
+    end
+    if (mi = params.delete(:machine_image))
+      params[:machine_image_id] = mi
     end
 
     params[:public_key] = public_key

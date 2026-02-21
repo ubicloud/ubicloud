@@ -252,6 +252,17 @@ class CloverAdmin < Roda
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
       end
     },
+    "MachineImage" => {
+      "make_public" => object_action("Make Public", "Image marked as public") do |obj|
+        obj.update(visible: true)
+      end,
+      "make_private" => object_action("Make Private", "Image marked as private") do |obj|
+        obj.update(visible: false)
+      end,
+      "decommission" => object_action("Decommission", "Image decommissioned") do |obj|
+        obj.update(state: "decommissioned")
+      end
+    },
     "Vm" => {
       "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart),
       "stop" => object_action("Stop", "Stop scheduled for Vm", &:incr_stop)
@@ -330,6 +341,27 @@ class CloverAdmin < Roda
     model Firewall do
       eager [:project, :location]
       columns [:name, :project, :location, :description]
+    end
+
+    model MachineImage do
+      order Sequel.desc(:created_at)
+      eager [:project, :location]
+      columns [:name, :state, :project, :location, :visible, :size_gib, :created_at]
+      column_options state: {type: "select", options: %w[available creating verifying decommissioned destroying], add_blank: true},
+        visible: {type: "boolean", value: nil},
+        created_at: {type: "text"},
+        project: ubid_input.call("Project")
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :visible
+          ds.where(visible: value == "t")
+        when :project
+          ubid_uuid_grep.call(ds, :project_id, value)
+        when :created_at
+          column_grep.call(ds, :created_at, value)
+        end
+      end
     end
 
     model Account do

@@ -26,6 +26,7 @@ class ObjectTag < Sequel::Model
       "InferenceApiKey" => project.api_keys,
       "InferenceEndpoint" => project.inference_endpoints,
       "KubernetesCluster" => project.kubernetes_clusters,
+      "MachineImage" => project.machine_images,
       "SubjectTag" => project.subject_tags,
       "ActionTag" => project.action_tags,
       {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)
@@ -34,7 +35,7 @@ class ObjectTag < Sequel::Model
 
   def self.valid_member?(project_id, object)
     case object
-    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer
+    when ObjectTag, ObjectMetatag, SubjectTag, ActionTag, InferenceEndpoint, Vm, PrivateSubnet, PostgresResource, Firewall, LoadBalancer, MachineImage
       object.project_id == project_id
     when Project
       object.id == project_id

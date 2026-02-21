@@ -386,6 +386,28 @@ RSpec.describe Validation do
     end
   end
 
+  describe "#validate_machine_image_quota" do
+    let(:project) { Project.create(name: "test-mi-quota-project") }
+
+    before do
+      project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageCount"]["id"], value: 2)
+    end
+
+    it "passes when under quota" do
+      expect { described_class.validate_machine_image_quota(project) }.not_to raise_error
+    end
+
+    it "raises error when quota exceeded" do
+      2.times do |i|
+        MachineImage.create(
+          name: "img-#{i}", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+          state: "available", s3_bucket: "b", s3_prefix: "p#{i}/", s3_endpoint: "https://e", size_gib: 10
+        )
+      end
+      expect { described_class.validate_machine_image_quota(project) }.to raise_error described_class::ValidationFailed
+    end
+  end
+
   describe "#validate_billing_rate" do
     it "valid billing rate" do
       expect { described_class.validate_billing_rate("VmVCpu", "standard", "hetzner-fsn1") }.not_to raise_error

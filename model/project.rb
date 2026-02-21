@@ -20,11 +20,12 @@ class Project < Sequel::Model
   one_to_many :postgres_resources, read_only: true
   one_to_many :firewalls, read_only: true
   one_to_many :load_balancers, read_only: true
+  one_to_many :machine_images, read_only: true
   one_to_many :inference_endpoints, read_only: true
   one_to_many :kubernetes_clusters, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners machine_images]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
@@ -155,6 +156,7 @@ class Project < Sequel::Model
     when "KubernetesVCpu" then kubernetes_clusters_dataset.select(Sequel[:kubernetes_cluster][:cp_node_count].as(:node_count), Sequel[:kubernetes_cluster][:target_node_size])
       .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)
       .all.sum { it[:node_count] * Validation.validate_vm_size(it[:target_node_size], "x64").vcpus } || 0
+    when "MachineImageCount" then machine_images_dataset.count
     else
       raise "Unknown resource type: #{resource_type}"
     end
@@ -271,6 +273,7 @@ end
 #  kubernetes_cluster        | kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  load_balancer             | load_balancer_project_id_fkey             | (project_id) REFERENCES project(id)
 #  location                  | location_project_id_fkey                  | (project_id) REFERENCES project(id)
+#  machine_image             | machine_image_project_id_fkey             | (project_id) REFERENCES project(id)
 #  minio_cluster             | minio_cluster_project_id_fkey             | (project_id) REFERENCES project(id)
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)

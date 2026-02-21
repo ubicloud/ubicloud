@@ -1,0 +1,9 @@
+! Invalid number of arguments for mi destroy subcommand (requires: 0, given: 1)
+
+Destroy a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation

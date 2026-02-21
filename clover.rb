@@ -78,6 +78,7 @@ class Clover < Roda
     KubernetesCluster,
     KubernetesNodepool,
     LoadBalancer,
+    MachineImage,
     PostgresResource,
     PrivateSubnet,
     SshPublicKey,
@@ -115,6 +116,7 @@ class Clover < Roda
     KubernetesNodepool
     LoadBalancer
     Location
+    MachineImage
     ObjectTag
     PaymentMethod
     PostgresResource

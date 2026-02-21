@@ -50,6 +50,12 @@ ubi lb (location/lb-name | lb-id) enable-ssl-certificate
 ubi lb (location/lb-name | lb-id) rename new-name
 ubi lb (location/lb-name | lb-id) show [options]
 ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint cert-enabled [(vm-name | vm-id) [...]]
+ubi mi command [...]
+ubi mi (location/mi-name | mi-id) post-command [...]
+ubi mi list [options]
+ubi mi location/mi-name create [options]
+ubi mi (location/mi-name | mi-id) destroy [options]
+ubi mi (location/mi-name | mi-id) show [options]
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]

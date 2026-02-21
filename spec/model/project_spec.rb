@@ -195,6 +195,13 @@ RSpec.describe Project do
       Prog::Kubernetes::KubernetesNodepoolNexus.assemble(name: "a-np", node_count: 3, kubernetes_cluster_id: cluster.id, target_node_size: "standard-4").subject
     }.to change { project.current_resource_usage("KubernetesVCpu") }.from(2).to(14)
 
+    expect(project.current_resource_usage("MachineImageCount")).to eq 0
+    MachineImage.create(
+      name: "img-1", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+      state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 10
+    )
+    expect(project.current_resource_usage("MachineImageCount")).to eq 1
+
     expect { project.current_resource_usage("UnknownResource") }.to raise_error(RuntimeError)
   end
 

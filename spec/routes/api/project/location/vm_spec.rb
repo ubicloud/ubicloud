@@ -291,6 +291,80 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: gpu", {"gpu" => "gpu type must be specified when gpu count is greater than 0."})
       end
+
+      it "success with machine image" do
+        mi = MachineImage.create(
+          name: "test-image", project_id: project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "available",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+      end
+
+      it "success with visible machine image from another project" do
+        other_project = Project.create(name: "other")
+        mi = MachineImage.create(
+          name: "public-image", project_id: other_project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "available",
+          visible: true,
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
+      end
+
+      it "invalid machine image not found" do
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: "mi00000000000000000000000a"
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image not found"})
+      end
+
+      it "invalid machine image not available" do
+        mi = MachineImage.create(
+          name: "creating-image", project_id: project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "creating",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image is not available"})
+      end
+
+      it "invalid machine image from other project not visible" do
+        other_project = Project.create(name: "other")
+        mi = MachineImage.create(
+          name: "private-image", project_id: other_project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "available",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image not found"})
+      end
     end
 
     it "succeeds with gpu count of zero" do

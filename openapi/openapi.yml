@@ -924,6 +924,71 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Load Balancer
+  '/project/{project_id}/location/{location}/machine-image':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getLocationMachineImage
+      summary: List machine images in a location
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - MachineImage
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/machine_image_reference'
+    delete:
+      operationId: deleteLocationMachineImage
+      summary: Delete a machine image
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - MachineImage
+    get:
+      operationId: getLocationMachineImageDetails
+      summary: Get machine image details
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImage'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - MachineImage
+    post:
+      operationId: createLocationMachineImage
+      summary: Create a new machine image
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                vm_id:
+                  description: UBID of the source VM (must be stopped)
+                  type: string
+                description:
+                  description: Description of the machine image
+                  type: string
+              additionalProperties: false
+              required:
+                - vm_id
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImage'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - MachineImage
   '/project/{project_id}/location/{location}/postgres':
     get:
       operationId: listLocationPostgresDatabases
@@ -1763,6 +1828,9 @@ paths:
                 boot_image:
                   description: Boot image of the VM
                   type: string
+                machine_image_id:
+                  description: ID of the machine image to boot from
+                  type: string
                 init_script:
                   description: VM init script
                   type: string
@@ -1840,6 +1908,19 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Virtual Machine
+  '/project/{project_id}/machine-image':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getMachineImage
+      summary: List all machine images
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - MachineImage
   '/project/{project_id}/object-info/{object_id}':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2189,6 +2270,18 @@ components:
       schema:
         type: string
         example: eu-central-h1
+    machine_image_reference:
+      description: Machine image ID or name
+      examples:
+        id:
+          value: m1n30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: machine-image-name
+      in: path
+      name: machine_image_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     metric_destination_id:
       description: Postgres Metric Destination ID
       in: path
@@ -2206,7 +2299,7 @@ components:
       schema:
         type: string
         example: fwkkmx0f2vke4h36nk9cm8v8q0
-        pattern: '^(fw|kc|1b|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
+        pattern: '^(fw|kc|1b|m1|pg|ps|vm)[0-9a-hj-km-np-tv-z]{24}$'
     order_column:
       description: Pagination - Order column
       in: query
@@ -3029,6 +3122,56 @@ components:
         - state
         - storage_size_gib
         - unix_user
+    MachineImage:
+      type: object
+      properties:
+        compression:
+          description: Compression algorithm used
+          type: string
+        created_at:
+          description: When the machine image was created
+          type: string
+        description:
+          description: Description of the machine image
+          type: string
+        encrypted:
+          description: Whether the machine image is encrypted
+          type: boolean
+        id:
+          description: ID of the machine image
+          type: string
+          example: m1n30gjk1d1e2jj34v9x0dq4rp
+          pattern: '^m1[0-9a-hj-km-np-tv-z]{24}$'
+        location:
+          description: Location of the machine image
+          type: string
+        name:
+          description: Name of the machine image
+          type: string
+        size_gib:
+          description: Size in GiB
+          type: integer
+        source_vm_id:
+          description: ID of the source VM
+          type: string
+          nullable: true
+        state:
+          description: State of the machine image
+          type: string
+        visible:
+          description: Whether the machine image is publicly visible
+          type: boolean
+      additionalProperties: false
+      required:
+        - created_at
+        - description
+        - encrypted
+        - id
+        - location
+        - name
+        - size_gib
+        - state
+        - visible
     KubernetesCluster:
       type: object
       properties:
@@ -3628,6 +3771,29 @@ components:
             additionalProperties: false
             allOf:
               - $ref: '#/components/schemas/KubernetesCluster'
+    MachineImage:
+      description: A Machine Image
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MachineImage'
+    MachineImages:
+      description: A list of Machine Images
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineImage'
+            additionalProperties: false
+            required:
+              - count
+              - items
     KubernetesClusters:
       description: A list of KubernetesClusters
       content:
@@ -3668,6 +3834,8 @@ tags:
     name: Inference Api Key
   - description: Load Balancer Operations
     name: Load Balancer
+  - description: Machine Image Operations
+    name: MachineImage
   - description: Login Operations
     name: Login
   - description: Postgres Database Operations
