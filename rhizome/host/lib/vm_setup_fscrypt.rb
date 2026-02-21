@@ -59,6 +59,135 @@ module VmSetupFscrypt
     # Ignore lock failures (may already be locked, may have open FDs, may not be encrypted)
   end
 
+  # Add a new protector to the directory's fscrypt policy using new_key_binary,
+  # so both old and new keys can unlock the directory (overlap begins).
+  # The directory must be unlocked first (using old_key_binary).
+  # Idempotent: checks for existing "-rotate" protector name before creating.
+  def self.add_protector(vm_name, old_key_binary, new_key_binary)
+    vm_home = File.join("", "vm", vm_name)
+    fail "Directory does not exist: #{vm_home}" unless File.directory?(vm_home)
+
+    # Ensure directory is unlocked (needed to add protector to policy)
+    unlock(vm_name, old_key_binary)
+
+    # Get the policy ID from directory status
+    dir_status = `fscrypt status #{vm_home.shellescape} 2>&1`
+    policy_id = dir_status[/Policy:\s+(\w+)/, 1]
+    fail "Cannot find fscrypt policy for #{vm_home}" unless policy_id
+
+    # Check if new protector already exists (idempotent retry)
+    rotate_name = "#{vm_name}-rotate"
+    root_status = `fscrypt status / 2>&1`
+    if root_status.include?("\"#{rotate_name}\"")
+      return
+    end
+
+    # Find the old protector ID (for authorizing the add-protector-to-policy)
+    old_protector_id = find_protector_id(vm_name)
+
+    new_key_file = File.join("", "tmp", "fscrypt-newkey-#{vm_name}-#{$$}")
+    old_key_file = File.join("", "tmp", "fscrypt-oldkey-#{vm_name}-#{$$}")
+    begin
+      File.open(new_key_file, "w", 0o600) { |f| f.write(new_key_binary) }
+      File.open(old_key_file, "w", 0o600) { |f| f.write(old_key_binary) }
+
+      # Create the new protector on the root filesystem
+      output = r "fscrypt metadata create protector / --source=raw_key --name=#{rotate_name.shellescape} --key=#{new_key_file.shellescape} --quiet"
+      new_protector_id = output.strip
+      fail "Failed to create protector" if new_protector_id.empty?
+
+      # Link new protector to the policy (authorize with old protector's key)
+      r "fscrypt metadata add-protector-to-policy --protector=/:#{new_protector_id} --policy=/:#{policy_id} --unlock-with=/:#{old_protector_id} --key=#{old_key_file.shellescape} --quiet"
+    ensure
+      FileUtils.rm_f(new_key_file)
+      FileUtils.rm_f(old_key_file)
+    end
+  end
+
+  # Remove all protectors except the one named "{vm_name}-rotate" (the new key).
+  # Called after DB promotion — the "-rotate" protector holds the now-active key.
+  # Idempotent: tolerates already-removed protectors.
+  def self.remove_old_protectors(vm_name, keep_key_binary)
+    vm_home = File.join("", "vm", vm_name)
+    return unless File.directory?(vm_home)
+
+    dir_status = `fscrypt status #{vm_home.shellescape} 2>&1`
+    policy_id = dir_status[/Policy:\s+(\w+)/, 1]
+    return unless policy_id
+
+    rotate_name = "#{vm_name}-rotate"
+    root_status = `fscrypt status / 2>&1`
+
+    # Find protectors associated with this VM. Parse lines matching vm_name.
+    root_status.each_line do |line|
+      next unless line.include?("\"#{vm_name}\"") && !line.include?("\"#{rotate_name}\"")
+      protector_id = line.strip.split(/\s+/).first
+      next if protector_id.nil? || protector_id.empty? || protector_id == "PROTECTOR"
+
+      begin
+        r "fscrypt metadata remove-protector-from-policy --protector=/:#{protector_id} --policy=/:#{policy_id} --force --quiet"
+      rescue CommandFail
+        # Already removed (idempotent)
+      end
+      begin
+        r "fscrypt metadata destroy --protector=/:#{protector_id} --force --quiet"
+      rescue CommandFail
+        # Already destroyed (idempotent)
+      end
+    end
+
+    # Rename the "-rotate" protector back to the VM name.
+    # fscrypt doesn't support rename, so we create a new protector with the
+    # original name, link it to the policy, then remove the "-rotate" one.
+    rotate_protector_id = find_protector_id_by_name(rotate_name)
+    return unless rotate_protector_id
+
+    key_file = File.join("", "tmp", "fscrypt-keepkey-#{vm_name}-#{$$}")
+    begin
+      File.open(key_file, "w", 0o600) { |f| f.write(keep_key_binary) }
+
+      # Create protector with original VM name
+      output = r "fscrypt metadata create protector / --source=raw_key --name=#{vm_name.shellescape} --key=#{key_file.shellescape} --quiet"
+      new_protector_id = output.strip
+      fail "Failed to create replacement protector" if new_protector_id.empty?
+
+      # Link new protector to policy (authorize with rotate protector)
+      r "fscrypt metadata add-protector-to-policy --protector=/:#{new_protector_id} --policy=/:#{policy_id} --unlock-with=/:#{rotate_protector_id} --key=#{key_file.shellescape} --quiet"
+
+      # Remove rotate protector
+      begin
+        r "fscrypt metadata remove-protector-from-policy --protector=/:#{rotate_protector_id} --policy=/:#{policy_id} --force --quiet"
+      rescue CommandFail
+        # Already removed
+      end
+      begin
+        r "fscrypt metadata destroy --protector=/:#{rotate_protector_id} --force --quiet"
+      rescue CommandFail
+        # Already destroyed
+      end
+    ensure
+      FileUtils.rm_f(key_file)
+    end
+  end
+
+  # Find the protector ID for a vm_name's primary protector (exact name match).
+  def self.find_protector_id(vm_name)
+    find_protector_id_by_name(vm_name) ||
+      fail("Cannot find protector for #{vm_name}")
+  end
+
+  # Find the protector ID by exact name. Returns nil if not found.
+  def self.find_protector_id_by_name(name)
+    output = `fscrypt status / 2>&1`
+    output.each_line do |line|
+      if line.include?("\"#{name}\"")
+        id = line.strip.split(/\s+/).first
+        return id unless id.nil? || id.empty? || id == "PROTECTOR"
+      end
+    end
+    nil
+  end
+
   # Clean up orphaned fscrypt metadata (policy and protector) after deleting
   # the encrypted directory. Call this after deluser --remove-home.
   def self.purge_metadata(vm_name)

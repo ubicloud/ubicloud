@@ -37,7 +37,7 @@ class Vm < Sequel::Model
 
   dataset_module Pagination
 
-  plugin ResourceMethods, redacted_columns: :public_key, encrypted_columns: :fscrypt_key
+  plugin ResourceMethods, redacted_columns: :public_key, encrypted_columns: [:fscrypt_key, :fscrypt_key_2]
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :destroy, :start_after_host_reboot, :prevent_destroy, :update_firewall_rules,
     :checkup, :update_spdk_dependency, :waiting_for_capacity, :lb_expiry_started, :restart, :stop, :migrate_to_separate_progs
@@ -385,6 +385,8 @@ end
 #  cpu_percent_limit       | integer                  |
 #  cpu_burst_percent_limit | integer                  |
 #  location_id             | uuid                     | NOT NULL
+#  fscrypt_key             | text                     |
+#  fscrypt_key_2           | text                     |
 # Indexes:
 #  vm_pkey                             | PRIMARY KEY btree (id)
 #  vm_ephemeral_net6_key               | UNIQUE btree (ephemeral_net6)
