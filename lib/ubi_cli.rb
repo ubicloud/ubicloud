@@ -11,6 +11,7 @@ class UbiCli
     "ak" => "inference_api_key",
     "kc" => "kubernetes_cluster",
     "lb" => "load_balancer",
+    "mi" => "machine_image",
     "pg" => "postgres",
     "ps" => "private_subnet",
     "vm" => "vm"
@@ -21,6 +22,7 @@ class UbiCli
     "ak" => "Inference API key",
     "kc" => "Kubernetes cluster",
     "lb" => "Load balancer",
+    "mi" => "Machine image",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
     "vm" => "Virtual machine"
@@ -32,7 +34,7 @@ class UbiCli
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-tv-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((fw|kc|1b|m1|pg|ps|vm)[a-tv-z0-9]{24})/
   EXACT_OBJECT_INFO_REGEXP = /\A#{OBJECT_INFO_REGEXP}\z/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 

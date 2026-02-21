@@ -94,6 +94,19 @@ RSpec.describe Clover, "cli vm create" do
     expect(body).to eq "VM created with id: #{vm.ubid}\n"
   end
 
+  it "creates vm with machine image" do
+    mi = MachineImage.create(
+      name: "test-image", project_id: @project.id,
+      location_id: Location::HETZNER_FSN1_ID, state: "available",
+      s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+    )
+    body = cli(%W[vm eu-central-h1/test-vm create -m #{mi.ubid}] << "a a")
+    expect(Vm.count).to eq 1
+    vm = Vm.first
+    expect(vm.name).to eq "test-vm"
+    expect(body).to eq "VM created with id: #{vm.ubid}\n"
+  end
+
   it "shows errors if trying to create a vm with an invalid private subnet" do
     expect(Vm.count).to eq 0
     ps = PrivateSubnet.create(project_id: @project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")

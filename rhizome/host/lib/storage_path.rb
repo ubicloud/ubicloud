@@ -40,6 +40,10 @@ class StoragePath
     @kek_pipe ||= File.join(storage_dir, "kek.pipe")
   end
 
+  def archive_kek_pipe
+    @archive_kek_pipe ||= File.join(storage_dir, "archive-kek.pipe")
+  end
+
   def vhost_backend_config
     @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
   end

@@ -1,0 +1,2 @@
+location       name     state      size-gib  id                        
+eu-central-h1  test-mi  available  20        m1t48w6zq2rx6qn9gya0f3nh70

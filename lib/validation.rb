@@ -146,7 +146,7 @@ module Validation
     allowed_keys = [
       :encrypted, :size_gib, :boot, :read_only, :image,
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
-      :vring_workers
+      :vring_workers, :machine_image_id
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length
@@ -268,6 +268,14 @@ module Validation
       effective_quota_value = project.effective_quota_value(resource_type)
 
       fail ValidationFailed.new({name => "Insufficient quota for requested size. Requested vCPU count: #{requested_vcpu_count}, currently used vCPU count: #{current_used_vcpu_count}, maximum allowed vCPU count: #{effective_quota_value}, remaining vCPU count: #{effective_quota_value - current_used_vcpu_count}"})
+    end
+  end
+
+  def self.validate_machine_image_quota(project)
+    unless project.quota_available?("MachineImageCount", 1)
+      current = project.current_resource_usage("MachineImageCount")
+      limit = project.effective_quota_value("MachineImageCount")
+      fail ValidationFailed.new({machine_image: "Machine image quota exceeded. Current: #{current}, Limit: #{limit}"})
     end
   end
 

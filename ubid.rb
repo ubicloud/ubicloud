@@ -107,6 +107,7 @@ class UBID
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
   TYPE_LOCATION_AWS_AZ = "1a"
   TYPE_AWS_SUBNET = "as"
+  TYPE_MACHINE_IMAGE = "m1"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
@@ -149,6 +150,7 @@ class UBID
     ActionTag: ta
     ObjectTag: t0
     KubernetesCluster: kc
+    MachineImage: m1
     Location: 10
   TYPES
   def self.generate_vanity_action_type(action)

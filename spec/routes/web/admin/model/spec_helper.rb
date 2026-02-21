@@ -122,6 +122,12 @@ module AdminModelSpecHelper
       Firewall.create(name: "test-firewall", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
     end
 
+    def create_machine_image
+      project = Project.create(name: "test-project")
+      MachineImage.create(name: "test-image", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "test-bucket", s3_prefix: "images/test/", s3_endpoint: "https://r2.example.com", size_gib: 10)
+    end
+
     def create_firewall_rule
       project = Project.create(name: "test-project")
       firewall = Firewall.create(name: "test-firewall", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)

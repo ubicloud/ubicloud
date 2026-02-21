@@ -1,0 +1,14 @@
+! Invalid number of arguments for mi list subcommand (requires: 0, given: 1)
+
+List machine images
+
+Usage:
+    ubi mi list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show machine images in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name state size-gib id

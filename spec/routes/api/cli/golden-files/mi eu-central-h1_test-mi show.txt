@@ -1,0 +1,8 @@
+id: m1t48w6zq2rx6qn9gya0f3nh70
+name: test-mi
+location: eu-central-h1
+state: available
+size-gib: 20
+description: test machine image
+source-vm-id: vmdzyppz6j166jh5e9t2dwrfas
+created-at: 2025-11-21T16:22:32+01:00

@@ -630,6 +630,130 @@ RSpec.describe StorageVolume do
     end
   end
 
+  describe "archive-backed volumes" do
+    let(:archive_params) {
+      {
+        "type" => "archive",
+        "archive_bucket" => "ubi-images",
+        "archive_prefix" => "images/abc123",
+        "archive_endpoint" => "https://r2.example.com",
+        "stripe_sector_count" => 2048,
+        "compression" => "zstd",
+        "encrypted" => false
+      }
+    }
+
+    let(:archive_vhost_sv) {
+      params = {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => false,
+        "size_gib" => 20,
+        "vhost_block_backend_version" => "v0.4.0",
+        "num_queues" => 4,
+        "queue_size" => 64,
+        "machine_image" => archive_params
+      }
+      described_class.new("test", params)
+    }
+
+    let(:encrypted_archive_vhost_sv) {
+      params = {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 20,
+        "vhost_block_backend_version" => "v0.4.0",
+        "num_queues" => 4,
+        "queue_size" => 64,
+        "machine_image" => archive_params.merge("encrypted" => true)
+      }
+      described_class.new("test", params)
+    }
+
+    it "reports archive? as true" do
+      expect(archive_vhost_sv.archive?).to be true
+    end
+
+    it "reports archive? as false for non-archive volumes" do
+      expect(unencrypted_sv.archive?).to be false
+    end
+
+    it "has no image_path for archive volumes" do
+      expect(archive_vhost_sv.image_path).to be_nil
+    end
+
+    it "can prep an archive-backed vhost volume" do
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
+      expect(archive_vhost_sv).to receive(:create_empty_disk_file)
+      expect(archive_vhost_sv).to receive(:prep_vhost_backend).with(nil, {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"})
+      archive_vhost_sv.prep({"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"})
+    end
+
+    it "creates metadata for archive-backed volumes during prep_vhost_backend" do
+      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"}
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_config).with(nil, key_wrapping_secrets)
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_metadata).with(key_wrapping_secrets)
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_service_file)
+      archive_vhost_sv.prep_vhost_backend(nil, key_wrapping_secrets)
+    end
+
+    it "creates service file with network access for archive volumes" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, /AF_UNIX AF_INET AF_INET6/)
+      archive_vhost_sv.vhost_backend_create_service_file
+    end
+
+    it "creates service file without PrivateNetwork for archive volumes" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      content = nil
+      expect(File).to receive(:write).with(service_file, anything) { |_, c| content = c }
+      archive_vhost_sv.vhost_backend_create_service_file
+      expect(content).not_to include("PrivateNetwork=yes")
+      expect(content).not_to include("IPAddressDeny=any")
+    end
+
+    it "can start an unencrypted archive vhost backend" do
+      expect(archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+      archive_vhost_sv.vhost_backend_start(nil)
+    end
+
+    it "can start an encrypted archive vhost backend with archive KEK pipe" do
+      archive_kek_secrets = {"key" => Base64.encode64("a" * 32)}
+      key_wrapping_secrets = {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.encode64("b" * 32),
+        "init_vector" => Base64.encode64("c" * 12),
+        "auth_data" => "test",
+        "archive_kek" => archive_kek_secrets
+      }
+
+      kek_pipe = "/var/storage/test/2/kek.pipe"
+      archive_kek_pipe = "/var/storage/test/2/archive-kek.pipe"
+
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(kek_pipe)
+      expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
+
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(archive_kek_pipe)
+      expect(File).to receive(:mkfifo).with(archive_kek_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", archive_kek_pipe)
+
+      expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+
+      # Disk KEK write (v2 format - raw key)
+      expect(File).to receive(:write).with(kek_pipe, key_wrapping_secrets["key"])
+      # Archive KEK write
+      expect(File).to receive(:write).with(archive_kek_pipe, archive_kek_secrets["key"])
+
+      encrypted_archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
+    end
+  end
+
   describe "#stop_service_if_loaded" do
     it "stops the service if it is loaded" do
       expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")

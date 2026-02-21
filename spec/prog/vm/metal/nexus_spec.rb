@@ -167,6 +167,58 @@ RSpec.describe Prog::Vm::Metal::Nexus do
           force_host_id: "some-vm-host-id", exclude_host_ids: ["some-vm-host-id"])
       }.to raise_error RuntimeError, "Cannot force and exclude the same host"
     end
+
+    it "fails if machine image not found" do
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
+      }.to raise_error RuntimeError, "Machine image not found"
+    end
+
+    it "fails if machine image is not in an acceptable state" do
+      mi = MachineImage.create(
+        name: "test-mi", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "creating", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com",
+        encrypted: false, size_gib: 20
+      )
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: mi.id)
+      }.to raise_error RuntimeError, "Machine image is not available"
+    end
+
+    it "accepts machine image in available state" do
+      mi = MachineImage.create(
+        name: "test-mi", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com",
+        encrypted: false, size_gib: 20
+      )
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: mi.id)
+      expect(st.subject.boot_image).to eq("")
+      vol = st.stack.first["storage_volumes"].first
+      expect(vol["machine_image_id"]).to eq(mi.id)
+    end
+
+    it "accepts machine image in verifying state" do
+      mi = MachineImage.create(
+        name: "test-mi-verify", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "verifying", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com",
+        encrypted: false, size_gib: 20
+      )
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: mi.id)
+      expect(st.subject.boot_image).to eq("")
+      vol = st.stack.first["storage_volumes"].first
+      expect(vol["machine_image_id"]).to eq(mi.id)
+    end
+
+    it "infers architecture from machine image source VM" do
+      source_vm = create_vm(arch: "arm64", project_id: project.id)
+      mi = MachineImage.create(
+        name: "test-mi-arch", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com",
+        encrypted: false, size_gib: 20, vm_id: source_vm.id
+      )
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: mi.id)
+      expect(st.subject.arch).to eq("arm64")
+    end
   end
 
   describe ".assemble_with_sshable" do

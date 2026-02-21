@@ -1,0 +1,4 @@
+id: m1t48w6zq2rx6qn9gya0f3nh70
+name: test-mi
+state: available
+size-gib: 20

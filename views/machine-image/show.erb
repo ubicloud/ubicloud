@@ -1,0 +1,12 @@
+<% @page_title = @machine_image.name %>
+
+<%== part("object/show",
+  object: @machine_image,
+  tabs: [
+    ["Overview", "overview", "hero-squares-plus"],
+    ["Settings", "settings", "hero-cog-8-tooth"]
+  ],
+  type: "machine-image",
+  prefix: "machine-image",
+  breadcrumb_label: "Machine Images",
+) %>

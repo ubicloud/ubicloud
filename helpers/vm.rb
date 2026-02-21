@@ -33,11 +33,21 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "machine_image_id", "private_subnet_id", "gpu", "init_script"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
+
+    # Validate machine image if provided
+    if assemble_params[:machine_image_id]
+      mi_uuid = UBID.to_uuid(assemble_params[:machine_image_id])
+      mi = MachineImage.for_project(project.id).first(id: mi_uuid)
+      fail Validation::ValidationFailed.new({machine_image_id: "Machine image not found"}) unless mi
+      fail Validation::ValidationFailed.new({machine_image_id: "Machine image is not available"}) unless mi.state == "available"
+      assemble_params[:machine_image_id] = mi.id
+      assemble_params.delete(:boot_image) # boot_image not needed with machine image
+    end
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
@@ -202,6 +212,18 @@ class Clover
           device_availability &&
           device_availability >= gpu_count
       end
+    end
+
+    machine_images = MachineImage.for_project(@project.id).where(state: "available").all
+    mi_values = machine_images.map {
+      {
+        location_id: it.location_id,
+        value: it.ubid,
+        display_name: it.name
+      }
+    }
+    options.add_option(name: "machine_image_id", values: mi_values, parent: "location") do |location, mi|
+      mi[:location_id] == location.id
     end
 
     boot_images = Option::BootImages.map(&:name)

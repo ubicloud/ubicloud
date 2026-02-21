@@ -25,6 +25,7 @@ class Clover < Roda
         ::Invoice => [:blob_storage_client],
         ::LoadBalancer => [:stack_options],
         ::Location => [:for_project, :postgres_locations, :visible_or_for_project],
+        ::MachineImage => [:for_project],
         ::LockedDomain => [:with_pk],
         ::ObjectTag => [:options_for_project],
         ::PaymentMethod => [:fraud?],

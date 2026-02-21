@@ -116,6 +116,22 @@ RSpec.describe Clover, "cli" do
     expect(ApiKey).to receive(:generate_uuid).and_return("6677de33-3888-8953-bde1-ed8a8137d507").at_least(:once)
     expect(SshPublicKey).to receive(:generate_uuid).and_return("7c2410cd-511a-8b33-8771-8a169d368d2d").at_least(:once)
 
+    expect(MachineImage).to receive(:generate_ubid).and_return(UBID.parse("m1t48w6zq2rx6qn9gya0f3nh70")).at_least(:once)
+    mi = MachineImage.create(
+      name: "test-mi",
+      project_id: @project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      state: "available",
+      s3_bucket: "test-bucket",
+      s3_prefix: "images/test/",
+      s3_endpoint: "https://r2.example.com",
+      size_gib: 20,
+      description: "test machine image",
+      vm_id: @vm.id,
+      created_at: now
+    )
+    Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
+
     cli_commands = []
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/error.txt").map { [it, {status: 400}] }

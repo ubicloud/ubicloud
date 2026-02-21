@@ -1,0 +1,2 @@
+location       name   
+eu-central-h1  test-mi

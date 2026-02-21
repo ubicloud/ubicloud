@@ -98,6 +98,43 @@ RSpec.describe Clover, "vm" do
         expect(page).to have_content("31/32 (96%)")
       end
 
+      it "can create new virtual machine with machine image" do
+        MachineImage.create(
+          name: "test-image", project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID, state: "available",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        visit "#{project.path}/vm/create"
+        expect(page.title).to eq("Ubicloud - Create Virtual Machine")
+        expect(page).to have_content("Machine Image")
+
+        name = "mi-vm"
+        fill_in "Name", with: name
+        fill_in "SSH Public Key", with: "a a"
+        choose option: Location::HETZNER_FSN1_UBID
+        select "test-image", from: "machine_image_id"
+        choose option: "standard-2"
+
+        click_button "Create"
+
+        expect(page.title).to eq("Ubicloud - #{name}")
+        expect(page).to have_flash_notice("'#{name}' will be ready in a few minutes")
+        expect(Vm.count).to eq(1)
+      end
+
+      it "shows machine image dropdown only for images in selected location" do
+        MachineImage.create(
+          name: "image-in-fsn1", project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID, state: "available",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        visit "#{project.path}/vm/create"
+        expect(page).to have_content("Machine Image")
+        expect(page).to have_content("image-in-fsn1")
+      end
+
       it "shows 404 page if attempting to create a VM with an invalid location" do
         visit "#{project.path}/vm/create"
         fill_in "Name", with: "dummy-vm"
