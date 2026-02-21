@@ -158,8 +158,8 @@ class StorageVolume
     metadata_path = sp.vhost_backend_metadata
     config_path = sp.vhost_backend_config
 
-    if @encrypted && use_config_v2?
-      vhost_backend_create_encrypted_metadata_v2(key_wrapping_secrets)
+    if use_config_v2? && (@encrypted || archive?)
+      vhost_backend_create_metadata_v2_with_pipes(key_wrapping_secrets)
       return
     end
 
@@ -178,15 +178,38 @@ class StorageVolume
     sync_parent_dir(metadata_path)
   end
 
-  def vhost_backend_create_encrypted_metadata_v2(key_wrapping_secrets)
+  def vhost_backend_create_metadata_v2_with_pipes(key_wrapping_secrets)
     vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
     config_path = sp.vhost_backend_config
-    kek_pipe = sp.kek_pipe
-    kek = key_wrapping_secrets.fetch("key")
 
-    rm_if_exists(kek_pipe)
-    File.mkfifo(kek_pipe, 0o600)
-    FileUtils.chown(@vm_name, @vm_name, kek_pipe)
+    pipes = []
+    pipe_writes = []
+
+    if @encrypted
+      kek_pipe = sp.kek_pipe
+      pipes << kek_pipe
+      pipe_writes << [kek_pipe, key_wrapping_secrets.fetch("key")]
+    end
+
+    if archive?
+      s3_key_pipe = sp.s3_key_id_pipe
+      s3_secret_pipe = sp.s3_secret_key_pipe
+      pipes << s3_key_pipe << s3_secret_pipe
+      pipe_writes << [s3_key_pipe, key_wrapping_secrets["archive_s3_access_key"]]
+      pipe_writes << [s3_secret_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
+
+      if @archive_params["encrypted"]
+        archive_pipe = sp.archive_kek_pipe
+        pipes << archive_pipe
+        pipe_writes << [archive_pipe, key_wrapping_secrets.dig("archive_kek", "key")]
+      end
+    end
+
+    pipes.each do |pipe|
+      rm_if_exists(pipe)
+      File.mkfifo(pipe, 0o600)
+      FileUtils.chown(@vm_name, @vm_name, pipe)
+    end
 
     cmd = [
       "sudo", "-u", @vm_name,
@@ -195,22 +218,22 @@ class StorageVolume
       "--config", config_path.to_s
     ]
 
-    # Start backend (it should open the FIFO for reading)
     pid = Process.spawn(*cmd)
 
     begin
       Timeout.timeout(10) do
-        # Open FIFO for writing (blocks until reader opens)
-        File.open(kek_pipe, File::WRONLY) do |f|
-          f.write(kek)
-          f.flush
+        pipe_writes.each do |pipe, value|
+          File.open(pipe, File::WRONLY) do |f|
+            f.write(value)
+            f.flush
+          end
         end
       end
 
       _, status = Process.wait2(pid)
       raise "init_metadata failed" unless status.success?
     ensure
-      FileUtils.rm_f(kek_pipe)
+      pipes.each { |p| FileUtils.rm_f(p) }
     end
   end
 
@@ -385,8 +408,8 @@ class StorageVolume
     if archive?
       params[:archive_params] = @archive_params
       params[:archive_kek_pipe] = sp.archive_kek_pipe
-      params[:s3_access_key] = key_wrapping_secrets["archive_s3_access_key"]
-      params[:s3_secret_key] = key_wrapping_secrets["archive_s3_secret_key"]
+      params[:s3_key_id_pipe] = sp.s3_key_id_pipe
+      params[:s3_secret_key_pipe] = sp.s3_secret_key_pipe
     end
 
     VhostBackendConfigV2.new(params)
@@ -440,14 +463,16 @@ class StorageVolume
     r "systemctl stop #{q_vhost_user_block_service}"
 
     needs_disk_kek = @encrypted
+    needs_s3_pipes = archive? && use_config_v2?
     needs_archive_kek = archive? && @archive_params["encrypted"] && use_config_v2?
 
-    unless needs_disk_kek || needs_archive_kek
+    unless needs_disk_kek || needs_s3_pipes
       r "systemctl start #{q_vhost_user_block_service}"
       return
     end
 
     pipes = []
+    pipe_writes = []
     begin
       if needs_disk_kek
         kek_pipe = sp.kek_pipe
@@ -455,6 +480,25 @@ class StorageVolume
         File.mkfifo(kek_pipe, 0o600)
         FileUtils.chown @vm_name, @vm_name, kek_pipe
         pipes << kek_pipe
+
+        if use_config_v2?
+          pipe_writes << [kek_pipe, key_wrapping_secrets["key"]]
+        else
+          pipe_writes << [kek_pipe, vhost_backend_kek(key_wrapping_secrets).to_yaml]
+        end
+      end
+
+      if needs_s3_pipes
+        s3_key_pipe = sp.s3_key_id_pipe
+        s3_secret_pipe = sp.s3_secret_key_pipe
+        [s3_key_pipe, s3_secret_pipe].each do |pipe|
+          rm_if_exists(pipe)
+          File.mkfifo(pipe, 0o600)
+          FileUtils.chown @vm_name, @vm_name, pipe
+          pipes << pipe
+        end
+        pipe_writes << [s3_key_pipe, key_wrapping_secrets["archive_s3_access_key"]]
+        pipe_writes << [s3_secret_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
       end
 
       if needs_archive_kek
@@ -463,23 +507,14 @@ class StorageVolume
         File.mkfifo(archive_pipe, 0o600)
         FileUtils.chown @vm_name, @vm_name, archive_pipe
         pipes << archive_pipe
+        pipe_writes << [archive_pipe, key_wrapping_secrets.dig("archive_kek", "key")]
       end
 
       r "systemctl start #{q_vhost_user_block_service}"
 
       Timeout.timeout(5) do
-        if needs_disk_kek
-          if use_config_v2?
-            File.write(kek_pipe, key_wrapping_secrets["key"])
-          else
-            kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
-            File.write(kek_pipe, kek_yaml)
-          end
-        end
-
-        if needs_archive_kek
-          archive_kek = key_wrapping_secrets.dig("archive_kek", "key")
-          File.write(archive_pipe, archive_kek)
+        pipe_writes.each do |pipe, value|
+          File.write(pipe, value)
         end
       end
     ensure

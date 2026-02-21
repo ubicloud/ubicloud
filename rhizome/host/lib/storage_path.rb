@@ -44,6 +44,14 @@ class StoragePath
     @archive_kek_pipe ||= File.join(storage_dir, "archive-kek.pipe")
   end
 
+  def s3_key_id_pipe
+    @s3_key_id_pipe ||= File.join(storage_dir, "s3-key-id.pipe")
+  end
+
+  def s3_secret_key_pipe
+    @s3_secret_key_pipe ||= File.join(storage_dir, "s3-secret-key.pipe")
+  end
+
   def vhost_backend_config
     @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
   end

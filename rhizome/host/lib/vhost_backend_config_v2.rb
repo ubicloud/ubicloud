@@ -35,8 +35,8 @@ class VhostBackendConfigV2
     # Archive stripe source params (for machine image-backed volumes)
     @archive_params = params[:archive_params]
     @archive_kek_pipe = params[:archive_kek_pipe]
-    @s3_access_key = params[:s3_access_key]
-    @s3_secret_key = params[:s3_secret_key]
+    @s3_key_id_pipe = params[:s3_key_id_pipe]
+    @s3_secret_key_pipe = params[:s3_secret_key_pipe]
   end
 
   def archive?
@@ -157,11 +157,11 @@ class VhostBackendConfigV2
     lines = []
 
     lines << "[secrets.s3-key-id]"
-    lines << "source.inline = #{toml_str(@s3_access_key)}"
+    lines << "source.file = #{toml_str(@s3_key_id_pipe)}"
     lines << ""
 
     lines << "[secrets.s3-secret-key]"
-    lines << "source.inline = #{toml_str(@s3_secret_key)}"
+    lines << "source.file = #{toml_str(@s3_secret_key_pipe)}"
     lines << ""
 
     if @archive_params["encrypted"]
