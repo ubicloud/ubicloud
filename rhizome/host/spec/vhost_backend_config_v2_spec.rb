@@ -72,8 +72,8 @@ RSpec.describe VhostBackendConfigV2 do
     let(:archive_config_params) {
       base_params.merge(
         archive_params: archive_params,
-        s3_access_key: "AKID_TEST",
-        s3_secret_key: "SECRET_TEST",
+        s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
+        s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       )
     }
@@ -105,13 +105,14 @@ RSpec.describe VhostBackendConfigV2 do
       expect(toml).to include('archive_kek.ref = "archive-kek"')
     end
 
-    it "generates S3 secrets toml" do
+    it "generates S3 secrets toml with pipe sources" do
       config = described_class.new(archive_config_params)
       toml = config.secrets_toml
       expect(toml).to include("[secrets.s3-key-id]")
-      expect(toml).to include('source.inline = "AKID_TEST"')
+      expect(toml).to include('source.file = "/var/storage/test/0/s3-key-id.pipe"')
       expect(toml).to include("[secrets.s3-secret-key]")
-      expect(toml).to include('source.inline = "SECRET_TEST"')
+      expect(toml).to include('source.file = "/var/storage/test/0/s3-secret-key.pipe"')
+      expect(toml).not_to include("source.inline")
     end
 
     it "generates archive KEK secret for encrypted archives" do
@@ -167,8 +168,8 @@ RSpec.describe VhostBackendConfigV2 do
         kek: kek_secrets,
         kek_pipe: "/var/storage/test/0/kek.pipe",
         archive_params: archive_params,
-        s3_access_key: "AKID",
-        s3_secret_key: "SECRET",
+        s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
+        s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       ))
 
@@ -194,8 +195,8 @@ RSpec.describe VhostBackendConfigV2 do
         kek: kek_secrets,
         kek_pipe: "/var/storage/test/0/kek.pipe",
         archive_params: archive_params,
-        s3_access_key: "AKID",
-        s3_secret_key: "SECRET",
+        s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
+        s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       ))
 
