@@ -84,7 +84,15 @@ r "sysctl --system"
 # driver.
 # acl is for setfacl, which is used to set permissions and not installed
 # by default in Leaseweb servers.
-r "apt-get -y install qemu-utils mtools acl"
+# fscrypt is for encrypting /vm/{vm_name}/ directories at rest.
+r "apt-get -y install qemu-utils mtools acl fscrypt"
+
+# Set up fscrypt for encrypting VM home directories at rest.
+# Enable the encrypt feature on the root filesystem and initialize fscrypt metadata.
+root_device = `findmnt -n -o SOURCE /`.strip
+r "tune2fs -O encrypt #{root_device.shellescape}" if root_device.start_with?("/dev/")
+r "fscrypt setup --quiet --force"
+r "fscrypt setup / --quiet --force"
 
 # We need nvme-cli to inspect installed NVMe cards in prod servers when
 # looking into I/O performance issues. systemd-coredump is useful when

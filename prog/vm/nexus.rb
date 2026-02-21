@@ -100,7 +100,8 @@ class Prog::Vm::Nexus < Prog::Base
         ip4_enabled: enable_ip4,
         pool_id:,
         arch:,
-        project_id:
+        project_id:,
+        fscrypt_key: Base64.encode64(OpenSSL::Random.random_bytes(32))
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 

@@ -187,16 +187,44 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#create_unix_user" do
-    it "runs adduser" do
+    it "runs adduser with fscrypt encryption when fscrypt_key is set" do
+      vm.update(fscrypt_key: Base64.encode64("k" * 32))
+      expect(nx).to receive(:rand).and_return(1111)
+
+      # First call: clean up and create directory
+      expect(sshable).to receive(:_cmd).with(<<~COMMAND).ordered
+        set -ueo pipefail
+        if id #{nx.vm_name} &>/dev/null; then sudo userdel --remove --force #{nx.vm_name}; fi
+        if getent group #{nx.vm_name} &>/dev/null; then sudo groupdel -f #{nx.vm_name}; fi
+        sudo rm -rf #{nx.vm_home}
+        sudo mkdir -p #{nx.vm_home}
+      COMMAND
+
+      # Second call: encrypt directory with fscrypt key via stdin
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/setup-vm encrypt-home #{nx.vm_name}/,
+        {stdin: "k" * 32}
+      ).ordered
+
+      # Third call: create user and set permissions
+      expect(sshable).to receive(:_cmd).with(<<~COMMAND).ordered
+        set -ueo pipefail
+        sudo adduser --disabled-password --gecos '' --no-create-home --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
+        sudo chown #{nx.vm_name}:#{nx.vm_name} #{nx.vm_home}
+        sudo chmod 750 #{nx.vm_home}
+        sudo usermod -a -G kvm #{nx.vm_name}
+      COMMAND
+
+      expect { nx.create_unix_user }.to hop("create_billing_record")
+    end
+
+    it "runs adduser without fscrypt when fscrypt_key is nil" do
       expect(nx).to receive(:rand).and_return(1111)
       expect(sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
-        # Make this script idempotent
-        sudo userdel --remove --force #{nx.vm_name} || true
-        sudo groupdel -f #{nx.vm_name} || true
-        # Create vm's user and home directory
+        if id #{nx.vm_name} &>/dev/null; then sudo userdel --remove --force #{nx.vm_name}; fi
+        if getent group #{nx.vm_name} &>/dev/null; then sudo groupdel -f #{nx.vm_name}; fi
         sudo adduser --disabled-password --gecos '' --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
-        # Enable KVM access for VM user
         sudo usermod -a -G kvm #{nx.vm_name}
       COMMAND
 
@@ -1078,7 +1106,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#start_after_host_reboot" do
-    it "can start a vm after reboot" do
+    it "can start a vm after reboot without fscrypt" do
       kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
       dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
       VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
@@ -1087,6 +1115,26 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
+      expect(vm).to receive(:update).with(display_state: "starting")
+      expect(vm).to receive(:update).with(display_state: "running")
+      expect(vm).to receive(:incr_update_firewall_rules)
+      expect { nx.start_after_host_reboot }.to hop("wait")
+    end
+
+    it "unlocks fscrypt directory before recreate-unpersisted when fscrypt_key is set" do
+      vm.update(fscrypt_key: Base64.encode64("k" * 32))
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+      dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
+
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/setup-vm unlock-home #{nx.vm_name}/,
+        {stdin: "k" * 32}
+      ).ordered
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
+        {stdin: /{"storage":/}
+      ).ordered
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
       expect(vm).to receive(:incr_update_firewall_rules)

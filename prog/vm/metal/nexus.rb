@@ -118,18 +118,48 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def create_unix_user
     uid = rand(1100..59999)
-    command = <<~COMMAND
-      set -ueo pipefail
-      # Make this script idempotent
-      sudo userdel --remove --force :vm_name || true
-      sudo groupdel -f :vm_name || true
-      # Create vm's user and home directory
-      sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
-      # Enable KVM access for VM user
-      sudo usermod -a -G kvm :vm_name
-    COMMAND
 
-    host.sshable.cmd(command, vm_name:, vm_home:, uid:)
+    if vm.fscrypt_key
+      # Clean up any previous user/group and recreate the home directory.
+      # Uses id/getent guards so real errors (disk full, corrupt passwd)
+      # propagate instead of being swallowed by || true.
+      # Unconditional rm -rf handles the retry case where fscrypt encrypt
+      # succeeded but adduser hadn't run yet.
+      command = <<~COMMAND
+        set -ueo pipefail
+        if id :vm_name &>/dev/null; then sudo userdel --remove --force :vm_name; fi
+        if getent group :vm_name &>/dev/null; then sudo groupdel -f :vm_name; fi
+        sudo rm -rf :vm_home
+        sudo mkdir -p :vm_home
+      COMMAND
+      host.sshable.cmd(command, vm_name:, vm_home:)
+
+      # Encrypt the empty directory with fscrypt (key delivered via stdin)
+      fscrypt_key_binary = Base64.decode64(vm.fscrypt_key)
+      host.sshable.cmd("sudo host/bin/setup-vm encrypt-home :vm_name", vm_name:, stdin: fscrypt_key_binary)
+
+      # Create the unix user with --no-create-home since the directory is already encrypted
+      command = <<~COMMAND
+        set -ueo pipefail
+        sudo adduser --disabled-password --gecos '' --no-create-home --home :vm_home --uid :uid :vm_name
+        sudo chown :vm_name::vm_name :vm_home
+        sudo chmod 750 :vm_home
+        sudo usermod -a -G kvm :vm_name
+      COMMAND
+      host.sshable.cmd(command, vm_name:, vm_home:, uid:)
+    else
+      # Old VM without fscrypt_key (T1/T3 backwards compatibility).
+      # Uses id/getent guards so real errors propagate instead of
+      # being swallowed by || true.
+      command = <<~COMMAND
+        set -ueo pipefail
+        if id :vm_name &>/dev/null; then sudo userdel --remove --force :vm_name; fi
+        if getent group :vm_name &>/dev/null; then sudo groupdel -f :vm_name; fi
+        sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
+        sudo usermod -a -G kvm :vm_name
+      COMMAND
+      host.sshable.cmd(command, vm_name:, vm_home:, uid:)
+    end
 
     hop_create_billing_record
   end
@@ -431,6 +461,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def start_after_host_reboot
     vm.update(display_state: "starting")
+
+    # Unlock the fscrypt-encrypted /vm/ directory before recreate-unpersisted
+    # reads prep.json and other files. After host reboot, directories are locked.
+    if vm.fscrypt_key
+      fscrypt_key_binary = Base64.decode64(vm.fscrypt_key)
+      host.sshable.cmd("sudo host/bin/setup-vm unlock-home :vm_name", vm_name:, stdin: fscrypt_key_binary)
+    end
 
     secrets_json = JSON.generate({
       storage: vm.storage_secrets

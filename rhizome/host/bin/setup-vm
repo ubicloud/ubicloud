@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/vm_setup"
 
 unless (action = ARGV.shift)
   puts "expected action as argument"
@@ -13,6 +12,24 @@ unless (vm_name = ARGV.shift)
   puts "expected path to vm_name as argument"
   exit 1
 end
+
+# fscrypt actions don't need prep.json — they run before it exists
+# or when the directory is locked (so prep.json can't be read).
+if action == "encrypt-home"
+  require_relative "../lib/vm_setup_fscrypt"
+  key_binary = $stdin.read
+  VmSetupFscrypt.encrypt(vm_name, key_binary)
+  exit 0
+end
+
+if action == "unlock-home"
+  require_relative "../lib/vm_setup_fscrypt"
+  key_binary = $stdin.read
+  VmSetupFscrypt.unlock(vm_name, key_binary)
+  exit 0
+end
+
+require_relative "../lib/vm_setup"
 
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))
