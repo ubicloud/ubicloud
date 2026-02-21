@@ -3158,6 +3158,10 @@ components:
         state:
           description: State of the machine image
           type: string
+        version:
+          description: Version of the machine image
+          type: string
+          nullable: true
         visible:
           description: Whether the machine image is publicly visible
           type: boolean

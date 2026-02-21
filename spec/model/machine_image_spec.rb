@@ -102,6 +102,47 @@ RSpec.describe MachineImage do
     expect(params["encrypted"]).to be true
   end
 
+  describe ".register_distro_image" do
+    let(:vm_host) { create_vm_host }
+
+    before do
+      allow(Config).to receive_messages(
+        machine_image_archive_bucket: "distro-bucket",
+        machine_image_archive_endpoint: "https://r2.example.com"
+      )
+    end
+
+    it "creates a public machine image and strand" do
+      result = described_class.register_distro_image(
+        project_id: project_id,
+        location_id: Location::HETZNER_FSN1_ID,
+        name: "ubuntu-noble",
+        url: "https://cloud-images.ubuntu.com/noble/release/image.img",
+        sha256: "abc123",
+        version: "20250502.1",
+        vm_host_id: vm_host.id
+      )
+
+      expect(result).to be_a(MachineImage)
+      expect(result.name).to eq("ubuntu-noble")
+      expect(result.version).to eq("20250502.1")
+      expect(result.visible).to be true
+      expect(result.encrypted).to be false
+      expect(result.state).to eq("creating")
+      expect(result.s3_bucket).to eq("distro-bucket")
+      expect(result.s3_prefix).to include("public/ubuntu-noble/20250502.1/")
+      expect(result.s3_prefix).to include(result.ubid)
+
+      strand = Strand[result.id]
+      expect(strand).not_to be_nil
+      expect(strand.prog).to eq("MachineImage::RegisterDistroImage")
+      expect(strand.label).to eq("start")
+      expect(strand.stack.first["vm_host_id"]).to eq(vm_host.id)
+      expect(strand.stack.first["url"]).to include("ubuntu")
+      expect(strand.stack.first["sha256"]).to eq("abc123")
+    end
+  end
+
   describe "state predicates" do
     it "returns true for available?" do
       expect(mi.available?).to be true

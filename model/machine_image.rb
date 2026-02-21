@@ -55,6 +55,36 @@ class MachineImage < Sequel::Model
     encrypted
   end
 
+  # Register a public distro image from a URL. Admin-only operation.
+  # Returns the Strand for the registration prog.
+  def self.register_distro_image(project_id:, location_id:, name:, url:, sha256:, version:, vm_host_id:)
+    mi = nil
+    DB.transaction do
+      mi = MachineImage.create(
+        name: name,
+        description: "#{name} #{version}",
+        project_id: project_id,
+        location_id: location_id,
+        state: "creating",
+        encrypted: false,
+        size_gib: 0,
+        visible: true,
+        version: version,
+        s3_bucket: Config.machine_image_archive_bucket || "",
+        s3_prefix: "public/#{name}/#{version}/",
+        s3_endpoint: Config.machine_image_archive_endpoint || ""
+      )
+      mi.update(s3_prefix: "#{mi.s3_prefix}#{mi.ubid}/")
+      Strand.create(
+        id: mi.id,
+        prog: "MachineImage::RegisterDistroImage",
+        label: "start",
+        stack: [{"subject_id" => mi.id, "vm_host_id" => vm_host_id, "url" => url, "sha256" => sha256}]
+      )
+    end
+    mi
+  end
+
   # Archive params needed by ubiblk to fetch stripes from S3.
   def archive_params
     {
@@ -86,6 +116,7 @@ end
 #  vm_id                   | uuid                     |
 #  created_at              | timestamp with time zone | NOT NULL DEFAULT now()
 #  visible                 | boolean                  | NOT NULL DEFAULT false
+#  version                 | text                     |
 # Indexes:
 #  machine_image_pkey                            | PRIMARY KEY btree (id)
 #  machine_image_project_id_location_id_name_key | UNIQUE btree (project_id, location_id, name)
