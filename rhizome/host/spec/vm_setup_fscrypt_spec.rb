@@ -102,14 +102,16 @@ RSpec.describe VmSetupFscrypt do
   end
 
   describe ".purge_metadata" do
-    it "removes orphaned protector metadata" do
+    it "removes orphaned protector metadata for both name variants" do
       status_output = <<~STATUS
         PROTECTOR  LINKED  DESCRIPTION
         abc123def  No      Raw key protector "#{vm_name}"
+        def456ghi  No      Raw key protector "#{vm_name}-rotate"
         xyz789ghi  No      Raw key protector "other-vm"
       STATUS
       allow(VmSetupFscrypt).to receive(:`).with(/fscrypt status/).and_return(status_output)
       expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata destroy --protector=\/:abc123def --force --quiet/)
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata destroy --protector=\/:def456ghi --force --quiet/)
 
       VmSetupFscrypt.purge_metadata(vm_name)
     end
@@ -122,29 +124,68 @@ RSpec.describe VmSetupFscrypt do
     end
   end
 
+  describe ".parse_protector_table" do
+    it "parses protector IDs and names from status output" do
+      status_output = <<~STATUS
+        PROTECTOR  LINKED     DESCRIPTION
+        abc123def  Yes (/)    Raw key protector "#{vm_name}"
+        xyz789ghi  No         Raw key protector "#{vm_name}-rotate"
+      STATUS
+
+      result = VmSetupFscrypt.parse_protector_table(status_output)
+      expect(result).to eq([
+        {id: "abc123def", name: vm_name},
+        {id: "xyz789ghi", name: "#{vm_name}-rotate"}
+      ])
+    end
+
+    it "returns empty array when no protectors found" do
+      expect(VmSetupFscrypt.parse_protector_table("No protectors\n")).to eq([])
+    end
+
+    it "skips the header line" do
+      status_output = <<~STATUS
+        PROTECTOR  LINKED  DESCRIPTION
+      STATUS
+
+      expect(VmSetupFscrypt.parse_protector_table(status_output)).to eq([])
+    end
+  end
+
   describe ".add_protector" do
     let(:old_key) { OpenSSL::Random.random_bytes(32) }
     let(:new_key) { OpenSSL::Random.random_bytes(32) }
-    let(:dir_status) { "Policy:  abc123policy\nUnlocked: Yes\n" }
-    let(:root_status_no_rotate) {
-      <<~STATUS
-        PROTECTOR  LINKED  DESCRIPTION
-        oldprot01  No      Raw key protector "#{vm_name}"
-      STATUS
-    }
 
     before do
-      # Stub unlock (called internally by add_protector)
       allow(VmSetupFscrypt).to receive(:unlock)
     end
 
-    it "creates a new protector and links it to the policy" do
-      allow(File).to receive(:directory?).with(vm_home).and_return(true)
-      # Use exact command strings instead of regexes to avoid overlap
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1").and_return(root_status_no_rotate)
+    # Helper to build dir_status with a protector table (policy-linked protectors)
+    def dir_status_with(*protectors)
+      lines = ["Policy:  abc123policy", "Unlocked: Yes", "PROTECTOR  LINKED     DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  Yes (/)    Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
+    end
 
-      # Key file writes
+    # Helper to build root_status (global protectors)
+    def root_status_with(*protectors)
+      lines = ["PROTECTOR  LINKED  DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  No      Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
+    end
+
+    it "creates a new protector and links it to the policy (first rotation)" do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["oldprot01", vm_name]))
+      # No orphan to clean up
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+        .and_return(root_status_with(["oldprot01", vm_name]))
+
       allow(File).to receive(:open).with(%r{/tmp/fscrypt-newkey}, "w", 0o600).and_yield(StringIO.new)
       allow(File).to receive(:open).with(%r{/tmp/fscrypt-oldkey}, "w", 0o600).and_yield(StringIO.new)
       allow(FileUtils).to receive(:rm_f)
@@ -152,22 +193,62 @@ RSpec.describe VmSetupFscrypt do
       expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata create protector.*--name=#{vm_name}-rotate/).and_return("newprot01\n")
       expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata add-protector-to-policy.*--protector=\/:newprot01.*--policy=\/:abc123policy.*--unlock-with=\/:oldprot01/)
 
-      VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      expect(result).to eq("#{vm_name}-rotate")
     end
 
-    it "is idempotent when rotate protector already exists" do
-      root_status_with_rotate = <<~STATUS
-        PROTECTOR  LINKED  DESCRIPTION
-        oldprot01  No      Raw key protector "#{vm_name}"
-        newprot01  No      Raw key protector "#{vm_name}-rotate"
-      STATUS
+    it "creates vm_name protector when current is vm_name-rotate (second rotation)" do
       allow(File).to receive(:directory?).with(vm_home).and_return(true)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1").and_return(root_status_with_rotate)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["rotprot01", "#{vm_name}-rotate"]))
+      # No orphan
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+        .and_return(root_status_with(["rotprot01", "#{vm_name}-rotate"]))
+
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-newkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-oldkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(FileUtils).to receive(:rm_f)
+
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata create protector.*--name=#{Regexp.escape(vm_name)} /).and_return("newprot01\n")
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata add-protector-to-policy.*--protector=\/:newprot01.*--policy=\/:abc123policy.*--unlock-with=\/:rotprot01/)
+
+      result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      expect(result).to eq(vm_name)
+    end
+
+    it "is idempotent when rotate protector already linked to policy" do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      # Both protectors linked — add_protector already completed
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["oldprot01", vm_name], ["newprot01", "#{vm_name}-rotate"]))
 
       expect(VmSetupFscrypt).not_to receive(:r).with(/fscrypt metadata create/)
 
-      VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      expect(result).to eq("#{vm_name}-rotate")
+    end
+
+    it "cleans up orphaned rotate protector and recreates (Bug 1 fix)" do
+      # Dir status shows only the old protector linked (orphan not linked)
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["oldprot01", vm_name]))
+      # Root status shows orphan exists globally
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+        .and_return(root_status_with(["oldprot01", vm_name], ["orphan01", "#{vm_name}-rotate"]))
+
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-newkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-oldkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(FileUtils).to receive(:rm_f)
+
+      # Should destroy the orphan first
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata destroy --protector=\/:orphan01 --force --quiet/).ordered
+      # Then create and link fresh
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata create protector.*--name=#{vm_name}-rotate/).and_return("newprot01\n").ordered
+      expect(VmSetupFscrypt).to receive(:r).with(/fscrypt metadata add-protector-to-policy.*--protector=\/:newprot01/).ordered
+
+      result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+      expect(result).to eq("#{vm_name}-rotate")
     end
 
     it "fails if directory does not exist" do
@@ -182,66 +263,87 @@ RSpec.describe VmSetupFscrypt do
 
       expect { VmSetupFscrypt.add_protector(vm_name, old_key, new_key) }.to raise_error(RuntimeError, /Cannot find fscrypt policy/)
     end
+
+    it "fails if no current protector found in policy" do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      # Policy exists but no matching protector linked
+      dir_status = "Policy:  abc123policy\nUnlocked: Yes\nPROTECTOR  LINKED  DESCRIPTION\nabc123  No  Raw key protector \"unrelated-vm\"\n"
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
+
+      expect { VmSetupFscrypt.add_protector(vm_name, old_key, new_key) }.to raise_error(RuntimeError, /Cannot find current protector/)
+    end
   end
 
   describe ".remove_old_protectors" do
-    let(:keep_key) { OpenSSL::Random.random_bytes(32) }
-    let(:dir_status) { "Policy:  abc123policy\nUnlocked: Yes\n" }
-
-    it "removes the old protector and renames rotate protector" do
-      root_status = <<~STATUS
-        PROTECTOR  LINKED  DESCRIPTION
-        oldprot01  No      Raw key protector "#{vm_name}"
-        newprot01  No      Raw key protector "#{vm_name}-rotate"
-      STATUS
-      allow(File).to receive(:directory?).with(vm_home).and_return(true)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1").and_return(root_status)
-
-      # Remove old protector from policy and destroy it
-      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:oldprot01.*--policy=\/:abc123policy/).ordered
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:oldprot01/).ordered
-
-      # Rename: find rotate protector, create new one with original name, link, then remove rotate
-      allow(VmSetupFscrypt).to receive(:find_protector_id_by_name).with("#{vm_name}-rotate").and_return("newprot01")
-      allow(File).to receive(:open).with(%r{/tmp/fscrypt-keepkey}, "w", 0o600).and_yield(StringIO.new)
-      allow(FileUtils).to receive(:rm_f)
-
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata create protector.*--name=#{Regexp.escape(vm_name)} /).and_return("renprot01\n").ordered
-      expect(VmSetupFscrypt).to receive(:r).with(/add-protector-to-policy.*--protector=\/:renprot01.*--unlock-with=\/:newprot01/).ordered
-      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:newprot01/).ordered
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:newprot01/).ordered
-
-      VmSetupFscrypt.remove_old_protectors(vm_name, keep_key)
+    # Helper to build dir_status with a protector table (policy-linked protectors)
+    def dir_status_with(*protectors)
+      lines = ["Policy:  abc123policy", "Unlocked: Yes", "PROTECTOR  LINKED     DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  Yes (/)    Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
     end
 
-    it "is idempotent when old protector already removed" do
-      root_status = <<~STATUS
-        PROTECTOR  LINKED  DESCRIPTION
-        newprot01  No      Raw key protector "#{vm_name}-rotate"
-      STATUS
+    it "removes the old protector, keeps the rotate protector (no rename)" do
       allow(File).to receive(:directory?).with(vm_home).and_return(true)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1").and_return(root_status)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["oldprot01", vm_name], ["newprot01", "#{vm_name}-rotate"]))
 
-      # No old protector to remove, just rename
-      allow(VmSetupFscrypt).to receive(:find_protector_id_by_name).with("#{vm_name}-rotate").and_return("newprot01")
-      allow(File).to receive(:open).with(%r{/tmp/fscrypt-keepkey}, "w", 0o600).and_yield(StringIO.new)
-      allow(FileUtils).to receive(:rm_f)
+      # Should remove old protector (vm_name), keep rotate protector
+      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:oldprot01.*--policy=\/:abc123policy/)
+      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:oldprot01/)
 
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata create protector.*--name=#{Regexp.escape(vm_name)} /).and_return("renprot01\n")
-      expect(VmSetupFscrypt).to receive(:r).with(/add-protector-to-policy.*--protector=\/:renprot01.*--unlock-with=\/:newprot01/)
-      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:newprot01/)
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:newprot01/)
+      # Should NOT touch the rotate protector
+      expect(VmSetupFscrypt).not_to receive(:r).with(/--protector=\/:newprot01/)
 
-      VmSetupFscrypt.remove_old_protectors(vm_name, keep_key)
+      VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+    end
+
+    it "removes the rotate protector when keep_name is vm_name (second rotation)" do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["rotprot01", "#{vm_name}-rotate"], ["newprot01", vm_name]))
+
+      # Should remove rotate protector, keep vm_name protector
+      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:rotprot01.*--policy=\/:abc123policy/)
+      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:rotprot01/)
+
+      # Should NOT touch the keep protector
+      expect(VmSetupFscrypt).not_to receive(:r).with(/--protector=\/:newprot01/)
+
+      VmSetupFscrypt.remove_old_protectors(vm_name, vm_name)
+    end
+
+    it "is idempotent when only keep_name protector remains (Bug 2 fix)" do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      # Only the keep protector is linked — already cleaned up on a previous run
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["newprot01", "#{vm_name}-rotate"]))
+
+      # Should NOT destroy anything
+      expect(VmSetupFscrypt).not_to receive(:r)
+
+      VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+    end
+
+    it "is idempotent on retry after full completion (Bug 2 regression test)" do
+      # This is the exact scenario from Bug 2:
+      # First run completed (old destroyed, no rename). Only keep protector remains.
+      # Lost COMMIT causes retry. Must NOT destroy the remaining good protector.
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["newprot01", "#{vm_name}-rotate"]))
+
+      expect(VmSetupFscrypt).not_to receive(:r)
+
+      VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
     end
 
     it "does nothing if directory does not exist" do
       allow(File).to receive(:directory?).with(vm_home).and_return(false)
       expect(VmSetupFscrypt).not_to receive(:r)
 
-      VmSetupFscrypt.remove_old_protectors(vm_name, keep_key)
+      VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
     end
 
     it "does nothing if no policy found" do
@@ -250,34 +352,19 @@ RSpec.describe VmSetupFscrypt do
 
       expect(VmSetupFscrypt).not_to receive(:r)
 
-      VmSetupFscrypt.remove_old_protectors(vm_name, keep_key)
+      VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
     end
 
     it "handles CommandFail when removing already-removed protectors" do
-      root_status = <<~STATUS
-        PROTECTOR  LINKED  DESCRIPTION
-        oldprot01  No      Raw key protector "#{vm_name}"
-        newprot01  No      Raw key protector "#{vm_name}-rotate"
-      STATUS
       allow(File).to receive(:directory?).with(vm_home).and_return(true)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1").and_return(dir_status)
-      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1").and_return(root_status)
+      allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+        .and_return(dir_status_with(["oldprot01", vm_name], ["newprot01", "#{vm_name}-rotate"]))
 
-      # Old protector removal fails (already removed)
+      # Old protector removal fails (already removed/destroyed)
       expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:oldprot01/).and_raise(CommandFail.new("already removed", "", ""))
       expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:oldprot01/).and_raise(CommandFail.new("already destroyed", "", ""))
 
-      # Rename still works
-      allow(VmSetupFscrypt).to receive(:find_protector_id_by_name).with("#{vm_name}-rotate").and_return("newprot01")
-      allow(File).to receive(:open).with(%r{/tmp/fscrypt-keepkey}, "w", 0o600).and_yield(StringIO.new)
-      allow(FileUtils).to receive(:rm_f)
-
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata create protector.*--name=#{Regexp.escape(vm_name)} /).and_return("renprot01\n")
-      expect(VmSetupFscrypt).to receive(:r).with(/add-protector-to-policy.*--protector=\/:renprot01.*--unlock-with=\/:newprot01/)
-      expect(VmSetupFscrypt).to receive(:r).with(/remove-protector-from-policy.*--protector=\/:newprot01/)
-      expect(VmSetupFscrypt).to receive(:r).with(/metadata destroy.*--protector=\/:newprot01/)
-
-      expect { VmSetupFscrypt.remove_old_protectors(vm_name, keep_key) }.not_to raise_error
+      expect { VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate") }.not_to raise_error
     end
   end
 

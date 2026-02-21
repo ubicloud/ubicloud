@@ -20,13 +20,15 @@ class Prog::RotateFscryptKey < Prog::Base
     old_key_binary = Base64.decode64(vm.fscrypt_key)
     new_key_binary = Base64.decode64(vm.fscrypt_key_2)
 
-    host.sshable.cmd(
+    rotate_name = host.sshable.cmd(
       "sudo host/bin/setup-vm rotate-fscrypt-add :vm_name",
       vm_name:, stdin: JSON.generate({
         old_key: Base64.strict_encode64(old_key_binary),
         new_key: Base64.strict_encode64(new_key_binary)
       })
-    )
+    ).strip
+
+    update_stack({"rotate_name" => rotate_name})
 
     hop_promote_db
   end
@@ -37,12 +39,13 @@ class Prog::RotateFscryptKey < Prog::Base
   end
 
   label def remove_old
-    keep_key_binary = Base64.decode64(vm.fscrypt_key)
+    rotate_name = frame["rotate_name"]
+    fail "BUG: rotate_name not set in frame" unless rotate_name
 
     host.sshable.cmd(
       "sudo host/bin/setup-vm rotate-fscrypt-remove :vm_name",
       vm_name:, stdin: JSON.generate({
-        keep_key: Base64.strict_encode64(keep_key_binary)
+        keep_name: rotate_name
       })
     )
 

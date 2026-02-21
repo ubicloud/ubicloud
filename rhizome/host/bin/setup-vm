@@ -35,15 +35,17 @@ if action == "rotate-fscrypt-add"
   params = JSON.parse($stdin.read)
   old_key = Base64.decode64(params["old_key"])
   new_key = Base64.decode64(params["new_key"])
-  VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+  rotate_name = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+  # Return the rotate name so the caller can pass it to remove_old_protectors
+  puts rotate_name
   exit 0
 end
 
 if action == "rotate-fscrypt-remove"
   require_relative "../lib/vm_setup_fscrypt"
   params = JSON.parse($stdin.read)
-  keep_key = Base64.decode64(params["keep_key"])
-  VmSetupFscrypt.remove_old_protectors(vm_name, keep_key)
+  keep_name = params["keep_name"]
+  VmSetupFscrypt.remove_old_protectors(vm_name, keep_name)
   exit 0
 end
 

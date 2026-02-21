@@ -51,7 +51,7 @@ RSpec.describe Prog::RotateFscryptKey do
       vm.fscrypt_key_2 = Base64.encode64("b" * 32)
     end
 
-    it "sends SSH command with old and new keys and hops to promote_db" do
+    it "sends SSH command, stores rotate_name in frame, and hops to promote_db" do
       expect(sshable).to receive(:_cmd).with(
         /sudo host\/bin\/setup-vm rotate-fscrypt-add vmabc123/,
         stdin: anything
@@ -59,7 +59,10 @@ RSpec.describe Prog::RotateFscryptKey do
         params = JSON.parse(stdin)
         expect(Base64.decode64(params["old_key"]).bytesize).to eq(32)
         expect(Base64.decode64(params["new_key"]).bytesize).to eq(32)
+        "vmabc123-rotate\n"
       end
+
+      expect(rfk).to receive(:update_stack).with({"rotate_name" => "vmabc123-rotate"})
 
       expect { rfk.add_protector }.to hop("promote_db")
     end
@@ -81,16 +84,23 @@ RSpec.describe Prog::RotateFscryptKey do
   end
 
   describe "#remove_old" do
-    it "sends SSH command with keep_key and pops" do
+    it "sends SSH command with keep_name from frame and pops" do
+      rfk.strand.stack.first.merge!("rotate_name" => "vmabc123-rotate")
+      rfk.instance_variable_set(:@frame, nil)
+
       expect(sshable).to receive(:_cmd).with(
         /sudo host\/bin\/setup-vm rotate-fscrypt-remove vmabc123/,
         stdin: anything
       ) do |_cmd, stdin:|
         params = JSON.parse(stdin)
-        expect(Base64.decode64(params["keep_key"]).bytesize).to eq(32)
+        expect(params["keep_name"]).to eq("vmabc123-rotate")
       end
 
       expect { rfk.remove_old }.to exit({"msg" => "fscrypt key rotated"})
+    end
+
+    it "fails if rotate_name not in frame" do
+      expect { rfk.remove_old }.to raise_error(RuntimeError, /BUG: rotate_name not set/)
     end
   end
 end
