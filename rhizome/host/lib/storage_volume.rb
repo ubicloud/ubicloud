@@ -99,7 +99,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path || archive?
+    vhost_backend_create_metadata(key_wrapping_secrets)
     vhost_backend_create_service_file
   end
 
@@ -340,9 +340,9 @@ class StorageVolume
       "rpc_socket_path" => sp.rpc_socket_path
     }
 
+    config["metadata_path"] = sp.vhost_backend_metadata
     if @image_path
       config["image_path"] = @image_path
-      config["metadata_path"] = sp.vhost_backend_metadata
     end
 
     if @encrypted
@@ -372,7 +372,7 @@ class StorageVolume
       write_through: write_through_device?,
       skip_sync: @skip_sync,
       image_path: @image_path,
-      metadata_path: (@image_path || archive?) ? sp.vhost_backend_metadata : nil,
+      metadata_path: sp.vhost_backend_metadata,
       cpus: @cpus,
       encrypted: @encrypted,
       encryption_key: encryption_key,

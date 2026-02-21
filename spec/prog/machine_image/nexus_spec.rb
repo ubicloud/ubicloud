@@ -105,12 +105,12 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect { nx.archive }.to hop("verify_boot")
     end
 
-    it "marks failed and pops when archive fails" do
+    it "marks failed and hops to wait when archive fails" do
       expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --check archive_/).and_return("Failed")
       expect(sshable).to receive(:_cmd).with(/cat var\/log\/archive_.*\.stderr/).and_return("some error\n")
       expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean archive_/)
       expect(Clog).to receive(:emit).with("Failed to create machine image archive", hash_including(machine_image_archive_failed: hash_including(stderr: "some error")))
-      expect { nx.archive }.to exit({"msg" => "machine image archive failed: some error"})
+      expect { nx.archive }.to hop("wait")
       expect(machine_image.reload.state).to eq("failed")
     end
 
@@ -119,7 +119,7 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect(sshable).to receive(:_cmd).with(/cat var\/log\/archive_.*\.stderr/).and_raise(RuntimeError, "file not found")
       expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean archive_/)
       expect(Clog).to receive(:emit).with("Failed to create machine image archive", hash_including(machine_image_archive_failed: hash_including(stderr: nil)))
-      expect { nx.archive }.to exit({"msg" => "machine image archive failed"})
+      expect { nx.archive }.to hop("wait")
       expect(machine_image.reload.state).to eq("failed")
     end
 
@@ -267,13 +267,13 @@ RSpec.describe Prog::MachineImage::Nexus do
       st
     }
 
-    it "destroys VM, marks image failed, and pops" do
+    it "destroys VM, marks image failed, and hops to wait" do
       verify_vm = instance_double(Vm)
       allow(Vm).to receive(:[]).with("test-verify-vm-id").and_return(verify_vm)
       expect(verify_vm).to receive(:incr_destroy)
 
       expect(Clog).to receive(:emit).with("Machine image failed boot verification", anything)
-      expect { nx.fail_verify_boot }.to exit({"msg" => "machine image failed boot verification"})
+      expect { nx.fail_verify_boot }.to hop("wait")
       expect(machine_image.reload.state).to eq("failed")
     end
 
@@ -281,7 +281,7 @@ RSpec.describe Prog::MachineImage::Nexus do
       allow(Vm).to receive(:[]).with("test-verify-vm-id").and_return(nil)
 
       expect(Clog).to receive(:emit).with("Machine image failed boot verification", anything)
-      expect { nx.fail_verify_boot }.to exit({"msg" => "machine image failed boot verification"})
+      expect { nx.fail_verify_boot }.to hop("wait")
       expect(machine_image.reload.state).to eq("failed")
     end
   end
