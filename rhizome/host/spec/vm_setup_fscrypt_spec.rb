@@ -368,6 +368,243 @@ RSpec.describe VmSetupFscrypt do
     end
   end
 
+  # ============================================================
+  # Crash-point interleaving tests
+  #
+  # Each test simulates the host-side state at a specific crash point
+  # (between two fscrypt operations), then calls the method as if
+  # retrying after crash. Asserts:
+  #   1. Method converges to correct end state (no infinite loop, no error)
+  #   2. The keep protector (DB slot-1 key) remains linked to the policy
+  #   3. No name ambiguity causes the wrong protector to be destroyed
+  # ============================================================
+
+  describe ".add_protector crash-point interleaving" do
+    let(:old_key) { OpenSSL::Random.random_bytes(32) }
+    let(:new_key) { OpenSSL::Random.random_bytes(32) }
+
+    before do
+      allow(VmSetupFscrypt).to receive(:unlock)
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-newkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(File).to receive(:open).with(%r{/tmp/fscrypt-oldkey}, "w", 0o600).and_yield(StringIO.new)
+      allow(FileUtils).to receive(:rm_f)
+    end
+
+    # Helper to build dir_status with a protector table (policy-linked protectors)
+    def dir_status_with(*protectors)
+      lines = ["Policy:  abc123policy", "Unlocked: Yes", "PROTECTOR  LINKED     DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  Yes (/)    Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
+    end
+
+    # Helper to build root_status (global protectors)
+    def root_status_with(*protectors)
+      lines = ["PROTECTOR  LINKED  DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  No      Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
+    end
+
+    context "crash after 'create protector' but before 'add-protector-to-policy' (Bug 1 scenario)" do
+      # Host state: rotate protector exists globally but is NOT linked to the policy.
+      # Dir status shows only the old protector linked. Root status shows the orphan.
+      # DB state: fscrypt_key = old_key, fscrypt_key_2 = new_key (pre-promote).
+      # On retry, add_protector must detect the orphan, destroy it, recreate,
+      # and link — not short-circuit thinking the rotation is done.
+
+      it "destroys orphan, recreates protector, and links to policy on retry" do
+        # Dir status: only old protector P("vm_name") linked to policy
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["oldprot01", vm_name]))
+        # Root status: orphan P("vm_name-rotate") exists globally but not linked
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+          .and_return(root_status_with(["oldprot01", vm_name], ["orphan01", "#{vm_name}-rotate"]))
+
+        # Must destroy the orphan
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata destroy --protector=\/:orphan01 --force --quiet/).ordered
+        # Must recreate and link
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata create protector.*--name=#{vm_name}-rotate/).and_return("fresh01\n").ordered
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata add-protector-to-policy.*--protector=\/:fresh01.*--policy=\/:abc123policy.*--unlock-with=\/:oldprot01/).ordered
+
+        result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+        # Converges: returns rotate_name, old protector still linked (overlap)
+        expect(result).to eq("#{vm_name}-rotate")
+      end
+
+      it "handles orphan destroy failure gracefully and still recreates" do
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["oldprot01", vm_name]))
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+          .and_return(root_status_with(["oldprot01", vm_name], ["orphan01", "#{vm_name}-rotate"]))
+
+        # Orphan destroy fails (already destroyed by concurrent cleanup)
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata destroy --protector=\/:orphan01/).and_raise(CommandFail.new("not found", "", "")).ordered
+        # Must still create and link
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata create protector.*--name=#{vm_name}-rotate/).and_return("fresh01\n").ordered
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata add-protector-to-policy.*--protector=\/:fresh01/).ordered
+
+        result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+        expect(result).to eq("#{vm_name}-rotate")
+      end
+    end
+
+    context "crash after 'add-protector-to-policy' completed (both protectors linked)" do
+      # Host state: both P("vm_name") and P("vm_name-rotate") are linked to policy.
+      # DB state: fscrypt_key = old_key, fscrypt_key_2 = new_key.
+      # This is the happy path completion crash. On retry, add_protector sees
+      # the rotate protector is already linked and returns immediately.
+      # Reboot safety: old_key (slot 1) can unlock via P("vm_name").
+
+      it "returns immediately without any fscrypt mutations" do
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["oldprot01", vm_name], ["newprot01", "#{vm_name}-rotate"]))
+
+        # Must NOT create or destroy anything
+        expect(VmSetupFscrypt).not_to receive(:r)
+
+        result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+        expect(result).to eq("#{vm_name}-rotate")
+      end
+    end
+
+    context "second rotation: crash after create but before link (vm_name-rotate -> vm_name)" do
+      # After first rotation, policy has P("vm_name-rotate") linked.
+      # Second rotation creates P("vm_name") but crashes before linking it.
+      # Orphan P("vm_name") exists globally but not linked to policy.
+
+      it "destroys orphan vm_name protector, recreates, and links on retry" do
+        # Dir status: only vm_name-rotate linked
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["rotprot01", "#{vm_name}-rotate"]))
+        # Root status: orphan P("vm_name") exists globally
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status / 2>&1")
+          .and_return(root_status_with(["rotprot01", "#{vm_name}-rotate"], ["orphan01", vm_name]))
+
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata destroy --protector=\/:orphan01 --force --quiet/).ordered
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata create protector.*--name=#{Regexp.escape(vm_name)} /).and_return("fresh01\n").ordered
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/fscrypt metadata add-protector-to-policy.*--protector=\/:fresh01.*--unlock-with=\/:rotprot01/).ordered
+
+        result = VmSetupFscrypt.add_protector(vm_name, old_key, new_key)
+        expect(result).to eq(vm_name)
+      end
+    end
+  end
+
+  describe ".remove_old_protectors crash-point interleaving" do
+    before do
+      allow(File).to receive(:directory?).with(vm_home).and_return(true)
+    end
+
+    # Helper to build dir_status with a protector table (policy-linked protectors)
+    def dir_status_with(*protectors)
+      lines = ["Policy:  abc123policy", "Unlocked: Yes", "PROTECTOR  LINKED     DESCRIPTION"]
+      protectors.each do |id, name|
+        lines << "#{id}  Yes (/)    Raw key protector \"#{name}\""
+      end
+      lines.join("\n") + "\n"
+    end
+
+    context "crash after remove-protector-from-policy but before destroy (first rotation)" do
+      # Host state: old protector unlinked from policy but metadata still exists.
+      # fscrypt status <dir> no longer shows it (only linked protectors shown).
+      # On retry, remove_old_protectors sees only the keep protector in policy
+      # and does nothing — the orphaned metadata is harmless (purge_metadata
+      # cleans it up at teardown).
+      # Reboot safety: new_key (slot 1 after promote) unlocks via P("vm_name-rotate").
+
+      it "converges with no mutations when old protector already unlinked" do
+        # Dir status shows only the keep protector (old was unlinked but not destroyed)
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["newprot01", "#{vm_name}-rotate"]))
+
+        expect(VmSetupFscrypt).not_to receive(:r)
+
+        VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+      end
+    end
+
+    context "crash after destroy old protector (first rotation complete, lost COMMIT)" do
+      # Host state: only P("vm_name-rotate") linked. Old protector fully removed.
+      # DB state: strand retries remove_old because COMMIT was lost.
+      # On retry, sees only keep protector — idempotent no-op.
+      # This is the Bug 2 scenario. With the fix (no rename), the keep protector
+      # name "vm_name-rotate" never matches the destroy target name "vm_name".
+
+      it "does not destroy the keep protector on lost-COMMIT retry" do
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["newprot01", "#{vm_name}-rotate"]))
+
+        # Critical assertion: no fscrypt mutations at all
+        expect(VmSetupFscrypt).not_to receive(:r)
+
+        VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+      end
+    end
+
+    context "crash after destroy old protector (second rotation, lost COMMIT)" do
+      # Same as above but after second rotation: keep_name is vm_name,
+      # old name was vm_name-rotate. Only P("vm_name") remains.
+
+      it "does not destroy the keep protector on lost-COMMIT retry (second rotation)" do
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["newprot01", vm_name]))
+
+        expect(VmSetupFscrypt).not_to receive(:r)
+
+        VmSetupFscrypt.remove_old_protectors(vm_name, vm_name)
+      end
+    end
+
+    context "partial failure: remove-from-policy succeeds but destroy fails" do
+      # Host state: old protector unlinked from policy but destroy raised CommandFail
+      # (e.g., transient I/O error). On retry, dir status no longer shows old protector
+      # (it was already unlinked). Method converges to no-op.
+      # The orphaned metadata is harmless and cleaned at teardown by purge_metadata.
+
+      it "converges on retry after partial remove (unlinked but not destroyed)" do
+        # On retry, dir status shows only the keep protector
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["newprot01", "#{vm_name}-rotate"]))
+
+        expect(VmSetupFscrypt).not_to receive(:r)
+
+        VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+      end
+    end
+
+    context "both protectors still linked on retry (crash before any remove started)" do
+      # Host state: both old and new protectors still linked (crash before
+      # remove_old_protectors did any work). On retry, it removes the old one.
+      # Reboot safety: new_key (slot 1) unlocks via P("vm_name-rotate").
+
+      it "removes old protector and keeps new on clean retry" do
+        allow(VmSetupFscrypt).to receive(:`).with("fscrypt status #{vm_home} 2>&1")
+          .and_return(dir_status_with(["oldprot01", vm_name], ["newprot01", "#{vm_name}-rotate"]))
+
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/remove-protector-from-policy.*--protector=\/:oldprot01.*--policy=\/:abc123policy/)
+        expect(VmSetupFscrypt).to receive(:r)
+          .with(/metadata destroy.*--protector=\/:oldprot01/)
+        expect(VmSetupFscrypt).not_to receive(:r).with(/--protector=\/:newprot01/)
+
+        VmSetupFscrypt.remove_old_protectors(vm_name, "#{vm_name}-rotate")
+      end
+    end
+  end
+
   describe ".find_protector_id" do
     it "finds the protector ID for a vm_name" do
       status_output = <<~STATUS
