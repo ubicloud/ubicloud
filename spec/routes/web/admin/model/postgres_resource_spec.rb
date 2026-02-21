@@ -18,5 +18,21 @@ RSpec.describe CloverAdmin, "PostgresResource" do
     click_link @instance.admin_label
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{@instance.ubid}"
+
+    expect(page.all("a").any? { |a| a.text == "View in Clover" }).to be(false)
+  end
+
+  it "links to clover when configured to" do
+    allow(Config).to receive(:clover_admin_links_to_clover).and_return(true)
+
+    click_link "PostgresResource"
+    expect(page.status_code).to eq 200
+
+    click_link @instance.admin_label
+    expect(page.status_code).to eq 200
+
+    link = page.all("a").find { |a| a.text == "View in Clover" }
+    expect(link).not_to be_nil
+    expect(link["href"]).to eq "http://localhost:9292/project/#{@instance.project.ubid}/location/#{@instance.location.display_name}/postgres/#{@instance.name}/overview"
   end
 end

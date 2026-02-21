@@ -52,6 +52,7 @@ module Config
   mandatory :rack_env, string
 
   override :clover_admin_development_no_webauthn, false, bool
+  override :clover_admin_links_to_clover, false, bool
   optional :clover_runtime_token_secret, base64, clear: true
   optional :kms_decrypt_clover_column_encryption_key_with_arn, string
   optional :heartbeat_url, string
