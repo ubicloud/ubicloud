@@ -70,7 +70,7 @@ class Prog::MachineImage::Nexus < Prog::Base
       host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       machine_image.update(state: "failed")
       Clog.emit("Failed to create machine image archive", {machine_image_archive_failed: {ubid: machine_image.ubid, stderr: stderr}})
-      pop "machine image archive failed#{stderr ? ": #{stderr}" : ""}"
+      hop_wait
     end
 
     nap 15
@@ -119,7 +119,7 @@ class Prog::MachineImage::Nexus < Prog::Base
 
     machine_image.update(state: "failed")
     Clog.emit("Machine image failed boot verification", {machine_image_verify_failed: {ubid: machine_image.ubid}})
-    pop "machine image failed boot verification"
+    hop_wait
   end
 
   label def finish

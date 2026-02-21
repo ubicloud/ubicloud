@@ -383,6 +383,22 @@ RSpec.describe StorageVolume do
       expect(encrypted_vhost_sv).to receive(:vhost_backend_create_service_file)
       encrypted_vhost_sv.prep_vhost_backend(encryption_key, key_wrapping_secrets)
     end
+
+    it "creates metadata even for non-imaged vhost backend volumes" do
+      non_imaged_vhost_sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => false,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.1-5",
+        "num_queues" => 4,
+        "queue_size" => 128
+      })
+      expect(non_imaged_vhost_sv).to receive(:vhost_backend_create_config).with(nil, nil)
+      expect(non_imaged_vhost_sv).to receive(:vhost_backend_create_metadata).with(nil)
+      expect(non_imaged_vhost_sv).to receive(:vhost_backend_create_service_file)
+      non_imaged_vhost_sv.prep_vhost_backend(nil, nil)
+    end
   end
 
   describe "#vhost_backend_create_config" do

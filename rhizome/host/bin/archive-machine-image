@@ -4,7 +4,6 @@
 require "json"
 require "fileutils"
 require_relative "../../common/lib/util"
-require_relative "../lib/write_tracking_check"
 
 params = JSON.parse($stdin.read)
 
@@ -18,9 +17,6 @@ s3_secret_key = params.fetch("s3_secret_key")
 archive_kek = params["archive_kek"]
 disk_kek = params["disk_kek"]
 vm_name = params.fetch("vm_name")
-
-# Verify write tracking before archiving
-WriteTrackingCheck.check(device_config)
 
 # Write target config
 safe_write_to_file(target_config_path, target_config_content)
@@ -53,7 +49,7 @@ if encrypt && archive_kek
   pipe_threads << Thread.new { File.write(archive_kek_pipe, archive_kek_bytes) }
 end
 
-# Disk KEK pipe — needed to decrypt the source disk's XTS key
+# Disk KEK pipe -- needed to decrypt the source disk's XTS key
 # The device config references kek.pipe for the disk encryption KEK
 disk_kek_pipe = nil
 if disk_kek

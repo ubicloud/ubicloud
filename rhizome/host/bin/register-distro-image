@@ -91,7 +91,7 @@ begin
   TOML
   safe_write_to_file(device_config_path, device_config)
 
-  # Step 4: Initialize metadata — marks all stripes as HAS_SOURCE
+  # Step 4: Initialize metadata -- marks all stripes as HAS_SOURCE
   $stderr.puts "Initializing metadata..."
   r init_metadata_bin, "-f", device_config_path, "--stripe-sector-count-shift", "11"
 

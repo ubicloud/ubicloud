@@ -103,7 +103,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path || archive?
+    vhost_backend_create_metadata(key_wrapping_secrets)
     vhost_backend_create_service_file
   end
 
@@ -311,9 +311,9 @@ class StorageVolume
       "rpc_socket_path" => sp.rpc_socket_path
     }
 
+    config["metadata_path"] = sp.vhost_backend_metadata
     if @image_path
       config["image_path"] = @image_path
-      config["metadata_path"] = sp.vhost_backend_metadata
     end
 
     if @encrypted
@@ -352,7 +352,7 @@ class StorageVolume
   def v2_device_section
     lines = ["[device]"]
     lines << "data_path = #{toml_str(disk_file)}"
-    lines << "metadata_path = #{toml_str(sp.vhost_backend_metadata)}" if @image_path || archive?
+    lines << "metadata_path = #{toml_str(sp.vhost_backend_metadata)}"
     lines << "vhost_socket = #{toml_str(vhost_sock)}"
     lines << "rpc_socket = #{toml_str(sp.rpc_socket_path)}"
     lines << "device_id = #{toml_str(@device_id)}"
