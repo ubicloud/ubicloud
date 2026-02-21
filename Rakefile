@@ -294,6 +294,33 @@ task "create_prod_admin_account", [:login] do |_, args|
   puts "Password for account is: #{CloverAdmin.create_admin_account(args[:login])}"
 end
 
+desc "Register a distro image as a public MachineImage"
+task "register_distro_image", [:project_ubid, :location_name, :name, :url, :sha256, :version, :vm_host_ubid] do |_, args|
+  env = ENV["RACK_ENV"] || "development"
+  load_db.call(env)
+  require_relative "loader"
+
+  project = Project[UBID.to_uuid(args[:project_ubid])]
+  fail "Project not found: #{args[:project_ubid]}" unless project
+
+  location = Location.where(display_name: args[:location_name]).first
+  fail "Location not found: #{args[:location_name]}" unless location
+
+  vm_host = VmHost[UBID.to_uuid(args[:vm_host_ubid])]
+  fail "VmHost not found: #{args[:vm_host_ubid]}" unless vm_host
+
+  mi = MachineImage.register_distro_image(
+    project_id: project.id,
+    location_id: location.id,
+    name: args[:name],
+    url: args[:url],
+    sha256: args[:sha256],
+    version: args[:version],
+    vm_host_id: vm_host.id
+  )
+  puts "Distro image registration started: #{mi.ubid}"
+end
+
 desc "Check generated SQL for parameterization"
 task "check_query_parameterization" do
   require "rbconfig"

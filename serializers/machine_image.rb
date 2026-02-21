@@ -11,6 +11,7 @@ class Serializers::MachineImage < Serializers::Base
       encrypted: mi.encrypted,
       compression: mi.compression,
       visible: mi.visible,
+      version: mi.version,
       location: mi.display_location,
       source_vm_id: mi.vm&.ubid,
       created_at: mi.created_at&.iso8601
