@@ -17,6 +17,9 @@ Sequel.migration do
       String :compression, null: false, default: "zstd"
       Integer :size_gib, null: false
       foreign_key :vm_id, :vm, type: :uuid
+      String :version
+      String :arch, null: false, default: "x64"
+      TrueClass :visible, null: false, default: false
       timestamptz :created_at, null: false, default: Sequel.lit("now()")
 
       unique [:project_id, :location_id, :name]
