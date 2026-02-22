@@ -4,7 +4,9 @@
   data: [
     ["ID", @machine_image.ubid],
     ["Name", @machine_image.name],
+    ["Version", @machine_image.version],
     ["State", "machine_image_state_label", {component: { state: @machine_image.state }}],
+    ["Active", @machine_image.active? ? "Yes" : "No"],
     ["Location", @machine_image.display_location],
     ["Architecture", @machine_image.arch],
     ["Size", "#{@machine_image.size_gib} GiB"],

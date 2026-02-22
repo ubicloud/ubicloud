@@ -1,0 +1,32 @@
+<% @versions = @machine_image.versions %>
+
+<%== part(
+  "components/table_card",
+  headers: ["Version", "State", "Active", "Size (GiB)", "Created At", "Actions"],
+  rows: @versions.map do |v|
+    active_label = v.active? ? "<span class='inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20'>Active</span>" : "-"
+
+    mi_path = "#{@project.path}#{@machine_image.path}"
+    action_html = ""
+    unless v.active?
+      action_html = "<form action='#{mi_path}/set-active' method='post'>#{csrf_tag(mi_path + "/set-active")}<input type='hidden' name='version_id' value='#{v.ubid}'/> <button type='submit' class='text-rose-500 hover:underline text-sm'>Set Active</button></form>"
+    end
+
+    [
+      [
+        v.version,
+        ["machine_image_state_label", {component: { state: v.state }}],
+        [active_label, {escape: false}],
+        v.size_gib,
+        v.created_at&.strftime("%B %d, %Y %H:%M UTC"),
+        [action_html, {escape: false}]
+      ],
+      {id: "ver-#{v.ubid}"}
+    ]
+  end,
+  empty_state: {
+    icon: "hero-clock",
+    title: "No versions",
+    description: "This image has no versions."
+  }
+) %>

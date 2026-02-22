@@ -13,7 +13,7 @@ class Clover
           machine_image_post(mi_name)
         end
 
-        filter = {Sequel[:machine_image][:name] => mi_name}
+        filter = {Sequel[:machine_image][:name] => mi_name, Sequel[:machine_image][:active] => true}
       else
         filter = {Sequel[:machine_image][:id] => mi_id}
       end
@@ -55,7 +55,31 @@ class Clover
       end
 
       if owned
-        r.show_object(machine_image, actions: %w[overview settings], perm: "MachineImage:view", template: "machine-image/show")
+        r.show_object(machine_image, actions: %w[overview versions settings], perm: "MachineImage:view", template: "machine-image/show")
+
+        r.post web?, "set-active" do
+          authorize("MachineImage:edit", machine_image)
+
+          version_ubid = typecast_params.str!("version_id")
+          version = MachineImage.where(
+            project_id: machine_image.project_id,
+            location_id: machine_image.location_id,
+            name: machine_image.name,
+            id: UBID.to_uuid(version_ubid)
+          ).first
+
+          unless version
+            fail Validation::ValidationFailed.new({version_id: "Version not found"})
+          end
+
+          DB.transaction do
+            version.set_active!
+            audit_log(version, "update")
+          end
+
+          flash["notice"] = "Version '#{version.version}' is now the active version"
+          r.redirect machine_image, "/versions"
+        end
       else
         # Public images from other projects: read-only overview, no settings
         r.web do

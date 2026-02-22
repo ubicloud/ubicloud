@@ -216,6 +216,106 @@ RSpec.describe MachineImage do
     end
   end
 
+  describe "versioning" do
+    it "defaults active to true" do
+      expect(mi.active?).to be true
+    end
+
+    it "defaults version to v1" do
+      expect(mi.version).to eq("v1")
+    end
+
+    it "has a version_path" do
+      expect(mi.version_path).to eq("/location/eu-central-h1/machine-image/#{mi.ubid}")
+    end
+
+    it "returns versions for the same name/project/location" do
+      v2 = described_class.create(
+        name: "test-image", version: "v2", project_id:,
+        location_id: Location::HETZNER_FSN1_ID, state: "available",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      )
+
+      expect(mi.versions).to include(mi, v2)
+    end
+
+    it "excludes decommissioned versions" do
+      v2 = described_class.create(
+        name: "test-image", version: "v2", project_id:,
+        location_id: Location::HETZNER_FSN1_ID, state: "decommissioned",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      )
+
+      expect(mi.versions).to include(mi)
+      expect(mi.versions).not_to include(v2)
+    end
+
+    it "sets active version and deactivates others" do
+      mi.update(active: true)
+      v2 = described_class.create(
+        name: "test-image", version: "v2", active: false, project_id:,
+        location_id: Location::HETZNER_FSN1_ID, state: "available",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      )
+
+      v2.set_active!
+
+      expect(mi.reload.active?).to be false
+      expect(v2.reload.active?).to be true
+    end
+
+    it "finds active version by name" do
+      mi.update(active: false)
+      v2 = described_class.create(
+        name: "test-image", version: "v2", active: true, project_id:,
+        location_id: Location::HETZNER_FSN1_ID, state: "available",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      )
+
+      result = described_class.active_version(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "test-image")
+      expect(result).to eq(v2)
+    end
+
+    it "returns active_versions dataset" do
+      mi # ensure created before query
+      inactive = described_class.create(
+        name: "other-image", version: "v1", active: false, project_id:,
+        location_id: Location::HETZNER_FSN1_ID, state: "available",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+      )
+
+      result = described_class.where(project_id:).active_versions.all
+      expect(result.map(&:id)).to include(mi.id)
+      expect(result.map(&:id)).not_to include(inactive.id)
+    end
+  end
+
+  describe ".register_distro_image" do
+    it "deactivates old versions when registering a new one" do
+      allow(Config).to receive_messages(
+        machine_image_archive_bucket: "distro-bucket",
+        machine_image_archive_endpoint: "https://r2.example.com"
+      )
+      vm_host = create_vm_host
+
+      v1 = described_class.register_distro_image(
+        project_id:, location_id: Location::HETZNER_FSN1_ID,
+        name: "ubuntu-noble", url: "https://example.com/v1.img",
+        sha256: "abc", version: "v1", vm_host_id: vm_host.id
+      )
+      expect(v1.active?).to be true
+
+      v2 = described_class.register_distro_image(
+        project_id:, location_id: Location::HETZNER_FSN1_ID,
+        name: "ubuntu-noble", url: "https://example.com/v2.img",
+        sha256: "def", version: "v2", vm_host_id: vm_host.id
+      )
+
+      expect(v1.reload.active?).to be false
+      expect(v2.active?).to be true
+    end
+  end
+
   describe "state predicates" do
     it "returns true for available?" do
       expect(mi.available?).to be true

@@ -13,6 +13,7 @@ class Serializers::MachineImage < Serializers::Base
       compression: mi.compression,
       visible: mi.visible,
       version: mi.version,
+      active: mi.active,
       location: mi.display_location,
       source_vm_id: mi.vm&.ubid,
       created_at: mi.created_at&.iso8601

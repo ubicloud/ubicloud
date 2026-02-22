@@ -2,8 +2,8 @@
 
 class Clover
   def machine_image_list_dataset
-    project_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
-    public_images = MachineImage.where(visible: true).exclude(project_id: @project.id)
+    project_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view").active_versions
+    public_images = MachineImage.where(visible: true).exclude(project_id: @project.id).active_versions
     project_images.union(public_images)
   end
 
@@ -45,11 +45,17 @@ class Clover
 
     Validation.validate_machine_image_quota(@project)
 
+    existing_count = MachineImage.where(project_id: @project.id, location_id: @location.id, name:).count
+    version = "v#{existing_count + 1}"
+
     machine_image = nil
     DB.transaction do
+      MachineImage.where(project_id: @project.id, location_id: @location.id, name:).update(active: false)
+
       machine_image = MachineImage.create(
         name:,
         description:,
+        version:,
         location_id: @location.id,
         project_id: @project.id,
         state: "creating",
@@ -57,6 +63,7 @@ class Clover
         size_gib: boot_size_gib,
         arch: vm.arch,
         encrypted: true,
+        active: true,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "#{@project.ubid}/#{@location.display_name}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""

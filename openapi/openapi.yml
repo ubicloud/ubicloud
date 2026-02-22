@@ -3167,9 +3167,11 @@ components:
         version:
           description: Version of the machine image
           type: string
-          nullable: true
         visible:
           description: Whether the machine image is publicly visible
+          type: boolean
+        active:
+          description: Whether this version is the active version
           type: boolean
       additionalProperties: false
       required:

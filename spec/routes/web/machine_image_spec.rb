@@ -205,6 +205,36 @@ RSpec.describe Clover, "machine_image" do
       end
     end
 
+    describe "versions" do
+      it "can view versions tab" do
+        machine_image
+        visit "#{project.path}#{machine_image.path}/versions"
+
+        expect(page.title).to eq("Ubicloud - #{machine_image.name}")
+        expect(page).to have_content machine_image.version
+      end
+
+      it "can set active version" do
+        mi = machine_image
+        Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
+
+        v2 = MachineImage.create(
+          name: mi.name, version: "v2", active: false,
+          project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+          state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+        )
+
+        visit "#{project.path}#{mi.path}/versions"
+
+        expect(page).to have_content "v2"
+        click_button "Set Active"
+
+        expect(page).to have_flash_notice("Version 'v2' is now the active version")
+        expect(v2.reload.active?).to be true
+        expect(mi.reload.active?).to be false
+      end
+    end
+
     describe "delete" do
       it "can delete machine image" do
         mi = machine_image

@@ -35,6 +35,10 @@ class MachineImage < Sequel::Model
     def for_project(project_id)
       where(Sequel[project_id:] | {visible: true}).exclude(state: "decommissioned")
     end
+
+    def active_versions
+      where(active: true)
+    end
   end
 
   def display_location
@@ -43,6 +47,10 @@ class MachineImage < Sequel::Model
 
   def path
     "/location/#{display_location}/machine-image/#{name}"
+  end
+
+  def version_path
+    "/location/#{display_location}/machine-image/#{ubid}"
   end
 
   def available?
@@ -69,11 +77,36 @@ class MachineImage < Sequel::Model
     encrypted
   end
 
+  def active?
+    active
+  end
+
+  def versions_dataset
+    MachineImage.where(project_id:, location_id:, name:).exclude(state: "decommissioned")
+  end
+
+  def versions
+    versions_dataset.order(Sequel.desc(:created_at)).all
+  end
+
+  def set_active!
+    DB.transaction do
+      MachineImage.where(project_id:, location_id:, name:).update(active: false)
+      update(active: true)
+    end
+  end
+
+  def self.active_version(project_id:, location_id:, name:)
+    where(project_id:, location_id:, name:, active: true).first
+  end
+
   # Register a public distro image from a URL. Admin-only operation.
-  # Returns the Strand for the registration prog.
+  # If an image with the same name already exists, deactivates old versions.
   def self.register_distro_image(project_id:, location_id:, name:, url:, sha256:, version:, vm_host_id:, arch: "x64")
     mi = nil
     DB.transaction do
+      MachineImage.where(project_id:, location_id:, name:).update(active: false)
+
       mi = MachineImage.create(
         name:,
         description: "#{name} #{version}",
