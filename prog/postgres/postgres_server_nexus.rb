@@ -547,12 +547,6 @@ SQL
       push Prog::Postgres::Restart
     end
 
-    when_promote_set? do
-      postgres_server.switch_to_new_timeline
-      decr_promote
-      hop_taking_over
-    end
-
     when_refresh_walg_credentials_set? do
       decr_refresh_walg_credentials
       postgres_server.refresh_walg_credentials

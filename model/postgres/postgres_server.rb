@@ -14,7 +14,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :promote, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
+    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -368,7 +368,8 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
-      timeline_access: "push"
+      timeline_access: "push",
+      synchronization_status: "ready"
     )
 
     increment_s3_new_timeline

@@ -11,8 +11,6 @@ RSpec.describe Clover, "cli pg promote-read-replica" do
   end
 
   it "promotes postgres database from read replica to primary" do
-    expect(Semaphore.where(strand_id: @pg.id, name: "promote")).to be_empty
     expect(cli(%w[pg eu-central-h1/test-pg-rr promote-read-replica])).to eq "Promoted PostgreSQL database with id #{@pg.ubid} from read replica to primary.\n"
-    expect(Semaphore.where(strand_id: @pg.id, name: "promote")).not_to be_empty
   end
 end
