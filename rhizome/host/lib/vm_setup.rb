@@ -785,7 +785,8 @@ DNSMASQ_SERVICE
 
   ExecStart=#{exec_start_cmd}
 
-  ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+  ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} power-button
+  TimeoutStopSec=60s
   #{footer}
     SERVICE
   end
