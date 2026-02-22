@@ -9,7 +9,7 @@
         [
           [mi.name, {link: path(mi)}],
           mi.display_location,
-          mi.state,
+          ["machine_image_state_label", {component: { state: mi.state }}],
           mi.size_gib,
           mi.created_at&.strftime("%B %d, %Y")
         ],
