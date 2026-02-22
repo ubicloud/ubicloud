@@ -268,8 +268,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_checkup
     end
 
-    if update_source_fetch_progress
+    case update_source_fetch_progress
+    when :in_progress
       nap 60
+    when :completed
+      hop_detach_machine_image
     end
 
     nap 6 * 60 * 60
@@ -277,8 +280,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def update_source_fetch_progress
     volumes = vm.vm_storage_volumes.select(&:image_backed?)
-    return false if volumes.empty?
-    return false if volumes.all?(&:source_fetch_complete?)
+    return nil if volumes.empty?
+    return :completed if volumes.all?(&:source_fetch_complete?)
 
     volumes.each do |vol|
       next if vol.source_fetch_complete?
@@ -299,7 +302,20 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
     end
 
-    !volumes.all? { it.reload.source_fetch_complete? }
+    volumes.all? { it.reload.source_fetch_complete? } ? :completed : :in_progress
+  end
+
+  label def detach_machine_image
+    vm.vm_storage_volumes.select(&:image_backed?).each do |vol|
+      host.sshable.cmd(
+        "sudo host/bin/setup-vm detach-archive :vm_name :disk_index",
+        vm_name:, disk_index: vol.disk_index
+      )
+      vol.update(machine_image_id: nil)
+      Clog.emit("Detached VM from machine image", {vm: vm.ubid, disk_index: vol.disk_index})
+    end
+
+    hop_wait
   end
 
   label def update_firewall_rules

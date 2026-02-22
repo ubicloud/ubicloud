@@ -157,6 +157,17 @@ class Prog::MachineImage::Nexus < Prog::Base
     register_deadline(nil, 10 * 60)
     decr_destroy
 
+    # Block deletion if any VMs still have an active (non-fully-synced) dependency
+    active_deps = VmStorageVolume.where(machine_image_id: machine_image.id)
+      .exclude { source_fetch_fetched >= source_fetch_total }
+      .count
+
+    if active_deps > 0
+      Clog.emit("Cannot destroy machine image: VMs still actively fetching",
+        {machine_image: machine_image.ubid, active_dependencies: active_deps})
+      nap 60
+    end
+
     machine_image.active_billing_records.each(&:finalize)
     machine_image.update(state: "destroying")
 

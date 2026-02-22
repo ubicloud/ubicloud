@@ -379,6 +379,30 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect { nx.destroy }.to hop("destroy_record")
       expect(machine_image.reload.state).to eq("destroying")
     end
+
+    it "naps when VMs still actively fetching from this image" do
+      other_vm = create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "fetching-vm")
+      VmStorageVolume.create(
+        vm_id: other_vm.id,
+        boot: true,
+        size_gib: 20,
+        disk_index: 0,
+        machine_image_id: machine_image.id,
+        storage_device_id: storage_device.id,
+        vhost_block_backend_id: vbb.id,
+        vring_workers: 1,
+        source_fetch_total: 1000,
+        source_fetch_fetched: 500
+      )
+
+      expect(Clog).to receive(:emit).with("Cannot destroy machine image: VMs still actively fetching", anything)
+      expect { nx.destroy }.to nap(60)
+    end
+
+    it "proceeds to destroy when all VMs are fully synced (machine_image_id already NULLed)" do
+      expect { nx.destroy }.to hop("destroy_record")
+      expect(machine_image.reload.state).to eq("destroying")
+    end
   end
 
   describe "#destroy_record" do

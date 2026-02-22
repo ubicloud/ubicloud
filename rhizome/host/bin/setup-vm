@@ -14,6 +14,24 @@ unless (vm_name = ARGV.shift)
   exit 1
 end
 
+if action == "detach-archive"
+  disk_index = ARGV.shift&.to_i
+  unless disk_index
+    puts "expected disk_index as argument for detach-archive"
+    exit 1
+  end
+  require_relative "../lib/storage_volume"
+  params = JSON.parse(File.read(VmPath.new(vm_name).prep_json))
+  vol_params = params.fetch("storage_volumes").find { |v| v["disk_index"] == disk_index }
+  unless vol_params
+    puts "no storage volume with disk_index #{disk_index}"
+    exit 1
+  end
+  sv = StorageVolume.new(vm_name, vol_params)
+  sv.detach_archive
+  exit 0
+end
+
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))
 rescue Errno::ENOENT

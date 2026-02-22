@@ -812,6 +812,40 @@ RSpec.describe StorageVolume do
 
       encrypted_archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
+
+    it "detach_archive removes stripe source config, secrets config, rewrites main config and service file" do
+      stripe_source_path = "/var/storage/test/2/vhost-backend-stripe-source.conf"
+      secrets_path = "/var/storage/test/2/vhost-backend-secrets.conf"
+      config_path = "/var/storage/test/2/vhost-backend.conf"
+      service_path = "/etc/systemd/system/test-2-storage.service"
+
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(stripe_source_path)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(secrets_path)
+
+      config_content = "include = [\"vhost-backend-stripe-source.conf\", \"vhost-backend-secrets.conf\"]\n[device]\ndata_path = \"/var/storage/test/2/disk.raw\"\n"
+      expect(File).to receive(:read).with(config_path).and_return(config_content)
+      written_content = nil
+      mock_file = instance_double(File)
+      expect(File).to receive(:open).with(config_path, "w", 0o600).and_yield(mock_file)
+      expect(mock_file).to receive(:write) { |c| written_content = c }
+      expect(archive_vhost_sv).to receive(:fsync_or_fail).with(mock_file)
+      expect(archive_vhost_sv).to receive(:sync_parent_dir).with(config_path)
+
+      expect(File).to receive(:write).with(service_path, /PrivateNetwork=yes/)
+      expect(archive_vhost_sv).to receive(:r).with("systemctl daemon-reload")
+
+      archive_vhost_sv.detach_archive
+
+      expect(written_content).not_to include("include")
+      expect(written_content).to include("[device]")
+      expect(archive_vhost_sv.archive?).to be false
+    end
+  end
+
+  describe "#detach_archive" do
+    it "raises error for non-archive volumes" do
+      expect { unencrypted_sv.detach_archive }.to raise_error(RuntimeError, "Not an archive-backed volume")
+    end
   end
 
   describe "#stop_service_if_loaded" do

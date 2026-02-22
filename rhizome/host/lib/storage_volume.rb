@@ -666,6 +666,41 @@ class StorageVolume
     end
   end
 
+  def detach_archive
+    fail "Not an archive-backed volume" unless archive?
+    fail "Config v2 required for detach" unless use_config_v2?
+
+    # Remove the stripe source config file (archive S3 connection details)
+    rm_if_exists(sp.vhost_backend_stripe_source_config)
+
+    # Remove the secrets config file (S3 credentials, archive KEK)
+    rm_if_exists(sp.vhost_backend_secrets_config)
+
+    # Rewrite the main config without include directives for stripe_source/secrets
+    @archive_params = nil
+    rewrite_main_config_without_includes
+
+    # Rewrite the systemd service file to restrict network access
+    vhost_backend_create_service_file
+    r "systemctl daemon-reload"
+  end
+
+  def rewrite_main_config_without_includes
+    config_path = sp.vhost_backend_config
+    content = File.read(config_path)
+
+    # Remove include line that references stripe_source and secrets configs
+    lines = content.lines.reject { |line|
+      line.start_with?("include")
+    }
+
+    File.open(config_path, "w", 0o600) do |file|
+      file.write(lines.join)
+      fsync_or_fail(file)
+    end
+    sync_parent_dir(config_path)
+  end
+
   def stop_service_if_loaded(name)
     r "systemctl stop #{name.shellescape}"
   rescue CommandFail => e

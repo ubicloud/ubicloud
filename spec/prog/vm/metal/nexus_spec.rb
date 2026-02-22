@@ -866,26 +866,31 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "naps 60 seconds when source fetch is in progress" do
-      expect(nx).to receive(:update_source_fetch_progress).and_return(true)
+      expect(nx).to receive(:update_source_fetch_progress).and_return(:in_progress)
       expect { nx.wait }.to nap(60)
     end
 
-    it "naps 6 hours when source fetch is complete" do
-      expect(nx).to receive(:update_source_fetch_progress).and_return(false)
+    it "hops to detach_machine_image when source fetch is completed" do
+      expect(nx).to receive(:update_source_fetch_progress).and_return(:completed)
+      expect { nx.wait }.to hop("detach_machine_image")
+    end
+
+    it "naps 6 hours when no image-backed volumes" do
+      expect(nx).to receive(:update_source_fetch_progress).and_return(nil)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
   end
 
   describe "#update_source_fetch_progress" do
-    it "returns false when no image-backed volumes exist" do
+    it "returns nil when no image-backed volumes exist" do
       expect(vm).to receive(:vm_storage_volumes).and_return([])
-      expect(nx.update_source_fetch_progress).to be false
+      expect(nx.update_source_fetch_progress).to be_nil
     end
 
-    it "returns false when all image-backed volumes are fully fetched" do
+    it "returns :completed when all image-backed volumes are fully fetched" do
       vol = instance_double(VmStorageVolume, image_backed?: true, source_fetch_complete?: true)
       expect(vm).to receive(:vm_storage_volumes).and_return([vol])
-      expect(nx.update_source_fetch_progress).to be false
+      expect(nx.update_source_fetch_progress).to eq(:completed)
     end
 
     it "queries RPC and updates volume progress" do
@@ -903,10 +908,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vol).to receive(:update).with(source_fetch_total: 1024, source_fetch_fetched: 512)
       reloaded_vol = instance_double(VmStorageVolume, source_fetch_complete?: false)
       expect(vol).to receive(:reload).and_return(reloaded_vol)
-      expect(nx.update_source_fetch_progress).to be true
+      expect(nx.update_source_fetch_progress).to eq(:in_progress)
     end
 
-    it "returns false when RPC shows fetch is complete" do
+    it "returns :completed when RPC shows fetch is complete" do
       vol = instance_double(VmStorageVolume,
         image_backed?: true,
         source_fetch_complete?: false,
@@ -919,7 +924,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vol).to receive(:update).with(source_fetch_total: 100, source_fetch_fetched: 100)
       reloaded_vol = instance_double(VmStorageVolume, source_fetch_complete?: true)
       expect(vol).to receive(:reload).and_return(reloaded_vol)
-      expect(nx.update_source_fetch_progress).to be false
+      expect(nx.update_source_fetch_progress).to eq(:completed)
     end
 
     it "handles RPC errors gracefully and continues" do
@@ -931,7 +936,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm).to receive(:inhost_name).and_return("vmtest123")
       expect(sshable).to receive(:cmd_json).and_raise(RuntimeError.new("connection refused"))
       expect(vol).to receive(:reload).and_return(vol)
-      expect(nx.update_source_fetch_progress).to be true
+      expect(nx.update_source_fetch_progress).to eq(:in_progress)
     end
 
     it "handles null status response" do
@@ -944,7 +949,25 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(sshable).to receive(:cmd_json).and_return({"status" => nil})
       expect(vol).not_to receive(:update)
       expect(vol).to receive(:reload).and_return(vol)
-      expect(nx.update_source_fetch_progress).to be true
+      expect(nx.update_source_fetch_progress).to eq(:in_progress)
+    end
+  end
+
+  describe "#detach_machine_image" do
+    it "detaches image-backed volumes by SSHing to host and NULLing machine_image_id" do
+      vol = instance_double(VmStorageVolume, image_backed?: true, disk_index: 0)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(sshable).to receive(:_cmd).with(/sudo host\/bin\/setup-vm detach-archive #{vm.inhost_name} 0/)
+      expect(vol).to receive(:update).with(machine_image_id: nil)
+      expect(Clog).to receive(:emit).with("Detached VM from machine image", hash_including(vm: vm.ubid, disk_index: 0))
+      expect { nx.detach_machine_image }.to hop("wait")
+    end
+
+    it "skips volumes that are not image-backed" do
+      vol = instance_double(VmStorageVolume, image_backed?: false)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(sshable).not_to receive(:_cmd).with(/detach-archive/)
+      expect { nx.detach_machine_image }.to hop("wait")
     end
   end
 
