@@ -119,7 +119,7 @@ class StorageVolume
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
       if archive?
-        write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_archive_toml)
+        write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_archive_toml(key_wrapping_secrets))
       elsif @image_path
         write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml)
       end
@@ -438,7 +438,7 @@ class StorageVolume
     lines.join("\n") + "\n"
   end
 
-  def v2_stripe_source_archive_toml
+  def v2_stripe_source_archive_toml(key_wrapping_secrets)
     lines = ["[stripe_source]"]
     lines << "type = \"archive\""
     lines << "storage = \"s3\""
@@ -450,7 +450,7 @@ class StorageVolume
     lines << "autofetch = true"
     lines << 'access_key_id.ref = "s3-key-id"'
     lines << 'secret_access_key.ref = "s3-secret-key"'
-    lines << 'session_token.ref = "s3-session-token"'
+    lines << 'session_token.ref = "s3-session-token"' if key_wrapping_secrets["archive_s3_session_token"]
     lines << 'archive_kek.ref = "archive-kek"' if @archive_params["encrypted"]
     lines.join("\n") + "\n"
   end
@@ -486,9 +486,11 @@ class StorageVolume
       lines << "source.file = #{toml_str(sp.s3_secret_key_pipe)}"
       lines << ""
 
-      lines << "[secrets.s3-session-token]"
-      lines << "source.file = #{toml_str(sp.s3_session_token_pipe)}"
-      lines << ""
+      if key_wrapping_secrets["archive_s3_session_token"]
+        lines << "[secrets.s3-session-token]"
+        lines << "source.file = #{toml_str(sp.s3_session_token_pipe)}"
+        lines << ""
+      end
 
       if @archive_params["encrypted"]
         lines << "[secrets.archive-kek]"
@@ -625,8 +627,20 @@ class StorageVolume
 
       r "systemctl start #{q_vhost_user_block_service}"
 
-      pipe_writes.each do |pipe, value|
-        write_kek_to_pipe(pipe, value)
+      # Write to all pipes concurrently using threads. The reader (vhost-backend)
+      # resolves secrets in non-deterministic HashMap order, so sequential writes
+      # would deadlock if the reader tries to read a different pipe first.
+      threads = pipe_writes.map do |pipe, value|
+        Thread.new do
+          File.open(pipe, File::WRONLY) do |f|
+            f.write(value)
+            f.flush
+          end
+        end
+      end
+
+      Timeout.timeout(30) do
+        threads.each(&:join)
       end
     ensure
       pipes.each { |p| FileUtils.rm_f(p) }

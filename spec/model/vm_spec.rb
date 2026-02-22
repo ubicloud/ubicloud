@@ -424,7 +424,9 @@ RSpec.describe Vm do
       storage_device
     end
 
-    it "includes archive secrets for machine_image-backed volumes" do
+    it "uses temporary credentials when cloudflare API token is configured" do
+      allow(Config).to receive(:cloudflare_r2_api_token).and_return("test-cf-token")
+
       mi = MachineImage.create(
         name: "test-umi", project_id: vm.project.id, location_id: vm_host.location_id,
         state: "available", s3_bucket: "ubi-images", s3_prefix: "images/abc",
@@ -451,7 +453,38 @@ RSpec.describe Vm do
       expect(secrets[device_id]).not_to have_key("archive_kek")
     end
 
+    it "falls back to main credentials when cloudflare API token is not configured" do
+      allow(Config).to receive(:cloudflare_r2_api_token).and_return(nil)
+      allow(Config).to receive(:machine_image_archive_access_key).and_return("MAIN_AKID")
+      allow(Config).to receive(:machine_image_archive_secret_key).and_return("MAIN_SECRET")
+
+      mi = MachineImage.create(
+        name: "test-umi-fb", project_id: vm.project.id, location_id: vm_host.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/fallback",
+        s3_endpoint: "https://r2.example.com", encrypted: false, size_gib: 20
+      )
+      VmStorageVolume.create(
+        vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,
+        machine_image_id: mi.id,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
+        storage_device_id: storage_device.id
+      )
+
+      expect(CloudflareR2).not_to receive(:create_temporary_credentials)
+      expect(Clog).to receive(:emit).with(/Using main R2 credentials/)
+
+      secrets = vm.storage_secrets
+      device_id = "#{vm.inhost_name}_0"
+      expect(secrets[device_id]).to include(
+        "archive_s3_access_key" => "MAIN_AKID",
+        "archive_s3_secret_key" => "MAIN_SECRET"
+      )
+      expect(secrets[device_id]).not_to have_key("archive_s3_session_token")
+    end
+
     it "includes archive KEK for encrypted machine_image-backed volumes" do
+      allow(Config).to receive(:cloudflare_r2_api_token).and_return("test-cf-token")
+
       archive_kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "archivekey", init_vector: "archiveiv", auth_data: "archiveauth")
       mi = MachineImage.create(
         name: "test-enc-umi", project_id: vm.project.id, location_id: vm_host.location_id,

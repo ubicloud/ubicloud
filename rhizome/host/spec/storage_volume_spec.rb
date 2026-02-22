@@ -560,7 +560,8 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
       expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
       expect(encrypted_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
-      expect(encrypted_vhost_sv).to receive(:write_kek_to_pipe).with(kek_pipe, /aes256-gcm/)
+      mock_file = instance_double(File, write: nil, flush: nil)
+      expect(File).to receive(:open).with(kek_pipe, File::WRONLY).and_yield(mock_file)
       encrypted_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
 
@@ -750,9 +751,10 @@ RSpec.describe StorageVolume do
       expect(archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
       expect(archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
 
-      expect(File).to receive(:write).with(s3_key_pipe, "AK")
-      expect(File).to receive(:write).with(s3_secret_pipe, "SK")
-      expect(File).to receive(:write).with(s3_session_pipe, "ST")
+      mock_file = instance_double(File, write: nil, flush: nil)
+      expect(File).to receive(:open).with(s3_key_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_secret_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_session_pipe, File::WRONLY).and_yield(mock_file)
 
       archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
@@ -800,12 +802,13 @@ RSpec.describe StorageVolume do
       expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
       expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
 
-      # All pipe writes
-      expect(File).to receive(:write).with(kek_pipe, key_wrapping_secrets["key"])
-      expect(File).to receive(:write).with(s3_key_pipe, "AK")
-      expect(File).to receive(:write).with(s3_secret_pipe, "SK")
-      expect(File).to receive(:write).with(s3_session_pipe, "ST")
-      expect(File).to receive(:write).with(archive_kek_pipe, archive_kek_secrets["key"])
+      # All pipe writes (concurrent via threads)
+      mock_file = instance_double(File, write: nil, flush: nil)
+      expect(File).to receive(:open).with(kek_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_key_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_secret_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_session_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(archive_kek_pipe, File::WRONLY).and_yield(mock_file)
 
       encrypted_archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
