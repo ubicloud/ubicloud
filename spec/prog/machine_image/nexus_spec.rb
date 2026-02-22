@@ -57,14 +57,8 @@ RSpec.describe Prog::MachineImage::Nexus do
       allow(nx.vm).to receive(:display_state).and_return("stopped")
     end
 
-    it "hops to archive for unencrypted image" do
-      expect { nx.start }.to hop("archive")
-    end
-
-    it "hops to create_kek for encrypted image" do
-      machine_image.update(encrypted: true)
-      nx.machine_image.reload
-      expect { nx.start }.to hop("create_kek")
+    it "hops to clean_cloud_init" do
+      expect { nx.start }.to hop("clean_cloud_init")
     end
 
     it "fails if VM is not stopped" do
@@ -83,6 +77,57 @@ RSpec.describe Prog::MachineImage::Nexus do
       boot_volume.update(vhost_block_backend_id: nil, vring_workers: nil)
       nx.instance_variable_set(:@boot_volume, nil)
       expect { nx.start }.to raise_error(RuntimeError, "VM lacks write tracking — cannot create a reliable archive")
+    end
+  end
+
+  describe "#clean_cloud_init" do
+    it "skips cleanup and hops to create_kek_or_archive for encrypted boot volumes" do
+      disk_kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "disk-key", init_vector: "iv", auth_data: "disk")
+      boot_volume.update(key_encryption_key_1_id: disk_kek.id)
+      nx.instance_variable_set(:@boot_volume, nil)
+
+      expect(Clog).to receive(:emit).with("Skipping cloud-init cleanup for encrypted boot volume")
+      expect { nx.clean_cloud_init }.to hop("create_kek_or_archive")
+    end
+
+    it "starts the clean-cloud-init daemonizer when not started" do
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --check cloudinit_clean_/).and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer 'sudo host\/bin\/clean-cloud-init' cloudinit_clean_/, stdin: anything) do |_, stdin:|
+        params = JSON.parse(stdin)
+        expect(params["disk_file"]).to end_with("/0/disk.raw")
+      end
+      expect { nx.clean_cloud_init }.to nap(5)
+    end
+
+    it "hops to create_kek_or_archive when cleanup succeeds" do
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --check cloudinit_clean_/).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean cloudinit_clean_/)
+      expect { nx.clean_cloud_init }.to hop("create_kek_or_archive")
+    end
+
+    it "logs warning and continues when cleanup fails" do
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --check cloudinit_clean_/).and_return("Failed")
+      expect(sshable).to receive(:_cmd).with(/cat var\/log\/cloudinit_clean_.*\.stderr/).and_return("mount failed\n")
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --clean cloudinit_clean_/)
+      expect(Clog).to receive(:emit).with("Cloud-init cleanup failed (continuing with archive)", hash_including(cloud_init_cleanup_failed: hash_including(stderr: "mount failed")))
+      expect { nx.clean_cloud_init }.to hop("create_kek_or_archive")
+    end
+
+    it "naps when cleanup is in progress" do
+      expect(sshable).to receive(:_cmd).with(/common\/bin\/daemonizer --check cloudinit_clean_/).and_return("InProgress")
+      expect { nx.clean_cloud_init }.to nap(5)
+    end
+  end
+
+  describe "#create_kek_or_archive" do
+    it "hops to create_kek for encrypted image" do
+      machine_image.update(encrypted: true)
+      nx.machine_image.reload
+      expect { nx.create_kek_or_archive }.to hop("create_kek")
+    end
+
+    it "hops to archive for unencrypted image" do
+      expect { nx.create_kek_or_archive }.to hop("archive")
     end
   end
 
@@ -533,6 +578,13 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect(toml).to include('archive_kek.ref = "archive-kek"')
       expect(toml).to include("[secrets.archive-kek]")
       expect(toml).to include("archive-kek.pipe")
+    end
+  end
+
+  describe "#disk_file_path" do
+    it "returns disk.raw path in the same directory as device config" do
+      path = nx.send(:disk_file_path)
+      expect(path).to eq("/var/storage/#{vm.inhost_name}/0/disk.raw")
     end
   end
 

@@ -29,6 +29,42 @@ class Prog::MachineImage::Nexus < Prog::Base
     fail "VM has no boot volume" unless boot_volume
     fail "VM lacks write tracking — cannot create a reliable archive" unless boot_volume.vhost_block_backend_id
 
+    hop_clean_cloud_init
+  end
+
+  label def clean_cloud_init
+    # Skip for encrypted boot volumes — ubiblk XTS encryption makes the raw
+    # disk unmountable without ubiblk itself.  Cloud-init will still re-init
+    # because the new VM gets a fresh nocloud disk with a different instance-id.
+    if boot_volume.key_encryption_key_1
+      Clog.emit("Skipping cloud-init cleanup for encrypted boot volume")
+      hop_create_kek_or_archive
+    end
+
+    daemon_name = "cloudinit_clean_#{machine_image.ubid}"
+    case host.sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
+    when "Succeeded"
+      host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+      hop_create_kek_or_archive
+    when "NotStarted"
+      params = {"disk_file" => disk_file_path}
+      host.sshable.cmd("common/bin/daemonizer 'sudo host/bin/clean-cloud-init' :daemon_name", daemon_name:, stdin: params.to_json)
+    when "Failed"
+      # Cloud-init cleanup is best-effort — log warning and continue with archiving
+      stderr = begin
+        host.sshable.cmd("cat var/log/:daemon_name.stderr", daemon_name:).strip
+      rescue
+        nil
+      end
+      host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
+      Clog.emit("Cloud-init cleanup failed (continuing with archive)", {cloud_init_cleanup_failed: {ubid: machine_image.ubid, stderr:}})
+      hop_create_kek_or_archive
+    end
+
+    nap 5
+  end
+
+  label def create_kek_or_archive
     if machine_image.encrypted
       hop_create_kek
     else
@@ -194,6 +230,10 @@ class Prog::MachineImage::Nexus < Prog::Base
   def archive_bin
     vbb_version = boot_volume.vhost_block_backend_version || "v0.4.0"
     "/opt/vhost-block-backend/#{vbb_version}/archive"
+  end
+
+  def disk_file_path
+    File.join(File.dirname(device_config_path), "disk.raw")
   end
 
   def device_config_path

@@ -1,0 +1,76 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# Cleans cloud-init state from a raw VM disk image so that VMs booted
+# from a machine image get fresh cloud-init initialization (hostname,
+# SSH keys, network config).
+#
+# Expects JSON on stdin with:
+#   disk_file: path to the raw disk image
+
+require "json"
+require "fileutils"
+require "shellwords"
+require_relative "../../common/lib/util"
+
+params = JSON.parse($stdin.read)
+disk_file = params.fetch("disk_file")
+
+raise "Disk file does not exist: #{disk_file}" unless File.exist?(disk_file)
+
+loop_dev = `losetup --find --show --partscan #{disk_file.shellescape}`.strip
+raise "Failed to create loop device" if loop_dev.empty?
+
+mount_point = "/tmp/cloud-init-cleanup-#{$$}"
+
+begin
+  # Give the kernel a moment to scan partitions
+  sleep 0.5
+
+  # Find partitions with a mountable filesystem
+  lsblk_output = `lsblk -nrbo NAME,SIZE,FSTYPE #{loop_dev.shellescape}`.strip
+  partitions = lsblk_output.split("\n").map { |line| line.split }
+
+  root_part = partitions
+    .select { |parts| parts.length >= 3 && %w[ext4 xfs btrfs].include?(parts[2]) }
+    .max_by { |parts| parts[1].to_i }
+
+  raise "No mountable root partition found on #{disk_file}" unless root_part
+
+  root_dev = "/dev/#{root_part[0]}"
+  FileUtils.mkdir_p(mount_point)
+
+  begin
+    r "mount #{root_dev.shellescape} #{mount_point.shellescape}"
+
+    # Remove cloud-init instance data (per-instance state that ties to the source VM)
+    cloud_instances = File.join(mount_point, "var/lib/cloud/instances")
+    if Dir.exist?(cloud_instances)
+      FileUtils.rm_rf(Dir.glob(File.join(cloud_instances, "*")))
+    end
+
+    # Remove cloud-init semaphores (tracks which modules have run)
+    cloud_sem = File.join(mount_point, "var/lib/cloud/sem")
+    if Dir.exist?(cloud_sem)
+      FileUtils.rm_rf(Dir.glob(File.join(cloud_sem, "*")))
+    end
+
+    # Remove cloud-init "instance" symlink so it doesn't point to old instance
+    cloud_instance_link = File.join(mount_point, "var/lib/cloud/instance")
+    FileUtils.rm_f(cloud_instance_link)
+
+    # Remove cloud-init logs
+    Dir.glob(File.join(mount_point, "var/log/cloud-init*")).each do |f|
+      FileUtils.rm_f(f)
+    end
+
+    # Truncate /etc/machine-id to force systemd to regenerate it on next boot
+    machine_id_file = File.join(mount_point, "etc/machine-id")
+    File.write(machine_id_file, "") if File.exist?(machine_id_file)
+  ensure
+    r "umount #{mount_point.shellescape}"
+    FileUtils.rm_rf(mount_point)
+  end
+ensure
+  r "losetup --detach #{loop_dev.shellescape}"
+end
