@@ -219,13 +219,20 @@ class StorageVolume
     pid = Process.spawn(*cmd)
 
     begin
-      Timeout.timeout(10) do
-        pipe_writes.each do |pipe, value|
+      # Write to all pipes concurrently using threads. The reader (init-metadata)
+      # resolves secrets in non-deterministic HashMap order, so sequential writes
+      # would deadlock if the reader tries to read a different pipe first.
+      threads = pipe_writes.map do |pipe, value|
+        Thread.new do
           File.open(pipe, File::WRONLY) do |f|
             f.write(value)
             f.flush
           end
         end
+      end
+
+      Timeout.timeout(30) do
+        threads.each(&:join)
       end
 
       _, status = Process.wait2(pid)
