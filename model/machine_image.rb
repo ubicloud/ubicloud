@@ -9,11 +9,17 @@ class MachineImage < Sequel::Model
   many_to_one :location
   many_to_one :vm
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
+  one_to_many :vm_storage_volumes, read_only: true
   one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
   include ObjectTag::Cleanup
+
+  def before_destroy
+    VmStorageVolume.where(machine_image_id: id).update(machine_image_id: nil)
+    super
+  end
 
   dataset_module Pagination
 
