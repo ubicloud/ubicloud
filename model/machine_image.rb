@@ -140,6 +140,6 @@ end
 #  machine_image_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
 #  machine_image_location_id_fkey             | (location_id) REFERENCES location(id)
 #  machine_image_project_id_fkey              | (project_id) REFERENCES project(id)
-#  machine_image_vm_id_fkey                   | (vm_id) REFERENCES vm(id)
+#  machine_image_vm_id_fkey                   | (vm_id) REFERENCES vm(id) ON DELETE SET NULL
 # Referenced By:
-#  vm_storage_volume | vm_storage_volume_machine_image_id_fkey | (machine_image_id) REFERENCES machine_image(id)
+#  vm_storage_volume | vm_storage_volume_machine_image_id_fkey | (machine_image_id) REFERENCES machine_image(id) ON DELETE SET NULL

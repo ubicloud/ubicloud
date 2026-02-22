@@ -16,7 +16,7 @@ Sequel.migration do
       foreign_key :key_encryption_key_1_id, :storage_key_encryption_key, type: :uuid
       String :compression, null: false, default: "zstd"
       Integer :size_gib, null: false
-      foreign_key :vm_id, :vm, type: :uuid
+      foreign_key :vm_id, :vm, type: :uuid, on_delete: :set_null
       String :version
       String :arch, null: false, default: "x64"
       TrueClass :visible, null: false, default: false
@@ -26,7 +26,7 @@ Sequel.migration do
     end
 
     alter_table(:vm_storage_volume) do
-      add_foreign_key :machine_image_id, :machine_image, type: :uuid
+      add_foreign_key :machine_image_id, :machine_image, type: :uuid, on_delete: :set_null
     end
   end
 
