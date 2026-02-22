@@ -345,7 +345,7 @@ RSpec.describe Prog::MachineImage::Nexus do
   end
 
   describe "#destroy" do
-    it "finalizes active billing records before destroying" do
+    it "finalizes active billing records and hops to destroy_record" do
       project.update(billable: true)
       br = BillingRecord.create(
         project_id: project.id,
@@ -355,15 +355,18 @@ RSpec.describe Prog::MachineImage::Nexus do
         amount: 20
       )
 
-      s3_client = instance_double(Aws::S3::Client)
-      expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
-      response = instance_double(Aws::S3::Types::ListObjectsV2Output, contents: [], is_truncated: false)
-      expect(s3_client).to receive(:list_objects_v2).and_return(response)
-
-      expect { nx.destroy }.to exit({"msg" => "machine image destroyed"})
+      expect { nx.destroy }.to hop("destroy_record")
+      expect(machine_image.reload.state).to eq("destroying")
       expect(BillingRecord[br.id].span.unbounded_end?).to be false
     end
 
+    it "sets state to destroying and hops to destroy_record" do
+      expect { nx.destroy }.to hop("destroy_record")
+      expect(machine_image.reload.state).to eq("destroying")
+    end
+  end
+
+  describe "#destroy_record" do
     it "deletes S3 objects, destroys KEK, and destroys the record" do
       machine_image.update(encrypted: true)
       kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "test")
@@ -382,7 +385,7 @@ RSpec.describe Prog::MachineImage::Nexus do
 
       mi_id = machine_image.id
       kek_id = kek.id
-      expect { nx.destroy }.to exit({"msg" => "machine image destroyed"})
+      expect { nx.destroy_record }.to exit({"msg" => "machine image destroyed"})
       expect(MachineImage[mi_id]).to be_nil
       expect(StorageKeyEncryptionKey[kek_id]).to be_nil
     end
@@ -398,8 +401,33 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect(s3_client).to receive(:list_objects_v2).and_return(response)
 
       mi_id = machine_image.id
-      expect { nx.destroy }.to exit({"msg" => "machine image destroyed"})
+      expect { nx.destroy_record }.to exit({"msg" => "machine image destroyed"})
       expect(MachineImage[mi_id]).to be_nil
+    end
+
+    it "nulls out machine_image_id on referencing volumes before destroying" do
+      # Create a VM with a storage volume that references this machine image
+      other_vm = create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "other-vm")
+      vol = VmStorageVolume.create(
+        vm_id: other_vm.id,
+        boot: true,
+        size_gib: 20,
+        disk_index: 0,
+        machine_image_id: machine_image.id,
+        storage_device_id: storage_device.id,
+        vhost_block_backend_id: vbb.id,
+        vring_workers: 1
+      )
+
+      s3_client = instance_double(Aws::S3::Client)
+      expect(Aws::S3::Client).to receive(:new).and_return(s3_client)
+      response = instance_double(Aws::S3::Types::ListObjectsV2Output, contents: [], is_truncated: false)
+      expect(s3_client).to receive(:list_objects_v2).and_return(response)
+
+      mi_id = machine_image.id
+      expect { nx.destroy_record }.to exit({"msg" => "machine image destroyed"})
+      expect(MachineImage[mi_id]).to be_nil
+      expect(vol.reload.machine_image_id).to be_nil
     end
 
     it "handles unencrypted images (no KEK)" do
@@ -411,7 +439,7 @@ RSpec.describe Prog::MachineImage::Nexus do
       expect(s3_client).to receive(:list_objects_v2).and_return(response)
 
       mi_id = machine_image.id
-      expect { nx.destroy }.to exit({"msg" => "machine image destroyed"})
+      expect { nx.destroy_record }.to exit({"msg" => "machine image destroyed"})
       expect(MachineImage[mi_id]).to be_nil
     end
 
@@ -435,7 +463,7 @@ RSpec.describe Prog::MachineImage::Nexus do
       )
 
       mi_id = machine_image.id
-      expect { nx.destroy }.to exit({"msg" => "machine image destroyed"})
+      expect { nx.destroy_record }.to exit({"msg" => "machine image destroyed"})
       expect(MachineImage[mi_id]).to be_nil
     end
   end

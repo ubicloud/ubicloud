@@ -143,6 +143,25 @@ RSpec.describe MachineImage do
     end
   end
 
+  describe "#before_destroy" do
+    it "nulls out machine_image_id on referencing volumes" do
+      vm_host = create_vm_host
+      vm = create_vm(vm_host_id: vm_host.id, project_id: project_id)
+      sd = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 200, total_storage_gib: 200)
+      vbb = VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm_host.id)
+      vol = VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0,
+        machine_image_id: mi.id, storage_device_id: sd.id,
+        vhost_block_backend_id: vbb.id, vring_workers: 1
+      )
+
+      mi.destroy
+
+      expect(MachineImage[mi.id]).to be_nil
+      expect(vol.reload.machine_image_id).to be_nil
+    end
+  end
+
   describe "state predicates" do
     it "returns true for available?" do
       expect(mi.available?).to be true

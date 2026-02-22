@@ -155,8 +155,12 @@ class Prog::MachineImage::Nexus < Prog::Base
     decr_destroy
 
     machine_image.active_billing_records.each(&:finalize)
-
     machine_image.update(state: "destroying")
+
+    hop_destroy_record
+  end
+
+  label def destroy_record
     delete_s3_objects
 
     if machine_image.encrypted
