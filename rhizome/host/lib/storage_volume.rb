@@ -197,6 +197,12 @@ class StorageVolume
       pipe_writes << [sp.s3_key_id_pipe, key_wrapping_secrets["archive_s3_access_key"]]
       pipe_writes << [sp.s3_secret_key_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
 
+      if key_wrapping_secrets["archive_s3_session_token"]
+        session_pipe = sp.s3_session_token_pipe
+        pipes << session_pipe
+        pipe_writes << [session_pipe, key_wrapping_secrets["archive_s3_session_token"]]
+      end
+
       if @archive_params["encrypted"]
         pipe_writes << [sp.archive_kek_pipe, key_wrapping_secrets.dig("archive_kek", "key")]
       end
@@ -444,6 +450,7 @@ class StorageVolume
     lines << "autofetch = true"
     lines << 'access_key_id.ref = "s3-key-id"'
     lines << 'secret_access_key.ref = "s3-secret-key"'
+    lines << 'session_token.ref = "s3-session-token"'
     lines << 'archive_kek.ref = "archive-kek"' if @archive_params["encrypted"]
     lines.join("\n") + "\n"
   end
@@ -477,6 +484,10 @@ class StorageVolume
 
       lines << "[secrets.s3-secret-key]"
       lines << "source.file = #{toml_str(sp.s3_secret_key_pipe)}"
+      lines << ""
+
+      lines << "[secrets.s3-session-token]"
+      lines << "source.file = #{toml_str(sp.s3_session_token_pipe)}"
       lines << ""
 
       if @archive_params["encrypted"]
@@ -595,6 +606,9 @@ class StorageVolume
     if needs_s3_pipes
       pipe_writes << [sp.s3_key_id_pipe, key_wrapping_secrets["archive_s3_access_key"]]
       pipe_writes << [sp.s3_secret_key_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
+      if key_wrapping_secrets["archive_s3_session_token"]
+        pipe_writes << [sp.s3_session_token_pipe, key_wrapping_secrets["archive_s3_session_token"]]
+      end
     end
 
     if needs_archive_kek

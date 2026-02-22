@@ -74,6 +74,7 @@ RSpec.describe VhostBackendConfigV2 do
         archive_params: archive_params,
         s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
         s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
+        s3_session_token_pipe: "/var/storage/test/0/s3-session-token.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       )
     }
@@ -90,6 +91,7 @@ RSpec.describe VhostBackendConfigV2 do
       expect(toml).to include("autofetch = true")
       expect(toml).to include('access_key_id.ref = "s3-key-id"')
       expect(toml).to include('secret_access_key.ref = "s3-secret-key"')
+      expect(toml).to include('session_token.ref = "s3-session-token"')
     end
 
     it "does not include archive_kek ref for unencrypted archives" do
@@ -105,13 +107,15 @@ RSpec.describe VhostBackendConfigV2 do
       expect(toml).to include('archive_kek.ref = "archive-kek"')
     end
 
-    it "generates S3 secrets toml with pipe sources" do
+    it "generates S3 secrets toml with pipe sources including session token" do
       config = described_class.new(archive_config_params)
       toml = config.secrets_toml
       expect(toml).to include("[secrets.s3-key-id]")
       expect(toml).to include('source.file = "/var/storage/test/0/s3-key-id.pipe"')
       expect(toml).to include("[secrets.s3-secret-key]")
       expect(toml).to include('source.file = "/var/storage/test/0/s3-secret-key.pipe"')
+      expect(toml).to include("[secrets.s3-session-token]")
+      expect(toml).to include('source.file = "/var/storage/test/0/s3-session-token.pipe"')
       expect(toml).not_to include("source.inline")
     end
 
@@ -170,6 +174,7 @@ RSpec.describe VhostBackendConfigV2 do
         archive_params: archive_params,
         s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
         s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
+        s3_session_token_pipe: "/var/storage/test/0/s3-session-token.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       ))
 
@@ -197,6 +202,7 @@ RSpec.describe VhostBackendConfigV2 do
         archive_params: archive_params,
         s3_key_id_pipe: "/var/storage/test/0/s3-key-id.pipe",
         s3_secret_key_pipe: "/var/storage/test/0/s3-secret-key.pipe",
+        s3_session_token_pipe: "/var/storage/test/0/s3-session-token.pipe",
         archive_kek_pipe: "/var/storage/test/0/archive-kek.pipe"
       ))
 

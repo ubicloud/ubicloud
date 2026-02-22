@@ -704,12 +704,12 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
       expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(archive_vhost_sv).to receive(:create_empty_disk_file)
-      expect(archive_vhost_sv).to receive(:prep_vhost_backend).with(nil, {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"})
-      archive_vhost_sv.prep({"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"})
+      expect(archive_vhost_sv).to receive(:prep_vhost_backend).with(nil, {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"})
+      archive_vhost_sv.prep({"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"})
     end
 
     it "creates metadata for archive-backed volumes during prep_vhost_backend" do
-      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"}
+      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"}
       expect(archive_vhost_sv).to receive(:vhost_backend_create_config).with(nil, key_wrapping_secrets)
       expect(archive_vhost_sv).to receive(:vhost_backend_create_metadata).with(key_wrapping_secrets)
       expect(archive_vhost_sv).to receive(:vhost_backend_create_service_file)
@@ -731,23 +731,28 @@ RSpec.describe StorageVolume do
       expect(content).not_to include("IPAddressDeny=any")
     end
 
-    it "can start an unencrypted archive vhost backend" do
-      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK"}
+    it "can start an unencrypted archive vhost backend with session token" do
+      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"}
       s3_key_pipe = "/var/storage/test/2/s3-key-id.pipe"
       s3_secret_pipe = "/var/storage/test/2/s3-secret-key.pipe"
+      s3_session_pipe = "/var/storage/test/2/s3-session-token.pipe"
 
       expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_key_pipe)
       expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_secret_pipe)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_session_pipe)
       expect(File).to receive(:mkfifo).with(s3_key_pipe, 0o600)
       expect(File).to receive(:mkfifo).with(s3_secret_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_session_pipe, 0o600)
       expect(FileUtils).to receive(:chown).with("test", "test", s3_key_pipe)
       expect(FileUtils).to receive(:chown).with("test", "test", s3_secret_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_session_pipe)
 
       expect(archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
       expect(archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
 
       expect(File).to receive(:write).with(s3_key_pipe, "AK")
       expect(File).to receive(:write).with(s3_secret_pipe, "SK")
+      expect(File).to receive(:write).with(s3_session_pipe, "ST")
 
       archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
@@ -761,12 +766,14 @@ RSpec.describe StorageVolume do
         "auth_data" => "test",
         "archive_kek" => archive_kek_secrets,
         "archive_s3_access_key" => "AK",
-        "archive_s3_secret_key" => "SK"
+        "archive_s3_secret_key" => "SK",
+        "archive_s3_session_token" => "ST"
       }
 
       kek_pipe = "/var/storage/test/2/kek.pipe"
       s3_key_pipe = "/var/storage/test/2/s3-key-id.pipe"
       s3_secret_pipe = "/var/storage/test/2/s3-secret-key.pipe"
+      s3_session_pipe = "/var/storage/test/2/s3-session-token.pipe"
       archive_kek_pipe = "/var/storage/test/2/archive-kek.pipe"
 
       # Disk KEK pipe
@@ -774,13 +781,16 @@ RSpec.describe StorageVolume do
       expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
       expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
 
-      # S3 credential pipes
+      # S3 credential pipes (including session token)
       expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_key_pipe)
       expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_secret_pipe)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_session_pipe)
       expect(File).to receive(:mkfifo).with(s3_key_pipe, 0o600)
       expect(File).to receive(:mkfifo).with(s3_secret_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_session_pipe, 0o600)
       expect(FileUtils).to receive(:chown).with("test", "test", s3_key_pipe)
       expect(FileUtils).to receive(:chown).with("test", "test", s3_secret_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_session_pipe)
 
       # Archive KEK pipe
       expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(archive_kek_pipe)
@@ -794,6 +804,7 @@ RSpec.describe StorageVolume do
       expect(File).to receive(:write).with(kek_pipe, key_wrapping_secrets["key"])
       expect(File).to receive(:write).with(s3_key_pipe, "AK")
       expect(File).to receive(:write).with(s3_secret_pipe, "SK")
+      expect(File).to receive(:write).with(s3_session_pipe, "ST")
       expect(File).to receive(:write).with(archive_kek_pipe, archive_kek_secrets["key"])
 
       encrypted_archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)

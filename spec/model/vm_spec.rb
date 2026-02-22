@@ -437,14 +437,16 @@ RSpec.describe Vm do
         storage_device_id: storage_device.id
       )
 
-      expect(Config).to receive(:machine_image_archive_access_key).and_return("AKID_TEST")
-      expect(Config).to receive(:machine_image_archive_secret_key).and_return("SECRET_TEST")
+      expect(CloudflareR2).to receive(:create_temporary_credentials)
+        .with(bucket: "ubi-images", prefix: "images/abc")
+        .and_return(access_key_id: "TEMP_AKID", secret_access_key: "TEMP_SECRET", session_token: "TEMP_TOKEN")
 
       secrets = vm.storage_secrets
       device_id = "#{vm.inhost_name}_0"
       expect(secrets[device_id]).to include(
-        "archive_s3_access_key" => "AKID_TEST",
-        "archive_s3_secret_key" => "SECRET_TEST"
+        "archive_s3_access_key" => "TEMP_AKID",
+        "archive_s3_secret_key" => "TEMP_SECRET",
+        "archive_s3_session_token" => "TEMP_TOKEN"
       )
       expect(secrets[device_id]).not_to have_key("archive_kek")
     end
@@ -464,8 +466,9 @@ RSpec.describe Vm do
         storage_device_id: storage_device.id
       )
 
-      expect(Config).to receive(:machine_image_archive_access_key).and_return("AKID")
-      expect(Config).to receive(:machine_image_archive_secret_key).and_return("SECRET")
+      expect(CloudflareR2).to receive(:create_temporary_credentials)
+        .with(bucket: "ubi-images", prefix: "images/enc")
+        .and_return(access_key_id: "TEMP_AKID", secret_access_key: "TEMP_SECRET", session_token: "TEMP_TOKEN")
 
       secrets = vm.storage_secrets
       device_id = "#{vm.inhost_name}_0"
@@ -473,8 +476,9 @@ RSpec.describe Vm do
       expect(secrets[device_id]["key"]).to eq("testkey")
       # Archive KEK
       expect(secrets[device_id]["archive_kek"]).to include("key" => "archivekey")
-      # S3 creds
-      expect(secrets[device_id]["archive_s3_access_key"]).to eq("AKID")
+      # Temporary S3 creds
+      expect(secrets[device_id]["archive_s3_access_key"]).to eq("TEMP_AKID")
+      expect(secrets[device_id]["archive_s3_session_token"]).to eq("TEMP_TOKEN")
     end
 
     it "returns empty hash for volumes without encryption or machine image" do

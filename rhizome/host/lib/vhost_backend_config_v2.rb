@@ -37,6 +37,7 @@ class VhostBackendConfigV2
     @archive_kek_pipe = params[:archive_kek_pipe]
     @s3_key_id_pipe = params[:s3_key_id_pipe]
     @s3_secret_key_pipe = params[:s3_secret_key_pipe]
+    @s3_session_token_pipe = params[:s3_session_token_pipe]
   end
 
   def archive?
@@ -149,6 +150,7 @@ class VhostBackendConfigV2
     lines << "autofetch = true"
     lines << 'access_key_id.ref = "s3-key-id"'
     lines << 'secret_access_key.ref = "s3-secret-key"'
+    lines << 'session_token.ref = "s3-session-token"' if @s3_session_token_pipe
     lines << 'archive_kek.ref = "archive-kek"' if @archive_params["encrypted"]
     lines.join("\n") + "\n"
   end
@@ -163,6 +165,12 @@ class VhostBackendConfigV2
     lines << "[secrets.s3-secret-key]"
     lines << "source.file = #{toml_str(@s3_secret_key_pipe)}"
     lines << ""
+
+    if @s3_session_token_pipe
+      lines << "[secrets.s3-session-token]"
+      lines << "source.file = #{toml_str(@s3_session_token_pipe)}"
+      lines << ""
+    end
 
     if @archive_params["encrypted"]
       lines << "[secrets.archive-kek]"

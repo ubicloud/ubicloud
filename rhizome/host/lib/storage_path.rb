@@ -52,6 +52,10 @@ class StoragePath
     @s3_secret_key_pipe ||= File.join(storage_dir, "s3-secret-key.pipe")
   end
 
+  def s3_session_token_pipe
+    @s3_session_token_pipe ||= File.join(storage_dir, "s3-session-token.pipe")
+  end
+
   def vhost_backend_config
     @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
   end

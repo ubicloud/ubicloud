@@ -120,6 +120,7 @@ module ThawedMock
   allow_mocking(BillingRate, :from_resource_properties)
   allow_mocking(Clog, :emit)
   allow_mocking(CloudflareClient, :new)
+  allow_mocking(CloudflareR2, :create_temporary_credentials)
   allow_mocking(Clover, :ips_v4, :call, :authorized_project)
   allow_mocking(EmailRenderer, :sendmail)
   allow_mocking(Hosting::Apis, :pull_data_center, :pull_ips, :reimage_server, :hardware_reset_server, :set_server_name)

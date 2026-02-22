@@ -187,6 +187,10 @@ module Config
   optional :machine_image_archive_secret_key, string, clear: true
   override :machine_image_max_size_gib, 200, int
 
+  # Cloudflare R2 temporary credentials
+  optional :cloudflare_account_id, string
+  optional :cloudflare_r2_api_token, string, clear: true
+
   override :ubuntu_noble_version, "20250502.1", string
   override :ubuntu_jammy_version, "20250508", string
   override :debian_12_version, "20250428-2096", string
