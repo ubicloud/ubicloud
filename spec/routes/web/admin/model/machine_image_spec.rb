@@ -20,7 +20,8 @@ RSpec.describe CloverAdmin, "MachineImage" do
     expect(page.title).to eq "Ubicloud Admin - MachineImage #{@instance.ubid}"
   end
 
-  it "can make an image public" do
+  it "can make an unencrypted image public" do
+    @instance.update(encrypted: false)
     expect(@instance.visible).to be false
 
     visit "/model/MachineImage/#{@instance.ubid}/make_public"
@@ -30,6 +31,15 @@ RSpec.describe CloverAdmin, "MachineImage" do
     expect(page.status_code).to eq 200
     expect(page).to have_content("Image marked as public")
     expect(@instance.reload.visible).to be true
+  end
+
+  it "rejects making an encrypted image public" do
+    @instance.update(encrypted: true)
+
+    visit "/model/MachineImage/#{@instance.ubid}/make_public"
+    expect(page.status_code).to eq 200
+
+    expect { click_button "Make Public" }.to raise_error(RuntimeError, /Cannot make an encrypted image public/)
   end
 
   it "can make an image private" do

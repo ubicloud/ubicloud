@@ -39,6 +39,10 @@ class Clover
       fail Validation::ValidationFailed.new({vm_id: "VM boot disk size (#{boot_size_gib} GiB) exceeds maximum image size (#{max_size_gib} GiB)"})
     end
 
+    if MachineImage.where(vm_id: vm.id).exclude(state: ["available", "failed", "destroying"]).any?
+      fail Validation::ValidationFailed.new({vm_id: "A machine image is already being created from this VM"})
+    end
+
     Validation.validate_machine_image_quota(@project)
 
     machine_image = nil

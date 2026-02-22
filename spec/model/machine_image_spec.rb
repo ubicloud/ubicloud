@@ -88,6 +88,20 @@ RSpec.describe MachineImage do
       result = described_class.for_project(project_id).all
       expect(result).not_to include(other_private_mi)
     end
+
+    it "excludes decommissioned images" do
+      mi
+      mi.update(state: "decommissioned")
+      result = described_class.for_project(project_id).all
+      expect(result).not_to include(mi)
+    end
+
+    it "excludes decommissioned public images from other projects" do
+      other_public_mi
+      other_public_mi.update(state: "decommissioned")
+      result = described_class.for_project(project_id).all
+      expect(result).not_to include(other_public_mi)
+    end
   end
 
   it "returns encrypted?" do

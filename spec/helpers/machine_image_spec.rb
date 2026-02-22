@@ -201,5 +201,29 @@ RSpec.describe Clover, "machine_image helper" do
       mi = MachineImage.first(name: "my-image")
       expect(mi.size_gib).to eq(0)
     end
+
+    it "fails with 409 when an image is already being created from the same VM" do
+      vm = stopped_vm
+
+      MachineImage.create(
+        name: "in-progress-image",
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        state: "archiving",
+        vm_id: vm.id,
+        s3_bucket: "b",
+        s3_prefix: "p/",
+        s3_endpoint: "https://r2.example.com",
+        size_gib: 10
+      )
+
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
+        vm_id: vm.ubid
+      }.to_json
+
+      expect(last_response).to have_api_error(400, /Validation failed/)
+      body = JSON.parse(last_response.body)
+      expect(body.to_s).to include("already being created")
+    end
   end
 end

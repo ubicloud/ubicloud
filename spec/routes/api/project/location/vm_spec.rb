@@ -397,6 +397,21 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image is in location '#{other_location.display_name}' but VM is being created in location '#{TEST_LOCATION}'"})
       end
+
+      it "rejects decommissioned machine image" do
+        mi = MachineImage.create(
+          name: "decom-image", project_id: project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "decommissioned",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image not found"})
+      end
     end
 
     it "succeeds with gpu count of zero" do
@@ -452,6 +467,26 @@ RSpec.describe Clover, "vm" do
         delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/foo-name"
 
         expect(last_response.status).to eq(204)
+        expect(SemSnap.new(vm.id).set?("destroy")).to be false
+      end
+
+      it "fails when image creation is in progress from this VM" do
+        MachineImage.create(
+          name: "in-progress-image",
+          project_id: project.id,
+          location_id: Location::HETZNER_FSN1_ID,
+          state: "archiving",
+          vm_id: vm.id,
+          s3_bucket: "b",
+          s3_prefix: "p/",
+          s3_endpoint: "https://r2.example.com",
+          size_gib: 10
+        )
+
+        delete "/project/#{project.ubid}/location/#{vm.display_location}/vm/#{vm.name}"
+
+        expect(last_response.status).to eq(409)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to include("image creation is in progress")
         expect(SemSnap.new(vm.id).set?("destroy")).to be false
       end
 

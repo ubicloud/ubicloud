@@ -25,7 +25,7 @@ class MachineImage < Sequel::Model
 
   dataset_module do
     def for_project(project_id)
-      where(Sequel[project_id:] | {visible: true})
+      where(Sequel[project_id:] | {visible: true}).exclude(state: "decommissioned")
     end
   end
 

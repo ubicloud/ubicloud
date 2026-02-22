@@ -35,6 +35,10 @@ class Clover
       r.delete true do
         authorize("Vm:delete", vm)
 
+        if MachineImage.where(vm_id: vm.id, state: ["creating", "archiving"]).any?
+          fail DependencyError.new("Cannot delete VM while image creation is in progress")
+        end
+
         DB.transaction do
           vm.incr_destroy
           audit_log(vm, "destroy")

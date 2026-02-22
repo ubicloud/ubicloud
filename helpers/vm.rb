@@ -44,6 +44,7 @@ class Clover
       mi_uuid = UBID.to_uuid(assemble_params[:machine_image_id])
       mi = MachineImage.for_project(project.id).first(id: mi_uuid)
       fail Validation::ValidationFailed.new({machine_image_id: "Machine image not found"}) unless mi
+      fail Validation::ValidationFailed.new({machine_image_id: "Machine image is decommissioned and cannot be used"}) if mi.decommissioned?
       fail Validation::ValidationFailed.new({machine_image_id: "Machine image is not available"}) unless mi.state == "available"
       if mi.location_id != @location.id
         fail Validation::ValidationFailed.new({machine_image_id: "Machine image is in location '#{mi.display_location}' but VM is being created in location '#{@location.display_name}'"})

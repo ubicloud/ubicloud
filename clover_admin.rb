@@ -254,6 +254,7 @@ class CloverAdmin < Roda
     },
     "MachineImage" => {
       "make_public" => object_action("Make Public", "Image marked as public") do |obj|
+        fail "Cannot make an encrypted image public. Create the image with encrypted=false first." if obj.encrypted?
         obj.update(visible: true)
       end,
       "make_private" => object_action("Make Private", "Image marked as private") do |obj|
