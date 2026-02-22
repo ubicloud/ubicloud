@@ -20,10 +20,15 @@
               "layouts/sidebar/item",
               name: "Compute",
               url: "#{@project.path}/vm",
-              is_active:
-                request.path.start_with?("#{@project.path}/vm") ||
-                request.path.start_with?("#{@project.path}/machine-image"),
+              is_active: request.path.start_with?("#{@project.path}/vm"),
               icon: "hero-server-stack"
+            ) %>
+            <%== part(
+              "layouts/sidebar/item",
+              name: "Machine Images",
+              url: "#{@project.path}/machine-image",
+              is_active: request.path.start_with?("#{@project.path}/machine-image"),
+              icon: "hero-square-2-stack-modified"
             ) %>
             <%== part(
               "layouts/sidebar/item",
