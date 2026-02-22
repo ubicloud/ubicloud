@@ -104,15 +104,32 @@ RSpec.describe Project do
   end
 
   describe "#destroy" do
-    it "cascades destroy to machine_images" do
+    it "cascades destroy to machine_images and finalizes billing and KEK" do
+      kek = StorageKeyEncryptionKey.create(
+        algorithm: "aes-256-gcm",
+        key: "dGVzdGtleQ==",
+        init_vector: "dGVzdGl2",
+        auth_data: "test"
+      )
       mi = MachineImage.create(
         name: "test-img", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
-        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 10
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 10,
+        encrypted: true, key_encryption_key_1_id: kek.id
+      )
+
+      br = BillingRecord.create(
+        project_id: project.id,
+        resource_id: mi.id,
+        resource_name: mi.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", "standard", "hetzner-fsn1")["id"],
+        amount: 1
       )
 
       project.destroy
 
       expect(MachineImage[mi.id]).to be_nil
+      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
+      expect(BillingRecord[br.id].span.unbounded_end?).to be false
     end
   end
 

@@ -18,6 +18,14 @@ class MachineImage < Sequel::Model
 
   def before_destroy
     VmStorageVolume.where(machine_image_id: id).update(machine_image_id: nil)
+    active_billing_records.each(&:finalize)
+
+    if key_encryption_key_1
+      kek = key_encryption_key_1
+      update(key_encryption_key_1_id: nil)
+      kek.destroy
+    end
+
     super
   end
 

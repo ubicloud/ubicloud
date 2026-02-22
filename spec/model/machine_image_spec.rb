@@ -178,6 +178,42 @@ RSpec.describe MachineImage do
       expect(described_class[mi.id]).to be_nil
       expect(vol.reload.machine_image_id).to be_nil
     end
+
+    it "finalizes active billing records" do
+      br = BillingRecord.create(
+        project_id:,
+        resource_id: mi.id,
+        resource_name: mi.name,
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", "standard", "hetzner-fsn1")["id"],
+        amount: 1
+      )
+
+      mi.destroy
+
+      expect(BillingRecord[br.id].span.unbounded_end?).to be false
+    end
+
+    it "destroys the KEK for encrypted images" do
+      kek = StorageKeyEncryptionKey.create(
+        algorithm: "aes-256-gcm",
+        key: "dGVzdGtleQ==",
+        init_vector: "dGVzdGl2",
+        auth_data: "test"
+      )
+      mi.update(encrypted: true, key_encryption_key_1_id: kek.id)
+
+      mi.destroy
+
+      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
+    end
+
+    it "handles unencrypted images without KEK" do
+      mi.update(encrypted: false, key_encryption_key_1_id: nil)
+
+      mi.destroy
+
+      expect(described_class[mi.id]).to be_nil
+    end
   end
 
   describe "state predicates" do
