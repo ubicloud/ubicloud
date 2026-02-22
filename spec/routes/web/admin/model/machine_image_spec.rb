@@ -20,6 +20,12 @@ RSpec.describe CloverAdmin, "MachineImage" do
     expect(page.title).to eq "Ubicloud Admin - MachineImage #{@instance.ubid}"
   end
 
+  it "includes failed in the search state filter options" do
+    visit "/autoforme/MachineImage/search"
+    expect(page.status_code).to eq 200
+    expect(page).to have_select("state", with_options: %w[available creating verifying failed decommissioned destroying])
+  end
+
   it "can make an unencrypted image public" do
     @instance.update(encrypted: false)
     expect(@instance.visible).to be false

@@ -348,7 +348,7 @@ class CloverAdmin < Roda
       order Sequel.desc(:created_at)
       eager [:project, :location]
       columns [:name, :state, :project, :location, :visible, :size_gib, :created_at]
-      column_options state: {type: "select", options: %w[available creating verifying decommissioned destroying], add_blank: true},
+      column_options state: {type: "select", options: %w[available creating verifying failed decommissioned destroying], add_blank: true},
         visible: {type: "boolean", value: nil},
         created_at: {type: "text"},
         project: ubid_input.call("Project")
