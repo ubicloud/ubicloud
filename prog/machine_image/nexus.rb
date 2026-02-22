@@ -27,6 +27,7 @@ class Prog::MachineImage::Nexus < Prog::Base
 
     fail "VM must be stopped to create a machine image" unless vm.display_state == "stopped"
     fail "VM has no boot volume" unless boot_volume
+    fail "VM lacks write tracking — cannot create a reliable archive" unless boot_volume.vhost_block_backend_id
 
     if machine_image.encrypted
       hop_create_kek

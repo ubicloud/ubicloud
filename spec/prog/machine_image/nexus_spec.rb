@@ -78,6 +78,12 @@ RSpec.describe Prog::MachineImage::Nexus do
       nx.instance_variable_set(:@boot_volume, nil)
       expect { nx.start }.to raise_error(RuntimeError, "VM has no boot volume")
     end
+
+    it "fails if boot volume lacks write tracking (no vhost_block_backend)" do
+      boot_volume.update(vhost_block_backend_id: nil, vring_workers: nil)
+      nx.instance_variable_set(:@boot_volume, nil)
+      expect { nx.start }.to raise_error(RuntimeError, "VM lacks write tracking — cannot create a reliable archive")
+    end
   end
 
   describe "#create_kek" do
