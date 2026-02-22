@@ -48,7 +48,7 @@ class Clover
       fail Validation::ValidationFailed.new({vm_id: "A machine image is already being created from this VM"})
     end
 
-    Validation.validate_machine_image_quota(@project)
+    Validation.validate_machine_image_quota(@project, image_size_gib: boot_size_gib)
 
     location = vm.location
     existing_count = MachineImage.where(project_id: @project.id, location_id: location.id, name:).count

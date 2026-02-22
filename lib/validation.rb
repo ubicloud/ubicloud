@@ -271,11 +271,17 @@ module Validation
     end
   end
 
-  def self.validate_machine_image_quota(project)
+  def self.validate_machine_image_quota(project, image_size_gib: 0)
     unless project.quota_available?("MachineImageCount", 1)
       current = project.current_resource_usage("MachineImageCount")
       limit = project.effective_quota_value("MachineImageCount")
       fail ValidationFailed.new({machine_image: "Machine image quota exceeded. Current: #{current}, Limit: #{limit}"})
+    end
+
+    unless project.quota_available?("MachineImageStorage", image_size_gib)
+      current = project.current_resource_usage("MachineImageStorage")
+      limit = project.effective_quota_value("MachineImageStorage")
+      fail ValidationFailed.new({machine_image: "Exceeded quota for machine image storage. Current usage: #{current} GiB, Requested: #{image_size_gib} GiB, Limit: #{limit} GiB"})
     end
   end
 

@@ -202,6 +202,28 @@ RSpec.describe Clover, "machine_image helper" do
       expect(mi.size_gib).to eq(0)
     end
 
+    it "fails when storage quota would be exceeded" do
+      project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageStorage"]["id"], value: 40)
+      vm = stopped_vm
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 30, disk_index: 0)
+
+      # Create an existing image that uses 20 GiB
+      MachineImage.create(
+        name: "existing-img", project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID, state: "available",
+        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      )
+
+      # 20 existing + 30 new = 50 > 40 quota
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
+        vm_id: vm.ubid
+      }.to_json
+
+      expect(last_response).to have_api_error(400, /Validation failed/)
+      body = JSON.parse(last_response.body)
+      expect(body.to_s).to include("Exceeded quota for machine image storage")
+    end
+
     it "fails with 409 when an image is already being created from the same VM" do
       vm = stopped_vm
 

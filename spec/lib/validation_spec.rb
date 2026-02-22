@@ -391,20 +391,37 @@ RSpec.describe Validation do
 
     before do
       project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageCount"]["id"], value: 2)
+      project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageStorage"]["id"], value: 100)
     end
 
-    it "passes when under quota" do
-      expect { described_class.validate_machine_image_quota(project) }.not_to raise_error
+    it "passes when under both count and storage quota" do
+      expect { described_class.validate_machine_image_quota(project, image_size_gib: 50) }.not_to raise_error
     end
 
-    it "raises error when quota exceeded" do
+    it "raises error when count quota exceeded" do
       2.times do |i|
         MachineImage.create(
           name: "img-#{i}", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
           state: "available", s3_bucket: "b", s3_prefix: "p#{i}/", s3_endpoint: "https://e", size_gib: 10
         )
       end
-      expect { described_class.validate_machine_image_quota(project) }.to raise_error described_class::ValidationFailed
+      expect { described_class.validate_machine_image_quota(project, image_size_gib: 10) }.to raise_error described_class::ValidationFailed
+    end
+
+    it "raises error when storage quota exceeded" do
+      MachineImage.create(
+        name: "big-img", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 80
+      )
+      expect { described_class.validate_machine_image_quota(project, image_size_gib: 30) }.to raise_error described_class::ValidationFailed
+    end
+
+    it "passes storage quota when image fits within remaining quota" do
+      MachineImage.create(
+        name: "small-img", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 50
+      )
+      expect { described_class.validate_machine_image_quota(project, image_size_gib: 50) }.not_to raise_error
     end
   end
 
