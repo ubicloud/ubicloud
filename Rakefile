@@ -295,7 +295,7 @@ task "create_prod_admin_account", [:login] do |_, args|
 end
 
 desc "Register a distro image as a public MachineImage"
-task "register_distro_image", [:project_ubid, :location_name, :name, :url, :sha256, :version, :vm_host_ubid] do |_, args|
+task "register_distro_image", [:project_ubid, :location_name, :name, :url, :sha256, :version, :vm_host_ubid, :arch] do |_, args|
   env = ENV["RACK_ENV"] || "development"
   load_db.call(env)
   require_relative "loader"
@@ -316,7 +316,8 @@ task "register_distro_image", [:project_ubid, :location_name, :name, :url, :sha2
     url: args[:url],
     sha256: args[:sha256],
     version: args[:version],
-    vm_host_id: vm_host.id
+    vm_host_id: vm_host.id,
+    arch: args[:arch] || vm_host.arch
   )
   puts "Distro image registration started: #{mi.ubid}"
 end

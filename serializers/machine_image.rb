@@ -8,6 +8,7 @@ class Serializers::MachineImage < Serializers::Base
       description: mi.description,
       state: mi.state,
       size_gib: mi.size_gib,
+      arch: mi.arch,
       encrypted: mi.encrypted,
       compression: mi.compression,
       visible: mi.visible,

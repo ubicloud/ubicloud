@@ -51,6 +51,7 @@ class Clover
         state: "creating",
         vm_id: vm.id,
         size_gib: boot_size_gib,
+        arch: vm.arch,
         encrypted: true,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "#{@project.ubid}/#{@location.display_name}/",

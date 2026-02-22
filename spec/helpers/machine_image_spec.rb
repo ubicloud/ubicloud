@@ -113,6 +113,10 @@ RSpec.describe Clover, "machine_image helper" do
       expect(parsed["state"]).to eq("creating")
       expect(parsed["encrypted"]).to be true
       expect(parsed["size_gib"]).to eq(30)
+      expect(parsed["arch"]).to eq("x64")
+
+      mi = MachineImage.first(name: "my-image")
+      expect(mi.arch).to eq(vm.arch)
     end
 
     it "fails when VM is not stopped" do

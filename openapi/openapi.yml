@@ -3125,6 +3125,12 @@ components:
     MachineImage:
       type: object
       properties:
+        arch:
+          description: Architecture of the machine image
+          type: string
+          enum:
+            - arm64
+            - x64
         compression:
           description: Compression algorithm used
           type: string
@@ -3167,6 +3173,7 @@ components:
           type: boolean
       additionalProperties: false
       required:
+        - arch
         - created_at
         - description
         - encrypted

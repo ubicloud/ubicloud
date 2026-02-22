@@ -365,6 +365,38 @@ RSpec.describe Clover, "vm" do
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image not found"})
       end
+
+      it "invalid machine image architecture mismatch" do
+        mi = MachineImage.create(
+          name: "arm-image", project_id: project.id,
+          location_id: Location[display_name: TEST_LOCATION].id, state: "available",
+          arch: "arm64",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image architecture (arm64) does not match requested VM architecture (x64)"})
+      end
+
+      it "invalid machine image location mismatch" do
+        other_location = Location[name: "hetzner-hel1"]
+        mi = MachineImage.create(
+          name: "other-loc-image", project_id: project.id,
+          location_id: other_location.id, state: "available",
+          s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 10
+        )
+
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/vm/test-vm", {
+          public_key: "ssh key",
+          machine_image_id: mi.ubid
+        }.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image is in location '#{other_location.display_name}' but VM is being created in location '#{TEST_LOCATION}'"})
+      end
     end
 
     it "succeeds with gpu count of zero" do

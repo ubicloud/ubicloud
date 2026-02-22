@@ -63,7 +63,7 @@ class MachineImage < Sequel::Model
 
   # Register a public distro image from a URL. Admin-only operation.
   # Returns the Strand for the registration prog.
-  def self.register_distro_image(project_id:, location_id:, name:, url:, sha256:, version:, vm_host_id:)
+  def self.register_distro_image(project_id:, location_id:, name:, url:, sha256:, version:, vm_host_id:, arch: "x64")
     mi = nil
     DB.transaction do
       mi = MachineImage.create(
@@ -76,6 +76,7 @@ class MachineImage < Sequel::Model
         size_gib: 0,
         visible: true,
         version: version,
+        arch: arch,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "public/#{name}/#{version}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""
@@ -123,6 +124,7 @@ end
 #  created_at              | timestamp with time zone | NOT NULL DEFAULT now()
 #  visible                 | boolean                  | NOT NULL DEFAULT false
 #  version                 | text                     |
+#  arch                    | text                     | NOT NULL DEFAULT 'x64'::text
 # Indexes:
 #  machine_image_pkey                            | PRIMARY KEY btree (id)
 #  machine_image_project_id_location_id_name_key | UNIQUE btree (project_id, location_id, name)

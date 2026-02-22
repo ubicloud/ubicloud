@@ -87,6 +87,7 @@ RSpec.describe Clover, "machine_image" do
       parsed = JSON.parse(last_response.body)
       expect(parsed["name"]).to eq("test-image")
       expect(parsed["state"]).to eq("available")
+      expect(parsed["arch"]).to eq("x64")
     end
 
     it "success get machine image by ubid" do

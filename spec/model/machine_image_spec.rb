@@ -31,6 +31,10 @@ RSpec.describe MachineImage do
     expect(mi.display_location).to eq("eu-central-h1")
   end
 
+  it "has an arch that defaults to x64" do
+    expect(mi.arch).to eq("x64")
+  end
+
   it "has project association" do
     expect(mi.project).to be_a(Project)
     expect(mi.project.id).to eq(project_id)

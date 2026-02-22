@@ -45,6 +45,12 @@ class Clover
       mi = MachineImage.for_project(project.id).first(id: mi_uuid)
       fail Validation::ValidationFailed.new({machine_image_id: "Machine image not found"}) unless mi
       fail Validation::ValidationFailed.new({machine_image_id: "Machine image is not available"}) unless mi.state == "available"
+      if mi.location_id != @location.id
+        fail Validation::ValidationFailed.new({machine_image_id: "Machine image is in location '#{mi.display_location}' but VM is being created in location '#{@location.display_name}'"})
+      end
+      if mi.arch != "x64"
+        fail Validation::ValidationFailed.new({machine_image_id: "Machine image architecture (#{mi.arch}) does not match requested VM architecture (x64)"})
+      end
       assemble_params[:machine_image_id] = mi.id
       assemble_params.delete(:boot_image) # boot_image not needed with machine image
     end
@@ -214,7 +220,7 @@ class Clover
       end
     end
 
-    machine_images = MachineImage.for_project(@project.id).where(state: "available").all
+    machine_images = MachineImage.for_project(@project.id).where(state: "available", arch: "x64").all
     mi_values = machine_images.map {
       {
         location_id: it.location_id,
