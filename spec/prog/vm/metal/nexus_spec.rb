@@ -864,6 +864,88 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:available?).and_return(true)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
+
+    it "naps 60 seconds when source fetch is in progress" do
+      expect(nx).to receive(:update_source_fetch_progress).and_return(true)
+      expect { nx.wait }.to nap(60)
+    end
+
+    it "naps 6 hours when source fetch is complete" do
+      expect(nx).to receive(:update_source_fetch_progress).and_return(false)
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+  end
+
+  describe "#update_source_fetch_progress" do
+    it "returns false when no image-backed volumes exist" do
+      expect(vm).to receive(:vm_storage_volumes).and_return([])
+      expect(nx.update_source_fetch_progress).to be false
+    end
+
+    it "returns false when all image-backed volumes are fully fetched" do
+      vol = instance_double(VmStorageVolume, image_backed?: true, source_fetch_complete?: true)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(nx.update_source_fetch_progress).to be false
+    end
+
+    it "queries RPC and updates volume progress" do
+      vol = instance_double(VmStorageVolume,
+        image_backed?: true,
+        source_fetch_complete?: false,
+        disk_index: 0)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(vm).to receive(:inhost_name).and_return("vmtest123")
+      expect(sshable).to receive(:cmd_json).with(
+        "sudo nc -U /var/storage/:inhost_name/:disk_index/rpc.sock -q 0",
+        inhost_name: "vmtest123", disk_index: 0,
+        stdin: '{"command": "status"}'
+      ).and_return({"status" => {"stripes" => {"source" => 1024, "fetched" => 512, "total" => 2048}}})
+      expect(vol).to receive(:update).with(source_fetch_total: 1024, source_fetch_fetched: 512)
+      reloaded_vol = instance_double(VmStorageVolume, source_fetch_complete?: false)
+      expect(vol).to receive(:reload).and_return(reloaded_vol)
+      expect(nx.update_source_fetch_progress).to be true
+    end
+
+    it "returns false when RPC shows fetch is complete" do
+      vol = instance_double(VmStorageVolume,
+        image_backed?: true,
+        source_fetch_complete?: false,
+        disk_index: 0)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(vm).to receive(:inhost_name).and_return("vmtest123")
+      expect(sshable).to receive(:cmd_json).and_return(
+        {"status" => {"stripes" => {"source" => 100, "fetched" => 100, "total" => 200}}}
+      )
+      expect(vol).to receive(:update).with(source_fetch_total: 100, source_fetch_fetched: 100)
+      reloaded_vol = instance_double(VmStorageVolume, source_fetch_complete?: true)
+      expect(vol).to receive(:reload).and_return(reloaded_vol)
+      expect(nx.update_source_fetch_progress).to be false
+    end
+
+    it "handles RPC errors gracefully and continues" do
+      vol = instance_double(VmStorageVolume,
+        image_backed?: true,
+        source_fetch_complete?: false,
+        disk_index: 0)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(vm).to receive(:inhost_name).and_return("vmtest123")
+      expect(sshable).to receive(:cmd_json).and_raise(RuntimeError.new("connection refused"))
+      expect(vol).to receive(:reload).and_return(vol)
+      expect(nx.update_source_fetch_progress).to be true
+    end
+
+    it "handles null status response" do
+      vol = instance_double(VmStorageVolume,
+        image_backed?: true,
+        source_fetch_complete?: false,
+        disk_index: 0)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+      expect(vm).to receive(:inhost_name).and_return("vmtest123")
+      expect(sshable).to receive(:cmd_json).and_return({"status" => nil})
+      expect(vol).not_to receive(:update)
+      expect(vol).to receive(:reload).and_return(vol)
+      expect(nx.update_source_fetch_progress).to be true
+    end
   end
 
   describe "#update_firewall_rules" do

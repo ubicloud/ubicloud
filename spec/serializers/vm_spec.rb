@@ -44,6 +44,7 @@ RSpec.describe Serializers::Vm do
       expect(vm).to receive(:private_ipv4).and_return("10.0.0.1")
       expect(vm).to receive(:private_ipv6).and_return("fd00::1")
       expect(vm).to receive(:nics).and_return([instance_double(Nic, private_subnet: instance_double(PrivateSubnet, name: "subnet-1"))])
+      expect(vm).to receive(:vm_storage_volumes).and_return([instance_double(VmStorageVolume, image_backed?: false)])
 
       expected_result = {
         id: "1234",
@@ -64,6 +65,60 @@ RSpec.describe Serializers::Vm do
       }
 
       expect(described_class.serialize_internal(vm, {detailed: true})).to eq(expected_result)
+    end
+
+    it "includes disk_sync when VM has image-backed volume" do
+      vm = instance_double(Vm, name: "test-vm", unix_user: "ubi", storage_size_gib: 100, ip4_enabled: true)
+      expect(vm).to receive(:ip4_enabled).and_return(true)
+      expect(vm).to receive(:display_state).and_return("running")
+      expect(vm).to receive(:display_size).and_return("standard-2")
+      expect(vm).to receive(:display_location).and_return("hetzner")
+      expect(vm).to receive(:ubid).and_return("1234")
+      expect(vm).to receive(:ip6).and_return(nil)
+      expect(vm).to receive(:ip4).and_return("192.168.1.0")
+      expect(vm).to receive(:display_gpu).and_return(nil)
+      expect(vm).to receive(:firewalls).and_return([])
+      expect(vm).to receive(:private_ipv4).and_return("10.0.0.1")
+      expect(vm).to receive(:private_ipv6).and_return("fd00::1")
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_subnet: instance_double(PrivateSubnet, name: "subnet-1"))])
+
+      image_vol = instance_double(VmStorageVolume,
+        image_backed?: true,
+        source_fetch_total: 1024,
+        source_fetch_fetched: 512,
+        source_fetch_percentage: 50,
+        source_fetch_complete?: false)
+      expect(vm).to receive(:vm_storage_volumes).and_return([image_vol])
+
+      result = described_class.serialize_internal(vm, {detailed: true})
+      expect(result[:disk_sync]).to eq({
+        total: 1024,
+        fetched: 512,
+        percentage: 50,
+        complete: false
+      })
+    end
+
+    it "does not include disk_sync when VM has no image-backed volume" do
+      vm = instance_double(Vm, name: "test-vm", unix_user: "ubi", storage_size_gib: 100, ip4_enabled: true)
+      expect(vm).to receive(:ip4_enabled).and_return(true)
+      expect(vm).to receive(:display_state).and_return("running")
+      expect(vm).to receive(:display_size).and_return("standard-2")
+      expect(vm).to receive(:display_location).and_return("hetzner")
+      expect(vm).to receive(:ubid).and_return("1234")
+      expect(vm).to receive(:ip6).and_return(nil)
+      expect(vm).to receive(:ip4).and_return("192.168.1.0")
+      expect(vm).to receive(:display_gpu).and_return(nil)
+      expect(vm).to receive(:firewalls).and_return([])
+      expect(vm).to receive(:private_ipv4).and_return("10.0.0.1")
+      expect(vm).to receive(:private_ipv6).and_return("fd00::1")
+      expect(vm).to receive(:nics).and_return([instance_double(Nic, private_subnet: instance_double(PrivateSubnet, name: "subnet-1"))])
+
+      vol = instance_double(VmStorageVolume, image_backed?: false)
+      expect(vm).to receive(:vm_storage_volumes).and_return([vol])
+
+      result = described_class.serialize_internal(vm, {detailed: true})
+      expect(result[:disk_sync]).to be_nil
     end
   end
 end

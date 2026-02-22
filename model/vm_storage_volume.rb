@@ -54,6 +54,19 @@ class VmStorageVolume < Sequel::Model
       256
     end
   end
+
+  def image_backed?
+    !machine_image_id.nil?
+  end
+
+  def source_fetch_complete?
+    source_fetch_total && source_fetch_fetched && source_fetch_fetched >= source_fetch_total
+  end
+
+  def source_fetch_percentage
+    return nil unless source_fetch_total&.positive?
+    [100, (100 * source_fetch_fetched.to_i / source_fetch_total)].min
+  end
 end
 
 # Table: vm_storage_volume
@@ -75,6 +88,8 @@ end
 #  vhost_block_backend_id   | uuid    |
 #  vring_workers            | integer |
 #  machine_image_id         | uuid    |
+#  source_fetch_total       | integer |
+#  source_fetch_fetched     | integer |
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
@@ -85,7 +100,7 @@ end
 #  vm_storage_volume_boot_image_id_fkey           | (boot_image_id) REFERENCES boot_image(id)
 #  vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
 #  vm_storage_volume_key_encryption_key_2_id_fkey | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
-#  vm_storage_volume_machine_image_id_fkey        | (machine_image_id) REFERENCES machine_image(id) ON DELETE SET NULL
+#  vm_storage_volume_machine_image_id_fkey        | (machine_image_id) REFERENCES machine_image(id)
 #  vm_storage_volume_spdk_installation_id_fkey    | (spdk_installation_id) REFERENCES spdk_installation(id)
 #  vm_storage_volume_storage_device_id_fkey       | (storage_device_id) REFERENCES storage_device(id)
 #  vm_storage_volume_vhost_block_backend_id_fkey  | (vhost_block_backend_id) REFERENCES vhost_block_backend(id)

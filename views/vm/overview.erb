@@ -1,4 +1,5 @@
-<% if @vm.display_state != "running" %>
+<% image_vol = @vm.vm_storage_volumes.find(&:image_backed?) %>
+<% if @vm.display_state != "running" || (image_vol && !image_vol.source_fetch_complete?) %>
   <div class="auto-refresh hidden" data-interval="10"></div>
 <% end %>
 
@@ -11,6 +12,16 @@
     ]
   if (gpu = @vm.display_gpu)
     data << ["GPU", gpu]
+  end
+  if image_vol
+    if image_vol.source_fetch_complete?
+      data << ["Disk Sync", "<span class='inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20'>Fully local</span>", { escape: false }]
+    elsif image_vol.source_fetch_total
+      pct = image_vol.source_fetch_percentage
+      data << ["Disk Sync", "<div><div class='text-sm text-gray-600 mb-1'>#{image_vol.source_fetch_fetched}/#{image_vol.source_fetch_total} stripes (#{pct}%)</div><div class='w-full bg-gray-200 rounded-full h-2'><div class='bg-blue-500 h-2 rounded-full' style='width: #{pct}%'></div></div></div>", { escape: false }]
+    else
+      data << ["Disk Sync", "<span class='text-gray-500'>Waiting for status...</span>", { escape: false }]
+    end
   end
   subnet = @vm.nics.first.private_subnet
   data += [

@@ -23,6 +23,16 @@ class Serializers::Vm < Serializers::Base
         subnet: vm.nics.first.private_subnet.name,
         gpu: vm.display_gpu
       )
+
+      image_vol = vm.vm_storage_volumes.find(&:image_backed?)
+      if image_vol
+        base[:disk_sync] = {
+          total: image_vol.source_fetch_total,
+          fetched: image_vol.source_fetch_fetched,
+          percentage: image_vol.source_fetch_percentage,
+          complete: image_vol.source_fetch_complete? || false
+        }
+      end
     end
 
     base

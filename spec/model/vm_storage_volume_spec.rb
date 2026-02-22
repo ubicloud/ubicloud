@@ -68,4 +68,60 @@ RSpec.describe VmStorageVolume do
       expect(v.queue_size).to eq(64)
     end
   end
+
+  describe "#image_backed?" do
+    it "returns true when machine_image_id is set" do
+      v = described_class.new(disk_index: 0, machine_image_id: "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5")
+      expect(v.image_backed?).to be true
+    end
+
+    it "returns false when machine_image_id is nil" do
+      v = described_class.new(disk_index: 0)
+      expect(v.image_backed?).to be false
+    end
+  end
+
+  describe "#source_fetch_complete?" do
+    it "returns true when all stripes are fetched" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 100, source_fetch_fetched: 100)
+      expect(v.source_fetch_complete?).to be true
+    end
+
+    it "returns true when fetched exceeds total" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 100, source_fetch_fetched: 105)
+      expect(v.source_fetch_complete?).to be true
+    end
+
+    it "returns false when fetching is in progress" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 100, source_fetch_fetched: 50)
+      expect(v.source_fetch_complete?).to be false
+    end
+
+    it "returns falsy when total is nil" do
+      v = described_class.new(disk_index: 0)
+      expect(v.source_fetch_complete?).to be_falsey
+    end
+  end
+
+  describe "#source_fetch_percentage" do
+    it "returns the correct percentage" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 200, source_fetch_fetched: 100)
+      expect(v.source_fetch_percentage).to eq(50)
+    end
+
+    it "caps at 100" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 100, source_fetch_fetched: 150)
+      expect(v.source_fetch_percentage).to eq(100)
+    end
+
+    it "returns nil when total is nil" do
+      v = described_class.new(disk_index: 0)
+      expect(v.source_fetch_percentage).to be_nil
+    end
+
+    it "returns nil when total is zero" do
+      v = described_class.new(disk_index: 0, source_fetch_total: 0)
+      expect(v.source_fetch_percentage).to be_nil
+    end
+  end
 end
