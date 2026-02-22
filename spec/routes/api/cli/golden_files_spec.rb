@@ -116,7 +116,8 @@ RSpec.describe Clover, "cli" do
     expect(ApiKey).to receive(:generate_uuid).and_return("6677de33-3888-8953-bde1-ed8a8137d507").at_least(:once)
     expect(SshPublicKey).to receive(:generate_uuid).and_return("7c2410cd-511a-8b33-8771-8a169d368d2d").at_least(:once)
 
-    expect(MachineImage).to receive(:generate_ubid).and_return(UBID.parse("m1t48w6zq2rx6qn9gya0f3nh70")).at_least(:once)
+    mi_ubids = [UBID.parse("m1t48w6zq2rx6qn9gya0f3nh70"), UBID.parse("m1xbr4wqzje5t0n2c8f6gdk7hp")].cycle
+    expect(MachineImage).to receive(:generate_ubid).and_invoke(-> { mi_ubids.next }).at_least(:once)
     mi = MachineImage.create(
       name: "test-mi",
       project_id: @project.id,
@@ -131,6 +132,7 @@ RSpec.describe Clover, "cli" do
       created_at: now
     )
     Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
+    @vm.strand.update(label: "stopped")
 
     cli_commands = []
     cli_commands.concat File.readlines("spec/routes/api/cli/golden-file-commands/success.txt").map { [it, {}] }

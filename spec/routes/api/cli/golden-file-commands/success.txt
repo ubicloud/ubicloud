@@ -96,6 +96,7 @@ lb list -N
 mi eu-central-h1/test-mi destroy -f
 mi eu-central-h1/test-mi show
 mi eu-central-h1/test-mi show -f id,name,state,size-gib
+mi eu-central-h1/test2-mi create -v vmdzyppz6j166jh5e9t2dwrfas
 mi list
 mi list -f location,name
 mi list -l eu-central-h1
