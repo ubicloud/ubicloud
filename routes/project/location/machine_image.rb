@@ -10,7 +10,7 @@ class Clover
       if mi_name
         r.post api? do
           check_visible_location
-          machine_image_post(mi_name)
+          machine_image_post(nil, mi_name)
         end
 
         filter = {Sequel[:machine_image][:name] => mi_name, Sequel[:machine_image][:active] => true}

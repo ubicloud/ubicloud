@@ -11,3 +11,43 @@
   breadcrumb_label: "Virtual Machines",
   right_header: part("components/vm_state_label", state: @vm.display_state, extra_class: "text-md")
 ) %>
+
+<% if @vm.display_state == "stopped" && has_permission?("MachineImage:create", @project) %>
+  <div class="mt-6 rounded-lg bg-white shadow p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="text-lg font-semibold text-gray-900">Create Image</h3>
+      <button type="button" id="toggle-create-image" onclick="document.getElementById('create-image-form').classList.toggle('hidden')" class="inline-flex items-center rounded-md bg-orange-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-700">
+        Create Image
+      </button>
+    </div>
+    <div id="create-image-form" class="hidden">
+      <% form(action: "#{path(@vm)}/create-image", method: :post) do %>
+        <div class="space-y-4">
+          <div class="sm:col-span-3">
+            <label for="image-name" class="block text-sm font-medium leading-6 text-gray-900">Image name</label>
+            <div class="mt-2">
+              <input type="text" name="name" id="image-name" required pattern="[a-z0-9][a-z0-9\-]{0,62}" value="<%= "#{@vm.name}-#{Date.today.iso8601}" %>" class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-orange-600 sm:text-sm sm:leading-6">
+            </div>
+          </div>
+          <div class="sm:col-span-3">
+            <label for="image-description" class="block text-sm font-medium leading-6 text-gray-900">Description <span class="text-gray-400">(optional)</span></label>
+            <div class="mt-2">
+              <input type="text" name="description" id="image-description" placeholder="Describe this image..." class="block w-full rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-orange-600 sm:text-sm sm:leading-6">
+            </div>
+          </div>
+          <div class="rounded-md bg-yellow-50 p-3">
+            <div class="flex">
+              <div class="text-sm text-yellow-700">
+                Cloud-init state will be reset when a new VM boots from this image. User data in <code>/home/ubi</code> may be overwritten by cloud-init on first boot.
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3">
+            <button type="button" onclick="document.getElementById('create-image-form').classList.add('hidden')" class="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Cancel</button>
+            <%== part("components/form/submit_button", text: "Create Image") %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

@@ -39,6 +39,12 @@ class Clover
     end
     assemble_params.compact!
 
+    # Handle boot_image that starts with "mi:" (user selected a machine image from dropdown)
+    if assemble_params[:boot_image]&.start_with?("mi:")
+      assemble_params[:machine_image_id] = assemble_params[:boot_image].delete_prefix("mi:")
+      assemble_params.delete(:boot_image)
+    end
+
     # Validate machine image if provided
     if assemble_params[:machine_image_id]
       mi_uuid = UBID.to_uuid(assemble_params[:machine_image_id])
@@ -219,21 +225,25 @@ class Clover
       end
     end
 
-    machine_images = MachineImage.for_project(@project.id).where(state: "available", arch: "x64").all
-    mi_values = machine_images.map {
-      {
-        location_id: it.location_id,
-        value: it.ubid,
-        display_name: it.name
-      }
-    }
-    options.add_option(name: "machine_image_id", values: mi_values, parent: "location") do |location, mi|
-      mi[:location_id] == location.id
-    end
-
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
     options.add_option(name: "boot_image", values: boot_images)
+
+    # User's machine images (shown as optional dropdown on VM create)
+    user_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+      .where(state: "available", active: true)
+      .eager(:location)
+      .all
+      .map {
+        {
+          location_id: it.location_id,
+          value: it.ubid,
+          display_name: "#{it.name} (#{it.arch}, #{it.size_gib} GiB)"
+        }
+      }
+    options.add_option(name: "machine_image_id", values: user_images, parent: "location") do |location, mi|
+      mi[:location_id] == location.id
+    end
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")

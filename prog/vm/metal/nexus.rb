@@ -302,7 +302,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       end
     end
 
-    volumes.all? { it.reload.source_fetch_complete? } ? :completed : :in_progress
+    (volumes.all? { it.reload.source_fetch_complete? }) ? :completed : :in_progress
   end
 
   label def detach_machine_image

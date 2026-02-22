@@ -48,8 +48,10 @@ current_usage = @project.current_resource_usage("VmVCpu")
 
   form_elements.concat(elements)
 
+  mi_description = "<a href='#{h @project.path}/machine-image' class='text-orange-600 hover:text-orange-700'>Manage images &rarr;</a>"
+
   form_elements.push(
-    {name: "machine_image_id", type: "select", label: "Machine Image", placeholder: "None (use boot image)", content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-3'>"},
+    {name: "machine_image_id", type: "select", label: "Your Images", placeholder: "None (use boot image below)", content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-3'>", description_html: mi_description, escape_description: false},
     {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )

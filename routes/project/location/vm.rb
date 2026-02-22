@@ -71,6 +71,11 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.post "create-image" do
+        handle_validation_failure("vm/show")
+        machine_image_post(vm)
+      end
     end
   end
 end

@@ -12,23 +12,28 @@ class Clover
     paginated_result(dataset.eager(:location, :vm).order(Sequel.desc(:created_at)), Serializers::MachineImage)
   end
 
-  def machine_image_post(name)
+  def machine_image_post(vm, name = nil)
     authorize("MachineImage:create", @project)
-    Validation.validate_name(name)
+    inline = !vm.nil? # true when called from VM show page
 
-    vm_ubid = typecast_params.str!("vm_id")
+    name ||= typecast_params.nonempty_str!("name")
+    Validation.validate_name(name)
     description = typecast_params.str("description") || ""
 
-    vm = dataset_authorize(@project.vms_dataset, "Vm:view").first(id: UBID.to_uuid(vm_ubid))
+    # If vm not provided directly (standalone create form), look up by vm_id param
     unless vm
-      fail Validation::ValidationFailed.new({vm_id: "VM with the given id \"#{vm_ubid}\" is not found"})
+      vm_ubid = typecast_params.str!("vm_id")
+      vm = dataset_authorize(@project.vms_dataset, "Vm:view").first(id: UBID.to_uuid(vm_ubid))
+      unless vm
+        fail Validation::ValidationFailed.new({vm_id: "VM with the given id \"#{vm_ubid}\" is not found"})
+      end
     end
 
     unless vm.display_state == "stopped"
       fail Validation::ValidationFailed.new({vm_id: "VM must be in 'stopped' state to create a machine image. Current state: '#{vm.display_state}'. Please stop the VM and try again."})
     end
 
-    unless vm.location_id == @location.id
+    if @location && vm.location_id != @location.id
       fail Validation::ValidationFailed.new({vm_id: "VM must be in the same location as the machine image"})
     end
 
@@ -45,18 +50,19 @@ class Clover
 
     Validation.validate_machine_image_quota(@project)
 
-    existing_count = MachineImage.where(project_id: @project.id, location_id: @location.id, name:).count
+    location = vm.location
+    existing_count = MachineImage.where(project_id: @project.id, location_id: location.id, name:).count
     version = "v#{existing_count + 1}"
 
     machine_image = nil
     DB.transaction do
-      MachineImage.where(project_id: @project.id, location_id: @location.id, name:).update(active: false)
+      MachineImage.where(project_id: @project.id, location_id: location.id, name:).update(active: false)
 
       machine_image = MachineImage.create(
         name:,
         description:,
         version:,
-        location_id: @location.id,
+        location_id: location.id,
         project_id: @project.id,
         state: "creating",
         vm_id: vm.id,
@@ -65,7 +71,7 @@ class Clover
         encrypted: true,
         active: true,
         s3_bucket: Config.machine_image_archive_bucket || "",
-        s3_prefix: "#{@project.ubid}/#{@location.display_name}/",
+        s3_prefix: "#{@project.ubid}/#{location.display_name}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""
       )
       machine_image.update(s3_prefix: "#{machine_image.s3_prefix}#{machine_image.ubid}/")
@@ -75,6 +81,9 @@ class Clover
 
     if api?
       Serializers::MachineImage.serialize(machine_image)
+    elsif inline
+      flash["notice"] = "'#{name}' image is being created"
+      request.redirect vm
     else
       flash["notice"] = "'#{name}' is being created"
       request.redirect machine_image

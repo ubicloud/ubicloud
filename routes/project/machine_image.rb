@@ -22,7 +22,7 @@ class Clover
       r.post true do
         handle_validation_failure("machine-image/create")
         check_visible_location
-        machine_image_post(typecast_params.nonempty_str("name"))
+        machine_image_post(nil, typecast_params.nonempty_str("name"))
       end
     end
   end

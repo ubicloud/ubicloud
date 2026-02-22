@@ -107,13 +107,13 @@ RSpec.describe Clover, "vm" do
 
         visit "#{project.path}/vm/create"
         expect(page.title).to eq("Ubicloud - Create Virtual Machine")
-        expect(page).to have_content("Machine Image")
+        expect(page).to have_content("Your Images")
 
         name = "mi-vm"
         fill_in "Name", with: name
         fill_in "SSH Public Key", with: "a a"
         choose option: Location::HETZNER_FSN1_UBID
-        select "test-image", from: "machine_image_id"
+        select "test-image (x64, 10 GiB)", from: "machine_image_id"
         choose option: "standard-2"
 
         click_button "Create"
@@ -131,7 +131,7 @@ RSpec.describe Clover, "vm" do
         )
 
         visit "#{project.path}/vm/create"
-        expect(page).to have_content("Machine Image")
+        expect(page).to have_content("Your Images")
         expect(page).to have_content("image-in-fsn1")
       end
 

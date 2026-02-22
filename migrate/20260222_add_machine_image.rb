@@ -17,21 +17,26 @@ Sequel.migration do
       String :compression, null: false, default: "zstd"
       Integer :size_gib, null: false
       foreign_key :vm_id, :vm, type: :uuid, on_delete: :set_null
-      String :version
+      String :version, null: false, default: "v1"
+      TrueClass :active, null: false, default: true
       String :arch, null: false, default: "x64"
       TrueClass :visible, null: false, default: false
       timestamptz :created_at, null: false, default: Sequel.lit("now()")
 
-      unique [:project_id, :location_id, :name]
+      unique [:project_id, :location_id, :name, :version]
     end
 
     alter_table(:vm_storage_volume) do
       add_foreign_key :machine_image_id, :machine_image, type: :uuid, on_delete: :set_null
+      add_column :source_fetch_total, :integer
+      add_column :source_fetch_fetched, :integer
     end
   end
 
   down do
     alter_table(:vm_storage_volume) do
+      drop_column :source_fetch_fetched
+      drop_column :source_fetch_total
       drop_foreign_key :machine_image_id
     end
 

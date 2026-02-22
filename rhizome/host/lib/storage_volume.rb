@@ -673,29 +673,70 @@ class StorageVolume
     # Remove the stripe source config file (archive S3 connection details)
     rm_if_exists(sp.vhost_backend_stripe_source_config)
 
-    # Remove the secrets config file (S3 credentials, archive KEK)
-    rm_if_exists(sp.vhost_backend_secrets_config)
+    if @encrypted
+      # Rewrite secrets config to keep only encryption entries, removing S3/archive entries
+      rewrite_secrets_config_without_archive
+    else
+      # No encryption entries to keep — remove secrets config entirely
+      rm_if_exists(sp.vhost_backend_secrets_config)
+    end
 
-    # Rewrite the main config without include directives for stripe_source/secrets
+    # Rewrite the main config: remove stripe_source include, keep secrets include if encrypted
     @archive_params = nil
-    rewrite_main_config_without_includes
+    rewrite_main_config_after_detach
 
     # Rewrite the systemd service file to restrict network access
     vhost_backend_create_service_file
     r "systemctl daemon-reload"
   end
 
-  def rewrite_main_config_without_includes
+  def rewrite_secrets_config_without_archive
+    secrets_path = sp.vhost_backend_secrets_config
+    return unless File.exist?(secrets_path)
+
+    content = File.read(secrets_path)
+
+    # Parse TOML sections: keep only encryption-related secrets (xts-key, kek)
+    archive_secret_names = ["s3-key-id", "s3-secret-key", "s3-session-token", "archive-kek"]
+    lines = content.lines
+    result = []
+    skip = false
+
+    lines.each do |line|
+      if line.match?(/^\[secrets\.(.+)\]/)
+        secret_name = line.match(/^\[secrets\.(.+)\]/)[1]
+        skip = archive_secret_names.include?(secret_name)
+      end
+      result << line unless skip
+    end
+
+    File.open(secrets_path, "w", 0o600) do |file|
+      file.write(result.join)
+      fsync_or_fail(file)
+    end
+    sync_parent_dir(secrets_path)
+  end
+
+  def rewrite_main_config_after_detach
     config_path = sp.vhost_backend_config
     content = File.read(config_path)
 
-    # Remove include line that references stripe_source and secrets configs
-    lines = content.lines.reject { |line|
-      line.start_with?("include")
+    lines = content.lines
+    new_lines = lines.filter_map { |line|
+      if line.start_with?("include")
+        if @encrypted
+          # Keep only the secrets config include
+          secrets_basename = File.basename(sp.vhost_backend_secrets_config)
+          "include = [\"#{secrets_basename}\"]\n"
+        end
+        # else: drop the include line entirely (nil filtered out)
+      else
+        line
+      end
     }
 
     File.open(config_path, "w", 0o600) do |file|
-      file.write(lines.join)
+      file.write(new_lines.join)
       fsync_or_fail(file)
     end
     sync_parent_dir(config_path)
