@@ -366,7 +366,7 @@ RSpec.describe Clover, "vm" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image not found"})
       end
 
-      it "invalid machine image architecture mismatch" do
+      it "success with arm64 machine image infers arch" do
         mi = MachineImage.create(
           name: "arm-image", project_id: project.id,
           location_id: Location[display_name: TEST_LOCATION].id, state: "available",
@@ -379,7 +379,8 @@ RSpec.describe Clover, "vm" do
           machine_image_id: mi.ubid
         }.to_json
 
-        expect(last_response).to have_api_error(400, "Validation failed for following fields: machine_image_id", {"machine_image_id" => "Machine image architecture (arm64) does not match requested VM architecture (x64)"})
+        expect(last_response.status).to eq(200)
+        expect(JSON.parse(last_response.body)["name"]).to eq("test-vm")
       end
 
       it "invalid machine image location mismatch" do

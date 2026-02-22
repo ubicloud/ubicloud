@@ -32,10 +32,8 @@ class Prog::Vm::Nexus < Prog::Base
       fail "Machine image not found" unless mi
       fail "Machine image is not available" unless ["available", "verifying"].include?(mi.state)
       boot_image = ""
-      # Infer architecture from the source VM that was used to create the image
-      if mi.vm
-        arch = mi.vm.arch
-      end
+      # Infer architecture from the machine image
+      arch = mi.arch
     end
 
     vm_size = Validation.validate_vm_size(size, arch)

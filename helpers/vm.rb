@@ -49,9 +49,7 @@ class Clover
       if mi.location_id != @location.id
         fail Validation::ValidationFailed.new({machine_image_id: "Machine image is in location '#{mi.display_location}' but VM is being created in location '#{@location.display_name}'"})
       end
-      if mi.arch != "x64"
-        fail Validation::ValidationFailed.new({machine_image_id: "Machine image architecture (#{mi.arch}) does not match requested VM architecture (x64)"})
-      end
+      assemble_params[:arch] = mi.arch
       assemble_params[:machine_image_id] = mi.id
       assemble_params.delete(:boot_image) # boot_image not needed with machine image
     end

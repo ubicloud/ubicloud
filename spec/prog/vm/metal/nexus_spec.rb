@@ -209,12 +209,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vol["machine_image_id"]).to eq(mi.id)
     end
 
-    it "infers architecture from machine image source VM" do
-      source_vm = create_vm(arch: "arm64", project_id: project.id)
+    it "infers architecture from machine image" do
       mi = MachineImage.create(
         name: "test-mi-arch", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
         state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com",
-        encrypted: false, size_gib: 20, vm_id: source_vm.id
+        encrypted: false, size_gib: 20, arch: "arm64"
       )
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_id: mi.id)
       expect(st.subject.arch).to eq("arm64")
