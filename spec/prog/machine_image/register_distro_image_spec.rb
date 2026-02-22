@@ -19,7 +19,7 @@ RSpec.describe Prog::MachineImage::RegisterDistroImage do
       s3_endpoint: "https://r2.example.com",
       encrypted: false,
       size_gib: 0,
-      visible: true,
+      visible: false,
       version: "20250502.1"
     )
   }

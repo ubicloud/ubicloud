@@ -115,7 +115,7 @@ class MachineImage < Sequel::Model
         state: "creating",
         encrypted: false,
         size_gib: 0,
-        visible: true,
+        visible: false,
         version:,
         arch:,
         s3_bucket: Config.machine_image_archive_bucket || "",

@@ -130,7 +130,7 @@ RSpec.describe MachineImage do
       )
     end
 
-    it "creates a public machine image and strand" do
+    it "creates a private unencrypted machine image and strand" do
       result = described_class.register_distro_image(
         project_id:,
         location_id: Location::HETZNER_FSN1_ID,
@@ -144,7 +144,7 @@ RSpec.describe MachineImage do
       expect(result).to be_a(described_class)
       expect(result.name).to eq("ubuntu-noble")
       expect(result.version).to eq("20250502.1")
-      expect(result.visible).to be true
+      expect(result.visible).to be false
       expect(result.encrypted).to be false
       expect(result.state).to eq("creating")
       expect(result.s3_bucket).to eq("distro-bucket")
