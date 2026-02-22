@@ -103,6 +103,19 @@ RSpec.describe Project do
     end
   end
 
+  describe "#destroy" do
+    it "cascades destroy to machine_images" do
+      mi = MachineImage.create(
+        name: "test-img", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
+        state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://e", size_gib: 10
+      )
+
+      project.destroy
+
+      expect(MachineImage[mi.id]).to be_nil
+    end
+  end
+
   describe ".active?" do
     it "returns false if it's soft deleted" do
       project.update(visible: false)
