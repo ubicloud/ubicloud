@@ -514,6 +514,36 @@ RSpec.describe Vm do
       expect(secrets[device_id]["archive_s3_session_token"]).to eq("TEMP_TOKEN")
     end
 
+    it "falls back to main credentials when cloudflare API call fails" do
+      allow(Config).to receive(:cloudflare_r2_api_token).and_return("test-cf-token")
+      allow(Config).to receive(:machine_image_archive_access_key).and_return("MAIN_AKID")
+      allow(Config).to receive(:machine_image_archive_secret_key).and_return("MAIN_SECRET")
+
+      mi = MachineImage.create(
+        name: "test-umi-apifail", project_id: vm.project.id, location_id: vm_host.location_id,
+        state: "available", s3_bucket: "ubi-images", s3_prefix: "images/apifail",
+        s3_endpoint: "https://r2.example.com", encrypted: false, size_gib: 20
+      )
+      VmStorageVolume.create(
+        vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,
+        machine_image_id: mi.id,
+        spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
+        storage_device_id: storage_device.id
+      )
+
+      expect(CloudflareR2).to receive(:create_temporary_credentials)
+        .and_raise(RuntimeError.new("Cloudflare API unreachable"))
+      expect(Clog).to receive(:emit).with(/Failed to create temp R2 credentials/, hash_including(:error))
+
+      secrets = vm.storage_secrets
+      device_id = "#{vm.inhost_name}_0"
+      expect(secrets[device_id]).to include(
+        "archive_s3_access_key" => "MAIN_AKID",
+        "archive_s3_secret_key" => "MAIN_SECRET"
+      )
+      expect(secrets[device_id]).not_to have_key("archive_s3_session_token")
+    end
+
     it "returns empty hash for volumes without encryption or machine image" do
       VmStorageVolume.create(
         vm_id: vm.id, disk_index: 0, size_gib: 20, boot: true,

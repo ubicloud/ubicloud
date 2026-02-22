@@ -278,10 +278,15 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     nap 6 * 60 * 60
   end
 
+  # Refresh credentials 4 hours before the 24-hour TTL expires
+  CREDS_REFRESH_AFTER_SECONDS = 20 * 60 * 60
+
   def update_source_fetch_progress
     volumes = vm.vm_storage_volumes.select(&:image_backed?)
     return nil if volumes.empty?
     return :completed if volumes.all?(&:source_fetch_complete?)
+
+    maybe_refresh_source_fetch_credentials(volumes)
 
     volumes.each do |vol|
       next if vol.source_fetch_complete?
@@ -303,6 +308,40 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     end
 
     (volumes.all? { it.reload.source_fetch_complete? }) ? :completed : :in_progress
+  end
+
+  def maybe_refresh_source_fetch_credentials(volumes)
+    creds_at = frame["source_fetch_creds_at"]
+
+    # Initialize tracking on first call
+    unless creds_at
+      set_frame_value("source_fetch_creds_at", Time.now.to_i)
+      return
+    end
+
+    return if Time.now.to_i - creds_at < CREDS_REFRESH_AFTER_SECONDS
+
+    secrets_json = JSON.generate({storage: vm.storage_secrets})
+
+    volumes.each do |vol|
+      next if vol.source_fetch_complete?
+      host.sshable.cmd(
+        "sudo host/bin/setup-vm refresh-credentials :vm_name :disk_index",
+        vm_name:, disk_index: vol.disk_index,
+        stdin: secrets_json
+      )
+    end
+
+    set_frame_value("source_fetch_creds_at", Time.now.to_i)
+    Clog.emit("Refreshed source fetch credentials", {vm: vm.ubid})
+  rescue => ex
+    Clog.emit("Failed to refresh source fetch credentials", {vm: vm.ubid, error: ex.message})
+  end
+
+  def set_frame_value(key, value)
+    strand.stack.first[key] = value
+    strand.modified!(:stack)
+    strand.save_changes
   end
 
   label def detach_machine_image
@@ -492,6 +531,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.nics.each(&:incr_repopulate)
 
     vm.update(display_state: "running")
+
+    # Fresh credentials were just generated, reset the tracking timestamp
+    set_frame_value("source_fetch_creds_at", Time.now.to_i)
 
     decr_start_after_host_reboot
 

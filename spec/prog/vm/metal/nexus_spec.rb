@@ -953,6 +953,61 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#maybe_refresh_source_fetch_credentials" do
+    it "initializes creds_at on first call" do
+      vol = instance_double(VmStorageVolume, source_fetch_complete?: false)
+      nx.maybe_refresh_source_fetch_credentials([vol])
+      expect(st.reload.stack.first["source_fetch_creds_at"]).to be_within(5).of(Time.now.to_i)
+    end
+
+    it "does nothing when credentials are fresh" do
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i
+      st.modified!(:stack)
+      st.save_changes
+
+      vol = instance_double(VmStorageVolume, source_fetch_complete?: false)
+      expect(vm).not_to receive(:storage_secrets)
+      nx.maybe_refresh_source_fetch_credentials([vol])
+    end
+
+    it "refreshes credentials when they are older than threshold" do
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.modified!(:stack)
+      st.save_changes
+
+      vol = instance_double(VmStorageVolume, source_fetch_complete?: false, disk_index: 0)
+      expect(vm).to receive(:storage_secrets).and_return({"dev0" => {"archive_s3_access_key" => "new_key"}})
+      expect(sshable).to receive(:_cmd).with(/sudo host\/bin\/setup-vm refresh-credentials/, hash_including(:stdin))
+      nx.maybe_refresh_source_fetch_credentials([vol])
+      expect(st.reload.stack.first["source_fetch_creds_at"]).to be_within(5).of(Time.now.to_i)
+    end
+
+    it "skips volumes that are already complete" do
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.modified!(:stack)
+      st.save_changes
+
+      complete_vol = instance_double(VmStorageVolume, source_fetch_complete?: true)
+      incomplete_vol = instance_double(VmStorageVolume, source_fetch_complete?: false, disk_index: 1)
+      expect(vm).to receive(:storage_secrets).and_return({})
+      expect(sshable).to receive(:_cmd).with(/refresh-credentials/, hash_including(:stdin)).once
+      nx.maybe_refresh_source_fetch_credentials([complete_vol, incomplete_vol])
+    end
+
+    it "handles errors gracefully and logs them" do
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.modified!(:stack)
+      st.save_changes
+
+      vol = instance_double(VmStorageVolume, source_fetch_complete?: false, disk_index: 0)
+      expect(vm).to receive(:storage_secrets).and_raise(RuntimeError.new("API unreachable"))
+      expect(Clog).to receive(:emit).with("Failed to refresh source fetch credentials", hash_including(vm: vm.ubid))
+      nx.maybe_refresh_source_fetch_credentials([vol])
+      # Timestamp should NOT be updated on failure
+      expect(st.reload.stack.first["source_fetch_creds_at"]).to be < (Time.now.to_i - 20 * 60 * 60)
+    end
+  end
+
   describe "#detach_machine_image" do
     it "detaches image-backed volumes by SSHing to host and NULLing machine_image_id" do
       vol = instance_double(VmStorageVolume, image_backed?: true, disk_index: 0)

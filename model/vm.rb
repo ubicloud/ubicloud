@@ -350,13 +350,19 @@ class Vm < Sequel::Model
       # Archive secrets for machine image-backed volumes
       if (mi = s.machine_image)
         if Config.cloudflare_r2_api_token
-          temp_creds = CloudflareR2.create_temporary_credentials(
-            bucket: mi.s3_bucket,
-            prefix: mi.s3_prefix
-          )
-          secrets["archive_s3_access_key"] = temp_creds[:access_key_id]
-          secrets["archive_s3_secret_key"] = temp_creds[:secret_access_key]
-          secrets["archive_s3_session_token"] = temp_creds[:session_token]
+          begin
+            temp_creds = CloudflareR2.create_temporary_credentials(
+              bucket: mi.s3_bucket,
+              prefix: mi.s3_prefix
+            )
+            secrets["archive_s3_access_key"] = temp_creds[:access_key_id]
+            secrets["archive_s3_secret_key"] = temp_creds[:secret_access_key]
+            secrets["archive_s3_session_token"] = temp_creds[:session_token]
+          rescue => ex
+            Clog.emit("Failed to create temp R2 credentials, falling back to main credentials", {error: ex.message})
+            secrets["archive_s3_access_key"] = Config.machine_image_archive_access_key
+            secrets["archive_s3_secret_key"] = Config.machine_image_archive_secret_key
+          end
         else
           Clog.emit("Using main R2 credentials for machine image boot (CLOUDFLARE_R2_API_TOKEN not configured)")
           secrets["archive_s3_access_key"] = Config.machine_image_archive_access_key

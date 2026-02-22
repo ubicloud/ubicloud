@@ -32,6 +32,28 @@ if action == "detach-archive"
   exit 0
 end
 
+if action == "refresh-credentials"
+  disk_index = ARGV.shift&.to_i
+  unless disk_index
+    puts "expected disk_index as argument for refresh-credentials"
+    exit 1
+  end
+  secrets = JSON.parse($stdin.read)
+  storage_secrets = secrets["storage"] || {}
+
+  require_relative "../lib/storage_volume"
+  params = JSON.parse(File.read(VmPath.new(vm_name).prep_json))
+  vol_params = params.fetch("storage_volumes").find { |v| v["disk_index"] == disk_index }
+  unless vol_params
+    puts "no storage volume with disk_index #{disk_index}"
+    exit 1
+  end
+  device_id = vol_params["device_id"]
+  sv = StorageVolume.new(vm_name, vol_params)
+  sv.start(storage_secrets[device_id] || {})
+  exit 0
+end
+
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))
 rescue Errno::ENOENT
