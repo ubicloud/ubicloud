@@ -99,6 +99,7 @@ RSpec/InstanceVariable:
 RSpec/SpecFilePathFormat:
   Exclude:
     - 'spec/routes/**/*.rb'
+    - 'spec/helpers/**/*.rb'
 
 RSpec/MultipleMemoizedHelpers:
   Enabled: false

@@ -40,7 +40,7 @@ secrets_dir = File.join(work_dir, "secrets")
 
 begin
   # Step 1: Download the image
-  $stderr.puts "Downloading image from #{url}..."
+  warn "Downloading image from #{url}..."
   actual_sha256 = curl_file(url, downloaded_path)
   fail "SHA-256 mismatch: expected #{expected_sha256}, got #{actual_sha256}" unless actual_sha256 == expected_sha256
 
@@ -52,14 +52,14 @@ begin
   if image_format == "raw"
     FileUtils.mv(downloaded_path, raw_path)
   else
-    $stderr.puts "Converting #{image_format} to raw..."
+    warn "Converting #{image_format} to raw..."
     r "qemu-img", "convert", "-f", image_format, "-O", "raw", downloaded_path, raw_path
     FileUtils.rm_f(downloaded_path)
   end
 
   # Get image size
   image_size = File.size(raw_path)
-  $stderr.puts "Raw image size: #{image_size} bytes (#{(image_size / (1024.0**3)).round(2)} GiB)"
+  warn "Raw image size: #{image_size} bytes (#{(image_size / (1024.0**3)).round(2)} GiB)"
 
   # Step 3: Create a minimal device config for init-metadata and archive
   # The stripe_source points to the raw image so init-metadata marks all
@@ -92,7 +92,7 @@ begin
   safe_write_to_file(device_config_path, device_config)
 
   # Step 4: Initialize metadata -- marks all stripes as HAS_SOURCE
-  $stderr.puts "Initializing metadata..."
+  warn "Initializing metadata..."
   r init_metadata_bin, "-f", device_config_path, "--stripe-sector-count-shift", "11"
 
   # Step 5: Write target config and set up secret pipes
@@ -113,15 +113,15 @@ begin
   pipe_threads << Thread.new { File.write(s3_secret_key_pipe, s3_secret_key) }
 
   # Step 6: Run archive
-  $stderr.puts "Archiving to R2..."
+  warn "Archiving to R2..."
   r "#{archive_bin} -f #{device_config_path} --target-config #{target_config_path} --compression zstd --zstd-level 3"
 
-  $stderr.puts "Archive complete."
+  warn "Archive complete."
   pipe_threads.each { |t| t.join(5) }
 
   # Output image size in GiB (ceiling) for the caller
   size_gib = (image_size / (1024.0**3)).ceil
-  puts size_gib.to_s
+  puts size_gib
 ensure
   # Clean up all temp files
   FileUtils.rm_f(downloaded_path)

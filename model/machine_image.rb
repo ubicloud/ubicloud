@@ -67,16 +67,16 @@ class MachineImage < Sequel::Model
     mi = nil
     DB.transaction do
       mi = MachineImage.create(
-        name: name,
+        name:,
         description: "#{name} #{version}",
-        project_id: project_id,
-        location_id: location_id,
+        project_id:,
+        location_id:,
         state: "creating",
         encrypted: false,
         size_gib: 0,
         visible: true,
-        version: version,
-        arch: arch,
+        version:,
+        arch:,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "public/#{name}/#{version}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""

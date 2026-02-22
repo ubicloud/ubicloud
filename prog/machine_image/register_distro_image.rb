@@ -70,7 +70,7 @@ class Prog::MachineImage::RegisterDistroImage < Prog::Base
       end
       vm_host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       machine_image.update(state: "failed")
-      Clog.emit("Failed to register distro image", {distro_image_register_failed: {ubid: machine_image.ubid, stderr: stderr}})
+      Clog.emit("Failed to register distro image", {distro_image_register_failed: {ubid: machine_image.ubid, stderr:}})
       hop_wait
     end
 

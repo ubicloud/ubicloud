@@ -69,7 +69,7 @@ class Prog::MachineImage::Nexus < Prog::Base
       end
       host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       machine_image.update(state: "failed")
-      Clog.emit("Failed to create machine image archive", {machine_image_archive_failed: {ubid: machine_image.ubid, stderr: stderr}})
+      Clog.emit("Failed to create machine image archive", {machine_image_archive_failed: {ubid: machine_image.ubid, stderr:}})
       hop_wait
     end
 
