@@ -132,7 +132,7 @@ RSpec.describe MachineImage do
 
     it "creates a public machine image and strand" do
       result = described_class.register_distro_image(
-        project_id: project_id,
+        project_id:,
         location_id: Location::HETZNER_FSN1_ID,
         name: "ubuntu-noble",
         url: "https://cloud-images.ubuntu.com/noble/release/image.img",
@@ -141,7 +141,7 @@ RSpec.describe MachineImage do
         vm_host_id: vm_host.id
       )
 
-      expect(result).to be_a(MachineImage)
+      expect(result).to be_a(described_class)
       expect(result.name).to eq("ubuntu-noble")
       expect(result.version).to eq("20250502.1")
       expect(result.visible).to be true
@@ -164,7 +164,7 @@ RSpec.describe MachineImage do
   describe "#before_destroy" do
     it "nulls out machine_image_id on referencing volumes" do
       vm_host = create_vm_host
-      vm = create_vm(vm_host_id: vm_host.id, project_id: project_id)
+      vm = create_vm(vm_host_id: vm_host.id, project_id:)
       sd = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 200, total_storage_gib: 200)
       vbb = VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm_host.id)
       vol = VmStorageVolume.create(
@@ -175,7 +175,7 @@ RSpec.describe MachineImage do
 
       mi.destroy
 
-      expect(MachineImage[mi.id]).to be_nil
+      expect(described_class[mi.id]).to be_nil
       expect(vol.reload.machine_image_id).to be_nil
     end
   end
