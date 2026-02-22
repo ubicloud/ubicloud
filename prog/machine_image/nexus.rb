@@ -147,6 +147,9 @@ class Prog::MachineImage::Nexus < Prog::Base
     when_destroy_set? do
       hop_destroy
     end
+    if machine_image.state == "failed" && machine_image.created_at < Time.now - 3600
+      hop_destroy
+    end
     nap 30
   end
 

@@ -342,6 +342,21 @@ RSpec.describe Prog::MachineImage::Nexus do
     it "naps when no semaphore is set" do
       expect { nx.wait }.to nap(30)
     end
+
+    it "hops to destroy when image is failed and older than 1 hour" do
+      machine_image.update(state: "failed", created_at: Time.now - 3601)
+      expect { nx.wait }.to hop("destroy")
+    end
+
+    it "naps when image is failed but within grace period" do
+      machine_image.update(state: "failed", created_at: Time.now - 1800)
+      expect { nx.wait }.to nap(30)
+    end
+
+    it "naps when image is available (not failed)" do
+      machine_image.update(state: "available")
+      expect { nx.wait }.to nap(30)
+    end
   end
 
   describe "#destroy" do
