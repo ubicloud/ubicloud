@@ -20,6 +20,9 @@ RSpec.describe Clover, "machine_image helper" do
     )
   }
 
+  let(:vm_host) { create_vm_host }
+  let(:vbb) { VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm_host.id) }
+
   let(:stopped_vm) {
     vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "stopped-vm", location_id: Location::HETZNER_FSN1_ID).subject
     vm.strand.update(label: "stopped")
@@ -100,7 +103,7 @@ RSpec.describe Clover, "machine_image helper" do
   describe "machine_image_post" do
     it "creates a machine image from a stopped VM" do
       vm = stopped_vm
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 30, disk_index: 0)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 30, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
         vm_id: vm.ubid,
@@ -117,6 +120,19 @@ RSpec.describe Clover, "machine_image helper" do
 
       mi = MachineImage.first(name: "my-image")
       expect(mi.arch).to eq(vm.arch)
+    end
+
+    it "fails when VM boot volume lacks write tracking (no ubiblk backend)" do
+      vm = stopped_vm
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0)
+
+      post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
+        vm_id: vm.ubid
+      }.to_json
+
+      expect(last_response).to have_api_error(400, /Validation failed/)
+      body = JSON.parse(last_response.body)
+      expect(body.to_s).to include("write tracking")
     end
 
     it "fails when VM is not stopped" do
@@ -166,6 +182,7 @@ RSpec.describe Clover, "machine_image helper" do
 
     it "creates image with empty description when not provided" do
       vm = stopped_vm
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
         vm_id: vm.ubid
@@ -178,7 +195,7 @@ RSpec.describe Clover, "machine_image helper" do
 
     it "fails when VM boot disk exceeds maximum image size" do
       vm = stopped_vm
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 300, disk_index: 0)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 300, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/my-image", {
         vm_id: vm.ubid
@@ -189,7 +206,7 @@ RSpec.describe Clover, "machine_image helper" do
       expect(body.to_s).to include("exceeds maximum image size")
     end
 
-    it "sets size_gib to 0 when VM has no boot volume" do
+    it "fails when VM has no boot volume (no write tracking)" do
       vm = stopped_vm
       VmStorageVolume.where(vm_id: vm.id).destroy
 
@@ -197,15 +214,15 @@ RSpec.describe Clover, "machine_image helper" do
         vm_id: vm.ubid
       }.to_json
 
-      expect(last_response.status).to eq(200)
-      mi = MachineImage.first(name: "my-image")
-      expect(mi.size_gib).to eq(0)
+      expect(last_response).to have_api_error(400, /Validation failed/)
+      body = JSON.parse(last_response.body)
+      expect(body.to_s).to include("write tracking")
     end
 
     it "fails when storage quota would be exceeded" do
       project.add_quota(quota_id: ProjectQuota.default_quotas["MachineImageStorage"]["id"], value: 40)
       vm = stopped_vm
-      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 30, disk_index: 0)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 30, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
       # Create an existing image that uses 20 GiB
       MachineImage.create(
@@ -226,6 +243,7 @@ RSpec.describe Clover, "machine_image helper" do
 
     it "fails with 409 when an image is already being created from the same VM" do
       vm = stopped_vm
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
       MachineImage.create(
         name: "in-progress-image",

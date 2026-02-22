@@ -33,12 +33,16 @@ class Clover
       fail Validation::ValidationFailed.new({vm_id: "VM must be in 'stopped' state to create a machine image. Current state: '#{vm.display_state}'. Please stop the VM and try again."})
     end
 
+    boot_vol = vm.vm_storage_volumes.find(&:boot)
+    unless boot_vol&.vhost_block_backend_id
+      fail Validation::ValidationFailed.new({vm_id: "This VM was created before write tracking was enabled and cannot be imaged. Please create a new VM, transfer your data, and try again."})
+    end
+
     if @location && vm.location_id != @location.id
       fail Validation::ValidationFailed.new({vm_id: "VM must be in the same location as the machine image"})
     end
 
-    boot_vol = vm.vm_storage_volumes.find(&:boot)
-    boot_size_gib = boot_vol ? boot_vol.size_gib : 0
+    boot_size_gib = boot_vol.size_gib
     max_size_gib = Config.machine_image_max_size_gib
     if boot_size_gib > max_size_gib
       fail Validation::ValidationFailed.new({vm_id: "VM boot disk size (#{boot_size_gib} GiB) exceeds maximum image size (#{max_size_gib} GiB)"})
