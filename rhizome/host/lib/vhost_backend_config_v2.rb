@@ -83,6 +83,7 @@ class VhostBackendConfigV2
     lines << "vhost_socket = #{toml_str(@vhost_sock)}"
     lines << "rpc_socket = #{toml_str(@rpc_socket_path)}"
     lines << "device_id = #{toml_str(@device_id)}"
+    lines << "track_written = true"
     lines.join("\n") + "\n"
   end
 
