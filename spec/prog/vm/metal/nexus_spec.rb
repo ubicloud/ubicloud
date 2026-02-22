@@ -913,6 +913,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.stop_set?).to be(false)
       expect { nx.stopped }.to nap(60 * 60)
     end
+
+    it "hops to restart when restart is set" do
+      vm.incr_restart
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
+      expect { nx.stopped }.to hop("restart")
+    end
   end
 
   describe "#unavailable" do
