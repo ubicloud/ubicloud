@@ -17,6 +17,8 @@ require_relative "storage_key_encryption"
 require_relative "storage_path"
 require_relative "vhost_block_backend"
 
+KEK_PIPE_WRITE_TIMEOUT_SEC = 5
+
 class StorageVolume
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
@@ -47,6 +49,14 @@ class StorageVolume
 
   def rpc_client
     @rpc_client ||= SpdkRpc.new(SpdkPath.rpc_sock(@spdk_version))
+  end
+
+  def vhost_backend
+    @vhost_backend ||= VhostBlockBackend.new(@vhost_backend_version)
+  end
+
+  def use_config_v2?
+    @vhost_backend_version && vhost_backend.config_v2?
   end
 
   def prep(key_wrapping_secrets)
@@ -99,40 +109,75 @@ class StorageVolume
   end
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    config_path = sp.vhost_backend_config
-    config = vhost_backend_config(encryption_key, key_wrapping_secrets)
-
-    write_new_file(config_path, @vm_name) do |file|
-      file.write(config.to_yaml)
-      fsync_or_fail(file)
+    if use_config_v2?
+      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path
+      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted
+      write_config_file(sp.vhost_backend_config, v2_main_toml)
+    else
+      config = vhost_backend_config(encryption_key, key_wrapping_secrets)
+      write_config_file(sp.vhost_backend_config, config.to_yaml)
     end
+  end
 
-    sync_parent_dir(config_path)
+  def write_config_file(path, content)
+    write_new_file(path, @vm_name) do |file|
+      file.write(content)
+      fsync_or_fail(file)
+      sync_parent_dir(path)
+    end
   end
 
   def vhost_backend_create_metadata(key_wrapping_secrets)
-    vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
     metadata_path = sp.vhost_backend_metadata
     config_path = sp.vhost_backend_config
-    if @encrypted
-      kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
-      kek_arg = "--kek /dev/stdin"
-    else
-      kek_yaml = ""
-    end
 
     write_new_file(metadata_path, @vm_name) do |file|
       file.truncate(8 * 1024 * 1024)
     end
 
-    r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift}  --config #{config_path.shellescape} #{kek_arg}", stdin: kek_yaml
+    if @encrypted
+      vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
+    else
+      r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift} --config #{config_path.shellescape}"
+    end
+
     sync_parent_dir(metadata_path)
   end
 
-  def vhost_backend_create_service_file
-    vhost_backend = VhostBlockBackend.new(@vhost_backend_version)
+  def vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
+    with_kek_pipe do |kek_pipe|
+      cmd = [
+        "sudo", "-u", @vm_name,
+        vhost_backend.init_metadata_path,
+        "-s", @stripe_sector_count_shift.to_s,
+        "--config", sp.vhost_backend_config
+      ]
 
-    kek_arg = if @encrypted
+      unless use_config_v2?
+        # Unlike v2, where the kek path is explicitly included in the TOML
+        # config, we need to pass the kek pipe path as a CLI arg in v1.
+        cmd += ["--kek", kek_pipe]
+      end
+
+      # Start backend (it should open the FIFO for reading)
+      pid = Process.spawn(*cmd)
+
+      begin
+        write_kek_to_pipe(kek_pipe, vhost_backend_kek(key_wrapping_secrets))
+      rescue => e
+        Process.kill("TERM", pid)
+        Process.waitpid(pid)
+        raise "init_metadata failed: error writing KEK to pipe: #{e.message}"
+      end
+
+      _, status = Process.wait2(pid)
+      raise "init_metadata failed" unless status.success?
+    end
+  end
+
+  def vhost_backend_create_service_file
+    # v2 config embeds the kek pipe path in the TOML, so no --kek CLI arg needed
+    kek_arg = if @encrypted && !use_config_v2?
       "--kek #{sp.kek_pipe}"
     end
 
@@ -274,13 +319,116 @@ class StorageVolume
     config
   end
 
+  def v2_main_toml
+    sections = []
+    sections << v2_include_section
+    sections << v2_device_section
+    sections << v2_tuning_section
+    sections << v2_encryption_section if @encrypted
+    sections.join("\n")
+  end
+
+  def v2_include_section
+    includes = []
+    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path
+    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted
+    return "" if includes.empty?
+    items = includes.map { |f| toml_str(f) }.join(", ")
+    "include = [#{items}]\n"
+  end
+
+  def v2_device_section
+    lines = ["[device]"]
+    lines << "data_path = #{toml_str(disk_file)}"
+    lines << "metadata_path = #{toml_str(sp.vhost_backend_metadata)}" if @image_path
+    lines << "vhost_socket = #{toml_str(vhost_sock)}"
+    lines << "rpc_socket = #{toml_str(sp.rpc_socket_path)}"
+    lines << "device_id = #{toml_str(@device_id)}"
+    lines.join("\n") + "\n"
+  end
+
+  def v2_tuning_section
+    lines = ["[tuning]"]
+    lines << "num_queues = #{@cpus ? @cpus.count : @num_queues}"
+    lines << "queue_size = #{@queue_size}"
+    lines << "seg_size_max = #{64 * 1024}"
+    lines << "seg_count_max = 4"
+    lines << "poll_timeout_us = 1000"
+    lines << "write_through = #{write_through_device?}"
+    lines << "cpus = [#{@cpus.join(", ")}]" if @cpus
+    lines.join("\n") + "\n"
+  end
+
+  def v2_encryption_section
+    lines = ["[encryption]"]
+    lines << 'xts_key.ref = "xts-key"'
+    lines.join("\n") + "\n"
+  end
+
+  def v2_secrets_toml(encryption_key, key_wrapping_secrets)
+    kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
+    xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
+    xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
+    wrapped_xts_b64 = Base64.strict_encode64(
+      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
+    )
+
+    lines = []
+    lines << "[secrets.#{xts_key_name}]"
+    lines << "source.inline = #{toml_str(wrapped_xts_b64)}"
+    lines << 'encoding = "base64"'
+    lines << 'encrypted_by.ref = "kek"'
+    lines << ""
+    lines << "[secrets.kek]"
+    lines << "source.file = #{toml_str(sp.kek_pipe)}"
+    lines << 'encoding = "base64"'
+    lines.join("\n") + "\n"
+  end
+
+  def v2_stripe_source_toml
+    lines = ["[stripe_source]"]
+    lines << "type = \"raw\""
+    lines << "image_path = #{toml_str(@image_path)}"
+    lines << "copy_on_read = #{@copy_on_read}"
+    lines.join("\n") + "\n"
+  end
+
+  def toml_str(value)
+    # From TOML specs:
+    # > Basic strings are surrounded by quotation marks ("). Any Unicode
+    # > character may be used except those that must be escaped: quotation mark,
+    # > backslash, and the control characters other than tab (U+0000 to U+0008,
+    # > U+000A to U+001F, U+007F).
+    #
+    # See https://toml.io/en/v1.0.0#string
+    escaped = value.gsub(/[\x00-\x08\x0A-\x1F\x7F"\\]/) do |ch|
+      case ch
+      when "\b" then '\\b'
+      when "\n" then '\\n'
+      when "\f" then '\\f'
+      when "\r" then '\\r'
+      when '"' then '\\"'
+      when "\\" then "\\\\"
+      else format('\\u%04X', ch.ord)
+      end
+    end
+    %("#{escaped}")
+  end
+
   def vhost_backend_kek(key_wrapping_secrets)
-    {
-      "method" => "aes256-gcm",
-      "key" => key_wrapping_secrets["key"].strip,
-      "init_vector" => key_wrapping_secrets["init_vector"].strip,
-      "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
-    }
+    if use_config_v2?
+      # In v2, aes256-gcm nonce (init_vector) is stored as part of the wrapped
+      # key, and auth_data is key name, so just pass the base64-encoded
+      # aes256-gcm key.
+      key_wrapping_secrets["key"]
+    else
+      {
+        "method" => "aes256-gcm",
+        "key" => key_wrapping_secrets["key"].strip,
+        "init_vector" => key_wrapping_secrets["init_vector"].strip,
+        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+      }.to_yaml
+    end
   end
 
   def write_through_device?
@@ -321,25 +469,36 @@ class StorageVolume
     # Stop the service in case this is a retry.
     r "systemctl stop #{q_vhost_user_block_service}"
 
+    rm_if_exists(vhost_sock)
+    rm_if_exists(sp.rpc_socket_path)
+
     unless @encrypted
       r "systemctl start #{q_vhost_user_block_service}"
       return
     end
 
-    begin
-      kek_pipe = sp.kek_pipe
-      rm_if_exists(kek_pipe)
-      File.mkfifo(kek_pipe, 0o600)
-      FileUtils.chown @vm_name, @vm_name, kek_pipe
-
+    with_kek_pipe do |kek_pipe|
       r "systemctl start #{q_vhost_user_block_service}"
+      write_kek_to_pipe(kek_pipe, vhost_backend_kek(key_wrapping_secrets))
+    end
+  end
 
-      Timeout.timeout(5) do
-        kek_yaml = vhost_backend_kek(key_wrapping_secrets).to_yaml
-        File.write(kek_pipe, kek_yaml)
+  def with_kek_pipe
+    kek_pipe = sp.kek_pipe
+    rm_if_exists(kek_pipe)
+    File.mkfifo(kek_pipe, 0o600)
+    FileUtils.chown @vm_name, @vm_name, kek_pipe
+    yield kek_pipe
+  ensure
+    FileUtils.rm_f(kek_pipe)
+  end
+
+  def write_kek_to_pipe(kek_pipe, payload, timeout_sec: KEK_PIPE_WRITE_TIMEOUT_SEC)
+    Timeout.timeout(timeout_sec) do
+      File.open(kek_pipe, File::WRONLY) do |file|
+        file.write(payload)
+        file.flush
       end
-    ensure
-      FileUtils.rm_f(kek_pipe)
     end
   end
 
