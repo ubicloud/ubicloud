@@ -11,6 +11,11 @@ RSpec.describe VmFscrypt do
   let(:dek_path) { "#{dek_dir}/#{vm_name}.json" }
   let(:dek_new_path) { "#{dek_path}.new" }
   let(:master_key) { OpenSSL::Random.random_bytes(32) }
+  let(:mountpoint) { "/" }
+
+  before do
+    allow(described_class).to receive(:mountpoint_of).with(vm_home).and_return(mountpoint)
+  end
 
   let(:kek_secrets) {
     algorithm = "aes-256-gcm"
@@ -232,6 +237,43 @@ RSpec.describe VmFscrypt do
       expect(File).to receive(:rename).with(dek_new_path, dek_path).and_raise(Errno::ENOENT)
 
       expect { described_class.retire_old(vm_name) }.not_to raise_error
+    end
+  end
+
+  describe "mountpoint resolution" do
+    it "uses resolved mountpoint in fscryptctl commands" do
+      allow(described_class).to receive(:mountpoint_of).with(vm_home).and_return("/vm")
+
+      expect(File).to receive(:directory?).with(vm_home).and_return(true)
+      expect(Dir).to receive(:entries).with(vm_home).and_return(%w[. ..])
+      expect(FileUtils).to receive(:mkdir_p).with(dek_dir, mode: 0o700)
+
+      fake_file = StringIO.new
+      expect(File).to receive(:open).with(dek_path, "w", 0o600).and_yield(fake_file)
+      expect(fake_file).to receive(:fsync)
+
+      expect(described_class).to receive(:r)
+        .with("fscryptctl add_key /vm", stdin: master_key)
+        .and_return("abcdef0123456789\n")
+      expect(described_class).to receive(:r)
+        .with("fscryptctl set_policy abcdef0123456789 #{vm_home}")
+
+      described_class.encrypt(vm_name, kek_secrets, master_key)
+    end
+  end
+
+  describe ".mountpoint_of" do
+    before do
+      allow(described_class).to receive(:mountpoint_of).and_call_original
+    end
+
+    it "returns a mountpoint for a given path" do
+      result = described_class.send(:mountpoint_of, "/usr/bin")
+      expect(Pathname.new(result)).to be_mountpoint
+    end
+
+    it "returns / when path is /" do
+      expect(described_class.send(:mountpoint_of, "/")).to eq("/")
     end
   end
 

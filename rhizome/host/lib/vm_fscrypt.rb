@@ -3,6 +3,7 @@
 require "fileutils"
 require "json"
 require "base64"
+require "pathname"
 require_relative "../../common/lib/util"
 require_relative "storage_key_encryption"
 require_relative "vm_path"
@@ -29,7 +30,8 @@ module VmFscrypt
     FileUtils.mkdir_p(DEK_DIR, mode: 0o700)
     write_wrapped_dek(dek_path(vm_name), kek_secrets, master_key_binary)
 
-    identifier = r("fscryptctl add_key /", stdin: master_key_binary).strip
+    mnt = mountpoint_of(vm_home).shellescape
+    identifier = r("fscryptctl add_key #{mnt}", stdin: master_key_binary).strip
     r("fscryptctl set_policy #{identifier} #{vm_home.shellescape}")
   end
 
@@ -45,7 +47,8 @@ module VmFscrypt
     return unless File.exist?(dek_file)
 
     master_key_binary = read_unwrapped_dek(dek_file, kek_secrets)
-    r("fscryptctl add_key /", stdin: master_key_binary)
+    mnt = mountpoint_of(vm_home).shellescape
+    r("fscryptctl add_key #{mnt}", stdin: master_key_binary)
   end
 
   # Lock an fscrypt-encrypted /vm/{vm_name}/ directory.
@@ -54,8 +57,9 @@ module VmFscrypt
     vm_home = VmPath.new(vm_name).home("")
     return unless File.directory?(vm_home)
 
+    mnt = mountpoint_of(vm_home).shellescape
     identifier = r("fscryptctl get_policy #{vm_home.shellescape}").strip
-    r("fscryptctl remove_key #{identifier} /")
+    r("fscryptctl remove_key #{identifier} #{mnt}")
   rescue CommandFail
     # Ignore failures (may already be locked, not encrypted, etc.)
   end
@@ -113,5 +117,11 @@ module VmFscrypt
     sek.unwrap_key(wrapped)
   end
 
-  private_class_method :write_wrapped_dek, :read_unwrapped_dek
+  def self.mountpoint_of(path)
+    p = Pathname.new(path)
+    p = p.parent until p.mountpoint?
+    p.to_s
+  end
+
+  private_class_method :write_wrapped_dek, :read_unwrapped_dek, :mountpoint_of
 end
