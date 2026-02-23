@@ -4,19 +4,21 @@ require "excon"
 require "json"
 
 module CloudflareR2
-  # Generate temporary R2 credentials scoped to a specific bucket/prefix
-  # with read-only access. Uses Cloudflare's temp-access-credentials API.
+  # Generate temporary R2 credentials scoped to a specific bucket/prefix.
+  # Uses Cloudflare's temp-access-credentials API.
+  #
+  # permission: "object-read-only" for VM boot, "object-read-write" for archive/delete
   #
   # Returns a hash with :access_key_id, :secret_access_key, :session_token
-  def self.create_temporary_credentials(bucket:, prefix: nil, ttl_seconds: 24 * 3600)
+  def self.create_temporary_credentials(bucket:, prefix: nil, permission: "object-read-only", ttl_seconds: 3600)
     account_id = Config.cloudflare_account_id
     api_token = Config.cloudflare_r2_api_token
-    parent_key_id = Config.machine_image_archive_access_key
+    parent_key_id = Config.cloudflare_r2_parent_access_key_id
 
     body = {
       "bucket" => bucket,
       "parentAccessKeyId" => parent_key_id,
-      "permission" => "object-read-only",
+      "permission" => permission,
       "ttlSeconds" => ttl_seconds
     }
     body["prefix"] = prefix if prefix

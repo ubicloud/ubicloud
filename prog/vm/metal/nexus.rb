@@ -278,8 +278,8 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     nap 6 * 60 * 60
   end
 
-  # Refresh credentials 4 hours before the 24-hour TTL expires
-  CREDS_REFRESH_AFTER_SECONDS = 20 * 60 * 60
+  # Refresh credentials 10 minutes before the 1-hour TTL expires
+  CREDS_REFRESH_AFTER_SECONDS = 50 * 60
 
   def update_source_fetch_progress
     volumes = vm.vm_storage_volumes.select(&:image_backed?)

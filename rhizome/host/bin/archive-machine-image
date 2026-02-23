@@ -14,6 +14,7 @@ target_config_content = params.fetch("target_config_content")
 encrypt = params.fetch("encrypt", false)
 s3_key_id = params.fetch("s3_key_id")
 s3_secret_key = params.fetch("s3_secret_key")
+s3_session_token = params["s3_session_token"]
 archive_kek = params["archive_kek"]
 disk_kek = params["disk_kek"]
 vm_name = params.fetch("vm_name")
@@ -38,6 +39,15 @@ s3_secret_key_pipe = File.join(secrets_dir, "s3-secret-key.pipe")
 FileUtils.rm_f(s3_secret_key_pipe)
 r "mkfifo -m 0600 #{s3_secret_key_pipe}"
 pipe_threads << Thread.new { File.write(s3_secret_key_pipe, s3_secret_key) }
+
+# S3 session token pipe
+s3_session_token_pipe = nil
+if s3_session_token
+  s3_session_token_pipe = File.join(secrets_dir, "s3-session-token.pipe")
+  FileUtils.rm_f(s3_session_token_pipe)
+  r "mkfifo -m 0600 #{s3_session_token_pipe}"
+  pipe_threads << Thread.new { File.write(s3_session_token_pipe, s3_session_token) }
+end
 
 # Archive KEK pipe (if encrypted)
 if encrypt && archive_kek
@@ -72,6 +82,7 @@ ensure
   FileUtils.rm_f(target_config_path)
   FileUtils.rm_f(s3_key_id_pipe) if s3_key_id_pipe
   FileUtils.rm_f(s3_secret_key_pipe) if s3_secret_key_pipe
+  FileUtils.rm_f(s3_session_token_pipe) if s3_session_token_pipe
   FileUtils.rm_f(archive_kek_pipe) if defined?(archive_kek_pipe) && archive_kek_pipe
   FileUtils.rm_f(disk_kek_pipe) if disk_kek_pipe
   pipe_threads.each { |t| t.join(5) }

@@ -4,10 +4,10 @@ RSpec.describe CloudflareR2 do
   before do
     allow(Config).to receive(:cloudflare_account_id).and_return("test-account-123")
     allow(Config).to receive(:cloudflare_r2_api_token).and_return("test-api-token")
-    allow(Config).to receive(:machine_image_archive_access_key).and_return("parent-key-id")
+    allow(Config).to receive(:cloudflare_r2_parent_access_key_id).and_return("parent-key-id")
   end
 
-  it "creates temporary credentials with read-only access" do
+  it "creates temporary credentials with read-only access by default" do
     Excon.stub(
       {path: "/client/v4/accounts/test-account-123/r2/temp-access-credentials", method: :post},
       {status: 200, body: {
@@ -43,7 +43,23 @@ RSpec.describe CloudflareR2 do
     expect(request_body["prefix"]).to eq("my/prefix/")
     expect(request_body["parentAccessKeyId"]).to eq("parent-key-id")
     expect(request_body["permission"]).to eq("object-read-only")
-    expect(request_body["ttlSeconds"]).to eq(86400)
+    expect(request_body["ttlSeconds"]).to eq(3600)
+  end
+
+  it "supports read-write permission" do
+    request_body = nil
+    Excon.stub(
+      {path: "/client/v4/accounts/test-account-123/r2/temp-access-credentials", method: :post}
+    ) do |params|
+      request_body = JSON.parse(params[:body])
+      {status: 200, body: {
+        success: true,
+        result: {"accessKeyId" => "ak", "secretAccessKey" => "sk", "sessionToken" => "st"}
+      }.to_json}
+    end
+
+    described_class.create_temporary_credentials(bucket: "b", permission: "object-read-write")
+    expect(request_body["permission"]).to eq("object-read-write")
   end
 
   it "allows custom TTL" do

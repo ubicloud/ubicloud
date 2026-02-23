@@ -13,6 +13,7 @@
 #   target_config_content - TOML content for the archive target (S3/R2)
 #   s3_key_id       - S3 access key ID
 #   s3_secret_key   - S3 secret access key
+#   s3_session_token - S3 session token (optional, for temporary credentials)
 
 require "json"
 require "fileutils"
@@ -28,6 +29,7 @@ init_metadata_bin = params.fetch("init_metadata_bin")
 target_config_content = params.fetch("target_config_content")
 s3_key_id = params.fetch("s3_key_id")
 s3_secret_key = params.fetch("s3_secret_key")
+s3_session_token = params["s3_session_token"]
 
 FileUtils.mkdir_p(work_dir)
 
@@ -111,6 +113,13 @@ begin
   FileUtils.rm_f(s3_secret_key_pipe)
   r "mkfifo -m 0600 #{s3_secret_key_pipe}"
   pipe_threads << Thread.new { File.write(s3_secret_key_pipe, s3_secret_key) }
+
+  if s3_session_token
+    s3_session_token_pipe = File.join(secrets_dir, "s3-session-token.pipe")
+    FileUtils.rm_f(s3_session_token_pipe)
+    r "mkfifo -m 0600 #{s3_session_token_pipe}"
+    pipe_threads << Thread.new { File.write(s3_session_token_pipe, s3_session_token) }
+  end
 
   # Step 6: Run archive
   warn "Archiving to R2..."

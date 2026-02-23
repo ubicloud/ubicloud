@@ -971,7 +971,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "refreshes credentials when they are older than threshold" do
-      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 51 * 60
       st.modified!(:stack)
       st.save_changes
 
@@ -983,7 +983,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "skips volumes that are already complete" do
-      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 51 * 60
       st.modified!(:stack)
       st.save_changes
 
@@ -995,7 +995,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
 
     it "handles errors gracefully and logs them" do
-      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 21 * 60 * 60
+      st.stack.first["source_fetch_creds_at"] = Time.now.to_i - 51 * 60
       st.modified!(:stack)
       st.save_changes
 
@@ -1004,7 +1004,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Clog).to receive(:emit).with("Failed to refresh source fetch credentials", hash_including(vm: vm.ubid))
       nx.maybe_refresh_source_fetch_credentials([vol])
       # Timestamp should NOT be updated on failure
-      expect(st.reload.stack.first["source_fetch_creds_at"]).to be < (Time.now.to_i - 20 * 60 * 60)
+      expect(st.reload.stack.first["source_fetch_creds_at"]).to be < (Time.now.to_i - 50 * 60)
     end
   end
 

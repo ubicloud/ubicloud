@@ -110,16 +110,26 @@ class Prog::MachineImage::RegisterDistroImage < Prog::Base
     lines << "connections = 16"
     lines << "access_key_id.ref = \"s3-key-id\""
     lines << "secret_access_key.ref = \"s3-secret-key\""
+    lines << "session_token.ref = \"s3-session-token\""
     lines << ""
     lines << "[secrets.s3-key-id]"
     lines << "source.file = \"#{secrets_path}/s3-key-id.pipe\""
     lines << ""
     lines << "[secrets.s3-secret-key]"
     lines << "source.file = \"#{secrets_path}/s3-secret-key.pipe\""
+    lines << ""
+    lines << "[secrets.s3-session-token]"
+    lines << "source.file = \"#{secrets_path}/s3-session-token.pipe\""
     lines.join("\n") + "\n"
   end
 
   def register_params
+    creds = CloudflareR2.create_temporary_credentials(
+      bucket: machine_image.s3_bucket,
+      prefix: machine_image.s3_prefix,
+      permission: "object-read-write"
+    )
+
     {
       "url" => url,
       "sha256" => sha256,
@@ -127,16 +137,24 @@ class Prog::MachineImage::RegisterDistroImage < Prog::Base
       "archive_bin" => archive_bin,
       "init_metadata_bin" => init_metadata_bin,
       "target_config_content" => target_config_toml,
-      "s3_key_id" => Config.machine_image_archive_access_key,
-      "s3_secret_key" => Config.machine_image_archive_secret_key
+      "s3_key_id" => creds[:access_key_id],
+      "s3_secret_key" => creds[:secret_access_key],
+      "s3_session_token" => creds[:session_token]
     }
   end
 
   def delete_s3_objects
+    creds = CloudflareR2.create_temporary_credentials(
+      bucket: machine_image.s3_bucket,
+      prefix: machine_image.s3_prefix,
+      permission: "object-read-write"
+    )
+
     client = Aws::S3::Client.new(
       endpoint: machine_image.s3_endpoint,
-      access_key_id: Config.machine_image_archive_access_key,
-      secret_access_key: Config.machine_image_archive_secret_key,
+      access_key_id: creds[:access_key_id],
+      secret_access_key: creds[:secret_access_key],
+      session_token: creds[:session_token],
       region: "auto",
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required"

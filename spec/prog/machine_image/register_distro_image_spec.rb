@@ -39,9 +39,8 @@ RSpec.describe Prog::MachineImage::RegisterDistroImage do
   let(:sshable) { nx.vm_host.sshable }
 
   before do
-    allow(Config).to receive_messages(
-      machine_image_archive_access_key: "test-key-id",
-      machine_image_archive_secret_key: "test-secret-key"
+    allow(CloudflareR2).to receive(:create_temporary_credentials).and_return(
+      access_key_id: "temp-key-id", secret_access_key: "temp-secret-key", session_token: "temp-session-token"
     )
   end
 
@@ -70,8 +69,9 @@ RSpec.describe Prog::MachineImage::RegisterDistroImage do
         expect(params["sha256"]).to eq("abc123def456")
         expect(params["archive_bin"]).to eq("/opt/vhost-block-backend/v0.4.0/archive")
         expect(params["init_metadata_bin"]).to eq("/opt/vhost-block-backend/v0.4.0/init-metadata")
-        expect(params["s3_key_id"]).to eq("test-key-id")
-        expect(params["s3_secret_key"]).to eq("test-secret-key")
+        expect(params["s3_key_id"]).to eq("temp-key-id")
+        expect(params["s3_secret_key"]).to eq("temp-secret-key")
+        expect(params["s3_session_token"]).to eq("temp-session-token")
         expect(params["target_config_content"]).to include("[target]")
         expect(params["target_config_content"]).to include('bucket = "test-bucket"')
       end
@@ -184,8 +184,9 @@ RSpec.describe Prog::MachineImage::RegisterDistroImage do
       expect(params["work_dir"]).to include("register-distro-")
       expect(params["archive_bin"]).to include("archive")
       expect(params["init_metadata_bin"]).to include("init-metadata")
-      expect(params["s3_key_id"]).to eq("test-key-id")
-      expect(params["s3_secret_key"]).to eq("test-secret-key")
+      expect(params["s3_key_id"]).to eq("temp-key-id")
+      expect(params["s3_secret_key"]).to eq("temp-secret-key")
+      expect(params["s3_session_token"]).to eq("temp-session-token")
       expect(params["target_config_content"]).to include("[target]")
     end
   end
