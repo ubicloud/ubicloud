@@ -149,7 +149,10 @@ class KubernetesCluster < Sequel::Model
         Page.from_tag_parts("KubernetesClusterPVMigrationStuck", id)&.incr_resolve
         "up"
       end
-    rescue
+    rescue IOError, Errno::ECONNRESET
+      raise
+    rescue => e
+      Clog.emit("Exception in KubernetesCluster #{ubid}", Util.exception_to_hash(e))
       "down"
     end
     aggregate_readings(previous_pulse:, reading:)

@@ -123,6 +123,13 @@ RSpec.describe KubernetesCluster do
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
       expect(page.reload.resolve_set?).to be true
     end
+
+    [IOError.new("closed stream"), Errno::ECONNRESET.new("recvfrom(2)")].each do |ex|
+      it "reraises #{ex.class}" do
+        expect(ssh_session).to receive(:_exec!).and_raise(ex)
+        expect { kc.check_pulse(session:, previous_pulse: down_pulse) }.to raise_error(ex)
+      end
+    end
   end
 
   describe "#kubectl" do
