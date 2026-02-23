@@ -4,9 +4,7 @@ require_relative "../spec_helper"
 
 RSpec.describe KubernetesCluster do
   subject(:kc) {
-    project = Project.create(name: "test")
-    private_subnet = PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24")
-    described_class.create(
+    Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "kc-name",
       version: Option.kubernetes_versions.first,
       location_id: Location::HETZNER_FSN1_ID,
@@ -14,7 +12,14 @@ RSpec.describe KubernetesCluster do
       project_id: project.id,
       private_subnet_id: private_subnet.id,
       target_node_size: "standard-2"
-    )
+    ).subject
+  }
+
+  let(:project) { Project.create(name: "test") }
+  let(:private_subnet) { PrivateSubnet.create(project_id: project.id, name: "test", location_id: Location::HETZNER_FSN1_ID, net6: "fe80::/64", net4: "192.168.0.0/24") }
+
+  before {
+    expect(Config).to receive(:kubernetes_service_project_id).and_return(project.id).twice
   }
 
   it "displays location properly" do
@@ -26,9 +31,9 @@ RSpec.describe KubernetesCluster do
   end
 
   it "#display_state shows appropriate state" do
-    kc.strand = Strand.new(prog: "Kubernetes::KubernetesClusterNexus", label: "wait")
+    kc.strand.update(label: "wait")
     expect(kc.display_state).to eq "running"
-    kc.strand.label = "start"
+    kc.strand.update(label: "start")
     expect(kc.display_state).to eq "creating"
     kc.incr_destroy
     kc.reload
@@ -49,33 +54,38 @@ RSpec.describe KubernetesCluster do
   describe "#check_pulse" do
     let(:ssh_session) { Net::SSH::Connection::Session.allocate }
     let(:session) { {ssh_session:} }
+    let(:lb) { LoadBalancer.create(private_subnet_id: kc.private_subnet_id, name: "services_lb", health_check_endpoint: "/", project_id: kc.project_id) }
     let(:client) { Kubernetes::Client.new(kc, ssh_session) }
     let(:down_pulse) { {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30} }
     let(:up_pulse) { {reading: "up", reading_rpt: 5, reading_chg: Time.now - 30} }
 
     before {
+      kc.update(services_lb_id: lb.id)
       expect(kc).to receive(:client).and_return(client)
     }
 
     it "checks pulse" do
-      expect(client).to receive(:any_lb_services_modified?).and_return(true)
-      expect(kc).to receive(:incr_sync_kubernetes_services)
+      LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 30000)
+      lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("up")
+      expect(kc.reload.sync_kubernetes_services_set?).to be true
     end
 
     it "checks pulse on with no changes to the internal services" do
-      expect(client).to receive(:any_lb_services_modified?).and_return(false)
+      lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
 
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
     end
 
     it "checks pulse and fails" do
-      expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_raise(Sshable::SshError)
       expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("down")
     end
 
@@ -86,9 +96,10 @@ RSpec.describe KubernetesCluster do
         {"metadata" => {"name" => "pv-no-annotation", "annotations" => {}}}
       ]})
 
-      expect(client).to receive(:any_lb_services_modified?).and_return(false)
+      lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
       pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(pv_json, 0)
-      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
       expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("down")
 
       page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
