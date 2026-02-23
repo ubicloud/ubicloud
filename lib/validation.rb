@@ -142,9 +142,18 @@ module Validation
     fail ValidationFailed.new({user: msg}) unless os_user_name&.match(ALLOWED_OS_USER_NAME_PATTERN)
   end
 
+  def self.validate_machine_image_quota(project)
+    unless project.quota_available?("MachineImageCount", 1)
+      current = project.current_resource_usage("MachineImageCount")
+      limit = project.effective_quota_value("MachineImageCount")
+      fail ValidationFailed.new({machine_image: "Machine image quota exceeded. You are using #{current} of your #{limit} allowed machine images."})
+    end
+  end
+
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [
       :encrypted, :size_gib, :boot, :read_only, :image,
+      :machine_image_id,
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
       :vring_workers
     ]

@@ -41,6 +41,13 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+
+    # Machine image archive params (for UMI-backed volumes)
+    @archive_params = params["machine_image"]
+  end
+
+  def archive?
+    !@archive_params.nil?
   end
 
   def vp
@@ -95,7 +102,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path || archive?
     vhost_backend_create_service_file
   end
 
@@ -110,8 +117,8 @@ class StorageVolume
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
-      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path
-      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted
+      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path || archive?
+      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted || archive?
       write_config_file(sp.vhost_backend_config, v2_main_toml)
     else
       config = vhost_backend_config(encryption_key, key_wrapping_secrets)
@@ -135,7 +142,9 @@ class StorageVolume
       file.truncate(8 * 1024 * 1024)
     end
 
-    if @encrypted
+    if use_config_v2? && (@encrypted || archive?)
+      vhost_backend_create_metadata_v2_with_pipes(key_wrapping_secrets)
+    elsif @encrypted
       vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
     else
       r "#{vhost_backend.init_metadata_path.shellescape} -s #{@stripe_sector_count_shift} --config #{config_path.shellescape}"
@@ -172,6 +181,72 @@ class StorageVolume
 
       _, status = Process.wait2(pid)
       raise "init_metadata failed" unless status.success?
+    end
+  end
+
+  def vhost_backend_create_metadata_v2_with_pipes(key_wrapping_secrets)
+    pipes = []
+    pipe_writes = []
+
+    if @encrypted
+      kek_pipe = sp.kek_pipe
+      pipes << kek_pipe
+      pipe_writes << [kek_pipe, key_wrapping_secrets.fetch("key")]
+    end
+
+    if archive?
+      s3_key_pipe = sp.s3_key_id_pipe
+      s3_secret_pipe = sp.s3_secret_key_pipe
+      pipes << s3_key_pipe << s3_secret_pipe
+      pipe_writes << [s3_key_pipe, key_wrapping_secrets["archive_s3_access_key"]]
+      pipe_writes << [s3_secret_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
+
+      if key_wrapping_secrets["archive_s3_session_token"]
+        session_pipe = sp.s3_session_token_pipe
+        pipes << session_pipe
+        pipe_writes << [session_pipe, key_wrapping_secrets["archive_s3_session_token"]]
+      end
+
+      if @archive_params["encrypted"]
+        archive_pipe = sp.archive_kek_pipe
+        pipes << archive_pipe
+        pipe_writes << [archive_pipe, key_wrapping_secrets.dig("archive_kek", "key")]
+      end
+    end
+
+    pipes.each do |pipe|
+      rm_if_exists(pipe)
+      File.mkfifo(pipe, 0o600)
+      FileUtils.chown(@vm_name, @vm_name, pipe)
+    end
+
+    cmd = [
+      "sudo", "-u", @vm_name,
+      vhost_backend.init_metadata_path,
+      "-s", @stripe_sector_count_shift.to_s,
+      "--config", sp.vhost_backend_config.to_s
+    ]
+
+    pid = Process.spawn(*cmd)
+
+    begin
+      threads = pipe_writes.map do |pipe, value|
+        Thread.new do
+          File.open(pipe, File::WRONLY) do |f|
+            f.write(value)
+            f.flush
+          end
+        end
+      end
+
+      Timeout.timeout(30) do
+        threads.each(&:join)
+      end
+
+      _, status = Process.wait2(pid)
+      raise "init_metadata failed" unless status.success?
+    ensure
+      pipes.each { |p| FileUtils.rm_f(p) }
     end
   end
 
@@ -226,7 +301,7 @@ class StorageVolume
         ProtectKernelLogs=true
         ProtectProc=invisible
         
-        RestrictAddressFamilies=AF_UNIX
+        RestrictAddressFamilies=#{archive? ? "AF_UNIX AF_INET AF_INET6" : "AF_UNIX"}
         RestrictNamespaces=true
         SystemCallArchitectures=native
         SystemCallFilter=@system-service
@@ -235,9 +310,9 @@ class StorageVolume
         RestrictSUIDSGID=yes
         RestrictRealtime=yes
         ProcSubset=pid
-        PrivateNetwork=yes
+        #{"PrivateNetwork=yes" unless archive?}
         PrivateUsers=yes
-        IPAddressDeny=any
+        #{"IPAddressDeny=any" unless archive?}
 
         [Install]
         WantedBy=multi-user.target
@@ -332,8 +407,8 @@ class StorageVolume
 
   def v2_include_section
     includes = []
-    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path
-    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted
+    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path || archive?
+    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted || archive?
     return "" if includes.empty?
     items = includes.map { |f| toml_str(f) }.join(", ")
     "include = [#{items}]\n"
@@ -342,7 +417,8 @@ class StorageVolume
   def v2_device_section
     lines = ["[device]"]
     lines << "data_path = #{toml_str(disk_file)}"
-    lines << "metadata_path = #{toml_str(sp.vhost_backend_metadata)}" if @image_path
+    lines << "metadata_path = #{toml_str(sp.vhost_backend_metadata)}" if @image_path || archive?
+    lines << "track_written = true" if archive?
     lines << "vhost_socket = #{toml_str(vhost_sock)}"
     lines << "rpc_socket = #{toml_str(sp.rpc_socket_path)}"
     lines << "device_id = #{toml_str(@device_id)}"
@@ -375,31 +451,123 @@ class StorageVolume
   end
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
-    kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
-    xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
-    xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
-    wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
-    )
-
     lines = []
-    lines << "[secrets.#{xts_key_name}]"
-    lines << "source.inline = #{toml_str(wrapped_xts_b64)}"
-    lines << 'encoding = "base64"'
-    lines << 'encrypted_by.ref = "kek"'
-    lines << ""
-    lines << "[secrets.kek]"
-    lines << "source.file = #{toml_str(sp.kek_pipe)}"
-    lines << 'encoding = "base64"'
+
+    if @encrypted && encryption_key
+      kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
+      xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
+      xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
+      wrapped_xts_b64 = Base64.strict_encode64(
+        StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
+      )
+
+      lines << "[secrets.#{xts_key_name}]"
+      lines << "source.inline = #{toml_str(wrapped_xts_b64)}"
+      lines << 'encoding = "base64"'
+      lines << 'encrypted_by.ref = "kek"'
+      lines << ""
+      lines << "[secrets.kek]"
+      lines << "source.file = #{toml_str(sp.kek_pipe)}"
+      lines << 'encoding = "base64"'
+    end
+
+    if archive?
+      lines << "" unless lines.empty?
+      lines << "[secrets.s3-key-id]"
+      lines << "source.file = #{toml_str(sp.s3_key_id_pipe)}"
+      lines << ""
+      lines << "[secrets.s3-secret-key]"
+      lines << "source.file = #{toml_str(sp.s3_secret_key_pipe)}"
+      lines << ""
+      lines << "[secrets.s3-session-token]"
+      lines << "source.file = #{toml_str(sp.s3_session_token_pipe)}"
+
+      if @archive_params["encrypted"]
+        lines << ""
+        lines << "[secrets.archive-kek]"
+        lines << "source.file = #{toml_str(sp.archive_kek_pipe)}"
+        lines << 'encoding = "base64"'
+      end
+    end
+
     lines.join("\n") + "\n"
   end
 
   def v2_stripe_source_toml
+    if archive?
+      v2_archive_stripe_source_toml
+    else
+      lines = ["[stripe_source]"]
+      lines << "type = \"raw\""
+      lines << "image_path = #{toml_str(@image_path)}"
+      lines << "copy_on_read = #{@copy_on_read}"
+      lines.join("\n") + "\n"
+    end
+  end
+
+  def v2_archive_stripe_source_toml
     lines = ["[stripe_source]"]
-    lines << "type = \"raw\""
-    lines << "image_path = #{toml_str(@image_path)}"
-    lines << "copy_on_read = #{@copy_on_read}"
+    lines << "type = \"archive\""
+    lines << "storage = \"s3\""
+    lines << "bucket = #{toml_str(@archive_params["archive_bucket"])}"
+    lines << "prefix = #{toml_str(@archive_params["archive_prefix"])}"
+    lines << "region = \"auto\""
+    lines << "endpoint = #{toml_str(@archive_params["archive_endpoint"])}"
+    lines << "connections = 16"
+    lines << "autofetch = true"
+    lines << 'access_key_id.ref = "s3-key-id"'
+    lines << 'secret_access_key.ref = "s3-secret-key"'
+    lines << 'session_token.ref = "s3-session-token"'
+    lines << 'archive_kek.ref = "archive-kek"' if @archive_params["encrypted"]
     lines.join("\n") + "\n"
+  end
+
+  def detach_archive
+    fail "Not an archive-backed volume" unless archive?
+    fail "Config v2 required for detach" unless use_config_v2?
+
+    # Remove the stripe source config file (archive S3 connection details)
+    rm_if_exists(sp.vhost_backend_stripe_source_config)
+
+    if @encrypted
+      rewrite_secrets_config_without_archive
+    else
+      rm_if_exists(sp.vhost_backend_secrets_config)
+    end
+
+    @archive_params = nil
+    rewrite_main_config_after_detach
+    vhost_backend_create_service_file
+    r "systemctl daemon-reload"
+  end
+
+  def rewrite_secrets_config_without_archive
+    secrets_path = sp.vhost_backend_secrets_config
+    return unless File.exist?(secrets_path)
+
+    content = File.read(secrets_path)
+    archive_secret_names = ["s3-key-id", "s3-secret-key", "s3-session-token", "archive-kek"]
+    lines = content.lines
+    result = []
+    skip = false
+
+    lines.each do |line|
+      if line.match?(/^\[secrets\.(.+)\]/)
+        secret_name = line.match(/^\[secrets\.(.+)\]/)[1]
+        skip = archive_secret_names.include?(secret_name)
+      end
+      result << line unless skip
+    end
+
+    File.open(secrets_path, "w", 0o600) do |file|
+      file.write(result.join)
+      fsync_or_fail(file)
+    end
+    sync_parent_dir(secrets_path)
+  end
+
+  def rewrite_main_config_after_detach
+    write_config_file(sp.vhost_backend_config, v2_main_toml)
   end
 
   def toml_str(value)
@@ -481,6 +649,13 @@ class StorageVolume
     rm_if_exists(vhost_sock)
     rm_if_exists(sp.rpc_socket_path)
 
+    # For archive-backed volumes, use threaded pipe writes for all secrets.
+    if archive? && use_config_v2?
+      vhost_backend_start_archive(key_wrapping_secrets)
+      return
+    end
+
+    # Non-archive: use origin's simple approach.
     unless @encrypted
       r "systemctl start #{q_vhost_user_block_service}"
       return
@@ -489,6 +664,67 @@ class StorageVolume
     with_kek_pipe do |kek_pipe|
       r "systemctl start #{q_vhost_user_block_service}"
       write_kek_to_pipe(kek_pipe, vhost_backend_kek(key_wrapping_secrets))
+    end
+  end
+
+  def vhost_backend_start_archive(key_wrapping_secrets)
+    pipes = []
+    pipe_writes = []
+    begin
+      if @encrypted
+        kek_pipe = sp.kek_pipe
+        rm_if_exists(kek_pipe)
+        File.mkfifo(kek_pipe, 0o600)
+        FileUtils.chown @vm_name, @vm_name, kek_pipe
+        pipes << kek_pipe
+        pipe_writes << [kek_pipe, key_wrapping_secrets["key"]]
+      end
+
+      s3_key_pipe = sp.s3_key_id_pipe
+      s3_secret_pipe = sp.s3_secret_key_pipe
+      s3_pipes = [s3_key_pipe, s3_secret_pipe]
+
+      if key_wrapping_secrets["archive_s3_session_token"]
+        s3_pipes << sp.s3_session_token_pipe
+      end
+
+      s3_pipes.each do |pipe|
+        rm_if_exists(pipe)
+        File.mkfifo(pipe, 0o600)
+        FileUtils.chown @vm_name, @vm_name, pipe
+        pipes << pipe
+      end
+      pipe_writes << [s3_key_pipe, key_wrapping_secrets["archive_s3_access_key"]]
+      pipe_writes << [s3_secret_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
+      if key_wrapping_secrets["archive_s3_session_token"]
+        pipe_writes << [sp.s3_session_token_pipe, key_wrapping_secrets["archive_s3_session_token"]]
+      end
+
+      if @archive_params["encrypted"]
+        archive_pipe = sp.archive_kek_pipe
+        rm_if_exists(archive_pipe)
+        File.mkfifo(archive_pipe, 0o600)
+        FileUtils.chown @vm_name, @vm_name, archive_pipe
+        pipes << archive_pipe
+        pipe_writes << [archive_pipe, key_wrapping_secrets.dig("archive_kek", "key")]
+      end
+
+      r "systemctl start #{q_vhost_user_block_service}"
+
+      threads = pipe_writes.map do |pipe, value|
+        Thread.new do
+          File.open(pipe, File::WRONLY) do |f|
+            f.write(value)
+            f.flush
+          end
+        end
+      end
+
+      Timeout.timeout(30) do
+        threads.each(&:join)
+      end
+    ensure
+      pipes.each { |p| FileUtils.rm_f(p) }
     end
   end
 

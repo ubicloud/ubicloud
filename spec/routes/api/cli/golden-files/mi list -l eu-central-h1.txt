@@ -1,0 +1,2 @@
+location       name     id                          state      arch  size-gib
+eu-central-h1  test-mi  m1b3hjaxypgy4n6hhd8drkmzzs  available  x64   20      

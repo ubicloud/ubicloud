@@ -1,0 +1,63 @@
+<% @page_title = @machine_image.name %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Images", "#{@project.path}/machine-image"],
+    [@machine_image.name, "#"]
+  ]
+) %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+  <div class="px-4 py-5 sm:p-6">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900"><%= @machine_image.name %></h2>
+        <p class="text-sm text-gray-500">id: <%= @machine_image.ubid %></p>
+      </div>
+      <div>
+        <%== part("components/machine_image_state_label", state: @machine_image.state, extra_class: "text-md") %>
+      </div>
+    </div>
+
+    <%== part("components/kv_data_card", data: [
+      ["Name", @machine_image.name],
+      ["State", @machine_image.state],
+      ["Location", @machine_image.display_location],
+      ["Architecture", @machine_image.arch],
+      ["Size", "#{@machine_image.size_gib} GiB"],
+      ["Compression", @machine_image.compression],
+      ["Encrypted", @machine_image.encrypted? ? "Yes" : "No"],
+      ["Source VM", @machine_image.vm ? "<a href='#{path(@machine_image.vm)}' class='text-orange-600 hover:text-orange-700'>#{h @machine_image.vm.name}</a>" : "(deleted)"],
+      ["Description", @machine_image.description.empty? ? "-" : @machine_image.description],
+      ["Created", @machine_image.created_at.strftime("%b %d, %Y %H:%M UTC")]
+    ]) %>
+  </div>
+
+  <% if @machine_image.project_id == @project.id && has_permission?("MachineImage:delete", @machine_image) %>
+    <div class="border-t px-4 py-5 sm:p-6">
+      <h3 class="text-lg font-semibold text-gray-900 mb-4">Danger Zone</h3>
+      <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+        <div class="px-4 py-5 sm:p-6">
+          <div class="sm:flex sm:items-center sm:justify-between">
+            <div>
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Delete this image</h3>
+              <div class="mt-2 text-sm text-gray-500">
+                <p>This action will permanently delete this machine image. This cannot be undone.</p>
+              </div>
+            </div>
+            <div class="mt-5 sm:ml-6 sm:mt-0 sm:flex sm:flex-shrink-0 sm:items-center">
+              <%== part("components/delete_button", confirmation: @machine_image.name, url: "#{@project.path}#{@machine_image.path}") %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="mt-4">
+  <a href="<%= @project.path %>/machine-image" class="text-sm font-semibold text-orange-600 hover:text-orange-700">&larr; Back to Images</a>
+</div>

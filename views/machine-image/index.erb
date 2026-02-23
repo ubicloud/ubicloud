@@ -1,0 +1,67 @@
+<% @page_title = "Your Images" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Virtual Machines", "#{@project.path}/vm"],
+    %w[Images #]
+  ]
+) %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+  <% if @machine_images.empty? %>
+    <div class="px-4 py-12 sm:px-6 text-center">
+      <p class="text-sm text-gray-500">No images yet. Create an image from a stopped virtual machine.</p>
+      <div class="mt-4">
+        <a href="<%= @project.path %>/vm" class="text-sm font-semibold text-orange-600 hover:text-orange-700">&larr; Back to Virtual Machines</a>
+      </div>
+    </div>
+  <% else %>
+    <table class="min-w-full divide-y divide-gray-300">
+      <thead class="bg-gray-50">
+        <tr>
+          <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Source VM</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Location</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">State</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Size</th>
+          <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Created</th>
+          <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 bg-white">
+        <% @machine_images.each do |mi| %>
+          <tr>
+            <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
+              <a href="<%= @project.path %><%= mi.path %>" class="text-orange-600 hover:text-orange-700"><%= mi.name %></a>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+              <% if mi.vm %>
+                <a href="<%= path(mi.vm) %>" class="text-orange-600 hover:text-orange-700"><%= mi.vm.name %></a>
+              <% else %>
+                <span class="text-gray-400">(deleted)</span>
+              <% end %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= mi.display_location %></td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm">
+              <%== part("components/machine_image_state_label", state: mi.state) %>
+            </td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= mi.size_gib %> GiB</td>
+            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500"><%= mi.created_at.strftime("%b %d, %Y") %></td>
+            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+              <% if mi.project_id == @project.id && has_permission?("MachineImage:delete", mi) %>
+                <%== part("components/delete_button", confirmation: mi.name, url: "#{@project.path}#{mi.path}") %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% end %>
+</div>
+
+<div class="mt-4">
+  <a href="<%= @project.path %>/vm/create" class="text-sm font-semibold text-orange-600 hover:text-orange-700">&larr; Back to Create VM</a>
+</div>

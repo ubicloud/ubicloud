@@ -268,7 +268,54 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_checkup
     end
 
+    case update_source_fetch_progress
+    when :in_progress
+      nap 60
+    when :completed
+      hop_detach_machine_image
+    end
+
     nap 6 * 60 * 60
+  end
+
+  def update_source_fetch_progress
+    volumes = vm.vm_storage_volumes.select(&:image_backed?)
+    return nil if volumes.empty?
+    return :completed if volumes.all?(&:source_fetch_complete?)
+
+    volumes.each do |vol|
+      next if vol.source_fetch_complete?
+      begin
+        response = host.sshable.cmd_json(
+          "sudo nc -U /var/storage/:inhost_name/:disk_index/rpc.sock -q 0",
+          inhost_name: vm.inhost_name, disk_index: vol.disk_index,
+          stdin: '{"command": "status"}'
+        )
+        if (stripes = response.dig("status", "stripes"))
+          vol.update(
+            source_fetch_total: stripes["source"],
+            source_fetch_fetched: stripes["fetched"]
+          )
+        end
+      rescue => ex
+        Clog.emit("Failed to query source fetch progress", {vm: vm.ubid, disk_index: vol.disk_index, error: ex.message})
+      end
+    end
+
+    volumes.all? { it.reload.source_fetch_complete? } ? :completed : :in_progress
+  end
+
+  label def detach_machine_image
+    vm.vm_storage_volumes.select(&:image_backed?).each do |vol|
+      host.sshable.cmd(
+        "sudo host/bin/setup-vm detach-archive :vm_name :disk_index",
+        vm_name:, disk_index: vol.disk_index
+      )
+      vol.update(machine_image_id: nil)
+      Clog.emit("Detached VM from machine image", {vm: vm.ubid, disk_index: vol.disk_index})
+    end
+
+    hop_wait
   end
 
   label def update_firewall_rules
@@ -298,6 +345,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
     end
     decr_stop
+
+    when_restart_set? do
+      register_deadline("wait", 5 * 60)
+      hop_restart
+    end
 
     nap 60 * 60
   end

@@ -14,6 +14,7 @@ module Ubicloud
   # +inference_api_key+ :: Ubicloud::InferenceApiKey
   # +kubernetes_cluster+ :: Ubicloud::KubernetesCluster
   # +load_balancer+ :: Ubicloud::LoadBalancer
+  # +machine_image+ :: Ubicloud::MachineImage
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
   # +ssh_public_key+ :: Ubicloud::SshPublicKey
@@ -28,6 +29,7 @@ module Ubicloud
       vm: Vm,
       postgres: Postgres,
       firewall: Firewall,
+      machine_image: MachineImage,
       private_subnet: PrivateSubnet,
       load_balancer: LoadBalancer,
       github_cache_entry: GithubCacheEntry,
@@ -44,6 +46,7 @@ module Ubicloud
       "vm" => Vm,
       "pg" => Postgres,
       "fw" => Firewall,
+      "m1" => MachineImage,
       "ps" => PrivateSubnet,
       "1b" => LoadBalancer,
       "ge" => GithubCacheEntry,

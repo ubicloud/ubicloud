@@ -3,6 +3,7 @@
 --confirm foo fw eu-central-h1/test-ps-default destroy
 --confirm foo kc eu-central-h1/test-kc destroy
 --confirm foo lb eu-central-h1/test-lb destroy
+--confirm foo mi eu-central-h1/test-mi destroy
 --confirm foo pg eu-central-h1/test-pg destroy
 --confirm foo ps eu-central-h1/test-ps destroy
 --confirm sk684jk5sa027g4mmr3rrwmakr sk sk684jk5sa027g4mmr3rrwmakr destroy
@@ -53,6 +54,11 @@ lb eu-central-h1/test-lb update https a 54321 /up2 true vmdzyppz6j166jh5e9t2dwrf
 lb eu-central-h1/test-lb update https 54321 a /up2 false vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test-lb update hash_based 1234 54321 /up2 bad vmdzyppz6j166jh5e9t2dwrfas
 lb eu-central-h1/test2-lb create
+mi eu-central-h1/test-mi show -f bad
+mi eu-central-h1/test2-mi create
+mi eu-central-h1/test-mi destroy invalid
+mi list -f invalid
+mi list invalid
 pg eu-central-h1/test2-pg create invalid
 pg eu-central-h1/test2-pg create -s bad -S 64
 pg eu-central-h1/test2-pg create -s standard-2 -S bad

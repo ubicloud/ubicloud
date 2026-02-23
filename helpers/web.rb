@@ -29,6 +29,14 @@ class Clover < Roda
   VM_STATE_LABEL_COLOR["deleted"] = VM_STATE_LABEL_COLOR["deleting"]
   VM_STATE_LABEL_COLOR.freeze
 
+  MACHINE_IMAGE_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
+    "available" => "bg-green-100 text-green-800",
+    "creating" => "bg-yellow-100 text-yellow-800",
+    "verifying" => "bg-yellow-100 text-yellow-800",
+    "failed" => "bg-red-100 text-red-800",
+    "destroying" => "bg-red-100 text-red-800"
+  ).freeze
+
   BUTTON_COLOR = Hash.new { |h, k| raise "unsupported button type: #{k}" }.merge!(
     "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
     "safe" => "bg-green-600 hover:bg-green-700 focus-visible:outline-green-600",

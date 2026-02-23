@@ -397,6 +397,22 @@ RSpec.describe StorageVolume do
       expect(encrypted_vhost_sv).to receive(:vhost_backend_create_service_file)
       encrypted_vhost_sv.prep_vhost_backend(encryption_key, key_wrapping_secrets)
     end
+
+    it "skips metadata for non-imaged non-archive vhost backend volumes" do
+      non_imaged_vhost_sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => false,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.1-5",
+        "num_queues" => 4,
+        "queue_size" => 128
+      })
+      expect(non_imaged_vhost_sv).to receive(:vhost_backend_create_config).with(nil, nil)
+      expect(non_imaged_vhost_sv).not_to receive(:vhost_backend_create_metadata)
+      expect(non_imaged_vhost_sv).to receive(:vhost_backend_create_service_file)
+      non_imaged_vhost_sv.prep_vhost_backend(nil, nil)
+    end
   end
 
   describe "#vhost_backend_create_config" do
@@ -657,6 +673,288 @@ RSpec.describe StorageVolume do
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return([])
       expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
       expect { encrypted_sv.persistent_device_id("storage_path") }.to raise_error RuntimeError, "No persistent device ID found for storage path: storage_path"
+    end
+  end
+
+  describe "archive-backed volumes" do
+    let(:archive_params) {
+      {
+        "type" => "archive",
+        "archive_bucket" => "ubi-images",
+        "archive_prefix" => "images/abc123",
+        "archive_endpoint" => "https://r2.example.com",
+        "stripe_sector_count" => 2048,
+        "compression" => "zstd",
+        "encrypted" => false
+      }
+    }
+
+    let(:archive_vhost_sv) {
+      params = {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => false,
+        "size_gib" => 20,
+        "vhost_block_backend_version" => "v0.4.0",
+        "num_queues" => 4,
+        "queue_size" => 64,
+        "machine_image" => archive_params
+      }
+      described_class.new("test", params)
+    }
+
+    let(:encrypted_archive_vhost_sv) {
+      params = {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 20,
+        "vhost_block_backend_version" => "v0.4.0",
+        "num_queues" => 4,
+        "queue_size" => 64,
+        "machine_image" => archive_params.merge("encrypted" => true)
+      }
+      described_class.new("test", params)
+    }
+
+    it "reports archive? as true" do
+      expect(archive_vhost_sv.archive?).to be true
+    end
+
+    it "reports archive? as false for non-archive volumes" do
+      expect(unencrypted_sv.archive?).to be false
+    end
+
+    it "has no image_path for archive volumes" do
+      expect(archive_vhost_sv.image_path).to be_nil
+    end
+
+    it "can prep an archive-backed vhost volume" do
+      expect(File).to receive(:exist?).with("/var/storage").and_return(true)
+      expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
+      expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
+      expect(archive_vhost_sv).to receive(:create_empty_disk_file)
+      expect(archive_vhost_sv).to receive(:prep_vhost_backend).with(nil, {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"})
+      archive_vhost_sv.prep({"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"})
+    end
+
+    it "creates metadata for archive-backed volumes during prep_vhost_backend" do
+      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"}
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_config).with(nil, key_wrapping_secrets)
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_metadata).with(key_wrapping_secrets)
+      expect(archive_vhost_sv).to receive(:vhost_backend_create_service_file)
+      archive_vhost_sv.prep_vhost_backend(nil, key_wrapping_secrets)
+    end
+
+    it "creates service file with network access for archive volumes" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, /AF_UNIX AF_INET AF_INET6/)
+      archive_vhost_sv.vhost_backend_create_service_file
+    end
+
+    it "creates service file without PrivateNetwork for archive volumes" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      content = nil
+      expect(File).to receive(:write).with(service_file, anything) { |_, c| content = c }
+      archive_vhost_sv.vhost_backend_create_service_file
+      expect(content).not_to include("PrivateNetwork=yes")
+      expect(content).not_to include("IPAddressDeny=any")
+    end
+
+    it "can start an unencrypted archive vhost backend with session token" do
+      key_wrapping_secrets = {"archive_s3_access_key" => "AK", "archive_s3_secret_key" => "SK", "archive_s3_session_token" => "ST"}
+      vhost_sock = "/var/storage/test/2/vhost.sock"
+      rpc_sock = "/var/storage/test/2/rpc.sock"
+      s3_key_pipe = "/var/storage/test/2/s3-key-id.pipe"
+      s3_secret_pipe = "/var/storage/test/2/s3-secret-key.pipe"
+      s3_session_pipe = "/var/storage/test/2/s3-session-token.pipe"
+
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_key_pipe)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_secret_pipe)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(s3_session_pipe)
+      expect(File).to receive(:mkfifo).with(s3_key_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_secret_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_session_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_key_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_secret_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_session_pipe)
+
+      expect(archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+
+      mock_file = instance_double(File, write: nil, flush: nil)
+      expect(File).to receive(:open).with(s3_key_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_secret_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_session_pipe, File::WRONLY).and_yield(mock_file)
+
+      archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
+    end
+
+    it "can start an encrypted archive vhost backend with all pipes" do
+      archive_kek_secrets = {"key" => Base64.encode64("a" * 32)}
+      key_wrapping_secrets = {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.encode64("b" * 32),
+        "init_vector" => Base64.encode64("c" * 12),
+        "auth_data" => "test",
+        "archive_kek" => archive_kek_secrets,
+        "archive_s3_access_key" => "AK",
+        "archive_s3_secret_key" => "SK",
+        "archive_s3_session_token" => "ST"
+      }
+
+      vhost_sock = "/var/storage/test/2/vhost.sock"
+      rpc_sock = "/var/storage/test/2/rpc.sock"
+      kek_pipe = "/var/storage/test/2/kek.pipe"
+      s3_key_pipe = "/var/storage/test/2/s3-key-id.pipe"
+      s3_secret_pipe = "/var/storage/test/2/s3-secret-key.pipe"
+      s3_session_pipe = "/var/storage/test/2/s3-session-token.pipe"
+      archive_kek_pipe = "/var/storage/test/2/archive-kek.pipe"
+
+      # Vhost sock and rpc socket cleanup
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
+
+      # Disk KEK pipe
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(kek_pipe)
+      expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
+
+      # S3 credential pipes (including session token)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_key_pipe)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_secret_pipe)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(s3_session_pipe)
+      expect(File).to receive(:mkfifo).with(s3_key_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_secret_pipe, 0o600)
+      expect(File).to receive(:mkfifo).with(s3_session_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_key_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_secret_pipe)
+      expect(FileUtils).to receive(:chown).with("test", "test", s3_session_pipe)
+
+      # Archive KEK pipe
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(archive_kek_pipe)
+      expect(File).to receive(:mkfifo).with(archive_kek_pipe, 0o600)
+      expect(FileUtils).to receive(:chown).with("test", "test", archive_kek_pipe)
+
+      expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+
+      # All pipe writes (concurrent via threads)
+      mock_file = instance_double(File, write: nil, flush: nil)
+      expect(File).to receive(:open).with(kek_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_key_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_secret_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(s3_session_pipe, File::WRONLY).and_yield(mock_file)
+      expect(File).to receive(:open).with(archive_kek_pipe, File::WRONLY).and_yield(mock_file)
+
+      encrypted_archive_vhost_sv.vhost_backend_start(key_wrapping_secrets)
+    end
+
+    it "detach_archive removes stripe source config, secrets config, rewrites main config and service file (unencrypted)" do
+      stripe_source_path = "/var/storage/test/2/vhost-backend-stripe-source.conf"
+      secrets_path = "/var/storage/test/2/vhost-backend-secrets.conf"
+      config_path = "/var/storage/test/2/vhost-backend.conf"
+      service_path = "/etc/systemd/system/test-2-storage.service"
+
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(stripe_source_path)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(secrets_path)
+
+      expect(archive_vhost_sv).to receive(:write_through_device?).and_return(true)
+
+      written_content = nil
+      mock_file = instance_double(File)
+      expect(archive_vhost_sv).to receive(:rm_if_exists).with(config_path)
+      expect(File).to receive(:open).with(config_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(mock_file)
+      expect(FileUtils).to receive(:chown).with("test", "test", config_path)
+      expect(mock_file).to receive(:write) { |c| written_content = c }
+      expect(archive_vhost_sv).to receive(:fsync_or_fail).with(mock_file)
+      expect(archive_vhost_sv).to receive(:sync_parent_dir).with(config_path)
+
+      expect(File).to receive(:write).with(service_path, /PrivateNetwork=yes/)
+      expect(archive_vhost_sv).to receive(:r).with("systemctl daemon-reload")
+
+      archive_vhost_sv.detach_archive
+
+      expect(written_content).not_to include("include")
+      expect(written_content).to include("[device]")
+      expect(archive_vhost_sv.archive?).to be false
+    end
+
+    it "detach_archive preserves encryption secrets for encrypted archive volumes" do
+      stripe_source_path = "/var/storage/test/2/vhost-backend-stripe-source.conf"
+      secrets_path = "/var/storage/test/2/vhost-backend-secrets.conf"
+      config_path = "/var/storage/test/2/vhost-backend.conf"
+      service_path = "/etc/systemd/system/test-2-storage.service"
+
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(stripe_source_path)
+
+      # Secrets config should be rewritten, not removed
+      secrets_content = <<~TOML
+        [secrets.xts-key]
+        source.inline = "wrapped-key-data"
+        encoding = "base64"
+        encrypted_by.ref = "kek"
+
+        [secrets.kek]
+        source.file = "/var/storage/test/2/kek.pipe"
+        encoding = "base64"
+
+        [secrets.s3-key-id]
+        source.file = "/var/storage/test/2/s3-key-id.pipe"
+
+        [secrets.s3-secret-key]
+        source.file = "/var/storage/test/2/s3-secret-key.pipe"
+
+        [secrets.archive-kek]
+        source.file = "/var/storage/test/2/archive-kek.pipe"
+      TOML
+      expect(File).to receive(:exist?).with(secrets_path).and_return(true)
+      expect(File).to receive(:read).with(secrets_path).and_return(secrets_content)
+
+      secrets_written = nil
+      secrets_mock = instance_double(File)
+      expect(File).to receive(:open).with(secrets_path, "w", 0o600).and_yield(secrets_mock)
+      expect(secrets_mock).to receive(:write) { |c| secrets_written = c }
+      expect(encrypted_archive_vhost_sv).to receive(:fsync_or_fail).with(secrets_mock)
+      expect(encrypted_archive_vhost_sv).to receive(:sync_parent_dir).with(secrets_path)
+
+      expect(encrypted_archive_vhost_sv).to receive(:write_through_device?).and_return(true)
+
+      # Main config rewrite via write_config_file (rm_if_exists + File.open with CREAT|EXCL)
+      config_written = nil
+      config_mock = instance_double(File)
+      expect(encrypted_archive_vhost_sv).to receive(:rm_if_exists).with(config_path)
+      expect(File).to receive(:open).with(config_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(config_mock)
+      expect(FileUtils).to receive(:chown).with("test", "test", config_path)
+      expect(config_mock).to receive(:write) { |c| config_written = c }
+      expect(encrypted_archive_vhost_sv).to receive(:fsync_or_fail).with(config_mock)
+      expect(encrypted_archive_vhost_sv).to receive(:sync_parent_dir).with(config_path)
+
+      expect(File).to receive(:write).with(service_path, /PrivateNetwork=yes/)
+      expect(encrypted_archive_vhost_sv).to receive(:r).with("systemctl daemon-reload")
+
+      encrypted_archive_vhost_sv.detach_archive
+
+      # Secrets should keep encryption entries but not S3/archive entries
+      expect(secrets_written).to include("[secrets.xts-key]")
+      expect(secrets_written).to include("[secrets.kek]")
+      expect(secrets_written).not_to include("[secrets.s3-key-id]")
+      expect(secrets_written).not_to include("[secrets.s3-secret-key]")
+      expect(secrets_written).not_to include("[secrets.archive-kek]")
+
+      # Main config should still include secrets file
+      expect(config_written).to include('include = ["vhost-backend-secrets.conf"]')
+      expect(config_written).to include("[device]")
+      expect(config_written).to include("[encryption]")
+      expect(encrypted_archive_vhost_sv.archive?).to be false
+    end
+  end
+
+  describe "#detach_archive" do
+    it "raises error for non-archive volumes" do
+      expect { unencrypted_sv.detach_archive }.to raise_error(RuntimeError, "Not an archive-backed volume")
     end
   end
 
