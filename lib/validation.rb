@@ -144,7 +144,7 @@ module Validation
 
   def self.validate_storage_volumes(storage_volumes, boot_disk_index)
     allowed_keys = [
-      :encrypted, :size_gib, :boot, :read_only, :image,
+      :encrypted, :size_gib, :boot, :skip_sync, :read_only, :image,
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
       :vring_workers
     ]
