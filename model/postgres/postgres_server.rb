@@ -391,6 +391,9 @@ class PostgresServer < Sequel::Model
     )
     archival_backlog = Integer(result.strip, 10)
 
+    # Apply I/O throttle based on archival backlog
+    apply_io_throttle_if_needed(session, archival_backlog)
+
     if archival_backlog > archival_backlog_threshold
       Prog::PageNexus.assemble("#{ubid} archival backlog high",
         ["PGArchivalBacklogHigh", id], ubid,
@@ -400,6 +403,29 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe archival backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def apply_io_throttle_if_needed(session, archival_backlog)
+    # Only apply I/O throttle when using the WAL-G daemon mode.
+    # With the old command set, wal-g runs as a subprocess of postgres archiver,
+    # so throttling postgresql@.service would also throttle archival itself.
+    return if resource.use_old_walg_command_set?
+
+    desired_throttle = calculate_io_throttle_mbps(archival_backlog)
+    current_throttle = current_io_throttle_mbps || 0
+
+    # Determine if we need to change the throttle
+    should_apply = if desired_throttle > current_throttle
+      # Always increase throttle when backlog grows
+      true
+    elsif desired_throttle < current_throttle
+      # Only decrease/remove throttle if backlog is well below threshold (hysteresis)
+      archival_backlog < IO_THROTTLE_CLEAR_THRESHOLD
+    else
+      false
+    end
+
+    apply_io_throttle(session, desired_throttle) if should_apply
   end
 
   def archival_backlog_threshold
@@ -448,20 +474,56 @@ class PostgresServer < Sequel::Model
 
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
+
+  # I/O throttle thresholds (WAL file counts)
+  # Throttling starts when archival backlog exceeds these thresholds
+  IO_THROTTLE_BACKLOG_THRESHOLD = 100       # Start throttling at 100 files behind
+  IO_THROTTLE_SEVERE_THRESHOLD = 500        # Increase throttling at 500 files
+  IO_THROTTLE_CRITICAL_THRESHOLD = 1000     # Maximum throttling at 1000 files
+  IO_THROTTLE_CLEAR_THRESHOLD = 50          # Remove throttle when backlog drops below this (hysteresis)
+
+  def calculate_io_throttle_mbps(backlog_count)
+    return 0 if backlog_count < IO_THROTTLE_BACKLOG_THRESHOLD
+
+    # Progressive throttling based on backlog severity
+    case backlog_count
+    when IO_THROTTLE_BACKLOG_THRESHOLD...IO_THROTTLE_SEVERE_THRESHOLD
+      100
+    when IO_THROTTLE_SEVERE_THRESHOLD...IO_THROTTLE_CRITICAL_THRESHOLD
+      50
+    else
+      20
+    end
+  end
+
+  def apply_io_throttle(session, throttle_mbps)
+    session[:ssh_session].exec!(
+      "sudo postgres/bin/apply-io-throttle :version :throttle_mbps",
+      version:,
+      throttle_mbps:
+    )
+    update(current_io_throttle_mbps: throttle_mbps)
+    Clog.emit("Applied I/O throttle") {
+      {io_throttle_applied: {ubid:, throttle_mbps:}}
+    }
+  rescue => ex
+    Clog.emit("Failed to apply I/O throttle", Util.exception_to_hash(ex, into: {postgres_server_id: id, throttle_mbps:}))
+  end
 end
 
 # Table: postgres_server
 # Columns:
-#  id                     | uuid                     | PRIMARY KEY
-#  created_at             | timestamp with time zone | NOT NULL DEFAULT now()
-#  resource_id            | uuid                     | NOT NULL
-#  vm_id                  | uuid                     |
-#  timeline_id            | uuid                     | NOT NULL
-#  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
-#  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
-#  version                | text                     | NOT NULL
-#  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
-#  is_representative      | boolean                  | NOT NULL DEFAULT false
+#  id                       | uuid                     | PRIMARY KEY
+#  created_at               | timestamp with time zone | NOT NULL DEFAULT now()
+#  resource_id              | uuid                     | NOT NULL
+#  vm_id                    | uuid                     |
+#  timeline_id              | uuid                     | NOT NULL
+#  timeline_access          | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
+#  synchronization_status   | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
+#  version                  | text                     | NOT NULL
+#  physical_slot_ready      | boolean                  | NOT NULL DEFAULT false
+#  is_representative        | boolean                  | NOT NULL DEFAULT false
+#  current_io_throttle_mbps | integer                  |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE

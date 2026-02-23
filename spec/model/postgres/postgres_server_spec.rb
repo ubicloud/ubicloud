@@ -644,6 +644,7 @@ RSpec.describe PostgresServer do
 
     before do
       allow(postgres_server).to receive(:archival_backlog_threshold).and_return(10)
+      allow(postgres_server).to receive(:apply_io_throttle_if_needed)
     end
 
     it "checks archival backlog and does nothing if it is within limits" do
@@ -886,6 +887,137 @@ RSpec.describe PostgresServer do
     it "raises if given interpolated string" do
       string = "string"
       expect { postgres_server.run_query("interpolated #{string}") }.to raise_error(NetSsh::PotentialInsecurity)
+    end
+  end
+
+  describe "#calculate_io_throttle_mbps" do
+    it "returns 0 when backlog is below threshold" do
+      expect(postgres_server.calculate_io_throttle_mbps(50)).to eq(0)
+      expect(postgres_server.calculate_io_throttle_mbps(99)).to eq(0)
+    end
+
+    it "returns 100 MB/s for moderate backlog (100-499 files)" do
+      expect(postgres_server.calculate_io_throttle_mbps(100)).to eq(100)
+      expect(postgres_server.calculate_io_throttle_mbps(250)).to eq(100)
+      expect(postgres_server.calculate_io_throttle_mbps(499)).to eq(100)
+    end
+
+    it "returns 50 MB/s for severe backlog (500-999 files)" do
+      expect(postgres_server.calculate_io_throttle_mbps(500)).to eq(50)
+      expect(postgres_server.calculate_io_throttle_mbps(750)).to eq(50)
+      expect(postgres_server.calculate_io_throttle_mbps(999)).to eq(50)
+    end
+
+    it "returns 20 MB/s for critical backlog (1000+ files)" do
+      expect(postgres_server.calculate_io_throttle_mbps(1000)).to eq(20)
+      expect(postgres_server.calculate_io_throttle_mbps(2000)).to eq(20)
+    end
+  end
+
+  describe "#apply_io_throttle" do
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
+    it "applies throttle and updates the column" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo postgres/bin/apply-io-throttle 16 100"
+      )
+      expect(Clog).to receive(:emit).with("Applied I/O throttle", instance_of(Hash))
+
+      postgres_server.apply_io_throttle(session, 100)
+      expect(postgres_server.reload.current_io_throttle_mbps).to eq(100)
+    end
+
+    it "sets column to nil when throttle is 0" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo postgres/bin/apply-io-throttle 16 0"
+      )
+      expect(Clog).to receive(:emit).with("Applied I/O throttle", instance_of(Hash))
+
+      postgres_server.apply_io_throttle(session, 0)
+      expect(postgres_server.reload.current_io_throttle_mbps).to be_nil
+    end
+
+    it "logs error and continues if apply fails" do
+      expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to apply I/O throttle", instance_of(Hash))
+
+      # Should not raise
+      postgres_server.apply_io_throttle(session, 100)
+    end
+  end
+
+  describe "#apply_io_throttle_if_needed" do
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
+    it "does not apply throttle when using old walg command set" do
+      expect(resource).to receive(:use_old_walg_command_set?).and_return(true)
+      expect(postgres_server).not_to receive(:apply_io_throttle)
+      postgres_server.apply_io_throttle_if_needed(session, 500)
+    end
+
+    it "applies throttle when backlog exceeds threshold and no current throttle" do
+      expect(postgres_server).to receive(:apply_io_throttle).with(session, 100)
+      postgres_server.apply_io_throttle_if_needed(session, 150)
+    end
+
+    it "increases throttle when backlog grows more severe" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      expect(postgres_server).to receive(:apply_io_throttle).with(session, 50)
+      postgres_server.apply_io_throttle_if_needed(session, 600)
+    end
+
+    it "does not change throttle when backlog is in same tier" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      expect(postgres_server).not_to receive(:apply_io_throttle)
+      postgres_server.apply_io_throttle_if_needed(session, 200)
+    end
+
+    it "does not decrease throttle unless backlog drops below clear threshold" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      # Backlog at 60 is below throttle threshold (100) but above clear threshold (50)
+      expect(postgres_server).not_to receive(:apply_io_throttle)
+      postgres_server.apply_io_throttle_if_needed(session, 60)
+    end
+
+    it "removes throttle when backlog drops below clear threshold" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      expect(postgres_server).to receive(:apply_io_throttle).with(session, 0)
+      postgres_server.apply_io_throttle_if_needed(session, 40)
+    end
+
+    it "does nothing when no throttle needed and none applied" do
+      expect(postgres_server).not_to receive(:apply_io_throttle)
+      postgres_server.apply_io_throttle_if_needed(session, 30)
+    end
+  end
+
+  describe "#observe_archival_backlog with I/O throttle" do
+    let(:session) { {ssh_session: instance_double(Net::SSH::Connection::Session)} }
+
+    before do
+      allow(postgres_server).to receive(:archival_backlog_threshold).and_return(1000)
+    end
+
+    it "applies I/O throttle when archival backlog is high" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("150\n")
+      expect(postgres_server).to receive(:apply_io_throttle_if_needed).with(session, 150)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+
+      postgres_server.observe_archival_backlog(session)
+    end
+
+    it "removes I/O throttle when archival backlog recovers" do
+      postgres_server.update(current_io_throttle_mbps: 100)
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("30\n")
+      expect(postgres_server).to receive(:apply_io_throttle_if_needed).with(session, 30)
+      expect(Page).to receive(:from_tag_parts).and_return(nil)
+
+      postgres_server.observe_archival_backlog(session)
     end
   end
 end
