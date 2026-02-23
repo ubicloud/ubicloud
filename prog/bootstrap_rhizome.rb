@@ -60,7 +60,16 @@ set -ueo pipefail
 sudo apt-get update
 sudo apt-get -y install ruby-bundler
 sudo which bundle
-sudo userdel -rf rhizome || true
+if id rhizome &>/dev/null; then
+  procs=$(ps -u rhizome -o pid,comm,args --no-headers) || [ $? -eq 1 ]
+  if [ -n "$procs" ]; then
+    echo "Terminating rhizome processes:"
+    echo "$procs"
+    sudo pkill -u rhizome || [ $? -eq 1 ]
+    sleep 1
+  fi
+  sudo userdel -r rhizome
+fi
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
