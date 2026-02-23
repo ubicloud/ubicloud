@@ -6,12 +6,19 @@ RSpec.describe CloudflareR2 do
   before do
     allow(Config).to receive_messages(
       machine_image_r2_api_token: "test-api-token",
-      machine_image_r2_account_id: "test-account-id",
-      machine_image_r2_access_key_id: "test-parent-key-id"
+      machine_image_r2_account_id: "test-account-id"
     )
+    # Reset cached parent access key ID between tests
+    described_class.instance_variable_set(:@parent_access_key_id, nil)
   end
 
   describe ".generate_temp_credentials" do
+    before do
+      stub_request(:get, "https://api.cloudflare.com/client/v4/user/tokens/verify")
+        .with(headers: {"Authorization" => "Bearer test-api-token"})
+        .to_return(status: 200, body: {success: true, result: {id: "test-parent-key-id"}}.to_json)
+    end
+
     it "generates temporary S3 credentials via Cloudflare API" do
       stub_request(:post, "https://api.cloudflare.com/client/v4/accounts/test-account-id/r2/temp-access-credentials")
         .with(
@@ -39,6 +46,38 @@ RSpec.describe CloudflareR2 do
       expect {
         described_class.generate_temp_credentials(bucket: "test-bucket", permission: "object-read-write", ttl_seconds: 900)
       }.to raise_error(Excon::Error::Forbidden)
+    end
+
+    it "caches the parent access key ID across calls" do
+      stub_request(:post, "https://api.cloudflare.com/client/v4/accounts/test-account-id/r2/temp-access-credentials")
+        .to_return(
+          status: 200,
+          body: {success: true, result: {accessKeyId: "k", secretAccessKey: "s", sessionToken: "t"}}.to_json
+        )
+
+      described_class.generate_temp_credentials(bucket: "b", permission: "object-read-only", ttl_seconds: 60)
+      described_class.generate_temp_credentials(bucket: "b", permission: "object-read-only", ttl_seconds: 60)
+
+      expect(WebMock).to have_requested(:get, "https://api.cloudflare.com/client/v4/user/tokens/verify").once
+    end
+  end
+
+  describe ".parent_access_key_id" do
+    it "derives the access key ID from the API token" do
+      stub_request(:get, "https://api.cloudflare.com/client/v4/user/tokens/verify")
+        .with(headers: {"Authorization" => "Bearer test-api-token"})
+        .to_return(status: 200, body: {success: true, result: {id: "derived-key-id"}}.to_json)
+
+      expect(described_class.parent_access_key_id("test-api-token")).to eq("derived-key-id")
+    end
+
+    it "raises on verification failure" do
+      stub_request(:get, "https://api.cloudflare.com/client/v4/user/tokens/verify")
+        .to_return(status: 401, body: {success: false}.to_json)
+
+      expect {
+        described_class.parent_access_key_id("bad-token")
+      }.to raise_error(Excon::Error::Unauthorized)
     end
   end
 end

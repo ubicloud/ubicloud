@@ -186,7 +186,6 @@ module Config
   optional :machine_image_archive_bucket, string
   optional :machine_image_archive_endpoint, string
   optional :machine_image_r2_api_token, string, clear: true
-  optional :machine_image_r2_access_key_id, string
   optional :machine_image_r2_account_id, string
   override :machine_image_max_size_gib, 200, int
 

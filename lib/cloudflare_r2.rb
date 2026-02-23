@@ -13,7 +13,6 @@ class CloudflareR2
   def self.generate_temp_credentials(bucket:, permission:, ttl_seconds:)
     api_token = Config.machine_image_r2_api_token
     account_id = Config.machine_image_r2_account_id
-    parent_access_key_id = Config.machine_image_r2_access_key_id
 
     conn = Excon.new("https://api.cloudflare.com", headers: {
       "Authorization" => "Bearer #{api_token}",
@@ -24,7 +23,7 @@ class CloudflareR2
       path: "/client/v4/accounts/#{account_id}/r2/temp-access-credentials",
       body: {
         bucket: bucket,
-        parentAccessKeyId: parent_access_key_id,
+        parentAccessKeyId: parent_access_key_id(api_token),
         permission: permission,
         ttlSeconds: ttl_seconds
       }.to_json,
@@ -37,5 +36,19 @@ class CloudflareR2
       secret_access_key: result.fetch("secretAccessKey"),
       session_token: result.fetch("sessionToken")
     }
+  end
+
+  # The R2 parent access key ID is the API token's ID. We derive it by
+  # calling the token-verify endpoint and cache the result for the process
+  # lifetime.
+  def self.parent_access_key_id(api_token)
+    @parent_access_key_id ||= begin
+      response = Excon.get(
+        "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        headers: {"Authorization" => "Bearer #{api_token}"},
+        expects: 200
+      )
+      JSON.parse(response.body).dig("result", "id")
+    end
   end
 end
