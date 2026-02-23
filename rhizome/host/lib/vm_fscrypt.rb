@@ -5,8 +5,9 @@ require "json"
 require "base64"
 require_relative "../../common/lib/util"
 require_relative "storage_key_encryption"
+require_relative "vm_path"
 
-module VmSetupFscrypt
+module VmFscrypt
   DEK_DIR = "/vm/.fscrypt_keys"
 
   def self.dek_path(vm_name)
@@ -21,7 +22,7 @@ module VmSetupFscrypt
   # Wraps master_key_binary with KEK and stores at /vm/.fscrypt_keys/{vm_name}.json.
   # Adds master key to kernel keyring and sets fscrypt v2 policy on directory.
   def self.encrypt(vm_name, kek_secrets, master_key_binary)
-    vm_home = File.join("", "vm", vm_name)
+    vm_home = VmPath.new(vm_name).home("")
     fail "Directory does not exist: #{vm_home}" unless File.directory?(vm_home)
     fail "Directory is not empty: #{vm_home}" unless (Dir.entries(vm_home) - %w[. ..]).empty?
 
@@ -37,7 +38,7 @@ module VmSetupFscrypt
   # Idempotent: kernel returns same identifier if key already added.
   # Returns silently if no DEK file exists (pre-fscrypt VM).
   def self.unlock(vm_name, kek_secrets)
-    vm_home = File.join("", "vm", vm_name)
+    vm_home = VmPath.new(vm_name).home("")
     fail "Directory does not exist: #{vm_home}" unless File.directory?(vm_home)
 
     dek_file = dek_path(vm_name)
@@ -50,7 +51,7 @@ module VmSetupFscrypt
   # Lock an fscrypt-encrypted /vm/{vm_name}/ directory.
   # Best-effort: does not fail if already locked, not encrypted, or has open FDs.
   def self.lock(vm_name)
-    vm_home = File.join("", "vm", vm_name)
+    vm_home = VmPath.new(vm_name).home("")
     return unless File.directory?(vm_home)
 
     identifier = r("fscryptctl get_policy #{vm_home.shellescape}").strip

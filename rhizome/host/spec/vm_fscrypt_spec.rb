@@ -1,12 +1,12 @@
 # frozen_string_literal: true
 
-require_relative "../lib/vm_setup_fscrypt"
+require_relative "../lib/vm_fscrypt"
 require "openssl"
 require "fileutils"
 
-RSpec.describe VmSetupFscrypt do
+RSpec.describe VmFscrypt do
   let(:vm_name) { "test-fscrypt-vm" }
-  let(:vm_home) { "/vm/#{vm_name}" }
+  let(:vm_home) { "/vm/#{vm_name}/" }
   let(:dek_dir) { "/vm/.fscrypt_keys" }
   let(:dek_path) { "#{dek_dir}/#{vm_name}.json" }
   let(:dek_new_path) { "#{dek_path}.new" }

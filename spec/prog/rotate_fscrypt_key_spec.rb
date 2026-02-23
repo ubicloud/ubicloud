@@ -83,7 +83,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
     it "sends reencrypt command with old and new KEK secrets and hops to test_keys" do
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-reencrypt vmabc123",
+        "sudo host/bin/vm-fscrypt reencrypt vmabc123",
         stdin: anything
       ) do |_cmd, stdin:|
         params = JSON.parse(stdin)
@@ -103,7 +103,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
     it "sends test-keys command and hops to promote_db" do
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-test-keys vmabc123",
+        "sudo host/bin/vm-fscrypt test-keys vmabc123",
         stdin: anything
       ) do |_cmd, stdin:|
         params = JSON.parse(stdin)
@@ -134,7 +134,7 @@ RSpec.describe Prog::RotateFscryptKey do
   describe "#retire_old" do
     it "sends retire-old command and pops" do
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-retire-old vmabc123",
+        "sudo host/bin/vm-fscrypt retire-old vmabc123",
         stdin: "{}"
       )
 
@@ -187,7 +187,7 @@ RSpec.describe Prog::RotateFscryptKey do
         allow(vm_metal).to receive(:fscrypt_key_2).and_return(kek_2)
 
         expect(sshable).to receive(:_cmd).with(
-          "sudo host/bin/setup-vm rotate-fscrypt-reencrypt vmabc123",
+          "sudo host/bin/vm-fscrypt reencrypt vmabc123",
           stdin: anything
         ).and_return("")
 
@@ -205,7 +205,7 @@ RSpec.describe Prog::RotateFscryptKey do
         allow(vm_metal).to receive(:fscrypt_key_2).and_return(kek_2)
 
         expect(sshable).to receive(:_cmd).with(
-          "sudo host/bin/setup-vm rotate-fscrypt-test-keys vmabc123",
+          "sudo host/bin/vm-fscrypt test-keys vmabc123",
           stdin: anything
         ).and_return("")
 
@@ -252,7 +252,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       it "re-sends retire-old command on retry" do
         expect(sshable).to receive(:_cmd).with(
-          "sudo host/bin/setup-vm rotate-fscrypt-retire-old vmabc123",
+          "sudo host/bin/vm-fscrypt retire-old vmabc123",
           stdin: "{}"
         )
 
@@ -291,7 +291,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 2: install — reencrypt DEK file with KEK2
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-reencrypt vmabc123",
+        "sudo host/bin/vm-fscrypt reencrypt vmabc123",
         stdin: anything
       ) do |_cmd, stdin:|
         params = JSON.parse(stdin)
@@ -303,7 +303,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 3: test_keys — verify both files match
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-test-keys vmabc123",
+        "sudo host/bin/vm-fscrypt test-keys vmabc123",
         stdin: anything
       ).and_return("")
       expect { rfk.test_keys }.to hop("promote_db")
@@ -319,7 +319,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 5: retire_old — rename .new over .json
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-retire-old vmabc123",
+        "sudo host/bin/vm-fscrypt retire-old vmabc123",
         stdin: "{}"
       )
       expect { rfk.retire_old }.to exit({"msg" => "fscrypt key rotated"})
@@ -342,7 +342,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 2: install
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-reencrypt vmabc123",
+        "sudo host/bin/vm-fscrypt reencrypt vmabc123",
         stdin: anything
       ) do |_cmd, stdin:|
         params = JSON.parse(stdin)
@@ -354,7 +354,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 3: test_keys
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-test-keys vmabc123",
+        "sudo host/bin/vm-fscrypt test-keys vmabc123",
         stdin: anything
       ).and_return("")
       expect { rfk2.test_keys }.to hop("promote_db")
@@ -370,7 +370,7 @@ RSpec.describe Prog::RotateFscryptKey do
 
       # Step 5: retire_old
       expect(sshable).to receive(:_cmd).with(
-        "sudo host/bin/setup-vm rotate-fscrypt-retire-old vmabc123",
+        "sudo host/bin/vm-fscrypt retire-old vmabc123",
         stdin: "{}"
       )
       expect { rfk2.retire_old }.to exit({"msg" => "fscrypt key rotated"})

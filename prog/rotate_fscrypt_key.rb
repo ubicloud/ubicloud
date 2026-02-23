@@ -23,7 +23,7 @@ class Prog::RotateFscryptKey < Prog::Base
   end
 
   label def install
-    setup_vm("rotate-fscrypt-reencrypt", {
+    vm_fscrypt("reencrypt", {
       old_key: JSON.parse(vm.vm_metal.fscrypt_key),
       new_key: JSON.parse(vm.vm_metal.fscrypt_key_2)
     })
@@ -32,7 +32,7 @@ class Prog::RotateFscryptKey < Prog::Base
   end
 
   label def test_keys
-    setup_vm("rotate-fscrypt-test-keys", {
+    vm_fscrypt("test-keys", {
       old_key: JSON.parse(vm.vm_metal.fscrypt_key),
       new_key: JSON.parse(vm.vm_metal.fscrypt_key_2)
     })
@@ -47,7 +47,7 @@ class Prog::RotateFscryptKey < Prog::Base
   end
 
   label def retire_old
-    setup_vm("rotate-fscrypt-retire-old", {})
+    vm_fscrypt("retire-old", {})
 
     pop "fscrypt key rotated"
   end
@@ -57,7 +57,7 @@ class Prog::RotateFscryptKey < Prog::Base
 
   private
 
-  def setup_vm(action, json)
-    host.sshable.cmd("sudo host/bin/setup-vm :action :vm_name", action:, vm_name:, stdin: JSON.generate(json))
+  def vm_fscrypt(action, json)
+    host.sshable.cmd("sudo host/bin/vm-fscrypt :action :vm_name", action:, vm_name:, stdin: JSON.generate(json))
   end
 end

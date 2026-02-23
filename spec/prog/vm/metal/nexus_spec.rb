@@ -203,7 +203,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
       # Second call: encrypt directory with kek_secrets + master_key as JSON via stdin
       expect(sshable).to receive(:_cmd).with(
-        /sudo host\/bin\/setup-vm encrypt-home #{nx.vm_name}/,
+        /sudo host\/bin\/vm-fscrypt encrypt #{nx.vm_name}/,
         {stdin: /{"kek_secrets":\{.*"algorithm":"aes-256-gcm".*\},"master_key":"/}
       ).ordered
 
@@ -1149,7 +1149,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
 
       expect(sshable).to receive(:_cmd).with(
-        /sudo host\/bin\/setup-vm unlock-home #{nx.vm_name}/,
+        /sudo host\/bin\/vm-fscrypt unlock #{nx.vm_name}/,
         {stdin: kek_json}
       ).ordered
       expect(sshable).to receive(:_cmd).with(

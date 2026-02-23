@@ -153,7 +153,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       # Encrypt the empty directory with fscryptctl (KEK secrets + master key via stdin)
       master_key = OpenSSL::Random.random_bytes(32)
-      host.sshable.cmd("sudo host/bin/setup-vm encrypt-home :vm_name", vm_name:,
+      host.sshable.cmd("sudo host/bin/vm-fscrypt encrypt :vm_name", vm_name:,
         stdin: JSON.generate({"kek_secrets" => JSON.parse(vm.vm_metal.fscrypt_key), "master_key" => Base64.strict_encode64(master_key)}))
 
       # Create the unix user with --no-create-home since the directory is already encrypted
@@ -482,7 +482,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     # Unlock the fscrypt-encrypted /vm/ directory before recreate-unpersisted
     # reads prep.json and other files. After host reboot, directories are locked.
     if vm.vm_metal&.fscrypt_key
-      host.sshable.cmd("sudo host/bin/setup-vm unlock-home :vm_name", vm_name:, stdin: vm.vm_metal.fscrypt_key)
+      host.sshable.cmd("sudo host/bin/vm-fscrypt unlock :vm_name", vm_name:, stdin: vm.vm_metal.fscrypt_key)
     end
 
     secrets_json = JSON.generate({
