@@ -174,8 +174,8 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_user
-    # Lock the fscrypt-encrypted directory before deletion (defense-in-depth)
-    VmFscrypt.lock(@vm_name)
+    # Remove the fscrypt key from the kernel keyring before deletion
+    VmFscrypt.remove_kernel_key(@vm_name)
     r "deluser --remove-home #{q_vm}"
     # Clean up wrapped DEK file after directory removal
     VmFscrypt.purge(@vm_name)

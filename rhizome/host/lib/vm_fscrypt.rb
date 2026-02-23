@@ -51,23 +51,31 @@ module VmFscrypt
     r("fscryptctl add_key #{mnt}", stdin: master_key_binary)
   end
 
-  # Lock an fscrypt-encrypted /vm/{vm_name}/ directory.
-  # Best-effort: does not fail if already locked, not encrypted, or has open FDs.
-  def self.lock(vm_name)
+  # Remove the fscrypt master key from the kernel keyring for a VM directory.
+  # Called during VM destruction (purge_user) to avoid leaking keyring entries
+  # on hosts with high VM churn. This is NOT a reversible lock/unlock pair.
+  # Tolerates: directory not encrypted, key already removed, directory gone.
+  # Surfaces: wrong mountpoint, kernel errors, unexpected failures.
+  def self.remove_kernel_key(vm_name)
     vm_home = VmPath.new(vm_name).home("")
     return unless File.directory?(vm_home)
 
     mnt = mountpoint_of(vm_home).shellescape
     identifier = r("fscryptctl get_policy #{vm_home.shellescape}").strip
     r("fscryptctl remove_key #{identifier} #{mnt}")
-  rescue CommandFail
-    # Ignore failures (may already be locked, not encrypted, etc.)
+  rescue CommandFail => ex
+    raise unless /Error getting policy|ENODATA|not encrypted|No such file|key not present/i.match?(ex.stderr + ex.message)
   end
 
   # Remove the wrapped DEK file(s) for a VM.
+  # Uses FileUtils.rm instead of rm_f so permission errors (EPERM, EACCES)
+  # are surfaced rather than silently swallowed.
   def self.purge(vm_name)
-    FileUtils.rm_f(dek_path(vm_name))
-    FileUtils.rm_f(dek_new_path(vm_name))
+    [dek_path(vm_name), dek_new_path(vm_name)].each do |path|
+      FileUtils.rm(path)
+    rescue Errno::ENOENT
+      # Already removed (idempotent)
+    end
   end
 
   # Re-encrypt the DEK file with a new KEK (writes to .new file).
@@ -88,12 +96,15 @@ module VmFscrypt
   # Promote the new DEK file (atomic rename).
   # Part of KEK rotation: phase 3 of 3.
   # Idempotent: if .new doesn't exist (already renamed on a prior attempt),
-  # this is a no-op.
+  # this is a no-op. The rescue is scoped to just the rename so errors from
+  # sync_parent_dir (missing parent dir, etc.) are not swallowed.
   def self.retire_old(vm_name)
-    File.rename(dek_new_path(vm_name), dek_path(vm_name))
+    begin
+      File.rename(dek_new_path(vm_name), dek_path(vm_name))
+    rescue Errno::ENOENT
+      return # .new was already renamed on a prior attempt
+    end
     sync_parent_dir(dek_path(vm_name))
-  rescue Errno::ENOENT
-    # .new was already renamed to .json on a previous attempt
   end
 
   def self.write_wrapped_dek(path, kek_secrets, master_key_binary)

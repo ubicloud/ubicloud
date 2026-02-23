@@ -99,7 +99,7 @@ RSpec.describe VmFscrypt do
     end
   end
 
-  describe ".lock" do
+  describe ".remove_kernel_key" do
     it "calls fscryptctl get_policy and remove_key" do
       expect(File).to receive(:directory?).with(vm_home).and_return(true)
       expect(described_class).to receive(:r)
@@ -108,32 +108,54 @@ RSpec.describe VmFscrypt do
       expect(described_class).to receive(:r)
         .with("fscryptctl remove_key abcdef0123456789 /")
 
-      described_class.lock(vm_name)
+      described_class.remove_kernel_key(vm_name)
     end
 
     it "does nothing if directory does not exist" do
       expect(File).to receive(:directory?).with(vm_home).and_return(false)
       expect(described_class).not_to receive(:r)
 
-      described_class.lock(vm_name)
+      described_class.remove_kernel_key(vm_name)
     end
 
-    it "ignores lock failures" do
+    it "tolerates expected failures (not encrypted, key already removed)" do
       expect(File).to receive(:directory?).with(vm_home).and_return(true)
       expect(described_class).to receive(:r)
         .with("fscryptctl get_policy #{vm_home}")
-        .and_raise(CommandFail.new("not encrypted", "", ""))
+        .and_raise(CommandFail.new("", "Error getting policy: not encrypted", ""))
 
-      expect { described_class.lock(vm_name) }.not_to raise_error
+      expect { described_class.remove_kernel_key(vm_name) }.not_to raise_error
+    end
+
+    it "raises on unexpected failures" do
+      expect(File).to receive(:directory?).with(vm_home).and_return(true)
+      expect(described_class).to receive(:r)
+        .with("fscryptctl get_policy #{vm_home}")
+        .and_raise(CommandFail.new("", "Permission denied", ""))
+
+      expect { described_class.remove_kernel_key(vm_name) }.to raise_error(CommandFail)
     end
   end
 
   describe ".purge" do
     it "removes DEK file and .new file" do
-      expect(FileUtils).to receive(:rm_f).with(dek_path)
-      expect(FileUtils).to receive(:rm_f).with(dek_new_path)
+      expect(FileUtils).to receive(:rm).with(dek_path)
+      expect(FileUtils).to receive(:rm).with(dek_new_path)
 
       described_class.purge(vm_name)
+    end
+
+    it "tolerates already-removed files (idempotent)" do
+      expect(FileUtils).to receive(:rm).with(dek_path).and_raise(Errno::ENOENT)
+      expect(FileUtils).to receive(:rm).with(dek_new_path).and_raise(Errno::ENOENT)
+
+      expect { described_class.purge(vm_name) }.not_to raise_error
+    end
+
+    it "raises on permission errors" do
+      expect(FileUtils).to receive(:rm).with(dek_path).and_raise(Errno::EACCES)
+
+      expect { described_class.purge(vm_name) }.to raise_error(Errno::EACCES)
     end
   end
 
@@ -233,8 +255,9 @@ RSpec.describe VmFscrypt do
       described_class.retire_old(vm_name)
     end
 
-    it "is idempotent when .new already renamed" do
+    it "is idempotent when .new already renamed and does not call sync_parent_dir" do
       expect(File).to receive(:rename).with(dek_new_path, dek_path).and_raise(Errno::ENOENT)
+      expect(File).not_to receive(:open).with(dek_dir)
 
       expect { described_class.retire_old(vm_name) }.not_to raise_error
     end
