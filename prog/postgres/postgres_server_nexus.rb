@@ -21,19 +21,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       server_version = postgres_resource.read_replica? ? postgres_resource.target_version : postgres_resource.version
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
-      boot_image = if postgres_resource.location.aws?
-        postgres_resource.location.pg_ami(server_version, arch)
-      else
-        flavor_suffix = case postgres_resource.flavor
-        when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
-        when PostgresResource::Flavor::LANTERN then "#{server_version}-lantern"
-        # :nocov: flavor is a DB enum, unknown values are impossible
-        else raise "Unknown PostgreSQL flavor: #{postgres_resource.flavor}"
-          # :nocov:
-        end
-
-        "postgres#{flavor_suffix}-ubuntu-2204"
-      end
+      boot_image = postgres_resource.location.pg_boot_image(server_version, arch, postgres_resource.flavor)
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,
@@ -151,10 +139,10 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def run_init_script
-    hop_configure_walg_credentials unless postgres_server.resource.init_script
+    hop_setup_blob_storage unless postgres_server.resource.init_script
     case vm.sshable.d_check("run_init_script")
     when "Succeeded"
-      hop_configure_walg_credentials
+      hop_setup_blob_storage
     when "Failed", "NotStarted"
       vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: postgres_server.resource.init_script.init_script.gsub("\r\n", "\n"))
       vm.sshable.cmd("sudo chmod +x postgres/bin/init_script.sh")
@@ -164,17 +152,20 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5
   end
 
-  label def configure_walg_credentials
+  label def setup_blob_storage
     postgres_server.attach_s3_policy_if_needed
-    postgres_server.refresh_walg_credentials
     hop_initialize_empty_database if postgres_server.primary?
+    # Standbys need WAL-G credentials before backup-fetch can run.
+    # Primary gets credentials after initialize_empty_database since
+    # that step doesn't use WAL-G.
+    postgres_server.refresh_walg_credentials
     hop_initialize_database_from_backup
   end
 
   label def initialize_empty_database
     case vm.sshable.d_check("initialize_empty_database")
     when "Succeeded"
-      hop_refresh_certificates
+      hop_configure_walg_credentials
     when "Failed", "NotStarted"
       vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version)
     end
@@ -185,7 +176,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def initialize_database_from_backup
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
-      hop_refresh_certificates
+      hop_configure_walg_credentials
     when "Failed", "NotStarted"
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
@@ -196,6 +187,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     end
 
     nap 5
+  end
+
+  label def configure_walg_credentials
+    postgres_server.refresh_walg_credentials
+    hop_refresh_certificates
   end
 
   label def refresh_certificates
@@ -675,10 +671,8 @@ SQL
   label def lockout
     decr_lockout
 
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless postgres_server.resource.location.aws?
-      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    postgres_server.lockout_mechanisms.each do |mechanism|
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 
     hop_wait_lockout_attempt

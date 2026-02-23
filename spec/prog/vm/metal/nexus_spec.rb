@@ -818,7 +818,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#update_firewall_rules" do
     it "hops to wait_firewall_rules" do
       vm.incr_update_firewall_rules
-      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false, provider_name: "metal"))
       expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
       expect { nx.update_firewall_rules }
         .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)

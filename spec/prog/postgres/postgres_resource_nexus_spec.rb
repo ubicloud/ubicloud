@@ -367,6 +367,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [["CNAME", "pg-test-resource.pg.example.com."]]
     end
 
+    it "skips public AAAA but creates private AAAA for GCP instances without ephemeral_net6" do
+      postgres_server
+      postgres_server.vm.update(ephemeral_net6: nil)
+      postgres_resource.location.update(provider: "gcp")
+      expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
+      dns_zone = DnsZone.create(project_id: postgres_project.id, name: "pg.example.com")
+      nx.incr_initial_provisioning
+      expect { nx.refresh_dns_record }.to hop("initialize_certificates")
+      expect(DnsRecord.where(dns_zone_id: dns_zone.id).exclude(:tombstoned).select_order_map([:type, :name])).to eq [
+        ["A", "pg-test-resource.pg.example.com."],
+        ["A", "private.pg-test-resource.pg.example.com."],
+        ["AAAA", "private.pg-test-resource.pg.example.com."]
+      ]
+    end
+
     it "hops even if dns zone is not configured" do
       postgres_server
       expect { nx.refresh_dns_record }.to hop("wait")
@@ -667,6 +682,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         postgres_server
         expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
         expect(postgres_resource).not_to exist
+      end
+
+      it "does not destroy timelines (retained for 10-day recovery)" do
+        postgres_server
+        expect { nx.wait_children_destroyed }.to exit({"msg" => "postgres resource is deleted"})
+        expect(Semaphore.where(strand_id: postgres_server.timeline.strand.id, name: "destroy").count).to eq(0)
       end
     end
   end

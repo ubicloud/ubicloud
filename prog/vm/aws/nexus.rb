@@ -141,7 +141,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     end
 
     params = {
-      image_id: vm.boot_image, # AMI ID
+      image_id: aws_ami_id,
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
       block_device_mappings: [
         {
@@ -416,6 +416,32 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   def is_runner?
     return @is_runner if defined?(@is_runner)
     @is_runner = vm.unix_user == "runneradmin"
+  end
+
+  CANONICAL_OWNER = "099720109477"
+  BOOT_IMAGE_NAMES = {
+    "ubuntu-noble" => "ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-ARCH-server-*",
+    "ubuntu-jammy" => "ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-ARCH-server-*"
+  }.freeze
+
+  def aws_ami_id
+    return vm.boot_image if vm.boot_image&.start_with?("ami-")
+
+    pattern = BOOT_IMAGE_NAMES[vm.boot_image]
+    raise "Unknown boot image '#{vm.boot_image}' — expected an ami-* ID or one of: #{BOOT_IMAGE_NAMES.keys.join(", ")}" unless pattern
+
+    ami_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
+    resp = client.describe_images(
+      filters: [
+        {name: "name", values: [pattern.sub("ARCH", ami_arch)]},
+        {name: "owner-id", values: [CANONICAL_OWNER]},
+        {name: "state", values: ["available"]}
+      ]
+    )
+    ami = resp.images.max_by(&:creation_date)
+    raise "No AMI found matching '#{vm.boot_image}' (#{ami_arch}) in #{vm.location.name}" unless ami
+
+    ami.image_id
   end
 
   def retry_in_different_az(e)

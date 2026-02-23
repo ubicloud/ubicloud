@@ -16,7 +16,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
+    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws? || postgres_resource.location.gcp?
       postgres_resource.provision_new_standby
     end
 
@@ -72,6 +72,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     ).id
     upgrade_candidate.update(version: postgres_resource.target_version, timeline_id: new_timeline_id, timeline_access: "push")
 
+    hop_setup_upgrade_credentials
+  end
+
+  label def setup_upgrade_credentials
+    upgrade_candidate.increment_s3_new_timeline
     upgrade_candidate.incr_refresh_walg_credentials
     upgrade_candidate.incr_configure
     upgrade_candidate.incr_restart

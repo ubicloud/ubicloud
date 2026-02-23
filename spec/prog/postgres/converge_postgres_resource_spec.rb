@@ -183,6 +183,19 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.vm.update(vm_host_id: nil)
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
+
+    it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
+      location.update(provider: "gcp")
+      LocationCredential.create_with_id(location.id,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.create(gcp_project_id: "test-project", pg_version: "17", arch: "x64", gce_image_name: "postgres-17-x64-test")
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
   end
 
   describe "#wait_servers_to_be_ready" do
@@ -350,14 +363,30 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "update_metadata")
-      candidate # force lazy let to create the candidate
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
     end
 
-    it "creates new timeline and updates candidate server metadata" do
-      expect { nx.update_metadata }.to hop("wait_upgrade_candidate").and change(PostgresTimeline, :count).by(1)
+    it "creates new timeline, updates candidate server metadata, and hops to setup_upgrade_credentials" do
+      expect { nx.update_metadata }.to hop("setup_upgrade_credentials").and change(PostgresTimeline, :count).by(1)
       expect(candidate.reload).to have_attributes(
         version: "17",
-        timeline_access: "push",
+        timeline_access: "push"
+      )
+    end
+  end
+
+  describe "#setup_upgrade_credentials" do
+    let(:candidate) { create_server(version: "17", upgrade_candidate: true) }
+
+    before do
+      strand.update(label: "setup_upgrade_credentials")
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+    end
+
+    it "sets up blob storage credentials and hops to wait_upgrade_candidate" do
+      expect(candidate).to receive(:increment_s3_new_timeline)
+      expect { nx.setup_upgrade_credentials }.to hop("wait_upgrade_candidate")
+      expect(candidate.reload).to have_attributes(
         refresh_walg_credentials_set?: true,
         configure_set?: true,
         restart_set?: true

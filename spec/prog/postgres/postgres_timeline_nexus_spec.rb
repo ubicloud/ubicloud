@@ -100,6 +100,21 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     loc
   end
 
+  def create_gcp_location
+    loc = Location.create(
+      name: "us-central1",
+      display_name: "GCP US Central 1",
+      ui_name: "gcp-us-central1",
+      visible: true,
+      provider: "gcp"
+    )
+    LocationCredential.create_with_id(loc,
+      project_id: "test-gcp-project",
+      service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+      credentials_json: '{"type":"service_account","project_id":"test-gcp-project"}')
+    loc
+  end
+
   def backup_fixture(days_ago:)
     Struct.new(:key, :last_modified).new(
       "basebackups_005/base_backup_stop_sentinel.json",
@@ -147,8 +162,15 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(st.subject).to exist
     end
 
+    it "does not generate access_key/secret_key for GCP locations" do
+      gcp_location = create_gcp_location
+      tl = described_class.assemble(location_id: gcp_location.id).subject
+      expect(tl.access_key).to be_nil
+      expect(tl.secret_key).to be_nil
+    end
+
     it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
-      expect(Config).to receive(:aws_postgres_iam_access).and_return(true).twice
+      expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
 
       tl = described_class.assemble(location_id: Location::HETZNER_FSN1_ID).subject
       expect(tl.access_key).not_to be_nil
@@ -204,9 +226,19 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       end
     end
 
+    describe "when blob storage is gcp gcs" do
+      it "skips setup_blob_storage and hops to setup_bucket" do
+        gcp_location = create_gcp_location
+        postgres_timeline.update(location_id: gcp_location.id)
+
+        expect(nx.postgres_timeline).to receive(:setup_blob_storage).and_call_original
+        expect { nx.start }.to hop("setup_bucket")
+      end
+    end
+
     it "hops without creating bucket if blob storage is not configured" do
       # No minio cluster created, so blob_storage is nil
-      expect(nx).not_to receive(:setup_blob_storage)
+      expect(nx.postgres_timeline).not_to receive(:setup_blob_storage)
       expect { nx.start }.to hop("wait_leader")
     end
   end
@@ -227,23 +259,23 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:create_policy, {policy: {arn: "policy-arn"}})
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
-      nx.setup_aws_s3
+      postgres_timeline.setup_blob_storage
     end
 
-    it "#destroy_aws_s3 detach policy to vm role when aws_postgres_iam_access configured" do
+    it "destroys AWS S3 blob storage when aws_postgres_iam_access configured" do
       expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
       aws_location = create_aws_location
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
+      expect(postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
 
       expect(iam_client).to receive(:delete_policy).with(policy_arn: "arn:aws:iam::123456789012:policy/#{postgres_timeline.ubid}")
 
-      nx.destroy_aws_s3
+      postgres_timeline.destroy_blob_storage
     end
 
     it "naps if aws and the key is not available" do
@@ -447,6 +479,50 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
         iam_client.stub_responses(:delete_access_key)
         expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+
+        expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+        expect(postgres_timeline).not_to exist
+      end
+    end
+
+    describe "when blob storage is gcp gcs" do
+      let(:iam_service) { instance_double(Google::Apis::IamV1::IamService) }
+
+      it "deletes bucket contents and bucket then destroys timeline" do
+        gcp_location = create_gcp_location
+        postgres_timeline.update(location_id: gcp_location.id)
+
+        file1 = instance_double(Google::Cloud::Storage::File)
+        file2 = instance_double(Google::Cloud::Storage::File)
+        bucket = instance_double(Google::Cloud::Storage::Bucket)
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+
+        expect(nx.postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(bucket)
+        expect(bucket).to receive(:files).and_return([file1, file2])
+        expect(file1).to receive(:delete)
+        expect(file2).to receive(:delete)
+        expect(bucket).to receive(:delete)
+
+        allow_any_instance_of(LocationCredential).to receive(:iam_client).and_return(iam_service)
+        expect(iam_service).to receive(:delete_project_service_account).with(
+          "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
+        )
+
+        expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
+        expect(postgres_timeline).not_to exist
+      end
+
+      it "handles missing bucket gracefully" do
+        gcp_location = create_gcp_location
+        postgres_timeline.update(location_id: gcp_location.id)
+
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        expect(nx.postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+        expect(storage_client).to receive(:bucket).with(postgres_timeline.ubid).and_return(nil)
+
+        allow_any_instance_of(LocationCredential).to receive(:iam_client).and_return(iam_service)
+        allow(iam_service).to receive(:delete_project_service_account)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
         expect(postgres_timeline).not_to exist
