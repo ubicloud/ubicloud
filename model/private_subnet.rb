@@ -93,15 +93,17 @@ class PrivateSubnet < Sequel::Model
     subnets.max_by { |_, (_, weight)| rand**(1.0 / weight) }.first
   end
 
-  # Here we are blocking the bottom 4 and top 1 addresses of each subnet
+  # Here we are blocking the bottom 4 and top 2 addresses of each subnet.
   # The bottom first address is called the network address, that must be
   # blocked since we use it for routing.
   # The very last address is blocked because typically it is used as the
   # broadcast address.
+  # The second-to-last address is reserved by GCP for potential future use.
   # We further block the bottom 3 addresses for future proofing. We may
   # use it in future for some other purpose. AWS also does that. Here
   # is the source;
   # https://docs.aws.amazon.com/vpc/latest/userguide/subnet-sizing.html
+  # https://cloud.google.com/vpc/docs/subnets#reserved_ip_addresses_in_every_subnet
   #
   # Requirements:
   # - The parent subnet mask can range from /16 to /26.
@@ -115,10 +117,11 @@ class PrivateSubnet < Sequel::Model
   private def _random_private_ipv4
     cidr_size = [32, (net4.netmask.prefix_len + 8)].min
 
-    # If the subnet size is /24 or higher like /26, exclude the first 4 and last 1 IPs
-    # to account for reserved addresses (network, broadcast, and reserved use).
+    # If the subnet size is /24 or higher like /26, exclude the first 4 and last 2 IPs
+    # to account for reserved addresses (network, gateway, broadcast, and
+    # cloud-provider reserved). Both AWS and GCP reserve the second-to-last address.
     if cidr_size == 32
-      total_hosts = 2**(cidr_size - net4.netmask.prefix_len) - 5
+      total_hosts = 2**(cidr_size - net4.netmask.prefix_len) - 6
       random_offset = SecureRandom.random_number(total_hosts) + 4
     else
       # For bigger subnets like /16, use the full available range without subtracting reserved IPs.
