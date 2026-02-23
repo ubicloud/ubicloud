@@ -118,7 +118,7 @@ class Scheduling::Dispatcher
 
       # The thread that listens for changes in the number of respirate processes
       # and adjusts the partition range accordingly.
-      @repartition_thread = Thread.new { @repartitioner.listen }
+      @repartition_thread = Thread.new { handle_disconnects { @repartitioner.listen } }
     else
       # Setup an unpartitioned prepared statement.
       # This method is called implicitly with the appropriate partition when
@@ -160,6 +160,43 @@ class Scheduling::Dispatcher
       data[:apoptosis_thread].join
       data[:strand_thread].join
     end
+  end
+
+  # Handle database disconnects by retrying the block. If a disconnect
+  # or connect after disconnect error is raised, sleep for 1-2 seconds
+  # (randomized to prevent the thundering herd) and retry. Disconnects
+  # are very rare and likely only due to a restart of the database.
+  #
+  # This does not use exponential backoff, but a 1-2 second sleep per thread
+  # results in about 15 connection attempts per second per production respirate
+  # process (with 20 strand threads) while the database is down, which is reasonable.
+  #
+  # Normally, Sequel handles removing disconnected connections from the connection
+  # pool automatically.  The reason for this code is that respirate uses coarse
+  # connection checkoutsm as there isn't a reason for fine grained connection
+  # checkouts. The reasons for this are:
+  #
+  # * Most respirate threads that use a database connection are strand threads
+  #   * Strand threads run inside a transaction
+  #   * The connection needs to be checked out for the entire transaction
+  # * The repartition thread uses LISTEN on a connection
+  #   * The requires a connection checked out for the entire thread.
+  # * The main (scan) thread could use fine grained checkouts, but since it
+  #   is the only thread that could use them, there is no benefit compared to
+  #   checking out a connection for the entire runtime of the thread.
+  #
+  # When using coarse grained checkouts, you need to handle and retry on
+  # disconnect outside of the DB.synchronize block. If you attempt to do it
+  # inside the DB.synchronize block (such as by the rescue in #run_strand), the
+  # disconnected connections are not removed from the connection pool, and all
+  # further database access inside the DB.synchronize block will fail.
+  def handle_disconnects
+    DB.synchronize do
+      yield
+    end
+  rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+    sleep(1 + rand)
+    retry
   end
 
   # Signal that the dispatcher should shut down.  This only sets a flag.
@@ -356,7 +393,7 @@ class Scheduling::Dispatcher
       start_queue:,
       finish_queue:,
       apoptosis_thread: Thread.new { apoptosis_thread(start_queue, finish_queue) },
-      strand_thread: Thread.new { DB.synchronize { strand_thread(strand_queue, start_queue, finish_queue) } }
+      strand_thread: Thread.new { handle_disconnects { strand_thread(strand_queue, start_queue, finish_queue) } }
     }
   end
 
@@ -451,9 +488,12 @@ class Scheduling::Dispatcher
       metrics.available_workers = strand_queue.num_waiting
       run_strand(strand, start_queue, finish_queue)
     end
+  rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError => e
+    raise
   ensure
-    # Signal related apoptosis thread to shutdown
-    start_queue.push(nil)
+    # Signal related apoptosis thread to shutdown, unless there was
+    # a disconnect error
+    start_queue.push(nil) unless e
   end
 
   # Handle the running of a single strand.  Signals the apoptosis
@@ -473,6 +513,11 @@ class Scheduling::Dispatcher
   rescue Strand::RunError => ex
     # Already logged by Strand#run
     ex.cause
+  rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError => disconnect
+    # Do not swallow disconnect errors, as that would break the current
+    # strand thread. These errors must be raised so that handle_disconnects
+    # can retry the strand thread with a new database connection.
+    raise
   rescue => ex
     # Unusual situation, where Strand#run raises after prog execution,
     # such as while handling a nap, hop, or exit
@@ -486,7 +531,9 @@ class Scheduling::Dispatcher
     finish_queue.push(true)
     @mutex.synchronize { @current_strands.delete(strand.id) }
 
-    @metrics_queue.push(strand.respirate_metrics)
+    # Do not push metrics if a disconnect errors, as the information could
+    # be incomplete.
+    @metrics_queue.push(strand.respirate_metrics) unless disconnect
 
     # If there are any sessions in the thread-local (really fiber-local) ssh
     # cache after the strand run, close them eagerly to close the related
