@@ -234,8 +234,8 @@ RSpec.describe KubernetesNode do
       result = kn.check_mesh_availability
       expect(result[:available]).to be false
       expect(result[:unreachable_pods]).to eq(["pod-1"])
-      expect(result[:pod_errors]).to eq({"pod-1" => "timeout"})
-      expect(result[:mtr_results]).to eq({"pod-1" => {"ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}})
+      expect(result[:pod_errors]).to eq([{"name" => "pod-1", "reachable" => false, "error" => "timeout"}])
+      expect(result[:mtr_results]).to eq([{"name" => "pod-1", "ip" => "10.0.0.2", "output" => "HOST: ...", "exit_status" => 0, "last_check" => "2026-01-01T00:00:00Z"}])
     end
 
     it "returns not available when api_error is present" do
@@ -254,12 +254,13 @@ RSpec.describe KubernetesNode do
     it "returns not available when external endpoints are unreachable" do
       status_json = JSON.generate({
         "pods" => {},
-        "external_endpoints" => {"10.0.0.1:443" => {"reachable" => false}}
+        "external_endpoints" => {"10.0.0.1:443" => {"reachable" => false, "error" => "connection refused"}}
       })
       expect(kn.sshable).to receive(:_cmd).with("cat /var/lib/ubicsi/mesh_status.json 2>/dev/null || echo -n").and_return(status_json)
       result = kn.check_mesh_availability
       expect(result[:available]).to be false
       expect(result[:unreachable_external]).to eq(["10.0.0.1:443"])
+      expect(result[:external_errors]).to eq([{"name" => "10.0.0.1:443", "reachable" => false, "error" => "connection refused"}])
     end
 
     it "uses ssh_session when provided" do
