@@ -507,6 +507,9 @@ RSpec.describe Csi::V1::NodeService do
     end
     let(:pv) do
       {
+        "metadata" => {
+          "annotations" => {}
+        },
         "spec" => {
           "csi" => {
             "volumeHandle" => "vol-old-123"
@@ -521,6 +524,18 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
       expect(service).to receive(:run_cmd_output).and_return("Succeeded")
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+
+      service.migrate_pvc_data(req_id, client, pvc, req)
+    end
+
+    it "cleans up retry count annotation on Succeeded" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "2"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(service).to receive(:run_cmd_output).and_return("Succeeded")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", nil)
 
       service.migrate_pvc_data(req_id, client, pvc, req)
     end
@@ -553,8 +568,34 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", "1")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
 
-      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(RuntimeError, "Copy old PV data failed")
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data copy failed, retrying (attempt 1)")
+    end
+
+    it "increments retry count on subsequent failures" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "2"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", "3")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data copy failed, retrying (attempt 3)")
+    end
+
+    it "raises a hard error after exceeding max retries" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "3"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(RuntimeError, "Migration copy failed after 3 attempts, please contact support")
     end
 
     it "handles migration when daemonizer check returns unknown status" do
