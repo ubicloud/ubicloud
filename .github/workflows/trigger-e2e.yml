@@ -62,10 +62,21 @@ jobs:
               const inputs = {}
               if (providers) inputs.providers = providers;
               if (testCases) inputs.test_cases = testCases;
-              await github.rest.actions.createWorkflowDispatch({
+              const dispatch = await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: 'e2e.yml',
                 ref: pullRequest.data.head.ref,
-                inputs: inputs
+                inputs: inputs,
+                return_run_details: true
               });
+
+              // Append the workflow run URL to the original comment
+              if (dispatch.data?.html_url) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: context.payload.comment.id,
+                  body: `${context.payload.comment.body}\n\nE2E tests triggered: ${dispatch.data.html_url}`
+                });
+              }
