@@ -119,6 +119,7 @@ class KubernetesNode < Sequel::Model
     pvs = JSON.parse(kubernetes_cluster.client.kubectl("get pv -ojson"))["items"]
     pvs.select do |pv|
       pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
+        pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain" &&
         pv.dig("spec", "nodeAffinity", "required", "nodeSelectorTerms", 0,
           "matchExpressions", 0, "values", 0) == name
     end

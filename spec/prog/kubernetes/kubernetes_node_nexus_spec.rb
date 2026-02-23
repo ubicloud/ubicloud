@@ -191,7 +191,10 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "naps when a PV with old-pvc-object annotation references this node" do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}}
+        "spec" => {
+          "persistentVolumeReclaimPolicy" => "Retain",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}
+        }
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to nap(15)
@@ -207,6 +210,18 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}}
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
+      expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
+    end
+
+    it "hops to remove_node_from_cluster when PV has Delete reclaim policy (rolled-back chained migration)" do
+      pv_list = {"items" => [{
+        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
+        "spec" => {
+          "persistentVolumeReclaimPolicy" => "Delete",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}
+        }
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")

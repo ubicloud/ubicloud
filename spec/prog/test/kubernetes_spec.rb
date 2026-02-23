@@ -552,7 +552,10 @@ RSpec.describe Prog::Test::Kubernetes do
 
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}}
+        "spec" => {
+          "persistentVolumeReclaimPolicy" => "Retain",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}
+        }
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
@@ -569,7 +572,10 @@ RSpec.describe Prog::Test::Kubernetes do
 
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}}
+        "spec" => {
+          "persistentVolumeReclaimPolicy" => "Retain",
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}
+        }
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
