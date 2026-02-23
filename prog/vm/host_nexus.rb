@@ -79,6 +79,7 @@ class Prog::Vm::HostNexus < Prog::Base
     bud Prog::LearnStorage
     bud Prog::LearnPci
     bud Prog::InstallDnsmasq
+    bud Prog::InstallFscryptctl
     bud Prog::SetupSysstat
     bud Prog::SetupNftables
     bud Prog::SetupNodeExporter
@@ -117,6 +118,8 @@ class Prog::Vm::HostNexus < Prog::Base
             spdk: cpu < vm_host.spdk_cpu_count
           )
         end
+      when "Vm::PrepHost"
+        vm_host.update(fsencrypt_capable: true)
       end
     end
 
