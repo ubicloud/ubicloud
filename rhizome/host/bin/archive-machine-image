@@ -1,0 +1,90 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "fileutils"
+require_relative "../../common/lib/util"
+
+params = JSON.parse($stdin.read)
+
+archive_bin = params.fetch("archive_bin")
+device_config = params.fetch("device_config")
+target_config_path = params.fetch("target_config_path")
+target_config_content = params.fetch("target_config_content")
+encrypt = params.fetch("encrypt", false)
+s3_key_id = params.fetch("s3_key_id")
+s3_secret_key = params.fetch("s3_secret_key")
+s3_session_token = params["s3_session_token"]
+archive_kek = params["archive_kek"]
+disk_kek = params["disk_kek"]
+vm_name = params.fetch("vm_name")
+
+# Write target config
+safe_write_to_file(target_config_path, target_config_content)
+
+# Set up named pipes for secrets
+secrets_dir = "/run/secrets/#{vm_name}"
+FileUtils.mkdir_p(secrets_dir)
+
+pipe_threads = []
+
+# S3 key ID pipe
+s3_key_id_pipe = File.join(secrets_dir, "s3-key-id.pipe")
+FileUtils.rm_f(s3_key_id_pipe)
+r "mkfifo -m 0600 #{s3_key_id_pipe}"
+pipe_threads << Thread.new { File.write(s3_key_id_pipe, s3_key_id) }
+
+# S3 secret key pipe
+s3_secret_key_pipe = File.join(secrets_dir, "s3-secret-key.pipe")
+FileUtils.rm_f(s3_secret_key_pipe)
+r "mkfifo -m 0600 #{s3_secret_key_pipe}"
+pipe_threads << Thread.new { File.write(s3_secret_key_pipe, s3_secret_key) }
+
+# S3 session token pipe (for temporary credentials)
+s3_session_token_pipe = nil
+if s3_session_token
+  s3_session_token_pipe = File.join(secrets_dir, "s3-session-token.pipe")
+  FileUtils.rm_f(s3_session_token_pipe)
+  r "mkfifo -m 0600 #{s3_session_token_pipe}"
+  pipe_threads << Thread.new { File.write(s3_session_token_pipe, s3_session_token) }
+end
+
+# Archive KEK pipe (if encrypted)
+archive_kek_pipe = nil
+if encrypt && archive_kek
+  archive_kek_pipe = File.join(secrets_dir, "archive-kek.pipe")
+  FileUtils.rm_f(archive_kek_pipe)
+  r "mkfifo -m 0600 #{archive_kek_pipe}"
+  # Archive KEK must be raw 32 bytes (decoded from Base64)
+  archive_kek_bytes = archive_kek.unpack1("m")
+  pipe_threads << Thread.new { File.write(archive_kek_pipe, archive_kek_bytes) }
+end
+
+# Disk KEK pipe -- needed to decrypt the source disk's XTS key
+# The device config references kek.pipe for the disk encryption KEK
+disk_kek_pipe = nil
+if disk_kek
+  # Find the kek.pipe path from the device config directory
+  config_dir = File.dirname(device_config)
+  disk_kek_pipe = File.join(config_dir, "kek.pipe")
+  FileUtils.rm_f(disk_kek_pipe)
+  r "mkfifo -m 0600 #{disk_kek_pipe}"
+  pipe_threads << Thread.new { File.write(disk_kek_pipe, disk_kek) }
+end
+
+# Build archive command
+cmd = "#{archive_bin} -f #{device_config} --target-config #{target_config_path} --compression zstd --zstd-level 3"
+cmd += " --encrypt" if encrypt
+
+begin
+  r cmd
+ensure
+  # Clean up
+  FileUtils.rm_f(target_config_path)
+  FileUtils.rm_f(s3_key_id_pipe) if s3_key_id_pipe
+  FileUtils.rm_f(s3_secret_key_pipe) if s3_secret_key_pipe
+  FileUtils.rm_f(s3_session_token_pipe) if s3_session_token_pipe
+  FileUtils.rm_f(archive_kek_pipe) if archive_kek_pipe
+  FileUtils.rm_f(disk_kek_pipe) if disk_kek_pipe
+  pipe_threads.each { |t| t.join(5) }
+end

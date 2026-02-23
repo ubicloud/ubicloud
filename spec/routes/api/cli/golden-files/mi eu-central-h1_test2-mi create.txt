@@ -1,0 +1,10 @@
+! Vm-id is required, provide with -v option
+
+Create a machine image from a stopped VM
+
+Usage:
+    ubi mi location/mi-name create [options]
+
+Options:
+    -v, --vm-id=vm-id                UBID of the source VM (required)
+    -d, --description=desc           description for machine image

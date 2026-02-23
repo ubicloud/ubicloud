@@ -442,7 +442,8 @@ RSpec.describe VmSetup do
           --net mac=02:aa:bb:cc:dd:01,tap=tap0,ip=,mask=,num_queues=5
         ].each { |frag| expect(content).to include(frag) }
 
-        expect(content).to include("ExecStop=/opt/cloud-hypervisor/v35.1/ch-remote --api-socket /tmp/ch.sock shutdown-vmm")
+        expect(content).to include("ExecStop=/opt/cloud-hypervisor/v35.1/ch-remote --api-socket /tmp/ch.sock power-button")
+        expect(content).to include("TimeoutStopSec=60s")
         expect(content).to include("Restart=no")
         expect(content).to include("User=test")
         expect(content).to include("Group=test")

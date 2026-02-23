@@ -252,6 +252,18 @@ class CloverAdmin < Roda
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
       end
     },
+    "MachineImage" => {
+      "make_public" => object_action("Make Public", "Image is now public") do |obj|
+        fail "Cannot make encrypted image public" if obj.encrypted
+        obj.update(visible: true)
+      end,
+      "make_private" => object_action("Make Private", "Image is now private") do |obj|
+        obj.update(visible: false)
+      end,
+      "decommission" => object_action("Decommission", "Image decommissioned") do |obj|
+        obj.update(state: "decommissioned")
+      end
+    },
     "Vm" => {
       "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart),
       "stop" => object_action("Stop", "Stop scheduled for Vm", &:incr_stop)
@@ -346,6 +358,22 @@ class CloverAdmin < Roda
     model Firewall do
       eager [:project, :location]
       columns [:name, :project, :location, :description]
+    end
+
+    model MachineImage do
+      order [:name]
+      eager [:project, :location]
+      columns [:name, :state, :project, :location, :arch, :size_gib, :encrypted, :visible, :created_at]
+      column_options state: {type: "select", options: %w[available creating verifying failed decommissioned destroying], add_blank: true},
+        arch: {type: "select", options: ["x64", "arm64"], add_blank: true},
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :created_at
+          column_grep.call(ds, :created_at, value)
+        end
+      end
     end
 
     model Account do

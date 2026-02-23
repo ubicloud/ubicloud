@@ -104,6 +104,7 @@ class UBID
   TYPE_VICTORIA_METRICS_RESOURCE = "vr"
   TYPE_VICTORIA_METRICS_SERVER = "vn"
   TYPE_SSH_PUBLIC_KEY = "sk"
+  TYPE_MACHINE_IMAGE = "m1"
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
   TYPE_LOCATION_AWS_AZ = "1a"
   TYPE_AWS_SUBNET = "as"
@@ -149,6 +150,7 @@ class UBID
     ActionTag: ta
     ObjectTag: t0
     KubernetesCluster: kc
+    MachineImage: m1
     Location: 10
   TYPES
   def self.generate_vanity_action_type(action)

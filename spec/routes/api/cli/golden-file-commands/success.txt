@@ -1,5 +1,6 @@
 --confirm 2c0j48 ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy
 --confirm test-lb lb eu-central-h1/test-lb destroy
+--confirm test-mi mi eu-central-h1/test-mi destroy
 --confirm test-pg pg eu-central-h1/test-pg destroy
 --confirm test-ps-default fw eu-central-h1/test-ps-default destroy
 --confirm test-ps ps eu-central-h1/test-ps destroy
@@ -92,6 +93,16 @@ lb list -l eu-north-h1
 lb list -l eu-north-h1 -f name,id
 lb list -l eu-north-h1 -N -f name,id
 lb list -N
+mi eu-central-h1/test-mi destroy -f
+mi eu-central-h1/test-mi show
+mi eu-central-h1/test-mi show -f id,name,state
+mi eu-central-h1/test-mi show -f location,arch,size-gib,encrypted,compression,visible
+mi list
+mi list -f location,name,id
+mi list -l eu-central-h1
+mi list -l eu-central-h1 -f name,id
+mi list -l eu-central-h1 -N -f name,id
+mi list -N
 pg eu-central-h1/test2-pg create -s standard-2 -S 64
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -f paradedb
 pg eu-central-h1/test2-pg create -s standard-2 -S 64 -h sync

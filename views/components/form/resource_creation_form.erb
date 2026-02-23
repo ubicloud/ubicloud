@@ -65,7 +65,14 @@ let option_dirty = <%== allow_unescaped(JSON.generate(form_elements.map { it[:na
     when "radio_small_cards"
       locals = {name:, label:, options:, attributes:, description_html: element[:description_html], additional_element_html: element[:additional_element_html]}
     when "select"
-      locals = {name:, label:, options:, placeholder:, attributes:, description_html: element[:description_html]}
+      select_options = options
+      if element[:optgroup_separator]
+        sep = element[:optgroup_separator]
+        distro = select_options.reject { |opt_val, *| opt_val.to_s.start_with?(sep) }
+        user = select_options.select { |opt_val, *| opt_val.to_s.start_with?(sep) }
+        select_options = user.any? ? {nil => distro, "Your Images" => user} : select_options
+      end
+      locals = {name:, label:, options: select_options, placeholder:, attributes:, description_html: element[:description_html]}
     when "checkbox"
       locals = {name:, label:, options:, description: element[:description]}
     when "text"

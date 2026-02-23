@@ -1,0 +1,12 @@
+id: m1b3hjaxypgy4n6hhd8drkmzzs
+name: test-mi
+description: test desc
+state: available
+location: eu-central-h1
+arch: x64
+size-gib: 20
+encrypted: true
+compression: zstd
+visible: false
+source-vm-id: vmdzyppz6j166jh5e9t2dwrfas
+created-at: 2025-11-21T16:22:32+01:00

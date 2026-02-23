@@ -1,0 +1,6 @@
+location: eu-central-h1
+arch: x64
+size-gib: 20
+encrypted: true
+compression: zstd
+visible: false

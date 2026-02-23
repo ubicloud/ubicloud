@@ -12,7 +12,8 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
+    machine_image_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -23,6 +24,14 @@ class Prog::Vm::Nexus < Prog::Base
 
     unless (location = (allow_private_subnet_in_other_project ? Location : Location.for_project(project_id)).with_pk(location_id))
       fail "No existing location in project"
+    end
+
+    # When booting from a machine image, no local boot_image is needed
+    if machine_image_id
+      mi = MachineImage[machine_image_id]
+      fail "Machine image not found" unless mi
+      fail "Machine image is not available" unless ["available", "verifying"].include?(mi.state)
+      boot_image = ""
     end
 
     vm_size = Validation.validate_vm_size(size, arch)
@@ -38,6 +47,11 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:boot] = disk_index == boot_disk_index
+
+      # When using a machine image, inject its ID into the boot volume
+      if machine_image_id && volume[:boot]
+        volume[:machine_image_id] = machine_image_id
+      end
 
       if volume[:read_only]
         volume[:size_gib] = 0

@@ -292,6 +292,22 @@ module AdminModelSpecHelper
       KubernetesNodepool.create(kubernetes_cluster_id: cluster.id, name: "test-pool", target_node_size: "standard-2", node_count: 1)
     end
 
+    def create_machine_image
+      project = Project.create(name: "test-project")
+      MachineImage.create(
+        name: "test-image-#{SecureRandom.hex(4)}",
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        state: "available",
+        s3_bucket: "test-bucket",
+        s3_prefix: "test-prefix",
+        s3_endpoint: "https://s3.example.com",
+        encrypted: false,
+        size_gib: 10,
+        arch: "x64"
+      )
+    end
+
     def create_load_balancer
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")

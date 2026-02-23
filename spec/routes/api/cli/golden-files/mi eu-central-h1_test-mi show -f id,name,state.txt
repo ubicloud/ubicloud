@@ -1,0 +1,3 @@
+id: m1b3hjaxypgy4n6hhd8drkmzzs
+name: test-mi
+state: available

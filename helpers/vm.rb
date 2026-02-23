@@ -39,11 +39,31 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "machine_image_id", "private_subnet_id", "gpu", "init_script"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
+
+    # Handle boot_image that starts with "mi:" (user selected a machine image from dropdown)
+    if assemble_params[:boot_image]&.start_with?("mi:")
+      assemble_params[:machine_image_id] = assemble_params[:boot_image].delete_prefix("mi:")
+      assemble_params.delete(:boot_image)
+    end
+
+    # Validate machine image if provided
+    if assemble_params[:machine_image_id]
+      mi_uuid = UBID.to_uuid(assemble_params[:machine_image_id])
+      mi = MachineImage.for_project(project.id).first(id: mi_uuid)
+      fail Validation::ValidationFailed.new({machine_image_id: "Machine image not found"}) unless mi
+      fail Validation::ValidationFailed.new({machine_image_id: "Machine image is not available"}) unless mi.state == "available"
+      if mi.location_id != @location.id
+        fail Validation::ValidationFailed.new({machine_image_id: "Machine image is in location '#{mi.display_location}' but VM is being created in location '#{@location.display_name}'"})
+      end
+      assemble_params[:arch] = mi.arch
+      assemble_params[:machine_image_id] = mi.id
+      assemble_params.delete(:boot_image)
+    end
 
     # Generally parameter validation is handled in progs while creating resources.
     # Since Vm::Nexus both handles VM creation requests from user and also Postgres
@@ -213,6 +233,23 @@ class Clover
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
     options.add_option(name: "boot_image", values: boot_images)
+
+    # User's machine images (shown as optional dropdown on VM create)
+    user_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+      .where(state: "available")
+      .eager(:location)
+      .all
+      .map {
+        {
+          location_id: it.location_id,
+          value: it.ubid,
+          display_name: "#{it.name} (#{it.arch}, #{it.size_gib} GiB)"
+        }
+      }
+    options.add_option(name: "machine_image_id", values: user_images, parent: "location") do |location, mi|
+      mi[:location_id] == location.id
+    end
+
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")

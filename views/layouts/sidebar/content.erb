@@ -25,6 +25,14 @@
             ) %>
             <%== part(
               "layouts/sidebar/item",
+              name: "Machine Images",
+              url: "#{@project.path}/machine-image",
+              is_active: request.path.include?('/machine-image'),
+              icon: "hero-document-text",
+              has_permission: has_project_permission("MachineImage:view")
+            ) %>
+            <%== part(
+              "layouts/sidebar/item",
               name: "Networking",
               url: "#{@project.path}/private-subnet",
               is_active:

@@ -492,7 +492,7 @@ DHCP
     raparams = nics.map { "ra-param=#{_1.tap}" }.join("\n")
     interfaces = nics.map { "interface=#{_1.tap}" }.join("\n")
     dnsmasq_address_ip6 = NetAddr::IPv6.parse("fd00:0b1c:100d:53::")
-    runner_config = if boot_image.include?("github")
+    runner_config = if boot_image&.include?("github")
       <<~ADDRESSES
       address=/ubicloudhostplaceholder.blob.core.windows.net/#{nics.first.net4.split("/").first}
       address=/.docker.io/::
@@ -585,9 +585,9 @@ DNSMASQ_CONF
   end
 
   private def install_commands(boot_image)
-    if boot_image.include?("almalinux")
+    if boot_image&.include?("almalinux")
       [%w[dnf install -y nftables].shelljoin]
-    elsif boot_image.include?("debian")
+    elsif boot_image&.include?("debian")
       [%w[apt-get update].shelljoin, %w[apt-get install -y nftables].shelljoin]
     else
       []
@@ -785,7 +785,8 @@ DNSMASQ_SERVICE
 
   ExecStart=#{exec_start_cmd}
 
-  ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} shutdown-vmm
+  ExecStop=#{@ch_version.ch_remote_bin} --api-socket #{vp.ch_api_sock} power-button
+  TimeoutStopSec=60s
   #{footer}
     SERVICE
   end

@@ -1,0 +1,127 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# Downloads a distro image from a URL, converts it to raw if needed,
+# initializes ubiblk metadata, and archives it to R2.
+
+require "json"
+require "fileutils"
+require_relative "../../common/lib/util"
+
+params = JSON.parse($stdin.read)
+
+url = params.fetch("url")
+expected_sha256 = params.fetch("sha256")
+work_dir = params.fetch("work_dir")
+archive_bin = params.fetch("archive_bin")
+init_metadata_bin = params.fetch("init_metadata_bin")
+target_config_content = params.fetch("target_config_content")
+s3_key_id = params.fetch("s3_key_id")
+s3_secret_key = params.fetch("s3_secret_key")
+s3_session_token = params["s3_session_token"]
+
+FileUtils.mkdir_p(work_dir)
+
+downloaded_path = File.join(work_dir, "image.download")
+raw_path = File.join(work_dir, "image.raw")
+metadata_path = File.join(work_dir, "metadata")
+device_config_path = File.join(work_dir, "device.toml")
+target_config_path = File.join(work_dir, "target.toml")
+secrets_dir = File.join(work_dir, "secrets")
+
+begin
+  # Step 1: Download the image
+  warn "Downloading image from #{url}..."
+  actual_sha256 = curl_file(url, downloaded_path)
+  fail "SHA-256 mismatch: expected #{expected_sha256}, got #{actual_sha256}" unless actual_sha256 == expected_sha256
+
+  # Step 2: Detect format and convert to raw if needed
+  format_output = r("qemu-img", "info", "--output=json", downloaded_path)
+  format_info = JSON.parse(format_output)
+  image_format = format_info["format"]
+
+  if image_format == "raw"
+    FileUtils.mv(downloaded_path, raw_path)
+  else
+    warn "Converting #{image_format} to raw..."
+    r "qemu-img", "convert", "-f", image_format, "-O", "raw", downloaded_path, raw_path
+    FileUtils.rm_f(downloaded_path)
+  end
+
+  image_size = File.size(raw_path)
+  warn "Raw image size: #{image_size} bytes (#{(image_size / (1024.0**3)).round(2)} GiB)"
+
+  # Step 3: Create a minimal device config for init-metadata and archive
+  device_config = <<~TOML
+    [device]
+    data_path = #{raw_path.inspect}
+    metadata_path = #{metadata_path.inspect}
+    device_id = "distro-register"
+
+    [tuning]
+    num_queues = 1
+    queue_size = 64
+    io_engine = "sync"
+
+    [stripe_source]
+    type = "raw"
+    image_path = #{raw_path.inspect}
+    autofetch = false
+    copy_on_read = false
+
+    [danger_zone]
+    enabled = true
+    allow_unencrypted_disk = true
+    allow_inline_plaintext_secrets = false
+    allow_secret_over_regular_file = true
+    allow_unencrypted_connection = true
+    allow_env_secrets = false
+  TOML
+  safe_write_to_file(device_config_path, device_config)
+
+  # Step 4: Initialize metadata
+  warn "Initializing metadata..."
+  r init_metadata_bin, "-f", device_config_path, "--stripe-sector-count-shift", "11"
+
+  # Step 5: Write target config and set up secret pipes
+  safe_write_to_file(target_config_path, target_config_content)
+
+  FileUtils.mkdir_p(secrets_dir)
+
+  pipe_threads = []
+
+  s3_key_id_pipe = File.join(secrets_dir, "s3-key-id.pipe")
+  FileUtils.rm_f(s3_key_id_pipe)
+  r "mkfifo -m 0600 #{s3_key_id_pipe}"
+  pipe_threads << Thread.new { File.write(s3_key_id_pipe, s3_key_id) }
+
+  s3_secret_key_pipe = File.join(secrets_dir, "s3-secret-key.pipe")
+  FileUtils.rm_f(s3_secret_key_pipe)
+  r "mkfifo -m 0600 #{s3_secret_key_pipe}"
+  pipe_threads << Thread.new { File.write(s3_secret_key_pipe, s3_secret_key) }
+
+  if s3_session_token
+    s3_session_token_pipe = File.join(secrets_dir, "s3-session-token.pipe")
+    FileUtils.rm_f(s3_session_token_pipe)
+    r "mkfifo -m 0600 #{s3_session_token_pipe}"
+    pipe_threads << Thread.new { File.write(s3_session_token_pipe, s3_session_token) }
+  end
+
+  # Step 6: Run archive
+  warn "Archiving to R2..."
+  r "#{archive_bin} -f #{device_config_path} --target-config #{target_config_path} --compression zstd --zstd-level 3"
+
+  warn "Archive complete."
+  pipe_threads.each { |t| t.join(5) }
+
+  # Output image size in GiB (ceiling) for the caller
+  size_gib = (image_size / (1024.0**3)).ceil
+  puts size_gib
+ensure
+  FileUtils.rm_f(downloaded_path)
+  FileUtils.rm_f(raw_path)
+  FileUtils.rm_f(metadata_path)
+  FileUtils.rm_f(device_config_path)
+  FileUtils.rm_f(target_config_path)
+  FileUtils.rm_rf(secrets_dir)
+end

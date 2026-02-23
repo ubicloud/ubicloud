@@ -103,7 +103,9 @@ RSpec.describe Clover, "vm" do
         fill_in "Name", with: "dummy-vm"
         choose "Germany"
 
-        Location.where(display_name: "eu-central-h1").destroy
+        loc_ids = Location.where(display_name: "eu-central-h1").select_map(:id)
+        MachineImage.where(location_id: loc_ids).destroy
+        Location.where(id: loc_ids).destroy
         click_button "Create"
         expect(page.status_code).to eq 404
       end
@@ -691,6 +693,7 @@ RSpec.describe Clover, "vm" do
         choose option: "ubuntu-jammy"
         choose option: "standard-2"
 
+        MachineImage.where(location_id: Location::HETZNER_FSN1_ID).destroy
         Location[Location::HETZNER_FSN1_ID].destroy
         click_button "Create"
 

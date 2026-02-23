@@ -111,6 +111,22 @@ RSpec.describe Clover, "cli" do
     expect(PostgresMetricDestination).to receive(:generate_uuid).and_return("46d93419-abcc-8a8d-823a-55efe660727f").at_least(:once)
     expect(Nic).to receive(:generate_ubid).and_return(UBID.parse("nc186qw3d23j1kzsgjqg2t811r")).at_least(:once)
     expect(LoadBalancer).to receive(:generate_uuid).and_return("eb8e0b21-94f2-8c2b-82c8-da57fcfe88c7").at_least(:once)
+    mi = MachineImage.create_with_id("58e32577-d687-8a81-a9a3-16a1b89d3ffc",
+      name: "test-mi",
+      description: "test desc",
+      project_id: @project.id,
+      location_id: Location::HETZNER_FSN1_ID,
+      state: "available",
+      s3_bucket: "test-bucket",
+      s3_prefix: "images/test/",
+      s3_endpoint: "https://r2.example.com",
+      size_gib: 20,
+      arch: "x64",
+      vm_id: @vm.id,
+      created_at: now
+    )
+    Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "wait", stack: [{"subject_id" => mi.id}])
+
     ApiKey.create_with_id("13012223-089c-8953-ac55-889bca83c6e5", owner_table: "project", owner_id: @project.id, used_for: "inference_endpoint", project_id: @project.id, key: "89k2Q8FSzNU3lbQ1ZIpS6HCAQzxplOq1")
     expect(ApiKey).to receive(:random_key).and_return("B5T6fbB5wXBX9kZEEdQXmAWbNY9rWuoL").at_least(:once)
     expect(ApiKey).to receive(:generate_uuid).and_return("6677de33-3888-8953-bde1-ed8a8137d507").at_least(:once)
