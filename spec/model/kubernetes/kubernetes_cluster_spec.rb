@@ -46,56 +46,72 @@ RSpec.describe KubernetesCluster do
     kc.init_health_monitor_session
   end
 
-  it "checks pulse" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
+  describe "#check_pulse" do
+    let(:ssh_session) { Net::SSH::Connection::Session.allocate }
+    let(:session) { {ssh_session:} }
+    let(:client) { Kubernetes::Client.new(kc, ssh_session) }
+    let(:down_pulse) { {reading: "down", reading_rpt: 5, reading_chg: Time.now - 30} }
+    let(:up_pulse) { {reading: "up", reading_rpt: 5, reading_chg: Time.now - 30} }
 
-    expect(kc).to receive(:incr_sync_kubernetes_services)
-    client = instance_double(Kubernetes::Client)
-    expect(kc).to receive(:client).and_return(client)
-    expect(client).to receive(:any_lb_services_modified?).and_return(true)
-
-    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
-  end
-
-  it "checks pulse on with no changes to the internal services" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate
-    }
-    pulse = {
-      reading: "up",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
+    before {
+      expect(kc).to receive(:client).and_return(client)
     }
 
-    client = instance_double(Kubernetes::Client)
-    expect(kc).to receive(:client).and_return(client)
-    expect(client).to receive(:any_lb_services_modified?).and_return(false)
+    it "checks pulse" do
+      expect(client).to receive(:any_lb_services_modified?).and_return(true)
+      expect(kc).to receive(:incr_sync_kubernetes_services)
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
 
-    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("up")
-  end
+      expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("up")
+    end
 
-  it "checks pulse and fails" do
-    session = {
-      ssh_session: Net::SSH::Connection::Session.allocate
-    }
-    pulse = {
-      reading: "down",
-      reading_rpt: 5,
-      reading_chg: Time.now - 30
-    }
+    it "checks pulse on with no changes to the internal services" do
+      expect(client).to receive(:any_lb_services_modified?).and_return(false)
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
 
-    client = instance_double(Kubernetes::Client)
-    expect(kc).to receive(:client).and_return(client)
-    expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
+      expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
+    end
 
-    expect(kc.check_pulse(session:, previous_pulse: pulse)[:reading]).to eq("down")
+    it "checks pulse and fails" do
+      expect(client).to receive(:any_lb_services_modified?).and_raise Sshable::SshError
+      expect(kc.check_pulse(session:, previous_pulse: down_pulse)[:reading]).to eq("down")
+    end
+
+    it "returns down and creates a page when a PV has migration retry count >= 3" do
+      pv_json = JSON.generate({"items" => [
+        {"metadata" => {"name" => "pv-healthy", "annotations" => {"csi.ubicloud.com/migration-retry-count" => "1"}}},
+        {"metadata" => {"name" => "pv-stuck", "annotations" => {"csi.ubicloud.com/migration-retry-count" => "3"}}},
+        {"metadata" => {"name" => "pv-no-annotation", "annotations" => {}}}
+      ]})
+
+      expect(client).to receive(:any_lb_services_modified?).and_return(false)
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(pv_json, 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response)
+      expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("down")
+
+      page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
+      expect(page).not_to be_nil
+      expect(page.summary).to eq("#{kc.ubid} PV migration stuck")
+      expect(page.details["stuck_pvs"]).to eq(["pv-stuck"])
+    end
+
+    it "resolves the page when PVs are no longer stuck" do
+      Prog::PageNexus.assemble("#{kc.ubid} PV migration stuck",
+        ["KubernetesClusterPVMigrationStuck", kc.id], kc.ubid,
+        extra_data: {stuck_pvs: ["pv-stuck"]})
+      expect(Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)).not_to be_nil
+
+      lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      pv_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(lb_response).ordered
+      expect(ssh_session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(pv_response).ordered
+
+      expect(kc.check_pulse(session:, previous_pulse: up_pulse)[:reading]).to eq("up")
+      page = Page.from_tag_parts("KubernetesClusterPVMigrationStuck", kc.id)
+      expect(page.reload.resolve_set?).to be true
+    end
   end
 
   describe "#kubectl" do
