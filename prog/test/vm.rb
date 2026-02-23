@@ -128,16 +128,20 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def ping_vms_in_subnet
     vms_with_same_subnet.each { |x|
-      # ping public IPs
-      sshable.cmd("ping -c 2 :ip", ip: x.ip4)
-      sshable.cmd("ping -c 2 :ip", ip: x.ip6)
+      # test public IP reachability
+      check_reachable(x.ip4)
+      check_reachable(x.ip6) if x.ip6
 
-      # ping private IPs
+      # test private IP reachability
       nic = x.nics.first
-      private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
-      sshable.cmd("ping -c 2 :ip", ip: private_ip6)
-      sshable.cmd("ping -c 2 :ip", ip: private_ip4)
+      check_reachable(private_ip4)
+
+      # Private IPv6 (ULA) only works on metal (IPsec tunnels)
+      if vm.location.provider == "metal"
+        private_ip6 = nic.private_ipv6.nth(2).to_s
+        check_reachable(private_ip6)
+      end
     }
 
     hop_ping_vms_not_in_subnet
@@ -145,27 +149,30 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def ping_vms_not_in_subnet
     vms_with_different_subnet.each { |x|
-      # ping public IPs should work
-      sshable.cmd("ping -c 2 :ip", ip: x.ip4)
-      sshable.cmd("ping -c 2 :ip", ip: x.ip6)
+      # public IPs should be reachable
+      check_reachable(x.ip4)
+      check_reachable(x.ip6) if x.ip6
 
-      # ping private IPs shouldn't work
+      # private IPv4 shouldn't be reachable across subnets
       nic = x.nics.first
-      private_ip6 = nic.private_ipv6.nth(2).to_s
       private_ip4 = nic.private_ipv4.network.to_s
 
       begin
-        sshable.cmd("ping -c 2 :ip", ip: private_ip6)
+        check_reachable(private_ip4)
       rescue Sshable::SshError
       else
-        raise "Unexpected successful ping to private ip6 of a vm in different subnet"
+        raise "Unexpected successful connection to private ip4 of a vm in different subnet"
       end
 
-      begin
-        sshable.cmd("ping -c 2 :ip", ip: private_ip4)
-      rescue Sshable::SshError
-      else
-        raise "Unexpected successful ping to private ip4 of a vm in different subnet"
+      # Private IPv6 (ULA) isolation only testable on metal (IPsec tunnels)
+      if vm.location.provider == "metal"
+        private_ip6 = nic.private_ipv6.nth(2).to_s
+        begin
+          check_reachable(private_ip6)
+        rescue Sshable::SshError
+        else
+          raise "Unexpected successful connection to private ip6 of a vm in different subnet"
+        end
       end
     }
 
@@ -178,6 +185,15 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def failed
     nap 15
+  end
+
+  def check_reachable(ip)
+    if vm.location.provider == "metal"
+      sshable.cmd("ping -c 2 :ip", ip:)
+    else
+      # Cloud providers may not allow ICMP; use TCP connect to port 22
+      sshable.cmd("nc -zw5 :ip 22", ip:)
+    end
   end
 
   def vms_in_same_project
