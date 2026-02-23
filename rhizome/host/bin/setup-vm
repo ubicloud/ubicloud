@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/vm_setup"
 
 unless (action = ARGV.shift)
   puts "expected action as argument"
@@ -13,6 +12,46 @@ unless (vm_name = ARGV.shift)
   puts "expected path to vm_name as argument"
   exit 1
 end
+
+# fscrypt actions don't need prep.json — they run before it exists
+# or when the directory is locked (so prep.json can't be read).
+if action == "encrypt-home"
+  require_relative "../lib/vm_setup_fscrypt"
+  params = JSON.parse($stdin.read)
+  kek_secrets = params["kek_secrets"]
+  master_key_binary = Base64.decode64(params["master_key"])
+  VmSetupFscrypt.encrypt(vm_name, kek_secrets, master_key_binary)
+  exit 0
+end
+
+if action == "unlock-home"
+  require_relative "../lib/vm_setup_fscrypt"
+  kek_secrets = JSON.parse($stdin.read)
+  VmSetupFscrypt.unlock(vm_name, kek_secrets)
+  exit 0
+end
+
+if action == "rotate-fscrypt-reencrypt"
+  require_relative "../lib/vm_setup_fscrypt"
+  params = JSON.parse($stdin.read)
+  VmSetupFscrypt.reencrypt(vm_name, params["old_key"], params["new_key"])
+  exit 0
+end
+
+if action == "rotate-fscrypt-test-keys"
+  require_relative "../lib/vm_setup_fscrypt"
+  params = JSON.parse($stdin.read)
+  VmSetupFscrypt.test_keys(vm_name, params["old_key"], params["new_key"])
+  exit 0
+end
+
+if action == "rotate-fscrypt-retire-old"
+  require_relative "../lib/vm_setup_fscrypt"
+  VmSetupFscrypt.retire_old(vm_name)
+  exit 0
+end
+
+require_relative "../lib/vm_setup"
 
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))
