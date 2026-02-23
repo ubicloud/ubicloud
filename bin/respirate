@@ -45,7 +45,7 @@ if partition_number
 end
 no_old_strands = true
 
-DB.synchronize do
+d.handle_disconnects do
   until d.shutting_down
     no_strands = d.start_cohort
 
