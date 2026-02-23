@@ -70,7 +70,7 @@ class KubernetesNode < Sequel::Model
     status = JSON.parse(file_content)
     pods_status = status["pods"]
     external_status = status["external_endpoints"]
-    mtr_results = status["mtr_results"]
+    mtr_results = status["mtr_results"]&.map { |name, v| v.merge("name" => name) }
     api_error = status["api_error"]
 
     if api_error
@@ -85,8 +85,8 @@ class KubernetesNode < Sequel::Model
         available: false,
         unreachable_pods: unreachable_pods.keys,
         unreachable_external: unreachable_external.keys,
-        pod_errors: unreachable_pods.transform_values { |v| v["error"] }.compact,
-        external_errors: unreachable_external.transform_values { |v| v["error"] }.compact,
+        pod_errors: unreachable_pods.map { |name, v| v.merge("name" => name) },
+        external_errors: unreachable_external.map { |name, v| v.merge("name" => name) },
         mtr_results:
       }
     else
