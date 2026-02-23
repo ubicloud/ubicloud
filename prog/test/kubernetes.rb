@@ -225,6 +225,30 @@ STS
       update_stack({"fail_message" => e.message})
       hop_destroy_kubernetes
     end
+    hop_test_rsync_retry
+  end
+
+  label def test_rsync_retry
+    client = kubernetes_cluster.client
+    nodepool.nodes.each { client.kubectl("uncordon :name", name: it.name) }
+    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    client.kubectl("cordon :pod_node_name", pod_node_name:)
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    update_stack({"rsync_retry_source_node" => pod_node_name})
+    hop_kill_rsync_process
+  end
+
+  label def kill_rsync_process
+    source_node_name = strand.stack.first["rsync_retry_source_node"]
+    target_node = nodepool.nodes.find { it.name != source_node_name }
+    nap 1 if target_node.vm.sshable.cmd("pgrep rsync || true").strip.empty?
+    target_node.vm.sshable.cmd("sudo pkill -9 rsync")
+    hop_verify_rsync_retry
+  end
+
+  label def verify_rsync_retry
+    nap 5 unless pod_status == "Running"
+    verify_data_hashes("rsync retry")
     hop_test_node_not_deleted_during_copy
   end
 
