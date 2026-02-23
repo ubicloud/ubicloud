@@ -107,6 +107,23 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       page.incr_resolve
     end
 
+    # Generate fscrypt KEK only if the allocated host supports it.
+    # Host capability is set during prep_host when fscryptctl is installed.
+    if host.fsencrypt_capable && !vm.vm_metal&.fscrypt_key
+      cipher = OpenSSL::Cipher.new("aes-256-gcm")
+      kek_secrets = {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.encode64(cipher.random_key),
+        "init_vector" => Base64.encode64(cipher.random_iv),
+        "auth_data" => "Ubicloud-fscrypt"
+      }
+      if vm.vm_metal
+        vm.vm_metal.update(fscrypt_key: JSON.generate(kek_secrets))
+      else
+        VmMetal.create_with_id(vm, fscrypt_key: JSON.generate(kek_secrets))
+      end
+    end
+
     register_deadline("wait", 10 * 60)
 
     # We don't need storage_volume info anymore, so delete it before
@@ -118,17 +135,47 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def create_unix_user
     uid = rand(1100..59999)
-    command = <<~COMMAND
-      set -ueo pipefail
-      # Make this script idempotent
-      sudo userdel --remove --force :vm_name || true
-      sudo groupdel -f :vm_name || true
-      # Create vm's user and home directory
-      sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
-      # Enable KVM access for VM user
-      sudo usermod -a -G kvm :vm_name
-    COMMAND
 
+    if vm.vm_metal&.fscrypt_key
+      # Clean up any previous user/group and recreate the home directory.
+      # Uses id/getent guards so real errors (disk full, corrupt passwd)
+      # propagate instead of being swallowed by || true.
+      # Unconditional rm -rf handles the retry case where fscrypt encrypt
+      # succeeded but adduser hadn't run yet.
+      command = <<~COMMAND
+        set -ueo pipefail
+        if id :vm_name &>/dev/null; then sudo userdel --remove --force :vm_name; fi
+        if getent group :vm_name &>/dev/null; then sudo groupdel -f :vm_name; fi
+        sudo rm -rf :vm_home
+        sudo mkdir -p :vm_home
+      COMMAND
+      host.sshable.cmd(command, vm_name:, vm_home:)
+
+      # Encrypt the empty directory with fscryptctl (KEK secrets + master key via stdin)
+      master_key = OpenSSL::Random.random_bytes(32)
+      host.sshable.cmd("sudo host/bin/vm-fscrypt encrypt :vm_name", vm_name:,
+        stdin: JSON.generate({"kek_secrets" => JSON.parse(vm.vm_metal.fscrypt_key), "master_key" => Base64.strict_encode64(master_key)}))
+
+      # Create the unix user with --no-create-home since the directory is already encrypted
+      command = <<~COMMAND
+        set -ueo pipefail
+        sudo adduser --disabled-password --gecos '' --no-create-home --home :vm_home --uid :uid :vm_name
+        sudo chown :vm_name::vm_name :vm_home
+        sudo chmod 750 :vm_home
+        sudo usermod -a -G kvm :vm_name
+      COMMAND
+    else
+      # VM without fscrypt_key (host not fscrypt-capable or pre-existing VM).
+      # Uses id/getent guards so real errors propagate instead of
+      # being swallowed by || true.
+      command = <<~COMMAND
+        set -ueo pipefail
+        if id :vm_name &>/dev/null; then sudo userdel --remove --force :vm_name; fi
+        if getent group :vm_name &>/dev/null; then sudo groupdel -f :vm_name; fi
+        sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
+        sudo usermod -a -G kvm :vm_name
+      COMMAND
+    end
     host.sshable.cmd(command, vm_name:, vm_home:, uid:)
 
     hop_create_billing_record
@@ -431,6 +478,12 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   label def start_after_host_reboot
     vm.update(display_state: "starting")
+
+    # Unlock the fscrypt-encrypted /vm/ directory before recreate-unpersisted
+    # reads prep.json and other files. After host reboot, directories are locked.
+    if vm.vm_metal&.fscrypt_key
+      host.sshable.cmd("sudo host/bin/vm-fscrypt unlock :vm_name", vm_name:, stdin: vm.vm_metal.fscrypt_key)
+    end
 
     secrets_json = JSON.generate({
       storage: vm.storage_secrets

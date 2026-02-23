@@ -13,6 +13,7 @@ require "shellwords"
 require_relative "vm_path"
 require_relative "cloud_hypervisor"
 require_relative "storage_volume"
+require_relative "vm_fscrypt"
 
 class VmSetup
   Nic = Struct.new(:net6, :net4, :tap, :mac, :private_ipv4_gateway)
@@ -173,7 +174,11 @@ add element inet drop_unused_ip_packets allowed_ipv4_addresses { #{ip_net} }
   end
 
   def purge_user
+    # Remove the fscrypt key from the kernel keyring before deletion
+    VmFscrypt.remove_kernel_key(@vm_name)
     r "deluser --remove-home #{q_vm}"
+    # Clean up wrapped DEK file after directory removal
+    VmFscrypt.purge(@vm_name)
   rescue CommandFail => ex
     raise unless /The user `.*' does not exist./.match?(ex.stderr)
   end

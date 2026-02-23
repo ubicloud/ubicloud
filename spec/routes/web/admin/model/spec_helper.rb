@@ -578,6 +578,11 @@ module AdminModelSpecHelper
       VmInitScript.create_with_id(vm, init_script: "echo 'test'")
     end
 
+    def create_vm_metal
+      vm = create_vm
+      VmMetal.create_with_id(vm)
+    end
+
     def create_vm_pool
       VmPool.create(
         size: 3,

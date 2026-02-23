@@ -1,0 +1,38 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+
+unless (action = ARGV.shift)
+  puts "expected action as argument"
+  exit 1
+end
+
+unless (vm_name = ARGV.shift)
+  puts "expected vm_name as argument"
+  exit 1
+end
+
+require_relative "../lib/vm_fscrypt"
+
+case action
+when "encrypt"
+  params = JSON.parse($stdin.read)
+  kek_secrets = params["kek_secrets"]
+  master_key_binary = Base64.decode64(params["master_key"])
+  VmFscrypt.encrypt(vm_name, kek_secrets, master_key_binary)
+when "unlock"
+  kek_secrets = JSON.parse($stdin.read)
+  VmFscrypt.unlock(vm_name, kek_secrets)
+when "reencrypt"
+  params = JSON.parse($stdin.read)
+  VmFscrypt.reencrypt(vm_name, params["old_key"], params["new_key"])
+when "test-keys"
+  params = JSON.parse($stdin.read)
+  VmFscrypt.test_keys(vm_name, params["old_key"], params["new_key"])
+when "retire-old"
+  VmFscrypt.retire_old(vm_name)
+else
+  puts "Invalid action #{action}"
+  exit 1
+end
