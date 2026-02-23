@@ -20,6 +20,8 @@ module Csi
       VOLUME_BASE_PATH = "/var/lib/ubicsi"
       OLD_PV_NAME_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
       OLD_PVC_OBJECT_ANNOTATION_KEY = "csi.ubicloud.com/old-pvc-object"
+      MIGRATION_RETRY_COUNT_ANNOTATION_KEY = "csi.ubicloud.com/migration-retry-count"
+      MAX_MIGRATION_RETRIES = 3
       ACCEPTABLE_FS = ["ext4", "xfs"].freeze
 
       def self.mkdir_p
@@ -220,6 +222,9 @@ module Csi
         case run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", daemonizer_unit_name, req_id:)
         when "Succeeded"
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
+          if pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY)
+            client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, nil)
+          end
         when "NotStarted"
           copy_command = ["rsync", "-az", "--inplace", "--compress-level=9", "--partial", "--whole-file", "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519", "ubi@#{old_node_ip}:#{old_data_path}", current_data_path]
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", daemonizer_unit_name, *copy_command, req_id:)
@@ -227,7 +232,15 @@ module Csi
         when "InProgress"
           raise CopyNotFinishedError, "Old PV data is not copied yet"
         when "Failed"
-          raise "Copy old PV data failed"
+          retry_count = Integer(pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY) || "0", 10)
+          if retry_count >= MAX_MIGRATION_RETRIES
+            raise "Migration copy failed after #{MAX_MIGRATION_RETRIES} attempts, please contact support"
+          end
+          retry_count += 1
+          client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, retry_count.to_s)
+          run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
+          log_with_id(req_id, "Migration copy failed, retrying (attempt #{retry_count})")
+          raise CopyNotFinishedError, "Old PV data copy failed, retrying (attempt #{retry_count})"
         else
           raise "Daemonizer2 returned unknown status"
         end
