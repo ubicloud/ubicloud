@@ -63,7 +63,7 @@ if [ :no_bundler_install = false ]; then
   sudo apt-get -y install ruby-bundler
 fi
 sudo which bundle
-sudo userdel -rf rhizome || true
+if id rhizome &>/dev/null; then sudo userdel -rf rhizome; fi
 sudo adduser --disabled-password --gecos '' rhizome
 echo 'rhizome ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/98-rhizome
 sudo install -d -o rhizome -g rhizome -m 0700 /home/rhizome/.ssh
