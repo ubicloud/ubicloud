@@ -15,7 +15,7 @@ on:
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
         required: true
-        default: 'metal,aws'
+        default: 'metal,aws,gcp'
         type: string
 
   schedule:
@@ -31,7 +31,7 @@ jobs:
       - name: Set provider matrix
         id: set-providers
         run: |
-          providers="metal,aws"
+          providers="metal,aws,gcp"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
             providers="${{ inputs.providers }}"
           fi
@@ -46,7 +46,7 @@ jobs:
         provider: ${{ fromJson(needs.setup.outputs.providers) }}
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
-    environment: E2E-${{ matrix.provider }}
+    environment: ${{ matrix.provider == 'metal' && 'E2E-metal' || 'E2E-aws' }}
     timeout-minutes: 85
     concurrency: E2E-${{ matrix.provider }}
 
@@ -123,6 +123,9 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -359,3 +362,94 @@ jobs:
             aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
           done
         done
+
+    - name: Cleanup GCP resources
+      if: always() && matrix.provider == 'gcp'
+      env:
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+      run: |
+        ruby -r bundler/setup -e '
+          creds_json = ENV["E2E_GCP_CREDENTIALS_JSON"]
+          project_id = ENV["E2E_GCP_PROJECT_ID"]
+          unless creds_json && project_id
+            puts "GCP credentials not configured, skipping cleanup"
+            exit 0
+          end
+
+          require "json"
+          require "google/cloud/compute/v1"
+          require "google/cloud/storage"
+          require "google/apis/iam_v1"
+
+          scope = ["https://www.googleapis.com/auth/cloud-platform"]
+          authorizer = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: StringIO.new(creds_json), scope: scope)
+
+          # Compute clients
+          compute_config = proc { |c| c.credentials = authorizer; c.quota_project = project_id }
+          instances_client = Google::Cloud::Compute::V1::Instances::Rest::Client.new(&compute_config)
+          firewalls_client = Google::Cloud::Compute::V1::Firewalls::Rest::Client.new(&compute_config)
+          networks_client = Google::Cloud::Compute::V1::Networks::Rest::Client.new(&compute_config)
+          subnetworks_client = Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new(&compute_config)
+          addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client.new(&compute_config)
+          zones_client = Google::Cloud::Compute::V1::Zones::Rest::Client.new(&compute_config)
+          regions_client = Google::Cloud::Compute::V1::Regions::Rest::Client.new(&compute_config)
+
+          zones = zones_client.list(project: project_id).map(&:name)
+          regions = regions_client.list(project: project_id).map(&:name)
+
+          puts "=== Cleaning up GCP instances ==="
+          zones.each do |zone|
+            instances_client.list(project: project_id, zone: zone).each do |inst|
+              puts "Deleting instance: #{inst.name} in #{zone}"
+              instances_client.delete(project: project_id, zone: zone, instance: inst.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          puts "=== Cleaning up GCP firewall rules ==="
+          firewalls_client.list(project: project_id).select { |fw| fw.name.start_with?("ubi-") }.each do |fw|
+            puts "Deleting firewall rule: #{fw.name}"
+            firewalls_client.delete(project: project_id, firewall: fw.name) rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "=== Cleaning up GCP subnetworks ==="
+          regions.each do |region|
+            subnetworks_client.list(project: project_id, region: region).select { |s| s.name.start_with?("ubi-") }.each do |subnet|
+              puts "Deleting subnetwork: #{subnet.name} in #{region}"
+              subnetworks_client.delete(project: project_id, region: region, subnetwork: subnet.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          puts "=== Cleaning up GCP VPC networks ==="
+          networks_client.list(project: project_id).select { |n| n.name.start_with?("ubi-") }.each do |vpc|
+            puts "Deleting VPC network: #{vpc.name}"
+            networks_client.delete(project: project_id, network: vpc.name) rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "=== Cleaning up GCP static addresses ==="
+          regions.each do |region|
+            addresses_client.list(project: project_id, region: region).select { |a| a.name.start_with?("ubi-") }.each do |addr|
+              puts "Releasing address: #{addr.name} in #{region}"
+              addresses_client.delete(project: project_id, region: region, address: addr.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          puts "=== Cleaning up GCP storage buckets ==="
+          storage = Google::Cloud::Storage.new(credentials: authorizer, project_id: project_id)
+          storage.buckets.select { |b| b.name != "ubicloud-gce-images" }.each do |bucket|
+            puts "Deleting bucket: #{bucket.name}"
+            bucket.files.each { |f| f.delete rescue nil }
+            bucket.delete rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "=== Cleaning up GCP service accounts ==="
+          iam = Google::Apis::IamV1::IamService.new
+          iam.authorization = authorizer
+          response = iam.list_project_service_accounts("projects/#{project_id}")
+          (response.accounts || []).select { |sa| sa.email.start_with?("ubi-") }.each do |sa|
+            puts "Deleting service account: #{sa.email}"
+            iam.delete_project_service_account("projects/#{project_id}/serviceAccounts/#{sa.email}") rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "GCP cleanup complete"
+        '

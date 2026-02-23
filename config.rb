@@ -212,6 +212,9 @@ module Config
   override :is_e2e, false, bool
   optional :e2e_aws_access_key, string, clear: true
   optional :e2e_aws_secret_key, string, clear: true
+  optional :e2e_gcp_credentials_json, string, clear: true
+  optional :e2e_gcp_project_id, string
+  optional :e2e_gcp_service_account_email, string
   optional :e2e_cache_proxy_download_url, string
 
   # Load Balancer

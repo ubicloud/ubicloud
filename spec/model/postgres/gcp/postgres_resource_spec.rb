@@ -94,9 +94,10 @@ RSpec.describe PostgresResource do
 
         server = PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
-          is_representative: true
+          synchronization_status: "ready", timeline_access: "push", version: "17"
         )
+        DB[:postgres_server].where(id: server.id).update(is_representative: true)
+        server.reload
 
         expect(postgres_resource.reload).to receive(:servers).and_return([server])
 
