@@ -407,7 +407,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(response)
       expect(kubernetes_test.strand).to receive(:stack).and_return([{"normal_pod_restart_test_node" => "nodename"}])
       expect(kubernetes_test).to receive(:verify_mount)
-      expect { kubernetes_test.verify_normal_pod_restart }.to hop("test_node_not_deleted_during_copy")
+      expect { kubernetes_test.verify_normal_pod_restart }.to hop("test_rsync_retry")
     end
 
     it "finds a mismatch in node name" do
@@ -429,6 +429,78 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:verify_mount).and_raise("some error")
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "some error"})
       expect { kubernetes_test.verify_normal_pod_restart }.to hop("destroy_kubernetes")
+    end
+  end
+
+  describe "#test_rsync_retry" do
+    before do
+      nodepool = kubernetes_cluster.nodepools.first
+      nodepool.update(node_count: 2)
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      KubernetesNode.create(vm_id: create_vm(name: "w2-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: nodepool.id)
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "uncordons nodes, cordons pod node, triggers migration and hops to kill_rsync_process" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon w2-node").and_return(response)
+
+      pod_node_response = Net::SSH::Connection::Session::StringWithExitstatus.new("w1-node", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").and_return(pod_node_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf cordon w1-node").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf delete pod ubuntu-statefulset-0 --wait=false").and_return(response)
+
+      expect { kubernetes_test.test_rsync_retry }.to hop("kill_rsync_process")
+      expect(kubernetes_test.strand.stack.first["rsync_retry_source_node"]).to eq("w1-node")
+    end
+  end
+
+  describe "#kill_rsync_process" do
+    let(:sshable) { Sshable.new }
+    let(:target_node) {
+      KubernetesNode.create(vm_id: create_vm(name: "w2-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      kubernetes_cluster.nodepools.first.nodes.find { |n| n.name == "w2-node" }
+    }
+
+    before do
+      KubernetesNode.create(vm_id: create_vm(name: "w1-node").id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: kubernetes_cluster.nodepools.first.id)
+      kubernetes_test.update_stack({"rsync_retry_source_node" => "w1-node"})
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+      expect(target_node.vm).to receive(:sshable).and_return(sshable).at_least(:once)
+    end
+
+    it "naps if rsync has not started yet" do
+      expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("")
+      expect { kubernetes_test.kill_rsync_process }.to nap(1)
+    end
+
+    it "kills rsync and hops to verify_rsync_retry" do
+      expect(sshable).to receive(:_cmd).with("pgrep rsync || true").and_return("12345 rsync -az /var/lib/ubicsi/vol.img")
+      expect(sshable).to receive(:_cmd).with("sudo pkill -9 rsync")
+      expect { kubernetes_test.kill_rsync_process }.to hop("verify_rsync_retry")
+    end
+  end
+
+  describe "#verify_rsync_retry" do
+    before do
+      expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
+    end
+
+    it "naps until pod is running" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect { kubernetes_test.verify_rsync_retry }.to nap(5)
+    end
+
+    it "verifies data hashes and hops to test_node_not_deleted_during_copy" do
+      kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
+      expect(kubernetes_test).to receive(:pod_status).and_return("Running")
+      (1..3).each do |i|
+        response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+      end
+      expect { kubernetes_test.verify_rsync_retry }.to hop("test_node_not_deleted_during_copy")
     end
   end
 
