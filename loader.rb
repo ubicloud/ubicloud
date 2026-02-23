@@ -10,6 +10,16 @@ require "bundler"
 rack_env = ENV["RACK_ENV"] || "development"
 Bundler.setup(:default, rack_env.to_sym)
 
+ENV["GIT_COMMIT_HASH"] ||= (
+  ENV["HEROKU_BUILD_COMMIT"] ||
+  ENV["GIT_REV"] ||
+  begin
+    `git rev-parse HEAD 2>/dev/null`.strip
+  rescue
+    nil
+  end
+)&.slice(0, 8) || "unknown"
+
 require_relative "config"
 require "mail"
 require "warning"
