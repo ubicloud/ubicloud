@@ -55,6 +55,20 @@ class Location < Sequel::Model
   def aws?
     provider == "aws"
   end
+
+  def gcp?
+    provider == "gcp"
+  end
+
+  def provider_name
+    if aws?
+      "aws"
+    elsif gcp?
+      "gcp"
+    else
+      "metal"
+    end
+  end
 end
 
 # Table: location

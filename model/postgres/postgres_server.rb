@@ -31,6 +31,10 @@ class PostgresServer < Sequel::Model
     (vm || timeline).location.aws?
   end
 
+  def provider_name
+    (vm || timeline).location.provider_name
+  end
+
   def configure_hash
     configs = {
       "listen_addresses" => "'*'",

@@ -55,6 +55,10 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
+  it "#aws? delegates through vm location" do
+    expect(postgres_server.aws?).to be false
+  end
+
   describe "#configure" do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])

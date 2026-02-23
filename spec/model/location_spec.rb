@@ -15,8 +15,8 @@ RSpec.describe Location do
   it ".for_project filters dataset to given project and non-project-specific locations" do
     p1_loc
     p2_loc
-    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
-    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
+    expect(described_class.for_project(p1_id).select_order_map(:name)).to eq ["gcp-us-central1", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l1", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
+    expect(described_class.for_project(p2_id).select_order_map(:name)).to eq ["gcp-us-central1", "github-runners", "hetzner-ai", "hetzner-fsn1", "hetzner-hel1", "l2", "latitude-ai", "latitude-fra", "leaseweb-wdc02", "tr-ist-u1", "tr-ist-u1-tom", "us-east-1", "us-west-2"]
   end
 
   it ".visible_or_for_project filters dataset to given project and visible non-project-specific locations" do
@@ -45,6 +45,11 @@ RSpec.describe Location do
     expect(LocationAwsAz.count).to eq(0)
   end
 
+  it "#azs raises for gcp location" do
+    gcp_loc = described_class.create(name: "gcp-azs-test", display_name: "gcp-azs-test", ui_name: "gcp-azs-test", visible: false, provider: "gcp")
+    expect { gcp_loc.azs }.to raise_error("azs is only valid for aws locations")
+  end
+
   it "returns the aws azs for an aws location" do
     p1_loc.add_location_aws_az(az: "a", zone_id: "123")
     p1_loc.add_location_aws_az(az: "b", zone_id: "456")
@@ -61,5 +66,26 @@ RSpec.describe Location do
     expect {
       p2_loc.pg_ami("16", "x64")
     }.to raise_error("No AMI found for PostgreSQL 16 (x64) in l2")
+  end
+
+  it "#pg_gce_image returns image path from pg_gce_image table" do
+    gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
+    LocationCredential.create_with_id(gcp_loc,
+      project_id: "my-gcp-project",
+      service_account_email: "test@my-gcp-project.iam.gserviceaccount.com",
+      credentials_json: "{}")
+    PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "my-gcp-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", pg_version: "16", arch: "x64")
+    expect(gcp_loc.pg_gce_image("16", "x64")).to eq("projects/my-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
+  end
+
+  it "#pg_gce_image raises when no image found" do
+    gcp_loc = described_class.create(name: "gcp-image-err", display_name: "gcp-image-err", ui_name: "gcp-image-err", visible: false, provider: "gcp")
+    LocationCredential.create_with_id(gcp_loc,
+      project_id: "my-gcp-project-2",
+      service_account_email: "test@my-gcp-project-2.iam.gserviceaccount.com",
+      credentials_json: "{}")
+    expect {
+      gcp_loc.pg_gce_image("16", "x64")
+    }.to raise_error("No GCE image found for PostgreSQL 16 (x64) in project my-gcp-project-2")
   end
 end

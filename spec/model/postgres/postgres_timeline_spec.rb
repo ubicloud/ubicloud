@@ -25,7 +25,7 @@ PGDATA=/dat/16/data
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true, provider_name: "aws")).at_least(:once)
     expect(postgres_timeline.generate_walg_config(16)).to eq(walg_config.sub("us-east-1", "us-east-2"))
   end
 
@@ -44,8 +44,22 @@ PGDATA=/dat/17/data
     WALG_CONF
 
     expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config)
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true)).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-east-2", aws?: true, provider_name: "aws")).at_least(:once)
     expect(postgres_timeline.generate_walg_config(17)).to eq(walg_config.sub("us-east-1", "us-east-2"))
+  end
+
+  it "returns walg_config_region for metal" do
+    expect(postgres_timeline.walg_config_region).to eq("us-east-1")
+  end
+
+  it "returns walg_config_region for aws" do
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, name: "us-west-2", aws?: true, provider_name: "aws")).at_least(:once)
+    expect(postgres_timeline.walg_config_region).to eq("us-west-2")
+  end
+
+  it "returns false for aws? when location is nil" do
+    tl = described_class.new
+    expect(tl.aws?).to be_nil
   end
 
   describe "#need_backup?" do
@@ -154,7 +168,7 @@ PGDATA=/dat/17/data
   end
 
   it "returns list of backups for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_name: "aws", name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
@@ -164,7 +178,7 @@ PGDATA=/dat/17/data
   end
 
   it "returns list of backups with enumeration for AWS regions" do
-    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
+    expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_name: "aws", name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
 
     s3_client = Aws::S3::Client.new(stub_responses: true)
     s3_client.stub_responses(:list_objects_v2, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: true, next_continuation_token: "token"}, {contents: [{key: "backup_stop_sentinel.json"}, {key: "unrelated_file.txt"}], is_truncated: false})
@@ -220,26 +234,26 @@ PGDATA=/dat/17/data
     let(:s3_client) { Aws::S3::Client.new(stub_responses: true) }
 
     before do
-      expect(postgres_timeline).to receive(:aws?).and_return(true).at_least(:once)
+      expect(postgres_timeline).to receive(:provider_name).and_return("aws").at_least(:once)
       expect(Aws::S3::Client).to receive(:new).and_return(s3_client).at_least(:once)
     end
 
     it "creates bucket" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-east-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_name: "aws", name: "us-east-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: {location_constraint: "us-east-2"}}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
     it "creates bucket in us-east-1" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-east-1", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_name: "aws", name: "us-east-1", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:create_bucket)
       expect(s3_client).to receive(:create_bucket).with({bucket: postgres_timeline.ubid, create_bucket_configuration: nil}).and_return(true)
       expect(postgres_timeline.create_bucket).to be(true)
     end
 
     it "sets lifecycle policy" do
-      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
+      expect(postgres_timeline).to receive(:location).and_return(instance_double(Location, aws?: true, provider_name: "aws", name: "us-west-2", location_credential: instance_double(LocationCredential, credentials: nil))).at_least(:once)
       s3_client.stub_responses(:put_bucket_lifecycle_configuration)
       expect(s3_client).to receive(:put_bucket_lifecycle_configuration).with({bucket: postgres_timeline.ubid, lifecycle_configuration: {rules: [{id: "DeleteOldBackups", status: "Enabled", expiration: {days: 8}, filter: {}}]}}).and_return(true)
       expect(postgres_timeline.set_lifecycle_policy).to be(true)
@@ -250,7 +264,7 @@ PGDATA=/dat/17/data
     let(:minio_client) { instance_double(Minio::Client) }
 
     before do
-      expect(postgres_timeline).to receive(:aws?).and_return(false).at_least(:once)
+      expect(postgres_timeline).to receive(:provider_name).and_return("metal").at_least(:once)
       expect(postgres_timeline).to receive(:blob_storage).and_return(instance_double(MinioCluster, url: "https://blob-endpoint", root_certs: "certs")).at_least(:once)
       expect(Minio::Client).to receive(:new).and_return(minio_client).at_least(:once)
     end
