@@ -191,10 +191,17 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:rand).and_return(1111)
       expect(sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
-        # Make this script idempotent
-        sudo userdel --remove --force #{nx.vm_name} || true
-        sudo groupdel -f #{nx.vm_name} || true
-        # Create vm's user and home directory
+        if id #{nx.vm_name} &>/dev/null; then
+          procs=$(ps -u #{nx.vm_name} -o pid,comm,args --no-headers) || [ $? -eq 1 ]
+          if [ -n "$procs" ]; then
+            echo "Terminating #{nx.vm_name} processes:"
+            echo "$procs"
+            sudo pkill -u #{nx.vm_name} || [ $? -eq 1 ]
+            sleep 1
+          fi
+          sudo userdel -r #{nx.vm_name}
+        fi
+        if getent group #{nx.vm_name} &>/dev/null; then sudo groupdel #{nx.vm_name}; fi
         sudo adduser --disabled-password --gecos '' --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
         # Enable KVM access for VM user
         sudo usermod -a -G kvm #{nx.vm_name}
