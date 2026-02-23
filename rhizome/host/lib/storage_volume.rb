@@ -198,9 +198,7 @@ class StorageVolume
       pipe_writes << [sp.s3_secret_key_pipe, key_wrapping_secrets["archive_s3_secret_key"]]
 
       if key_wrapping_secrets["archive_s3_session_token"]
-        session_pipe = sp.s3_session_token_pipe
-        pipes << session_pipe
-        pipe_writes << [session_pipe, key_wrapping_secrets["archive_s3_session_token"]]
+        pipe_writes << [sp.s3_session_token_pipe, key_wrapping_secrets["archive_s3_session_token"]]
       end
 
       if @archive_params["encrypted"]
