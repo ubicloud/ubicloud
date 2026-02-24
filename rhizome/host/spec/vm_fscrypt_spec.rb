@@ -107,7 +107,7 @@ RSpec.describe VmFscrypt do
       expect(File).to receive(:directory?).with(vm_home).and_return(true)
       expect(described_class).to receive(:r)
         .with("fscryptctl get_policy #{vm_home}")
-        .and_return("abcdef0123456789\n")
+        .and_return("Encryption policy for /vm/test/:\n\tPolicy version: 2\n\tMaster key identifier: abcdef0123456789\n\tContents encryption mode: AES-256-XTS\n\tFilenames encryption mode: AES-256-CTS\n\tFlags: PAD_32\n\tData unit size: default\n")
       expect(described_class).to receive(:r)
         .with("fscryptctl remove_key abcdef0123456789 /")
 

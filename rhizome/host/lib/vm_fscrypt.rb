@@ -61,7 +61,9 @@ module VmFscrypt
     return unless File.directory?(vm_home)
 
     mnt = mountpoint_of(vm_home).shellescape
-    identifier = r("fscryptctl get_policy #{vm_home.shellescape}").strip
+    policy_output = r("fscryptctl get_policy #{vm_home.shellescape}")
+    identifier = policy_output[/Master key identifier:\s*(\h+)/, 1]
+    fail "Could not parse key identifier from get_policy output" unless identifier
     r("fscryptctl remove_key #{identifier} #{mnt}")
   rescue CommandFail => ex
     raise unless /Error getting policy|ENODATA|not encrypted|No such file|key not present/i.match?(ex.stderr + ex.message)

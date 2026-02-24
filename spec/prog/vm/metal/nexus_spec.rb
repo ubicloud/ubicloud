@@ -187,7 +187,49 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#create_unix_user" do
-    it "runs adduser" do
+    it "runs adduser with fscrypt encryption when fscrypt_key is set" do
+      kek_secrets = {"algorithm" => "aes-256-gcm", "key" => Base64.encode64("k" * 32), "init_vector" => Base64.encode64("i" * 12), "auth_data" => "clover-fscrypt:#{vm.inhost_name}"}
+      VmMetal.create_with_id(vm, fscrypt_key: JSON.generate(kek_secrets))
+      expect(nx).to receive(:rand).and_return(1111)
+
+      # First call: clean up and create directory
+      expect(sshable).to receive(:_cmd).with(<<~COMMAND).ordered
+        set -ueo pipefail
+        if id #{nx.vm_name} &>/dev/null; then
+          procs=$(ps -u #{nx.vm_name} -o pid,comm,args --no-headers) || [ $? -eq 1 ]
+          if [ -n "$procs" ]; then
+            echo "Terminating #{nx.vm_name} processes:"
+            echo "$procs"
+            sudo pkill -u #{nx.vm_name} || [ $? -eq 1 ]
+            sleep 1
+          fi
+          sudo userdel -r #{nx.vm_name}
+        fi
+        if getent group #{nx.vm_name} &>/dev/null; then sudo groupdel #{nx.vm_name}; fi
+        sudo rm -rf #{nx.vm_home}
+        sudo mkdir -p #{nx.vm_home}
+      COMMAND
+
+      # Second call: encrypt directory with kek_secrets + master_key as JSON via stdin
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/vm-fscrypt encrypt #{nx.vm_name}/,
+        {stdin: /{"kek_secrets":\{.*"algorithm":"aes-256-gcm".*\},"master_key":"/}
+      ).ordered
+
+      # Third call: create user and set permissions
+      expect(sshable).to receive(:_cmd).with(<<~COMMAND).ordered
+        set -ueo pipefail
+        sudo adduser --disabled-password --gecos '' --no-create-home --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
+        sudo chown #{nx.vm_name}:#{nx.vm_name} #{nx.vm_home}
+        sudo chmod 750 #{nx.vm_home}
+        # Enable KVM access for VM user
+        sudo usermod -a -G kvm #{nx.vm_name}
+      COMMAND
+
+      expect { nx.create_unix_user }.to hop("create_billing_record")
+    end
+
+    it "runs adduser without fscrypt when fscrypt_key is nil" do
       expect(nx).to receive(:rand).and_return(1111)
       expect(sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
@@ -635,6 +677,25 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       )
       expect { nx.start }.to hop("create_unix_user")
     end
+
+    it "generates fscrypt_key when host is fsencrypt_capable" do
+      vm_host.update(fsencrypt_capable: true)
+      expect(Scheduling::Allocator).to receive(:allocate)
+      expect { nx.start }.to hop("create_unix_user")
+      expect(VmMetal[vm.id]).not_to be_nil
+      kek_secrets = JSON.parse(VmMetal[vm.id].fscrypt_key)
+      expect(kek_secrets["algorithm"]).to eq("aes-256-gcm")
+      expect(kek_secrets).to have_key("key")
+      expect(kek_secrets).to have_key("init_vector")
+      expect(kek_secrets["auth_data"]).to eq("clover-fscrypt:#{vm.inhost_name}")
+    end
+
+    it "does not generate fscrypt_key when host is not fsencrypt_capable" do
+      vm_host.update(fsencrypt_capable: false)
+      expect(Scheduling::Allocator).to receive(:allocate)
+      expect { nx.start }.to hop("create_unix_user")
+      expect(VmMetal[vm.id]).to be_nil
+    end
   end
 
   describe "#clear_stack_storage_volumes" do
@@ -1076,7 +1137,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#start_after_host_reboot" do
-    it "can start a vm after reboot" do
+    it "can start a vm after reboot without fscrypt" do
       kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
       dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
       VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, skip_sync: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
@@ -1085,6 +1146,27 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
         {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
       )
+      expect(vm).to receive(:update).with(display_state: "starting")
+      expect(vm).to receive(:update).with(display_state: "running")
+      expect(vm).to receive(:incr_update_firewall_rules)
+      expect { nx.start_after_host_reboot }.to hop("wait")
+    end
+
+    it "adds fscrypt key before recreate-unpersisted when fscrypt_key is set" do
+      kek_json = JSON.generate({"algorithm" => "aes-256-gcm", "key" => Base64.encode64("k" * 32), "init_vector" => Base64.encode64("i" * 12), "auth_data" => "clover-fscrypt:#{vm.inhost_name}"})
+      VmMetal.create_with_id(vm, fscrypt_key: kek_json)
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
+      dev = StorageDevice.create(name: "nvme0", total_storage_gib: 1000, available_storage_gib: 500)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, key_encryption_key_1_id: kek.id)
+
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/vm-fscrypt add-key #{nx.vm_name}/,
+        {stdin: kek_json}
+      ).ordered
+      expect(sshable).to receive(:_cmd).with(
+        /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
+        {stdin: /{"storage":/}
+      ).ordered
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
       expect(vm).to receive(:incr_update_firewall_rules)
