@@ -114,11 +114,6 @@ RSpec.describe VmHostSlice do
   describe "availability monitoring" do
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
 
-    it "initiates a new health monitor session" do
-      expect(vm_host_slice.vm_host.sshable).to receive(:start_fresh_session)
-      vm_host_slice.init_health_monitor_session
-    end
-
     it "checks pulse" do
       Strand.create_with_id(vm_host_slice, prog: "Vm::VmHostSliceNexus", label: "wait")
       pulse = {

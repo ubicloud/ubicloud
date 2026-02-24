@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 class MonitorableResource
-  attr_reader :deleted, :resource
+  attr_reader :deleted, :resource, :attached_resources
   attr_accessor :monitor_job_started_at, :monitor_job_finished_at
+  attr_writer :session
 
   def initialize(resource)
     @resource = resource
@@ -11,6 +12,7 @@ class MonitorableResource
     @pulse_check_started_at = Time.now
     @pulse_thread = nil
     @deleted = false
+    @attached_resources = ({} if resource.is_a?(VmHost))
   end
 
   def open_resource_session
@@ -65,12 +67,37 @@ class MonitorableResource
         @session.merge!(@resource.init_health_monitor_session)
         retry
       end
-      Clog.emit("Pulse checking has failed.", {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
+
+      begin
+        @resource.reload
+      rescue Sequel::NoExistingObject
+        @deleted = true
+        Clog.emit("Resource is deleted.", {resource_deleted: {ubid: resource.ubid}})
+      else
+        Clog.emit("Pulse checking has failed.", {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
+      end
       # TODO: Consider raising the exception here, and let the caller handle it.
     end
 
     run_event_loop = false
     pulse_thread&.join
     @session = nil if event_loop_failed
+
+    return unless @session && @session[:ssh_session] && @attached_resources
+
+    delete_attached_resource_ids = []
+
+    @attached_resources.each_value do |resource|
+      resource.session = @session
+      resource.check_pulse
+      delete_attached_resource_ids << resource.resource.id if resource.deleted
+      break unless @session[:ssh_session]
+    end
+
+    delete_attached_resource_ids.each do
+      @attached_resources.delete(it)
+    end
+
+    nil
   end
 end

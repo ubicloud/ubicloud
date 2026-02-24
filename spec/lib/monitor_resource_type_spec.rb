@@ -14,6 +14,7 @@ RSpec.describe MonitorResourceType do
       expect(mrt.wrapper_class.equal?(c)).to be true
       expect(mrt.resources).to eq({})
       expect(mrt.types).to eq [[:foo], [:bar]]
+      expect(mrt.host_attached_types).to eq []
       expect(mrt.submit_queue).to be_a SizedQueue
       expect(mrt.submit_queue.max).to eq 5
       expect(mrt.finish_queue).to be_a Queue
@@ -21,6 +22,11 @@ RSpec.describe MonitorResourceType do
       expect(mrt.threads.size).to eq 2
       expect(mrt.threads.all?(Thread)).to be true
       expect(mrt.stuck_pulse_info).to eq :foo
+    end
+
+    it "supports host_attached_types keyword argument" do
+      @mrt = mrt = described_class.create(Object, :foo, 2, [[]], host_attached_types: [:baz])
+      expect(mrt.host_attached_types).to eq [:baz]
     end
 
     it "clamps pool size, and bases queue size on pool size and object count" do
@@ -207,6 +213,64 @@ RSpec.describe MonitorResourceType do
       expect(@mrt.resources.keys).to eq [vm_host.id]
       @mrt.scan("00000000-0000-0000-0000-000000000000"..vm_host.id)
       expect(@mrt.resources.keys).to eq [vm_host.id]
+    end
+  end
+
+  describe "#scan with host attached types" do
+    entire_range = "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"
+
+    it "works as expected" do
+      vm_host = create_vm_host
+      vm_host2 = create_vm_host
+      ds = VmHost.exclude(id: vm_host2.id)
+      wrapped_ds = Struct.new(:ds) do
+        def ==(other)
+          true if other.equal?(VmHost)
+        end
+
+        def respond_to_missing?(m)
+          ds.respond_to?(m)
+        end
+
+        def method_missing(...)
+          ds.send(...)
+        end
+      end.new(ds)
+
+      @mrt = described_class.create(MonitorableResource, [5, "stuck", :stuck], 2, [wrapped_ds], host_attached_types: [Vm])
+
+      @mrt.scan(vm_host.id.."ffffffff-ffff-ffff-ffff-ffffffffffff")
+      expect(@mrt.resources.keys).to eq [vm_host.id]
+
+      @mrt.scan(entire_range)
+      monitored_vmh = @mrt.resources[vm_host.id]
+      expect(monitored_vmh.attached_resources.keys).to eq []
+
+      vm1 = create_vm
+      create_vm
+      @mrt.scan(entire_range)
+      expect(@mrt.resources[vm_host.id]).to be monitored_vmh
+      expect(monitored_vmh.attached_resources.keys).to eq []
+
+      vm1.update(vm_host_id: vm_host2.id)
+      @mrt.scan(entire_range)
+      expect(@mrt.resources[vm_host.id]).to be monitored_vmh
+      expect(monitored_vmh.attached_resources.keys).to eq []
+
+      vm1.update(vm_host_id: vm_host.id)
+      @mrt.scan(entire_range)
+      expect(@mrt.resources[vm_host.id]).to be monitored_vmh
+      expect(monitored_vmh.attached_resources.keys).to eq [vm1.id]
+      monitored_vm = monitored_vmh.attached_resources[vm1.id]
+
+      @mrt.scan(entire_range)
+      expect(@mrt.resources[vm_host.id]).to be monitored_vmh
+      expect(monitored_vmh.attached_resources[vm1.id]).to be monitored_vm
+
+      vm1.destroy
+      @mrt.scan(entire_range)
+      expect(@mrt.resources[vm_host.id]).to be monitored_vmh
+      expect(monitored_vmh.attached_resources.keys).to eq []
     end
   end
 

@@ -15,9 +15,9 @@
 # threads :: Pool/array of worker threads, which process jobs on the submit queue.
 # stuck_pulse_info :: Array with timeout seconds, log message, and log key for handling stuck
 #                     pulses/metric exports.
-MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_queue, :finish_queue, :run_queue, :threads, :stuck_pulse_info) do
+MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attached_types, :submit_queue, :finish_queue, :run_queue, :threads, :stuck_pulse_info) do
   # Helper method for creating the instance
-  def self.create(klass, stuck_pulse_info, num_threads, types)
+  def self.create(klass, stuck_pulse_info, num_threads, types, host_attached_types: [])
     pool_size = (num_threads - 2).clamp(1, nil)
 
     # This does not get updated during runtime, which means that if many resources are
@@ -66,7 +66,7 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
       end
     end
 
-    new(klass, {}, types, submit_queue, finish_queue, [], threads, stuck_pulse_info)
+    new(klass, {}, types, host_attached_types, submit_queue, finish_queue, [], threads, stuck_pulse_info)
   end
 
   def shutdown!
@@ -103,14 +103,43 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
   def scan(id_range)
     scanned_resources = {}
     new_resources = []
+    hosts = {} unless host_attached_types.empty?
 
     types.each do |type|
+      populate_hosts = hosts && type == VmHost
+
       type.where_each(id: id_range) do
         unless (v = resources[it.id])
           v = wrapper_class.new(it)
           new_resources << v
         end
         scanned_resources[it.id] = v
+        hosts[it.id] = v if populate_hosts
+      end
+    end
+
+    unless host_attached_types.empty?
+      hash = {}
+
+      host_attached_types.each do |ds|
+        ds.where(vm_host_id: id_range).to_hash_groups(:vm_host_id, nil, hash:)
+      end
+
+      hash.each do |vm_host_id, vms|
+        if (host = hosts.delete(vm_host_id))
+          new_attached_resources = {}
+          old_attached_resources = host.attached_resources
+          vms.each do
+            new_attached_resources[it.id] = old_attached_resources[it.id] || wrapper_class.new(it)
+          end
+          host.attached_resources.replace(new_attached_resources)
+        end
+      end
+
+      # These are hosts who may have had attached resources in earlier scans,
+      # but did not have any attached resources in the current scan.
+      hosts.each_value do
+        it.attached_resources.clear
       end
     end
 

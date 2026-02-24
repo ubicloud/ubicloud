@@ -45,6 +45,7 @@ RSpec.describe MonitorableResource do
   }
 
   let(:vm_host) { create_vm_host }
+  let(:vm) { create_vm }
 
   let(:r_w_event_loop) { described_class.new(postgres_server) }
   let(:r_without_event_loop) { described_class.new(vm_host) }
@@ -82,8 +83,61 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.check_pulse
 
       # resource does not need event loop
-      r_without_event_loop.instance_variable_set(:@session, "not nil")
+      r_without_event_loop.instance_variable_set(:@session, {})
       r_without_event_loop.check_pulse
+    end
+
+    it "marks resource deleted if an exception is raised and the resource no longer exists" do
+      resource = r_without_event_loop.resource
+      resource.destroy
+      expect(resource).to receive(:check_pulse).and_raise(RuntimeError)
+      expect(Clog).to receive(:emit).with("Resource is deleted.", {resource_deleted: {ubid: resource.ubid}})
+      r_without_event_loop.instance_variable_set(:@session, {})
+      r_without_event_loop.check_pulse
+      expect(r_without_event_loop.deleted).to be true
+    end
+
+    it "handles checking pulses for attached resources" do
+      attached_resource = r_without_event_loop.attached_resources[vm.id] = described_class.new(vm)
+      session = {ssh_session: :foo}
+      expect(attached_resource).to receive(:session=).with(session).and_call_original
+      expect(attached_resource).to receive(:check_pulse)
+      r_without_event_loop.instance_variable_set(:@session, session)
+      r_without_event_loop.check_pulse
+      expect(r_without_event_loop.deleted).to be false
+      expect(attached_resource.deleted).to be false
+    end
+
+    it "handles deleting attached resources that no longer exist" do
+      attached_resource = r_without_event_loop.attached_resources[vm.id] = described_class.new(vm)
+      vm.destroy
+      session = {ssh_session: :foo}
+      expect(attached_resource).to receive(:session=).with(session).and_call_original
+      expect(attached_resource.resource).to receive(:check_pulse).and_raise(RuntimeError)
+      r_without_event_loop.instance_variable_set(:@session, session)
+      r_without_event_loop.check_pulse
+      expect(r_without_event_loop.deleted).to be false
+      expect(attached_resource.deleted).to be true
+      expect(r_without_event_loop.attached_resources).to eq({})
+    end
+
+    it "handles attached resources check pulses that clears the session" do
+      attached_resource = r_without_event_loop.attached_resources[vm.id] = described_class.new(vm)
+      vm2 = create_vm
+      attached_resource2 = r_without_event_loop.attached_resources[vm2.id] = described_class.new(vm2)
+      session = {ssh_session: :foo}
+      expect(attached_resource).to receive(:session=).with(session).and_call_original
+      expect(attached_resource.resource).to receive(:check_pulse) do |session:, previous_pulse:|
+        session.clear
+      end
+      expect(attached_resource2).not_to receive(:session=)
+      expect(attached_resource2.resource).not_to receive(:check_pulse)
+      r_without_event_loop.instance_variable_set(:@session, session)
+      r_without_event_loop.check_pulse
+      expect(r_without_event_loop.deleted).to be false
+      expect(attached_resource.deleted).to be false
+      expect(r_without_event_loop.attached_resources.keys).to eq([vm.id, vm2.id])
+      expect(session.keys).to eq [:last_pulse]
     end
 
     it "swallows exception and logs it if event loop fails" do
