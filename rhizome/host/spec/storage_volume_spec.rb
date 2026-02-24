@@ -55,6 +55,49 @@ RSpec.describe StorageVolume do
     described_class.new("test", params)
   }
 
+  let(:encrypted_vhost_v2_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => true,
+      "size_gib" => 12,
+      "image" => "kubuntu",
+      "vhost_block_backend_version" => "v0.4.0",
+      "num_queues" => 4,
+      "queue_size" => 128
+    }
+    described_class.new("test", params)
+  }
+
+  let(:unencrypted_vhost_v2_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => false,
+      "size_gib" => 12,
+      "image" => "kubuntu",
+      "vhost_block_backend_version" => "v0.4.0",
+      "num_queues" => 4,
+      "queue_size" => 128
+    }
+    described_class.new("test", params)
+  }
+
+  let(:unencrypted_vhost_v2_with_cpus_sv) {
+    params = {
+      "disk_index" => 2,
+      "device_id" => "xyz01",
+      "encrypted" => false,
+      "size_gib" => 12,
+      "image" => "kubuntu",
+      "vhost_block_backend_version" => "v0.4.0",
+      "num_queues" => 2,
+      "queue_size" => 128,
+      "cpus" => [0, 1]
+    }
+    described_class.new("test", params)
+  }
+
   let(:image_path) {
     "/var/storage/images/kubuntu.raw"
   }
@@ -236,7 +279,7 @@ RSpec.describe StorageVolume do
   describe "#encrypted_image_copy" do
     it "can copy an image to an encrypted volume" do
       encryption_key = {cipher: "aes_xts", key: "key1value", key2: "key2value"}
-      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*$/, stdin: /{.*}/)
+      expect(encrypted_sv).to receive(:r).with(/spdk_dd.*--if #{image_path} --ob crypt0 --bs=[0-9]+\s*\z/, stdin: /{.*}/)
       encrypted_sv.encrypted_image_copy(encryption_key, image_path)
     end
   end
@@ -387,13 +430,77 @@ RSpec.describe StorageVolume do
       }
       config_path = "/var/storage/test/2/vhost-backend.conf"
       f = instance_double(File)
-      expect(File).to receive(:open).with(config_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(f)
+      allow(f).to receive(:path).and_return(config_path)
+      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(config_path).and_yield(f)
       expect(FileUtils).to receive(:chown).with("test", "test", config_path)
+      expect(File).to receive(:chmod).with(0o600, config_path)
       expect(f).to receive(:write).with(/image_path/)
       expect(encrypted_vhost_sv).to receive(:fsync_or_fail).with(f)
       expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(config_path)
       expect(encrypted_vhost_sv).to receive(:write_through_device?).and_return(true)
       encrypted_vhost_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "creates v2 config files for v0.4.0" do
+      encryption_key = {
+        key: "abcdefgh01234567abcdefgh01234567",
+        key2: "abcdefgh01234567abcdefgh01234567"
+      }
+      algorithm = "aes-256-gcm"
+      cipher = OpenSSL::Cipher.new(algorithm)
+      key_wrapping_secrets = {
+        "algorithm" => algorithm,
+        "key" => Base64.encode64(cipher.random_key),
+        "init_vector" => Base64.encode64(cipher.random_iv),
+        "auth_data" => "Ubicloud-Test-Auth"
+      }
+
+      expect(encrypted_vhost_v2_sv).to receive(:write_through_device?).and_return(true)
+      expect(encrypted_vhost_v2_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", /\[stripe_source\]/)
+      expect(encrypted_vhost_v2_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-secrets.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[secrets.xts-key]") &&
+            lines.include?("[secrets.kek]")
+        })
+      expect(encrypted_vhost_v2_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("include = [\"vhost-backend-stripe-source.conf\", \"vhost-backend-secrets.conf\"]") &&
+            lines.include?("[device]") &&
+            lines.include?("[tuning]") &&
+            !lines.include?("[danger_zone]")
+        })
+
+      encrypted_vhost_v2_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
+
+    it "writes cpu pinning as integer values in v2 config" do
+      expect(unencrypted_vhost_v2_with_cpus_sv).to receive(:write_through_device?).and_return(true)
+      expect(unencrypted_vhost_v2_with_cpus_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", /\[stripe_source\]/)
+      expect(unencrypted_vhost_v2_with_cpus_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+          content.include?("cpus = [0, 1]")
+        })
+
+      unencrypted_vhost_v2_with_cpus_sv.vhost_backend_create_config(nil, nil)
+    end
+
+    it "enables danger zone for unencrypted v2 config" do
+      expect(unencrypted_vhost_v2_sv).to receive(:write_through_device?).and_return(true)
+      expect(unencrypted_vhost_v2_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", /\[stripe_source\]/)
+      expect(unencrypted_vhost_v2_sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[danger_zone]") &&
+            lines.include?("enabled = true") &&
+            lines.include?("allow_unencrypted_disk = true")
+        })
+
+      unencrypted_vhost_v2_sv.vhost_backend_create_config(nil, nil)
     end
   end
 
@@ -435,12 +542,14 @@ RSpec.describe StorageVolume do
       }
       metadata_path = "/var/storage/test/2/metadata"
       f = instance_double(File)
+      allow(f).to receive(:path).and_return(metadata_path)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(metadata_path)
-      expect(File).to receive(:open).with(metadata_path, "w", 0o600, flags: File::CREAT | File::EXCL).and_yield(f)
+      expect(encrypted_vhost_sv).to receive(:safe_write_to_file).with(metadata_path).and_yield(f)
       expect(FileUtils).to receive(:chown).with("test", "test", metadata_path)
+      expect(File).to receive(:chmod).with(0o600, metadata_path)
       expect(f).to receive(:truncate).with(8 * 1024 * 1024)
-      expect(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
-      expect(encrypted_vhost_sv).to receive(:r).with(/.*init-metadata.* --kek \/dev\/stdin/, stdin: /.*aes256-gcm.*/)
+      expect(encrypted_vhost_sv).to receive(:vhost_backend_create_encrypted_metadata).with(key_wrapping_secrets)
+      allow(encrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
       encrypted_vhost_sv.vhost_backend_create_metadata(key_wrapping_secrets)
     end
 
@@ -450,7 +559,12 @@ RSpec.describe StorageVolume do
       expect(unencrypted_vhost_sv).to receive(:write_new_file).with(metadata_path, "test").and_yield(f)
       expect(f).to receive(:truncate).with(8 * 1024 * 1024)
       expect(unencrypted_vhost_sv).to receive(:sync_parent_dir).with(metadata_path)
-      expect(unencrypted_vhost_sv).to receive(:r).with(/.*init-metadata.*--config \/var\/storage\/test\/2\/vhost-backend.conf $/, stdin: "")
+      expect(unencrypted_vhost_sv).to receive(:r).with(
+        "sudo", "-u", "test",
+        "/opt/vhost-block-backend/v0.1-5/init-metadata",
+        "-s", "11", "--config",
+        "/var/storage/test/2/vhost-backend.conf"
+      )
       unencrypted_vhost_sv.vhost_backend_create_metadata(nil)
     end
   end
@@ -467,6 +581,13 @@ RSpec.describe StorageVolume do
       expect(File).to receive(:write).with(service_file, /vhost-backend\.conf \nRestart=always/)
       unencrypted_vhost_sv.vhost_backend_create_service_file
     end
+
+    it "does not add --kek to service file for encrypted v2 config" do
+      service_file = "/etc/systemd/system/test-2-storage.service"
+      expect(File).to receive(:write).with(service_file, satisfy { |content| !content.include?("--kek") })
+
+      encrypted_vhost_v2_sv.vhost_backend_create_service_file
+    end
   end
 
   describe "#vhost_backend_start" do
@@ -480,18 +601,26 @@ RSpec.describe StorageVolume do
         "auth_data" => "Ubicloud-Test-Auth"
       }
       kek_pipe = "/var/storage/test/2/kek.pipe"
+      vhost_sock = "/var/storage/test/2/vhost.sock"
+      rpc_sock = "/var/storage/test/2/rpc.sock"
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
+      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(kek_pipe)
       expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
       expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
-      expect(File).to receive(:write).with(kek_pipe, /aes256-gcm/)
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "start", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:write_kek_to_pipe).with(kek_pipe, /aes256-gcm/)
       encrypted_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end
 
     it "can start an unencrypted vhost backend" do
-      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
-      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl start test-2-storage.service")
+      vhost_sock = "/var/storage/test/2/vhost.sock"
+      rpc_sock = "/var/storage/test/2/rpc.sock"
+      expect(unencrypted_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
+      expect(unencrypted_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
+      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
+      expect(unencrypted_vhost_sv).to receive(:r).with("systemctl", "start", "test-2-storage.service")
       unencrypted_vhost_sv.vhost_backend_start(nil)
     end
   end
@@ -569,7 +698,7 @@ RSpec.describe StorageVolume do
 
   describe "#stop_service_if_loaded" do
     it "stops the service if it is loaded" do
-      expect(encrypted_vhost_sv).to receive(:r).with("systemctl stop test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
       encrypted_vhost_sv.stop_service_if_loaded("test-2-storage.service")
     end
 
