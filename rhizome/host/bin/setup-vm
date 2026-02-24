@@ -2,7 +2,6 @@
 # frozen_string_literal: true
 
 require "json"
-require_relative "../lib/vm_setup"
 
 unless (action = ARGV.shift)
   puts "expected action as argument"
@@ -13,6 +12,8 @@ unless (vm_name = ARGV.shift)
   puts "expected path to vm_name as argument"
   exit 1
 end
+
+require_relative "../lib/vm_setup"
 
 params = begin
   JSON.parse(File.read(VmPath.new(vm_name).prep_json))

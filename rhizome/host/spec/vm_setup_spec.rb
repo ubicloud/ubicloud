@@ -134,7 +134,9 @@ RSpec.describe VmSetup do
       expect(vs).to receive(:r).with("systemctl daemon-reload")
       expect(vs).to receive(:purge_storage)
       expect(vs).to receive(:unmount_hugepages)
+      expect(VmFscrypt).to receive(:remove_key).with("test")
       expect(vs).to receive(:r).with("deluser --remove-home test")
+      expect(VmFscrypt).to receive(:purge).with("test")
       expect(IO).to receive(:popen).with(["systemd-escape", "test.service"]).and_return("test.service")
       expect(vs).to receive(:block_ip4)
 
