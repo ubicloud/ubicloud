@@ -21,6 +21,7 @@ class Vm < Sequel::Model
   many_to_one :vm_host_slice, read_only: true
   many_to_one :location
   one_to_one :aws_instance, key: :id, read_only: true
+  one_to_one :vm_metal, key: :id, read_only: true
   one_to_one :init_script, class: :VmInitScript, key: :id, read_only: true
   one_to_one :github_runner, read_only: true
 
@@ -32,7 +33,7 @@ class Vm < Sequel::Model
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil
 
-  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy
+  plugin :association_dependencies, sshable: :destroy, assigned_vm_address: :destroy, vm_storage_volumes: :destroy, load_balancer_vm: :destroy, init_script: :destroy, vm_metal: :destroy
 
   dataset_module Pagination
 
@@ -403,4 +404,5 @@ end
 #  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
 #  vm_init_script             | vm_init_script_id_fkey                | (id) REFERENCES vm(id)
+#  vm_metal                   | vm_metal_id_fkey                      | (id) REFERENCES vm(id)
 #  vm_storage_volume          | vm_storage_volume_vm_id_fkey          | (vm_id) REFERENCES vm(id)

@@ -476,6 +476,7 @@ end
 #  accepts_slices     | boolean                  | NOT NULL DEFAULT false
 #  location_id        | uuid                     | NOT NULL
 #  family             | text                     | NOT NULL
+#  fsencrypt_capable  | boolean                  | NOT NULL DEFAULT false
 # Indexes:
 #  vm_host_pkey     | PRIMARY KEY btree (id)
 #  vm_host_ip6_key  | UNIQUE btree (ip6)
