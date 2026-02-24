@@ -223,12 +223,6 @@ class Vm < Sequel::Model
     vm_storage_volumes.map { it.size_gib }.sum
   end
 
-  def init_health_monitor_session
-    {
-      ssh_session: vm_host.sshable.start_fresh_session
-    }
-  end
-
   def healthcheck_systemd_units
     [inhost_name, "#{inhost_name}-dnsmasq"] +
       vm_storage_volumes.filter_map { it.vhost_backend_systemd_unit_name if it.vhost_block_backend }

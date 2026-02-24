@@ -197,16 +197,6 @@ RSpec.describe Vm do
     end
   end
 
-  describe "#init_health_monitor_session" do
-    it "initiates a new health monitor session" do
-      vmh = create_vm_host
-      vm = create_vm(vm_host_id: vmh.id)
-      sshable = vm.vm_host.sshable
-      expect(sshable).to receive(:start_fresh_session)
-      vm.init_health_monitor_session
-    end
-  end
-
   it "checks underlying enum value when validating" do
     vm = create_vm
     expect(vm.valid?).to be true
