@@ -66,7 +66,7 @@ class Page < Sequel::Model
     @pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
   end
 
-  plugin SemaphoreMethods, :resolve
+  plugin SemaphoreMethods, :resolve, :retrigger
   plugin ResourceMethods
 
   def pagerduty_client
@@ -99,6 +99,12 @@ class Page < Sequel::Model
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
     Page.active.where(tag:).first
+  end
+
+  SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze
+
+  def self.severity_order(severity)
+    SEVERITY_ORDER.fetch(severity)
   end
 
   private
