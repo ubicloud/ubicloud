@@ -7,6 +7,11 @@ class Prog::PageNexus < Prog::Base
     DB.transaction do
       details = extra_data.merge({"related_resources" => Array(related_resources)})
       tag = Page.generate_tag(tag_parts)
+
+      if (existing_page = Page.active.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
+        existing_page.incr_retrigger
+      end
+
       page = Page.new(summary:, details:, tag:, severity:)
       page.skip_auto_validations(:unique) do
         page.insert_conflict(
@@ -27,6 +32,11 @@ class Prog::PageNexus < Prog::Base
   end
 
   label def wait
+    when_retrigger_set? do
+      page.trigger
+      decr_retrigger
+    end
+
     when_resolve_set? do
       page.resolve
       page.destroy

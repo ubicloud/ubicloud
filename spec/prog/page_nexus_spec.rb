@@ -24,6 +24,14 @@ RSpec.describe Prog::PageNexus do
       expect(pg.exists?).to be false
     end
 
+    it "triggers page when retrigger semaphore is set" do
+      expect(pn).to receive(:page).and_return(pg).at_least(:once)
+      expect(pg).to receive(:trigger)
+      pn.incr_retrigger
+      expect { pn.wait }.to nap(6 * 60 * 60)
+      expect(pg.semaphores.map(&:name)).not_to include("retrigger")
+    end
+
     it "naps" do
       expect { pn.wait }.to nap(6 * 60 * 60)
     end
@@ -79,6 +87,48 @@ RSpec.describe Prog::PageNexus do
       expect(existing_page.details["related_resources"]).to eq(related_resources)
       expect(existing_page.details["foo"]).to eq("bar")
       expect(existing_page.details["old_data"]).to be_nil
+    end
+
+    it "sets retrigger semaphore when severity is increased" do
+      existing_page = described_class.assemble(
+        "Old Summary",
+        tag_parts,
+        ["old_ubid"],
+        severity: "warning"
+      ).subject
+
+      expect(existing_page.semaphores.map(&:name)).not_to include("retrigger")
+
+      described_class.assemble(summary, tag_parts, related_resources, severity: "error")
+
+      existing_page.reload
+      expect(existing_page.semaphores.map(&:name)).to include("retrigger")
+    end
+
+    it "does not set retrigger semaphore when severity is decreased" do
+      existing_page = described_class.assemble(
+        "Old Summary",
+        tag_parts,
+        ["old_ubid"],
+        severity: "error"
+      ).subject
+
+      described_class.assemble(summary, tag_parts, related_resources, severity: "warning")
+
+      expect(existing_page.semaphores.map(&:name)).not_to include("retrigger")
+    end
+
+    it "does not set retrigger semaphore when severity is unchanged" do
+      existing_page = described_class.assemble(
+        "Old Summary",
+        tag_parts,
+        ["old_ubid"],
+        severity: "error"
+      ).subject
+
+      described_class.assemble(summary, tag_parts, related_resources, severity: "error")
+
+      expect(existing_page.semaphores.map(&:name)).not_to include("retrigger")
     end
   end
 end

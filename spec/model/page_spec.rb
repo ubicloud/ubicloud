@@ -78,4 +78,17 @@ RSpec.describe Page do
       p.resolve
     end
   end
+
+  describe ".severity_order" do
+    it "returns the correct order for severity levels" do
+      expect(described_class.severity_order("info")).to eq(0)
+      expect(described_class.severity_order("warning")).to eq(1)
+      expect(described_class.severity_order("error")).to eq(2)
+      expect(described_class.severity_order("critical")).to eq(3)
+    end
+
+    it "raises an error for unknown severity" do
+      expect { described_class.severity_order("unknown") }.to raise_error(KeyError)
+    end
+  end
 end
