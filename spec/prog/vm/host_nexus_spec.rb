@@ -184,6 +184,7 @@ RSpec.describe Prog::Vm::HostNexus do
         Prog::LearnStorage,
         Prog::LearnPci,
         Prog::InstallDnsmasq,
+        Prog::InstallFscryptctl,
         Prog::SetupSysstat,
         Prog::SetupNftables,
         Prog::SetupNodeExporter
@@ -215,6 +216,7 @@ RSpec.describe Prog::Vm::HostNexus do
       Strand.create(parent_id: st.id, prog: "LearnMemory", label: "start", stack: [{}], exitval: {"mem_gib" => 1})
       Strand.create(parent_id: st.id, prog: "LearnOs", label: "start", stack: [{}], exitval: {"os_version" => "ubuntu-24.04"})
       Strand.create(parent_id: st.id, prog: "LearnCpu", label: "start", stack: [{}], exitval: {"arch" => "arm64", "total_sockets" => 2, "total_dies" => 3, "total_cores" => 4, "total_cpus" => 5})
+      Strand.create(parent_id: st.id, prog: "Vm::PrepHost", label: "start", stack: [{}], exitval: {"msg" => "host prepared"})
       Strand.create(parent_id: st.id, prog: "ArbitraryOtherProg", label: "start", stack: [{}], exitval: {})
 
       vm_host = st.subject
@@ -230,6 +232,7 @@ RSpec.describe Prog::Vm::HostNexus do
       expect(vm_host.total_cpus).to eq 5
       expect(vm_host.total_dies).to eq 3
       expect(vm_host.total_sockets).to eq 2
+      expect(vm_host.fsencrypt_capable).to be true
       expect(VmHostCpu.where(vm_host_id: vm_host.id).select_order_map([:cpu_number, :spdk])).to eq [[0, true], [1, true], [2, false], [3, false], [4, false]]
     end
 

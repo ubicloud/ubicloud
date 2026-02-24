@@ -86,6 +86,10 @@ r "sysctl --system"
 # by default in Leaseweb servers.
 r "apt-get -y install qemu-utils mtools acl"
 
+# Enable the encrypt feature on the root filesystem for fscryptctl.
+root_device = r("findmnt -n -o SOURCE /").strip
+r "tune2fs -O encrypt #{root_device.shellescape}" if root_device.start_with?("/dev/")
+
 # We need nvme-cli to inspect installed NVMe cards in prod servers when
 # looking into I/O performance issues. systemd-coredump is useful when
 # debugging crashes.
