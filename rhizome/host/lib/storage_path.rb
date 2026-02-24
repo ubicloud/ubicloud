@@ -44,6 +44,14 @@ class StoragePath
     @vhost_backend_config ||= File.join(storage_dir, "vhost-backend.conf")
   end
 
+  def vhost_backend_stripe_source_config
+    @vhost_backend_stripe_source_config ||= File.join(storage_dir, "vhost-backend-stripe-source.conf")
+  end
+
+  def vhost_backend_secrets_config
+    @vhost_backend_secrets_config ||= File.join(storage_dir, "vhost-backend-secrets.conf")
+  end
+
   def vhost_backend_metadata
     @vhost_backend_metadata ||= File.join(storage_dir, "metadata")
   end

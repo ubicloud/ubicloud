@@ -3,10 +3,23 @@
 require_relative "../../common/lib/util"
 require "openssl"
 require "base64"
+require "securerandom"
 
 class StorageKeyEncryption
   def initialize(key_encryption_cipher)
     @key_encryption_cipher = key_encryption_cipher
+  end
+
+  # Wrap a plaintext with AES-256-GCM:
+  # [12-byte nonce || ciphertext || 16-byte tag]
+  def self.aes256gcm_encrypt(key, auth_data, plaintext)
+    cipher = OpenSSL::Cipher.new("aes-256-gcm")
+    cipher.encrypt
+    cipher.key = key
+    nonce = SecureRandom.random_bytes(12)
+    cipher.iv = nonce
+    cipher.auth_data = auth_data
+    nonce << cipher.update(plaintext) << cipher.final << cipher.auth_tag
   end
 
   def write_encrypted_dek(key_file, data_encryption_key)
