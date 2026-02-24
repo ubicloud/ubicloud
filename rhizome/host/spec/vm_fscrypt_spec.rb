@@ -100,6 +100,68 @@ RSpec.describe VmFscrypt do
       expect(File).to receive(:directory?).with(vm_home).and_return(false)
       expect { described_class.add_key(vm_name, kek_secrets) }.to raise_error(RuntimeError, /does not exist/)
     end
+
+    context "rotation window fallback (.new file)" do
+      let(:new_kek_secrets) {
+        algorithm = "aes-256-gcm"
+        cipher = OpenSSL::Cipher.new(algorithm)
+        {
+          "algorithm" => algorithm,
+          "key" => Base64.encode64(cipher.random_key),
+          "init_vector" => Base64.encode64(cipher.random_iv),
+          "auth_data" => "Ubicloud-fscrypt-test-new"
+        }
+      }
+
+      it "falls back to .new file when main file fails to unwrap (rotation window)" do
+        expect(File).to receive(:directory?).with(vm_home).and_return(true)
+        expect(File).to receive(:exist?).with(dek_path).and_return(true)
+
+        # Main file wrapped with OLD KEK (can't unwrap with new KEK)
+        sek_old = StorageKeyEncryption.new(kek_secrets)
+        old_wrapped = sek_old.wrap_key(master_key)
+        old_wrapped_b64 = old_wrapped.map { |s| Base64.strict_encode64(s) }
+        old_json = JSON.pretty_generate({"cipher" => "fscrypt-v2", "key" => old_wrapped_b64})
+        expect(File).to receive(:read).with(dek_path).and_return(old_json)
+
+        # .new file wrapped with NEW KEK (the current KEK in DB)
+        expect(File).to receive(:exist?).with(dek_new_path).and_return(true)
+        sek_new = StorageKeyEncryption.new(new_kek_secrets)
+        new_wrapped = sek_new.wrap_key(master_key)
+        new_wrapped_b64 = new_wrapped.map { |s| Base64.strict_encode64(s) }
+        new_json = JSON.pretty_generate({"cipher" => "fscrypt-v2", "key" => new_wrapped_b64})
+        expect(File).to receive(:read).with(dek_new_path).and_return(new_json)
+
+        # Expect rename to fix host state
+        expect(File).to receive(:rename).with(dek_new_path, dek_path)
+        parent_dir_io = instance_double(File)
+        expect(File).to receive(:open).with(dek_dir).and_yield(parent_dir_io)
+        expect(parent_dir_io).to receive(:fsync)
+
+        expect(described_class).to receive(:r)
+          .with("fscryptctl add_key /", stdin: master_key)
+          .and_return("abcdef0123456789\n")
+
+        described_class.add_key(vm_name, new_kek_secrets)
+      end
+
+      it "raises CipherError if neither main nor .new file can be unwrapped" do
+        expect(File).to receive(:directory?).with(vm_home).and_return(true)
+        expect(File).to receive(:exist?).with(dek_path).and_return(true)
+
+        # Main file wrapped with old KEK
+        sek_old = StorageKeyEncryption.new(kek_secrets)
+        old_wrapped = sek_old.wrap_key(master_key)
+        old_wrapped_b64 = old_wrapped.map { |s| Base64.strict_encode64(s) }
+        old_json = JSON.pretty_generate({"cipher" => "fscrypt-v2", "key" => old_wrapped_b64})
+        expect(File).to receive(:read).with(dek_path).and_return(old_json)
+
+        # No .new file exists
+        expect(File).to receive(:exist?).with(dek_new_path).and_return(false)
+
+        expect { described_class.add_key(vm_name, new_kek_secrets) }.to raise_error(OpenSSL::Cipher::CipherError)
+      end
+    end
   end
 
   describe ".remove_key" do

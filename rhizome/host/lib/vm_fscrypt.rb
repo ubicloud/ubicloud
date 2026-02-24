@@ -39,6 +39,11 @@ module VmFscrypt
   # Reads wrapped DEK from disk, unwraps with KEK, passes to fscryptctl add_key.
   # Idempotent: kernel returns same identifier if key already added.
   # Returns silently if no DEK file exists (pre-fscrypt VM).
+  #
+  # Falls back to the .new DEK file if the main file fails to unwrap.
+  # This handles the KEK rotation window between promote_db (DB has new
+  # KEK) and retire_old (.new not yet renamed to .json). If the fallback
+  # succeeds, the rename is completed here to fix the host state.
   def self.add_key(vm_name, kek_secrets)
     vm_home = VmPath.new(vm_name).home("")
     fail "Directory does not exist: #{vm_home}" unless File.directory?(vm_home)
@@ -46,7 +51,18 @@ module VmFscrypt
     dek_file = dek_path(vm_name)
     return unless File.exist?(dek_file)
 
-    master_key_binary = read_unwrapped_dek(dek_file, kek_secrets)
+    begin
+      master_key_binary = read_unwrapped_dek(dek_file, kek_secrets)
+    rescue OpenSSL::Cipher::CipherError
+      # Main file may be wrapped with old KEK during rotation window.
+      # Try the .new file which should be wrapped with the current KEK.
+      new_file = dek_new_path(vm_name)
+      raise unless File.exist?(new_file)
+      master_key_binary = read_unwrapped_dek(new_file, kek_secrets)
+      # Complete the pending rename to fix host state.
+      File.rename(new_file, dek_file)
+      sync_parent_dir(dek_file)
+    end
     mnt = mountpoint_of(vm_home).shellescape
     r("fscryptctl add_key #{mnt}", stdin: master_key_binary)
   end

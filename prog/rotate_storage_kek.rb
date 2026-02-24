@@ -10,6 +10,8 @@ class Prog::RotateStorageKek < Prog::Base
       pop "storage volume is not encrypted"
     end
 
+    register_deadline(nil, 10 * 60)
+
     key_wrapping_algorithm = "aes-256-gcm"
     cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
     key_wrapping_key = cipher.random_key

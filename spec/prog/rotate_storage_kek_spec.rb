@@ -53,6 +53,13 @@ RSpec.describe Prog::RotateStorageKek do
   end
 
   describe "#start" do
+    it "registers a 10-minute deadline" do
+      expect(rsk).to receive(:register_deadline).with(nil, 10 * 60)
+      expect(StorageKeyEncryptionKey).to receive(:create).and_return(current_kek)
+      expect(volume).to receive(:update).with({key_encryption_key_2_id: current_kek.id})
+      expect { rsk.start }.to hop("install")
+    end
+
     it "creates a key & hops to install" do
       expect(StorageKeyEncryptionKey).to receive(:create).and_return(current_kek)
       expect(volume).to receive(:update).with({key_encryption_key_2_id: current_kek.id})
