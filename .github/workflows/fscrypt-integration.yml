@@ -1,0 +1,57 @@
+name: Fscrypt Integration Tests
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'rhizome/host/lib/vm_fscrypt.rb'
+      - 'rhizome/host/lib/storage_key_encryption.rb'
+      - 'rhizome/host/spec/vm_fscrypt_integration_spec.rb'
+      - '.github/workflows/fscrypt-integration.yml'
+  pull_request:
+    paths:
+      - 'rhizome/host/lib/vm_fscrypt.rb'
+      - 'rhizome/host/lib/storage_key_encryption.rb'
+      - 'rhizome/host/spec/vm_fscrypt_integration_spec.rb'
+      - '.github/workflows/fscrypt-integration.yml'
+
+jobs:
+  fscrypt-integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud, ubicloud-arm]
+    name: fscrypt - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.2"
+        bundler-cache: true
+      env:
+        BUNDLE_GEMFILE: rhizome/Gemfile
+
+    - name: Build and install fscryptctl
+      run: |
+        sudo apt-get -y install make gcc
+        git init /tmp/fscryptctl
+        cd /tmp/fscryptctl
+        git fetch --depth=1 https://github.com/google/fscryptctl.git f1ec919877f6b5360c03fdb44b6ed8a47aa459e8
+        git checkout FETCH_HEAD
+        make fscryptctl
+        sudo install -m755 fscryptctl /usr/local/bin/fscryptctl
+
+    - name: Enable ext4 encrypt feature
+      run: |
+        ROOT_DEV=$(findmnt -n -o SOURCE /)
+        sudo tune2fs -O encrypt "$ROOT_DEV" || true
+
+    - name: Run fscrypt integration tests
+      run: (cd rhizome && bundle exec rspec -O /dev/null host/spec/vm_fscrypt_integration_spec.rb --format documentation)
