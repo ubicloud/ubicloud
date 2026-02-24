@@ -8,6 +8,7 @@ class VmInitScript < Sequel::Model
   def validate
     super
     validates_max_length(2000, :init_script)
+    errors.add(:init_script, "must contain only ASCII characters") unless init_script&.ascii_only?
   end
 end
 
