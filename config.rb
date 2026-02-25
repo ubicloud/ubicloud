@@ -83,6 +83,7 @@ module Config
   override :smtp_tls, true, bool
 
   override :base_url, "http://localhost:9292", string
+  override :admin_url, "http://admin.localhost:9292", string
   override :database_timeout, 10, int
   override :db_pool, 5, int
   override :db_pool_web, Config.db_pool, int
