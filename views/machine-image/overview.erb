@@ -1,20 +1,17 @@
-<% source_vm = @machine_image.vm %>
+<% active_ver = @machine_image.active_version %>
 <%== part(
   "components/kv_data_card",
   data: [
     ["ID", @machine_image.ubid],
     ["Name", @machine_image.name],
-    ["Version", @machine_image.version],
-    ["State", "machine_image_state_label", {component: { state: @machine_image.state }}],
-    ["Active", @machine_image.active? ? "Yes" : "No"],
     ["Location", @machine_image.display_location],
-    ["Architecture", @machine_image.arch],
-    ["Size", "#{@machine_image.size_gib} GiB"],
-    ["Compression", @machine_image.compression],
-    ["Encrypted", @machine_image.encrypted? ? "Yes" : "No"],
+    ["Active Version", active_ver ? active_ver.version.to_s : "None"],
+    ["Active Version State", active_ver ? ["machine_image_state_label", {component: { state: active_ver.state }}] : "N/A"],
+    ["Architecture", active_ver&.arch || "N/A"],
+    ["Size", active_ver ? "#{active_ver.size_gib} GiB" : "N/A"],
     ["Source VM",
-      source_vm ? "<a href='#{source_vm.path}' class='text-rose-500 hover:underline'>#{h(source_vm.name)}</a>" : "N/A",
-      source_vm ? { escape: false } : {}],
+      active_ver&.vm ? "<a href='#{active_ver.vm.path}' class='text-rose-500 hover:underline'>#{h(active_ver.vm.name)}</a>" : "N/A",
+      active_ver&.vm ? { escape: false } : {}],
     ["Created At", @machine_image.created_at&.strftime("%B %d, %Y %H:%M UTC")]
   ]
 ) %>

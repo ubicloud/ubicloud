@@ -2,14 +2,14 @@
 
 class Clover
   def machine_image_list_dataset
-    project_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view").active_versions
-    public_images = MachineImage.where(visible: true).exclude(project_id: @project.id).active_versions
+    project_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+    public_images = MachineImage.where(visible: true).exclude(project_id: @project.id)
     project_images.union(public_images)
   end
 
   def machine_image_list_api_response(dataset)
     dataset = dataset.where(location_id: @location.id) if @location
-    paginated_result(dataset.eager(:location, :vm).order(Sequel.desc(:created_at)), Serializers::MachineImage)
+    paginated_result(dataset.eager(:location, versions: :vm).order(Sequel.desc(:created_at)), Serializers::MachineImage)
   end
 
   def machine_image_post(name = nil)
@@ -44,43 +44,52 @@ class Clover
       fail Validation::ValidationFailed.new({vm_id: "VM boot disk size (#{boot_size_gib} GiB) exceeds maximum image size (#{max_size_gib} GiB)"})
     end
 
-    if MachineImage.where(vm_id: vm.id).exclude(state: ["available", "failed", "destroying"]).any?
+    if MachineImageVersion.where(vm_id: vm.id).exclude(state: ["available", "failed", "destroying"]).any?
       fail Validation::ValidationFailed.new({vm_id: "A machine image is already being created from this VM"})
     end
 
     Validation.validate_machine_image_quota(@project, image_size_gib: boot_size_gib)
 
     location = vm.location
-    existing_count = MachineImage.where(project_id: @project.id, location_id: location.id, name:).count
-    version = "v#{existing_count + 1}"
 
     machine_image = nil
+    version = nil
     DB.transaction do
-      MachineImage.where(project_id: @project.id, location_id: location.id, name:).update(active: false)
+      # Find or create the parent MachineImage
+      machine_image = MachineImage.where(project_id: @project.id, location_id: location.id, name:).first
+      if machine_image
+        machine_image.update(description:) unless description.empty?
+      else
+        machine_image = MachineImage.create(
+          name:,
+          description:,
+          location_id: location.id,
+          project_id: @project.id,
+          visible: false
+        )
+      end
 
-      machine_image = MachineImage.create(
-        name:,
-        description:,
-        version:,
-        location_id: location.id,
-        project_id: @project.id,
+      # Auto-increment version number
+      max_version = MachineImageVersion.where(machine_image_id: machine_image.id).max(:version) || 0
+
+      version = MachineImageVersion.create(
+        machine_image_id: machine_image.id,
+        version: max_version + 1,
         state: "creating",
         vm_id: vm.id,
         size_gib: boot_size_gib,
         arch: vm.arch,
-        encrypted: true,
-        active: true,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "#{@project.ubid}/#{location.display_name}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""
       )
-      machine_image.update(s3_prefix: "#{machine_image.s3_prefix}#{machine_image.ubid}/")
-      Strand.create(id: machine_image.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => machine_image.id}])
+      version.update(s3_prefix: "#{version.s3_prefix}#{version.ubid}/")
+      Strand.create(id: version.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => version.id}])
       audit_log(machine_image, "create")
     end
 
     if api?
-      Serializers::MachineImage.serialize(machine_image)
+      Serializers::MachineImage.serialize(machine_image.refresh)
     else
       flash["notice"] = "'#{name}' is being created"
       request.redirect machine_image

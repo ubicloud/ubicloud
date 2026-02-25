@@ -309,11 +309,11 @@ class Vm < Sequel::Model
         cpus = spdk_cpus.shuffle.take(s.num_queues)
       end
 
-      mi = s.machine_image
+      miv = s.machine_image_version
       {
         "boot" => s.boot,
-        "image" => mi ? nil : s.boot_image&.name,
-        "image_version" => mi ? nil : s.boot_image&.version,
+        "image" => miv ? nil : s.boot_image&.name,
+        "image_version" => miv ? nil : s.boot_image&.version,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,
@@ -328,10 +328,10 @@ class Vm < Sequel::Model
         "slice_name" => vm_host_slice&.inhost_name || "system.slice",
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
-        "copy_on_read" => !mi.nil?
+        "copy_on_read" => !miv.nil?
       }.tap { |v|
         v["cpus"] = cpus if add_cpus
-        v["machine_image"] = mi.archive_params if mi
+        v["machine_image"] = miv.archive_params if miv
       }
     }
   end
@@ -344,17 +344,17 @@ class Vm < Sequel::Model
         secrets.merge!(s.key_encryption_key_1.secret_key_material_hash)
       end
 
-      if (mi = s.machine_image)
+      if (miv = s.machine_image_version)
         creds = CloudflareR2.generate_temp_credentials(
-          bucket: mi.s3_bucket,
+          bucket: miv.s3_bucket,
           permission: "object-read-only",
           ttl_seconds: 86400
         )
         secrets["archive_s3_access_key"] = creds[:access_key_id]
         secrets["archive_s3_secret_key"] = creds[:secret_access_key]
         secrets["archive_s3_session_token"] = creds[:session_token]
-        if mi.key_encryption_key_1
-          secrets["archive_kek"] = mi.key_encryption_key_1.secret_key_material_hash
+        if miv.key_encryption_key_1
+          secrets["archive_kek"] = miv.key_encryption_key_1.secret_key_material_hash
         end
       end
 

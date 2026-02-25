@@ -3,14 +3,15 @@
 <div class="grid gap-6">
   <%== part(
     "components/table_card",
-    headers: ["Name", "Location", "State", "Size (GiB)", "Created At"],
+    headers: ["Name", "Location", "Versions", "Active Version", "Created At"],
     rows: @machine_images.map do |mi|
+      active_ver = mi.active_version
       [
         [
           [mi.name, {link: path(mi)}],
           mi.display_location,
-          ["machine_image_state_label", {component: { state: mi.state }}],
-          mi.size_gib,
+          mi.versions.count,
+          active_ver ? "v#{active_ver.version} (#{active_ver.state})" : "None",
           mi.created_at&.strftime("%B %d, %Y")
         ],
         {id: "mi-#{mi.ubid}"}

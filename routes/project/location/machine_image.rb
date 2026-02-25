@@ -23,7 +23,7 @@ class Clover
           machine_image_post(mi_name)
         end
 
-        filter = {Sequel[:machine_image][:name] => mi_name, Sequel[:machine_image][:active] => true}
+        filter = {Sequel[:machine_image][:name] => mi_name}
       else
         filter = {Sequel[:machine_image][:id] => mi_id}
       end
@@ -38,7 +38,7 @@ class Clover
         authorize("MachineImage:delete", machine_image)
 
         DB.transaction do
-          machine_image.incr_destroy
+          machine_image.versions.each(&:incr_destroy)
           audit_log(machine_image, "destroy")
         end
 
@@ -72,10 +72,8 @@ class Clover
           handle_validation_failure("machine-image/show") { @page = "versions" }
 
           version_ubid = typecast_params.str!("version_id")
-          version = MachineImage.where(
-            project_id: machine_image.project_id,
-            location_id: machine_image.location_id,
-            name: machine_image.name,
+          version = MachineImageVersion.where(
+            machine_image_id: machine_image.id,
             id: UBID.to_uuid(version_ubid)
           ).first
 
@@ -84,11 +82,11 @@ class Clover
           end
 
           DB.transaction do
-            version.set_active!
-            audit_log(version, "update")
+            version.activate!
+            audit_log(machine_image, "update")
           end
 
-          flash["notice"] = "Version '#{version.version}' is now the active version"
+          flash["notice"] = "Version #{version.version} is now the active version"
           r.redirect machine_image, "/versions"
         end
       else

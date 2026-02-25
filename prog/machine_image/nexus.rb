@@ -4,10 +4,14 @@ require "json"
 require "aws-sdk-s3"
 
 class Prog::MachineImage::Nexus < Prog::Base
-  subject_is :machine_image
+  subject_is :machine_image_version
+
+  def machine_image
+    @machine_image ||= machine_image_version.machine_image
+  end
 
   def vm
-    @vm ||= machine_image.vm
+    @vm ||= machine_image_version.vm
   end
 
   def host
@@ -22,12 +26,12 @@ class Prog::MachineImage::Nexus < Prog::Base
     @boot_volume ||= vm.vm_storage_volumes.find(&:boot)
   end
 
-  def self.assemble(machine_image)
+  def self.assemble(machine_image_version)
     Strand.create(
       prog: "MachineImage::Nexus",
       label: "start",
-      stack: [{"subject_id" => machine_image.id}]
-    ) { it.id = machine_image.id }
+      stack: [{"subject_id" => machine_image_version.id}]
+    ) { it.id = machine_image_version.id }
   end
 
   label def start
@@ -49,15 +53,15 @@ class Prog::MachineImage::Nexus < Prog::Base
       algorithm: key_wrapping_algorithm,
       key: Base64.encode64(key_wrapping_key),
       init_vector: Base64.encode64(key_wrapping_iv),
-      auth_data: machine_image.ubid
+      auth_data: machine_image_version.ubid
     )
-    machine_image.update(key_encryption_key_1_id: kek.id)
+    machine_image_version.update(key_encryption_key_1_id: kek.id)
 
     hop_archive
   end
 
   label def archive
-    daemon_name = "archive_#{machine_image.ubid}"
+    daemon_name = "archive_#{machine_image_version.ubid}"
     case host.sshable.cmd("common/bin/daemonizer --check :daemon_name", daemon_name:)
     when "Succeeded"
       host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
@@ -72,8 +76,8 @@ class Prog::MachineImage::Nexus < Prog::Base
         nil
       end
       host.sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
-      machine_image.update(state: "failed")
-      Clog.emit("Failed to create machine image archive", {machine_image_archive_failed: {ubid: machine_image.ubid, stderr:}})
+      machine_image_version.update(state: "failed")
+      Clog.emit("Failed to create machine image archive", {machine_image_archive_failed: {ubid: machine_image_version.ubid, stderr:}})
       hop_wait
     end
 
@@ -81,20 +85,20 @@ class Prog::MachineImage::Nexus < Prog::Base
   end
 
   label def finish
-    machine_image.update(state: "available", size_gib: boot_volume.size_gib)
+    machine_image_version.update(state: "available", size_gib: boot_volume.size_gib, activated_at: Time.now)
 
-    if machine_image.project.billable && machine_image.active_billing_records.empty?
+    if machine_image.project.billable && machine_image_version.active_billing_records.empty?
       billing_rate = BillingRate.from_resource_properties("MachineImageStorage", "standard", machine_image.location.name)
       if billing_rate
         BillingRecord.create(
           project_id: machine_image.project_id,
-          resource_id: machine_image.id,
+          resource_id: machine_image_version.id,
           resource_name: machine_image.name,
           billing_rate_id: billing_rate["id"],
-          amount: machine_image.size_gib
+          amount: machine_image_version.size_gib
         )
       else
-        Clog.emit("No billing rate found for machine image", {machine_image_billing_rate_missing: {ubid: machine_image.ubid, location: machine_image.location.name}})
+        Clog.emit("No billing rate found for machine image", {machine_image_billing_rate_missing: {ubid: machine_image_version.ubid, location: machine_image.location.name}})
       end
     end
 
@@ -106,7 +110,7 @@ class Prog::MachineImage::Nexus < Prog::Base
       hop_destroy
     end
 
-    if machine_image.state == "failed" && machine_image.created_at < Time.now - 3600
+    if machine_image_version.state == "failed" && machine_image_version.created_at < Time.now - 3600
       hop_destroy
     end
 
@@ -117,8 +121,8 @@ class Prog::MachineImage::Nexus < Prog::Base
     register_deadline(nil, 10 * 60)
     decr_destroy
 
-    machine_image.active_billing_records.each(&:finalize)
-    machine_image.update(state: "destroying")
+    machine_image_version.active_billing_records.each(&:finalize)
+    machine_image_version.update(state: "destroying")
 
     hop_destroy_record
   end
@@ -126,13 +130,13 @@ class Prog::MachineImage::Nexus < Prog::Base
   label def destroy_record
     delete_s3_objects
 
-    kek = machine_image.key_encryption_key_1
-    machine_image.update(key_encryption_key_1_id: nil)
+    kek = machine_image_version.key_encryption_key_1
+    machine_image_version.update(key_encryption_key_1_id: nil)
     kek&.destroy
 
-    machine_image.destroy
+    machine_image_version.destroy
 
-    pop "machine image destroyed"
+    pop "machine image version destroyed"
   end
 
   private
@@ -149,17 +153,17 @@ class Prog::MachineImage::Nexus < Prog::Base
   end
 
   def target_config_path
-    "/tmp/archive-target-#{machine_image.ubid}.toml"
+    "/tmp/archive-target-#{machine_image_version.ubid}.toml"
   end
 
   def target_config_toml
     lines = []
     lines << "[target]"
     lines << "storage = \"s3\""
-    lines << "bucket = #{toml_str(machine_image.s3_bucket)}"
-    lines << "prefix = #{toml_str(machine_image.s3_prefix)}"
+    lines << "bucket = #{toml_str(machine_image_version.s3_bucket)}"
+    lines << "prefix = #{toml_str(machine_image_version.s3_prefix)}"
     lines << "region = \"auto\""
-    lines << "endpoint = #{toml_str(machine_image.s3_endpoint)}"
+    lines << "endpoint = #{toml_str(machine_image_version.s3_endpoint)}"
     lines << "connections = 16"
     lines << "access_key_id.ref = \"s3-key-id\""
     lines << "secret_access_key.ref = \"s3-secret-key\""
@@ -184,7 +188,7 @@ class Prog::MachineImage::Nexus < Prog::Base
 
   def archive_params
     creds = CloudflareR2.generate_temp_credentials(
-      bucket: machine_image.s3_bucket,
+      bucket: machine_image_version.s3_bucket,
       permission: "object-read-write",
       ttl_seconds: 86400
     )
@@ -198,7 +202,7 @@ class Prog::MachineImage::Nexus < Prog::Base
       "s3_secret_key" => creds[:secret_access_key],
       "s3_session_token" => creds[:session_token],
       "vm_name" => vm_name,
-      "archive_kek" => machine_image.key_encryption_key_1.key
+      "archive_kek" => machine_image_version.key_encryption_key_1.key
     }
 
     if boot_volume.key_encryption_key_1
@@ -210,13 +214,13 @@ class Prog::MachineImage::Nexus < Prog::Base
 
   def delete_s3_objects
     creds = CloudflareR2.generate_temp_credentials(
-      bucket: machine_image.s3_bucket,
+      bucket: machine_image_version.s3_bucket,
       permission: "object-read-write",
       ttl_seconds: 3600
     )
 
     client = Aws::S3::Client.new(
-      endpoint: machine_image.s3_endpoint,
+      endpoint: machine_image_version.s3_endpoint,
       access_key_id: creds[:access_key_id],
       secret_access_key: creds[:secret_access_key],
       session_token: creds[:session_token],
@@ -226,12 +230,12 @@ class Prog::MachineImage::Nexus < Prog::Base
     )
 
     objects = []
-    response = client.list_objects_v2(bucket: machine_image.s3_bucket, prefix: machine_image.s3_prefix)
+    response = client.list_objects_v2(bucket: machine_image_version.s3_bucket, prefix: machine_image_version.s3_prefix)
     objects.concat(response.contents)
     while response.is_truncated
       response = client.list_objects_v2(
-        bucket: machine_image.s3_bucket,
-        prefix: machine_image.s3_prefix,
+        bucket: machine_image_version.s3_bucket,
+        prefix: machine_image_version.s3_prefix,
         continuation_token: response.next_continuation_token
       )
       objects.concat(response.contents)
@@ -239,7 +243,7 @@ class Prog::MachineImage::Nexus < Prog::Base
 
     objects.each_slice(1000) do |batch|
       client.delete_objects(
-        bucket: machine_image.s3_bucket,
+        bucket: machine_image_version.s3_bucket,
         delete: {objects: batch.map { {key: it.key} }}
       )
     end

@@ -6,6 +6,6 @@ module Ubicloud
 
     set_fragment "machine-image"
 
-    set_columns :id, :name, :description, :state, :size_gib, :arch, :encrypted, :compression, :visible, :version, :active, :location, :source_vm_id, :created_at
+    set_columns :id, :name, :description, :visible, :location, :created_at, :active_version, :versions
   end
 end

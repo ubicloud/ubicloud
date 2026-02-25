@@ -10,7 +10,7 @@ class VmStorageVolume < Sequel::Model
   many_to_one :key_encryption_key_1, class: :StorageKeyEncryptionKey
   many_to_one :key_encryption_key_2, class: :StorageKeyEncryptionKey
   many_to_one :boot_image, read_only: true
-  many_to_one :machine_image, read_only: true
+  many_to_one :machine_image_version, read_only: true
 
   plugin :association_dependencies, key_encryption_key_1: :destroy, key_encryption_key_2: :destroy
 
@@ -56,7 +56,7 @@ class VmStorageVolume < Sequel::Model
   end
 
   def image_backed?
-    !machine_image_id.nil?
+    !machine_image_version_id.nil?
   end
 end
 

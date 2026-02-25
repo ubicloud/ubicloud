@@ -18,7 +18,7 @@ class Clover
       if api?
         machine_image_list_api_response(dataset)
       else
-        @machine_images = dataset.eager(:location, :vm).order(Sequel.desc(:created_at)).all
+        @machine_images = dataset.eager(:location, versions: :vm).order(Sequel.desc(:created_at)).all
         view "machine-image/index"
       end
     end

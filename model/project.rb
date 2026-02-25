@@ -157,7 +157,7 @@ class Project < Sequel::Model
       .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)
       .all.sum { it[:node_count] * Validation.validate_vm_size(it[:target_node_size], "x64").vcpus } || 0
     when "MachineImageCount" then machine_images_dataset.count
-    when "MachineImageStorage" then machine_images_dataset.sum(:size_gib) || 0
+    when "MachineImageStorage" then MachineImageVersion.where(machine_image_id: machine_images_dataset.select(:id)).sum(:size_gib) || 0
     else
       raise "Unknown resource type: #{resource_type}"
     end

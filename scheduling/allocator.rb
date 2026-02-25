@@ -697,8 +697,8 @@ module Scheduling::Allocator
           )
         end
 
-        machine_image_id = volume["machine_image_id"]
-        image_id = if machine_image_id
+        machine_image_version_id = volume["machine_image_version_id"]
+        image_id = if machine_image_version_id
           nil
         elsif volume["boot"]
           allocate_boot_image(vm_host, vm.boot_image)
@@ -712,7 +712,7 @@ module Scheduling::Allocator
           size_gib: volume["size_gib"],
           use_bdev_ubi:,
           boot_image_id: image_id,
-          machine_image_id:,
+          machine_image_version_id:,
           disk_index:,
           key_encryption_key_1_id: key_encryption_key&.id,
           spdk_installation_id:,
