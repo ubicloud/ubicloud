@@ -12,7 +12,14 @@ class MonitorableResource
     @pulse_check_started_at = Time.now
     @pulse_thread = nil
     @deleted = false
-    @attached_resources = ({} if resource.is_a?(VmHost))
+    if resource.is_a?(VmHost)
+      @attached_resources = {}
+      @attached_resources_mutex = Mutex.new
+    end
+  end
+
+  def attached_resources_sync(&)
+    @attached_resources_mutex.synchronize(&)
   end
 
   def open_resource_session
@@ -87,15 +94,17 @@ class MonitorableResource
 
     delete_attached_resource_ids = []
 
-    @attached_resources.each_value do |resource|
+    attached_resources_sync { @attached_resources.values }.each do |resource|
       resource.session = @session
       resource.check_pulse
       delete_attached_resource_ids << resource.resource.id if resource.deleted
       break unless @session[:ssh_session]
     end
 
-    delete_attached_resource_ids.each do
-      @attached_resources.delete(it)
+    attached_resources_sync do
+      delete_attached_resource_ids.each do
+        @attached_resources.delete(it)
+      end
     end
 
     nil
