@@ -1,0 +1,182 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# Downloads a distro image from a URL, converts it to raw if needed,
+# initializes ubiblk metadata, and archives it to R2.
+#
+# Expects JSON params on stdin. Outputs image size in GiB on stdout.
+
+require "json"
+require "fileutils"
+require "base64"
+require_relative "../../common/lib/util"
+require_relative "../lib/storage_key_encryption"
+
+params = JSON.parse($stdin.read)
+
+url = params.fetch("url")
+expected_sha256 = params.fetch("sha256")
+work_dir = params.fetch("work_dir")
+archive_bin = params.fetch("archive_bin")
+init_metadata_bin = params.fetch("init_metadata_bin")
+secrets_id = params.fetch("secrets_id")
+
+# S3 target
+s3_bucket = params.fetch("s3_bucket")
+s3_prefix = params.fetch("s3_prefix")
+s3_endpoint = params.fetch("s3_endpoint")
+s3_connections = params.fetch("s3_connections", 16)
+
+# Credentials
+s3_key_id = params.fetch("s3_key_id")
+s3_secret_key = params.fetch("s3_secret_key")
+s3_session_token = params["s3_session_token"]
+
+# KEK: used to wrap S3 secrets inline in TOML config
+archive_kek = params.fetch("archive_kek") # base64-encoded 32-byte key
+kek_bytes = Base64.decode64(archive_kek)
+
+FileUtils.mkdir_p(work_dir)
+
+downloaded_path = File.join(work_dir, "image.download")
+raw_path = File.join(work_dir, "image.raw")
+metadata_path = File.join(work_dir, "metadata")
+device_config_path = File.join(work_dir, "device.toml")
+target_config_path = File.join(work_dir, "target.toml")
+
+# -- Helpers --
+
+def toml_quote(s)
+  "\"#{s.gsub("\\", "\\\\\\\\").gsub("\"", "\\\"")}\""
+end
+
+def encrypted_inline_secret(kek_bytes, key_name, plaintext)
+  wrapped = StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, key_name, plaintext)
+  wrapped_b64 = Base64.strict_encode64(wrapped)
+  <<~TOML
+    [secrets.#{key_name}]
+    source.inline = #{toml_quote(wrapped_b64)}
+    encoding = "base64"
+    encrypted_by.ref = "kek"
+  TOML
+end
+
+secrets_dir = nil
+kek_pipe = nil
+
+begin
+  # Step 1: Download the image
+  warn "Downloading image from #{url}..."
+  actual_sha256 = curl_file(url, downloaded_path)
+  fail "SHA-256 mismatch: expected #{expected_sha256}, got #{actual_sha256}" unless actual_sha256 == expected_sha256
+
+  # Step 2: Detect format and convert to raw if needed
+  format_output = r("qemu-img", "info", "--output=json", downloaded_path)
+  format_info = JSON.parse(format_output)
+  image_format = format_info["format"]
+
+  if image_format == "raw"
+    FileUtils.mv(downloaded_path, raw_path)
+  else
+    warn "Converting #{image_format} to raw..."
+    r "qemu-img", "convert", "-f", image_format, "-O", "raw", downloaded_path, raw_path
+    FileUtils.rm_f(downloaded_path)
+  end
+
+  image_size = File.size(raw_path)
+  warn "Raw image size: #{image_size} bytes (#{(image_size / (1024.0**3)).round(2)} GiB)"
+
+  # Step 3: Create device config for init-metadata and archive
+  device_config = <<~TOML
+    [device]
+    data_path = #{raw_path.inspect}
+    metadata_path = #{metadata_path.inspect}
+    device_id = "distro-register"
+
+    [tuning]
+    num_queues = 1
+    queue_size = 64
+    io_engine = "sync"
+
+    [stripe_source]
+    type = "raw"
+    image_path = #{raw_path.inspect}
+    autofetch = false
+    copy_on_read = false
+
+    [danger_zone]
+    enabled = true
+    allow_unencrypted_disk = true
+    allow_inline_plaintext_secrets = false
+    allow_secret_over_regular_file = true
+    allow_unencrypted_connection = true
+    allow_env_secrets = false
+  TOML
+  safe_write_to_file(device_config_path, device_config)
+
+  # Step 4: Initialize metadata
+  warn "Initializing metadata..."
+  r init_metadata_bin, "-f", device_config_path, "--stripe-sector-count-shift", "11"
+
+  # Step 5: Build target config with KEK-encrypted inline S3 secrets
+  target_lines = []
+  target_lines << "[target]"
+  target_lines << "storage = \"s3\""
+  target_lines << "bucket = #{toml_quote(s3_bucket)}"
+  target_lines << "prefix = #{toml_quote(s3_prefix)}"
+  target_lines << "region = \"auto\""
+  target_lines << "endpoint = #{toml_quote(s3_endpoint)}"
+  target_lines << "connections = #{s3_connections}"
+  target_lines << "access_key_id.ref = \"s3-key-id\""
+  target_lines << "secret_access_key.ref = \"s3-secret-key\""
+  target_lines << "session_token.ref = \"s3-session-token\"" if s3_session_token
+
+  toml_parts = []
+  toml_parts << target_lines.join("\n")
+
+  # S3 credentials encrypted inline with KEK
+  toml_parts << encrypted_inline_secret(kek_bytes, "s3-key-id", s3_key_id)
+  toml_parts << encrypted_inline_secret(kek_bytes, "s3-secret-key", s3_secret_key)
+  if s3_session_token
+    toml_parts << encrypted_inline_secret(kek_bytes, "s3-session-token", s3_session_token)
+  end
+
+  # KEK itself passed via named pipe
+  secrets_dir = "/run/secrets/#{secrets_id}"
+  FileUtils.mkdir_p(secrets_dir)
+  kek_pipe = File.join(secrets_dir, "kek.pipe")
+
+  toml_parts << <<~TOML
+    [secrets.kek]
+    source.file = #{toml_quote(kek_pipe)}
+    encoding = "base64"
+  TOML
+
+  target_config = toml_parts.join("\n")
+  safe_write_to_file(target_config_path, target_config)
+
+  # Step 6: Set up KEK pipe and run archive
+  pipe_threads = []
+  FileUtils.rm_f(kek_pipe)
+  r "mkfifo -m 0600 #{kek_pipe}"
+  pipe_threads << Thread.new { File.write(kek_pipe, archive_kek) }
+
+  # Step 7: Archive to R2 (unencrypted -- distro images are public)
+  warn "Archiving to R2..."
+  r "#{archive_bin} -f #{device_config_path} --target-config #{target_config_path} --compression zstd --zstd-level 3"
+
+  warn "Archive complete."
+  pipe_threads.each { _1.join(5) }
+
+  # Output image size in GiB (ceiling) for the caller
+  size_gib = (image_size / (1024.0**3)).ceil
+  puts size_gib
+ensure
+  FileUtils.rm_f(downloaded_path)
+  FileUtils.rm_f(raw_path)
+  FileUtils.rm_f(metadata_path)
+  FileUtils.rm_f(device_config_path)
+  FileUtils.rm_f(target_config_path)
+  FileUtils.rm_f(kek_pipe) if kek_pipe
+  FileUtils.rm_rf(secrets_dir) if secrets_dir
+end
