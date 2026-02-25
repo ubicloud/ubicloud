@@ -692,6 +692,19 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#archival_backlog" do
+    it "invokes vm.sshable.cmd when given no parameter" do
+      expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l").and_return("12\n")
+      expect(postgres_server.archival_backlog).to eq(12)
+    end
+
+    it "uses ssh_session when given one" do
+      ssh_session = Net::SSH::Connection::Session.allocate
+      expect(ssh_session).to receive(:_exec!).with("sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l").and_return("13\n")
+      expect(postgres_server.archival_backlog(ssh_session)).to eq(13)
+    end
+  end
+
   describe "#archival_backlog_threshold" do
     it "returns 1000 if the storage size is large" do
       allow(postgres_server).to receive(:storage_size_gib).and_return(1024)
@@ -886,6 +899,13 @@ RSpec.describe PostgresServer do
     it "raises if given interpolated string" do
       string = "string"
       expect { postgres_server.run_query("interpolated #{string}") }.to raise_error(NetSsh::PotentialInsecurity)
+    end
+  end
+
+  describe "#pg_last_xact_replay_timestamp" do
+    it "gets value from postgres server" do
+      expect(postgres_server).to receive(:_run_query).with("select pg_last_xact_replay_timestamp()").and_return(:result)
+      expect(postgres_server.pg_last_xact_replay_timestamp).to eq(:result)
     end
   end
 end
