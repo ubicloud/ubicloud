@@ -118,7 +118,7 @@ class Scheduling::Dispatcher
 
       # The thread that listens for changes in the number of respirate processes
       # and adjusts the partition range accordingly.
-      @repartition_thread = Thread.new { handle_disconnects { @repartitioner.listen } }
+      @repartition_thread = Thread.new { handle_disconnects("unexpected respirate repartition thread failure") { @repartitioner.listen } }
     else
       # Setup an unpartitioned prepared statement.
       # This method is called implicitly with the appropriate partition when
@@ -190,13 +190,16 @@ class Scheduling::Dispatcher
   # inside the DB.synchronize block (such as by the rescue in #run_strand), the
   # disconnected connections are not removed from the connection pool, and all
   # further database access inside the DB.synchronize block will fail.
-  def handle_disconnects
+  def handle_disconnects(msg)
     DB.synchronize do
       yield
     end
   rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
     sleep(1 + rand)
     retry
+  rescue => ex
+    Clog.emit(msg, Util.exception_to_hash(ex))
+    raise
   end
 
   # Signal that the dispatcher should shut down.  This only sets a flag.
@@ -393,7 +396,7 @@ class Scheduling::Dispatcher
       start_queue:,
       finish_queue:,
       apoptosis_thread: Thread.new { apoptosis_thread(start_queue, finish_queue) },
-      strand_thread: Thread.new { handle_disconnects { strand_thread(strand_queue, start_queue, finish_queue) } }
+      strand_thread: Thread.new { handle_disconnects("unexpected respirate strand thread error") { strand_thread(strand_queue, start_queue, finish_queue) } }
     }
   end
 

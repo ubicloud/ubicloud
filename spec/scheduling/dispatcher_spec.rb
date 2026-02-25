@@ -22,7 +22,7 @@ RSpec.describe Scheduling::Dispatcher do
     it "automatically retries block on disconnect error" do
       i = 0
       expect(di).to receive(:sleep).twice
-      v = di.handle_disconnects do
+      v = di.handle_disconnects("") do
         i += 1
         case i
         when 1
@@ -34,6 +34,11 @@ RSpec.describe Scheduling::Dispatcher do
         end
       end
       expect(v).to eq 3
+    end
+
+    it "raises and emits for other exceptions" do
+      expect(Clog).to receive(:emit)
+      expect { di.handle_disconnects("foo") { raise "bar" } }.to raise_error(RuntimeError)
     end
   end
 
