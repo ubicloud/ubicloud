@@ -124,7 +124,7 @@ module Scheduling::Allocator
     def self.candidate_hosts(request)
       ds = DB[:vm_host]
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
-        .join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
+        .left_join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:gpu_partitions, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
@@ -215,9 +215,11 @@ module Scheduling::Allocator
           .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus)) }
       end
 
-      ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
-        .where(Sequel[:boot_image][:name] => request.boot_image)
-        .exclude(Sequel[:boot_image][:activated_at] => nil)
+      unless request.boot_image.to_s.empty?
+        ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
+          .where(Sequel[:boot_image][:name] => request.boot_image)
+          .exclude(Sequel[:boot_image][:activated_at] => nil)
+      end
 
       request.storage_volumes.select { it[1]["read_only"] && it[1]["image"] }.map { [it[0], it[1]["image"]] }.each do |idx, img|
         table_alias = :"boot_image_#{idx}"
@@ -695,7 +697,10 @@ module Scheduling::Allocator
           )
         end
 
-        image_id = if volume["boot"]
+        machine_image_id = volume["machine_image_id"]
+        image_id = if machine_image_id
+          nil
+        elsif volume["boot"]
           allocate_boot_image(vm_host, vm.boot_image)
         elsif volume["read_only"]
           allocate_boot_image(vm_host, volume["image"])
@@ -707,6 +712,7 @@ module Scheduling::Allocator
           size_gib: volume["size_gib"],
           use_bdev_ubi:,
           boot_image_id: image_id,
+          machine_image_id:,
           disk_index:,
           key_encryption_key_1_id: key_encryption_key&.id,
           spdk_installation_id:,

@@ -275,7 +275,41 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       decr_checkup
     end
 
+    case update_source_fetch_progress
+    when :in_progress
+      nap 5
+    end
+
     nap 6 * 60 * 60
+  end
+
+  def update_source_fetch_progress
+    volumes = vm.vm_storage_volumes.select(&:image_backed?)
+    return nil if volumes.empty?
+    return :completed if volumes.all? { it.source_fetch_state == "ready" }
+
+    volumes.each do |vol|
+      next if vol.source_fetch_state == "ready"
+      begin
+        response = host.sshable.cmd_json(
+          "sudo nc -U /var/storage/:inhost_name/:disk_index/rpc.sock -q 0",
+          inhost_name: vm.inhost_name, disk_index: vol.disk_index,
+          stdin: '{"command": "status"}'
+        )
+        if (stripes = response.dig("status", "stripes"))
+          state = if stripes["fetched"] >= stripes["source"]
+            "ready"
+          else
+            "fetching: #{stripes["fetched"]}/#{stripes["source"]}"
+          end
+          vol.update(source_fetch_state: state)
+        end
+      rescue => ex
+        Clog.emit("Failed to query source fetch progress", {vm: vm.ubid, disk_index: vol.disk_index, error: ex.message})
+      end
+    end
+
+    volumes.all? { it.reload.source_fetch_state == "ready" } ? :completed : :in_progress
   end
 
   label def update_firewall_rules

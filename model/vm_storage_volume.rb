@@ -54,6 +54,10 @@ class VmStorageVolume < Sequel::Model
       256
     end
   end
+
+  def image_backed?
+    !machine_image_id.nil?
+  end
 end
 
 # Table: vm_storage_volume

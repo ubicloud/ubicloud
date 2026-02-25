@@ -308,10 +308,12 @@ class Vm < Sequel::Model
         spdk_cpus = vm_host.cpus.filter(&:spdk).map(&:cpu_number)
         cpus = spdk_cpus.shuffle.take(s.num_queues)
       end
+
+      mi = s.machine_image
       {
         "boot" => s.boot,
-        "image" => s.boot_image&.name,
-        "image_version" => s.boot_image&.version,
+        "image" => mi ? nil : s.boot_image&.name,
+        "image_version" => mi ? nil : s.boot_image&.version,
         "size_gib" => s.size_gib,
         "device_id" => s.device_id,
         "disk_index" => s.disk_index,
@@ -326,16 +328,37 @@ class Vm < Sequel::Model
         "slice_name" => vm_host_slice&.inhost_name || "system.slice",
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
-        "copy_on_read" => false
-      }.tap { |v| v["cpus"] = cpus if add_cpus }
+        "copy_on_read" => !mi.nil?
+      }.tap { |v|
+        v["cpus"] = cpus if add_cpus
+        v["machine_image"] = mi.archive_params if mi
+      }
     }
   end
 
   def storage_secrets
     vm_storage_volumes.filter_map { |s|
-      if !s.key_encryption_key_1.nil?
-        [s.device_id, s.key_encryption_key_1.secret_key_material_hash]
+      secrets = {}
+
+      if s.key_encryption_key_1
+        secrets.merge!(s.key_encryption_key_1.secret_key_material_hash)
       end
+
+      if (mi = s.machine_image)
+        creds = CloudflareR2.generate_temp_credentials(
+          bucket: mi.s3_bucket,
+          permission: "object-read-only",
+          ttl_seconds: 86400
+        )
+        secrets["archive_s3_access_key"] = creds[:access_key_id]
+        secrets["archive_s3_secret_key"] = creds[:secret_access_key]
+        secrets["archive_s3_session_token"] = creds[:session_token]
+        if mi.key_encryption_key_1
+          secrets["archive_kek"] = mi.key_encryption_key_1.secret_key_material_hash
+        end
+      end
+
+      [s.device_id, secrets] unless secrets.empty?
     }.to_h
   end
 
