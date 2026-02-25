@@ -152,40 +152,6 @@ class Prog::MachineImage::Nexus < Prog::Base
     "#{device_dir}/#{vm_name}/#{boot_volume.disk_index}/vhost-backend.conf"
   end
 
-  def target_config_path
-    "/tmp/archive-target-#{machine_image_version.ubid}.toml"
-  end
-
-  def target_config_toml
-    lines = []
-    lines << "[target]"
-    lines << "storage = \"s3\""
-    lines << "bucket = #{toml_str(machine_image_version.s3_bucket)}"
-    lines << "prefix = #{toml_str(machine_image_version.s3_prefix)}"
-    lines << "region = \"auto\""
-    lines << "endpoint = #{toml_str(machine_image_version.s3_endpoint)}"
-    lines << "connections = 16"
-    lines << "access_key_id.ref = \"s3-key-id\""
-    lines << "secret_access_key.ref = \"s3-secret-key\""
-    lines << "session_token.ref = \"s3-session-token\""
-    lines << "archive_kek.ref = \"archive-kek\""
-
-    lines << ""
-    lines << "[secrets.s3-key-id]"
-    lines << "source.file = \"/run/secrets/#{vm_name}/s3-key-id.pipe\""
-    lines << ""
-    lines << "[secrets.s3-secret-key]"
-    lines << "source.file = \"/run/secrets/#{vm_name}/s3-secret-key.pipe\""
-    lines << ""
-    lines << "[secrets.s3-session-token]"
-    lines << "source.file = \"/run/secrets/#{vm_name}/s3-session-token.pipe\""
-    lines << ""
-    lines << "[secrets.archive-kek]"
-    lines << "source.file = \"/run/secrets/#{vm_name}/archive-kek.pipe\""
-
-    lines.join("\n") + "\n"
-  end
-
   def archive_params
     creds = CloudflareR2.generate_temp_credentials(
       bucket: machine_image_version.s3_bucket,
@@ -196,12 +162,15 @@ class Prog::MachineImage::Nexus < Prog::Base
     params = {
       "archive_bin" => archive_bin,
       "device_config" => device_config_path,
-      "target_config_path" => target_config_path,
-      "target_config_content" => target_config_toml,
+      "vm_name" => vm_name,
+      "encrypt" => true,
+      "s3_bucket" => machine_image_version.s3_bucket,
+      "s3_prefix" => machine_image_version.s3_prefix,
+      "s3_region" => "auto",
+      "s3_endpoint" => machine_image_version.s3_endpoint,
       "s3_key_id" => creds[:access_key_id],
       "s3_secret_key" => creds[:secret_access_key],
       "s3_session_token" => creds[:session_token],
-      "vm_name" => vm_name,
       "archive_kek" => machine_image_version.key_encryption_key_1.key
     }
 
@@ -247,9 +216,5 @@ class Prog::MachineImage::Nexus < Prog::Base
         delete: {objects: batch.map { {key: it.key} }}
       )
     end
-  end
-
-  def toml_str(value)
-    "\"#{value.gsub("\\", "\\\\\\\\").gsub("\"", "\\\"")}\""
   end
 end

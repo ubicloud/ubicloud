@@ -3,15 +3,12 @@
 
 require "json"
 require "fileutils"
-require "base64"
 require_relative "../../common/lib/util"
-require_relative "../lib/storage_key_encryption"
 
 params = JSON.parse($stdin.read)
 
 archive_bin = params.fetch("archive_bin")
 device_config = params.fetch("device_config")
-target_config_path = params.fetch("target_config_path")
 vm_name = params.fetch("vm_name")
 encrypt = params.fetch("encrypt", false)
 
@@ -22,33 +19,21 @@ s3_region = params.fetch("s3_region")
 s3_endpoint = params.fetch("s3_endpoint")
 s3_connections = params.fetch("s3_connections", 16)
 
-# Credentials
+# Credentials (plaintext, passed via stdin to archive binary)
 s3_key_id = params.fetch("s3_key_id")
 s3_secret_key = params.fetch("s3_secret_key")
 s3_session_token = params["s3_session_token"]
 
-# KEK: always required to wrap S3 secrets inline; also used as archive KEK when encrypt=true
-archive_kek = params.fetch("archive_kek") # base64-encoded 32-byte key
-kek_bytes = Base64.decode64(archive_kek)
+# Archive KEK: base64-encoded 32-byte key, used when encrypt=true
+archive_kek = params["archive_kek"]
 
 # Disk KEK: optional, needed to decrypt encrypted source disks
 disk_kek = params["disk_kek"]
 
-# -- Build target config TOML with KEK-encrypted inline secrets --
+# -- Build target config TOML with inline plaintext secrets --
 
 def toml_quote(s)
   "\"#{s.gsub("\\", "\\\\\\\\").gsub("\"", "\\\"")}\""
-end
-
-def encrypted_inline_secret(kek_bytes, key_name, plaintext)
-  wrapped = StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, key_name, plaintext)
-  wrapped_b64 = Base64.strict_encode64(wrapped)
-  <<~TOML
-    [secrets.#{key_name}]
-    source.inline = #{toml_quote(wrapped_b64)}
-    encoding = "base64"
-    encrypted_by.ref = "kek"
-  TOML
 end
 
 # [target] section
@@ -63,43 +48,47 @@ target_lines << "connections = #{s3_connections}"
 target_lines << "access_key_id.ref = \"s3-key-id\""
 target_lines << "secret_access_key.ref = \"s3-secret-key\""
 target_lines << "session_token.ref = \"s3-session-token\"" if s3_session_token
-target_lines << "archive_kek.ref = \"kek\"" if encrypt
+target_lines << "archive_kek.ref = \"archive-kek\"" if encrypt
 
 toml_parts = []
 toml_parts << target_lines.join("\n")
 
-# [secrets.*] sections -- S3 credentials encrypted inline with KEK
-toml_parts << encrypted_inline_secret(kek_bytes, "s3-key-id", s3_key_id)
-toml_parts << encrypted_inline_secret(kek_bytes, "s3-secret-key", s3_secret_key)
-if s3_session_token
-  toml_parts << encrypted_inline_secret(kek_bytes, "s3-session-token", s3_session_token)
-end
-
-# [secrets.kek] -- KEK itself passed via named pipe
-secrets_dir = "/run/secrets/#{vm_name}"
-FileUtils.mkdir_p(secrets_dir)
-kek_pipe = File.join(secrets_dir, "kek.pipe")
+# [secrets.*] sections -- plaintext inline secrets
+toml_parts << <<~TOML
+  [secrets.s3-key-id]
+  source.inline = #{toml_quote(s3_key_id)}
+TOML
 
 toml_parts << <<~TOML
-  [secrets.kek]
-  source.file = #{toml_quote(kek_pipe)}
-  encoding = "base64"
+  [secrets.s3-secret-key]
+  source.inline = #{toml_quote(s3_secret_key)}
+TOML
+
+if s3_session_token
+  toml_parts << <<~TOML
+    [secrets.s3-session-token]
+    source.inline = #{toml_quote(s3_session_token)}
+  TOML
+end
+
+if encrypt && archive_kek
+  toml_parts << <<~TOML
+    [secrets.archive-kek]
+    source.inline = #{toml_quote(archive_kek)}
+    encoding = "base64"
+  TOML
+end
+
+# danger_zone: allow plaintext secrets in config
+toml_parts << <<~TOML
+  [danger_zone]
+  allow_inline_plaintext_secrets = true
 TOML
 
 target_config = toml_parts.join("\n")
 
-# Write target config
-safe_write_to_file(target_config_path, target_config)
-
-# Set up named pipes
-pipe_threads = []
-
-# KEK pipe -- base64-encoded, single pipe for all KEK needs
-FileUtils.rm_f(kek_pipe)
-r "mkfifo -m 0600 #{kek_pipe}"
-pipe_threads << Thread.new { File.write(kek_pipe, archive_kek) }
-
 # Disk KEK pipe -- needed to decrypt the source disk's XTS key
+pipe_threads = []
 disk_kek_pipe = nil
 if disk_kek
   config_dir = File.dirname(device_config)
@@ -109,15 +98,13 @@ if disk_kek
   pipe_threads << Thread.new { File.write(disk_kek_pipe, disk_kek) }
 end
 
-# Build and run archive command
-cmd = "RUST_LOG=debug #{archive_bin} --config #{device_config} --target-config #{target_config_path} --compression zstd --zstd-level 3"
+# Build and run archive command, passing target config via stdin
+cmd = "RUST_LOG=debug #{archive_bin} --config #{device_config} --target-config /dev/stdin --compression zstd --zstd-level 3"
 cmd += " --encrypt" if encrypt
 
 begin
-  r cmd
+  r cmd, stdin: target_config
 ensure
-  FileUtils.rm_f(target_config_path)
-  FileUtils.rm_f(kek_pipe)
   FileUtils.rm_f(disk_kek_pipe) if disk_kek_pipe
   pipe_threads.each { _1.join(5) }
 end
