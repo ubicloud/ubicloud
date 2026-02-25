@@ -54,6 +54,15 @@
               is_active: request.path.start_with?("#{@project.path}/kubernetes-cluster"),
               icon: "kubernetes"
             ) %>
+            <% if @project.get_ff_machine_image %>
+              <%== part(
+                "layouts/sidebar/item",
+                name: "Machine Images",
+                url: "#{@project.path}/machine-image",
+                is_active: request.path.start_with?("#{@project.path}/machine-image"),
+                icon: "hero-square-2-stack-modified"
+              ) %>
+            <% end %>
             <%== part(
               "layouts/sidebar/item",
               name: "Web Shell",

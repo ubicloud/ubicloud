@@ -22,9 +22,10 @@ class Project < Sequel::Model
   one_to_many :load_balancers, read_only: true
   one_to_many :inference_endpoints, read_only: true
   one_to_many :kubernetes_clusters, read_only: true
+  one_to_many :machine_images, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
-  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
+  RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters machine_images github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
 
   one_to_many :invoices, order: Sequel.desc(:created_at), read_only: true
@@ -155,6 +156,8 @@ class Project < Sequel::Model
     when "KubernetesVCpu" then kubernetes_clusters_dataset.select(Sequel[:kubernetes_cluster][:cp_node_count].as(:node_count), Sequel[:kubernetes_cluster][:target_node_size])
       .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)
       .all.sum { it[:node_count] * Validation.validate_vm_size(it[:target_node_size], "x64").vcpus } || 0
+    when "MachineImageCount" then machine_images_dataset.count
+    when "MachineImageStorage" then machine_images_dataset.sum(:size_gib) || 0
     else
       raise "Unknown resource type: #{resource_type}"
     end
@@ -233,7 +236,8 @@ class Project < Sequel::Model
     :visible_locations,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
-    :cache_proxy_download_url
+    :cache_proxy_download_url,
+    :machine_image
   )
 end
 

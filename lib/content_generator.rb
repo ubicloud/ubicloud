@@ -208,6 +208,12 @@ module ContentGenerator
     end
   end
 
+  module MachineImage
+    def self.vm(location, vm)
+      vm[:display_name]
+    end
+  end
+
   module PrivateLocation
     def self.select_option(select_option)
       select_option[:display_name]

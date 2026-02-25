@@ -33,6 +33,10 @@ class MachineImage < Sequel::Model
     def for_project(project_id)
       where(Sequel[project_id:] | {visible: true}).exclude(state: "decommissioned")
     end
+
+    def active_versions
+      where(active: true)
+    end
   end
 
   def display_location
@@ -57,6 +61,34 @@ class MachineImage < Sequel::Model
 
   def destroying?
     state == "destroying"
+  end
+
+  def verifying?
+    state == "verifying"
+  end
+
+  def active?
+    active
+  end
+
+  def encrypted?
+    encrypted
+  end
+
+  def versions_dataset
+    MachineImage.where(project_id:, location_id:, name:).exclude(state: "decommissioned")
+  end
+
+  def versions
+    versions_dataset.order(Sequel.desc(:created_at)).all
+  end
+
+  def set_active!
+    DB.transaction do
+      MachineImage.where(project_id:, location_id:, name:).update(active: false)
+      this.update(active: true)
+    end
+    refresh
   end
 
   def archive_params

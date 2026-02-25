@@ -1,0 +1,20 @@
+<% source_vm = @machine_image.vm %>
+<%== part(
+  "components/kv_data_card",
+  data: [
+    ["ID", @machine_image.ubid],
+    ["Name", @machine_image.name],
+    ["Version", @machine_image.version],
+    ["State", "machine_image_state_label", {component: { state: @machine_image.state }}],
+    ["Active", @machine_image.active? ? "Yes" : "No"],
+    ["Location", @machine_image.display_location],
+    ["Architecture", @machine_image.arch],
+    ["Size", "#{@machine_image.size_gib} GiB"],
+    ["Compression", @machine_image.compression],
+    ["Encrypted", @machine_image.encrypted? ? "Yes" : "No"],
+    ["Source VM",
+      source_vm ? "<a href='#{source_vm.path}' class='text-rose-500 hover:underline'>#{h(source_vm.name)}</a>" : "N/A",
+      source_vm ? { escape: false } : {}],
+    ["Created At", @machine_image.created_at&.strftime("%B %d, %Y %H:%M UTC")]
+  ]
+) %>

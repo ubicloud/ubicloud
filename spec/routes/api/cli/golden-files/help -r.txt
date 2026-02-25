@@ -14,6 +14,7 @@ Commands:
     help       Get command help
     kc         Manage Kubernetes clusters
     lb         Manage load balancers
+    mi         Manage machine images
     pg         Manage PostgreSQL databases
     ps         Manage private subnets
     sk         Manage SSH public keys
@@ -480,6 +481,67 @@ Update a load balancer
 
 Usage:
     ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-check-endpoint cert-enabled [(vm-name | vm-id) [...]]
+
+
+Manage machine images
+
+Usage:
+    ubi mi command [...]
+    ubi mi (location/mi-name | mi-id) post-command [...]
+
+Commands:
+    list       List machine images
+
+Post Commands:
+    create     Create a machine image from a stopped VM
+    destroy    Destroy a machine image
+    show       Show details for a machine image
+
+
+List machine images
+
+Usage:
+    ubi mi list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -l, --location=location          only show machine images in given location
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: location name version state size-gib id
+
+
+Create a machine image from a stopped VM
+
+Usage:
+    ubi mi location/mi-name create [options]
+
+Options:
+    -d, --description=desc           description for machine image
+    -v, --vm-id=vm-id                UBID of the source VM (must be stopped)
+
+
+Destroy a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) destroy [options]
+
+Options:
+    -f, --force                      do not require confirmation
+
+
+Show details for a machine image
+
+Usage:
+    ubi mi (location/mi-name | mi-id) show [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+
+Allowed Option Values:
+    Fields: id name version location state size-gib description source-vm-id
+            created-at
 
 
 Manage PostgreSQL databases

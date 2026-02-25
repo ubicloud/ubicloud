@@ -1,0 +1,35 @@
+<% @page_title = "Machine Images" %>
+
+<div class="grid gap-6">
+  <%== part(
+    "components/table_card",
+    headers: ["Name", "Location", "State", "Size (GiB)", "Created At"],
+    rows: @machine_images.map do |mi|
+      [
+        [
+          [mi.name, {link: path(mi)}],
+          mi.display_location,
+          ["machine_image_state_label", {component: { state: mi.state }}],
+          mi.size_gib,
+          mi.created_at&.strftime("%B %d, %Y")
+        ],
+        {id: "mi-#{mi.ubid}"}
+      ]
+    end,
+    empty_state: {
+      icon: "hero-square-2-stack-modified",
+      title: "No machine images",
+      description: "You don't have permission to create machine images."
+    }.merge(has_project_permission("MachineImage:create") ? {
+      description: "Get started by creating a new machine image.",
+      button_link: "#{@project.path}/machine-image/create",
+      button_title: "Create Machine Image"
+    } : {})
+  ) %>
+
+  <% if @machine_images.count > 0 && has_project_permission("MachineImage:create") %>
+    <div class="flex justify-end">
+      <%== part("components/button", text: "Create Machine Image", link: "machine-image/create") %>
+    </div>
+  <% end %>
+</div>

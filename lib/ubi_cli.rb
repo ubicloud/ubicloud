@@ -11,6 +11,7 @@ class UbiCli
     "ak" => "inference_api_key",
     "kc" => "kubernetes_cluster",
     "lb" => "load_balancer",
+    "mi" => "machine_image",
     "pg" => "postgres",
     "ps" => "private_subnet",
     "vm" => "vm"
@@ -21,6 +22,7 @@ class UbiCli
     "ak" => "Inference API key",
     "kc" => "Kubernetes cluster",
     "lb" => "Load balancer",
+    "mi" => "Machine image",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
     "vm" => "Virtual machine"
