@@ -427,7 +427,7 @@ class StorageVolume
       "device_id" => @device_id
     }
     hash["metadata_path"] = sp.vhost_backend_metadata if @image_path || archive?
-    hash["track_written"] = true if archive?
+    hash["track_written"] = true
     toml_section("device", hash)
   end
 
