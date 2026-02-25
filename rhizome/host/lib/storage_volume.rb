@@ -41,6 +41,13 @@ class StorageVolume
     @copy_on_read = params.fetch("copy_on_read", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+
+    # Machine image archive params (for UMI-backed volumes)
+    @archive_params = params["machine_image"]
+  end
+
+  def archive?
+    !@archive_params.nil?
   end
 
   def vp
@@ -95,7 +102,7 @@ class StorageVolume
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets)
     vhost_backend_create_service_file
   end
 
@@ -113,8 +120,8 @@ class StorageVolume
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
-      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path
-      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted
+      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path || archive?
+      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted || archive?
       write_config_file(sp.vhost_backend_config, v2_main_toml)
     else
       config = vhost_backend_config(encryption_key, key_wrapping_secrets)
@@ -228,7 +235,7 @@ class StorageVolume
         ProtectKernelLogs=true
         ProtectProc=invisible
         
-        RestrictAddressFamilies=AF_UNIX
+        RestrictAddressFamilies=#{archive? ? "AF_UNIX AF_INET AF_INET6" : "AF_UNIX"}
         RestrictNamespaces=true
         SystemCallArchitectures=native
         SystemCallFilter=@system-service
@@ -237,9 +244,9 @@ class StorageVolume
         RestrictSUIDSGID=yes
         RestrictRealtime=yes
         ProcSubset=pid
-        PrivateNetwork=yes
+        #{"PrivateNetwork=yes" unless archive?}
         PrivateUsers=yes
-        IPAddressDeny=any
+        #{"IPAddressDeny=any" unless archive?}
 
         [Install]
         WantedBy=multi-user.target
@@ -337,8 +344,8 @@ class StorageVolume
 
   def v2_include_section
     includes = []
-    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path
-    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted
+    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path || archive?
+    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted || archive?
     return "" if includes.empty?
     items = includes.map { |f| toml_str(f) }.join(", ")
     "include = [#{items}]\n"
@@ -349,9 +356,10 @@ class StorageVolume
       "data_path" => disk_file,
       "vhost_socket" => vhost_sock,
       "rpc_socket" => sp.rpc_socket_path,
-      "device_id" => @device_id
+      "device_id" => @device_id,
+      "metadata_path" => sp.vhost_backend_metadata,
+      "track_written" => true
     }
-    hash["metadata_path"] = sp.vhost_backend_metadata if @image_path
     toml_section("device", hash)
   end
 
@@ -385,32 +393,109 @@ class StorageVolume
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
     kek_bytes = Base64.decode64(key_wrapping_secrets["key"])
-    xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
-    xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
-    wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
-    )
+    sections = []
 
-    secrets_xts_key_section = toml_section("secrets.#{xts_key_name}", {
-      "source.inline" => wrapped_xts_b64,
-      "encoding" => "base64",
-      "encrypted_by.ref" => "kek"
-    })
+    if @encrypted && encryption_key
+      xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
+      xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
+      wrapped_xts_b64 = Base64.strict_encode64(
+        StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
+      )
 
-    secrets_kek_section = toml_section("secrets.kek", {
+      sections << toml_section("secrets.#{xts_key_name}", {
+        "source.inline" => wrapped_xts_b64,
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek"
+      })
+    end
+
+    if archive?
+      sections << v2_archive_secrets_toml(kek_bytes, key_wrapping_secrets)
+    end
+
+    sections << toml_section("secrets.kek", {
       "source.file" => sp.kek_pipe,
       "encoding" => "base64"
     })
 
-    secrets_xts_key_section + "\n" + secrets_kek_section
+    sections.join("\n")
+  end
+
+  def v2_archive_secrets_toml(kek_bytes, key_wrapping_secrets)
+    sections = []
+
+    # S3 credentials encrypted by disk KEK, inlined in TOML
+    s3_key_id = key_wrapping_secrets["archive_s3_access_key"]
+    sections << toml_section("secrets.s3-key-id", {
+      "source.inline" => Base64.strict_encode64(
+        StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, "s3-key-id", s3_key_id)
+      ),
+      "encoding" => "base64",
+      "encrypted_by.ref" => "kek"
+    })
+
+    s3_secret_key = key_wrapping_secrets["archive_s3_secret_key"]
+    sections << toml_section("secrets.s3-secret-key", {
+      "source.inline" => Base64.strict_encode64(
+        StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, "s3-secret-key", s3_secret_key)
+      ),
+      "encoding" => "base64",
+      "encrypted_by.ref" => "kek"
+    })
+
+    if key_wrapping_secrets["archive_s3_session_token"]
+      s3_session_token = key_wrapping_secrets["archive_s3_session_token"]
+      sections << toml_section("secrets.s3-session-token", {
+        "source.inline" => Base64.strict_encode64(
+          StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, "s3-session-token", s3_session_token)
+        ),
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek"
+      })
+    end
+
+    # Archive KEK (for encrypted archives)
+    if @archive_params["encrypted"]
+      archive_kek = Base64.decode64(key_wrapping_secrets["archive_kek"])
+      sections << toml_section("secrets.archive-kek", {
+        "source.inline" => Base64.strict_encode64(
+          StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, "archive-kek", archive_kek)
+        ),
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek"
+      })
+    end
+
+    sections.join("\n")
   end
 
   def v2_stripe_source_toml
-    hash = {
+    if archive?
+      return v2_archive_stripe_source_toml
+    end
+
+    toml_section("stripe_source", {
       "type" => "raw",
       "image_path" => @image_path,
       "copy_on_read" => @copy_on_read
+    })
+  end
+
+  def v2_archive_stripe_source_toml
+    hash = {
+      "type" => "archive",
+      "storage" => "s3",
+      "bucket" => @archive_params["archive_bucket"],
+      "prefix" => @archive_params["archive_prefix"],
+      "region" => "auto",
+      "endpoint" => @archive_params["archive_endpoint"],
+      "connections" => 16,
+      "autofetch" => true,
+      "access_key_id.ref" => "s3-key-id",
+      "secret_access_key.ref" => "s3-secret-key"
     }
+    hash["session_token.ref"] = "s3-session-token" if @archive_params["has_session_token"]
+    hash["archive_kek.ref"] = "archive-kek" if @archive_params["encrypted"]
     toml_section("stripe_source", hash)
   end
 
