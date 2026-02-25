@@ -21,7 +21,7 @@ RSpec.describe Csi::V1::IdentityService do
       request = Csi::V1::GetPluginInfoRequest.new
       response = service.get_plugin_info(request, call)
       expect(response.name).to eq("csi.ubicloud.com")
-      expect(response.vendor_version).to eq("0.1.0")
+      expect(response.vendor_version).to eq("0.6.0")
     end
   end
 
