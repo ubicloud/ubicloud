@@ -110,7 +110,7 @@ if disk_kek
 end
 
 # Build and run archive command
-cmd = "#{archive_bin} --config #{device_config} --target-config #{target_config_path} --compression zstd --zstd-level 3"
+cmd = "RUST_LOG=debug #{archive_bin} --config #{device_config} --target-config #{target_config_path} --compression zstd --zstd-level 3"
 cmd += " --encrypt" if encrypt
 
 begin
