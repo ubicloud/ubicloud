@@ -137,11 +137,16 @@ class MonitorRunner
         scan_after = t + @scan_every
         @repartitioner.repartitioned = false
 
-        if phased_initial_scan
-          phased_initial_scan = true
-          initial_scan
-        else
-          scan
+        begin
+          if phased_initial_scan
+            phased_initial_scan = true
+            initial_scan
+          else
+            scan
+          end
+        rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+          sleep(1 + rand)
+          retry
         end
 
         # Pushing to the queue may block, and there may a large amount of time
