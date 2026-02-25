@@ -631,6 +631,10 @@ class PostgresResource < Sequel::Model
     "17" => "20240801",
     "18" => "20251021"
   }
+
+  def otel_otlp_export_endpoint
+    location.otel_otlp_export_endpoint
+  end
 end
 
 # Table: postgres_resource

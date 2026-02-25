@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "forwardable"
-
 require_relative "../../lib/util"
 
 class Prog::Postgres::PostgresServerNexus < Prog::Base
@@ -101,6 +100,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     nap 5 unless vm.strand.label == "wait"
 
     postgres_server.incr_initial_provisioning
+    hop_setup_otel_collector if Config.postgres_otel_otlp_export_enabled
     hop_bootstrap_rhizome
   end
 
@@ -350,6 +350,7 @@ WantedBy=timers.target
 TIMER
     vm.sshable.write_file("/etc/systemd/system/pg-collect-metrics.timer", pg_metrics_timer)
 
+    setup_otel if Config.postgres_otel_otlp_export_enabled
     vm.sshable.cmd("sudo systemctl daemon-reload")
 
     when_initial_provisioning_set? do
@@ -358,15 +359,17 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
       vm.sshable.cmd("sudo systemctl enable --now pg-collect-metrics.timer")
-      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
+      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !postgres_server.resource.use_old_walg_command_set?
+      vm.sshable.cmd("sudo systemctl enable --now otelcol-contrib") if Config.postgres_otel_otlp_export_enabled
 
-      hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
+      hop_setup_cloudwatch if postgres_server.timeline.aws? && postgres_server.resource.project.get_ff_aws_cloudwatch_logs
       hop_setup_hugepages
     end
 
     vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
     vm.sshable.cmd("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+    vm.sshable.cmd("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib") if Config.postgres_otel_otlp_export_enabled
 
     hop_wait
   end
@@ -637,6 +640,8 @@ SQL
       end
       nap 60
     end
+
+    write_otel_token if Config.postgres_otel_otlp_export_enabled && otel_token_needs_refresh?
 
     nap 6 * 60 * 60
   end

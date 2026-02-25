@@ -63,15 +63,16 @@ end
 
 # Table: location
 # Columns:
-#  id           | uuid    | PRIMARY KEY
-#  display_name | text    | NOT NULL
-#  name         | text    | NOT NULL
-#  ui_name      | text    | NOT NULL
-#  visible      | boolean | NOT NULL
-#  provider     | text    | NOT NULL
-#  project_id   | uuid    |
-#  dns_suffix   | text    |
-#  byoc         | boolean | NOT NULL DEFAULT false
+#  id                        | uuid    | PRIMARY KEY
+#  display_name              | text    | NOT NULL
+#  name                      | text    | NOT NULL
+#  ui_name                   | text    | NOT NULL
+#  visible                   | boolean | NOT NULL
+#  provider                  | text    | NOT NULL
+#  project_id                | uuid    |
+#  dns_suffix                | text    |
+#  byoc                      | boolean | NOT NULL DEFAULT false
+#  otel_otlp_export_endpoint | text    |
 # Indexes:
 #  location_pkey                         | PRIMARY KEY btree (id)
 #  location_project_id_display_name_uidx | UNIQUE btree (project_id, display_name)

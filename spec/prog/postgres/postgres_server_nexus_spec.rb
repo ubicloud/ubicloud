@@ -196,8 +196,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.start }.to nap(5)
     end
 
-    it "update sshable host and hops" do
+    it "update sshable host and hops to setup_otel_collector when enabled" do
       postgres_server.vm.strand.update(label: "wait")
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect { nx.start }.to hop("setup_otel_collector")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
+    end
+
+    it "update sshable host and hops to bootstrap_rhizome when otel disabled" do
+      postgres_server.vm.strand.update(label: "wait")
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(false)
       expect { nx.start }.to hop("bootstrap_rhizome")
       expect(Semaphore.where(strand_id: postgres_server.id, name: "initial_provisioning").count).to eq(1)
     end
@@ -490,11 +498,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "configures prometheus and metrics during initial provisioning" do
       nx.incr_initial_provisioning
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(nx).to receive(:setup_otel)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
 
       # Configure metrics expectations
       expect(nx.postgres_server).to receive(:metrics_config).and_return(metrics_config)
@@ -507,6 +514,40 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now otelcol-contrib")
+
+      expect { nx.configure_metrics }.to hop("setup_hugepages")
+    end
+
+    it "configures prometheus and metrics during initial provisioning without otel when disabled" do
+      nx.incr_initial_provisioning
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(false)
+      expect(nx).not_to receive(:setup_otel)
+
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+
+      # Configure metrics expectations
+      expect(nx.postgres_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
+      expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
 
@@ -526,13 +567,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       server.update(timeline: aws_timeline)
 
       nx.incr_initial_provisioning
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(nx).to receive(:setup_otel)
       expect(nx.postgres_server.resource).to receive(:use_old_walg_command_set?).and_return(false)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
-      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now wal-g")
 
       # Configure metrics expectations
       expect(nx.postgres_server).to receive(:metrics_config).and_return(metrics_config)
@@ -545,8 +584,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now node_exporter")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now prometheus")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now postgres-metrics.timer")
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now pg-collect-metrics.timer")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now wal-g")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now otelcol-contrib")
 
       nx.postgres_server.resource.project.set_ff_aws_cloudwatch_logs(true)
       expect { nx.configure_metrics }.to hop("setup_cloudwatch")
@@ -558,13 +603,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_server = standby_nx.postgres_server
       standby_sshable = standby_server.vm.sshable
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(standby_nx).to receive(:setup_otel)
 
       # Prometheus expectations
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /ubicloud_resource_role: standby/)
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
       # Configure metrics expectations
       expect(standby_server).to receive(:metrics_config).and_return(metrics_config)
@@ -578,6 +622,39 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
 
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
+
+      expect { standby_nx.configure_metrics }.to hop("wait")
+    end
+
+    it "does not reload otelcol-contrib when otel is disabled at non-initial provisioning" do
+      server
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_server = standby_nx.postgres_server
+      standby_sshable = standby_server.vm.sshable
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(false)
+
+      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: anything)
+      expect(standby_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(standby_sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(standby_sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(standby_sshable).not_to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
+
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
 
@@ -589,13 +666,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_server = standby_nx.postgres_server
       standby_sshable = standby_server.vm.sshable
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(standby_nx).to receive(:setup_otel)
 
       # Prometheus expectations
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /ubicloud_resource_role: standby/)
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
       # Configure metrics expectations with default interval
       expect(standby_server).to receive(:metrics_config).and_return(config_without_interval)
@@ -608,6 +684,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
@@ -626,13 +707,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       standby_server = standby_nx.postgres_server
       standby_sshable = standby_server.vm.sshable
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(standby_nx).to receive(:setup_otel)
 
       # Prometheus expectations
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /remote_write:.*url:.*metrics\.example\.com/m)
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
-      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
       # Configure metrics expectations
       expect(standby_server).to receive(:metrics_config).and_return(metrics_config)
@@ -645,6 +725,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
       expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
@@ -968,6 +1053,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#wait" do
     it "naps" do
+      expect { nx.wait }.to nap(6 * 60 * 60)
+    end
+
+    it "refreshes otel token when enabled and token needs refresh" do
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(nx).to receive(:otel_token_needs_refresh?).and_return(true)
+      expect(nx).to receive(:write_otel_token)
       expect { nx.wait }.to nap(6 * 60 * 60)
     end
 

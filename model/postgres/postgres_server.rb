@@ -371,7 +371,9 @@ class PostgresServer < Sequel::Model
       location_id: UBID.to_ubid(resource.location_id),
       location_name: resource.location.name,
       location_provider: resource.location.provider,
-      location_display_name: resource.location.display_name
+      location_display_name: resource.location.display_name,
+      vm_size: resource.target_vm_size,
+      target_standby_count: resource.target_standby_count
     })
 
     {
@@ -468,6 +470,10 @@ class PostgresServer < Sequel::Model
     segment = name[16, 8].to_i(16)
     low = format("%X", segment * 16 * 1024 * 1024)
     "#{high}/#{low}"
+  end
+
+  def sku_memory_bytes
+    vm.memory_gib * 1024 * 1024 * 1024
   end
 
   def archival_backlog_threshold

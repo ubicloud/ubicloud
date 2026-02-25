@@ -177,6 +177,9 @@ module Config
   optional :postgres_notification_email, string
   override :aws_postgres_iam_access, false, bool
   override :aws_vm_attach_ssm_permissions, false, bool
+  override :postgres_otel_otlp_export_enabled, false, bool
+  optional :postgres_otel_otlp_export_jwt_oidc_provider_id, uuid
+  optional :postgres_otel_otlp_export_additional_metadata_field, string
 
   # Logging
   optional :database_logger_level, string
