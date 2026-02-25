@@ -83,7 +83,15 @@ repartitioner = Repartitioner.new(partition_number:, channel: :monitor, listen_t
 
 runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, **runner_args)
 
-repartition_thread = Thread.new { repartitioner.listen }
+repartition_thread = Thread.new do
+  repartitioner.listen
+rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+  sleep(1 + rand)
+  retry
+rescue => ex
+  Clog.emit("unexpected monitor repartition thread failure", Util.exception_to_hash(ex))
+  raise
+end
 
 # Only NOTIFY for the first 3-5 seconds, so that by the time we actually start monitoring,
 # all monitor processes know the expected partitioning. The rand is to avoid thundering herd issues.
