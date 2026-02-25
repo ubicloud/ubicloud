@@ -45,6 +45,14 @@ class Kubernetes::Client
     kubectl("delete node :node_name", node_name:)
   end
 
+  def get_csr(node_name, csr_status:)
+    kubectl("get csr --sort-by=.metadata.creationTimestamp | awk '/:csr_status/ && /kubelet-serving/ && /':node_name'/ {print $1}' | tail -1", node_name:, csr_status:).chomp
+  end
+
+  def approve_csr(csr_name)
+    kubectl("certificate approve :csr_name", csr_name:)
+  end
+
   def set_load_balancer_hostname(svc, hostname)
     patch_data = JSON.generate({
       "status" => {

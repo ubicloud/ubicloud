@@ -11,11 +11,11 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     Project.create(name: "default")
   }
   let(:subnet) {
-    Prog::Vnet::SubnetNexus.assemble(Config.kubernetes_service_project_id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
+    Prog::Vnet::SubnetNexus.assemble(project.id, name: "test", ipv4_range: "172.19.0.0/16", ipv6_range: "fd40:1a0a:8d48:182a::/64").subject
   }
 
   let(:kubernetes_cluster) {
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
       version: Option.kubernetes_versions.first,
       cp_node_count: 3,
@@ -24,13 +24,22 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       project_id: project.id,
       target_node_size: "standard-4",
       target_node_storage_size_gib: 37
-    )
-    Firewall.create(name: "#{kc.ubid}-cp-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
-    Firewall.create(name: "#{kc.ubid}-worker-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
+    ).subject
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
-    KubernetesNode.create(vm_id: create_vm(created_at: Time.now - 1).id, kubernetes_cluster_id: kc.id)
+    Prog::Kubernetes::KubernetesNodeNexus.assemble(
+      project.id,
+      sshable_unix_user: "ubi",
+      name: "cp-node",
+      location_id: Location::HETZNER_FSN1_ID,
+      size: "standard-4",
+      storage_volumes: [{encrypted: true, size_gib: 40}],
+      boot_image: Option.kubernetes_versions.first,
+      private_subnet_id: subnet.id,
+      enable_ip4: true,
+      kubernetes_cluster_id: kc.id
+    )
     kc.update(api_server_lb_id: lb.id)
   }
 
@@ -44,7 +53,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   let(:kubernetes_nodepool) { KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kubernetes_cluster.id, target_node_size: "standard-8", target_node_storage_size_gib: 78) }
 
   before do
-    allow(Config).to receive(:kubernetes_service_project_id).and_return(Project.create(name: "UbicloudKubernetesService").id)
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(project.id)
     allow(prog).to receive_messages(kubernetes_cluster:, frame: {"node_id" => node.id})
   end
 
@@ -71,8 +80,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
   describe "#before_run" do
     it "destroys itself if the kubernetes cluster is getting deleted" do
-      Strand.create(id: kubernetes_cluster.id, label: "something", prog: "KubernetesClusterNexus")
-      kubernetes_cluster.reload
+      kubernetes_cluster.strand.update(label: "something")
       expect(kubernetes_cluster.strand.label).to eq("something")
       prog.before_run # Nothing happens
 
@@ -330,13 +338,32 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
   end
 
   describe "#approve_new_csr" do
-    it "approves the csr" do
-      sshable = Sshable.new
-      expect(kubernetes_cluster.functional_nodes.first).to receive(:sshable).and_return(sshable)
-      expect(kubernetes_cluster).to receive(:incr_sync_internal_dns_config)
-      expect(kubernetes_cluster).to receive(:incr_sync_worker_mesh)
-      expect(sshable).to receive(:_cmd).with("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve")
+    let(:session) { Net::SSH::Connection::Session.allocate }
+
+    before do
+      allow(kubernetes_cluster.sshable).to receive(:connect).and_return(session)
+    end
+
+    it "naps if no pending or approved csr exists yet" do
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Pending/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect { prog.approve_new_csr }.to nap(5)
+    end
+
+    it "skips approve if the csr is already approved" do
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
+      expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
+      expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
+    end
+
+    it "approves the csr when it is pending" do
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Pending/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf certificate approve csr-abc123").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("approved", 0))
+      expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
+      expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
+      expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
     end
   end
 end

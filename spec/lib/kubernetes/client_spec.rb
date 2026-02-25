@@ -229,6 +229,28 @@ RSpec.describe Kubernetes::Client do
     end
   end
 
+  describe "get_csr" do
+    it "returns the pending csr name for the node" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Pending/ && /kubelet-serving/ && /'my-node'/ {print $1}' | tail -1").and_return(response)
+      expect(kubernetes_client.get_csr("my-node", csr_status: "Pending")).to eq("csr-abc123")
+    end
+
+    it "returns the approved csr name for the node" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("csr-xyz789\n", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'my-node'/ {print $1}' | tail -1").and_return(response)
+      expect(kubernetes_client.get_csr("my-node", csr_status: "Approved")).to eq("csr-xyz789")
+    end
+  end
+
+  describe "approve_csr" do
+    it "approves the given csr" do
+      response = Net::SSH::Connection::Session::StringWithExitstatus.new("approved", 0)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf certificate approve csr-abc123").and_return(response)
+      kubernetes_client.approve_csr("csr-abc123")
+    end
+  end
+
   describe "set_load_balancer_hostname" do
     it "calls kubectl function with right inputs" do
       svc = {
