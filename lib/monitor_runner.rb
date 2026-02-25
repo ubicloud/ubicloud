@@ -139,7 +139,7 @@ class MonitorRunner
 
         begin
           if phased_initial_scan
-            phased_initial_scan = true
+            phased_initial_scan = false
             initial_scan
           else
             scan
