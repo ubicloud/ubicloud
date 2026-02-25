@@ -39,6 +39,10 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
             # Yield so that monitored resources and metric export resources can be
             # handled differently.
             yield r
+          rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+            # Reraise so that ensure block runs without checkup being incremented,
+            # and the outer rescue retries.
+            raise
           rescue => ex
             Clog.emit("Monitoring job has failed.", {monitoring_job_failure: Util.exception_to_hash(ex, into: {resource: r.resource})})
             r.resource.incr_checkup if r.resource.respond_to?(:incr_checkup) && !r.resource.checkup_set?
@@ -53,6 +57,12 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :submit_que
             finish_queue.push(r)
           end
         end
+      rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+        sleep(1 + rand)
+        retry
+      rescue => ex
+        Clog.emit("unexpected monitor worker thread error", {monitor_worker_thread_error: Util.exception_to_hash(ex, into: {resource: r.resource})})
+        raise
       end
     end
 

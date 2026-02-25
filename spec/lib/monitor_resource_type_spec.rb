@@ -49,6 +49,51 @@ RSpec.describe MonitorResourceType do
       @mrt.submit_queue.push(@mr)
     end
 
+    it "handles disconnect errors raised during job processing and sleeps" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise Sequel::DatabaseDisconnectError
+      end
+
+      vm_host = create_vm_host
+      @mr = MonitorableResource.new(vm_host)
+      expect(described_class).to receive(:sleep)
+      expect(vm_host).not_to receive(:incr_checkup)
+      @mrt.submit_queue.push(@mr)
+    end
+
+    it "handles disconnect errors raised while incrementing checkup" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise StandardError
+      end
+
+      vm_host = create_vm_host
+      @mr = MonitorableResource.new(vm_host)
+      expect(described_class).to receive(:sleep)
+      expect(vm_host).to receive(:incr_checkup).and_raise(Sequel::DatabaseDisconnectError)
+      @mrt.submit_queue.push(@mr)
+    end
+
+    it "handles other errors raised while incrementing checkup" do
+      @started_at = nil
+      @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        @started_at = it.monitor_job_started_at
+        raise StandardError
+      end
+
+      vm_host = create_vm_host
+      @mr = MonitorableResource.new(vm_host)
+      expect(described_class).to receive(:raise)
+      expect(Clog).to receive(:emit).with("Resource is deleted.", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("Monitoring job has failed.", instance_of(Hash)).and_call_original
+      expect(Clog).to receive(:emit).with("unexpected monitor worker thread error", instance_of(Hash)).and_call_original
+      expect(vm_host).to receive(:incr_checkup).and_raise(StandardError)
+      @mrt.submit_queue.push(@mr)
+    end
+
     it "handles exceptions raised during job processing and invokes checkup" do
       @started_at = nil
       @mrt = described_class.create(Object, :foo, 2, [[]]) do
