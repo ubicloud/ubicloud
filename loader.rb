@@ -77,6 +77,8 @@ module Prog::Github; end
 
 module Prog::Kubernetes; end
 
+module Prog::MachineImage; end
+
 module Prog::Minio; end
 
 module Prog::Postgres; end
