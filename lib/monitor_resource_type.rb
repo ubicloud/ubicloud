@@ -129,17 +129,21 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
         if (host = hosts.delete(vm_host_id))
           new_attached_resources = {}
           old_attached_resources = host.attached_resources
-          vms.each do
-            new_attached_resources[it.id] = old_attached_resources[it.id] || wrapper_class.new(it)
+          host.attached_resources_sync do
+            vms.each do
+              new_attached_resources[it.id] = old_attached_resources[it.id] || wrapper_class.new(it)
+            end
+            host.attached_resources.replace(new_attached_resources)
           end
-          host.attached_resources.replace(new_attached_resources)
         end
       end
 
       # These are hosts who may have had attached resources in earlier scans,
       # but did not have any attached resources in the current scan.
-      hosts.each_value do
-        it.attached_resources.clear
+      hosts.each_value do |host|
+        host.attached_resources_sync do
+          host.attached_resources.clear
+        end
       end
     end
 
