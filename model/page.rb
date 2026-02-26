@@ -7,8 +7,6 @@ require "openssl"
 
 class Page < Sequel::Model
   dataset_module do
-    where :active, resolved_at: nil
-
     def group_by_vm_host
       pages = all
       related_resources = pages.flat_map { it.details["related_resources"] }.compact.to_h { [UBID.to_uuid(it), nil] }
@@ -98,7 +96,7 @@ class Page < Sequel::Model
 
   def self.from_tag_parts(*tag_parts)
     tag = Page.generate_tag(tag_parts)
-    Page.active.where(tag:).first
+    Page.where(tag:).first
   end
 
   SEVERITY_ORDER = {"info" => 0, "warning" => 1, "error" => 2, "critical" => 3}.freeze

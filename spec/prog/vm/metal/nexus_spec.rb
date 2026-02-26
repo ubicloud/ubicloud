@@ -303,13 +303,13 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(vm.waiting_for_capacity_set?).to be(false)
       expect { nx.start }.to nap(30)
       expect(vm.reload.waiting_for_capacity_set?).to be(true)
-      expect(Page.active.count).to eq(1)
+      expect(Page.count).to eq(1)
       expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
       expect(nx).not_to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
-      expect(Page.active.count).to eq(1)
+      expect(Page.count).to eq(1)
     end
 
     it "waits for a while before creating a page for github-runners" do
@@ -318,34 +318,34 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.created_at = Time.now - 10 * 60
       vm.location_id = Location[name: "github-runners"].id
       expect { nx.start }.to nap(30)
-      expect(Page.active.count).to eq(0)
+      expect(Page.count).to eq(0)
     end
 
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
       expect { nx.start }.to nap(30)
-      expect(Page.active.count).to eq(1)
+      expect(Page.count).to eq(1)
 
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
       expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
         .and change { vm.reload.waiting_for_capacity_set? }.from(true).to(false)
-      expect(Page.active.count).to eq(1)
-      expect(Page.active.first.resolve_set?).to be false
+      expect(Page.count).to eq(1)
+      expect(Page.first.resolve_set?).to be false
 
       # Third run is able to allocate and there are no vms left in the queue, but it's not 15 minutes yet, so we don't resolve the page
       expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
-      expect(Page.active.count).to eq(1)
-      expect(Page.active.first.resolve_set?).to be false
+      expect(Page.count).to eq(1)
+      expect(Page.first.resolve_set?).to be false
 
       # Fourth run is able to allocate and there are no vms left in the queue after 15 minutes, so we resolve the page
-      Page.active.first.update(created_at: Time.now - 16 * 60)
+      Page.first.update(created_at: Time.now - 16 * 60)
       expect(Scheduling::Allocator).to receive(:allocate)
       expect { nx.start }.to hop("create_unix_user")
-      expect(Page.active.count).to eq(1)
-      expect(Page.active.first.resolve_set?).to be true
+      expect(Page.count).to eq(1)
+      expect(Page.first.resolve_set?).to be true
     end
 
     it "re-raises exceptions other than lack of capacity" do
