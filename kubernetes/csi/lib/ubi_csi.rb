@@ -5,7 +5,7 @@ require "csi_pb"
 require "csi_services_pb"
 
 module Csi
-  VERSION = "0.6.0"
+  VERSION = "0.7.0"
 end
 
 require_relative "ubi_csi/identity_service"
