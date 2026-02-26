@@ -228,7 +228,7 @@ RSpec.describe Csi::V1::NodeService do
         is_mounted?: false,
         find_loop_device: nil
       )
-      allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
+      allow(service).to receive(:run_cmd).with("losetup", "--direct-io=on", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
       allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["", true])
       allow(Dir).to receive(:exist?).with(staging_path).and_return(false)
       allow(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["", true])
@@ -276,14 +276,14 @@ RSpec.describe Csi::V1::NodeService do
 
       it "handles loop device setup failure" do
         expect(service).to receive(:find_loop_device).and_return(nil)
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["Error setting up loop device", false])
+        expect(service).to receive(:run_cmd).with("losetup", "--direct-io=on", "--find", "--show", backing_file, req_id:).and_return(["Error setting up loop device", false])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to setup loop device: Error setting up loop device")
       end
 
       it "handles empty loop device output" do
         expect(service).to receive(:find_loop_device).and_return(nil)
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["", true])
+        expect(service).to receive(:run_cmd).with("losetup", "--direct-io=on", "--find", "--show", backing_file, req_id:).and_return(["", true])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to setup loop device: ")
       end
@@ -352,7 +352,7 @@ RSpec.describe Csi::V1::NodeService do
           find_loop_device: nil,  # New loop device
           find_file_system: ""
         )
-        expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
+        expect(service).to receive(:run_cmd).with("losetup", "--direct-io=on", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
         expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["mkfs error", false])
 
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Failed to format device /dev/loop0 with ext4: mkfs error")
