@@ -325,8 +325,14 @@ module Csi
             client.remove_pvc_finalizers(pvc_namespace, pvc_name)
             log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
           end
-          client.create_pvc(pvc)
-          log_with_id(req_id, "Recreated PVC with the new spec")
+          begin
+            client.create_pvc(pvc)
+          rescue AlreadyExistsError
+            log_with_id(req_id, "PVC already recreated by StatefulSet controller, patching migration annotation")
+            client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace: pvc_namespace)
+          else
+            log_with_id(req_id, "Recreated PVC with the new spec")
+          end
         else
           # PVC is recreated now.
           # At this stage we don't know whether we have created the PVC or

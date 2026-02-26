@@ -890,6 +890,25 @@ RSpec.describe Csi::V1::NodeService do
 
       service.recreate_pvc(req_id, client, pv)
     end
+
+    it "patches annotation when create_pvc fails with AlreadyExistsError" do
+      success = instance_double(Process::Status, success?: true)
+      failure = instance_double(Process::Status, success?: false)
+      pvc_yaml = YAML.dump(pvc)
+      pv_patch = {metadata: {annotations: {Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY => "base64_content"}}}.to_json
+      pvc_finalizer_patch = {metadata: {finalizers: nil}}.to_json
+      pvc_annotation_patch = {metadata: {annotations: {Csi::V1::NodeService::OLD_PV_NAME_ANNOTATION_KEY => pv_name}}}.to_json
+
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "get", "pvc", pvc_name, "-oyaml", stdin_data: nil).and_return([pvc_yaml, success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "patch", "pv", pv_name, "--type=merge", "-p", pv_patch, stdin_data: nil).and_return(["patched", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "delete", "pvc", pvc_name, "--wait=false", "--ignore-not-found=true", stdin_data: nil).and_return(["deleted", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "get", "pvc", pvc_name, "-oyaml", stdin_data: nil).and_return([pvc_yaml, success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "patch", "pvc", pvc_name, "--type=merge", "-p", pvc_finalizer_patch, stdin_data: nil).and_return(["patched", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(service.trim_pvc(pvc.dup, pv_name))).and_return(["pvc already exists", failure])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "patch", "pvc", pvc_name, "--type=merge", "-p", pvc_annotation_patch, stdin_data: nil).and_return(["patched", success])
+
+      service.recreate_pvc(req_id, client, pv)
+    end
   end
 
   describe "#trim_pvc" do
