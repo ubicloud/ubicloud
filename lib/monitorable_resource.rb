@@ -97,8 +97,17 @@ class MonitorableResource
     attached_resources_sync { @attached_resources.values }.each do |resource|
       resource.session = @session
       resource.check_pulse
+      unless @session[:ssh_session]
+        # If checking the pulse for an attached resource drops the SSH session,
+        # remove the resource temporarily. It will be added back on the next scan
+        # (within 60s).  Also emit a log message so we can track this information.
+        # This is done so a problem with a particular attached resource does not
+        # cause monitoring to stop for all attached resources following it.
+        delete_attached_resource_ids << resource.resource.id
+        Clog.emit("monitor VmHost worker SSH connection lost", {monitor_vm_host_ssh_connection_lost: {host: @resource.ubid, resource: resource.resource.ubid}})
+        break
+      end
       delete_attached_resource_ids << resource.resource.id if resource.deleted
-      break unless @session[:ssh_session]
     end
 
     attached_resources_sync do
