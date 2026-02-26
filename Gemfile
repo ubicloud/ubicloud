@@ -8,10 +8,13 @@ ruby "3.4.8"
 gem "acme-client"
 gem "argon2"
 gem "argon2-kdf"
-gem "autoforme", github: "jeremyevans/autoforme", ref: "9ce4ec5eb30e8444a96bdfd0a575423536d03a42"
+gem "autoforme", ">= 1.14"
 gem "aws-sdk-ec2", "~> 1.512"
 gem "aws-sdk-iam"
 gem "aws-sdk-s3"
+gem "google-apis-iam_v1"
+gem "google-cloud-compute-v1", "~> 3.4"
+gem "google-cloud-storage", "~> 1.58"
 gem "bcrypt_pbkdf"
 gem "committee", ">= 5.5.4"
 gem "countries"
@@ -67,7 +70,7 @@ group :development do
 end
 
 group :rubocop do
-  gem "rubocop-capybara"
+  gem "rubocop-capybara", "< 2.22"
   gem "rubocop-erb"
   gem "rubocop-performance"
   gem "rubocop-rake"

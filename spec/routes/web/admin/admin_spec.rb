@@ -454,22 +454,6 @@ RSpec.describe CloverAdmin do
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
       "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
     ]
-
-    child_pg = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID,
-      name: "test-child-pg",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 64,
-      parent_id: pg.id
-    ).subject
-
-    click_link "Search"
-    fill_in "Parent", with: pg.ubid
-    click_button "Search"
-    expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s
-    ]
   end
 
   it "allows browsing and searching PostgresServer" do

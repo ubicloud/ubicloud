@@ -66,9 +66,10 @@ RSpec.describe Location do
     expect(LocationAwsAz.count).to eq(0)
   end
 
-  it "#azs raises for gcp location" do
+  it "#azs returns cached gcp azs" do
     gcp_loc = described_class.create(name: "gcp-azs-test", display_name: "gcp-azs-test", ui_name: "gcp-azs-test", visible: false, provider: "gcp")
-    expect { gcp_loc.azs }.to raise_error("azs is only valid for aws locations")
+    gcp_loc.add_location_gcp_az(az: "a", zone_name: "azs-test-a")
+    expect(gcp_loc.azs.map(&:az)).to eq(["a"])
   end
 
   it "returns the aws azs for an aws location" do

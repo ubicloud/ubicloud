@@ -89,23 +89,41 @@ module ContentGenerator
       size = Option::POSTGRES_SIZE_OPTIONS[size]
       unit_price = BillingRate.unit_price_from_resource_properties("PostgresVCpu", "#{flavor}-#{family}", location.name, location.byoc)
 
-      [
-        size.name,
-        "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
-        "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
-      ]
+      if unit_price
+        [
+          size.name,
+          "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
+          "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
+          "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
+        ]
+      else
+        [
+          size.name,
+          "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
+          "N/A",
+          "N/A"
+        ]
+      end
     end
 
     def self.storage_size(flavor, location, family, vm_size, storage_size)
       unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name, location.byoc)
 
-      [
-        "#{storage_size}GB",
-        nil,
-        "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
-      ]
+      if unit_price
+        [
+          "#{storage_size}GB",
+          nil,
+          "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
+          "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
+        ]
+      else
+        [
+          "#{storage_size}GB",
+          nil,
+          "N/A",
+          "N/A"
+        ]
+      end
     end
 
     def self.version(flavor, version)
@@ -119,12 +137,21 @@ module ContentGenerator
       storage_unit_price = BillingRate.unit_price_from_resource_properties("PostgresStorage", flavor, location.name, location.byoc)
       standby_count = ha_type.standby_count
 
-      [
-        ha_type.description,
-        "",
-        "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
-        "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
-      ]
+      if compute_unit_price && storage_unit_price
+        [
+          ha_type.description,
+          "",
+          "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
+          "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
+        ]
+      else
+        [
+          ha_type.description,
+          "",
+          "N/A",
+          "N/A"
+        ]
+      end
     end
 
     def self.partnership_notice(flavor)
