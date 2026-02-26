@@ -238,6 +238,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(vm.update_firewall_rules_set?).to be true
       expect(ps.update_firewall_rules_set?).to be false
     end
+
+    it "clears refresh_keys semaphore without doing anything" do
+      nx.incr_refresh_keys
+      expect { nx.wait }.to nap(60 * 60 * 24 * 365)
+      expect(ps.refresh_keys_set?).to be false
+    end
   end
 
   describe "#destroy" do

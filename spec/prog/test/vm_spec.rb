@@ -19,6 +19,8 @@ RSpec.describe Prog::Test::Vm do
     main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0")
     extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1")
 
+    location = instance_double(Location, provider: "metal")
+
     nic1 = instance_double(Nic,
       private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"),
       private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
@@ -27,6 +29,7 @@ RSpec.describe Prog::Test::Vm do
       ip4: "1.1.1.1",
       ip6: "2001:db8:85a1::2",
       nics: [nic1],
+      location:,
       vm_storage_volumes: [main_storage_volume, extra_storage_volume])
 
     nic2 = instance_double(Nic,
@@ -255,6 +258,31 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a2::2")
       expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
     end
+
+    it "skips ip6 check when ip6 is nil" do
+      vm2_no_ip6 = instance_double(Vm, id: "vm2",
+        private_subnets: [instance_double(PrivateSubnet, id: "subnet1")],
+        ip4: "1.1.1.2",
+        ip6: nil,
+        nics: [instance_double(Nic,
+          private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a2::/64"),
+          private_ipv4: NetAddr::IPv4Net.parse("192.168.0.2/32"))])
+      allow(vm_test).to receive(:vms_with_same_subnet).and_return([vm2_no_ip6])
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a2::2")
+      expect(sshable).not_to receive(:_cmd).with(/2001:db8:85a2/)
+      expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
+    end
+
+    it "uses nc for non-metal providers and skips private IPv6" do
+      location = instance_double(Location, provider: "aws")
+      allow(vm_test.vm).to receive(:location).and_return(location)
+      expect(sshable).to receive(:_cmd).with("nc -zw5 1.1.1.2 22")
+      expect(sshable).to receive(:_cmd).with("nc -zw5 2001:db8:85a2::2 22")
+      expect(sshable).to receive(:_cmd).with("nc -zw5 192.168.0.2 22")
+      expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
+    end
   end
 
   describe "#ping_vms_not_in_subnet" do
@@ -266,19 +294,44 @@ RSpec.describe Prog::Test::Vm do
       expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
     end
 
+    it "skips ip6 check when ip6 is nil" do
+      vm3_no_ip6 = instance_double(Vm, id: "vm3",
+        private_subnets: [instance_double(PrivateSubnet, id: "subnet2")],
+        ip4: "1.1.1.3",
+        ip6: nil,
+        nics: [instance_double(Nic,
+          private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a3::/64"),
+          private_ipv4: NetAddr::IPv4Net.parse("192.168.0.3/32"))])
+      allow(vm_test).to receive(:vms_with_different_subnet).and_return([vm3_no_ip6])
+      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).not_to receive(:_cmd).with(/2001:db8:85a3/)
+      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
+    end
+
+    it "uses nc for non-metal providers and skips private IPv6 isolation test" do
+      location = instance_double(Location, provider: "aws")
+      allow(vm_test.vm).to receive(:location).and_return(location)
+      expect(sshable).to receive(:_cmd).with("nc -zw5 1.1.1.3 22")
+      expect(sshable).to receive(:_cmd).with("nc -zw5 2001:db8:85a3::2 22")
+      expect(sshable).to receive(:_cmd).with("nc -zw5 192.168.0.3 22").and_raise Sshable::SshError.new("nc failed", "", "", nil, nil)
+      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
+    end
+
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
       expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip4 of a vm in different subnet"
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
+      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful connection to private ip4 of a vm in different subnet"
     end
 
     it "raises error if pinging private ipv9 of vms in other subnets succeed" do
       expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2")
-      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip6 of a vm in different subnet"
+      expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful connection to private ip6 of a vm in different subnet"
     end
   end
 

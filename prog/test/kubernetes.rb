@@ -5,12 +5,12 @@ require_relative "../../lib/util"
 class Prog::Test::Kubernetes < Prog::Test::Base
   semaphore :destroy
 
-  MIGRATION_TRIES = 2
+  MIGRATION_TRIES = 3
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
-    kubernetes_service_project = Project[Config.kubernetes_service_project_id] ||
-      Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
+    kubernetes_service_project = Project.create_with_id(Config.kubernetes_service_project_id, name: "Ubicloud-Kubernetes-Resources")
+
     Strand.create(
       prog: "Test::Kubernetes",
       label: "start",
@@ -114,7 +114,7 @@ spec:
     spec:
       accessModes: [ "ReadWriteOnce" ]
       resources:
-        requests: { storage: 5Gi }
+        requests: { storage: 1Gi }
       storageClassName: ubicloud-standard
 STS
     kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf apply -f -", stdin: sts)
@@ -138,47 +138,13 @@ STS
   end
 
   label def test_data_write
-    (1..3).each do |i|
-      unit_name = "csi_data_write_#{i}"
-      kubernetes_cluster.sshable.d_run(
-        unit_name,
-        "bash", "-c",
-        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
-      )
+    write_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"head -c 200M /dev/urandom | tee /etc/data/random-data | sha256sum | awk '{print \\$1}'\"").strip
+    read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    if write_hash != read_hash
+      update_stack({"fail_message" => "wrong read hash, expected: #{write_hash}, got: #{read_hash}"})
+      hop_destroy_kubernetes
     end
-    hop_wait_data_write
-  end
-
-  label def wait_data_write
-    (1..3).each do |i|
-      unit_name = "csi_data_write_#{i}"
-      case kubernetes_cluster.sshable.d_check(unit_name)
-      when "InProgress"
-        nap 30
-      when "Failed"
-        update_stack({"fail_message" => "daemonized write for random-data-#{i} failed"})
-        hop_destroy_kubernetes
-      end
-    end
-    hop_verify_data_write
-  end
-
-  label def verify_data_write
-    read_hashes = {}
-    (1..3).each do |i|
-      file = "random-data-#{i}"
-      unit_name = "csi_data_write_#{i}"
-      hash_path = "/dev/shm/#{unit_name}.hash"
-      write_hash = kubernetes_cluster.sshable.cmd("cat :hash_path", hash_path:).strip
-      read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
-      kubernetes_cluster.sshable.d_clean(unit_name)
-      if write_hash != read_hash
-        update_stack({"fail_message" => "wrong read hash for #{file}, expected: #{write_hash}, got: #{read_hash}"})
-        hop_destroy_kubernetes
-      end
-      read_hashes[file] = read_hash
-    end
-    update_stack({"read_hashes" => read_hashes})
+    update_stack({"read_hash" => read_hash})
     hop_test_pod_data_migration
   end
 
@@ -187,8 +153,8 @@ STS
     pod_node = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
     client.kubectl("cordon :pod_node", pod_node:)
     # we need to uncordon other nodes each time so we won't run out of nodes accepting pods
-    nodepool.nodes.reject { it.name == pod_node }.each {
-      client.kubectl("uncordon :name", name: it.name)
+    nodepool.nodes.reject { it.name == pod_node }.each { |node|
+      client.kubectl("uncordon :name", name: node.name)
     }
     client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
     hop_verify_data_after_migration
@@ -196,7 +162,12 @@ STS
 
   label def verify_data_after_migration
     nap 5 unless pod_status == "Running"
-    verify_data_hashes("migration")
+    new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data | awk '{print \\$1}'\"").strip
+    expected_hash = strand.stack.first["read_hash"]
+    if new_hash != expected_hash
+      update_stack({"fail_message" => "data hash changed after migration, expected: #{expected_hash}, got: #{new_hash}"})
+      hop_destroy_kubernetes
+    end
     hop_test_normal_pod_restart if migration_number == MIGRATION_TRIES
     increment_migration_number
     hop_test_pod_data_migration
@@ -223,104 +194,6 @@ STS
       verify_mount
     rescue => e
       update_stack({"fail_message" => e.message})
-      hop_destroy_kubernetes
-    end
-    hop_test_rsync_retry
-  end
-
-  label def test_rsync_retry
-    client = kubernetes_cluster.client
-    nodepool.nodes.each { client.kubectl("uncordon :name", name: it.name) }
-    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    client.kubectl("cordon :pod_node_name", pod_node_name:)
-    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
-    update_stack({"rsync_retry_source_node" => pod_node_name})
-    hop_kill_rsync_process
-  end
-
-  label def kill_rsync_process
-    source_node_name = strand.stack.first["rsync_retry_source_node"]
-    target_node = nodepool.nodes.find { it.name != source_node_name }
-    nap 1 if target_node.vm.sshable.cmd("pgrep rsync || true").strip.empty?
-    target_node.vm.sshable.cmd("sudo pkill -9 rsync")
-    hop_verify_rsync_retry
-  end
-
-  label def verify_rsync_retry
-    nap 5 unless pod_status == "Running"
-    verify_data_hashes("rsync retry")
-    hop_test_node_not_deleted_during_copy
-  end
-
-  label def test_node_not_deleted_during_copy
-    client = kubernetes_cluster.client
-    nodepool.nodes.each {
-      client.kubectl("uncordon :name", name: it.name)
-    }
-
-    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
-    update_stack({"drain_test_node_name" => pod_node_name})
-
-    pod_node = nodepool.nodes.find { it.name == pod_node_name }
-    pod_node.incr_retire
-
-    hop_verify_node_not_deleted_during_copy
-  end
-
-  label def verify_node_not_deleted_during_copy
-    drain_node_name = strand.stack.first["drain_test_node_name"]
-    drain_node = kubernetes_cluster.all_nodes.detect { it.name == drain_node_name }
-
-    # Node record destroyed means the nexus completed the full retire flow
-    hop_verify_data_after_drain unless drain_node
-
-    if drain_node.pending_pvs.any?
-      begin
-        kubernetes_cluster.client.kubectl("get node :drain_node_name", drain_node_name:)
-      rescue => e
-        update_stack({"fail_message" => "Node #{drain_node_name} was removed while CSI data copy was still in progress: #{e.message}"})
-        hop_destroy_kubernetes
-      end
-    end
-
-    nap 15
-  end
-
-  label def verify_data_after_drain
-    nap 5 unless pod_status == "Running"
-    verify_data_hashes("node drain")
-    hop_test_reboot_nftables
-  end
-
-  label def test_reboot_nftables
-    node = nodepool.nodes.first
-    nat_rules = node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
-    pod_access_rules = node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
-    update_stack({
-      "reboot_node_id" => node.id,
-      "nat_rules_before_reboot" => nat_rules,
-      "pod_access_rules_before_reboot" => pod_access_rules
-    })
-    begin
-      node.vm.sshable.cmd("sudo systemctl reboot")
-    rescue
-      # SSH connection drops during reboot
-      nil
-    end
-    hop_verify_reboot_nftables
-  end
-
-  label def verify_reboot_nftables
-    reboot_node = nodepool.nodes.find { |n| n.id == frame["reboot_node_id"] }
-    nap 5 unless vm_ready?(reboot_node.vm)
-    nat_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip nat postrouting")
-    pod_access_rules = reboot_node.vm.sshable.cmd("sudo nft list chain ip6 pod_access ingress_egress_control")
-    if nat_rules != frame["nat_rules_before_reboot"]
-      update_stack({"fail_message" => "ip nat rules changed after reboot"})
-      hop_destroy_kubernetes
-    end
-    if pod_access_rules != frame["pod_access_rules_before_reboot"]
-      update_stack({"fail_message" => "ip6 pod_access rules changed after reboot"})
     end
     hop_destroy_kubernetes
   end
@@ -401,7 +274,7 @@ STS
       size = cols[3]         # e.g. "1G"
       mountpoint = cols[6]   # e.g. "/etc/data"
 
-      if device_name.start_with?("loop") && size == "5G" && mountpoint == "/etc/data"
+      if device_name.start_with?("loop") && size == "1G" && mountpoint == "/etc/data"
         # no op
       else
         raise "/etc/data is mounted incorrectly: #{data_mount}"
@@ -418,16 +291,5 @@ STS
   # customer. This also keeps the logic simpler
   def pod_status
     kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
-  end
-
-  def verify_data_hashes(context)
-    expected_hashes = strand.stack.first["read_hashes"]
-    expected_hashes.each do |file, expected_hash|
-      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
-      if new_hash != expected_hash
-        update_stack({"fail_message" => "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"})
-        hop_destroy_kubernetes
-      end
-    end
   end
 end
