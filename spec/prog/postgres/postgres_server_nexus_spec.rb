@@ -168,7 +168,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project_id: "test-gcp-project",
         service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
         credentials_json: "{}")
-      PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "test-gcp-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", pg_version: "16", arch: "x64")
+      PgGceImage.where(pg_version: "16", arch: "x64").destroy
+      PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", pg_version: "16", arch: "x64")
       gcp_resource = PostgresResource.create(
         project: user_project,
         location: gcp_location,
@@ -183,7 +184,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       allow(Validation).to receive(:validate_billing_rate)
 
       st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
-      expect(st.subject.vm.boot_image).to eq("projects/test-gcp-project/global/images/postgres-ubuntu-2204-x64-20260218")
+      expect(st.subject.vm.boot_image).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
     end
 
     it "raises error if the version is not supported for AWS" do

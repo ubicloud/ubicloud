@@ -5,10 +5,9 @@ class Location < Sequel::Model
 
   module Gcp
     def pg_gce_image(pg_version, arch)
-      project_id = location_credential.project_id
-      image = PgGceImage.find(gcp_project_id: project_id, pg_version:, arch:)
-      raise "No GCE image found for PostgreSQL #{pg_version} (#{arch}) in project #{project_id}" unless image
-      "projects/#{project_id}/global/images/#{image.gce_image_name}"
+      image = PgGceImage.find(pg_version:, arch:)
+      raise "No GCE image found for PostgreSQL #{pg_version} (#{arch})" unless image
+      "projects/#{image.gcp_project_id}/global/images/#{image.gce_image_name}"
     end
 
     private
@@ -33,7 +32,7 @@ class Location < Sequel::Model
 
     def get_gcp_zones(region)
       credential = location_credential
-      zones = credential.zones_client.list(project: credential.project_id).items || []
+      zones = credential.zones_client.list(project: credential.project_id).to_a
       zones.select { it.name.start_with?("#{region}-") && it.status == "UP" }
     end
   end

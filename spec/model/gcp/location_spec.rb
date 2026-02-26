@@ -16,39 +16,35 @@ RSpec.describe Location do
 
   context "with GCP provider" do
     describe "#pg_gce_image" do
-      before { location_credential }
-
-      it "returns a GCE image path when a matching PgGceImage exists" do
+      it "returns a GCE image path using the image's hosting project" do
         PgGceImage.create_with_id(SecureRandom.uuid,
-          gcp_project_id: "test-project",
+          gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-x64-20260218",
-          pg_version: "17",
+          pg_version: "99",
           arch: "x64")
 
-        expect(location.pg_gce_image("17", "x64")).to eq(
-          "projects/test-project/global/images/postgres-ubuntu-2404-x64-20260218"
+        expect(location.pg_gce_image("99", "x64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218"
         )
       end
 
       it "raises when no matching PgGceImage is found" do
-        expect { location.pg_gce_image("17", "x64") }.to raise_error(
-          RuntimeError, /No GCE image found for PostgreSQL 17 \(x64\)/
+        expect { location.pg_gce_image("99", "x64") }.to raise_error(
+          RuntimeError, /No GCE image found for PostgreSQL 99 \(x64\)/
         )
       end
     end
 
     describe "#pg_boot_image" do
-      before { location_credential }
-
       it "delegates to pg_gce_image" do
         PgGceImage.create_with_id(SecureRandom.uuid,
-          gcp_project_id: "test-project",
+          gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
-          pg_version: "17",
+          pg_version: "99",
           arch: "arm64")
 
-        expect(location.send(:gcp_pg_boot_image, "17", "arm64", "standard")).to eq(
-          "projects/test-project/global/images/postgres-ubuntu-2404-arm64-20260218"
+        expect(location.send(:gcp_pg_boot_image, "99", "arm64", "standard")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218"
         )
       end
     end
@@ -78,7 +74,7 @@ RSpec.describe Location do
 
         allow(zones_client).to receive(:list)
           .with(project: "test-project")
-          .and_return(double(items: [zone_a, zone_b, zone_c, zone_f, zone_other, zone_down]))
+          .and_return([zone_a, zone_b, zone_c, zone_f, zone_other, zone_down])
 
         azs = location.send(:gcp_azs)
         expect(azs.map(&:az)).to contain_exactly("a", "b", "c", "f")
@@ -88,13 +84,13 @@ RSpec.describe Location do
         expect(LocationGcpAz.where(location_id: location.id).count).to eq(4)
       end
 
-      it "handles nil items from GCP API" do
+      it "handles empty zone list from GCP API" do
         location_credential
         allow(location).to receive(:location_credential).and_return(location_credential)
         allow(location_credential).to receive(:zones_client).and_return(zones_client)
         allow(zones_client).to receive(:list)
           .with(project: "test-project")
-          .and_return(double(items: nil))
+          .and_return([])
 
         azs = location.send(:gcp_azs)
         expect(azs).to be_empty
