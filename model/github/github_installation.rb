@@ -56,6 +56,7 @@ end
 #  use_docker_mirror     | boolean                  | NOT NULL DEFAULT false
 #  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
+#  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
 # Indexes:
 #  github_installation_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
