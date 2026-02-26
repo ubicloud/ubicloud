@@ -200,15 +200,43 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect(AwsSubnet.where(location_aws_az_id: az_b.id).first.subnet_id).to eq("subnet-us-west-2b")
     end
 
-    it "describes existing subnets and creates new ones" do
+    it "describes existing subnets when subnet_id is already set" do
       AwsSubnet.where(location_aws_az_id: az_a.id).update(subnet_id: "subnet-existing-a", ipv6_cidr: "2600:1f14:1000::/64")
       client.stub_responses(:describe_subnets, subnets: [{subnet_id: "subnet-existing-a", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]}])
-      expect(client).to receive(:describe_subnets).and_call_original
+      expect(client).to receive(:describe_subnets).once.and_call_original
       expect(client).to receive(:create_subnet).once.and_call_original
       expect(client).to receive(:modify_subnet_attribute).twice.and_call_original
       expect { nx.create_az_subnets }.to hop("associate_az_route_tables")
       expect(AwsSubnet.count).to eq(2)
       expect(AwsSubnet.where(location_aws_az_id: az_a.id).first.subnet_id).to eq("subnet-existing-a")
+    end
+
+    it "recovers from partial failure by catching InvalidSubnetConflict and finding existing subnet" do
+      ipv4_cidr_a = ps.net4.nth_subnet(24, 0).to_s
+      client.stub_responses(:create_subnet, ->(context) {
+        az = context.params[:availability_zone]
+        if az == "us-west-2a"
+          raise Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "The CIDR conflicts with another subnet")
+        else
+          {subnet: {subnet_id: "subnet-#{az}", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: context.params[:ipv_6_cidr_block]}]}}
+        end
+      })
+      client.stub_responses(:describe_subnets, subnets: [
+        {subnet_id: "subnet-recovered-a", availability_zone: "us-west-2a", cidr_block: ipv4_cidr_a, ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]}
+      ])
+      expect(client).to receive(:create_subnet).twice.and_call_original
+      expect(client).to receive(:describe_subnets).once.and_call_original
+      expect(client).to receive(:modify_subnet_attribute).twice.and_call_original
+      expect { nx.create_az_subnets }.to hop("associate_az_route_tables")
+      expect(AwsSubnet.count).to eq(2)
+      expect(AwsSubnet.where(location_aws_az_id: az_a.id).first.subnet_id).to eq("subnet-recovered-a")
+      expect(AwsSubnet.where(location_aws_az_id: az_b.id).first.subnet_id).to eq("subnet-us-west-2b")
+    end
+
+    it "fails if subnet conflict occurs but no matching subnet is found" do
+      client.stub_responses(:create_subnet, Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "The CIDR conflicts"))
+      client.stub_responses(:describe_subnets, subnets: [])
+      expect { nx.create_az_subnets }.to raise_error(RuntimeError, /Subnet conflict but no matching subnet found/)
     end
   end
 
