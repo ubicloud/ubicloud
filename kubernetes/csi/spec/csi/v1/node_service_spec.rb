@@ -173,7 +173,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#fetch_and_migrate_pvc" do
-    let(:client) { instance_double(Csi::KubernetesClient) }
     let(:req) do
       Csi::V1::NodeStageVolumeRequest.new(
         volume_context: {
@@ -182,25 +181,46 @@ RSpec.describe Csi::V1::NodeService do
         }
       )
     end
+    let(:success_status) { instance_double(Process::Status, success?: true) }
 
     it "migrates PVC data when migration is needed" do
       pvc_with_migration = {"metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv"}}}
-      expect(client).to receive(:get_pvc).with("default", "test-pvc").and_return(pvc_with_migration)
-      expect(service).to receive(:pvc_needs_migration?).with(pvc_with_migration).and_return(true)
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_with_migration), success_status])
       expect(service).to receive(:migrate_pvc_data).with(req_id, client, pvc_with_migration, req)
 
       result = service.fetch_and_migrate_pvc(req_id, client, req)
       expect(result).to eq(pvc_with_migration)
     end
 
-    it "does not migrate PVC data when not needed" do
-      pvc_with_migration = {"metadata" => {"annotations" => {}}}
-      expect(client).to receive(:get_pvc).with("default", "test-pvc").and_return(pvc_with_migration)
-      expect(service).to receive(:pvc_needs_migration?).with(pvc_with_migration).and_return(false)
-      expect(service).not_to receive(:migrate_pvc_data).with(req_id, client, pvc_with_migration, req)
+    it "does not migrate PVC data when not needed and no retained PV exists" do
+      pvc_without_migration = {"metadata" => {"annotations" => {}}}
+      pv_list = {"items" => [
+        {"metadata" => {"name" => "pvc-abc", "annotations" => {}},
+         "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+      ]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_migration), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+      expect(service).not_to receive(:migrate_pvc_data)
 
       result = service.fetch_and_migrate_pvc(req_id, client, req)
-      expect(result).to eq(pvc_with_migration)
+      expect(result).to eq(pvc_without_migration)
+    end
+
+    it "migrates PVC data via fallback when PVC lacks annotation but retained PV exists" do
+      pvc_without_annotation = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {}}}
+      retained_pv = {"metadata" => {"name" => "old-pv-123", "annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
+                     "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+      pv_list = {"items" => [retained_pv]}
+      pvc_annotation_patch = {metadata: {annotations: {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}.to_json
+
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_annotation), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "patch", "pvc", "test-pvc", "--type=merge", "-p", pvc_annotation_patch, stdin_data: nil).and_return(["patched", success_status])
+      expected_pvc = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}
+      expect(service).to receive(:migrate_pvc_data).with(req_id, client, expected_pvc, req)
+
+      result = service.fetch_and_migrate_pvc(req_id, client, req)
+      expect(result.dig("metadata", "annotations", "csi.ubicloud.com/old-pv-name")).to eq("old-pv-123")
     end
   end
 
