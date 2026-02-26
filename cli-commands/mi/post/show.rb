@@ -3,7 +3,7 @@
 UbiCli.on("mi").run_on("show") do
   desc "Show details for a machine image"
 
-  fields = %w[id name version location state size-gib description source-vm-id created-at].freeze.each(&:freeze)
+  fields = %w[id name version location state size-gib arch description created-at].freeze.each(&:freeze)
 
   options("ubi mi (location/mi-name | mi-id) show [options]", key: :mi_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")

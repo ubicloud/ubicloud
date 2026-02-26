@@ -8,20 +8,24 @@ RSpec.describe Clover, "cli mi destroy" do
     @mi = MachineImage.create(
       name: "test-image",
       project_id: @project.id,
-      location_id: Location::HETZNER_FSN1_ID,
+      location_id: Location::HETZNER_FSN1_ID
+    )
+    @ver = MachineImageVersion.create(
+      machine_image_id: @mi.id,
+      version: 1,
       state: "available",
+      size_gib: 20,
+      arch: "arm64",
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
-      s3_endpoint: "https://r2.example.com",
-      size_gib: 20,
-      active: true
+      s3_endpoint: "https://r2.example.com"
     )
-    Strand.create(id: @mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => @mi.id}])
+    Strand.create(id: @ver.id, prog: "MachineImage::Nexus", label: "wait", stack: [{"subject_id" => @ver.id}])
   end
 
   it "destroys mi directly if -f option is given" do
     expect(cli(%w[mi eu-central-h1/test-image destroy -f])).to eq "Machine image, if it exists, is now scheduled for destruction\n"
-    expect(@mi.reload.destroy_set?).to be true
+    expect(SemSnap.new(@ver.id).set?("destroy")).to be true
   end
 
   it "asks for confirmation if -f option is not given" do
@@ -29,16 +33,16 @@ RSpec.describe Clover, "cli mi destroy" do
       Destroying this machine image is not recoverable.
       Enter the following to confirm destruction of the machine image: #{@mi.name}
     END
-    expect(@mi.reload.destroy_set?).to be false
+    expect(SemSnap.new(@ver.id).set?("destroy")).to be false
   end
 
   it "works on correct confirmation" do
     expect(cli(%w[--confirm test-image mi eu-central-h1/test-image destroy])).to eq "Machine image, if it exists, is now scheduled for destruction\n"
-    expect(@mi.reload.destroy_set?).to be true
+    expect(SemSnap.new(@ver.id).set?("destroy")).to be true
   end
 
   it "fails on incorrect confirmation" do
     expect(cli(%w[--confirm foo mi eu-central-h1/test-image destroy], status: 400)).to eq "! Confirmation of machine image name not successful.\n"
-    expect(@mi.reload.destroy_set?).to be false
+    expect(SemSnap.new(@ver.id).set?("destroy")).to be false
   end
 end

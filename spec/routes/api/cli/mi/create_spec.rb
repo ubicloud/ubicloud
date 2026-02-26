@@ -16,7 +16,8 @@ RSpec.describe Clover, "cli mi create" do
     body = cli(["mi", "eu-central-h1/my-image", "create", "-v", @vm.ubid])
     mi = MachineImage.first(name: "my-image")
     expect(mi).not_to be_nil
-    expect(mi.state).to eq "creating"
+    ver = mi.versions.first
+    expect(ver.state).to eq "creating"
     expect(body).to eq "Machine image created with id: #{mi.ubid}\n"
   end
 

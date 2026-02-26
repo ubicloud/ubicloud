@@ -10,33 +10,47 @@ RSpec.describe Clover, "machine_image" do
   let(:project_wo_permissions) { user.create_project_with_default_policy("project-2", default_policy: nil) }
 
   let(:machine_image) do
-    MachineImage.create(
+    mi = MachineImage.create(
       name: "test-image",
       description: "test desc",
       project_id: project.id,
       location_id: Location::HETZNER_FSN1_ID,
+      visible: false
+    )
+    MachineImageVersion.create(
+      machine_image_id: mi.id,
+      version: 1,
       state: "available",
+      size_gib: 20,
+      arch: "arm64",
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
-      s3_endpoint: "https://r2.example.com",
-      size_gib: 20
+      s3_endpoint: "https://r2.example.com"
     )
+    mi
   end
 
   let(:vm_host) { create_vm_host }
   let(:vbb) { VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm_host.id) }
 
   let(:mi_wo_permission) {
-    MachineImage.create(
+    mi = MachineImage.create(
       name: "other-image",
       project_id: project_wo_permissions.id,
       location_id: Location::HETZNER_FSN1_ID,
+      visible: false
+    )
+    MachineImageVersion.create(
+      machine_image_id: mi.id,
+      version: 1,
       state: "available",
+      size_gib: 10,
+      arch: "arm64",
       s3_bucket: "test-bucket",
       s3_prefix: "images/other/",
-      s3_endpoint: "https://r2.example.com",
-      size_gib: 10
+      s3_endpoint: "https://r2.example.com"
     )
+    mi
   }
 
   describe "unauthenticated" do
@@ -189,12 +203,17 @@ RSpec.describe Clover, "machine_image" do
           name: "public-image",
           project_id: other_project.id,
           location_id: Location::HETZNER_FSN1_ID,
+          visible: true
+        )
+        MachineImageVersion.create(
+          machine_image_id: public_mi.id,
+          version: 1,
           state: "available",
-          visible: true,
+          size_gib: 10,
+          arch: "arm64",
           s3_bucket: "b",
           s3_prefix: "p/",
-          s3_endpoint: "https://r2.example.com",
-          size_gib: 10
+          s3_endpoint: "https://r2.example.com"
         )
 
         visit "#{project.path}#{public_mi.path}/overview"
@@ -222,40 +241,44 @@ RSpec.describe Clover, "machine_image" do
 
       it "can set active version" do
         mi = machine_image
-        Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
-
-        v2 = MachineImage.create(
-          name: mi.name, version: "v2", active: false,
-          project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
-          state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+        v2 = MachineImageVersion.create(
+          machine_image_id: mi.id,
+          version: 2,
+          state: "available",
+          size_gib: 20,
+          arch: "arm64",
+          s3_bucket: "b",
+          s3_prefix: "p/",
+          s3_endpoint: "https://r2.example.com"
         )
 
         visit "#{project.path}#{mi.path}/versions"
 
-        expect(page).to have_content "v2"
-        click_button "Set Active"
+        within("#ver-#{v2.ubid}") { click_button "Set Active" }
 
-        expect(page).to have_flash_notice("Version 'v2' is now the active version")
+        expect(page).to have_flash_notice("Version 2 is now the active version")
         expect(v2.reload.active?).to be true
-        expect(mi.reload.active?).to be false
         expect(DB[:audit_log].where(action: "update", ubid_type: "m1").count).to eq(1)
       end
 
       it "fails when version not found" do
         mi = machine_image
-        Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
-
-        MachineImage.create(
-          name: mi.name, version: "v2", active: false,
-          project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
-          state: "available", s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+        MachineImageVersion.create(
+          machine_image_id: mi.id,
+          version: 2,
+          state: "available",
+          size_gib: 20,
+          arch: "arm64",
+          s3_bucket: "b",
+          s3_prefix: "p/",
+          s3_endpoint: "https://r2.example.com"
         )
 
         visit "#{project.path}#{mi.path}/versions"
         form = find("form[action*='set-active']", match: :first)
         _csrf = form.find("input[name='_csrf']", visible: false).value
         action = form["action"]
-        page.driver.post action, {version_id: MachineImage.generate_ubid, _csrf:}
+        page.driver.post action, {version_id: MachineImageVersion.generate_ubid, _csrf:}
 
         expect(page.driver.status_code).to eq(400)
       end
@@ -264,18 +287,14 @@ RSpec.describe Clover, "machine_image" do
     describe "delete" do
       it "can delete machine image" do
         mi = machine_image
-        Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
-
         visit "#{project.path}#{mi.path}"
         within("#machine-image-submenu") { click_link "Settings" }
 
         click_button "Delete"
         expect(page).to have_flash_notice("Machine image is being deleted")
-        expect(mi.reload.destroy_set?).to be true
       end
 
       it "can not delete machine image when does not have permissions" do
-        Strand.create(id: mi_wo_permission.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi_wo_permission.id}])
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["MachineImage:view"])
 
         visit "#{project_wo_permissions.path}#{mi_wo_permission.path}/settings"

@@ -11,39 +11,60 @@ RSpec.describe Serializers::MachineImage do
     }
 
     let(:mi) {
-      mi = MachineImage.create(
+      MachineImage.create(
         name: "test-image",
         description: "A test image",
         project_id: project.id,
         location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        s3_bucket: "test-bucket",
-        s3_prefix: "images/test/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 20,
-        encrypted: true,
-        compression: "zstd",
         visible: false
       )
-      allow(mi).to receive(:vm).and_return(vm)
-      mi
     }
 
-    it "returns correct hash shape" do
+    let(:version) {
+      MachineImageVersion.create(
+        machine_image_id: mi.id,
+        version: 1,
+        state: "available",
+        size_gib: 20,
+        arch: "arm64",
+        s3_bucket: "test-bucket",
+        s3_prefix: "images/test/",
+        s3_endpoint: "https://r2.example.com"
+      ).tap { it.activate! }
+    }
+
+    it "returns correct hash shape with active version" do
+      version # create and activate
+      mi.refresh
+
       result = described_class.serialize_internal(mi)
 
       expect(result[:id]).to eq(mi.ubid)
       expect(result[:name]).to eq("test-image")
       expect(result[:description]).to eq("A test image")
-      expect(result[:state]).to eq("available")
-      expect(result[:size_gib]).to eq(20)
-      expect(result[:encrypted]).to be true
-      expect(result[:compression]).to eq("zstd")
       expect(result[:visible]).to be false
       expect(result[:location]).to eq("eu-central-h1")
-      expect(result[:source_vm_id]).to eq("vmtest1234567890123456")
+      expect(result[:version]).to eq(1)
+      expect(result[:state]).to eq("available")
+      expect(result[:size_gib]).to eq(20)
+      expect(result[:arch]).to eq("arm64")
       expect(result[:created_at]).to be_a(String)
+      expect(result[:active_version]).to be_a(Hash)
+      expect(result[:active_version][:id]).to eq(version.ubid)
+      expect(result[:versions]).to be_an(Array)
+      expect(result[:versions].length).to eq(1)
       expect(result).not_to have_key(:path)
+    end
+
+    it "returns nil active version fields when no active version" do
+      result = described_class.serialize_internal(mi)
+
+      expect(result[:version]).to be_nil
+      expect(result[:state]).to be_nil
+      expect(result[:size_gib]).to be_nil
+      expect(result[:arch]).to be_nil
+      expect(result[:active_version]).to be_nil
+      expect(result[:versions]).to eq([])
     end
 
     it "includes path when include_path option is set" do
@@ -64,21 +85,27 @@ RSpec.describe Serializers::MachineImage do
       expect(result[:created_at]).to be_nil
     end
 
-    it "handles nil vm" do
-      mi_no_vm = MachineImage.create(
-        name: "no-vm-image",
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
+    it "serializes version with source vm" do
+      ver = MachineImageVersion.create(
+        machine_image_id: mi.id,
+        version: 1,
         state: "available",
+        size_gib: 10,
+        arch: "x64",
+        vm_id: nil,
         s3_bucket: "test-bucket",
         s3_prefix: "images/test2/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
+        s3_endpoint: "https://r2.example.com"
       )
 
-      result = described_class.serialize_internal(mi_no_vm)
+      result = described_class.serialize_version(ver)
 
       expect(result[:source_vm_id]).to be_nil
+      expect(result[:version]).to eq(1)
+      expect(result[:state]).to eq("available")
+      expect(result[:size_gib]).to eq(10)
+      expect(result[:arch]).to eq("x64")
+      expect(result[:active]).to be false
     end
   end
 end

@@ -7,19 +7,29 @@ RSpec.describe Clover, "machine_image" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:machine_image) {
-    MachineImage.create(
-      name: "test-image",
-      description: "test desc",
-      project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID,
-      state: "available",
+  def create_mi(name: "test-image", project_id: nil, location_id: nil, visible: false, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64", activate: false)
+    mi = MachineImage.create(
+      name:,
+      description:,
+      project_id: project_id || project.id,
+      location_id: location_id || Location::HETZNER_FSN1_ID,
+      visible:
+    )
+    ver = MachineImageVersion.create(
+      machine_image_id: mi.id,
+      version: 1,
+      state: version_state,
+      size_gib:,
+      arch:,
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
-      s3_endpoint: "https://r2.example.com",
-      size_gib: 20
+      s3_endpoint: "https://r2.example.com"
     )
-  }
+    ver.activate! if activate
+    mi
+  end
+
+  let(:machine_image) { create_mi(activate: true) }
 
   let(:vm_host) { create_vm_host }
   let(:vbb) { VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm_host.id) }
@@ -59,16 +69,7 @@ RSpec.describe Clover, "machine_image" do
 
     it "success get all location machine images" do
       machine_image
-      MachineImage.create(
-        name: "test-image-2",
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        s3_bucket: "test-bucket",
-        s3_prefix: "images/test2/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      create_mi(name: "test-image-2")
 
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image"
 
@@ -92,7 +93,7 @@ RSpec.describe Clover, "machine_image" do
       parsed = JSON.parse(last_response.body)
       expect(parsed["name"]).to eq("test-image")
       expect(parsed["state"]).to eq("available")
-      expect(parsed["arch"]).to eq("x64")
+      expect(parsed["arch"]).to eq("arm64")
     end
 
     it "success get machine image by ubid" do
@@ -104,7 +105,7 @@ RSpec.describe Clover, "machine_image" do
     it "get does not exist for valid name" do
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/fooname"
 
-      expect(last_response).to have_api_error(404, "Sorry, we couldn’t find the resource you’re looking for.")
+      expect(last_response).to have_api_error(404, /Sorry, we couldn.t find the resource you.re looking for/)
     end
 
     it "success post" do
@@ -119,12 +120,14 @@ RSpec.describe Clover, "machine_image" do
       parsed = JSON.parse(last_response.body)
       expect(parsed["name"]).to eq("my-image")
       expect(parsed["state"]).to eq("creating")
-      expect(parsed["encrypted"]).to be true
       expect(parsed["size_gib"]).to eq(20)
-      expect(parsed["arch"]).to eq("x64")
+      expect(parsed["arch"]).to eq(vm.arch)
 
       mi = MachineImage.first(name: "my-image")
-      expect(mi.arch).to eq(vm.arch)
+      expect(mi).not_to be_nil
+      ver = mi.versions.first
+      expect(ver.state).to eq("creating")
+      expect(ver.arch).to eq(vm.arch)
     end
 
     it "post fails when VM is not stopped" do
@@ -194,10 +197,21 @@ RSpec.describe Clover, "machine_image" do
 
     it "post fails when another image is being created from VM" do
       vm = stopped_vm
-      MachineImage.create(
-        name: "in-progress", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
-        state: "creating", vm_id: vm.id,
-        s3_bucket: "b", s3_prefix: "p/", s3_endpoint: "https://r2.example.com", size_gib: 20
+      in_progress_mi = MachineImage.create(
+        name: "in-progress",
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID
+      )
+      MachineImageVersion.create(
+        machine_image_id: in_progress_mi.id,
+        version: 1,
+        state: "creating",
+        vm_id: vm.id,
+        size_gib: 20,
+        arch: "arm64",
+        s3_bucket: "b",
+        s3_prefix: "p/",
+        s3_endpoint: "https://r2.example.com"
       )
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/another-image", {
@@ -217,7 +231,8 @@ RSpec.describe Clover, "machine_image" do
 
     it "success delete" do
       mi = machine_image
-      Strand.create(id: mi.id, prog: "MachineImage::Nexus", label: "start", stack: [{"subject_id" => mi.id}])
+      ver = mi.versions.first
+      Strand.create(id: ver.id, prog: "MachineImage::Nexus", label: "wait", stack: [{"subject_id" => ver.id}])
 
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{mi.ubid}"
 
@@ -233,17 +248,7 @@ RSpec.describe Clover, "machine_image" do
 
     it "can get a public image from another project" do
       other_project = Project.create(name: "other-project")
-      public_mi = MachineImage.create(
-        name: "public-image",
-        project_id: other_project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        visible: true,
-        s3_bucket: "b",
-        s3_prefix: "p/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      public_mi = create_mi(name: "public-image", project_id: other_project.id, visible: true, activate: true)
 
       get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{public_mi.ubid}"
 

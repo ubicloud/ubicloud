@@ -7,19 +7,28 @@ RSpec.describe Clover, "machine_image" do
 
   let(:project) { project_with_default_policy(user) }
 
-  let(:machine_image) {
-    MachineImage.create(
-      name: "test-image",
-      description: "test desc",
-      project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID,
-      state: "available",
+  def create_mi(name: "test-image", project_id: nil, location_id: nil, visible: false, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64")
+    mi = MachineImage.create(
+      name:,
+      description:,
+      project_id: project_id || project.id,
+      location_id: location_id || Location::HETZNER_FSN1_ID,
+      visible:
+    )
+    MachineImageVersion.create(
+      machine_image_id: mi.id,
+      version: 1,
+      state: version_state,
+      size_gib:,
+      arch:,
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
-      s3_endpoint: "https://r2.example.com",
-      size_gib: 20
+      s3_endpoint: "https://r2.example.com"
     )
-  }
+    mi
+  end
+
+  let(:machine_image) { create_mi }
 
   describe "unauthenticated" do
     it "not list" do
@@ -43,16 +52,7 @@ RSpec.describe Clover, "machine_image" do
 
     it "success get all machine images" do
       machine_image
-      MachineImage.create(
-        name: "test-image-2",
-        project_id: project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        s3_bucket: "test-bucket",
-        s3_prefix: "images/test2/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      create_mi(name: "test-image-2")
 
       get "/project/#{project.ubid}/machine-image"
 
@@ -62,16 +62,7 @@ RSpec.describe Clover, "machine_image" do
 
     it "lists images across all locations" do
       machine_image
-      MachineImage.create(
-        name: "other-location-image",
-        project_id: project.id,
-        location_id: Location[name: "hetzner-hel1"].id,
-        state: "available",
-        s3_bucket: "test-bucket",
-        s3_prefix: "images/other/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      create_mi(name: "other-location-image", location_id: Location[name: "hetzner-hel1"].id)
 
       get "/project/#{project.ubid}/machine-image"
 
@@ -90,16 +81,7 @@ RSpec.describe Clover, "machine_image" do
     it "does not list images from other projects" do
       machine_image
       other_project = Project.create(name: "other-project")
-      MachineImage.create(
-        name: "other-project-image",
-        project_id: other_project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        s3_bucket: "test-bucket",
-        s3_prefix: "images/other/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      create_mi(name: "other-project-image", project_id: other_project.id)
 
       get "/project/#{project.ubid}/machine-image"
 
@@ -112,17 +94,7 @@ RSpec.describe Clover, "machine_image" do
     it "includes public images from other projects" do
       machine_image
       other_project = Project.create(name: "other-project")
-      MachineImage.create(
-        name: "public-image",
-        project_id: other_project.id,
-        location_id: Location::HETZNER_FSN1_ID,
-        state: "available",
-        visible: true,
-        s3_bucket: "b",
-        s3_prefix: "p/",
-        s3_endpoint: "https://r2.example.com",
-        size_gib: 10
-      )
+      create_mi(name: "public-image", project_id: other_project.id, visible: true)
 
       get "/project/#{project.ubid}/machine-image"
 

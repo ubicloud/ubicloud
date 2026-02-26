@@ -3,6 +3,8 @@
 class Serializers::MachineImage < Serializers::Base
   def self.serialize_internal(mi, options = {})
     active_ver = mi.active_version
+    # Fall back to latest version for top-level fields when no active version
+    latest_ver = active_ver || mi.versions.first
 
     base = {
       id: mi.ubid,
@@ -10,6 +12,10 @@ class Serializers::MachineImage < Serializers::Base
       description: mi.description,
       visible: mi.visible,
       location: mi.display_location,
+      version: latest_ver&.version,
+      state: latest_ver&.state,
+      size_gib: latest_ver&.size_gib,
+      arch: latest_ver&.arch,
       created_at: mi.created_at&.iso8601,
       active_version: active_ver ? serialize_version(active_ver) : nil,
       versions: mi.versions.map { serialize_version(it) }
