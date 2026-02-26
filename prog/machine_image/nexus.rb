@@ -118,7 +118,6 @@ class Prog::MachineImage::Nexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 10 * 60)
     decr_destroy
 
     machine_image_version.active_billing_records.each(&:finalize)
@@ -128,7 +127,11 @@ class Prog::MachineImage::Nexus < Prog::Base
   end
 
   label def destroy_record
-    delete_s3_objects
+    register_deadline(nil, 10 * 60, allow_extension: true)
+
+    if delete_s3_objects_batch
+      nap 0
+    end
 
     kek = machine_image_version.key_encryption_key_1
     machine_image_version.update(key_encryption_key_1_id: nil)
@@ -182,7 +185,11 @@ class Prog::MachineImage::Nexus < Prog::Base
     params
   end
 
-  def delete_s3_objects
+  DELETE_BATCH_SIZE = 5000
+
+  # Deletes up to DELETE_BATCH_SIZE objects under the image prefix.
+  # Returns true if more objects likely remain, false if deletion is complete.
+  def delete_s3_objects_batch
     creds = CloudflareR2.generate_temp_credentials(
       bucket: machine_image_version.s3_bucket,
       permission: "object-read-write",
@@ -200,16 +207,20 @@ class Prog::MachineImage::Nexus < Prog::Base
     )
 
     objects = []
-    response = client.list_objects_v2(bucket: machine_image_version.s3_bucket, prefix: machine_image_version.s3_prefix)
-    objects.concat(response.contents)
-    while response.is_truncated
-      response = client.list_objects_v2(
-        bucket: machine_image_version.s3_bucket,
-        prefix: machine_image_version.s3_prefix,
-        continuation_token: response.next_continuation_token
-      )
+    continuation_token = nil
+
+    loop do
+      params = {bucket: machine_image_version.s3_bucket, prefix: machine_image_version.s3_prefix}
+      params[:continuation_token] = continuation_token if continuation_token
+
+      response = client.list_objects_v2(**params)
       objects.concat(response.contents)
+
+      break if objects.size >= DELETE_BATCH_SIZE || !response.is_truncated
+      continuation_token = response.next_continuation_token
     end
+
+    return false if objects.empty?
 
     objects.each_slice(1000) do |batch|
       client.delete_objects(
@@ -217,5 +228,7 @@ class Prog::MachineImage::Nexus < Prog::Base
         delete: {objects: batch.map { {key: it.key} }}
       )
     end
+
+    objects.size >= DELETE_BATCH_SIZE
   end
 end
