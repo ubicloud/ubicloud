@@ -688,6 +688,7 @@ class CloverAdmin < Roda
     end
 
     r.get "vm-by-ipv4" do
+      @days = (typecast_params.pos_int("days") || 5).clamp(1, 15)
       if (@ips_param = typecast_params.nonempty_str("ips"))
         ips = @ips_param.split(",").filter_map {
           begin
@@ -708,7 +709,7 @@ class CloverAdmin < Roda
             project_id: it.project.ubid
           }
         }
-        archived_vms = ArchivedRecord.vms_by_ips(ips).map {
+        archived_vms = ArchivedRecord.vms_by_ips(ips, days: @days).map {
           {
             ip: it[:ip],
             created_at: it[:created_at],
