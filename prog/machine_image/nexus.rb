@@ -168,7 +168,7 @@ class Prog::MachineImage::Nexus < Prog::Base
       "s3_prefix" => machine_image_version.s3_prefix,
       "s3_region" => "auto",
       "s3_endpoint" => machine_image_version.s3_endpoint,
-      "s3_connections" => 1,
+      "s3_connections" => 16,
       "s3_key_id" => creds[:access_key_id],
       "s3_secret_key" => creds[:secret_access_key],
       "s3_session_token" => creds[:session_token],
