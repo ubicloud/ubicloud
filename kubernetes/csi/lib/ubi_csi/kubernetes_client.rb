@@ -106,6 +106,16 @@ module Csi
       pv
     end
 
+    def find_retained_pv_for_pvc(namespace, name)
+      pv_list = yaml_load_kubectl("get", "pv")
+      pv_list["items"].find do |pv|
+        pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
+          pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain" &&
+          pv.dig("spec", "claimRef", "namespace") == namespace &&
+          pv.dig("spec", "claimRef", "name") == name
+      end
+    end
+
     def get_nodeplugin_pods
       pods_yaml = yaml_load_kubectl("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin")
       pods_yaml["items"].filter_map do |pod|
