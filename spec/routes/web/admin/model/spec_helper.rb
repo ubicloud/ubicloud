@@ -480,6 +480,11 @@ module AdminModelSpecHelper
       ProjectDiscountCode.create(project_id: project.id, discount_code_id: code.id)
     end
 
+    def create_rhizome_installation
+      sshable = create_sshable
+      RhizomeInstallation.create_with_id(sshable, folder: "test-folder", commit: "abc123", digest: "def456")
+    end
+
     def create_semaphore
       strand = Strand.create(prog: "Test", label: "test")
       Semaphore.create(strand_id: strand.id, name: "test-semaphore")

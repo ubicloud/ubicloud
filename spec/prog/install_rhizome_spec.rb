@@ -11,6 +11,7 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#start" do
     it "writes tar" do
+      expect(ir).to receive(:update_stack).with({"rhizome_digest" => instance_of(String)}).and_call_original
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
 
@@ -40,8 +41,32 @@ RSpec.describe Prog::InstallRhizome do
 
   describe "#validate" do
     it "runs the validate script" do
+      expect(ir).to receive(:frame).and_return({"target_folder" => "host", "rhizome_digest" => "abc"}).at_least(:once)
       expect(ir.sshable).to receive(:_cmd).with("common/bin/validate")
       expect { ir.validate }.to exit({"msg" => "installed rhizome"})
+
+      expect(ir.sshable.rhizome_installation.folder).to eq("host")
+      expect(ir.sshable.rhizome_installation.digest).to eq("abc")
+      expect(ir.sshable.rhizome_installation.commit).to eq(Config.git_commit_hash)
+      expect(ir.sshable.rhizome_installation.installed_at).to be_within(10).of(Time.now)
+    end
+
+    it "updates the rhizome installation" do
+      RhizomeInstallation.dataset.insert(
+        id: sshable.id,
+        folder: "old_folder",
+        commit: "old_commit",
+        digest: "old_digest",
+        installed_at: Time.now - 3600
+      )
+      expect(ir).to receive(:frame).and_return({"target_folder" => "host", "rhizome_digest" => "abc"}).at_least(:once)
+      expect(ir.sshable).to receive(:_cmd).with("common/bin/validate")
+      expect { ir.validate }.to exit({"msg" => "installed rhizome"})
+
+      expect(ir.sshable.rhizome_installation.folder).to eq("host")
+      expect(ir.sshable.rhizome_installation.digest).to eq("abc")
+      expect(ir.sshable.rhizome_installation.commit).to eq(Config.git_commit_hash)
+      expect(ir.sshable.rhizome_installation.installed_at).to be_within(10).of(Time.now)
     end
   end
 end
