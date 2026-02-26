@@ -55,6 +55,10 @@ class Clover
           @installation.cache_enabled = typecast_params.bool("cache_enabled")
         end
 
+        if typecast_params.present?("cache_scope_protected")
+          @installation.cache_scope_protected = typecast_params.bool("cache_scope_protected")
+        end
+
         if typecast_params.present?("premium_runner_enabled")
           @installation.allocator_preferences["family_filter"] = if typecast_params.bool("premium_runner_enabled")
             ["premium", "standard"]

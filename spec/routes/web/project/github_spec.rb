@@ -183,6 +183,34 @@ RSpec.describe Clover, "github" do
       expect(installation.reload.cache_enabled).to be false
     end
 
+    it "enables cache scope protection for installation" do
+      installation.update(cache_scope_protected: false)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: true, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_scope_protected).to be true
+    end
+
+    it "disables cache scope protection for installation" do
+      installation.update(cache_scope_protected: true)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: false, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_scope_protected).to be false
+    end
+
     it "raises not found when installation doesn't exist" do
       visit "#{project.path}/github/invalid_id"
 
