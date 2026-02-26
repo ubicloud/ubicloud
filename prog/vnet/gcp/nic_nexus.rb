@@ -8,17 +8,8 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
 
   subject_is :nic
 
-  GCP_ZONE_SUFFIXES = ["a", "b", "c"].freeze
-
   label def start
     register_deadline("wait", 5 * 60)
-
-    available = GCP_ZONE_SUFFIXES - (frame["exclude_availability_zones"] || [])
-    zone_suffix = frame["availability_zone"] || available.sample || "a"
-    current_frame = strand.stack.first
-    current_frame["gcp_zone_suffix"] = zone_suffix
-    strand.modified!(:stack)
-    strand.save_changes
 
     ps = nic.private_subnet
     NicGcpResource.create_with_id(

@@ -55,6 +55,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       network_firewall_policies_client: nfp_client,
       zone_operations_client: zone_ops_client
     )
+    %w[a b c].each do |suffix|
+      LocationGcpAz.create_with_id(SecureRandom.uuid, location_id: location.id, az: suffix, zone_name: "hetzner-fsn1-#{suffix}")
+    end
   end
 
   describe ".assemble" do
@@ -108,6 +111,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
+      st.stack.first["gcp_zone_suffix"] = "a"
+      st.modified!(:stack)
+      st.save_changes
+
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-12345")
       expect(compute_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
@@ -133,13 +140,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(st.reload.stack.first["gcp_op_name"]).to eq("op-12345")
     end
 
-    it "persists gcp_zone_suffix in VM strand frame" do
+    it "selects a zone suffix and persists it in VM strand frame" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
-      nic.strand.stack.first["gcp_zone_suffix"] = "c"
-      nic.strand.modified!(:stack)
-      nic.strand.save_changes
       ensure_nic_gcp_resource(nic)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
+      expect(compute_client).to receive(:insert).and_return(op)
+
+      expect { nx.start }.to hop("wait_create_op")
+      expect(st.reload.stack.first["gcp_zone_suffix"]).to match(/\A[abc]\z/)
+    end
+
+    it "preserves existing gcp_zone_suffix on re-entry (retry case)" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      st.stack.first["gcp_zone_suffix"] = "c"
+      st.modified!(:stack)
+      st.save_changes
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
       expect(compute_client).to receive(:insert).and_return(op)
@@ -180,54 +200,88 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "retries on ResourceExhaustedError with backoff" do
+    it "retries in a different zone on ResourceExhaustedError" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
-      expect { nx.start }.to nap(30)
-      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+      expect { nx.start }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to be_a(Array)
+      expect(stack["exclude_zones"].length).to eq(1)
+      expect(stack["gcp_zone_suffix"]).not_to eq(stack["exclude_zones"].first)
     end
 
-    it "retries on UnavailableError with backoff" do
+    it "retries in a different zone on UnavailableError" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::UnavailableError.new("service unavailable"))
-      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
-      expect { nx.start }.to nap(30)
-      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+      expect { nx.start }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to be_a(Array)
+      expect(stack["exclude_zones"].length).to eq(1)
     end
 
-    it "raises after 5 zone retries" do
+    it "retries in a different zone on InvalidArgumentError for missing machine type" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["zone_retries"] = 4
+      expect(compute_client).to receive(:insert).and_raise(
+        Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'.")
+      )
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+
+      expect { nx.start }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"].length).to eq(1)
+    end
+
+    it "re-raises InvalidArgumentError when not about missing machine type" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      expect(compute_client).to receive(:insert).and_raise(
+        Google::Cloud::InvalidArgumentError.new("Invalid disk size")
+      )
+
+      expect { nx.start }.to raise_error(Google::Cloud::InvalidArgumentError, /Invalid disk size/)
+    end
+
+    it "raises when all zones are exhausted" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      st.stack.first["gcp_zone_suffix"] = "c"
+      st.stack.first["exclude_zones"] = ["a", "b"]
       st.modified!(:stack)
       st.save_changes
 
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
 
-      expect { nx.start }.to raise_error(RuntimeError, /GCE instance creation failed after 5 zone retries/)
+      expect { nx.start }.to raise_error(RuntimeError, /no zones left after trying a, b, c/)
     end
 
-    it "increments zone retry counter on successive retries" do
+    it "excludes failed zones on successive retries" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["zone_retries"] = 2
+      st.stack.first["gcp_zone_suffix"] = "b"
+      st.stack.first["exclude_zones"] = ["a"]
       st.modified!(:stack)
       st.save_changes
 
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
-      expect { nx.start }.to nap(30)
-      expect(st.reload.stack.first["zone_retries"]).to eq(3)
+      expect { nx.start }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to eq(["a", "b"])
+      expect(stack["gcp_zone_suffix"]).to eq("c")
     end
 
     it "attaches persistent data disks for non-LSSD machine types" do
@@ -283,8 +337,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to hop("wait_instance_created")
     end
 
-    it "hops to start when no operation is pending but zone_retries is set" do
-      st.stack.first["zone_retries"] = 1
+    it "hops to start when no operation is pending but exclude_zones is set" do
+      st.stack.first["exclude_zones"] = ["a"]
       st.modified!(:stack)
       st.save_changes
       expect { nx.wait_create_op }.to hop("start")
@@ -333,10 +387,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
-    it "retries on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
+    it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
       st.stack.first["gcp_op_name"] = "op-123"
       st.stack.first["gcp_op_scope"] = "zone"
       st.stack.first["gcp_op_scope_value"] = "hetzner-fsn1-a"
+      st.stack.first["gcp_zone_suffix"] = "a"
       st.modified!(:stack)
       st.save_changes
 
@@ -346,16 +401,41 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
-      expect { nx.wait_create_op }.to nap(30)
-      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+      expect { nx.wait_create_op }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to include("a")
+      expect(stack["gcp_zone_suffix"]).not_to eq("a")
     end
 
-    it "retries on QUOTA_EXCEEDED operation error" do
+    it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do
       st.stack.first["gcp_op_name"] = "op-123"
       st.stack.first["gcp_op_scope"] = "zone"
       st.stack.first["gcp_op_scope_value"] = "hetzner-fsn1-a"
+      st.stack.first["gcp_zone_suffix"] = "a"
+      st.modified!(:stack)
+      st.save_changes
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS", message: "exhausted with details")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+
+      expect { nx.wait_create_op }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to include("a")
+      expect(stack["gcp_zone_suffix"]).not_to eq("a")
+    end
+
+    it "retries in a different zone on QUOTA_EXCEEDED operation error" do
+      st.stack.first["gcp_op_name"] = "op-123"
+      st.stack.first["gcp_op_scope"] = "zone"
+      st.stack.first["gcp_op_scope_value"] = "hetzner-fsn1-a"
+      st.stack.first["gcp_zone_suffix"] = "a"
       st.modified!(:stack)
       st.save_changes
 
@@ -365,10 +445,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone capacity exhausted", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
-      expect { nx.wait_create_op }.to nap(30)
-      expect(st.reload.stack.first["zone_retries"]).to eq(1)
+      expect { nx.wait_create_op }.to nap(5)
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to include("a")
     end
   end
 
@@ -941,34 +1022,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.send(:gce_source_image) }.to raise_error(RuntimeError, /Unknown boot image/)
     end
 
-    it "returns correct GCP zone defaulting to suffix a" do
-      expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-a")
-    end
-
-    it "reads GCP zone suffix from VM strand frame first" do
+    it "reads GCP zone suffix from VM strand frame" do
       st.stack.first["gcp_zone_suffix"] = "c"
       st.modified!(:stack)
       st.save_changes
-      vm.nic.strand.stack.first["gcp_zone_suffix"] = "b"
-      vm.nic.strand.modified!(:stack)
-      vm.nic.strand.save_changes
       expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-c")
     end
 
-    it "falls back to NIC strand frame when VM strand has no zone suffix" do
-      vm.nic.strand.stack.first["gcp_zone_suffix"] = "b"
-      vm.nic.strand.modified!(:stack)
-      vm.nic.strand.save_changes
-      expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-b")
-    end
-
-    it "defaults to zone suffix 'a' when NIC is nil" do
-      vm.nics.each { |n|
-        n.strand.destroy
-        n.destroy
-      }
-      nx.instance_variable_set(:@nic, nil)
-      nx.instance_variable_set(:@gcp_zone, nil)
+    it "defaults to zone suffix 'a' when not set in strand" do
       expect(nx.send(:gcp_zone)).to eq("hetzner-fsn1-a")
     end
 

@@ -18,6 +18,16 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap 5 unless nic.private_subnet.strand.label == "wait"
     nap 1 unless nic.strand.label == "wait"
 
+    # Zone selection is a VM concern — pick a zone on first entry,
+    # then honour the value already set by retry_zone_capacity.
+    unless strand.stack.first.key?("gcp_zone_suffix")
+      excluded = frame["exclude_zones"] || []
+      available = gcp_az_suffixes - excluded
+      strand.stack.first["gcp_zone_suffix"] = available.sample || "a"
+      strand.modified!(:stack)
+      strand.save_changes
+    end
+
     public_keys = vm.sshable.keys.map(&:public_key).join("\n")
     user_data = <<~STARTUP
       #!/bin/bash
@@ -105,12 +115,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
     )
 
-    # Persist zone suffix in VM strand so it survives NIC destruction
-    zone_suffix = nic.strand.stack.dig(0, "gcp_zone_suffix") || "a"
-    strand.stack.first["gcp_zone_suffix"] = zone_suffix
-    strand.modified!(:stack)
-    strand.save_changes
-
     begin
       op = compute_client.insert(
         project: gcp_project_id,
@@ -124,6 +128,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       retry_zone_capacity(e.message)
     rescue Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
+    rescue Google::Cloud::InvalidArgumentError => e
+      raise unless e.message.include?("does not exist in zone")
+      retry_zone_capacity(e.message)
     end
 
     hop_wait_create_op
@@ -131,7 +138,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   label def wait_create_op
     unless frame["gcp_op_name"]
-      hop_start if frame["zone_retries"]
+      hop_start if frame["exclude_zones"]
       hop_wait_instance_created
     end
 
@@ -141,7 +148,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     if op_error?(op)
       error_code = op_error_code(op)
-      if %w[ZONE_RESOURCE_POOL_EXHAUSTED QUOTA_EXCEEDED].include?(error_code)
+      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].include?(error_code)
         clear_gcp_op
         retry_zone_capacity("GCE operation error: #{error_code}")
       end
@@ -309,11 +316,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def gcp_zone
-    @gcp_zone ||= begin
-      region = vm.location.name.delete_prefix("gcp-")
-      zone_suffix = strand.stack.dig(0, "gcp_zone_suffix") || (nic && nic.strand.stack.dig(0, "gcp_zone_suffix")) || "a"
-      "#{region}-#{zone_suffix}"
-    end
+    @gcp_zone ||= "#{gcp_region}-#{gcp_zone_suffix}"
+  end
+
+  def gcp_zone_suffix
+    strand.stack.dig(0, "gcp_zone_suffix") || "a"
   end
 
   def gcp_region
@@ -366,13 +373,30 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def retry_zone_capacity(error_message)
-    retries = (frame["zone_retries"] || 0) + 1
-    if retries >= 5
-      raise "GCE instance creation failed after #{retries} zone retries: #{error_message}"
+    excluded = (frame["exclude_zones"] || []) + [gcp_zone_suffix]
+    available = gcp_az_suffixes - excluded
+
+    if available.empty?
+      raise "GCE instance creation failed: no zones left after " \
+            "trying #{excluded.join(", ")}: #{error_message}"
     end
-    Clog.emit("GCE zone capacity exhausted", {zone_exhausted: {zone: gcp_zone, retries:, error: error_message}})
-    update_stack({"zone_retries" => retries})
-    nap 30
+
+    Clog.emit("GCE zone retry",
+      {zone_retry: {failed_zone: gcp_zone, excluded:,
+                    remaining: available, error: error_message}})
+
+    new_suffix = available.sample
+    # Clear memoized zone so the next iteration uses the new suffix
+    @gcp_zone = nil
+    update_stack({
+      "gcp_zone_suffix" => new_suffix,
+      "exclude_zones" => excluded
+    })
+    nap 5
+  end
+
+  def gcp_az_suffixes
+    @gcp_az_suffixes ||= vm.location.azs.map(&:az)
   end
 
   # --- Cleanup ---

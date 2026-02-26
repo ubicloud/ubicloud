@@ -8,7 +8,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   }
 
   let(:st) {
-    Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id, "exclude_availability_zones" => [], "availability_zone" => nil}], label: "start")
+    Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id}], label: "start")
   }
 
   let(:project) { Project.create(name: "test-prj") }
@@ -53,31 +53,6 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(gcp_res).not_to be_nil
       expect(gcp_res.network_name).to eq("ubicloud-gcp-us-central1")
       expect(gcp_res.subnet_name).to eq("ubicloud-#{private_subnet.ubid}")
-      expect(st.reload.stack.first["gcp_zone_suffix"]).to match(/\A[abc]\z/)
-    end
-
-    it "excludes specified availability zones" do
-      st2 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id, "exclude_availability_zones" => ["a", "b"], "availability_zone" => nil}], label: "start")
-      nx2 = described_class.new(st2)
-      allow(nx2).to receive(:nic).and_return(nic)
-      expect { nx2.start }.to hop("allocate_static_ip")
-      expect(st2.stack.first["gcp_zone_suffix"]).to eq("c")
-    end
-
-    it "uses specified availability_zone when set" do
-      st2 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id, "exclude_availability_zones" => [], "availability_zone" => "b"}], label: "start")
-      nx2 = described_class.new(st2)
-      allow(nx2).to receive(:nic).and_return(nic)
-      expect { nx2.start }.to hop("allocate_static_ip")
-      expect(st2.stack.first["gcp_zone_suffix"]).to eq("b")
-    end
-
-    it "falls back to 'a' when all zones are excluded" do
-      st2 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id, "exclude_availability_zones" => ["a", "b", "c"], "availability_zone" => nil}], label: "start")
-      nx2 = described_class.new(st2)
-      allow(nx2).to receive(:nic).and_return(nic)
-      expect { nx2.start }.to hop("allocate_static_ip")
-      expect(st2.stack.first["gcp_zone_suffix"]).to eq("a")
     end
   end
 
