@@ -13,17 +13,17 @@ class ArchivedRecord < Sequel::Model
       .first
   end
 
-  def self.vms_by_ips(ips)
+  def self.vms_by_ips(ips, days: 5)
     ip_values = Sequel.pg_jsonb_op(Sequel[:ip][:model_values])
     vm_values = Sequel.pg_jsonb_op(Sequel[:vm][:model_values])
-    last_15_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("15 days", :interval)
+    last_n_days = Sequel::CURRENT_TIMESTAMP - Sequel.cast("#{days} days", :interval)
     DB.from(Sequel[:archived_record].as(:ip))
       .join(Sequel[:archived_record].as(:vm), ip_values.get_text("dst_vm_id") => vm_values.get_text("id"))
       .where(Sequel[:ip][:model_name] => "AssignedVmAddress")
       .where(Sequel[:vm][:model_name] => "Vm")
       .where(ip_values.get_text("ip") => ips)
-      .where(Sequel[:ip][:archived_at] > last_15_days)
-      .where(Sequel[:vm][:archived_at] > last_15_days)
+      .where(Sequel[:ip][:archived_at] > last_n_days)
+      .where(Sequel[:vm][:archived_at] > last_n_days)
       .select(
         ip_values.get_text("ip").as(:ip),
         Sequel[:ip][:archived_at],

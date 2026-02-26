@@ -1052,10 +1052,12 @@ RSpec.describe CloverAdmin do
 
     visit "/vm-by-ipv4"
     fill_in "ips", with: "172.16.0.1, 172.16.1.1,,invalid-ip"
+    fill_in "days", with: "10"
     click_button "Show Virtual Machines"
 
     expect(page).to have_content("active-vm")
     expect(page).to have_content("archived-vm")
+    expect(page.find_field("days").value).to eq "10"
   end
 
   it "shows a message when no data available" do
@@ -1064,6 +1066,7 @@ RSpec.describe CloverAdmin do
     click_button "Show Virtual Machines"
 
     expect(page).to have_content("No data available for Virtual Machines table")
+    expect(page.find_field("days").value).to eq "5"
   end
 
   describe "archived-record-by-id" do
