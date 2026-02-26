@@ -276,11 +276,11 @@ RSpec.describe Prog::Base do
       st.unsynchronized_run
       expect {
         st.unsynchronized_run
-      }.to change { Page.active.count }.from(0).to(1)
+      }.to change { Page.count }.from(0).to(1)
 
       expect {
         st.unsynchronized_run
-      }.not_to change { Page.active.count }.from(1)
+      }.not_to change { Page.count }.from(1)
     end
 
     it "resolves the page if the frame is popped" do
@@ -289,7 +289,7 @@ RSpec.describe Prog::Base do
       st.unsynchronized_run
       expect {
         st.unsynchronized_run
-      }.to change { Page.active.count }.from(0).to(1)
+      }.to change { Page.count }.from(0).to(1)
 
       expect {
         st.unsynchronized_run
@@ -297,7 +297,7 @@ RSpec.describe Prog::Base do
         page_id = Page.first.id
         Strand[page_id].unsynchronized_run
         Strand[page_id].unsynchronized_run
-      }.to change { Page.active.count }.from(1).to(0)
+      }.to change { Page.count }.from(1).to(0)
     end
 
     it "resolves the page of the budded prog when pop" do
@@ -306,7 +306,7 @@ RSpec.describe Prog::Base do
       st.unsynchronized_run
       expect {
         st.unsynchronized_run
-      }.to change { Page.active.count }.from(0).to(1)
+      }.to change { Page.count }.from(0).to(1)
 
       expect {
         st.unsynchronized_run
@@ -314,7 +314,7 @@ RSpec.describe Prog::Base do
         page_id = Page.first.id
         Strand[page_id].unsynchronized_run
         Strand[page_id].unsynchronized_run
-      }.to change { Page.active.count }.from(1).to(0)
+      }.to change { Page.count }.from(1).to(0)
     end
 
     it "resolves the page once the target is reached" do
@@ -328,7 +328,7 @@ RSpec.describe Prog::Base do
         st.unsynchronized_run
         Strand[page_id].unsynchronized_run
         Strand[page_id].unsynchronized_run
-      }.to change { Page.active.count }.from(1).to(0)
+      }.to change { Page.count }.from(1).to(0)
     end
 
     it "resolves the page once a new deadline is registered" do
@@ -346,7 +346,7 @@ RSpec.describe Prog::Base do
         page_id = Page.first.id
         Strand[page_id].unsynchronized_run
         Strand[page_id].unsynchronized_run
-      }.to change { Page.active.count }.from(1).to(0)
+      }.to change { Page.count }.from(1).to(0)
     end
 
     it "deletes the deadline information once the target is reached" do
@@ -371,7 +371,7 @@ RSpec.describe Prog::Base do
 
       expect {
         st.unsynchronized_run
-      }.to change { Page.active.count }.from(0).to(2)
+      }.to change { Page.count }.from(0).to(2)
 
       expect(Page.all.map(&:summary)).to include(
         "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
@@ -383,7 +383,7 @@ RSpec.describe Prog::Base do
       vm = create_vm
       st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["location"]).to eq(vm.location.display_name)
       expect(page.details["vcpus"]).to eq(vm.vcpus)
@@ -393,7 +393,7 @@ RSpec.describe Prog::Base do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       st = Strand.create_with_id(vm, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["vm_host"]).to eq(vm.vm_host.ubid)
       expect(page.details["data_center"]).to eq(vm.vm_host.data_center)
@@ -404,7 +404,7 @@ RSpec.describe Prog::Base do
       create_vm(vm_host: vmh)
       st = Strand.create_with_id(vmh, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["arch"]).to eq(vmh.arch)
       expect(page.details["vm_count"]).to eq(1)
@@ -414,7 +414,7 @@ RSpec.describe Prog::Base do
       slice = VmHostSlice.create(vm_host_id: create_vm_host.id, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
       st = Strand.create_with_id(slice, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["vm_host"]).to eq(slice.vm_host.ubid)
       expect(page.details["location"]).to eq(slice.vm_host.location.display_name)
@@ -425,7 +425,7 @@ RSpec.describe Prog::Base do
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", installation:)
       st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["label"]).to eq("ubicloud-standard-2")
       expect(page.details["installation"]).to eq(installation.ubid)
@@ -437,7 +437,7 @@ RSpec.describe Prog::Base do
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
       st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
       st.unsynchronized_run
-      page = Page.active.first
+      page = Page.first
       expect(page).not_to be_nil
       expect(page.details["vm"]).to eq(vm.ubid)
       expect(page.details["data_center"]).to eq(vm.vm_host.data_center)
