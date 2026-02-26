@@ -829,6 +829,48 @@ usermod -L ubuntu
     end
   end
 
+  describe "#aws_ami_id" do
+    it "returns boot_image directly if it starts with ami-" do
+      vm.update(boot_image: "ami-030c060f85668b37d")
+      expect(nx.aws_ami_id).to eq("ami-030c060f85668b37d")
+    end
+
+    it "looks up AMI by boot image name for ubuntu-noble arm64" do
+      vm.update(boot_image: "ubuntu-noble", arch: "arm64")
+      client.stub_responses(:describe_images, images: [
+        {image_id: "ami-111111111", creation_date: "2024-01-01T00:00:00Z"},
+        {image_id: "ami-222222222", creation_date: "2024-06-01T00:00:00Z"}
+      ])
+      expect(nx.aws_ami_id).to eq("ami-222222222")
+    end
+
+    it "looks up AMI by boot image name for ubuntu-noble x64" do
+      vm.update(boot_image: "ubuntu-noble", arch: "x64")
+      client.stub_responses(:describe_images, images: [
+        {image_id: "ami-333333333", creation_date: "2024-01-01T00:00:00Z"}
+      ])
+      expect(client).to receive(:describe_images).with(
+        filters: [
+          {name: "name", values: ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]},
+          {name: "owner-id", values: ["099720109477"]},
+          {name: "state", values: ["available"]}
+        ]
+      ).and_call_original
+      expect(nx.aws_ami_id).to eq("ami-333333333")
+    end
+
+    it "raises if boot image is unknown" do
+      vm.update(boot_image: "unknown-image")
+      expect { nx.aws_ami_id }.to raise_error(RuntimeError, /Unknown boot image/)
+    end
+
+    it "raises if no AMI found" do
+      vm.update(boot_image: "ubuntu-noble", arch: "arm64")
+      client.stub_responses(:describe_images, images: [])
+      expect { nx.aws_ami_id }.to raise_error(RuntimeError, /No AMI found/)
+    end
+  end
+
   describe "#cleanup_roles" do
     it "cleans up roles" do
       allow(Config).to receive(:aws_postgres_iam_access).and_return(true)

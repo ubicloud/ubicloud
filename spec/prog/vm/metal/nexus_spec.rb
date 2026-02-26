@@ -191,17 +191,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:rand).and_return(1111)
       expect(sshable).to receive(:_cmd).with(<<~COMMAND)
         set -ueo pipefail
-        if id #{nx.vm_name} &>/dev/null; then
-          procs=$(ps -u #{nx.vm_name} -o pid,comm,args --no-headers) || [ $? -eq 1 ]
-          if [ -n "$procs" ]; then
-            echo "Terminating #{nx.vm_name} processes:"
-            echo "$procs"
-            sudo pkill -u #{nx.vm_name} || [ $? -eq 1 ]
-            sleep 1
-          fi
-          sudo userdel -r #{nx.vm_name}
-        fi
-        if getent group #{nx.vm_name} &>/dev/null; then sudo groupdel #{nx.vm_name}; fi
+        # Make this script idempotent
+        sudo userdel --remove --force #{nx.vm_name} || true
+        sudo groupdel -f #{nx.vm_name} || true
+        # Create vm's user and home directory
         sudo adduser --disabled-password --gecos '' --home #{nx.vm_home} --uid 1111 #{nx.vm_name}
         # Enable KVM access for VM user
         sudo usermod -a -G kvm #{nx.vm_name}
@@ -825,7 +818,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   describe "#update_firewall_rules" do
     it "hops to wait_firewall_rules" do
       vm.incr_update_firewall_rules
-      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false))
+      expect(vm).to receive(:location).and_return(instance_double(Location, aws?: false, provider_name: "metal"))
       expect(nx).to receive(:push).with(Prog::Vnet::Metal::UpdateFirewallRules, {}, :update_firewall_rules)
       expect { nx.update_firewall_rules }
         .to change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
