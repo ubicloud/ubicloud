@@ -47,6 +47,12 @@ RSpec.describe Csi::KubernetesClient do
       expect { client.run_kubectl(*args) }.to raise_error(ObjectNotFoundError, "resource not found")
     end
 
+    it "raises AlreadyExistsError for 'already exists' failures" do
+      pvc = {"metadata" => {"name" => "test-pvc"}}
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(pvc)).and_return(["persistentvolumeclaims \"test-pvc\" already exists", failure_status])
+      expect { client.create_pvc(pvc) }.to raise_error(AlreadyExistsError)
+    end
+
     it "raises generic error for other failures" do
       expect(client).to receive(:run_cmd).and_return(["other error", failure_status]).at_least(:once)
       expect { client.run_kubectl(*args) }.to raise_error(/Command failed: kubectl get pods/)

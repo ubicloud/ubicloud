@@ -23,6 +23,10 @@ module Csi
           raise ObjectNotFoundError, output
         end
 
+        if output.strip.end_with?("already exists")
+          raise AlreadyExistsError, output
+        end
+
         raise "Command failed: #{cmd.join(" ")}\nOutput: #{output}"
       end
       output
