@@ -206,7 +206,6 @@ class Project < Sequel::Model
   end
 
   feature_flag(
-    :access_all_cache_scopes,
     :allocator_diagnostics,
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
