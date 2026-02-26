@@ -48,6 +48,11 @@ class Prog::Vm::Nexus < Prog::Base
 
     Validation.validate_storage_volumes(storage_volumes, boot_disk_index)
 
+    # If the boot volume uses a machine image, don't require a boot_image on the host
+    if storage_volumes[boot_disk_index][:machine_image_version_id]
+      boot_image = ""
+    end
+
     ubid = Vm.generate_ubid
     name ||= Vm.ubid_to_name(ubid)
 

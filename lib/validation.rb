@@ -146,7 +146,7 @@ module Validation
     allowed_keys = [
       :encrypted, :size_gib, :boot, :read_only, :image,
       :max_read_mbytes_per_sec, :max_write_mbytes_per_sec,
-      :vring_workers
+      :vring_workers, :machine_image_version_id
     ]
     fail ValidationFailed.new({storage_volumes: "At least one storage volume is required."}) if storage_volumes.empty?
     if boot_disk_index < 0 || boot_disk_index >= storage_volumes.length

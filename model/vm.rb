@@ -354,7 +354,7 @@ class Vm < Sequel::Model
         secrets["archive_s3_secret_key"] = creds[:secret_access_key]
         secrets["archive_s3_session_token"] = creds[:session_token]
         if miv.key_encryption_key_1
-          secrets["archive_kek"] = miv.key_encryption_key_1.secret_key_material_hash
+          secrets["archive_kek"] = miv.key_encryption_key_1.key
         end
       end
 

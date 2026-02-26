@@ -82,10 +82,15 @@ end
 # danger_zone: allow plaintext secrets in config
 toml_parts << <<~TOML
   [danger_zone]
+  enabled = true
   allow_inline_plaintext_secrets = true
 TOML
 
 target_config = toml_parts.join("\n")
+
+# Write target config to a temp file
+target_config_path = "/tmp/archive-target-#{vm_name}.toml"
+safe_write_to_file(target_config_path, target_config)
 
 # Disk KEK pipe -- needed to decrypt the source disk's XTS key
 pipe_threads = []
@@ -98,13 +103,16 @@ if disk_kek
   pipe_threads << Thread.new { File.write(disk_kek_pipe, disk_kek) }
 end
 
-# Build and run archive command, passing target config via stdin
-cmd = "RUST_LOG=debug #{archive_bin} --config #{device_config} --target-config /dev/stdin --compression zstd --zstd-level 3"
+# Build and run archive command
+log_file = "/tmp/archive-#{vm_name}.log"
+cmd = "RUST_LOG=debug #{archive_bin} --config #{device_config} --target-config #{target_config_path} --compression zstd --zstd-level 3"
 cmd += " --encrypt" if encrypt
+cmd += " 2>#{log_file}"
 
 begin
-  r cmd, stdin: target_config
+  r cmd
 ensure
+  FileUtils.rm_f(target_config_path)
   FileUtils.rm_f(disk_kek_pipe) if disk_kek_pipe
   pipe_threads.each { _1.join(5) }
 end

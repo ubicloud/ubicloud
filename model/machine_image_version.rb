@@ -64,7 +64,8 @@ class MachineImageVersion < Sequel::Model
       "archive_prefix" => s3_prefix,
       "archive_endpoint" => s3_endpoint,
       "compression" => "zstd",
-      "encrypted" => true
+      "encrypted" => true,
+      "has_session_token" => true
     }
   end
 end

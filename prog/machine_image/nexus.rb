@@ -168,14 +168,15 @@ class Prog::MachineImage::Nexus < Prog::Base
       "s3_prefix" => machine_image_version.s3_prefix,
       "s3_region" => "auto",
       "s3_endpoint" => machine_image_version.s3_endpoint,
+      "s3_connections" => 1,
       "s3_key_id" => creds[:access_key_id],
       "s3_secret_key" => creds[:secret_access_key],
       "s3_session_token" => creds[:session_token],
-      "archive_kek" => machine_image_version.key_encryption_key_1.key
+      "archive_kek" => machine_image_version.key_encryption_key_1.key.strip
     }
 
     if boot_volume.key_encryption_key_1
-      params["disk_kek"] = boot_volume.key_encryption_key_1.key
+      params["disk_kek"] = boot_volume.key_encryption_key_1.key.strip
     end
 
     params
