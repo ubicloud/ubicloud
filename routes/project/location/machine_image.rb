@@ -36,7 +36,7 @@ class Clover
         authorize("MachineImage:delete", machine_image)
 
         DB.transaction do
-          machine_image.update(deleting: true)
+          machine_image.this.update(deleting: true)
           if machine_image.versions.empty?
             machine_image.destroy
           else
