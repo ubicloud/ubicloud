@@ -38,12 +38,29 @@ class Prog::MachineImage::RegisterDistroImage < Prog::Base
     "/opt/vhost-block-backend/#{vbb_version}/init-metadata"
   end
 
-  def self.assemble(machine_image_version, vm_host_id:, url:, sha256:)
-    Strand.create(
-      prog: "MachineImage::RegisterDistroImage",
-      label: "start",
-      stack: [{"subject_id" => machine_image_version.id, "vm_host_id" => vm_host_id, "url" => url, "sha256" => sha256}]
-    ) { it.id = machine_image_version.id }
+  def self.assemble(machine_image, vm_host_id:, url:, sha256:)
+    next_version = (machine_image.versions_dataset.max(:version) || 0) + 1
+    s3_bucket = Config.machine_image_archive_bucket
+    s3_endpoint = Config.machine_image_archive_endpoint
+    s3_prefix = "#{machine_image.ubid}/#{next_version}/"
+
+    DB.transaction do
+      version = MachineImageVersion.create(
+        machine_image_id: machine_image.id,
+        version: next_version,
+        state: "creating",
+        size_gib: 0,
+        s3_bucket: s3_bucket,
+        s3_prefix: s3_prefix,
+        s3_endpoint: s3_endpoint
+      )
+
+      Strand.create(
+        prog: "MachineImage::RegisterDistroImage",
+        label: "start",
+        stack: [{"subject_id" => version.id, "vm_host_id" => vm_host_id, "url" => url, "sha256" => sha256}]
+      ) { it.id = version.id }
+    end
   end
 
   label def start
