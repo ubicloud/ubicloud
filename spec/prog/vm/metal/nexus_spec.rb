@@ -1024,6 +1024,15 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(frame["reason_determined"]).to be true
     end
 
+    it "naps without paging if vm is unavailable and systemctl command results in a timeout or connection error" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshTimeout.new("", "", "", 1, nil))
+      expect { nx.unavailable }.to nap(30)
+        .and not_change { Page.count }
+      frame = st.stack[0]
+      expect(frame.has_key?("reason_determined")).to be false
+    end
+
     it "pages and naps if vm is unavailable and systemctl command results in an error" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshError.new("", "", "", 1, nil))
