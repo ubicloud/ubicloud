@@ -23,7 +23,7 @@
 
       action_html = ""
       unless v.active?
-        activate_html = "<form action='#{mi_path}/set-active' method='post' style='display: block; margin-bottom: 5px'>#{csrf_tag(mi_path + "/set-active")}<input type='hidden' name='version_id' value='#{v.ubid}'/>" +
+        activate_html = "<form action='#{mi_path}/set-active' method='post'>#{csrf_tag(mi_path + "/set-active")}<input type='hidden' name='version_id' value='#{v.ubid}'/>" +
           part("components/button", text: "Activate", icon: nil, type: "safe") +
           "</form>"
         delete_html = part("components/delete_button",
@@ -32,7 +32,13 @@
           confirmation: @machine_image.name,
           icon: nil
         )
-        action_html = "#{activate_html}#{delete_html}"
+        delete_html = part("components/delete_button",
+          url: "#{mi_path}/version/#{v.ubid}",
+          text: "Delete",
+          confirmation: @machine_image.name,
+          icon: nil
+        )
+        action_html = "<div class='flex flex-col gap-2'>#{activate_html} #{delete_html}</div>"
       end
 
       [
