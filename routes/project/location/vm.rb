@@ -3,7 +3,7 @@
 class Clover
   hash_branch(:project_location_prefix, "vm") do |r|
     r.get api? do
-      vm_list
+      vm_list_api_response(vm_list_dataset)
     end
 
     r.on VM_NAME_OR_UBID do |vm_name, vm_id|

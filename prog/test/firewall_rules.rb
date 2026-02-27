@@ -73,6 +73,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_public_ipv6
+    # Skip if VM has no public IPv6 (e.g. older VMs without dual-stack)
+    hop_perform_tests_private_ipv4 unless vm1.ip6
+
     update_firewall_rules(config: :perform_tests_public_ipv6) unless frame["firewalls"] == "public_ipv6"
 
     update_stack({"firewalls" => "public_ipv6"})
@@ -103,6 +106,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv6
+    # Private IPv6 (ULA) only routed on metal via IPsec tunnels
+    hop_finish if vm1.location.provider != "metal"
+
     update_firewall_rules(config: :perform_tests_private_ipv6) unless frame["firewalls"] == "private_ipv6"
 
     update_stack({"firewalls" => "private_ipv6"})

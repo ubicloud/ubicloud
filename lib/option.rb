@@ -41,6 +41,7 @@ module Option
   end
 
   AWS_FAMILY_OPTIONS = ["c6gd", "m6a", "m6id", "m6gd", "m7a", "m7i", "m8gd", "i8g", "i8ge", "i7i", "i7ie", "r8gd", "r6gd", "r6id"].freeze
+  GCP_FAMILY_OPTIONS = ["c4a-standard", "c4a-highmem", "c3-standard", "c3d-standard", "c3d-highmem"].freeze
   non_storage_optimized_vm_storage_size_options = {1 => [59], 2 => [118], 4 => [237], 8 => [474], 16 => [950], 32 => [1900], 48 => [2850], 64 => [3800], 96 => [5700], 128 => [7600], 192 => [11400]}
   AWS_STORAGE_SIZE_OPTIONS = {
     "c6gd" => non_storage_optimized_vm_storage_size_options,
@@ -57,6 +58,17 @@ module Option
     "r8gd" => non_storage_optimized_vm_storage_size_options,
     "r6gd" => non_storage_optimized_vm_storage_size_options,
     "r6id" => non_storage_optimized_vm_storage_size_options
+  }.freeze
+
+  gcp_c4a_storage = {4 => [375], 8 => [750], 16 => [1500], 32 => [2250], 48 => [3750], 64 => [5250], 72 => [6000]}
+  gcp_c3_storage = {4 => [375], 8 => [750], 22 => [1500], 44 => [3000], 88 => [6000], 176 => [12000]}
+  gcp_c3d_storage = {8 => [375], 16 => [375], 30 => [750], 60 => [1500], 90 => [3000], 180 => [6000], 360 => [12000]}
+  GCP_STORAGE_SIZE_OPTIONS = {
+    "c4a-standard" => gcp_c4a_storage,
+    "c4a-highmem" => gcp_c4a_storage,
+    "c3-standard" => gcp_c3_storage,
+    "c3d-standard" => gcp_c3d_storage,
+    "c3d-highmem" => gcp_c3d_storage
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -122,6 +134,16 @@ module Option
     VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * 8, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "arm64")
   }).concat(["r6id"].product([2, 4, 8, 16, 32, 48, 64, 96, 128]).map { |family, vcpu|
     VmSize.new(aws_instance_type_name(family, vcpu), family, vcpu, vcpu * 100, 0, vcpu * 8, AWS_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "x64")
+  }).concat(["c4a-standard"].product([4, 8, 16, 32, 48, 64, 72]).map { |family, vcpu|
+    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 4, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "arm64")
+  }).concat(["c4a-highmem"].product([4, 8, 16, 32, 48, 64, 72]).map { |family, vcpu|
+    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 8, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "arm64")
+  }).concat(["c3-standard"].product([4, 8, 22, 44, 88, 176]).map { |family, vcpu|
+    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 4, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "x64")
+  }).concat(["c3d-standard"].product([8, 16, 30, 60, 90, 180, 360]).map { |family, vcpu|
+    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 4, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "x64")
+  }).concat(["c3d-highmem"].product([8, 16, 30, 60, 90, 180, 360]).map { |family, vcpu|
+    VmSize.new("#{family}-#{vcpu}", family, vcpu, vcpu * 100, 0, vcpu * 8, GCP_STORAGE_SIZE_OPTIONS[family][vcpu], NO_IO_LIMITS, nil, false, "x64")
   }).freeze
 
   # Postgres Global Options
@@ -146,7 +168,12 @@ module Option
     ["r6id", "Memory Optimized, Intel Xeon"],
     ["c6gd", "Compute Optimized, Graviton2"],
     ["m6id", "General Purpose, Intel Xeon"],
-    ["m6gd", "General Purpose, Graviton2"]
+    ["m6gd", "General Purpose, Graviton2"],
+    ["c4a-standard", "General Purpose, Google Axion"],
+    ["c4a-highmem", "Memory Optimized, Google Axion"],
+    ["c3-standard", "General Purpose, Intel Sapphire Rapids"],
+    ["c3d-standard", "General Purpose, AMD EPYC Genoa"],
+    ["c3d-highmem", "Memory Optimized, AMD EPYC Genoa"]
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -240,7 +267,41 @@ module Option
     ["r6id", 48, 384],
     ["r6id", 64, 512],
     ["r6id", 96, 768],
-    ["r6id", 128, 1024]
+    ["r6id", 128, 1024],
+    ["c4a-standard", 4, 16],
+    ["c4a-standard", 8, 32],
+    ["c4a-standard", 16, 64],
+    ["c4a-standard", 32, 128],
+    ["c4a-standard", 48, 192],
+    ["c4a-standard", 64, 256],
+    ["c4a-standard", 72, 288],
+    ["c4a-highmem", 4, 32],
+    ["c4a-highmem", 8, 64],
+    ["c4a-highmem", 16, 128],
+    ["c4a-highmem", 32, 256],
+    ["c4a-highmem", 48, 384],
+    ["c4a-highmem", 64, 512],
+    ["c4a-highmem", 72, 576],
+    ["c3-standard", 4, 16],
+    ["c3-standard", 8, 32],
+    ["c3-standard", 22, 88],
+    ["c3-standard", 44, 176],
+    ["c3-standard", 88, 352],
+    ["c3-standard", 176, 704],
+    ["c3d-standard", 8, 32],
+    ["c3d-standard", 16, 64],
+    ["c3d-standard", 30, 120],
+    ["c3d-standard", 60, 240],
+    ["c3d-standard", 90, 360],
+    ["c3d-standard", 180, 720],
+    ["c3d-standard", 360, 1440],
+    ["c3d-highmem", 8, 64],
+    ["c3d-highmem", 16, 128],
+    ["c3d-highmem", 30, 240],
+    ["c3d-highmem", 60, 480],
+    ["c3d-highmem", 90, 720],
+    ["c3d-highmem", 180, 1440],
+    ["c3d-highmem", 360, 2880]
   ].to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])

@@ -1,9 +1,9 @@
 # Modified from https://www.fastruby.io/blog/ruby/code-quality/how-we-use-rubocop-and-standardrb.html
 require:
+  - rubocop-capybara
   - standard
 
 plugins:
-  - rubocop-capybara
   - rubocop-erb
   - rubocop-performance
   - rubocop-rake
@@ -108,12 +108,6 @@ Sequel/IrreversibleMigration:
 
 Capybara/ClickLinkOrButtonStyle:
   EnforcedStyle: strict
-
-Capybara/FindAllFirst:
-  Enabled: false
-
-Capybara/NegationMatcherAfterVisit:
-  Enabled: false
 
 Lint/UselessTimes:
   Enabled: false

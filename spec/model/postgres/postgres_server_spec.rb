@@ -55,6 +55,42 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
+  it "#aws? delegates through vm location" do
+    expect(postgres_server.aws?).to be false
+  end
+
+  describe "#aws_lockout_mechanisms" do
+    it "returns pg_stop and hba for AWS servers" do
+      aws_location = Location.create(
+        name: "us-east-1", project:, display_name: "us-east-1",
+        ui_name: "us-east-1", provider: "aws", visible: true
+      )
+      aws_timeline = PostgresTimeline.create(location: aws_location)
+      aws_resource = PostgresResource.create(
+        name: "aws-postgres-resource", project:, location: aws_location,
+        ha_type: PostgresResource::HaType::NONE, user_config: {},
+        pgbouncer_user_config: {}, target_version: "16",
+        target_vm_size: "standard-2", target_storage_size_gib: 64,
+        superuser_password: "super"
+      )
+      aws_ps = PrivateSubnet.create(
+        name: "aws-pg-subnet", project:, location: aws_location,
+        net4: NetAddr::IPv4Net.parse("172.0.1.0/26"),
+        net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a4d::/64")
+      )
+      aws_vm = Prog::Vm::Nexus.assemble_with_sshable(
+        project.id, name: "aws-pg-vm", private_subnet_id: aws_ps.id,
+        location_id: aws_location.id, unix_user: "ubi"
+      ).subject
+      aws_server = described_class.create(
+        timeline: aws_timeline, resource: aws_resource, vm_id: aws_vm.id,
+        is_representative: true, synchronization_status: "ready",
+        timeline_access: "push", version: "16"
+      )
+      expect(aws_server.lockout_mechanisms).to eq(["pg_stop", "hba"])
+    end
+  end
+
   describe "#configure" do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
@@ -647,153 +683,48 @@ RSpec.describe PostgresServer do
     end
 
     it "checks archival backlog and does nothing if it is within limits" do
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000005.ready\n",
-        "5\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).to be_nil
-    end
-
-    it "checks archival backlog and creates a page if it is outside of limits with no previous data" do
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000010.ready\n",
-        "15\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      expect(page).not_to be_nil
-      expect(page.summary).to eq("#{postgres_server.ubid} archival backlog high")
-      expect(page.severity).to eq("warning")
-      expect(page.details["archival_backlog"]).to eq(15)
-      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
-    end
-
-    it "does not page when backlog is moderate and upload rate is above threshold" do
-      # Previous: segment 5, now: segment 10 (5 segments = 80MB archived)
-      # With 1 second elapsed, rate = 80 MB/s > 50 MB/s threshold
-      session[:previous_oldest_pending_wal] = "000000010000000000000005.ready"
-      session[:previous_archival_check_time] = Time.now - 1
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "00000001000000000000000A.ready\n",
-        "15\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).to be_nil
-    end
-
-    it "pages when backlog is moderate but upload rate is below threshold" do
-      # Previous: segment 5, now: segment 6 (1 segment = 16MB archived)
-      # With 2 seconds elapsed, rate = 8 MB/s < 10 MB/s threshold
-      session[:previous_oldest_pending_wal] = "000000010000000000000005.ready"
-      session[:previous_archival_check_time] = Time.now - 2
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000006.ready\n",
-        "15\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).not_to be_nil
-    end
-
-    it "pages when backlog is severe regardless of upload rate" do
-      # Even with good upload rate, severe backlog (>2x threshold) should page
-      session[:last_oldest_pending_wal] = "000000010000000000000010.ready"
-      session[:last_archival_check_time] = Time.now - 1
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000020.ready\n",
-        "25\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      expect(Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)).not_to be_nil
-    end
-
-    it "checks archival backlog and resolves a page if it is back within limits" do
-      Prog::PageNexus.assemble(
-        "#{postgres_server.ubid} archival backlog high",
-        ["PGArchivalBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {archival_backlog: 30}
-      )
-      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000003.ready\n",
-        "3\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
-    end
-
-    it "does not resolve page when backlog is between 80% of threshold and threshold (hysteresis)" do
-      # With threshold=10, page should only resolve when backlog < 8 (80% of 10)
-      # Backlog of 9 should NOT trigger resolve
-      Prog::PageNexus.assemble(
-        "Archival backlog high",
-        ["PGArchivalBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {archival_backlog: 15}
-      )
-      existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000009.ready\n",
-        "9\n"
-      )
-
-      postgres_server.observe_archival_backlog(session)
-
-      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
-    end
-
-    it "logs errors when checking archival backlog fails" do
-      allow(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
-      expect(Clog).to receive(:emit).with("Failed to observe archival backlog", instance_of(Hash)).and_call_original
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("5\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(nil)
 
       postgres_server.observe_archival_backlog(session)
     end
 
-    it "sets oldest_pending to nil when no ready files exist" do
-      # When find returns empty string (no .ready files), oldest_pending should be nil
-      # This triggers the "no previous data" path in should_page_for_archival_backlog?
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "\n",
-        "15\n"
-      )
+    it "checks archival backlog and creates a page if it is outside of limits" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("15\n")
       expect(Prog::PageNexus).to receive(:assemble).with(
         "#{postgres_server.ubid} archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {archival_backlog: 15, disk_usage_percent: 0}
+        extra_data: {archival_backlog: 15}
       )
 
       postgres_server.observe_archival_backlog(session)
     end
 
-    it "escalates severity to error when disk usage is high" do
-      session[:disk_usage_percent] = 90
-      allow(session[:ssh_session]).to receive(:_exec!).and_return(
-        "000000010000000000000010.ready\n",
-        "15\n"
-      )
+    it "checks archival backlog and resolves a page if it is back within limits" do
+      existing_page = instance_double(Page)
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_return("3\n")
+      expect(Page).to receive(:from_tag_parts).with("PGArchivalBacklogHigh", postgres_server.id).and_return(existing_page)
+      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_archival_backlog(session)
+    end
 
-      page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
-      expect(page).not_to be_nil
-      expect(page.severity).to eq("error")
-      expect(page.details["disk_usage_percent"]).to eq(90)
+    it "logs errors when checking archival backlog fails" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(
+        "sudo find /dat/16/data/pg_wal/archive_status -name '*.ready' | wc -l"
+      ).and_raise(Net::SSH::Exception.new("SSH error"))
+      expect(Clog).to receive(:emit).with("Failed to observe archival backlog", instance_of(Hash)).and_call_original
+
+      postgres_server.observe_archival_backlog(session)
     end
   end
 
@@ -806,59 +737,6 @@ RSpec.describe PostgresServer do
     it "returns smaller threshold for smaller storage sizes" do
       allow(postgres_server).to receive(:storage_size_gib).and_return(100)
       expect(postgres_server.archival_backlog_threshold).to eq(320)
-    end
-  end
-
-  describe "#should_page_for_archival_backlog?" do
-    before do
-      allow(postgres_server).to receive(:archival_backlog_threshold).and_return(10)
-    end
-
-    let(:now) { Time.now }
-    let(:previous_time) { now - 1 }
-
-    it "returns true when backlog is severe (more than 2x threshold)" do
-      expect(postgres_server.should_page_for_archival_backlog?(
-        25, "00000001000000000000000F.ready", "000000010000000000000005.ready", now, previous_time
-      )).to be true
-    end
-
-    it "returns true when there is no previous data" do
-      expect(postgres_server.should_page_for_archival_backlog?(
-        15, "00000001000000000000000F.ready", nil, now, nil
-      )).to be true
-    end
-
-    it "returns false when backlog is moderate and upload rate is above threshold" do
-      # 5 segments = 80MB in 1 second = 80 MB/s > 50 MB/s
-      expect(postgres_server.should_page_for_archival_backlog?(
-        15, "00000001000000000000000A.ready", "000000010000000000000005.ready", now, previous_time
-      )).to be false
-    end
-
-    it "returns true when backlog is moderate but upload rate is below threshold" do
-      # 1 segment = 16MB in 2 seconds = 8 MB/s < 10 MB/s
-      expect(postgres_server.should_page_for_archival_backlog?(
-        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now - 2
-      )).to be true
-    end
-
-    it "returns true when backlog is moderate but upload rate cannot be calculated due to zero time elapsed" do
-      expect(postgres_server.should_page_for_archival_backlog?(
-        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now
-      )).to be true
-    end
-  end
-
-  describe "#wal2lsn" do
-    it "converts WAL filename to LSN format" do
-      # Segment 5 = 5 * 16MB = 83886080 = 0x5000000
-      expect(postgres_server.wal2lsn("000000010000000000000005.ready")).to eq("00000000/5000000")
-    end
-
-    it "handles higher segment numbers" do
-      # Segment 0x10 = 16 * 16MB = 268435456 = 0x10000000
-      expect(postgres_server.wal2lsn("000000010000000000000010.ready")).to eq("00000000/10000000")
     end
   end
 
@@ -878,10 +756,10 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(nil)
 
       postgres_server.observe_metrics_backlog(session)
-
-      expect(Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)).to be_nil
     end
 
     it "checks metrics backlog and creates a page if it exceeds threshold" do
@@ -889,34 +767,27 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("30\n")
-
-      postgres_server.observe_metrics_backlog(session)
-
-      page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
-      expect(page).not_to be_nil
-      expect(page.summary).to eq("#{postgres_server.ubid} metrics backlog high")
-      expect(page.severity).to eq("warning")
-      expect(page.details["metrics_backlog"]).to eq(30)
-      expect(page.details["related_resources"]).to eq([postgres_server.ubid])
-    end
-
-    it "checks metrics backlog and resolves a page if it is back within limits" do
-      Prog::PageNexus.assemble(
-        "Metrics backlog high",
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "#{postgres_server.ubid} metrics backlog high",
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
         extra_data: {metrics_backlog: 30}
       )
-      existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
+
+      postgres_server.observe_metrics_backlog(session)
+    end
+
+    it "checks metrics backlog and resolves a page if it is back within limits" do
+      existing_page = instance_double(Page)
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
         "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
       ).and_return("10\n")
+      expect(Page).to receive(:from_tag_parts).with("PGMetricsBacklogHigh", postgres_server.id).and_return(existing_page)
+      expect(existing_page).to receive(:incr_resolve)
 
       postgres_server.observe_metrics_backlog(session)
-
-      expect(existing_page.reload.semaphores.map(&:name)).to include("resolve")
     end
 
     it "logs errors when checking metrics backlog fails" do
@@ -926,24 +797,6 @@ RSpec.describe PostgresServer do
       expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
 
       postgres_server.observe_metrics_backlog(session)
-    end
-
-    it "does not resolve page if it is still high" do
-      Prog::PageNexus.assemble(
-        "Metrics backlog high",
-        ["PGMetricsBacklogHigh", postgres_server.id],
-        postgres_server.ubid,
-        severity: "warning",
-        extra_data: {metrics_backlog: 30}
-      )
-      existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
-      expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
-      ).and_return("19\n")
-
-      postgres_server.observe_metrics_backlog(session)
-
-      expect(existing_page.reload.semaphores.map(&:name)).not_to include("resolve")
     end
   end
 

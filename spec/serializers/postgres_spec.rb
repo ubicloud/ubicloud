@@ -75,6 +75,28 @@ RSpec.describe Serializers::Postgres do
     expect(data).not_to have_key(:latest_restore_time)
   end
 
+  it "can serialize when there is no server" do
+    data = described_class.serialize(pg, {detailed: true})
+    expect(data.fetch(:primary)).to be_nil
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
+  end
+
+  it "can serialize when timeline exists but representative server is nil" do
+    vm = create_hosted_vm(project, private_subnet, "pg-vm-nonrep")
+    PostgresServer.create(
+      timeline:, resource_id: pg.id, vm_id: vm.id,
+      is_representative: false,
+      synchronization_status: "ready",
+      timeline_access: "push",
+      version: "17"
+    )
+    data = described_class.serialize(pg, {detailed: true})
+    expect(data.fetch(:primary)).to be_nil
+    expect(data).not_to have_key(:earliest_restore_time)
+    expect(data).not_to have_key(:latest_restore_time)
+  end
+
   it "includes created_at in detailed serialization" do
     create_representative_server(primary: true)
     data = described_class.serialize(pg)

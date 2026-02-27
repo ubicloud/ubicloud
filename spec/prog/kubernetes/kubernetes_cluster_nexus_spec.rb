@@ -804,8 +804,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
 
       expect(kubernetes_cluster).not_to receive(:destroy)
 
-      expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
 
     it "naps until all control plane nodes are gone" do
@@ -814,8 +815,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to be_empty
 
-      expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
 
     it "does not incr_destroy private_subnet with other resources" do
@@ -827,8 +829,9 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       Firewall.create(name: "t", project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID)
         .associate_with_private_subnet(kubernetes_cluster.private_subnet, apply_firewalls: false)
 
-      expect { nx.destroy }.to nap(5)
       expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq []
+      expect { nx.destroy }.to nap(5)
+      expect(kubernetes_cluster.private_subnet.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
 
     it "triggers deletion of associated resources and completes destroy when nodepools are gone" do

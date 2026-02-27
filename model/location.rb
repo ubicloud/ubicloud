@@ -36,6 +36,7 @@ class Location < Sequel::Model
   def self.postgres_locations
     where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
       .or(provider: "aws", project_id: nil)
+      .or(provider: "gcp", project_id: nil)
       .all
   end
 
@@ -54,6 +55,20 @@ class Location < Sequel::Model
 
   def aws?
     provider == "aws"
+  end
+
+  def gcp?
+    provider == "gcp"
+  end
+
+  def provider_name
+    if aws?
+      "aws"
+    elsif gcp?
+      "gcp"
+    else
+      "metal"
+    end
   end
 end
 
@@ -83,6 +98,7 @@ end
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
 #  location_aws_az           | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
+#  location_gcp_az           | location_gcp_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)

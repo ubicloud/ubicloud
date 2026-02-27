@@ -10,12 +10,12 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,kubernetes'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_standard_arm,postgres_ha,postgres_ha_arm,postgres_upgrade,postgres_firewall,kubernetes'
         type: string
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
         required: true
-        default: 'metal,aws'
+        default: 'metal,aws,gcp'
         type: string
 
   schedule:
@@ -31,7 +31,7 @@ jobs:
       - name: Set provider matrix
         id: set-providers
         run: |
-          providers="metal,aws"
+          providers="metal,aws,gcp"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
             providers="${{ inputs.providers }}"
           fi
@@ -47,7 +47,7 @@ jobs:
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
-    timeout-minutes: 85
+    timeout-minutes: ${{ matrix.provider == 'gcp' && 45 || 85 }}
     concurrency: E2E-${{ matrix.provider }}
 
     steps:
@@ -59,6 +59,7 @@ jobs:
       with:
         public-ssh-key: |
           ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2YqaaJlZ2+N1oa1Y8QIxW1ZCMHAfZv+HaMh1dqXnBe claude@ubicloud-e2e
         wait-minutes: 0
 
     - name: Set up Clover
@@ -123,6 +124,9 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -156,11 +160,12 @@ jobs:
         SMTP_TLS: false
         STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        VHOST_BLOCK_BACKEND_VERSION: v0.4.0
+        VHOST_BLOCK_BACKEND_VERSION: v0.3.1
         OPERATOR_SSH_PUBLIC_KEYS: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
       run: |
         set -o pipefail
-        timeout 83m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        provider_timeout=${{ matrix.provider == 'gcp' && '43m' || '83m' }}
+        timeout $provider_timeout foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()
@@ -359,3 +364,133 @@ jobs:
             aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
           done
         done
+
+    - name: Cleanup GCP resources
+      if: always() && matrix.provider == 'gcp'
+      env:
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+      run: |
+        ruby -r bundler/setup -e '
+          creds_json = ENV["E2E_GCP_CREDENTIALS_JSON"]
+          project_id = ENV["E2E_GCP_PROJECT_ID"]
+          unless creds_json && project_id
+            puts "GCP credentials not configured, skipping cleanup"
+            exit 0
+          end
+
+          require "json"
+          require "google/cloud/compute/v1"
+          require "google/cloud/storage"
+          require "google/apis/iam_v1"
+
+          scope = ["https://www.googleapis.com/auth/cloud-platform"]
+          authorizer = Google::Auth::ServiceAccountCredentials.make_creds(json_key_io: StringIO.new(creds_json), scope: scope)
+
+          compute_config = proc { |c| c.credentials = authorizer; c.quota_project = project_id }
+          instances_client = Google::Cloud::Compute::V1::Instances::Rest::Client.new(&compute_config)
+          zone_ops_client = Google::Cloud::Compute::V1::ZoneOperations::Rest::Client.new(&compute_config)
+          firewalls_client = Google::Cloud::Compute::V1::Firewalls::Rest::Client.new(&compute_config)
+          nfp_client = Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client.new(&compute_config)
+          global_ops_client = Google::Cloud::Compute::V1::GlobalOperations::Rest::Client.new(&compute_config)
+          networks_client = Google::Cloud::Compute::V1::Networks::Rest::Client.new(&compute_config)
+          subnetworks_client = Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new(&compute_config)
+          addresses_client = Google::Cloud::Compute::V1::Addresses::Rest::Client.new(&compute_config)
+
+          zones = ["us-central1-a", "us-central1-b", "us-central1-c", "us-central1-f"]
+          regions = ["us-central1"]
+
+          # 1. Delete instances and collect delete operations
+          puts "=== Deleting GCP instances ==="
+          delete_ops = []
+          zones.each do |zone|
+            instances_client.list(project: project_id, zone: zone).each do |inst|
+              puts "Deleting instance: #{inst.name} in #{zone}"
+              op = instances_client.delete(project: project_id, zone: zone, instance: inst.name) rescue nil
+              delete_ops << [op, zone] if op
+            end
+          end
+
+          # 2. Wait for instance deletions to complete
+          delete_ops.each do |op, zone|
+            30.times do
+              result = zone_ops_client.get(project: project_id, zone: zone, operation: op.name)
+              break if result.status == :DONE
+              sleep 2
+            end rescue nil
+          end
+
+          # 3. Delete static addresses (may be held by deleted instances)
+          puts "=== Cleaning up GCP static addresses ==="
+          regions.each do |region|
+            addresses_client.list(project: project_id, region: region).select { |a| a.name.start_with?("ubicloud-") }.each do |addr|
+              puts "Releasing address: #{addr.name} in #{region}"
+              addresses_client.delete(project: project_id, region: region, address: addr.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          # 4. Delete subnetworks (now safe since instances are gone)
+          puts "=== Cleaning up GCP subnetworks ==="
+          regions.each do |region|
+            subnetworks_client.list(project: project_id, region: region).select { |s| s.name.start_with?("ubicloud-") }.each do |subnet|
+              puts "Deleting subnetwork: #{subnet.name} in #{region}"
+              subnetworks_client.delete(project: project_id, region: region, subnetwork: subnet.name) rescue puts "  Failed: #{$!.message}"
+            end
+          end
+
+          # 5. Remove firewall policy associations, then delete policies
+          puts "=== Cleaning up GCP network firewall policies ==="
+          nfp_client.list(project: project_id).select { |p| p.name&.start_with?("ubicloud-") }.each do |policy|
+            (policy.associations || []).each do |assoc|
+              puts "Removing association: #{assoc.name} from policy #{policy.name}"
+              begin
+                op = nfp_client.remove_association(project: project_id, firewall_policy: policy.name, name: assoc.name)
+                # Wait for the LRO to complete before deleting the policy
+                30.times do
+                  result = global_ops_client.get(project: project_id, operation: op.name)
+                  break if result.status == :DONE
+                  sleep 2
+                end
+              rescue => e
+                puts "  Failed: #{e.message}"
+              end
+            end
+            puts "Deleting network firewall policy: #{policy.name}"
+            nfp_client.delete(project: project_id, firewall_policy: policy.name) rescue puts "  Failed: #{$!.message}"
+          end
+
+          # 6. Delete classic firewall rules (fallback)
+          puts "=== Cleaning up GCP classic firewall rules ==="
+          firewalls_client.list(project: project_id).select { |fw| fw.name.start_with?("ubicloud-") }.each do |fw|
+            puts "Deleting firewall rule: #{fw.name}"
+            firewalls_client.delete(project: project_id, firewall: fw.name) rescue puts "  Failed: #{$!.message}"
+          end
+
+          # 7. Delete VPC networks (now safe since subnets and policies are gone)
+          puts "=== Cleaning up GCP VPC networks ==="
+          networks_client.list(project: project_id).select { |n| n.name.start_with?("ubicloud-") }.each do |vpc|
+            puts "Deleting VPC network: #{vpc.name}"
+            networks_client.delete(project: project_id, network: vpc.name) rescue puts "  Failed: #{$!.message}"
+          end
+
+          # 8. Cleanup storage buckets
+          puts "=== Cleaning up GCP storage buckets ==="
+          storage = Google::Cloud::Storage.new(credentials: authorizer, project_id: project_id)
+          storage.buckets.select { |b| b.name != "ubicloud-gce-images" }.each do |bucket|
+            puts "Deleting bucket: #{bucket.name}"
+            bucket.files.each { |f| f.delete rescue nil }
+            bucket.delete rescue puts "  Failed: #{$!.message}"
+          end
+
+          # 9. Cleanup service accounts
+          puts "=== Cleaning up GCP service accounts ==="
+          iam = Google::Apis::IamV1::IamService.new
+          iam.authorization = authorizer
+          response = iam.list_project_service_accounts("projects/#{project_id}")
+          (response.accounts || []).select { |sa| sa.email.start_with?("ubicloud-") }.each do |sa|
+            puts "Deleting service account: #{sa.email}"
+            iam.delete_project_service_account("projects/#{project_id}/serviceAccounts/#{sa.email}") rescue puts "  Failed: #{$!.message}"
+          end
+
+          puts "GCP cleanup complete"
+        '

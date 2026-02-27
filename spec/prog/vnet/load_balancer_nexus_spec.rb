@@ -82,12 +82,14 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
     end
 
     it "creates new cert if refresh_cert semaphore is set" do
-      nx.load_balancer.incr_refresh_cert
-      expect { nx.wait }.to hop("create_new_cert")
+      st.subject.incr_refresh_cert
+      fresh_nx = described_class.new(st)
+      expect { fresh_nx.wait }.to hop("create_new_cert")
     end
 
     it "creates new cert if needed" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(true)
+      expect(nx.load_balancer).to receive(:incr_refresh_cert)
       expect { nx.wait }.to hop("create_new_cert")
     end
   end

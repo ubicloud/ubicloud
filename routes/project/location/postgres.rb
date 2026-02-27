@@ -74,7 +74,7 @@ class Clover
 
         validate_postgres_input(pg.name, postgres_params)
 
-        if target_storage_size_gib < pg.representative_server.storage_size_gib
+        if pg.representative_server.nil? || target_storage_size_gib < pg.representative_server.storage_size_gib
           begin
             current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
           rescue
@@ -403,6 +403,10 @@ class Clover
       r.post "recycle" do
         authorize("Postgres:edit", pg)
 
+        if pg.representative_server.nil?
+          raise CloverError.new(400, "InvalidRequest", "No representative server available to recycle")
+        end
+
         DB.transaction do
           pg.representative_server.incr_recycle
           audit_log(pg, "recycle")
@@ -589,7 +593,7 @@ class Clover
           {
             pg_config: pg.user_config,
             pgbouncer_config: pg.pgbouncer_user_config,
-            default_pg_config: pg.representative_server.configure_hash[:configs]
+            default_pg_config: pg.representative_server&.configure_hash&.[](:configs)
           }
         end
 

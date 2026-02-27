@@ -14,7 +14,8 @@ RSpec.describe Prog::Test::FirewallRules do
 
   let(:private_subnet_1) {
     nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
-    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"))
+    location = instance_double(Location, provider: "metal")
+    vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", ip6: NetAddr::IPv6.parse("2001:0db8:85a1::2"), inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"), location:)
     vm_2 = instance_double(Vm, id: "vm_2", sshable:, boot_image: "almalinux-9", ip4_string: "1.1.1.2", ip6_string: "2001:0db8:85a2::2", inhost_name: "vm2", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a2::2"))
     instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, vm_2])
   }
@@ -232,6 +233,17 @@ ExecStart=nc -l 8080 -6
   end
 
   describe "#perform_tests_public_ipv6" do
+    it "skips to perform_tests_private_ipv4 when vm1 has no ip6" do
+      nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
+      location = instance_double(Location, provider: "metal")
+      vm_no_ip6 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: nil, ip6: nil, inhost_name: "vm1", nics: [nic], private_ipv6: nil, location:)
+      ps = instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_no_ip6, private_subnet_1.vms.last])
+      fw = instance_double(Firewall, id: "fw_id", private_subnets: [ps])
+      allow(firewall_test).to receive(:firewall).and_return(fw)
+      expect(firewall_test).to receive_messages(frame: {"vm_to_be_connected_id" => "vm_1"})
+      expect { firewall_test.perform_tests_public_ipv6 }.to hop("perform_tests_private_ipv4")
+    end
+
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "public_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_public_ipv6)
@@ -386,6 +398,17 @@ ExecStart=nc -l 8080 -6
   end
 
   describe "#perform_tests_private_ipv6" do
+    it "skips to finish on non-metal providers" do
+      nic = instance_double(Nic, private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"), private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
+      location = instance_double(Location, provider: "gcp")
+      vm_1 = instance_double(Vm, id: "vm_1", sshable:, boot_image: "ubuntu-noble", ip4_string: "1.1.1.1", ip6_string: "2001:0db8:85a1::2", ip6: NetAddr::IPv6.parse("2001:0db8:85a1::2"), inhost_name: "vm1", nics: [nic], private_ipv6: NetAddr::IPv6.parse("fd01:0db8:85a1::2"), location:)
+      ps = instance_double(PrivateSubnet, id: "subnet_1", vms: [vm_1, private_subnet_1.vms.last])
+      fw = instance_double(Firewall, id: "fw_id", private_subnets: [ps])
+      allow(firewall_test).to receive(:firewall).and_return(fw)
+      expect(firewall_test).to receive_messages(frame: {"vm_to_be_connected_id" => "vm_1"})
+      expect { firewall_test.perform_tests_private_ipv6 }.to hop("finish")
+    end
+
     it "updates firewall rules and naps when the fw update is not done yet" do
       expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv4", "vm_to_be_connected_id" => "vm_1"})
       expect(firewall_test).to receive(:update_firewall_rules).with(config: :perform_tests_private_ipv6)
@@ -396,7 +419,7 @@ ExecStart=nc -l 8080 -6
     end
 
     it "does not update firewall rules and naps when the fw update is not done yet" do
-      expect(firewall_test).to receive(:frame).and_return({"firewalls" => "private_ipv6"})
+      expect(firewall_test).to receive_messages(frame: {"firewalls" => "private_ipv6"})
       expect(firewall_test).not_to receive(:update_firewall_rules)
       expect(firewall_test).to receive(:update_stack).with({"firewalls" => "private_ipv6"})
 

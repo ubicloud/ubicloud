@@ -173,43 +173,9 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect { nx.drain }.to nap(3 * 60 * 60)
     end
 
-    it "drains the old node and hops to wait_for_copy" do
+    it "drains the old node and hops to remove_node_from_cluster" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("Succeeded")
-      expect { nx.drain }.to hop("wait_for_copy")
-    end
-  end
-
-  describe "#wait_for_copy" do
-    let(:session) { Net::SSH::Connection::Session.allocate }
-    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
-    let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
-
-    before do
-      expect(nx.cluster).to receive(:client).and_return(client)
-    end
-
-    it "naps when a PV with old-pvc-object annotation references this node" do
-      pv_list = {"items" => [{
-        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}}
-      }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
-      expect { nx.wait_for_copy }.to nap(15)
-    end
-
-    it "hops to remove_node_from_cluster when no PVs reference this node" do
-      pv_list = {"items" => []}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
-      expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
-    end
-
-    it "hops to remove_node_from_cluster when PVs reference a different node" do
-      pv_list = {"items" => [{
-        "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}}
-      }]}
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
-      expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
+      expect { nx.drain }.to hop("remove_node_from_cluster")
     end
   end
 

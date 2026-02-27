@@ -16,7 +16,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def provision_servers
     hop_wait_servers_to_be_ready if postgres_resource.has_enough_fresh_servers?
 
-    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws?
+    if postgres_resource.servers.all? { it.vm.vm_host } || postgres_resource.location.aws? || postgres_resource.location.gcp?
       postgres_resource.provision_new_standby
     end
 
@@ -72,6 +72,11 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     ).id
     upgrade_candidate.update(version: postgres_resource.target_version, timeline_id: new_timeline_id, timeline_access: "push")
 
+    hop_setup_upgrade_credentials
+  end
+
+  label def setup_upgrade_credentials
+    upgrade_candidate.increment_s3_new_timeline
     upgrade_candidate.incr_refresh_walg_credentials
     upgrade_candidate.incr_configure
     upgrade_candidate.incr_restart
@@ -81,6 +86,15 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
 
   label def wait_upgrade_candidate
     nap 5 if upgrade_candidate.restart_set? || upgrade_candidate.strand.label != "wait"
+
+    hop_wait_initial_backup
+  end
+
+  label def wait_initial_backup
+    unless upgrade_candidate.timeline.backups.any?
+      Clog.emit("Waiting for initial backup on new timeline before provisioning standbys")
+      nap 30
+    end
 
     hop_recycle_representative_server
   end
@@ -98,8 +112,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def recycle_representative_server
-    unless postgres_resource.ongoing_failover?
-      hop_prune_servers unless postgres_resource.representative_server.needs_recycling?
+    if (rs = postgres_resource.representative_server) && !postgres_resource.ongoing_failover?
+      hop_prune_servers unless rs.needs_recycling?
       hop_prune_servers if postgres_resource.storage_auto_scale_canceled_set?
       hop_provision_servers unless postgres_resource.has_enough_ready_servers?
 
@@ -108,7 +122,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
       postgres_resource.incr_storage_auto_scale_not_cancellable
 
       register_deadline(nil, 10 * 60)
-      postgres_resource.representative_server.trigger_failover(mode: "planned")
+      rs.trigger_failover(mode: "planned")
     end
 
     nap 60

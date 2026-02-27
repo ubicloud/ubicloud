@@ -45,9 +45,13 @@ if Config.test?
   host_attached_types = []
 else
   runner_args = {ignore_threads: 2}
+  provisionable_postgres_servers = PostgresServer.exclude(vm_id: nil).where(
+    vm_id: Sshable.exclude(Sequel.like(:host, "temp_%")).select(:id)
+  )
+
   monitor_models = [
     VmHost,
-    PostgresServer,
+    provisionable_postgres_servers,
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
     LoadBalancerVmPort,
@@ -61,7 +65,7 @@ else
   ]
 
   metric_export_models = [
-    PostgresServer,
+    provisionable_postgres_servers,
     VmHost
   ]
 end

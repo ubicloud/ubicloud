@@ -324,6 +324,11 @@ module AdminModelSpecHelper
       LocationAwsAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
     end
 
+    def create_location_gcp_az
+      location = Location.create(name: "gcp-us-central1", display_name: "GCP US Central 1", ui_name: "GCP US Central", visible: true, provider: "gcp", project_id: nil)
+      LocationGcpAz.create(location_id: location.id, az: "a", zone_name: "us-central1-a")
+    end
+
     def create_location_credential
       location = Location.create(name: "test-loc-cred", display_name: "Test Location", ui_name: "Test", visible: true, provider: "aws")
       LocationCredential.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
@@ -365,6 +370,11 @@ module AdminModelSpecHelper
       NicAwsResource.create_with_id(nic, network_interface_id: "eni-12345")
     end
 
+    def create_nic_gcp_resource
+      nic = create_nic
+      NicGcpResource.create_with_id(nic)
+    end
+
     def create_object_tag
       project = Project.create(name: "test-project")
       ObjectTag.create(project_id: project.id, name: "test-object-tag")
@@ -399,6 +409,11 @@ module AdminModelSpecHelper
 
     def create_pg_aws_ami
       PgAwsAmi.create(aws_ami_id: "ami-#{SecureRandom.hex(4)}", aws_location_name: "us-east-#{SecureRandom.hex(2)}", pg_version: "16", arch: "x64")
+    end
+
+    def create_pg_gce_image
+      PgGceImage.where(pg_version: "99", arch: "x64").each(&:destroy)
+      PgGceImage.create(gcp_project_id: "test-project", gce_image_name: "postgres-ubuntu-2204-x64-test", pg_version: "99", arch: "x64")
     end
 
     def create_postgres_metric_destination

@@ -39,21 +39,17 @@ class PostgresResource < Sequel::Model
   end
 
   def vm_size
-    representative_server.vm.display_size.gsub("burstable", "hobby")
+    representative_server&.vm&.display_size&.gsub("burstable", "hobby") || target_vm_size
   end
 
   def storage_size_gib
-    representative_server.storage_size_gib
-  end
-
-  def version
-    representative_server.version
+    representative_server&.storage_size_gib || target_storage_size_gib
   end
 
   def display_state
     return "deleting" if destroying_set? || destroy_set? || strand.nil?
 
-    server_strand_label = representative_server.strand.label
+    server_strand_label = representative_server&.strand&.label
     return "unavailable" if server_strand_label == "unavailable"
     return "restoring_backup" if server_strand_label == "initialize_database_from_backup"
     return "replaying_wal" if ["wait_catch_up", "wait_synchronization"].include?(server_strand_label)
@@ -77,7 +73,7 @@ class PostgresResource < Sequel::Model
     !location.aws? &&
       created_at < AAAA_CUTOFF &&
       dns_zone &&
-      representative_server.vm.ip6_string &&
+      representative_server&.vm&.ip6_string &&
       dns_zone
         .records_dataset
         .where(type: "AAAA", name: hostname + ".")
@@ -90,7 +86,7 @@ class PostgresResource < Sequel::Model
 
       "#{name}.#{ubid}.#{hostname_suffix}"
     else
-      representative_server.vm.ip4_string
+      representative_server&.vm&.ip4_string
     end
   end
 
@@ -99,10 +95,12 @@ class PostgresResource < Sequel::Model
   end
 
   def connection_string
+    return nil unless (hn = hostname)
+
     URI::Generic.build2(
       scheme: "postgres",
       userinfo: "postgres:#{URI.encode_uri_component(superuser_password)}",
-      host: hostname,
+      host: hn,
       port: 5432,
       path: "/postgres",
       query: "channel_binding=require"
@@ -110,6 +108,8 @@ class PostgresResource < Sequel::Model
   end
 
   def replication_connection_string(application_name:)
+    return nil unless dns_zone || representative_server
+
     query_parameters = {
       sslrootcert: "/etc/ssl/certs/ca.crt",
       sslcert: "/etc/ssl/certs/server.crt",
@@ -120,6 +120,10 @@ class PostgresResource < Sequel::Model
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
+  end
+
+  def version
+    representative_server&.version || target_version
   end
 
   def provision_new_standby
@@ -236,6 +240,8 @@ class PostgresResource < Sequel::Model
   end
 
   def handle_storage_auto_scale
+    return unless representative_server
+
     begin
       disk_usage_percent = representative_server.vm.sshable.cmd("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     rescue
@@ -474,6 +480,8 @@ class PostgresResource < Sequel::Model
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       if location.aws?
         ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+      elsif location.gcp?
+        Option::GCP_FAMILY_OPTIONS.include?(family)
       else
         family == "standard" || family == "hobby"
       end
@@ -483,12 +491,16 @@ class PostgresResource < Sequel::Model
       Option::POSTGRES_SIZE_OPTIONS[size].family == family
     end
 
-    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS +
+      Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq +
+      Option::GCP_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.aws?
         Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
+      elsif location.gcp?
+        Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "hobby"

@@ -75,7 +75,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         target_storage_size_gib: 64, private_subnet_id: private_subnet.id
       )
       Strand.create_with_id(parent, prog: "Postgres::PostgresResourceNexus", label: "wait")
-      create_server(resource: parent, is_representative: true)
       pg.update(parent_id: parent.id)
 
       expect { nx.start }.to nap(60)
@@ -184,6 +183,20 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.vm.update(vm_host_id: nil)
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
+
+    it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
+      location.update(provider: "gcp")
+      LocationCredential.create_with_id(location.id,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(pg_version: "17", arch: "x64").each(&:destroy)
+      PgGceImage.create(gcp_project_id: "test-project", pg_version: "17", arch: "x64", gce_image_name: "postgres-17-x64-test")
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
   end
 
   describe "#wait_servers_to_be_ready" do
@@ -192,8 +205,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to provision_servers if there is not enough fresh servers" do
-      server = create_server(is_representative: true)
-      server.incr_recycle
       expect { nx.wait_servers_to_be_ready }.to hop("provision_servers")
     end
 
@@ -214,11 +225,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       strand.update(label: "recycle_representative_server")
     end
 
-    it "naps if there is an ongoing failover" do
-      server = create_server(is_representative: true)
-      server.incr_recycle
-      server.incr_planned_take_over
-      expect { nx.recycle_representative_server }.to nap(60)
+    it "waits until there is a representative server to act on it" do
+      expect { nx.recycle_representative_server }.to nap
     end
 
     it "hops to prune_servers if the representative server does not need recycling" do
@@ -267,8 +275,6 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     end
 
     it "hops to provision_servers if there are not enough fresh servers" do
-      server = create_server(is_representative: true)
-      server.incr_recycle
       expect { nx.wait_for_maintenance_window }.to hop("provision_servers")
     end
 
@@ -358,14 +364,30 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "update_metadata")
-      candidate # force lazy let to create the candidate
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
     end
 
-    it "creates new timeline and updates candidate server metadata" do
-      expect { nx.update_metadata }.to hop("wait_upgrade_candidate").and change(PostgresTimeline, :count).by(1)
+    it "creates new timeline, updates candidate server metadata, and hops to setup_upgrade_credentials" do
+      expect { nx.update_metadata }.to hop("setup_upgrade_credentials").and change(PostgresTimeline, :count).by(1)
       expect(candidate.reload).to have_attributes(
         version: "17",
-        timeline_access: "push",
+        timeline_access: "push"
+      )
+    end
+  end
+
+  describe "#setup_upgrade_credentials" do
+    let(:candidate) { create_server(version: "17", upgrade_candidate: true) }
+
+    before do
+      strand.update(label: "setup_upgrade_credentials")
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+    end
+
+    it "sets up blob storage credentials and hops to wait_upgrade_candidate" do
+      expect(candidate).to receive(:increment_s3_new_timeline)
+      expect { nx.setup_upgrade_credentials }.to hop("wait_upgrade_candidate")
+      expect(candidate.reload).to have_attributes(
         refresh_walg_credentials_set?: true,
         configure_set?: true,
         restart_set?: true
@@ -378,10 +400,10 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       strand.update(label: "wait_upgrade_candidate")
     end
 
-    it "hops to recycle_representative_server when candidate is ready" do
+    it "hops to wait_initial_backup when candidate is ready" do
       candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.strand.update(label: "wait")
-      expect { nx.wait_upgrade_candidate }.to hop("recycle_representative_server")
+      expect { nx.wait_upgrade_candidate }.to hop("wait_initial_backup")
     end
 
     it "waits when candidate is waiting for restart" do
@@ -394,6 +416,25 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       candidate = create_server(version: "16", upgrade_candidate: true)
       candidate.strand.update(label: "configure")
       expect { nx.wait_upgrade_candidate }.to nap(5)
+    end
+  end
+
+  describe "#wait_initial_backup" do
+    let(:candidate) { create_server(version: "17", upgrade_candidate: true) }
+
+    before do
+      strand.update(label: "wait_initial_backup")
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
+    end
+
+    it "hops to recycle_representative_server when backups exist" do
+      expect(candidate.timeline).to receive(:backups).and_return([instance_double(Object)])
+      expect { nx.wait_initial_backup }.to hop("recycle_representative_server")
+    end
+
+    it "naps when no backups exist yet" do
+      expect(candidate.timeline).to receive(:backups).and_return([])
+      expect { nx.wait_initial_backup }.to nap(30)
     end
   end
 

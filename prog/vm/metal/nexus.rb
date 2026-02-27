@@ -120,17 +120,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     uid = rand(1100..59999)
     command = <<~COMMAND
       set -ueo pipefail
-      if id :vm_name &>/dev/null; then
-        procs=$(ps -u :vm_name -o pid,comm,args --no-headers) || [ $? -eq 1 ]
-        if [ -n "$procs" ]; then
-          echo "Terminating :vm_name processes:"
-          echo "$procs"
-          sudo pkill -u :vm_name || [ $? -eq 1 ]
-          sleep 1
-        fi
-        sudo userdel -r :vm_name
-      fi
-      if getent group :vm_name &>/dev/null; then sudo groupdel :vm_name; fi
+      # Make this script idempotent
+      sudo userdel --remove --force :vm_name || true
+      sudo groupdel -f :vm_name || true
+      # Create vm's user and home directory
       sudo adduser --disabled-password --gecos '' --home :vm_home --uid :uid :vm_name
       # Enable KVM access for VM user
       sudo usermod -a -G kvm :vm_name

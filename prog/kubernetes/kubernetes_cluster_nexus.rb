@@ -374,16 +374,16 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       kubernetes_cluster.kubernetes_etcd_backup&.incr_destroy
 
+      kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
+        ubid: kubernetes_cluster.ubid,
+        vm_ids: kubernetes_cluster.all_nodes.map(&:vm_id)
+      )
+
       kubernetes_cluster.nodes.each(&:incr_destroy)
       kubernetes_cluster.nodepools.each(&:incr_destroy)
 
-      nap 5 unless kubernetes_cluster.nodepools.empty? && kubernetes_cluster.nodes.empty? &&
-        kubernetes_cluster.cp_vms.empty? && kubernetes_cluster.worker_vms.empty?
-
-      kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
-        ubid: kubernetes_cluster.ubid,
-        vm_ids: []
-      )
+      nap 5 unless kubernetes_cluster.nodepools.empty?
+      nap 5 unless kubernetes_cluster.nodes.empty?
 
       if (services_lb = kubernetes_cluster.services_lb)
         services_lb.dns_zone&.delete_record(record_name: "*.#{services_lb.hostname}.")

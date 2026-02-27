@@ -77,6 +77,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_tests_private_ipv6
+    # Private IPv6 (ULA) only routed on metal via IPsec tunnels
+    hop_perform_blocked_private_ipv4 if vm_to_be_connected.location.provider != "metal"
+
     unless frame["firewalls"] == "connected_private_ipv6"
       update_firewall_rules(ps_multiple, ps_single, config: :perform_connected_private_ipv6)
       update_stack({"firewalls" => "connected_private_ipv6"})
@@ -112,6 +115,9 @@ ExecStart=nc -l 8080 -6
   end
 
   label def perform_blocked_private_ipv6
+    # Private IPv6 (ULA) only routed on metal via IPsec tunnels
+    hop_finish if vm_to_be_connected.location.provider != "metal"
+
     unless frame["firewalls"] == "blocked_private_ipv6"
       update_firewall_rules(ps_multiple, ps_multiple, config: :perform_blocked_private_ipv6)
       update_stack({"firewalls" => "blocked_private_ipv6"})
