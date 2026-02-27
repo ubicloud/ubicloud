@@ -703,18 +703,18 @@ RSpec.describe Prog::Test::Kubernetes do
   end
 
   describe "#destroy_kubernetes" do
-    it "increments destroy and hops to destroy" do
+    it "increments destroy and hops to finish" do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster).at_least(:once)
       expect(kubernetes_cluster).to receive(:incr_destroy)
 
-      expect { kubernetes_test.destroy_kubernetes }.to hop("destroy")
+      expect { kubernetes_test.destroy_kubernetes }.to hop("finish")
     end
   end
 
-  describe "#destroy" do
+  describe "#finish" do
     it "naps if kubernetes cluster is not destroyed yet" do
       expect(kubernetes_test).to receive(:kubernetes_cluster).and_return(kubernetes_cluster)
-      expect { kubernetes_test.destroy }.to nap(5)
+      expect { kubernetes_test.finish }.to nap(5)
     end
 
     it "destroys test project and exits successfully" do
@@ -723,7 +723,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test_project).to receive(:destroy)
       expect(kubernetes_test).to receive(:frame).and_return({}).twice
 
-      expect { kubernetes_test.destroy }.to exit({"msg" => "Kubernetes tests are finished!"})
+      expect { kubernetes_test.finish }.to exit({"msg" => "Kubernetes tests are finished!"})
     end
 
     it "destroys test project and fails if there is a fail message" do
@@ -733,7 +733,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:frame).and_return({"fail_message" => "Test failed"}).thrice
       expect(kubernetes_test).to receive(:fail_test).with("Test failed")
 
-      expect { kubernetes_test.destroy }.to exit({"msg" => "Kubernetes tests are finished!"})
+      expect { kubernetes_test.finish }.to exit({"msg" => "Kubernetes tests are finished!"})
     end
   end
 

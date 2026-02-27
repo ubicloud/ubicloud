@@ -3,8 +3,6 @@
 require_relative "../../lib/util"
 
 class Prog::Test::PostgresResource < Prog::Test::Base
-  semaphore :destroy
-
   def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
     postgres_service_project = Project[Config.postgres_service_project_id] ||
@@ -75,10 +73,10 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       nap 5
     end
 
-    hop_destroy
+    hop_finish
   end
 
-  label def destroy
+  label def finish
     postgres_test_project.destroy
 
     fail_test(frame["fail_message"]) if frame["fail_message"]
