@@ -36,7 +36,6 @@ class Clover
         authorize("MachineImage:delete", machine_image)
 
         DB.transaction do
-          machine_image.this.update(deleting: true)
           if machine_image.versions.empty?
             machine_image.destroy
           else
@@ -85,7 +84,7 @@ class Clover
           fail Validation::ValidationFailed.new({vm_ubid: "VM not found or not stopped"})
         end
 
-        next_version = (machine_image.versions_dataset.max(:version) || 0) + 1
+        next_version = MachineImage.next_auto_version(machine_image.versions_dataset)
         s3_bucket = Config.machine_image_archive_bucket
         s3_endpoint = Config.machine_image_archive_endpoint
         s3_prefix = "#{machine_image.ubid}/#{next_version}/"

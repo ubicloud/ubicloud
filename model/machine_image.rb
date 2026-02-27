@@ -18,6 +18,14 @@ class MachineImage < Sequel::Model
     end
   end
 
+  def self.next_auto_version(versions_dataset)
+    max_num = versions_dataset
+      .select_map(:version)
+      .filter_map { |v| v[/\Av(\d+)\z/, 1]&.to_i }
+      .max || 0
+    "v#{max_num + 1}"
+  end
+
   def display_location
     location.display_name
   end
@@ -36,10 +44,6 @@ class MachineImage < Sequel::Model
         .order(Sequel.desc(:activated_at))
         .first
     end
-  end
-
-  def deleting?
-    deleting
   end
 
   def before_destroy

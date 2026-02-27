@@ -9,7 +9,6 @@ Sequel.migration do
       foreign_key :project_id, :project, type: :uuid, null: false
       foreign_key :location_id, :location, type: :uuid, null: false
       String :arch, null: false, default: "x64"
-      TrueClass :deleting, null: false, default: false
       timestamptz :created_at, null: false, default: Sequel.lit("now()")
 
       unique [:project_id, :location_id, :name]
@@ -18,7 +17,7 @@ Sequel.migration do
     create_table(:machine_image_version) do
       uuid :id, primary_key: true, default: Sequel.lit("gen_random_uuid()")
       foreign_key :machine_image_id, :machine_image, type: :uuid, null: false
-      Integer :version, null: false
+      String :version, null: false
       String :state, null: false
       Integer :size_gib, null: false
       Integer :archive_size_mib

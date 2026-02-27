@@ -38,8 +38,8 @@ class Prog::MachineImage::RegisterDistroImage < Prog::Base
     "/opt/vhost-block-backend/#{vbb_version}/init-metadata"
   end
 
-  def self.assemble(machine_image, vm_host_id:, url:, sha256:)
-    next_version = (machine_image.versions_dataset.max(:version) || 0) + 1
+  def self.assemble(machine_image, vm_host_id:, url:, sha256:, version: nil)
+    next_version = version || MachineImage.next_auto_version(machine_image.versions_dataset)
     s3_bucket = Config.machine_image_archive_bucket
     s3_endpoint = Config.machine_image_archive_endpoint
     s3_prefix = "#{machine_image.ubid}/#{next_version}/"

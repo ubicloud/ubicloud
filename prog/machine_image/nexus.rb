@@ -142,7 +142,7 @@ class Prog::MachineImage::Nexus < Prog::Base
     mi = machine_image_version.machine_image
     machine_image_version.destroy
 
-    if mi.deleting? && mi.versions_dataset.empty?
+    if mi.versions_dataset.empty?
       mi.destroy
     end
 
