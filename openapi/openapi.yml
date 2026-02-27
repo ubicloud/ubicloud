@@ -2754,12 +2754,10 @@ components:
         size_gib:
           description: Size in GiB
           type: integer
-        arch:
-          description: Architecture
-          type: string
-          enum:
-            - arm64
-            - x64
+        archive_size_gib:
+          description: Archive size in GiB (set after archive completes)
+          type: integer
+          nullable: true
         active:
           description: Whether this is the active version
           type: boolean
@@ -2780,7 +2778,7 @@ components:
         - version
         - state
         - size_gib
-        - arch
+        - archive_size_gib
         - active
         - source_vm_id
         - activated_at
@@ -2799,9 +2797,6 @@ components:
         description:
           description: Description of the machine image
           type: string
-        visible:
-          description: Whether the machine image is publicly visible
-          type: boolean
         location:
           description: Location of the machine image
           type: string
@@ -2818,9 +2813,8 @@ components:
           type: integer
           nullable: true
         arch:
-          description: Active version architecture (from active_version)
+          description: Architecture of the machine image
           type: string
-          nullable: true
           enum:
             - arm64
             - x64
@@ -2842,7 +2836,6 @@ components:
         - id
         - name
         - description
-        - visible
         - location
         - version
         - state

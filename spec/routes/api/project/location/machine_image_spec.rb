@@ -7,20 +7,19 @@ RSpec.describe Clover, "machine_image" do
 
   let(:project) { project_with_default_policy(user) }
 
-  def create_mi(name: "test-image", project_id: nil, location_id: nil, visible: false, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64", activate: false)
+  def create_mi(name: "test-image", project_id: nil, location_id: nil, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64", activate: false)
     mi = MachineImage.create(
       name:,
       description:,
       project_id: project_id || project.id,
       location_id: location_id || Location::HETZNER_FSN1_ID,
-      visible:
+      arch:
     )
     ver = MachineImageVersion.create(
       machine_image_id: mi.id,
       version: 1,
       state: version_state,
       size_gib:,
-      arch:,
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
       s3_endpoint: "https://r2.example.com"
@@ -125,9 +124,9 @@ RSpec.describe Clover, "machine_image" do
 
       mi = MachineImage.first(name: "my-image")
       expect(mi).not_to be_nil
+      expect(mi.arch).to eq(vm.arch)
       ver = mi.versions.first
       expect(ver.state).to eq("creating")
-      expect(ver.arch).to eq(vm.arch)
     end
 
     it "post fails when VM is not stopped" do
@@ -208,7 +207,6 @@ RSpec.describe Clover, "machine_image" do
         state: "creating",
         vm_id: vm.id,
         size_gib: 20,
-        arch: "arm64",
         s3_bucket: "b",
         s3_prefix: "p/",
         s3_endpoint: "https://r2.example.com"
@@ -244,17 +242,6 @@ RSpec.describe Clover, "machine_image" do
       delete "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{MachineImage.generate_ubid}"
 
       expect(last_response.status).to eq(204)
-    end
-
-    it "can get a public image from another project" do
-      other_project = Project.create(name: "other-project")
-      public_mi = create_mi(name: "public-image", project_id: other_project.id, visible: true, activate: true)
-
-      get "/project/#{project.ubid}/location/#{TEST_LOCATION}/machine-image/#{public_mi.ubid}"
-
-      expect(last_response.status).to eq(200)
-      parsed = JSON.parse(last_response.body)
-      expect(parsed["name"]).to eq("public-image")
     end
 
     it "location not exist" do

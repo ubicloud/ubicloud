@@ -14,7 +14,7 @@ class MachineImage < Sequel::Model
 
   dataset_module do
     def for_project(project_id)
-      where(Sequel[project_id:] | {visible: true})
+      where(project_id:)
     end
   end
 
@@ -51,7 +51,7 @@ end
 #  description | text                     | NOT NULL DEFAULT ''::text
 #  project_id  | uuid                     | NOT NULL
 #  location_id | uuid                     | NOT NULL
-#  visible     | boolean                  | NOT NULL DEFAULT false
+#  arch        | text                     | NOT NULL DEFAULT 'x64'::text
 #  created_at  | timestamp with time zone | NOT NULL DEFAULT now()
 # Indexes:
 #  machine_image_pkey                            | PRIMARY KEY btree (id)

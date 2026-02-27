@@ -8,7 +8,7 @@ Sequel.migration do
       String :description, null: false, default: ""
       foreign_key :project_id, :project, type: :uuid, null: false
       foreign_key :location_id, :location, type: :uuid, null: false
-      TrueClass :visible, null: false, default: false
+      String :arch, null: false, default: "x64"
       timestamptz :created_at, null: false, default: Sequel.lit("now()")
 
       unique [:project_id, :location_id, :name]
@@ -20,7 +20,7 @@ Sequel.migration do
       Integer :version, null: false
       String :state, null: false
       Integer :size_gib, null: false
-      String :arch, null: false, default: "x64"
+      Integer :archive_size_gib
       foreign_key :key_encryption_key_1_id, :storage_key_encryption_key, type: :uuid
       String :s3_bucket, null: false
       String :s3_prefix, null: false

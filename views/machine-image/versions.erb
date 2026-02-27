@@ -2,7 +2,7 @@
 
 <%== part(
   "components/table_card",
-  headers: ["Version", "State", "Active", "Size (GiB)", "Arch", "Created At", "Actions"],
+  headers: ["Version", "State", "Active", "Size (GiB)", "Archive Size (GiB)", "Created At", "Actions"],
   rows: @versions.map do |v|
     active_label = v.active? ? "<span class='inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20'>Active</span>" : "-"
 
@@ -18,7 +18,7 @@
         ["machine_image_state_label", {component: { state: v.state }}],
         [active_label, {escape: false}],
         v.size_gib,
-        v.arch,
+        v.archive_size_gib || "-",
         v.created_at&.strftime("%B %d, %Y %H:%M UTC"),
         [action_html, {escape: false}]
       ],

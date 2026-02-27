@@ -7,7 +7,7 @@
     ["Location", @machine_image.display_location],
     ["Active Version", active_ver ? active_ver.version.to_s : "None"],
     ["Active Version State", active_ver ? ["machine_image_state_label", {component: { state: active_ver.state }}] : "N/A"],
-    ["Architecture", active_ver&.arch || "N/A"],
+    ["Architecture", @machine_image.arch],
     ["Size", active_ver ? "#{active_ver.size_gib} GiB" : "N/A"],
     ["Source VM",
       active_ver&.vm ? "<a href='#{active_ver.vm.path}' class='text-rose-500 hover:underline'>#{h(active_ver.vm.name)}</a>" : "N/A",

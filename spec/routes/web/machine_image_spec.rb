@@ -15,14 +15,13 @@ RSpec.describe Clover, "machine_image" do
       description: "test desc",
       project_id: project.id,
       location_id: Location::HETZNER_FSN1_ID,
-      visible: false
+      arch: "arm64"
     )
     MachineImageVersion.create(
       machine_image_id: mi.id,
       version: 1,
       state: "available",
       size_gib: 20,
-      arch: "arm64",
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
       s3_endpoint: "https://r2.example.com"
@@ -38,14 +37,13 @@ RSpec.describe Clover, "machine_image" do
       name: "other-image",
       project_id: project_wo_permissions.id,
       location_id: Location::HETZNER_FSN1_ID,
-      visible: false
+      arch: "arm64"
     )
     MachineImageVersion.create(
       machine_image_id: mi.id,
       version: 1,
       state: "available",
       size_gib: 10,
-      arch: "arm64",
       s3_bucket: "test-bucket",
       s3_prefix: "images/other/",
       s3_endpoint: "https://r2.example.com"
@@ -197,31 +195,6 @@ RSpec.describe Clover, "machine_image" do
         expect(page).to have_content "Forbidden"
       end
 
-      it "can view public image from another project" do
-        other_project = Project.create(name: "other-project")
-        public_mi = MachineImage.create(
-          name: "public-image",
-          project_id: other_project.id,
-          location_id: Location::HETZNER_FSN1_ID,
-          visible: true
-        )
-        MachineImageVersion.create(
-          machine_image_id: public_mi.id,
-          version: 1,
-          state: "available",
-          size_gib: 10,
-          arch: "arm64",
-          s3_bucket: "b",
-          s3_prefix: "p/",
-          s3_endpoint: "https://r2.example.com"
-        )
-
-        visit "#{project.path}#{public_mi.path}/overview"
-
-        expect(page.title).to eq("Ubicloud - #{public_mi.name}")
-        expect(page).to have_content public_mi.name
-      end
-
       it "raises not found when machine image not exists" do
         visit "#{project.path}/location/eu-central-h1/machine-image/08s56d4kaj94xsmrnf5v5m3mav"
 
@@ -246,7 +219,6 @@ RSpec.describe Clover, "machine_image" do
           version: 2,
           state: "available",
           size_gib: 20,
-          arch: "arm64",
           s3_bucket: "b",
           s3_prefix: "p/",
           s3_endpoint: "https://r2.example.com"
@@ -268,7 +240,6 @@ RSpec.describe Clover, "machine_image" do
           version: 2,
           state: "available",
           size_gib: 20,
-          arch: "arm64",
           s3_bucket: "b",
           s3_prefix: "p/",
           s3_endpoint: "https://r2.example.com"

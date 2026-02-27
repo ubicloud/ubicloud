@@ -7,20 +7,19 @@ RSpec.describe Clover, "machine_image" do
 
   let(:project) { project_with_default_policy(user) }
 
-  def create_mi(name: "test-image", project_id: nil, location_id: nil, visible: false, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64")
+  def create_mi(name: "test-image", project_id: nil, location_id: nil, description: "test desc", version_state: "available", size_gib: 20, arch: "arm64")
     mi = MachineImage.create(
       name:,
       description:,
       project_id: project_id || project.id,
       location_id: location_id || Location::HETZNER_FSN1_ID,
-      visible:
+      arch:
     )
     MachineImageVersion.create(
       machine_image_id: mi.id,
       version: 1,
       state: version_state,
       size_gib:,
-      arch:,
       s3_bucket: "test-bucket",
       s3_prefix: "images/test/",
       s3_endpoint: "https://r2.example.com"
@@ -89,20 +88,6 @@ RSpec.describe Clover, "machine_image" do
       parsed = JSON.parse(last_response.body)
       expect(parsed["items"].length).to eq(1)
       expect(parsed["items"][0]["name"]).to eq("test-image")
-    end
-
-    it "includes public images from other projects" do
-      machine_image
-      other_project = Project.create(name: "other-project")
-      create_mi(name: "public-image", project_id: other_project.id, visible: true)
-
-      get "/project/#{project.ubid}/machine-image"
-
-      expect(last_response.status).to eq(200)
-      parsed = JSON.parse(last_response.body)
-      expect(parsed["items"].length).to eq(2)
-      names = parsed["items"].map { |i| i["name"] }
-      expect(names).to include("test-image", "public-image")
     end
 
     it "does not list project images without MachineImage:view permission" do

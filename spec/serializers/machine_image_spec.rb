@@ -16,7 +16,7 @@ RSpec.describe Serializers::MachineImage do
         description: "A test image",
         project_id: project.id,
         location_id: Location::HETZNER_FSN1_ID,
-        visible: false
+        arch: "arm64"
       )
     }
 
@@ -26,7 +26,6 @@ RSpec.describe Serializers::MachineImage do
         version: 1,
         state: "available",
         size_gib: 20,
-        arch: "arm64",
         s3_bucket: "test-bucket",
         s3_prefix: "images/test/",
         s3_endpoint: "https://r2.example.com"
@@ -42,12 +41,11 @@ RSpec.describe Serializers::MachineImage do
       expect(result[:id]).to eq(mi.ubid)
       expect(result[:name]).to eq("test-image")
       expect(result[:description]).to eq("A test image")
-      expect(result[:visible]).to be false
       expect(result[:location]).to eq("eu-central-h1")
+      expect(result[:arch]).to eq("arm64")
       expect(result[:version]).to eq(1)
       expect(result[:state]).to eq("available")
       expect(result[:size_gib]).to eq(20)
-      expect(result[:arch]).to eq("arm64")
       expect(result[:created_at]).to be_a(String)
       expect(result[:active_version]).to be_a(Hash)
       expect(result[:active_version][:id]).to eq(version.ubid)
@@ -62,7 +60,7 @@ RSpec.describe Serializers::MachineImage do
       expect(result[:version]).to be_nil
       expect(result[:state]).to be_nil
       expect(result[:size_gib]).to be_nil
-      expect(result[:arch]).to be_nil
+      expect(result[:arch]).to eq("arm64")
       expect(result[:active_version]).to be_nil
       expect(result[:versions]).to eq([])
     end
@@ -91,7 +89,6 @@ RSpec.describe Serializers::MachineImage do
         version: 1,
         state: "available",
         size_gib: 10,
-        arch: "x64",
         vm_id: nil,
         s3_bucket: "test-bucket",
         s3_prefix: "images/test2/",
@@ -104,7 +101,7 @@ RSpec.describe Serializers::MachineImage do
       expect(result[:version]).to eq(1)
       expect(result[:state]).to eq("available")
       expect(result[:size_gib]).to eq(10)
-      expect(result[:arch]).to eq("x64")
+      expect(result[:archive_size_gib]).to be_nil
       expect(result[:active]).to be false
     end
   end

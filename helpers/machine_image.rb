@@ -2,9 +2,7 @@
 
 class Clover
   def machine_image_list_dataset
-    project_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
-    public_images = MachineImage.where(visible: true).exclude(project_id: @project.id)
-    project_images.union(public_images)
+    dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
   end
 
   def machine_image_list_api_response(dataset)
@@ -65,7 +63,7 @@ class Clover
           description:,
           location_id: location.id,
           project_id: @project.id,
-          visible: false
+          arch: vm.arch
         )
       end
 
@@ -78,7 +76,6 @@ class Clover
         state: "creating",
         vm_id: vm.id,
         size_gib: boot_size_gib,
-        arch: vm.arch,
         s3_bucket: Config.machine_image_archive_bucket || "",
         s3_prefix: "#{@project.ubid}/#{location.display_name}/",
         s3_endpoint: Config.machine_image_archive_endpoint || ""
