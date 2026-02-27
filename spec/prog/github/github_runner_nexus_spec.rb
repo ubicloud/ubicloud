@@ -193,7 +193,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
     end
@@ -203,7 +203,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
@@ -217,7 +217,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("premium-2")
@@ -231,7 +231,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2")
@@ -246,7 +246,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-2")
@@ -261,7 +261,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       nx.update_billing_record
 
-      br = BillingRecord[resource_id: project.id]
+      br = BillingRecord[resource_id: installation.id]
       expect(br.amount).to eq(5)
       expect(br.duration(now, now)).to eq(1)
       expect(br.billing_rate["resource_family"]).to eq("standard-30")
@@ -276,7 +276,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       nx.update_billing_record
 
       expect { nx.update_billing_record }
-        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
+        .to change { BillingRecord[resource_id: installation.id].amount }.from(5).to(10)
     end
 
     it "create a new record for a new day" do
@@ -293,9 +293,9 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(BillingRecord).to receive(:create).and_call_original
       # Create tomorrow record
       expect { nx.update_billing_record }
-        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
+        .to change { BillingRecord.where(resource_id: installation.id).count }.from(1).to(2)
 
-      expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
+      expect(BillingRecord.where(resource_id: installation.id).map(&:amount)).to eq([5, 5])
     end
 
     it "tries 3 times and creates single billing record" do
@@ -305,7 +305,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect {
         3.times { nx.update_billing_record }
-      }.to change { BillingRecord.where(resource_id: project.id).count }.from(0).to(1)
+      }.to change { BillingRecord.where(resource_id: installation.id).count }.from(0).to(1)
     end
 
     it "tries 4 times and fails" do
