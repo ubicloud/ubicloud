@@ -86,8 +86,8 @@ class Prog::MachineImage::Nexus < Prog::Base
 
   label def finish
     archive_size_bytes = calculate_archive_size
-    archive_size_gib = archive_size_bytes ? (archive_size_bytes.to_f / (1024**3)).round(2) : nil
-    machine_image_version.update(state: "available", size_gib: boot_volume.size_gib, archive_size_gib: archive_size_gib, activated_at: Time.now)
+    archive_size_mib = archive_size_bytes ? (archive_size_bytes.to_f / (1024**2)).ceil : nil
+    machine_image_version.update(state: "available", size_gib: boot_volume.size_gib, archive_size_mib: archive_size_mib, activated_at: Time.now)
 
     if machine_image.project.billable && machine_image_version.active_billing_records.empty?
       billing_rate = BillingRate.from_resource_properties("MachineImageStorage", "standard", machine_image.location.name)

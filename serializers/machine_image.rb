@@ -33,7 +33,7 @@ class Serializers::MachineImage < Serializers::Base
       version: ver.version,
       state: ver.state,
       size_gib: ver.size_gib,
-      archive_size_gib: ver.archive_size_gib,
+      archive_size_mib: ver.archive_size_mib,
       active: ver.active?,
       source_vm_id: ver.vm&.ubid,
       activated_at: ver.activated_at&.iso8601,

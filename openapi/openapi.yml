@@ -2754,8 +2754,8 @@ components:
         size_gib:
           description: Size in GiB
           type: integer
-        archive_size_gib:
-          description: Archive size in GiB (set after archive completes)
+        archive_size_mib:
+          description: Archive size in MiB (set after archive completes)
           type: integer
           nullable: true
         active:
@@ -2778,7 +2778,7 @@ components:
         - version
         - state
         - size_gib
-        - archive_size_gib
+        - archive_size_mib
         - active
         - source_vm_id
         - activated_at

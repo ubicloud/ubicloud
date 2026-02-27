@@ -21,7 +21,7 @@
         ["machine_image_state_label", {component: { state: v.state }}],
         [active_label, {escape: false}],
         v.size_gib,
-        v.archive_size_gib || "-",
+        v.archive_size_mib ? "#{v.archive_size_mib} MiB" : "-",
         v.created_at&.strftime("%B %d, %Y %H:%M UTC"),
         [action_html, {escape: false}]
       ],

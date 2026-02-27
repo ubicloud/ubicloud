@@ -101,7 +101,7 @@ RSpec.describe Serializers::MachineImage do
       expect(result[:version]).to eq(1)
       expect(result[:state]).to eq("available")
       expect(result[:size_gib]).to eq(10)
-      expect(result[:archive_size_gib]).to be_nil
+      expect(result[:archive_size_mib]).to be_nil
       expect(result[:active]).to be false
     end
   end
