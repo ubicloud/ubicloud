@@ -49,7 +49,16 @@ current_usage = @project.current_resource_usage("VmVCpu")
   form_elements.concat(elements)
 
   form_elements.push(
-    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)},
+    {name: "boot_image", type: "radio_small_cards", label: "Boot Image", required: "required", content_generator: ContentGenerator::Vm.method(:boot_image)}
+  )
+
+  if @project.get_ff_machine_image
+    form_elements.push(
+      {name: "machine_image", type: "select", label: "Or use a Machine Image", placeholder: "None (use boot image above)", content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-2'>"}
+    )
+  end
+
+  form_elements.push(
     {name: "unix_user", type: "text", label: "Username", placeholder: "ubi", value: "ubi", required: "required", opening_tag: "<div class='sm:col-span-2'>"}
   )
 

@@ -69,6 +69,10 @@ module ContentGenerator
     def self.boot_image(boot_image)
       Option::BootImages.find { it.name == boot_image }.display_name
     end
+
+    def self.machine_image(location, mi)
+      mi[:display_name]
+    end
   end
 
   module Postgres

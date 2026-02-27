@@ -39,17 +39,27 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script", "machine_image"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
 
-    # Generally parameter validation is handled in progs while creating resources.
-    # Since Vm::Nexus both handles VM creation requests from user and also Postgres
-    # service, moved the boot_image validation here to not allow users to pass
-    # postgres image as boot image while creating a VM.
-    if assemble_params[:boot_image]
+    if (mi_ubid = assemble_params.delete(:machine_image))
+      mi = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+        .eager(:versions)
+        .first(id: UBID.to_uuid(mi_ubid))
+      fail Validation::ValidationFailed.new({machine_image: "Machine image not found"}) unless mi
+      version = mi.active_version
+      fail Validation::ValidationFailed.new({machine_image: "Machine image has no active available version"}) unless version&.available?
+      assemble_params[:storage_volumes] = [{size_gib: version.size_gib, encrypted: true, machine_image_version_id: version.id}]
+      assemble_params.delete(:boot_image)
+      assemble_params.delete(:storage_size)
+    elsif assemble_params[:boot_image]
+      # Generally parameter validation is handled in progs while creating resources.
+      # Since Vm::Nexus both handles VM creation requests from user and also Postgres
+      # service, moved the boot_image validation here to not allow users to pass
+      # postgres image as boot image while creating a VM.
       Validation.validate_boot_image(assemble_params[:boot_image])
     end
 
@@ -213,6 +223,17 @@ class Clover
     boot_images = Option::BootImages.map(&:name)
     boot_images.reject! { |name| name == "gpu-ubuntu-noble" } unless @show_gpu != false
     options.add_option(name: "boot_image", values: boot_images)
+
+    if @project.get_ff_machine_image
+      machine_images = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
+        .eager(:versions, :location)
+        .all
+        .select { |mi| mi.active_version&.available? }
+        .map { |mi| {location_id: mi.location_id, value: mi.ubid, display_name: mi.name, size_gib: mi.active_version.size_gib} }
+      options.add_option(name: "machine_image", values: machine_images, parent: "location") do |location, mi|
+        mi[:location_id] == location.id
+      end
+    end
     options.add_option(name: "unix_user")
     options.add_option(name: "ssh_public_key", values: @project.ssh_public_keys)
     options.add_option(name: "public_key")
