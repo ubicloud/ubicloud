@@ -52,9 +52,12 @@ class Clover
       fail Validation::ValidationFailed.new({machine_image: "Machine image not found"}) unless mi
       version = mi.active_version
       fail Validation::ValidationFailed.new({machine_image: "Machine image has no active available version"}) unless version&.available?
-      assemble_params[:storage_volumes] = [{size_gib: version.size_gib, encrypted: true, machine_image_version_id: version.id}]
+      storage_size = assemble_params.delete(:storage_size)&.to_i || version.size_gib
+      if storage_size < version.size_gib
+        fail Validation::ValidationFailed.new({storage_size: "Storage size (#{storage_size} GiB) cannot be less than image size (#{version.size_gib} GiB)"})
+      end
+      assemble_params[:storage_volumes] = [{size_gib: storage_size, encrypted: true, machine_image_version_id: version.id}]
       assemble_params.delete(:boot_image)
-      assemble_params.delete(:storage_size)
     elsif assemble_params[:boot_image]
       # Generally parameter validation is handled in progs while creating resources.
       # Since Vm::Nexus both handles VM creation requests from user and also Postgres
