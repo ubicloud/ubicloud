@@ -18,9 +18,6 @@
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-2'>"},
     {name: "description", type: "text", label: "Description", placeholder: "Enter description", opening_tag: "<div class='sm:col-span-2'>"},
     {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
-    {name: "vm_id", type: "select", label: "Source VM (must be stopped)", required: "required", placeholder: "Select a stopped VM", content_generator: ContentGenerator::MachineImage.method(:vm), opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "cloud_init_notice", type: "section", label: "Before creating an image", separator: true,
-     content: "Shut down the VM cleanly before creating an image. Cloud-init will run on VMs launched from this image, which resets /home/ubi to its default state. To preserve customizations in /home/ubi, move them elsewhere or use a different user. You can also run 'sudo cloud-init clean' on the source VM before imaging to remove instance-specific state."},
   ]
 
   action = "#{@project.path}/machine-image"
