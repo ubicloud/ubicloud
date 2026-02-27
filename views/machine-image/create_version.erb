@@ -1,0 +1,43 @@
+<% @page_title = "Add Version — #{@machine_image.name}" %>
+<% mi_path = "#{@project.path}#{@machine_image.path}" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["Machine Images", "#{@project.path}/machine-image"],
+    [@machine_image.name, mi_path],
+    %w[Add\ Version #]
+  ]
+) %>
+
+<div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white p-6">
+  <h3 class="text-lg font-semibold text-gray-900 mb-4">Create Machine Image Version</h3>
+  <p class="text-sm text-gray-500 mb-6">Select a stopped VM to archive as a new version of this machine image. The VM must be stopped before creating an image.</p>
+
+  <% if @stopped_vms.empty? %>
+    <div class="text-center py-8">
+      <p class="text-sm text-gray-500">No stopped VMs available in this location. Stop a VM first, then come back to create a version.</p>
+      <div class="mt-4">
+        <%== part("components/button", text: "Back to Image", link: "#{mi_path}/overview") %>
+      </div>
+    </div>
+  <% else %>
+    <% form(action: "#{mi_path}/create-version", method: :post) do %>
+      <div class="mb-4">
+        <label for="vm_ubid" class="block text-sm font-medium text-gray-700 mb-1">Source VM</label>
+        <select name="vm_ubid" id="vm_ubid" required class="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+          <option value="">Select a stopped VM...</option>
+          <% @stopped_vms.each do |vm| %>
+            <option value="<%= vm.ubid %>"><%= h(vm.name) %></option>
+          <% end %>
+        </select>
+      </div>
+      <div class="flex justify-end gap-3">
+        <%== part("components/button", text: "Cancel", type: "secondary", link: "#{mi_path}/overview") %>
+        <%== part("components/button", text: "Create Version", icon: "hero-plus") %>
+      </div>
+    <% end %>
+  <% end %>
+</div>
