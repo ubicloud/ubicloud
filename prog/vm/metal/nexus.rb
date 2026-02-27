@@ -441,7 +441,11 @@ class Prog::Vm::Metal::Nexus < Prog::Base
                 -e 'thread panicked'
           END
         end
-      rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+      rescue Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+        # Command didn't finish running or connection problem, nap and try again
+        nap 30
+      rescue Sshable::SshError
+        # Command finish running, but we cannot determine why we failed
         reason = "unknown"
       end
 
