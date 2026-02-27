@@ -158,6 +158,10 @@ module Config
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string
 
+  # incident.io
+  optional :incidentio_key, string, clear: true
+  optional :incidentio_alert_source_config_id, string
+
   # Postgres
   optional :postgres_service_project_id, uuid
   override :postgres_service_hostname, "postgres.ubicloud.com", string

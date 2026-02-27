@@ -27,7 +27,6 @@ gem "nokogiri"
 gem "octokit"
 gem "omniauth-github"
 gem "omniauth-google-oauth2"
-gem "pagerduty", ">= 4.0"
 gem "prawn"
 gem "prawn-table"
 gem "pry"
@@ -56,6 +55,10 @@ end
 
 group :aws_rds_iam do
   gem "pg-aws_rds_iam", github: "haines/pg-aws_rds_iam", ref: "fb91b9232837e350aa9c8440b7340346adae845e"
+end
+
+group :pagerduty do
+  gem "pagerduty", ">= 4.0"
 end
 
 group :development do

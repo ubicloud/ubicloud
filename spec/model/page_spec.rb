@@ -3,6 +3,7 @@
 require_relative "spec_helper"
 
 require "json"
+require "pagerduty"
 
 RSpec.describe Page do
   subject(:p) { described_class.create(tag: "dummy-tag") }
@@ -45,37 +46,131 @@ RSpec.describe Page do
     end
   end
 
-  describe "#trigger" do
+  context "with pager duty" do
     before do
       expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
       stub_request(:post, "https://events.pagerduty.com/v2/enqueue")
         .to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
+      # reinitialize to setup @client
+      p.client.send(:initialize)
     end
 
-    it "triggers a page in Pagerduty if key is present" do
-      expect(p).to receive(:details).and_return({}).at_least(:once)
-      p.trigger
+    describe "#trigger" do
+      it "triggers a page in Pagerduty if key is present" do
+        expect(p).to receive(:details).and_return({}).at_least(:once)
+        p.trigger
+      end
+
+      it "triggers a page with custom_details" do
+        expect(p).to receive(:details).and_return({"related_resources" => ["a410a91a-dc31-4119-9094-3c6a1fb49601"]}).at_least(:once)
+        p.trigger
+      end
+
+      it "triggers a page with custom_details and log link" do
+        expect(Config).to receive(:pagerduty_log_link).and_return("https://logviewer.com?q=<ubid>").at_least(:once)
+        expect(p).to receive(:details).and_return({"related_resources" => ["a410a91a-dc31-4119-9094-3c6a1fb49601"]}).at_least(:once)
+        p.trigger
+      end
     end
 
-    it "triggers a page with custom_details" do
-      expect(p).to receive(:details).and_return({"related_resources" => ["a410a91a-dc31-4119-9094-3c6a1fb49601"]}).at_least(:once)
-      p.trigger
-    end
-
-    it "triggers a page with custom_details and log link" do
-      expect(Config).to receive(:pagerduty_log_link).and_return("https://logviewer.com?q=<ubid>").at_least(:once)
-      expect(p).to receive(:details).and_return({"related_resources" => ["a410a91a-dc31-4119-9094-3c6a1fb49601"]}).at_least(:once)
-      p.trigger
+    describe "#resolve" do
+      it "resolves the page in Pagerduty if key is present" do
+        expect(p.client).to receive(:resolve).and_call_original
+        p.resolve
+      end
     end
   end
 
-  describe "#resolve" do
-    it "resolves the page in Pagerduty if key is present" do
-      expect(Config).to receive(:pagerduty_key).and_return("dummy-key").at_least(:once)
-      stub_request(:post, "https://events.pagerduty.com/v2/enqueue")
-        .to_return(status: 200, body: {dedup_key: "dummy-dedup-key", message: "Event processed", status: "success"}.to_json, headers: {})
+  context "with incident.io" do
+    before do
+      expect(Config).to receive(:incidentio_key).and_return("dummy-key").at_least(:once)
+      expect(Config).to receive(:incidentio_alert_source_config_id).and_return("source-id").at_least(:once)
+    end
 
-      p.resolve
+    describe "#trigger" do
+      it "triggers a page if key is present" do
+        Excon.stub({
+          url: "https://api.incident.io/v2/alert_events/http/source-id",
+          method: "post",
+          body: {
+            deduplication_key: p.client.send(:deduplication_key, p.tag),
+            status: "firing",
+            title: p.summary,
+            source_url: "#{Config.admin_url}/model/Page/#{p.ubid}",
+            metadata: {severity: p.severity}
+          }.to_json,
+          headers: {
+            "Authorization" => "Bearer dummy-key",
+            "Content-Type" => "application/json"
+          }
+        }, {status: 202})
+        expect(p.trigger.status).to eq(202)
+      end
+
+      it "triggers a page with extra links" do
+        Excon.stub({
+          url: "https://api.incident.io/v2/alert_events/http/source-id",
+          method: "post",
+          body: {
+            deduplication_key: p.client.send(:deduplication_key, p.tag),
+            status: "firing",
+            title: "title",
+            source_url: nil,
+            metadata: {
+              severity: "low",
+              links: ["https://example.com"]
+            }
+          }.to_json,
+          headers: {
+            "Authorization" => "Bearer dummy-key",
+            "Content-Type" => "application/json"
+          }
+        }, {status: 202})
+        expect(p.client.trigger(p.tag, summary: "title", severity: "low", details: {}, links: [nil, "https://example.com"]).status).to eq(202)
+      end
+    end
+
+    describe "#resolve" do
+      it "resolves the page if key is present" do
+        Excon.stub({
+          url: "https://api.incident.io/v2/alert_events/http/source-id",
+          method: "post",
+          body: {
+            deduplication_key: p.client.send(:deduplication_key, p.tag),
+            status: "resolved",
+            title: p.summary
+          }.to_json,
+          headers: {
+            "Authorization" => "Bearer dummy-key",
+            "Content-Type" => "application/json"
+          }
+        }, {status: 202})
+        expect(p.resolve.status).to eq(202)
+      end
+    end
+  end
+
+  context "without any api" do
+    describe "#trigger" do
+      it "triggers a page if key is present" do
+        expect(Clog).to receive(:emit).with("page triggered", {page_triggered: {
+          tag: p.tag,
+          summary: p.summary,
+          severity: p.severity,
+          details: p.details,
+          links: [{href: "#{Config.admin_url}/model/Page/#{p.ubid}", text: "Admin Page"}]
+        }})
+        p.trigger
+      end
+    end
+
+    describe "#resolve" do
+      it "resolves the page if key is present" do
+        expect(Clog).to receive(:emit).with("page resolved", {page_resolved: {
+          tag: p.tag
+        }})
+        p.resolve
+      end
     end
   end
 
