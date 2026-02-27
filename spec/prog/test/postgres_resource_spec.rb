@@ -136,14 +136,14 @@ RSpec.describe Prog::Test::PostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
-    it "hops to destroy if the postgres resource destroyed" do
-      expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
+    it "hops to finish if the postgres resource destroyed" do
+      expect { pgr_test.wait_resources_destroyed }.to hop("finish")
     end
   end
 
-  describe "#destroy" do
+  describe "#finish" do
     it "exits successfully if no failure happened" do
-      expect { pgr_test.destroy }.to exit({"msg" => "Postgres tests are finished!"})
+      expect { pgr_test.finish }.to exit({"msg" => "Postgres tests are finished!"})
     end
 
     it "hops to failed if a failure happened" do
@@ -151,7 +151,7 @@ RSpec.describe Prog::Test::PostgresResource do
       pgr_test.strand.modified!(:stack)
       pgr_test.strand.save_changes
       fresh_pgr_test = described_class.new(pgr_test.strand)
-      expect { fresh_pgr_test.destroy }.to hop("failed")
+      expect { fresh_pgr_test.finish }.to hop("failed")
     end
   end
 

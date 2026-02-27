@@ -3,8 +3,6 @@
 require_relative "../../lib/util"
 
 class Prog::Test::Kubernetes < Prog::Test::Base
-  semaphore :destroy
-
   MIGRATION_TRIES = 2
 
   def self.assemble
@@ -327,10 +325,10 @@ STS
 
   label def destroy_kubernetes
     kubernetes_cluster.incr_destroy
-    hop_destroy
+    hop_finish
   end
 
-  label def destroy
+  label def finish
     nap 5 if kubernetes_cluster
     kubernetes_test_project.destroy
 
