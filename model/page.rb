@@ -2,8 +2,89 @@
 
 require_relative "../model"
 
-require "pagerduty"
 require "openssl"
+
+if Config.pagerduty_key
+  require "pagerduty"
+
+  class PagerClient
+    def initialize
+      @client = Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
+    end
+
+    def trigger(tag, summary:, severity:, details:, links:)
+      incident(tag).trigger(summary:, severity:, source: "clover", custom_details: details, links:)
+    end
+
+    def resolve(tag)
+      incident(tag).resolve
+    end
+
+    private
+
+    def incident(tag)
+      @client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
+    end
+  end
+elsif Config.incidentio_key
+  require "net/http"
+  require "uri"
+
+  class PagerClient
+    def initialize
+      @uri = URI("https://api.incident.io/v2/alert_events/http/#{Config.incidentio_alert_source_config_id}")
+    end
+
+    def trigger(tag, summary:, severity:, details:, links:)
+      metadata = (details || {}).merge({severity:})
+      metadata[:links] = links[1..] if links && links.length > 1
+      Net::HTTP.start(@uri.hostname, use_ssl: true) do |http|
+        request = Net::HTTP::Post.new(@uri)
+        request["Authorization"] = "Bearer #{Config.incidentio_key}"
+        request["Content-Type"] = "application/json"
+        request.body = {
+          deduplication_key: deduplication_key(tag),
+          status: "firing",
+          title: summary,
+          source_url: links.first&.[](:href),
+          metadata:
+        }.to_json
+        http.request(request)
+      end
+    end
+
+    def resolve(tag, summary:)
+      Net::HTTP.start(@uri.hostname, use_ssl: true) do |http|
+        request = Net::HTTP::Post.new(@uri)
+        request["Authorization"] = "Bearer #{Config.incidentio_key}"
+        request.content_type = "application/json"
+        request.body = {
+          deduplication_key: deduplication_key(tag),
+          title: summary,
+          status: "resolved"
+        }.to_json
+        http.request(request)
+      end
+    end
+
+    private
+
+    def deduplication_key(tag)
+      OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag)
+    end
+  end
+else
+  class PagerClient
+    def trigger(tag, **kwargs)
+      kwargs[:tag] = tag
+      Clog.emit("page triggered", kwargs)
+    end
+
+    def resolve(tag)
+      Clog.emit("page resolved", {tag:})
+    end
+  end
+end
 
 class Page < Sequel::Model
   dataset_module do
@@ -55,39 +136,35 @@ class Page < Sequel::Model
   # This cannot be covered, as the current coverage tests run without freezing models.
   # :nocov:
   def self.freeze
-    pagerduty_client
+    client
     super
   end
   # :nocov:
 
-  def self.pagerduty_client
-    @pagerduty_client ||= Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
+  def self.client
+    @client ||= PagerClient.new
   end
 
   plugin SemaphoreMethods, :resolve, :retrigger
   plugin ResourceMethods
 
-  def pagerduty_client
-    self.class.pagerduty_client
+  def client
+    self.class.client
   end
 
   def trigger
-    return unless Config.pagerduty_key
-
     links = [{href: "#{Config.admin_url}/model/Page/#{ubid}", text: "Admin Page"}]
     details.fetch("related_resources", []).each do |ubid|
       links << {href: Config.pagerduty_log_link.gsub("<ubid>", ubid), text: "View #{ubid} Logs"} if Config.pagerduty_log_link
     end
 
-    pagerduty_incident.trigger(summary:, severity:, source: "clover", custom_details: details, links:)
+    client.trigger(tag, summary:, severity:, details:, links:)
   end
 
   def resolve
     this.update(resolved_at: Sequel::CURRENT_TIMESTAMP)
 
-    return unless Config.pagerduty_key
-
-    pagerduty_incident.resolve
+    client.resolve(tag, summary:)
   end
 
   def self.generate_tag(*tag_parts)
@@ -107,8 +184,8 @@ class Page < Sequel::Model
 
   private
 
-  def pagerduty_incident
-    pagerduty_client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
+  def incident
+    client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
   end
 end
 
