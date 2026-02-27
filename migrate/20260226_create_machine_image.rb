@@ -9,6 +9,7 @@ Sequel.migration do
       foreign_key :project_id, :project, type: :uuid, null: false
       foreign_key :location_id, :location, type: :uuid, null: false
       String :arch, null: false, default: "x64"
+      TrueClass :deleting, null: false, default: false
       timestamptz :created_at, null: false, default: Sequel.lit("now()")
 
       unique [:project_id, :location_id, :name]

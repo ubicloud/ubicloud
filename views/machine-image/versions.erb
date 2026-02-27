@@ -9,7 +9,10 @@
     mi_path = "#{@project.path}#{@machine_image.path}"
     action_html = ""
     unless v.active?
-      action_html = "<form action='#{mi_path}/set-active' method='post'>#{csrf_tag(mi_path + "/set-active")}<input type='hidden' name='version_id' value='#{v.ubid}'/> <button type='submit' class='text-rose-500 hover:underline text-sm'>Set Active</button></form>"
+      activate_html = "<form action='#{mi_path}/set-active' method='post' class='inline mr-2'>#{csrf_tag(mi_path + "/set-active")}<input type='hidden' name='version_id' value='#{v.ubid}'/>" +
+        part("components/button", text: "Activate", icon: nil, type: "safe", extra_class: "!px-2 !py-1 !text-xs") +
+        "</form>"
+      action_html = activate_html
     end
 
     [

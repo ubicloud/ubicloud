@@ -36,7 +36,12 @@ class Clover
         authorize("MachineImage:delete", machine_image)
 
         DB.transaction do
-          machine_image.versions.each(&:incr_destroy)
+          machine_image.update(deleting: true)
+          if machine_image.versions.empty?
+            machine_image.destroy
+          else
+            machine_image.versions.each(&:incr_destroy)
+          end
           audit_log(machine_image, "destroy")
         end
 

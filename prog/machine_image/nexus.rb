@@ -85,7 +85,9 @@ class Prog::MachineImage::Nexus < Prog::Base
   end
 
   label def finish
-    machine_image_version.update(state: "available", size_gib: boot_volume.size_gib, activated_at: Time.now)
+    archive_size_bytes = calculate_archive_size
+    archive_size_gib = archive_size_bytes ? (archive_size_bytes.to_f / (1024**3)).round(2) : nil
+    machine_image_version.update(state: "available", size_gib: boot_volume.size_gib, archive_size_gib: archive_size_gib, activated_at: Time.now)
 
     if machine_image.project.billable && machine_image_version.active_billing_records.empty?
       billing_rate = BillingRate.from_resource_properties("MachineImageStorage", "standard", machine_image.location.name)
@@ -137,7 +139,12 @@ class Prog::MachineImage::Nexus < Prog::Base
     machine_image_version.update(key_encryption_key_1_id: nil)
     kek&.destroy
 
+    mi = machine_image_version.machine_image
     machine_image_version.destroy
+
+    if mi.deleting? && mi.versions_dataset.empty?
+      mi.destroy
+    end
 
     pop "machine image version destroyed"
   end
@@ -185,18 +192,14 @@ class Prog::MachineImage::Nexus < Prog::Base
     params
   end
 
-  DELETE_BATCH_SIZE = 5000
-
-  # Deletes up to DELETE_BATCH_SIZE objects under the image prefix.
-  # Returns true if more objects likely remain, false if deletion is complete.
-  def delete_s3_objects_batch
+  def s3_client
     creds = CloudflareR2.generate_temp_credentials(
       bucket: machine_image_version.s3_bucket,
       permission: "object-read-write",
       ttl_seconds: 3600
     )
 
-    client = Aws::S3::Client.new(
+    Aws::S3::Client.new(
       endpoint: machine_image_version.s3_endpoint,
       access_key_id: creds[:access_key_id],
       secret_access_key: creds[:secret_access_key],
@@ -205,7 +208,36 @@ class Prog::MachineImage::Nexus < Prog::Base
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required"
     )
+  end
 
+  def calculate_archive_size
+    client = s3_client
+    total_bytes = 0
+    continuation_token = nil
+
+    loop do
+      params = {bucket: machine_image_version.s3_bucket, prefix: machine_image_version.s3_prefix}
+      params[:continuation_token] = continuation_token if continuation_token
+
+      response = client.list_objects_v2(**params)
+      response.contents.each { total_bytes += it.size }
+
+      break unless response.is_truncated
+      continuation_token = response.next_continuation_token
+    end
+
+    total_bytes
+  rescue => e
+    Clog.emit("Failed to calculate archive size", {archive_size_error: {ubid: machine_image_version.ubid, error: e.message}})
+    nil
+  end
+
+  DELETE_BATCH_SIZE = 5000
+
+  # Deletes up to DELETE_BATCH_SIZE objects under the image prefix.
+  # Returns true if more objects likely remain, false if deletion is complete.
+  def delete_s3_objects_batch
+    client = s3_client
     objects = []
     continuation_token = nil
 

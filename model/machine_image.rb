@@ -38,6 +38,10 @@ class MachineImage < Sequel::Model
     end
   end
 
+  def deleting?
+    deleting
+  end
+
   def before_destroy
     versions.each(&:destroy)
     super
