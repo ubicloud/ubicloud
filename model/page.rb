@@ -4,89 +4,81 @@ require_relative "../model"
 
 require "openssl"
 
-if Config.pagerduty_key
-  require "pagerduty"
+class Page < Sequel::Model
+  class Client
+    if Config.pagerduty_key
+      require "pagerduty"
 
-  class PagerClient
-    def initialize
-      @client = Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
-    end
+      def initialize
+        @client = Pagerduty.build(integration_key: Config.pagerduty_key, api_version: 2)
+      end
 
-    def trigger(tag, summary:, severity:, details:, links:)
-      incident(tag).trigger(summary:, severity:, source: "clover", custom_details: details, links:)
-    end
+      def trigger(tag, summary:, severity:, details:, links:)
+        incident(tag).trigger(summary:, severity:, source: "clover", custom_details: details, links:)
+      end
 
-    def resolve(tag)
-      incident(tag).resolve
-    end
+      def resolve(tag)
+        incident(tag).resolve
+      end
 
-    private
+      private
 
-    def incident(tag)
-      @client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
-    end
-  end
-elsif Config.incidentio_key
-  require "net/http"
-  require "uri"
+      def incident(tag)
+        @client.incident(OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag))
+      end
+    elsif Config.incidentio_key
+      require "excon"
 
-  class PagerClient
-    def initialize
-      @uri = URI("https://api.incident.io/v2/alert_events/http/#{Config.incidentio_alert_source_config_id}")
-    end
-
-    def trigger(tag, summary:, severity:, details:, links:)
-      metadata = (details || {}).merge({severity:})
-      metadata[:links] = links[1..] if links && links.length > 1
-      Net::HTTP.start(@uri.hostname, use_ssl: true) do |http|
-        request = Net::HTTP::Post.new(@uri)
-        request["Authorization"] = "Bearer #{Config.incidentio_key}"
-        request["Content-Type"] = "application/json"
-        request.body = {
+      def trigger(tag, summary:, severity:, details:, links:)
+        metadata = (details || {}).merge({severity:})
+        link, *links = links
+        metadata[:links] = links unless links.empty?
+        body = {
           deduplication_key: deduplication_key(tag),
           status: "firing",
           title: summary,
-          source_url: links.first&.[](:href),
+          source_url: link&.[](:href),
           metadata:
         }.to_json
-        http.request(request)
+        Excon.post(uri, body:, headers: {
+          "Authorization" => "Bearer #{Config.incidentio_key}",
+          "Content-Type" => "application/json"
+        })
       end
-    end
 
-    def resolve(tag, summary:)
-      Net::HTTP.start(@uri.hostname, use_ssl: true) do |http|
-        request = Net::HTTP::Post.new(@uri)
-        request["Authorization"] = "Bearer #{Config.incidentio_key}"
-        request.content_type = "application/json"
-        request.body = {
+      def resolve(tag, summary:)
+        body = {
           deduplication_key: deduplication_key(tag),
           title: summary,
           status: "resolved"
         }.to_json
-        http.request(request)
+        Excon.post(uri, body:, headers: {
+          "Authorization" => "Bearer #{Config.incidentio_key}",
+          "Content-Type" => "application/json"
+        })
+      end
+
+      private
+
+      def uri
+        "https://api.incident.io/v2/alert_events/http/#{Config.incidentio_alert_source_config_id}"
+      end
+
+      def deduplication_key(tag)
+        OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag)
+      end
+    else
+      def trigger(tag, **kwargs)
+        kwargs[:tag] = tag
+        Clog.emit("page triggered", {page_triggered: kwargs})
+      end
+
+      def resolve(tag)
+        Clog.emit("page resolved", {page_resolved: {tag:}})
       end
     end
-
-    private
-
-    def deduplication_key(tag)
-      OpenSSL::HMAC.hexdigest("SHA256", "ubicloud-page-key", tag)
-    end
   end
-else
-  class PagerClient
-    def trigger(tag, **kwargs)
-      kwargs[:tag] = tag
-      Clog.emit("page triggered", kwargs)
-    end
 
-    def resolve(tag)
-      Clog.emit("page resolved", {tag:})
-    end
-  end
-end
-
-class Page < Sequel::Model
   dataset_module do
     def group_by_vm_host
       pages = all
@@ -142,7 +134,7 @@ class Page < Sequel::Model
   # :nocov:
 
   def self.client
-    @client ||= PagerClient.new
+    @client ||= Client.new
   end
 
   plugin SemaphoreMethods, :resolve, :retrigger
