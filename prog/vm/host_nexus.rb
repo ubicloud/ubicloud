@@ -141,18 +141,10 @@ class Prog::Vm::HostNexus < Prog::Base
       hop_download_boot_images
     end
 
-    if frame["spdk_version"]
-      push Prog::Storage::SetupSpdk, {
-        "version" => frame["spdk_version"],
-        "start_service" => false,
-        "allocation_weight" => 100
-      }
-    else
-      push Prog::Storage::SetupVhostBlockBackend, {
-        "version" => frame["vhost_block_backend_version"],
-        "allocation_weight" => 100
-      }
-    end
+    push Prog::Storage::SetupVhostBlockBackend, {
+           "version" => frame["vhost_block_backend_version"],
+           "allocation_weight" => 100
+         }
   end
 
   label def download_boot_images
