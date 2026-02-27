@@ -14,8 +14,7 @@ RSpec.describe Clover, "machine_image" do
       name: "test-image",
       description: "test desc",
       project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID,
-      arch: "arm64"
+      location_id: Location::HETZNER_FSN1_ID
     )
     MachineImageVersion.create(
       machine_image_id: mi.id,
@@ -36,8 +35,7 @@ RSpec.describe Clover, "machine_image" do
     mi = MachineImage.create(
       name: "other-image",
       project_id: project_wo_permissions.id,
-      location_id: Location::HETZNER_FSN1_ID,
-      arch: "arm64"
+      location_id: Location::HETZNER_FSN1_ID
     )
     MachineImageVersion.create(
       machine_image_id: mi.id,
@@ -201,6 +199,58 @@ RSpec.describe Clover, "machine_image" do
         expect(page.title).to eq("Ubicloud - ResourceNotFound")
         expect(page.status_code).to eq(404)
         expect(page).to have_content "ResourceNotFound"
+      end
+    end
+
+    describe "create version" do
+      it "can create a version from a stopped VM" do
+        allow(Config).to receive(:machine_image_archive_bucket).and_return("test-bucket")
+        allow(Config).to receive(:machine_image_archive_endpoint).and_return("https://r2.example.com")
+
+        mi = machine_image
+        vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "stopped-vm", location_id: Location::HETZNER_FSN1_ID).subject
+        vm.strand.update(label: "stopped")
+        VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, vhost_block_backend_id: vbb.id, vring_workers: 1)
+
+        visit "#{project.path}#{mi.path}/create-version"
+
+        expect(page.title).to eq("Ubicloud - Add Version — #{mi.name}")
+        expect(page).to have_content "Create Machine Image Version"
+        select "stopped-vm", from: "vm_ubid"
+
+        click_button "Create Version"
+
+        expect(page).to have_flash_notice("Version 2 is being created")
+        ver = MachineImageVersion.where(machine_image_id: mi.id, version: 2).first
+        expect(ver).not_to be_nil
+        expect(ver.state).to eq("creating")
+        expect(ver.vm_id).to eq(vm.id)
+        expect(ver.size_gib).to eq(20)
+        expect(ver.s3_bucket).not_to be_nil
+        expect(ver.strand).not_to be_nil
+      end
+
+      it "shows message when no stopped VMs available" do
+        mi = machine_image
+        visit "#{project.path}#{mi.path}/create-version"
+
+        expect(page).to have_content "No stopped VMs available"
+      end
+
+      it "fails when VM not found" do
+        mi = machine_image
+        # Create a stopped VM so the form is shown (not the "no stopped VMs" message)
+        vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "stopped-vm", location_id: Location::HETZNER_FSN1_ID).subject
+        vm.strand.update(label: "stopped")
+
+        visit "#{project.path}#{mi.path}/create-version"
+
+        form = find("form[action*='create-version']")
+        _csrf = form.find("input[name='_csrf']", visible: false).value
+        action = form["action"]
+        page.driver.post action, {vm_ubid: Vm.generate_ubid, _csrf:}
+
+        expect(page.driver.status_code).to eq(400)
       end
     end
 

@@ -35,7 +35,7 @@
         </select>
       </div>
       <div class="flex justify-end gap-3">
-        <%== part("components/button", text: "Cancel", type: "secondary", link: "#{mi_path}/overview") %>
+        <a href="<%= mi_path %>/overview" class="inline-flex items-center rounded-md px-3.5 py-2.5 text-sm font-semibold text-gray-700 hover:text-gray-900">Cancel</a>
         <%== part("components/button", text: "Create Version", icon: "hero-plus") %>
       </div>
     <% end %>

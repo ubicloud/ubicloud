@@ -41,6 +41,15 @@ class Clover
     end
   end
 
+  def stopped_vms_in_location(project, location_id)
+    project.vms_dataset
+      .where(location_id: location_id)
+      .eager(:strand)
+      .all
+      .select { it.display_state == "stopped" }
+      .sort_by(&:name)
+  end
+
   def generate_machine_image_options
     options = OptionTreeGenerator.new
     options.add_option(name: "name")

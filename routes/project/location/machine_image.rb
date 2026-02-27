@@ -62,43 +62,41 @@ class Clover
 
       r.get web?, "create-version" do
         authorize("MachineImage:edit", machine_image)
-        @stopped_vms = @project.vms_dataset
-          .where(location_id: machine_image.location_id)
-          .where(display_state: "stopped")
-          .order(:name)
-          .all
+        @stopped_vms = stopped_vms_in_location(@project, machine_image.location_id)
         view "machine-image/create_version"
       end
 
       r.post web?, "create-version" do
         authorize("MachineImage:edit", machine_image)
         handle_validation_failure("machine-image/create_version") do
-          @stopped_vms = @project.vms_dataset
-            .where(location_id: machine_image.location_id)
-            .where(display_state: "stopped")
-            .order(:name)
-            .all
+          @stopped_vms = stopped_vms_in_location(@project, machine_image.location_id)
         end
 
         vm_ubid = typecast_params.nonempty_str!("vm_ubid")
-        vm = @project.vms_dataset
-          .where(location_id: machine_image.location_id)
-          .where(display_state: "stopped")
-          .first(id: UBID.to_uuid(vm_ubid))
+        vm = stopped_vms_in_location(@project, machine_image.location_id)
+          .find { it.ubid == vm_ubid }
 
         unless vm
           fail Validation::ValidationFailed.new({vm_ubid: "VM not found or not stopped"})
         end
 
         next_version = (machine_image.versions_dataset.max(:version) || 0) + 1
+        s3_bucket = Config.machine_image_archive_bucket
+        s3_endpoint = Config.machine_image_archive_endpoint
+        s3_prefix = "#{machine_image.ubid}/#{next_version}/"
 
         DB.transaction do
-          MachineImageVersion.create(
+          version = MachineImageVersion.create(
             machine_image_id: machine_image.id,
             version: next_version,
+            state: "creating",
             vm_id: vm.id,
-            size_gib: vm.storage_volumes.first&.size_gib || 0
+            size_gib: vm.vm_storage_volumes.find(&:boot)&.size_gib || 0,
+            s3_bucket: s3_bucket,
+            s3_prefix: s3_prefix,
+            s3_endpoint: s3_endpoint
           )
+          Prog::MachineImage::Nexus.assemble(version)
           audit_log(machine_image, "update")
         end
 
