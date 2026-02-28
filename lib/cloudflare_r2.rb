@@ -41,8 +41,9 @@ class CloudflareR2
   # The R2 parent access key ID is the API token's ID. We derive it by
   # calling the token-verify endpoint and cache the result for the process
   # lifetime.
+  PARENT_ACCESS_KEY_CACHE = {}
   def self.parent_access_key_id(api_token)
-    @parent_access_key_id ||= begin
+    PARENT_ACCESS_KEY_CACHE[api_token] ||= begin
       response = Excon.get(
         "https://api.cloudflare.com/client/v4/user/tokens/verify",
         headers: {"Authorization" => "Bearer #{api_token}"},
