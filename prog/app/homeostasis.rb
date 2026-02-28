@@ -49,7 +49,7 @@ class Prog::App::Homeostasis < Prog::Base
         size: ap.vm_size,
         location_id: ap.location_id,
         private_subnet_id: ap.private_subnet_id,
-        enable_ip4: false,
+        enable_ip4: true,
         init_script: combined_init,
         **vm_options
       )
