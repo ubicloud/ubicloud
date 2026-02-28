@@ -34,7 +34,7 @@ class Prog::App::Homeostasis < Prog::Base
       fail "Machine image not found: #{ap.umi_ref}" unless mi
       miv = mi.active_version
       fail "No active version for machine image: #{ap.umi_ref}" unless miv
-      {storage_volumes: [{machine_image_version_id: miv.id}]}
+      {storage_volumes: [{machine_image_version_id: miv.id, size_gib: miv.size_gib}]}
     else
       {boot_image: "ubuntu-noble"}
     end
