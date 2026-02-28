@@ -15,7 +15,7 @@ class Clover
 
       dataset = repository.cache_entries_dataset.exclude(committed_at: nil).where(version:)
 
-      unless repository.installation.project.get_ff_access_all_cache_scopes
+      if repository.installation.cache_scope_protected
         # Clients can send multiple keys, and we look for caches in multiple scopes.
         # We prioritize scope over key, returning the cache for the first matching
         # key in the head branch scope, followed by the first matching key in

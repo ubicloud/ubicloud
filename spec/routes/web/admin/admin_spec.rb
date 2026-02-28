@@ -906,7 +906,6 @@ RSpec.describe CloverAdmin do
 
     [
       ["allocator_diagnostics", "", nil],
-      ["access_all_cache_scopes", "true", true],
       ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
       ["gpu_runner", "1", 1],

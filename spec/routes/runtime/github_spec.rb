@@ -383,7 +383,7 @@ RSpec.describe Clover, "github" do
         GithubCacheEntry.create(key: "mix-prod-123", version: "v1", scope: "main", repository_id: repository.id, created_at: Time.now, created_by: runner.id, committed_at: Time.now)
 
         expect(url_presigner).to receive(:presigned_url).with(:get_object, anything).and_return("http://presigned-url").at_least(:once)
-        installation.project.set_ff_access_all_cache_scopes(true)
+        installation.update(cache_scope_protected: false)
         get "/runtime/github/cache", {keys: "mix-dev-main-,mix-dev-,mix-", version: "v1"}
 
         expect(last_response.status).to eq(200)
