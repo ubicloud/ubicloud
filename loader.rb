@@ -77,6 +77,8 @@ module Prog::Github; end
 
 module Prog::Kubernetes; end
 
+module Prog::App; end
+
 module Prog::MachineImage; end
 
 module Prog::Minio; end
@@ -229,6 +231,7 @@ def clover_freeze
     Prog::Base::FlowControl,
     Prog::Base::Hop,
     Prog::Base::Nap,
+    Prog::App,
     Prog::DnsZone,
     Prog::Github,
     Prog::Kubernetes,

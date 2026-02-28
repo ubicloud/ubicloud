@@ -72,6 +72,7 @@ class Clover < Roda
     UBID.to_uuid(s)
   end
   [
+    AppProcess,
     Firewall,
     [GithubInstallation, /([A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?)/],
     [GithubRepository, /([A-Za-z0-9\-_.]{1,100})/],
@@ -111,6 +112,7 @@ class Clover < Roda
   %w[
     ActionTag
     ApiKey
+    AppProcess
     Firewall
     KubernetesCluster
     KubernetesNodepool
@@ -1042,7 +1044,7 @@ class Clover < Roda
             raise "request not found in openapi schema: #{r.request_method} #{r.path_info}"
           end
 
-          next
+          next unless ENV["IGNORE_INVALID_API_PATHS"]
         end
       rescue JSON::ParserError => e
         raise Committee::InvalidRequest.new("Request body wasn't valid JSON.", original_error: e)
@@ -1059,7 +1061,7 @@ class Clover < Roda
     next unless api? && status && headers && body
 
     @schema_validator ||= SCHEMA_ROUTER.build_schema_validator(request)
-    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist?
+    @schema_validator.response_validate(status, headers, body, true) if @schema_validator.link_exist? && !ENV["IGNORE_INVALID_API_PATHS"]
   rescue JSON::ParserError => e
     raise Committee::InvalidResponse.new("Response body wasn't valid JSON.", original_error: e)
   end

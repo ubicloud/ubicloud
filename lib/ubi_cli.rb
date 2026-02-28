@@ -7,7 +7,9 @@ class UbiCli
   force_autoload = Config.production? || ENV["FORCE_AUTOLOAD"] == "1"
 
   SDK_METHODS = {
+    "app" => "app_process",
     "fw" => "firewall",
+    "init" => "init_script_tag",
     "ak" => "inference_api_key",
     "kc" => "kubernetes_cluster",
     "lb" => "load_balancer",
@@ -18,6 +20,7 @@ class UbiCli
   }.freeze
 
   CAPITALIZED_LABELS = {
+    "app" => "App process",
     "fw" => "Firewall",
     "ak" => "Inference API key",
     "kc" => "Kubernetes cluster",
@@ -34,7 +37,7 @@ class UbiCli
   LOWERCASE_LABELS["ak"] = "inference API key"
   LOWERCASE_LABELS.freeze
 
-  OBJECT_INFO_REGEXP = /((fw|kc|1b|pg|ps|vm)[a-tv-z0-9]{24})/
+  OBJECT_INFO_REGEXP = /((ap|fw|kc|1b|pg|ps|vm)[a-tv-z0-9]{24})/
   EXACT_OBJECT_INFO_REGEXP = /\A#{OBJECT_INFO_REGEXP}\z/
   UBI_VERSION_REGEXP = /\A\d{1,4}\.\d{1,4}\.\d{1,4}\z/
 

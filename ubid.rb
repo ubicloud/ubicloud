@@ -110,6 +110,14 @@ class UBID
   # TYPE_AUDIT_LOG = "a1"
   TYPE_MACHINE_IMAGE = "m1"
   TYPE_MACHINE_IMAGE_VERSION = "mv"
+  TYPE_APP_PROCESS = "ap"
+  TYPE_APP_PROCESS_MEMBER = "am"
+  TYPE_APP_RELEASE = "ar"
+  TYPE_APP_RELEASE_SNAPSHOT = "ae"
+  TYPE_INIT_SCRIPT_TAG = "nt"
+  TYPE_APP_PROCESS_INIT = "a0"
+  TYPE_APP_MEMBER_INIT = "m0"
+  TYPE_APP_RELEASE_SNAPSHOT_INIT = "r1"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
@@ -152,6 +160,8 @@ class UBID
     ObjectTag: t0
     KubernetesCluster: kc
     Location: 10
+    AppProcess: ap
+    InitScriptTag: nt
   TYPES
   def self.generate_vanity_action_type(action)
     prefix, suffix = action.split(":")
