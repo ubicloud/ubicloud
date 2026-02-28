@@ -30,7 +30,9 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
   end
 
   label def remove_load_balancer
-    vm.vm_host.sshable.cmd("sudo ip netns exec :inhost_name nft --file -", inhost_name:, stdin: generate_nat_rules(vm.ip4_string, vm.private_ipv4.to_s))
+    if vm.ip4_string
+      vm.vm_host.sshable.cmd("sudo ip netns exec :inhost_name nft --file -", inhost_name:, stdin: generate_nat_rules(vm.ip4_string, vm.private_ipv4.to_s))
+    end
 
     pop "load balancer is removed"
   end
@@ -54,7 +56,7 @@ class Prog::Vnet::UpdateLoadBalancerNode < Prog::Base
       fail ArgumentError, "Unsupported load balancer algorithm: #{load_balancer.algorithm}"
     end
 
-    ipv4_prerouting = if load_balancer.ipv4_enabled?
+    ipv4_prerouting = if load_balancer.ipv4_enabled? && public_ipv4
       load_balancer_ports_to_work_on.select { |vm_port| vm_port.stack == "ipv4" }.uniq(&:load_balancer_port_id).map do |vm_port|
         port = vm_port.load_balancer_port
         ipv4_map_def = generate_lb_map_defs_ipv4(port)
@@ -82,7 +84,7 @@ ip6 daddr #{private_ipv6} tcp dport #{port.src_port} ct state established,relate
 
     sorted_ports = load_balancer.ports.sort_by { |port| port.src_port }
     ipv4_postrouting_rule = sorted_ports.map do |port|
-      if load_balancer.ipv4_enabled?
+      if load_balancer.ipv4_enabled? && public_ipv4
         "ip daddr @neighbor_ips_v4 tcp dport #{port.src_port} ct state established,related,new counter snat to #{private_ipv4}"
       end
     end.join("\n")
@@ -114,18 +116,14 @@ table inet nat {
 #{ipv4_prerouting}
 #{ipv6_prerouting}
 
-    # Basic NAT for public IPv4 to private IPv4
-    ip daddr #{public_ipv4} dnat to #{private_ipv4}
+#{public_ipv4 ? "    # Basic NAT for public IPv4 to private IPv4\n    ip daddr #{public_ipv4} dnat to #{private_ipv4}" : ""}
   }
 
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
 #{ipv4_postrouting_rule}
 #{ipv6_postrouting_rule}
-
-    # Basic NAT for private IPv4 to public IPv4
-    ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}
-    ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}
+#{public_ipv4 ? "\n    # Basic NAT for private IPv4 to public IPv4\n    ip saddr #{private_ipv4} ip daddr != { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 } snat to #{public_ipv4}\n    ip saddr #{private_ipv4} ip daddr #{private_ipv4} snat to #{public_ipv4}" : ""}
   }
 }
 TEMPLATE
