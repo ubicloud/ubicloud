@@ -7,6 +7,7 @@ module Ubicloud
   # The following instance methods are defined via metaprogramming.  All
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
+  # +app_process+ :: Ubicloud::AppProcess
   # +machine_image+ :: Ubicloud::MachineImage
   # +firewall+ :: Ubicloud::Firewall
   # +github_cache_entry+ :: Ubicloud::GithubCacheEntry
@@ -17,6 +18,7 @@ module Ubicloud
   # +load_balancer+ :: Ubicloud::LoadBalancer
   # +postgres+ :: Ubicloud::Postgres
   # +private_subnet+ :: Ubicloud::PrivateSubnet
+  # +init_script_tag+ :: Ubicloud::InitScriptTag
   # +ssh_public_key+ :: Ubicloud::SshPublicKey
   # +vm+ :: Ubicloud::Vm
   class Context
@@ -26,6 +28,7 @@ module Ubicloud
     end
 
     {
+      app_process: AppProcess,
       vm: Vm,
       postgres: Postgres,
       machine_image: MachineImage,
@@ -36,6 +39,7 @@ module Ubicloud
       github_installation: GithubInstallation,
       github_repository: GithubRepository,
       inference_api_key: InferenceApiKey,
+      init_script_tag: InitScriptTag,
       kubernetes_cluster: KubernetesCluster,
       ssh_public_key: SshPublicKey
     }.each do |meth, model|
@@ -43,6 +47,7 @@ module Ubicloud
     end
 
     MODEL_PREFIX_MAP = {
+      "ap" => AppProcess,
       "vm" => Vm,
       "pg" => Postgres,
       "m1" => MachineImage,
@@ -53,6 +58,7 @@ module Ubicloud
       "g1" => GithubInstallation,
       "gp" => GithubRepository,
       "ak" => InferenceApiKey,
+      "it" => InitScriptTag,
       "kc" => KubernetesCluster,
       "sk" => SshPublicKey
     }.freeze
