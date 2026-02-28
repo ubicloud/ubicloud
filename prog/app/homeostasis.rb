@@ -14,10 +14,6 @@ class Prog::App::Homeostasis < Prog::Base
       fill_gap(ap, gap)
     end
 
-    hop_wait
-  end
-
-  label def wait
     nap 60
   end
 
