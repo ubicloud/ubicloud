@@ -120,7 +120,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       used_amount = (duration / 60).ceil
       github_runner.log_duration("runner_completed", duration)
       today_record = BillingRecord
-        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
+        .where(project_id: project.id, resource_id: installation.id, billing_rate_id: rate_id)
         .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
         .first
 
@@ -130,8 +130,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       else
         BillingRecord.create(
           project_id: project.id,
-          resource_id: project.id,
-          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
+          resource_id: installation.id,
+          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")} (#{installation.name})",
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount
