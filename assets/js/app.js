@@ -412,7 +412,7 @@ function setupPlayground() {
     if (controller) {
       controller.abort();
       $('#inference_submit').text("Submit");
-      $('#inference_files').prop('disabled', false);
+      update_file_input_state();
       controller = null;
       return;
     }
@@ -580,13 +580,13 @@ function setupPlayground() {
       $(`#inference_message_info_${assistant_message_id}`).text(errorMessage);
     } finally {
       $("#inference_submit").text("Submit");
-      $("#inference_files").prop("disabled", false);
+      update_file_input_state();
       controller = null;
     }
   };
 
   $('#inference_submit').on("click", generate);
-  $('#inference_config-show_advanced-0').on("change", function() {
+  $('#inference_config-show_advanced-0').on("change", function () {
     $('#inference_config_advanced_settings').toggleClass("hidden", !$(this).is(":checked"));
   });
 }
