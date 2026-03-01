@@ -1,0 +1,10 @@
+<%# locals: (tags:) %>
+<% if tags.nil? || tags.empty? %>
+  -
+<% else %>
+  <div class="flex flex-wrap gap-1 max-w-[250px]">
+    <% tags.each do |tag| %>
+      <%= tag["key"] %> <%== part("components/copyable_content", content: tag["value"], message: "Copied tag") %>
+    <% end %>
+  </div>
+<% end %>

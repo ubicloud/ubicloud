@@ -227,6 +227,7 @@ class Project < Sequel::Model
     :postgres_init_script,
     :postgres_lantern,
     :postgres_paradedb,
+    :postgres_tag_search_ui,
     :private_locations,
     :skip_runner_pool,
     :spill_to_alien_runners,

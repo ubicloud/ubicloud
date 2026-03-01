@@ -101,6 +101,52 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_content pg_wo_permission.name
       end
+
+      describe "tag search" do
+        before do
+          project.set_ff_postgres_tag_search_ui(true)
+        end
+
+        it "shows search input when feature flag is enabled" do
+          pg
+          visit "#{project.path}/postgres"
+          expect(page).to have_field("tags")
+        end
+
+        it "does not show search input when feature flag is disabled" do
+          project.set_ff_postgres_tag_search_ui(nil)
+          pg
+          visit "#{project.path}/postgres"
+          expect(page).to have_no_field("tags")
+        end
+
+        it "displays tags in the table" do
+          pg.update(tags: [{"key" => "env", "value" => "prod"}, {"key" => "team", "value" => "backend"}])
+          visit "#{project.path}/postgres"
+          expect(page).to have_css(".tag-pill", text: "env:prod")
+          expect(page).to have_css(".tag-pill", text: "team:backend")
+        end
+
+        it "filters postgres databases by tag" do
+          pg.update(tags: [{"key" => "env", "value" => "prod"}])
+          visit "#{project.path}/postgres?tags=env:prod"
+          expect(page).to have_content pg.name
+          expect(page).to have_field("tags", with: "env:prod")
+        end
+
+        it "shows clear button when filter is active" do
+          pg
+          visit "#{project.path}/postgres?tags=env:prod"
+          expect(page).to have_link("Clear")
+        end
+
+        it "shows empty table when filter matches nothing" do
+          pg
+          visit "#{project.path}/postgres?tags=nonexistent:tag"
+          expect(page).to have_no_content pg.name
+          expect(page).to have_link("Clear")
+        end
+      end
     end
 
     describe "create" do
