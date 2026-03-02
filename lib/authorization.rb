@@ -129,7 +129,7 @@ module Authorization
 
     ds = DB[:object_ids]
       .with_recursive(:object_ids,
-        Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
+        matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
         DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
           .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },
