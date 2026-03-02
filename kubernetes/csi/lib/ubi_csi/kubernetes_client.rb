@@ -23,6 +23,10 @@ module Csi
           raise ObjectNotFoundError, output
         end
 
+        if output.strip.end_with?("already exists")
+          raise AlreadyExistsError, output
+        end
+
         raise "Command failed: #{cmd.join(" ")}\nOutput: #{output}"
       end
       output
@@ -104,6 +108,16 @@ module Csi
       raise ObjectNotFoundError, "PersistentVolume with volumeHandle '#{volume_id}' not found" unless pv
 
       pv
+    end
+
+    def find_retained_pv_for_pvc(namespace, name)
+      pv_list = yaml_load_kubectl("get", "pv")
+      pv_list["items"].find do |pv|
+        pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
+          pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain" &&
+          pv.dig("spec", "claimRef", "namespace") == namespace &&
+          pv.dig("spec", "claimRef", "name") == name
+      end
     end
 
     def get_nodeplugin_pods

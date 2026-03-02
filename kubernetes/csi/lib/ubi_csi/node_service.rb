@@ -126,9 +126,21 @@ module Csi
       end
 
       def fetch_and_migrate_pvc(req_id, client, req)
-        pvc = client.get_pvc(req.volume_context["csi.storage.k8s.io/pvc/namespace"],
-          req.volume_context["csi.storage.k8s.io/pvc/name"])
+        pvc_namespace = req.volume_context["csi.storage.k8s.io/pvc/namespace"]
+        pvc_name = req.volume_context["csi.storage.k8s.io/pvc/name"]
+        pvc = client.get_pvc(pvc_namespace, pvc_name)
         if pvc_needs_migration?(pvc)
+          migrate_pvc_data(req_id, client, pvc, req)
+
+        # Fallback: during node drain, recreate_pvc may race with the StatefulSet controller,
+        # which can recreate the PVC without the migration annotation. The old PV's
+        # old-pvc-object annotation is set before any PVC deletion, so check it as a safety net.
+        elsif (old_pv = client.find_retained_pv_for_pvc(pvc_namespace, pvc_name))
+          old_pv_name = old_pv.dig("metadata", "name")
+          log_with_id(req_id, "PVC missing migration annotation, found retained PV: #{old_pv_name}")
+          pvc["metadata"]["annotations"] ||= {}
+          pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = old_pv_name
+          client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, old_pv_name, namespace: pvc_namespace)
           migrate_pvc_data(req_id, client, pvc, req)
         end
         pvc
@@ -313,8 +325,13 @@ module Csi
             client.remove_pvc_finalizers(pvc_namespace, pvc_name)
             log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
           end
-          client.create_pvc(pvc)
-          log_with_id(req_id, "Recreated PVC with the new spec")
+          begin
+            client.create_pvc(pvc)
+            log_with_id(req_id, "Recreated PVC with the new spec")
+          rescue AlreadyExistsError
+            log_with_id(req_id, "PVC already recreated by StatefulSet controller, patching migration annotation")
+            client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace: pvc_namespace)
+          end
         else
           # PVC is recreated now.
           # At this stage we don't know whether we have created the PVC or
