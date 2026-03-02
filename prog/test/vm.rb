@@ -83,7 +83,64 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("sync :test_file", test_file:)
     }
 
-    hop_ping_google
+    hop_stop_semaphore
+  end
+
+  label def stop_semaphore
+    vm.incr_stop
+    hop_check_stopped_by_stop_semaphore
+  end
+
+  label def check_stopped_by_stop_semaphore
+    if vm.strand.label == "stopped" && !up?
+      hop_start_semaphore_after_stop
+    end
+
+    nap 5
+  end
+
+  label def start_semaphore_after_stop
+    vm.incr_start
+    hop_check_started_by_start_semaphore
+  end
+
+  label def check_started_by_start_semaphore
+    if vm.strand.label == "wait" && up?
+      hop_shutdown_command
+    end
+
+    nap 5
+  end
+
+  label def shutdown_command
+    begin
+      sshable.cmd("sudo shutdown now")
+    rescue Errno::ECONNRESET, IOError, Net::SSH::Disconnect
+      nil
+    end
+
+    hop_check_stopped_by_shutdown_command
+  end
+
+  label def check_stopped_by_shutdown_command
+    if vm.strand.label == "stopped" && !up?
+      hop_start_semaphore_after_shutdown
+    end
+
+    nap 5
+  end
+
+  label def start_semaphore_after_shutdown
+    vm.incr_start
+    hop_check_started_after_shutdown
+  end
+
+  label def check_started_after_shutdown
+    if vm.strand.label == "wait" && up?
+      hop_ping_google
+    end
+
+    nap 5
   end
 
   label def ping_google
@@ -169,64 +226,7 @@ class Prog::Test::Vm < Prog::Test::Base
       end
     }
 
-    hop_stop_semaphore
-  end
-
-  label def stop_semaphore
-    vm.incr_stop
-    hop_check_stopped_by_stop_semaphore
-  end
-
-  label def check_stopped_by_stop_semaphore
-    if vm.strand.label == "stopped" && !up?
-      hop_start_semaphore_after_stop
-    end
-
-    nap 5
-  end
-
-  label def start_semaphore_after_stop
-    vm.incr_start
-    hop_check_started_by_start_semaphore
-  end
-
-  label def check_started_by_start_semaphore
-    if vm.strand.label == "wait" && up?
-      hop_shutdown_command
-    end
-
-    nap 5
-  end
-
-  label def shutdown_command
-    begin
-      sshable.cmd("sudo shutdown now")
-    rescue Errno::ECONNRESET, IOError, Net::SSH::Disconnect
-      nil
-    end
-
-    hop_check_stopped_by_shutdown_command
-  end
-
-  label def check_stopped_by_shutdown_command
-    if vm.strand.label == "stopped" && !up?
-      hop_start_semaphore_after_shutdown
-    end
-
-    nap 5
-  end
-
-  label def start_semaphore_after_shutdown
-    vm.incr_start
-    hop_check_started_after_shutdown
-  end
-
-  label def check_started_after_shutdown
-    if vm.strand.label == "wait" && up?
-      hop_finish
-    end
-
-    nap 5
+    hop_finish
   end
 
   label def finish
