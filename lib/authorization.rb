@@ -7,17 +7,19 @@ module Authorization
     end
   end
 
-  def self.has_permission?(project_id, subject_id, actions, object_id)
+  extend self
+
+  def has_permission?(project_id, subject_id, actions, object_id)
     !matched_policies_dataset(project_id, subject_id, actions, object_id).empty?
   end
 
-  def self.authorize(project_id, subject_id, actions, object_id)
+  def authorize(project_id, subject_id, actions, object_id)
     unless has_permission?(project_id, subject_id, actions, object_id)
       fail Unauthorized
     end
   end
 
-  def self.all_permissions(project_id, subject_id, object_id)
+  def all_permissions(project_id, subject_id, object_id)
     DB[:action_type]
       .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
       .with_recursive(:rec_action_ids,
@@ -37,7 +39,7 @@ module Authorization
     action: [:applied_action_tag, :action_id],
     object: [:applied_object_tag, :object_id]
   }.freeze
-  private_class_method def self.recursive_tag_query(type, values, project_id: nil)
+  private def recursive_tag_query(type, values, project_id: nil)
     table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
 
     base_ds = DB[table]
@@ -63,7 +65,7 @@ module Authorization
       .select(:tag_id)
   end
 
-  def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+  def matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
     project_id = project_id.id if project_id.is_a?(Project)
     subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
 
@@ -118,11 +120,11 @@ module Authorization
     dataset
   end
 
-  def self.matched_policies(project_id, subject_id, actions = nil, object_id = nil)
+  def matched_policies(project_id, subject_id, actions = nil, object_id = nil)
     matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
-  def self.dataset_authorize(dataset, project_id, subject_id, actions)
+  def dataset_authorize(dataset, project_id, subject_id, actions)
     # We can't use "id" column directly, because it's ambiguous in big joined queries.
     # We need to determine table of id explicitly.
     from = dataset.opts[:from].first
