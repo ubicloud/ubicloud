@@ -917,6 +917,18 @@ class Clover < Roda
       r.get "runtime-error" do
         raise "foo"
       end
+
+      r.get "custom", :ubid_uuid, :ubid_uuid, :ubid_uuid, String, :ubid_uuid do |project_id, allowed_action, allowed_object, requested_action, requested_object|
+        @project = Clover.authorized_project(current_account, project_id)
+
+        define_singleton_method(:ace_base_query) do |project_id|
+          ds = super(project_id)
+          ds.union(DB.values([[nil, project_id, current_account.id, allowed_action, allowed_object].map { Sequel.cast(it, :uuid) }]), alias: :access_control_entry)
+        end
+
+        no_authorization_needed
+        has_permission?(requested_action, requested_object).to_s
+      end
     end
 
     hash_branch("clear-last-password-entry") do |r|

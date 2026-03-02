@@ -25,6 +25,84 @@ RSpec.describe Clover do
     expect(page.title).to end_with("Dashboard")
   end
 
+  it "supports per-request customization by overriding ace_base_query" do
+    account = create_account
+    project = account.create_project_with_default_policy("project-1")
+    pg = PostgresResource.create(
+      name: "pg-name",
+      superuser_password: "dummy-password",
+      ha_type: "none",
+      target_version: "17",
+      location_id: Location::HETZNER_FSN1_ID,
+      project_id: project.id,
+      user_config: {},
+      pgbouncer_user_config: {},
+      target_vm_size: "standard-2",
+      target_storage_size_gib: 64
+    )
+    action_type_id = ActionType::NAME_MAP.fetch("Postgres:view")
+    action_type_ubid = UBID.from_uuidish(action_type_id).to_s
+
+    login
+
+    # Test that admin access is allowed even for incorrect actions
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{action_type_ubid}/#{pg.ubid}/Postgres:edit/#{pg.ubid}"
+    expect(page.body).to eq("true")
+
+    # Remove admin access
+    project.subject_tags_dataset.first(name: "Admin").remove_members(account.id)
+
+    # Test that access is allowed
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{action_type_ubid}/#{pg.ubid}/Postgres:view/#{pg.ubid}"
+    expect(page.body).to eq("true")
+
+    # Create empty action and object tags, that don't contain any entries
+    action_tag = ActionTag.create(project_id: project.id, name: "Empty")
+    object_tag = ObjectTag.create(project_id: project.id, name: "Empty")
+    # Add an ACE that grants access to those tags. Since the tags do not
+    # contain any actions/objects, by itself, this grants access to nothing.
+    AccessControlEntry.create(project_id: project.id, subject_id: account.id, action_id: action_tag.id, object_id: object_tag.id)
+
+    # Test that access is allowed based on request-specific action and object
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{action_type_ubid}/#{pg.ubid}/Postgres:view/#{pg.ubid}"
+    expect(page.body).to eq("true")
+
+    # Test that request-specific permissions require matching action
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{action_type_ubid}/#{pg.ubid}/Postgres:edit/#{pg.ubid}"
+    expect(page.body).to eq("false")
+
+    # Test that request-specific permissions require matching object
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{action_type_ubid}/#{pg.ubid}/Postgres:view/#{account.ubid}"
+    expect(page.body).to eq("false")
+
+    # Add tags containing the action and object. There are no ACEs for these tags, so
+    # this allows not access by default.
+    containing_action_tag = ActionTag.create(project_id: project.id, name: "Containing")
+    containing_action_tag.add_action(action_type_id)
+    containing_object_tag = ObjectTag.create(project_id: project.id, name: "Containing")
+    containing_object_tag.add_object(pg.id)
+
+    # Test that request-specific permissions work recursively (1 level)
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag.ubid}/#{containing_object_tag.ubid}/Postgres:view/#{pg.ubid}"
+    expect(page.body).to eq("true")
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag.ubid}/#{containing_object_tag.ubid}/Postgres:edit/#{pg.ubid}"
+    expect(page.body).to eq("false")
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag.ubid}/#{containing_object_tag.ubid}/Postgres:view/#{account.ubid}"
+    expect(page.body).to eq("false")
+
+    # Test that request-specific permissions work recursively (2 levels)
+    containing_action_tag2 = ActionTag.create(project_id: project.id, name: "Containing2")
+    containing_action_tag2.add_action(containing_action_tag.id)
+    containing_object_tag2 = ObjectTag.create(project_id: project.id, name: "Containing2")
+    containing_object_tag2.add_object(containing_object_tag.id)
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag2.ubid}/#{containing_object_tag2.ubid}/Postgres:view/#{pg.ubid}"
+    expect(page.body).to eq("true")
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag2.ubid}/#{containing_object_tag2.ubid}/Postgres:edit/#{pg.ubid}"
+    expect(page.body).to eq("false")
+    visit "/test-no-authorization-needed/custom/#{project.ubid}/#{containing_action_tag2.ubid}/#{containing_object_tag2.ubid}/Postgres:view/#{account.ubid}"
+    expect(page.body).to eq("false")
+  end
+
   if Config.unfrozen_test?
     it "raises error if no_authorization_needed called when not needed or already authorized" do
       create_account.create_project_with_default_policy("project-1")
