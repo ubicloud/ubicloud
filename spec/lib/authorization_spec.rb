@@ -187,6 +187,43 @@ RSpec.describe Authorization do
   end
   # rubocop:enable RSpec/MissingExpectationTargetMethod
 
+  describe "#allowed_accounts_dataset" do
+    it "returns the users who have access" do
+      # Admin access
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_map(:email)).to eq [users[0].email]
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", users[0].id).select_map(:email)).to eq [users[0].email]
+      expect(described_class.allowed_accounts_dataset(projects[1].id, "Postgres:view", pg.id).select_map(:email)).to eq []
+      # Access to specific account
+      AccessControlEntry.dataset.destroy
+      ace = AccessControlEntry.create(project_id: projects[0].id, subject_id: users[0].id, action_id: ActionType::NAME_MAP.fetch("Postgres:view"), object_id: pg.id)
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_map(:email)).to eq [users[0].email]
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", users[0].id).select_map(:email)).to eq []
+      expect(described_class.allowed_accounts_dataset(projects[1].id, "Postgres:view", pg.id).select_map(:email)).to eq []
+
+      # Adding account to project without access has no effect
+      projects[0].add_account(users[1])
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_map(:email)).to eq [users[0].email]
+
+      # Change ACE subject changes result
+      ace.update(subject_id: users[1].id)
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_map(:email)).to eq [users[1].email]
+
+      # Direct access through tags is respected
+      subject_tag = SubjectTag.create(project_id: projects[0].id, name: "Test")
+      ace.update(subject_id: subject_tag.id)
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_map(:email)).to eq []
+      subject_tag.add_member(users[0].id)
+      subject_tag.add_member(users[1].id)
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_order_map(:email)).to eq users.map { it.email }
+
+      # Recursive access through nested tags is respected
+      subject_tag2 = SubjectTag.create(project_id: projects[0].id, name: "Test2")
+      ace.update(subject_id: subject_tag2.id)
+      subject_tag2.add_member(subject_tag.id)
+      expect(described_class.allowed_accounts_dataset(projects[0].id, "Postgres:view", pg.id).select_order_map(:email)).to eq users.map { it.email }
+    end
+  end
+
   describe "#has_permission?" do
     it "returns true when has matched policies" do
       expect(described_class.has_permission?(projects[0].id, users[0].id, "Vm:view", vms[0].id)).to be(true)
