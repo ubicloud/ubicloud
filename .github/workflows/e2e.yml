@@ -47,7 +47,7 @@ jobs:
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
-    timeout-minutes: 85
+    timeout-minutes: 70
     concurrency: E2E-${{ matrix.provider }}
 
     steps:
@@ -160,7 +160,7 @@ jobs:
         OPERATOR_SSH_PUBLIC_KEYS: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
       run: |
         set -o pipefail
-        timeout 83m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
+        timeout 68m foreman start -m all=1,respirate=2 | tee foreman.log | grep --line-buffered -F "e2e.1"
 
     - name: Print logs
       if: always()
