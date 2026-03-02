@@ -13,8 +13,12 @@ module Authorization
     !matched_policies_dataset(project_id, subject_id, actions, object_id).empty?
   end
 
+  # Add private alias, for internal calls. This allows classes including
+  # Authorization to override has_permission? to accept different arguments.
+  private alias_method(:_has_permission?, :has_permission?)
+
   def authorize(project_id, subject_id, actions, object_id)
-    unless has_permission?(project_id, subject_id, actions, object_id)
+    unless _has_permission?(project_id, subject_id, actions, object_id)
       fail Unauthorized
     end
   end
