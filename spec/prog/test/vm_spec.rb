@@ -174,7 +174,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("sudo chown ubi #{mount_path}")
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:_cmd).with("sync #{mount_path}/1.txt")
-      expect { vm_test.verify_extra_disks }.to hop("ping_google")
+      expect { vm_test.verify_extra_disks }.to hop("stop_semaphore")
     end
   end
 
@@ -263,7 +263,7 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
       expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect { vm_test.ping_vms_not_in_subnet }.to hop("stop_semaphore")
+      expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
@@ -387,7 +387,7 @@ RSpec.describe Prog::Test::Vm do
     it "hops if VM is up" do
       expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
-      expect { vm_test.check_started_after_shutdown }.to hop("finish")
+      expect { vm_test.check_started_after_shutdown }.to hop("ping_google")
     end
   end
 
