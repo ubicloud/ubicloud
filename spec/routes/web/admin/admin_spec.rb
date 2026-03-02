@@ -508,7 +508,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
   end
 
-  it "shows download PDF button for the invoice as extra" do
+  it "supports downloading invoice PDF" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
       invoice_number: "invoice-number-378",
@@ -517,22 +517,22 @@ RSpec.describe CloverAdmin do
       end_time: "2024-12-01 00:00:00"
     )
 
-    # No download link if download link generation fails
-    expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
-    click_link "Invoice"
-    click_link invoice.invoice_number
+    visit "/model/Invoice/#{invoice.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_no_content "Download PDF"
+    expect(page).to have_button "Download PDF"
 
-    # Shows download link if it's generated
+    # Returns HTML with download link when successful
     presigner = instance_double(Aws::S3::Presigner)
     expect(Invoice).to receive(:blob_storage_client).and_return(instance_double(Aws::S3::Client))
     expect(Aws::S3::Presigner).to receive(:new).and_return(presigner)
     expect(presigner).to receive(:presigned_url).and_return("https://ubicloud.com/download/invoice/link.pdf")
+    click_button "Download PDF"
+    expect(page).to have_link("Download PDF", href: "https://ubicloud.com/download/invoice/link.pdf")
 
+    # Raises error when download link generation fails
     visit "/model/Invoice/#{invoice.ubid}"
-    expect(page.title).to eq "Ubicloud Admin - Invoice #{invoice.ubid}"
-    expect(page).to have_content "Download PDF"
+    expect(Invoice).to receive(:blob_storage_client).and_raise("Simulated failure")
+    expect { click_button "Download PDF" }.to raise_error(CloverError, "Download link is not available")
   end
 
   it "shows quotas for project as extra" do
@@ -832,7 +832,6 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
 
     expect(GithubRunner.count).to eq 1
-    click_link "Provision Spare Runner"
     click_button "Provision Spare Runner"
     expect(page).to have_flash_notice("Spare runner provisioned")
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{ghr.ubid}"
@@ -848,6 +847,25 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubRunner #{runner.ubid}"
     expect(page.all(".workflow-job-table td").map(&:text))
       .to eq ["id", "60587328050", "name", "ubicloud-standard-2", "status", "in_progress"]
+  end
+
+  it "supports showing job log for GithubRepository" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    visit "/model/GithubRepository/#{repo.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+
+    click_link "Show Job Log"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+
+    client = double
+    expect(Github).to receive(:installation_client).and_return(client)
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345.zip")
+
+    fill_in "job_id", with: "12345"
+    click_button "Show Job Log"
+    expect(page).to have_link("Download Job Log", href: "https://example.com/logs/12345.zip")
   end
 
   it "supports suspending Accounts" do
