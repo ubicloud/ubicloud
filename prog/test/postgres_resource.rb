@@ -3,13 +3,14 @@
 require_relative "../../lib/util"
 
 class Prog::Test::PostgresResource < Prog::Test::Base
-  def self.assemble(provider: "metal")
+  def self.assemble(provider: "metal", family: nil)
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
     postgres_service_project = Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
     frame = {
       "provider" => provider,
+      "family" => family,
       "postgres_service_project_id" => postgres_service_project.id,
       "postgres_test_project_id" => postgres_test_project.id
     }
@@ -24,10 +25,23 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   label def start
     location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      end
       family = "m8gd"
       vcpus = 2
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
+    elsif frame["provider"] == "gcp"
+      location = Location[provider: "gcp", project_id: nil]
+      unless LocationCredential[location.id]
+        LocationCredential.create_with_id(location.id,
+          credentials_json: Config.e2e_gcp_credentials_json,
+          project_id: Config.e2e_gcp_project_id,
+          service_account_email: Config.e2e_gcp_service_account_email)
+      end
+      family = frame["family"] || "c4a-standard"
+      vcpus = Option::GCP_STORAGE_SIZE_OPTIONS[family].keys.first
+      [location.id, "#{family}-#{vcpus}", Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     else
       [Location::HETZNER_FSN1_ID, "standard-2", 128]
     end
@@ -62,6 +76,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
+    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -70,6 +85,15 @@ class Prog::Test::PostgresResource < Prog::Test::Base
     nap 5 if postgres_resource
     if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
       Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
+    # Timelines are retained for 10 days after resource destruction for
+    # customer recovery. Verify they still exist, then explicitly destroy
+    # them to test timeline cleanup.
+    remaining_timelines = frame["timeline_ids"]&.filter_map { PostgresTimeline[it] } || []
+    if remaining_timelines.any?
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
+      remaining_timelines.each(&:incr_destroy)
       nap 5
     end
 
