@@ -110,6 +110,26 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       Clog.emit("Replica server #{server.ubid}: version=#{server.version}, target=#{read_replica.target_version}, access=#{server.timeline_access}, state=#{server.strand.label}")
     end
 
+    # Log timeline and backup information for debugging
+    all_servers = postgres_resource.servers + read_replica.servers
+    all_servers.map(&:timeline).uniq.each do |timeline|
+      backup_count = timeline.backups.count
+      Clog.emit("Timeline #{timeline.ubid}: backups_count=#{backup_count}, blob_storage=#{timeline.blob_storage&.url || 'none'}")
+    end
+
+    # Log initialize_database_from_backup logs for servers stuck in that state
+    all_servers.each do |server|
+      next unless server.strand.label == "initialize_database_from_backup"
+
+      Clog.emit("Server #{server.ubid} stuck in initialize_database_from_backup, fetching logs...")
+      begin
+        logs = server.vm.sshable.cmd("sudo journalctl -u initialize_database_from_backup.service --no-pager -n 50")
+        Clog.emit("Logs for server #{server.ubid} initialize_database_from_backup:\n#{logs}")
+      rescue => ex
+        Clog.emit("Failed to fetch logs for server #{server.ubid}: #{ex.message}")
+      end
+    end
+
     # Check if all servers have been upgraded to version 18
     primary_upgraded = postgres_resource.servers.all? { |s| s.version == "18" && s.strand.label == "wait" }
     replica_upgraded = read_replica.servers.all? { |s| s.version == "18" && s.strand.label == "wait" }
