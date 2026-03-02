@@ -23,6 +23,19 @@ module Authorization
     end
   end
 
+  def allowed_accounts_dataset(project_id, actions, object_id)
+    DB[:accounts]
+      .with(:subject_ids, matched_policies_dataset(project_id, nil, actions, object_id).select(:subject_id))
+      .with_recursive(:rec_subject_ids,
+        DB[:applied_subject_tag].select(:subject_id, 0).where(tag_id: DB[:subject_ids]),
+        DB[:applied_subject_tag].join(:rec_subject_ids, subject_id: :tag_id)
+          .select(Sequel[:applied_subject_tag][:subject_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:subject_id, :level],
+        cycle: {columns: :subject_id})
+      .where(Sequel.or([DB[:subject_ids], DB[:rec_subject_ids].exclude(:is_cycle).select(:subject_id)].map { [:id, it] }))
+  end
+
   def all_permissions(project_id, subject_id, object_id)
     DB[:action_type]
       .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
@@ -37,10 +50,9 @@ module Authorization
       .select_order_map(:name)
   end
 
-  private def ace_base_query(project_id, subject_id)
+  private def ace_base_query(project_id)
     DB[:access_control_entry]
       .where(project_id:)
-      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
   end
 
   # Used to avoid dynamic symbol creation at runtime
@@ -76,11 +88,15 @@ module Authorization
       .select(:tag_id)
   end
 
-  def matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+  def matched_policies_dataset(project_id, subject_id = nil, actions = nil, object_id = nil)
     project_id = project_id.id if project_id.is_a?(Project)
-    subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
 
-    dataset = ace_base_query(project_id, subject_id)
+    dataset = ace_base_query(project_id)
+
+    if subject_id
+      subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
+      dataset = dataset.where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+    end
 
     if actions
       actions = Array(actions).map { ActionType::NAME_MAP.fetch(it) }
