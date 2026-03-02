@@ -33,12 +33,19 @@ module Authorization
       .select_order_map(:name)
   end
 
+  private def ace_base_query(project_id, subject_id)
+    DB[:access_control_entry]
+      .where(project_id:)
+      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+  end
+
   # Used to avoid dynamic symbol creation at runtime
   RECURSIVE_TAG_QUERY_MAP = {
     subject: [:applied_subject_tag, :subject_id],
     action: [:applied_action_tag, :action_id],
     object: [:applied_object_tag, :object_id]
   }.freeze
+  RECURSIVE_TAG_QUERY_MAP.each_value(&:freeze)
   private def recursive_tag_query(type, values, project_id: nil)
     table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
 
@@ -69,9 +76,7 @@ module Authorization
     project_id = project_id.id if project_id.is_a?(Project)
     subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
 
-    dataset = DB[:access_control_entry]
-      .where(project_id:)
-      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+    dataset = ace_base_query(project_id, subject_id)
 
     if actions
       actions = Array(actions).map { ActionType::NAME_MAP.fetch(it) }
