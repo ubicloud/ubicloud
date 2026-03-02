@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Clover < Roda
+  include Authorization
+
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
@@ -239,26 +241,26 @@ class Clover < Roda
       fail Authorization::Unauthorized unless has_project_permission(actions)
     else
       each_authorization_id do |id|
-        Authorization.authorize(@project, id, actions, object_id)
+        super(@project, id, actions, object_id)
       end
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(@project, id, actions, object_id)
+      super(@project, id, actions, object_id)
     end
   end
 
   def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(@project, id, object_id)
+      super(@project, id, object_id)
     end.reduce(:&)
   end
 
   def dataset_authorize(ds, actions)
     each_authorization_id do |id|
-      ds = Authorization.dataset_authorize(ds, @project.id, id, actions)
+      ds = super(ds, @project.id, id, actions)
     end
     ds
   end
