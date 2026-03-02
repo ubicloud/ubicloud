@@ -104,15 +104,28 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       subnet = if aws_subnet.subnet_id
         client.describe_subnets({filters: [{name: "subnet-id", values: [aws_subnet.subnet_id]}]}).subnets[0]
       else
+        az_name = location.name + aws_subnet.location_aws_az.az
         ipv6_cidr = vpc_ipv6.nth_subnet(64, idx)
 
-        client.create_subnet({
-          vpc_id: private_subnet_aws_resource.vpc_id,
-          cidr_block: aws_subnet.ipv4_cidr.to_s,
-          ipv_6_cidr_block: ipv6_cidr.to_s,
-          availability_zone: location.name + aws_subnet.location_aws_az.az,
-          tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_aws_az.az}")
-        }).subnet
+        begin
+          client.create_subnet({
+            vpc_id: private_subnet_aws_resource.vpc_id,
+            cidr_block: aws_subnet.ipv4_cidr.to_s,
+            ipv_6_cidr_block: ipv6_cidr.to_s,
+            availability_zone: az_name,
+            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_aws_az.az}")
+          }).subnet
+        rescue Aws::EC2::Errors::InvalidSubnetConflict
+          # Subnet was created in a previous attempt but database wasn't updated.
+          # Find the existing subnet by AZ and CIDR.
+          existing = client.describe_subnets({filters: [
+            {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
+            {name: "availability-zone", values: [az_name]},
+            {name: "cidr-block", values: [aws_subnet.ipv4_cidr.to_s]}
+          ]}).subnets.first
+          fail "Subnet conflict but no matching subnet found for #{az_name}" unless existing
+          existing
+        end
       end
 
       aws_subnet.update(subnet_id: subnet.subnet_id, ipv6_cidr: subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block)
