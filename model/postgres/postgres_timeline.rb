@@ -101,6 +101,10 @@ PGDATA=/dat/#{version}/data
     location&.aws?
   end
 
+  def provider_name
+    location&.provider_name || "metal"
+  end
+
   S3BlobStorage = Struct.new(:url)
 
   def blob_storage_endpoint

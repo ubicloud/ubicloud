@@ -1,16 +1,23 @@
 # frozen_string_literal: true
 
 module ProviderDispatcher
-  PROVIDERS = %i[Aws Metal].freeze
+  PROVIDERS = %i[Aws Metal Gcp].freeze
 
   def self.configure(model, file)
     dir, file = File.split(file)
     methods = {}
+    available_providers = []
     PROVIDERS.each do |const|
       subdir = const.to_s.downcase
-      load File.join(dir, const.to_s.downcase, file)
+      provider_file = File.join(dir, subdir, file)
+      # :nocov:
+      next unless File.exist?(provider_file)
+      # :nocov:
+
+      load provider_file
       implementation = model.const_get(const)
       model.include implementation
+      available_providers << const
 
       prefix = subdir + "_"
       methods[prefix] = implementation.private_instance_methods.filter_map do
@@ -28,14 +35,8 @@ module ProviderDispatcher
     end
 
     all_meths.each do |meth|
-      aws_meth = :"aws_#{meth}"
-      metal_meth = :"metal_#{meth}"
       model.define_method(meth) do |*a, **kw, &b|
-        if aws?
-          send(aws_meth, *a, **kw, &b)
-        else
-          send(metal_meth, *a, **kw, &b)
-        end
+        send(:"#{provider_name}_#{meth}", *a, **kw, &b)
       end
     end
   end
@@ -43,6 +44,10 @@ module ProviderDispatcher
   module InstanceMethods
     def aws?
       location.aws?
+    end
+
+    def provider_name
+      location.provider_name
     end
   end
 end
