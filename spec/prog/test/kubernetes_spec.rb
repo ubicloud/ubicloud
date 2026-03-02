@@ -350,6 +350,8 @@ RSpec.describe Prog::Test::Kubernetes do
     it "naps until the pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
       expect { kubernetes_test.verify_data_after_migration }.to nap(5)
     end
 
@@ -397,6 +399,8 @@ RSpec.describe Prog::Test::Kubernetes do
     it "waits until pod is runnning" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
       expect { kubernetes_test.verify_normal_pod_restart }.to nap(5)
     end
 
@@ -490,6 +494,8 @@ RSpec.describe Prog::Test::Kubernetes do
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
       expect { kubernetes_test.verify_rsync_retry }.to nap(5)
     end
 
@@ -594,6 +600,8 @@ RSpec.describe Prog::Test::Kubernetes do
     it "naps until pod is running" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("ContainerCreating", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp")
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv,pvc")
       expect { kubernetes_test.verify_data_after_drain }.to nap(5)
     end
 
