@@ -415,7 +415,16 @@ STS
   # to keep the query simple, we let the kubectl do the processing and observe the system from the eyes of a
   # customer. This also keeps the logic simpler
   def pod_status
-    kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
+    status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
+    if status != "Running"
+      client = kubernetes_cluster.client
+      Clog.emit("pod not running", {
+        pod_status: status,
+        events: begin; client.kubectl("get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp"); rescue => e; e.message; end,
+        pv_pvc: begin; client.kubectl("get pv,pvc"); rescue => e; e.message; end
+      })
+    end
+    status
   end
 
   def verify_data_hashes(context)
