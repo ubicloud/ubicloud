@@ -426,16 +426,65 @@ RSpec.describe Clover, "postgres" do
         expect(page).to have_css(".metric-chart")
       end
 
-      it "shows connections if the resource is running" do
+      it "shows connection information if the resource is running" do
+        ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps").subject
+        expect(Config).to receive(:postgres_service_hostname).and_return("pg.ubicloud.com").at_least(:once)
+        DnsZone.create(project_id: Config.postgres_service_project_id, name: Config.postgres_service_hostname)
         pg.strand.update(label: "wait")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_no_content "No connection information available"
+        expect(page).to have_no_content "Use Private DNS?"
+        password = pg.superuser_password
+        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
+
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true"
+        ]
+
+        # Show private DNS information if private subnet is connected to anything
+        pg.private_subnet.connect_subnet(ps)
+        page.refresh
+        expect(page).to have_content "Use Private DNS?"
+        expect(page.all(".connection-info-box div[data-content]").map { it["data-content"] }).to eq [
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
+
+          "postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "psql postgresql://postgres:#{password}@pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "PGHOST=pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
+          "host: pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
+          "jdbc:postgresql://pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true",
+
+          "postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "psql postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?channel_binding=require",
+          "PGHOST=private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=5432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGCHANNELBINDING=require",
+          "host: private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 5432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nchannel_binding: require",
+          "jdbc:postgresql://private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:5432/postgres?user=postgres&password=#{password}&ssl=true&channelBinding=require",
+
+          "postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "psql postgresql://postgres:#{password}@private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?sslmode=require",
+          "PGHOST=private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nPGPORT=6432\nPGUSER=postgres\nPGPASSWORD=#{password}\nPGDATABASE=postgres\nPGSSLMODE=require",
+          "host: private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com\nport: 6432\nuser: postgres\npassword: #{password}\ndatabase: postgres\nsslmode: require",
+          "jdbc:postgresql://private.pg-with-permission.#{pg.ubid}.pg.ubicloud.com:6432/postgres?user=postgres&password=#{password}&ssl=true"
+        ]
       end
 
-      it "does not show connections if the resource is creating" do
+      it "does not show connection information if the resource is creating" do
         pg.strand.update(label: "wait_servers")
         visit "#{project.path}#{pg.path}/connection"
         expect(page).to have_content "No connection information available"
+        expect(page.all(".connection-info-box div[data-content]").to_a).to eq []
       end
 
       it "shows 404 for invalid pages for read replicas" do
