@@ -813,8 +813,9 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to unavailable based on the vm's available status" do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
+      frame = st.stack[0]
+      expect(frame["reason_determined"]).to be false
 
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
@@ -856,17 +857,114 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#start_after_stop" do
+    it "starts VM if start semaphore is set" do
+      vm.incr_start
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
+      expect { nx.start_after_stop }.to nap(5)
+        .and change { vm.reload.start_set? }.from(true).to(false)
+    end
+
+    it "hops to wait if vm is available" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect { nx.start_after_stop }.to hop("wait")
+    end
+
+    it "naps if vm is not yet available" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.start_after_stop }.to nap(5)
+    end
+  end
+
+  describe "#stopped_by_admin" do
+    it "naps for 10 years" do
+      expect { nx.stopped_by_admin }.to nap(315360000)
+    end
+  end
+
   describe "#stopped" do
-    it "naps after stopping the vm" do
+    it "hops to restart when needed" do
+      vm.incr_restart
+      expect { nx.stopped }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
+    it "stops the vm and hops to stopped_by_admin with admin_stop semaphore" do
+      vm.incr_admin_stop
       vm.incr_stop
+      vm.incr_stopping
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
-      expect { nx.stopped }.to nap(60 * 60)
+      expect { nx.stopped }.to hop("stopped_by_admin")
+        .and change { vm.reload.admin_stop_set? }.from(true).to(false)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and change { vm.reload.stopping_set? }.from(true).to(false)
+    end
+
+    it "decrements stop semaphore with stop and stopping semaphores" do
+      vm.incr_stop
+      vm.incr_stopping
+      expect { nx.stopped }.to nap(0)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and not_change { vm.reload.stopping_set? }
+    end
+
+    it "naps if not running with stop semaphore" do
+      vm.incr_stop
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.stopped }.to nap(0)
         .and change { vm.reload.stop_set? }.from(true).to(false)
     end
 
+    it "does a soft stop if running with stop semaphore" do
+      vm.incr_stop
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm #{vm.inhost_name}")
+      expect { nx.stopped }.to nap(10)
+        .and change { vm.reload.stop_set? }.from(true).to(false)
+        .and change { vm.reload.stopping_set? }.from(false).to(true)
+    end
+
+    it "decrements stopping semaphore when stopping semaphore if vm not running" do
+      vm.incr_stopping
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.stopped }.to nap(0)
+        .and change { vm.reload.stopping_set? }.from(true).to(false)
+    end
+
+    it "attempts nice shutdown with stopping semaphore and vm is running" do
+      vm.incr_stopping
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/stop-vm vm4hjdwr").and_return("")
+      expect { nx.stopped }.to nap(10)
+    end
+
+    it "does hard stop with stopping semaphore and vm is running when stopping was set over 1 minute ago" do
+      Semaphore.create(name: "stopping", strand_id: st.id) do |sem|
+        sem.id = UBID.generate_from_time(UBID::TYPE_SEMAPHORE, Time.now - 65).to_uuid
+      end
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}").and_return("")
+      expect { nx.stopped }.to nap(0)
+    end
+
+    it "hops to start when needed" do
+      vm.incr_start
+      expect { nx.stopped }.to hop("start_after_stop")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
     it "does not stop if already stopped" do
-      expect(vm.stop_set?).to be(false)
-      expect { nx.stopped }.to nap(60 * 60)
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect { nx.stopped }.to nap(15 * 60)
+    end
+
+    it "hops to unavailable if available" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect { nx.stopped }.to hop("wait")
     end
   end
 
@@ -877,14 +975,109 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.checkup_set? }.from(false).to(true)
     end
 
-    it "naps if vm is still unavailable" do
-      expect(nx).to receive(:available?).and_return(false)
+    it "restarts the VM when needed" do
+      vm.incr_restart
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
+      expect { nx.unavailable }.to nap(0)
+        .and change { vm.reload.restart_set? }.from(true).to(false)
+    end
+
+    it "hops to start when needed" do
+      vm.incr_start
+      expect { nx.unavailable }.to hop("start_after_stop")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
+    it "hops to stopped when needed" do
+      vm.incr_stop
+      expect { nx.unavailable }.to hop("stopped")
+    end
+
+    it "naps if vm is still unavailable and the reason has been determined" do
+      refresh_frame(nx, new_values: {"reason_determined" => true})
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
       expect { nx.unavailable }.to nap(30)
     end
 
-    it "hops to wait if vm is available" do
-      expect(nx).to receive(:available?).and_return(true)
+    it "naps if vm is unreachable" do
+      refresh_frame(nx, new_values: {"reason_determined" => true})
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_raise(Errno::ECONNRESET)
+      expect { nx.unavailable }.to nap(30)
+    end
+
+    it "pages and naps if vm is unavailable but vm process is running" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\ninactive\n")
+      expect { nx.unavailable }.to nap(30)
+        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} unavailable but main process running")
+      frame = st.stack[0]
+      expect(frame["reason_determined"]).to be true
+    end
+
+    it "pages and naps if vm is unavailable and systemctl show returns oom-kill" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("oom-kill\nfoo\n")
+      expect { nx.unavailable }.to nap(30)
+        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (oom-kill)")
+      frame = st.stack[0]
+      expect(frame["reason_determined"]).to be true
+    end
+
+    it "naps without paging if vm is unavailable and systemctl command results in a timeout or connection error" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshTimeout.new("", "", "", 1, nil))
+      expect { nx.unavailable }.to nap(30)
+        .and not_change { Page.count }
+      frame = st.stack[0]
+      expect(frame.has_key?("reason_determined")).to be false
+    end
+
+    it "pages and naps if vm is unavailable and systemctl command results in an error" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_raise(Sshable::SshError.new("", "", "", 1, nil))
+      expect { nx.unavailable }.to nap(30)
+        .and change { Page.get(:summary) }.from(nil).to("#{vm.ubid} stopped unexpectedly (unknown)")
+      frame = st.stack[0]
+      expect(frame["reason_determined"]).to be true
+    end
+
+    it "hops to stopped if vm is unavailable and systemctl show returns success" do
+      nx.incr_checkup
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("success\nfoo\n")
+      expect(Clog).to receive(:emit).with("VM stopped by operator", Hash)
+      expect { nx.unavailable }.to hop("stopped")
+        .and change(nx, :checkup_set?).from(true).to(false)
+    end
+
+    it "hops to stopped if vm is unavailable and systemctl show returns other value and journalctl shows ACPI Shutdown signalled" do
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
+      expect(sshable).to receive(:_cmd).with("systemctl show -p Result -p InvocationID --value #{vm.inhost_name}").and_return("other\nfoo\n")
+      expect(sshable).to receive(:_cmd).with(<<~END).and_return("ACPI Shutdown signalled\n")
+        sudo journalctl _SYSTEMD_INVOCATION_ID=foo -o cat -n 50 --no-pager | \
+          grep -m1 -oF \
+            -e 'ACPI Shutdown signalled' \
+            -e 'vCPU thread panicked' \
+            -e 'VCPU generated error' \
+            -e 'thread panicked'
+      END
+      expect(Clog).to receive(:emit).with("VM stopped by guest ACPI shutdown", Hash)
+      expect { nx.unavailable }.to hop("stopped")
+    end
+
+    it "decrements checkup and hops to wait if vm is available" do
+      nx.incr_checkup
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.unavailable }.to hop("wait")
+        .and change(nx, :checkup_set?).from(true).to(false)
+    end
+
+    it "resolves page and hops to wait if vm is available" do
+      page = Prog::PageNexus.assemble("#{vm.ubid} stopped unexpectedly", ["VmExit", vm.ubid], vm.ubid).subject
+      expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
+      expect { nx.unavailable }.to hop("wait")
+        .and change { page.reload.resolve_set? }.from(false).to(true)
     end
   end
 

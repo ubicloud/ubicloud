@@ -243,6 +243,10 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   label def wait
+    when_stop_set? do
+      hop_stopped
+    end
+
     when_start_after_host_reboot_set? do
       register_deadline("wait", 5 * 60)
       hop_start_after_host_reboot
@@ -263,13 +267,9 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_restart
     end
 
-    when_stop_set? do
-      hop_stopped
-    end
-
     when_checkup_set? do
       unless available?
-        register_deadline("wait", 2 * 60)
+        update_stack("reason_determined" => false)
         hop_unavailable
       end
       decr_checkup
@@ -300,16 +300,89 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     hop_wait
   end
 
-  label def stopped
-    when_stop_set? do
-      host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
+  label def start_after_stop
+    when_start_set? do
+      decr_start
+      host.sshable.cmd("sudo systemctl start :vm_name", vm_name:)
+      nap 5
     end
-    decr_stop
 
-    nap 60 * 60
+    if available?
+      hop_wait
+    end
+
+    nap 5
   end
 
+  label def stopped_by_admin
+    nap 315360000 # 10 years
+  end
+
+  # Stopped label is for cases where VM was manually stopped and should not
+  # automatically restart.
+  label def stopped
+    when_admin_stop_set? do
+      decr_admin_stop
+      decr_stop
+      decr_stopping
+      hard_stop
+      hop_stopped_by_admin
+    end
+
+    when_stop_set? do
+      decr_stop
+
+      when_stopping_set? do
+        nap 0
+      end
+
+      if vm_process_running_map[vm_name]
+        incr_stopping
+        soft_stop
+        nap 10
+      else
+        nap 0
+      end
+    end
+
+    when_stopping_set? do
+      if vm_process_running_map[vm_name] == false
+        decr_stopping
+        nap 0
+      elsif @snap.set_at(:stopping) + 60 < Time.now
+        hard_stop
+        decr_stopping
+        nap 0
+      else
+        soft_stop
+        nap 10
+      end
+    end
+
+    when_start_set? do
+      register_deadline("wait", 5 * 60)
+      hop_start_after_stop
+    end
+
+    when_restart_set? do
+      register_deadline("wait", 5 * 60)
+      hop_restart
+    end
+
+    if available?
+      hop_wait
+    end
+
+    nap 15 * 60
+  end
+
+  # Unavailable label is for cases where VM was not manually stopped, and is
+  # expected to become available.
   label def unavailable
+    when_stop_set? do
+      hop_stopped
+    end
+
     # If the VM become unavailable due to host unavailability, it first needs to
     # go through start_after_host_reboot state to be able to recover.
     when_start_after_host_reboot_set? do
@@ -317,9 +390,88 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_start_after_host_reboot
     end
 
-    if available?
+    when_start_set? do
+      register_deadline("wait", 5 * 60)
+      hop_start_after_stop
+    end
+
+    when_restart_set? do
+      decr_restart
+      host.sshable.cmd("sudo host/bin/setup-vm restart :vm_name", vm_name:)
+      nap 0
+    end
+
+    begin
+      running_map = vm_process_running_map
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
+      # VM unreachable, should stay in unavailable
+      nap 30
+    end
+
+    if running_map.values.all?
       decr_checkup
+      Page.from_tag_parts("VmExit", vm.ubid)&.incr_resolve
       hop_wait
+    elsif !frame["reason_determined"]
+      if running_map[vm_name]
+        # Page due to weird situation, where VM process (generally cloud-hypervisor)
+        # is running, but dnsmasq or storage process isn't. We explicitly check this,
+        # because we never want to check for a shutdown reason if the VM is still running.
+        Prog::PageNexus.assemble(
+          "#{vm.ubid} unavailable but main process running",
+          ["VmExit", vm.ubid], vm.ubid,
+          extra_data: {vm_host: host.ubid}
+        )
+        update_stack("reason_determined" => true)
+        nap 30
+      end
+
+      begin
+        result, invocation_id = host.sshable.cmd("systemctl show -p Result -p InvocationID --value :vm_name", vm_name:).strip.split("\n")
+
+        reason = if %w[signal core-dump oom-kill timeout success].include?(result)
+          result
+        else
+          host.sshable.cmd(<<~END, invocation_id:).strip
+            sudo journalctl _SYSTEMD_INVOCATION_ID=:invocation_id -o cat -n 50 --no-pager | \
+              grep -m1 -oF \
+                -e 'ACPI Shutdown signalled' \
+                -e 'vCPU thread panicked' \
+                -e 'VCPU generated error' \
+                -e 'thread panicked'
+          END
+        end
+      rescue Sshable::SshTimeout, *Sshable::SSH_CONNECTION_ERRORS
+        # Command didn't finish running or connection problem, nap and try again
+        nap 30
+      rescue Sshable::SshError
+        # Command finish running, but we cannot determine why we failed
+        reason = "unknown"
+      end
+
+      case reason
+      when "ACPI Shutdown signalled", "success"
+        msg = if reason == "success"
+          # ExecStop succeeded: someone ran systemctl stop or ch-remote shutdown-vmm.
+          # Deliberate action, not an issue, don't page
+          "VM stopped by operator"
+        else
+          # Customer shutdown their VM from inside the VM, don't page
+          "VM stopped by guest ACPI shutdown"
+        end
+        Clog.emit(msg, {vm_exit: {vm: vm.ubid}})
+        decr_checkup
+        hop_stopped
+      else
+        # Unexpected exit: signal, crash, unknown cause.
+        # Page with the reason in the summary.
+        Prog::PageNexus.assemble(
+          "#{vm.ubid} stopped unexpectedly (#{reason})",
+          ["VmExit", vm.ubid], vm.ubid,
+          extra_data: {vm_host: host.ubid, result:, reason:}
+        )
+        update_stack("reason_determined" => true)
+      end
     end
 
     nap 30
@@ -455,8 +607,22 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def available?
-    host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: vm.healthcheck_systemd_units).split("\n").all?("active")
+    vm_process_running_map.all? { |_, v| v }
   rescue
     false
+  end
+
+  def vm_process_running_map
+    units = vm.healthcheck_systemd_units
+    states = host.sshable.cmd("systemctl is-active :shelljoin_units", shelljoin_units: units).split("\n")
+    units.zip(states).to_h { |k, v| [k, v == "active"] }
+  end
+
+  def soft_stop
+    host.sshable.cmd("sudo host/bin/stop-vm :vm_name", vm_name:)
+  end
+
+  def hard_stop
+    host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
   end
 end

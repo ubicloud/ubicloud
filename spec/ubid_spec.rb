@@ -4,6 +4,12 @@ RSpec.describe UBID do
   let(:type_constants) { described_class.constants.select { it.start_with?("TYPE_") } }
   let(:all_types) { type_constants.map { described_class.const_get(it) } }
 
+  it ".generate_from_time generates a ubid with the given timestamp" do
+    t = Time.now
+    ubid = described_class.generate_from_time("et", t)
+    expect((ubid.to_i >> 80) / 1000.0).to eq t.to_f.round(3)
+  end
+
   it ".generate_vanity_action_type supports creating vanity ubids for action types" do
     expect(described_class.generate_vanity_action_type("Project:view").to_s).to eq "ttzzzzzzzz021gzzz0pj0v1ew0"
     expect(described_class.generate_vanity_action_type("ObjectTag:add").to_s).to eq "ttzzzzzzzz021gzzzz0t00add0"

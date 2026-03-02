@@ -29,6 +29,7 @@ RSpec.describe Clover, "cli" do
     SshPublicKey.create_with_id("32092997-2a00-8f33-8129-4c0f18e5153c", project_id: @project.id, name: "spk", public_key: "a a")
     cli(%w[vm eu-central-h1/test-vm create] << "ssh-rsa a")
     @vm = Vm.first
+    @vm.update(display_state: "running")
     add_ipv4_to_vm(@vm, "128.0.0.1")
     @vm.nics.first.update(private_ipv4: "10.67.141.133/32", private_ipv6: "fda0:d79a:93e7:d4fd:1c2::0/80")
     @ps = PrivateSubnet.first

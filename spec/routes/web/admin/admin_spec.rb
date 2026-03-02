@@ -750,7 +750,7 @@ RSpec.describe CloverAdmin do
     click_button "Stop"
     expect(page).to have_flash_notice("Stop scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
-    expect(vm.semaphores_dataset.select_map(:name)).to eq ["stop"]
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
   end
 
   it "supports restarting PostgresResource" do
@@ -1034,6 +1034,19 @@ RSpec.describe CloverAdmin do
     expect(related_resources_cell).to have_link(vm.ubid, href: "/model/Vm/#{vm.ubid}")
     created_at_cell = cells[2]
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+  end
+
+  it "shows unavailable VMs" do
+    project = Project.create(name: "test")
+    vm = create_vm(project_id: project.id, name: "active-vm")
+    Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "unavailable")
+
+    visit "/"
+    click_link "Show Unavailable VMs"
+    click_link vm.ubid
+    expect(page.title).to eq "Ubicloud Admin - Strand #{vm.ubid}"
+    click_link "Subject"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
   it "finds both active and archived VMs by IPv4" do
