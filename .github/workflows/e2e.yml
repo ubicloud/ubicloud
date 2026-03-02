@@ -3,6 +3,7 @@ run-name: E2E ${{ github.event_name }} ${{ inputs.providers }}
 
 permissions:
   contents: read
+  pull-requests: write
 
 on:
   workflow_dispatch:
@@ -10,12 +11,12 @@ on:
       test_cases:
         description: 'Comma-separated list of test cases (vm)'
         required: true
-        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_ha,postgres_upgrade,kubernetes'
+        default: 'vm,github_runner_ubuntu_2404,github_runner_ubuntu_2204,postgres_standard,postgres_standard_arm,postgres_ha,postgres_ha_arm,postgres_upgrade,postgres_firewall,kubernetes'
         type: string
       providers:
         description: 'Comma-separated list of providers (metal,aws)'
         required: true
-        default: 'metal,aws'
+        default: 'metal,aws,gcp'
         type: string
 
   schedule:
@@ -31,7 +32,7 @@ jobs:
       - name: Set provider matrix
         id: set-providers
         run: |
-          providers="metal,aws"
+          providers="metal,aws,gcp"
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.providers }}" ]]; then
             providers="${{ inputs.providers }}"
           fi
@@ -47,7 +48,7 @@ jobs:
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
-    timeout-minutes: 70
+    timeout-minutes: ${{ matrix.provider == 'gcp' && 45 || 70 }}
     concurrency: E2E-${{ matrix.provider }}
 
     steps:
@@ -55,11 +56,23 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Setup SSH access
+      id: ssh
       uses: ubicloud/ssh-runner@v1
       with:
         public-ssh-key: |
           ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
+          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2YqaaJlZ2+N1oa1Y8QIxW1ZCMHAfZv+HaMh1dqXnBe claude@ubicloud-e2e
         wait-minutes: 0
+
+    - name: Post runner IP
+      if: github.event_name == 'workflow_dispatch'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        pr_number=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number' || true)
+        if [ -n "$pr_number" ]; then
+          gh pr comment "$pr_number" --body "E2E runner (${{ matrix.provider }}): \`ssh ${{ steps.ssh.outputs.user }}@${{ steps.ssh.outputs.ip }}\` (run [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))"
+        fi
 
     - name: Set up Clover
       uses: ./.github/actions/setup-clover
@@ -123,6 +136,9 @@ jobs:
         E2E_GITHUB_INSTALLATION_ID: ${{ secrets.E2E_GH_INSTALLATION_ID }}
         E2E_AWS_ACCESS_KEY: ${{ secrets.E2E_AWS_ACCESS_KEY }}
         E2E_AWS_SECRET_KEY: ${{ secrets.E2E_AWS_SECRET_KEY }}
+        E2E_GCP_CREDENTIALS_JSON: ${{ secrets.E2E_GCP_CREDENTIALS_JSON }}
+        E2E_GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        E2E_GCP_SERVICE_ACCOUNT_EMAIL: ${{ secrets.E2E_GCP_SERVICE_ACCOUNT_EMAIL }}
         E2E_CACHE_PROXY_DOWNLOAD_URL: ${{ secrets.E2E_CACHE_PROXY_DOWNLOAD_URL }}
         HETZNER_SSH_PUBLIC_KEY: ${{ secrets.HETZNER_SSH_PUBLIC_KEY }}
         HETZNER_SSH_PRIVATE_KEY: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
@@ -368,3 +384,111 @@ jobs:
             aws ec2 delete-vpc --vpc-id $vpc_id --region $region || true
           done
         done
+
+    - name: Cleanup GCP resources
+      if: always() && matrix.provider == 'gcp'
+      env:
+        GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
+        GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-credentials.json
+      run: |
+        echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
+        gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
+
+        echo "=== Cleaning up ALL GCP E2E resources ==="
+
+        # 1. Delete all GCE instances (the only permanent resources are SAs, VPCs, and a bucket)
+        all_instances=$(gcloud compute instances list --project=$GCP_PROJECT_ID \
+          --format="csv[no-heading](name,zone)" 2>/dev/null || true)
+        if [ -n "$all_instances" ]; then
+          echo "Found instances to delete:"
+          echo "$all_instances"
+          echo "$all_instances" | cut -d"," -f2 | sort -u | while read -r zone; do
+            instances=$(echo "$all_instances" | grep ",$zone" | cut -d"," -f1 | paste -sd" " -)
+            echo "Deleting instances in $zone: $instances"
+            gcloud compute instances delete $instances --zone="$zone" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No GCE instances found"
+        fi
+
+        # 2. Release all ubicloud-* static IPs (all regions)
+        all_ips=$(gcloud compute addresses list --project=$GCP_PROJECT_ID \
+          --filter="name~^ubicloud-" --format="csv[no-heading](name,region)" 2>/dev/null || true)
+        if [ -n "$all_ips" ]; then
+          echo "Releasing static IPs:"
+          echo "$all_ips"
+          echo "$all_ips" | while IFS="," read -r ip_name region; do
+            region_name=$(basename "$region")
+            echo "Releasing IP: $ip_name in $region_name"
+            gcloud compute addresses delete "$ip_name" --region="$region_name" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No static IPs found"
+        fi
+
+        # 3. Delete all pt* GCS buckets (postgres timeline buckets)
+        all_buckets=$(gcloud storage ls --project=$GCP_PROJECT_ID 2>/dev/null | grep "^gs://pt" | sed "s|gs://||;s|/||" || true)
+        if [ -n "$all_buckets" ]; then
+          echo "Deleting GCS buckets:"
+          echo "$all_buckets"
+          for bucket in $all_buckets; do
+            echo "Deleting bucket: $bucket"
+            gcloud storage rm -r "gs://$bucket" --project=$GCP_PROJECT_ID --quiet 2>/dev/null || true
+          done
+        else
+          echo "No pt* GCS buckets found"
+        fi
+
+        # 4. Delete all pg-tl-* service accounts
+        all_sas=$(gcloud iam service-accounts list --project=$GCP_PROJECT_ID \
+          --format="value(email)" --filter="email~^pg-tl-" 2>/dev/null || true)
+        if [ -n "$all_sas" ]; then
+          echo "Deleting service accounts:"
+          echo "$all_sas"
+          for sa in $all_sas; do
+            echo "Deleting SA: $sa"
+            gcloud iam service-accounts delete "$sa" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No pg-tl-* service accounts found"
+        fi
+
+        # 5. Delete ubicloud-* subnets (all regions)
+        all_subnets=$(gcloud compute networks subnets list --project=$GCP_PROJECT_ID \
+          --filter="name~^ubicloud-" --format="csv[no-heading](name,region)" 2>/dev/null || true)
+        if [ -n "$all_subnets" ]; then
+          echo "Deleting subnets:"
+          echo "$all_subnets"
+          echo "$all_subnets" | while IFS="," read -r subnet_name region; do
+            region_name=$(basename "$region")
+            echo "Deleting subnet: $subnet_name in $region_name"
+            gcloud compute networks subnets delete "$subnet_name" --region="$region_name" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No ubicloud-* subnets found"
+        fi
+
+        # 6. Delete ubicloud-* VPC networks (after subnets and firewall rules)
+        all_vpcs=$(gcloud compute networks list --project=$GCP_PROJECT_ID \
+          --filter="name~^ubicloud-" --format="value(name)" 2>/dev/null || true)
+        if [ -n "$all_vpcs" ]; then
+          echo "Deleting VPC networks:"
+          echo "$all_vpcs"
+          for vpc in $all_vpcs; do
+            # Delete firewall rules in this VPC first
+            fw_rules=$(gcloud compute firewall-rules list --project=$GCP_PROJECT_ID \
+              --filter="network~$vpc" --format="value(name)" 2>/dev/null || true)
+            if [ -n "$fw_rules" ]; then
+              for rule in $fw_rules; do
+                echo "Deleting firewall rule: $rule"
+                gcloud compute firewall-rules delete "$rule" --project=$GCP_PROJECT_ID --quiet || true
+              done
+            fi
+            echo "Deleting VPC: $vpc"
+            gcloud compute networks delete "$vpc" --project=$GCP_PROJECT_ID --quiet || true
+          done
+        else
+          echo "No ubicloud-* VPC networks found"
+        fi
+
+        rm -f /tmp/gcp-credentials.json
