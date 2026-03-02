@@ -384,7 +384,7 @@ class PostgresResource < Sequel::Model
     end
 
     Util.send_email(
-      accounts_with_access.map(&:email).uniq,
+      accounts_with_access,
       "PostgreSQL Storage Warning: #{name} at #{usage_percent}% capacity",
       bcc: Config.postgres_notification_email,
       greeting: "Hello,",
@@ -424,7 +424,7 @@ class PostgresResource < Sequel::Model
     end
 
     Util.send_email(
-      accounts_with_access.map(&:email).uniq,
+      accounts_with_access,
       "PostgreSQL Auto-Scaling: #{name}",
       bcc: Config.postgres_notification_email,
       greeting: "Hello,",
@@ -446,7 +446,7 @@ class PostgresResource < Sequel::Model
     ]
 
     Util.send_email(
-      accounts_with_access.map(&:email).uniq,
+      accounts_with_access,
       "PostgreSQL Auto-Scaling Canceled: #{name}",
       bcc: Config.postgres_notification_email,
       greeting: "Hello,",
@@ -456,8 +456,9 @@ class PostgresResource < Sequel::Model
     )
   end
 
+  # Returns emails for accounts with access
   def accounts_with_access
-    project.accounts.select { Authorization.has_permission?(project, it, "Postgres:view", project) }
+    Authorization.allowed_accounts_dataset(project.id, "Postgres:view", self).distinct.select_map(:email)
   end
 
   def self.generate_postgres_options(project, flavor: nil, location: nil)
