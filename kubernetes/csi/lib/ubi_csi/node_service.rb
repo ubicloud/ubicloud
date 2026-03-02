@@ -156,7 +156,7 @@ module Csi
         is_new_loop_device = loop_device.nil?
         if is_new_loop_device
           log_with_id(req_id, "Setting up new loop device for: #{backing_file}")
-          output, ok = run_cmd("losetup", "--find", "--show", backing_file, req_id:)
+          output, ok = run_cmd("losetup", "--direct-io=on", "--find", "--show", backing_file, req_id:)
           loop_device = output.strip
           unless ok && !loop_device.empty?
             raise "Failed to setup loop device: #{output}"
