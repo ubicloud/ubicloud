@@ -322,7 +322,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:d_check).with("run_init_script").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: "sudo whoami")
       expect(sshable).to receive(:_cmd).with("sudo chmod +x postgres/bin/init_script.sh")
-      expect(sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", stdin: postgres_resource.name)
+      expect(sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", "primary", stdin: postgres_resource.name)
       expect { nx.run_init_script }.to nap(5)
     end
 
@@ -336,6 +336,53 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
       expect(sshable).to receive(:d_check).with("run_init_script").and_return("Succeeded")
       expect { nx.run_init_script }.to hop("configure_walg_credentials")
+    end
+
+    it "passes standby role for standby servers" do
+      standby_nx = create_standby_nexus
+      PostgresInitScript.create_with_id(postgres_resource, init_script: "sudo whoami")
+      standby_sshable = standby_nx.postgres_server.vm.sshable
+      expect(standby_sshable).to receive(:d_check).with("run_init_script").and_return("NotStarted")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: "sudo whoami")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chmod +x postgres/bin/init_script.sh")
+      expect(standby_sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", "standby", stdin: postgres_resource.name)
+      expect { standby_nx.run_init_script }.to nap(5)
+    end
+
+    it "passes read_replica role for read replica servers" do
+      replica_resource = create_read_replica_resource(parent: postgres_resource)
+      PostgresInitScript.create_with_id(replica_resource, init_script: "sudo whoami")
+      replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
+      replica_nx = described_class.new(replica_server.strand)
+      replica_sshable = replica_nx.postgres_server.vm.sshable
+      expect(replica_sshable).to receive(:d_check).with("run_init_script").and_return("NotStarted")
+      expect(replica_sshable).to receive(:_cmd).with("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: "sudo whoami")
+      expect(replica_sshable).to receive(:_cmd).with("sudo chmod +x postgres/bin/init_script.sh")
+      expect(replica_sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", "read_replica", stdin: replica_resource.name)
+      expect { replica_nx.run_init_script }.to nap(5)
+    end
+
+    it "passes restore role for PITR restore servers" do
+      pitr_resource = PostgresResource.create(
+        name: "pg-pitr-#{SecureRandom.hex(4)}",
+        superuser_password: "dummy-password",
+        ha_type: "none",
+        target_version: "16",
+        location_id:,
+        project:,
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        restore_target: Time.now
+      )
+      PostgresInitScript.create_with_id(pitr_resource, init_script: "sudo whoami")
+      pitr_server = create_postgres_server(resource: pitr_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
+      pitr_nx = described_class.new(pitr_server.strand)
+      pitr_sshable = pitr_nx.postgres_server.vm.sshable
+      expect(pitr_sshable).to receive(:d_check).with("run_init_script").and_return("NotStarted")
+      expect(pitr_sshable).to receive(:_cmd).with("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: "sudo whoami")
+      expect(pitr_sshable).to receive(:_cmd).with("sudo chmod +x postgres/bin/init_script.sh")
+      expect(pitr_sshable).to receive(:d_run).with("run_init_script", "./postgres/bin/init_script.sh", "restore", stdin: pitr_resource.name)
+      expect { pitr_nx.run_init_script }.to nap(5)
     end
   end
 

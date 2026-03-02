@@ -373,6 +373,22 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "read-replica inherits init_script from parent" do
+        PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
+        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-init-script"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        replica = PostgresResource.first(name: "my-read-replica-with-init-script")
+        expect(replica.init_script).not_to be_nil
+        expect(replica.init_script.init_script).to eq("sudo whoami")
+      end
+
       it "read-replica with tags" do
         VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
@@ -502,6 +518,25 @@ RSpec.describe Clover, "postgres" do
         }.to_json
 
         expect(last_response.status).to eq(200)
+      end
+
+      it "restore inherits init_script from parent" do
+        PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg-with-init-script",
+          restore_target:
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        restored = PostgresResource.first(name: "restored-pg-with-init-script")
+        expect(restored.init_script).not_to be_nil
+        expect(restored.init_script.init_script).to eq("sudo whoami")
       end
 
       it "restore invalid target" do

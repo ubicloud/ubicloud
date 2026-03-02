@@ -320,7 +320,8 @@ class Clover
             user_config:,
             pgbouncer_user_config:,
             tags:,
-            restore_target: nil
+            restore_target: nil,
+            init_script: pg.init_script&.init_script
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -386,7 +387,8 @@ class Clover
             user_config:,
             pgbouncer_user_config:,
             tags:,
-            restore_target:
+            restore_target:,
+            init_script: pg.init_script&.init_script
           ).subject
           audit_log(pg, "restore", restored)
         end
