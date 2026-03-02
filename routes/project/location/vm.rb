@@ -52,18 +52,31 @@ class Clover
 
       r.show_object(vm, actions: %w[overview networking settings], perm: "Vm:view", template: "vm/show")
 
-      r.post "restart" do
+      r.post %w[restart start stop] do |action|
         authorize("Vm:edit", vm)
+        handle_validation_failure("vm/show") { @page = "settings" }
+
+        if vm.aws?
+          raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported for VMs running on AWS")
+        end
+
+        unless vm.send(:"can_#{action}?")
+          raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported in the VM's current state")
+        end
 
         DB.transaction do
-          vm.incr_restart
-          audit_log(vm, "restart")
+          vm.public_send(:"incr_#{action}")
+          audit_log(vm, action)
         end
 
         if api?
           Serializers::Vm.serialize(vm, {detailed: true})
         else
-          flash["notice"] = "'#{vm.name}' will be restarted in a few seconds"
+          notice = "Scheduled #{action} of #{vm.name}"
+          if action == "stop"
+            notice << ". Note that stopped VMs still accrue billing charges. To stop billing charges, delete the VM."
+          end
+          flash["notice"] = notice
           r.redirect vm, "/settings"
         end
       end

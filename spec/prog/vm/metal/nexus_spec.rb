@@ -813,7 +813,6 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "hops to unavailable based on the vm's available status" do
       vm.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:register_deadline).with("wait", 2 * 60)
       expect { nx.wait }.to hop("unavailable")
 
       vm.incr_checkup
@@ -856,12 +855,37 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     end
   end
 
+  describe "#start_after_stop" do
+    it "hops to wait after starting the vm" do
+      vm.incr_start
+      expect(sshable).to receive(:_cmd).with("sudo systemctl start #{vm.inhost_name}")
+      expect { nx.start_after_stop }.to hop("wait")
+        .and change { vm.reload.start_set? }.from(true).to(false)
+    end
+  end
+
   describe "#stopped" do
     it "naps after stopping the vm" do
       vm.incr_stop
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{vm.inhost_name}")
-      expect { nx.stopped }.to nap(60 * 60)
+      expect { nx.stopped }.to nap(0)
         .and change { vm.reload.stop_set? }.from(true).to(false)
+    end
+
+    it "hops to restart when needed" do
+      vm.incr_restart
+      expect { nx.stopped }.to hop("restart")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
+    it "hops to start when needed" do
+      vm.incr_start
+      expect { nx.stopped }.to hop("start_after_stop")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
     end
 
     it "does not stop if already stopped" do
@@ -875,6 +899,26 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       vm.incr_start_after_host_reboot
       expect { nx.unavailable }.to hop("start_after_host_reboot")
         .and change { vm.reload.checkup_set? }.from(false).to(true)
+    end
+
+    it "restarts the VM when needed" do
+      vm.incr_restart
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm restart #{vm.inhost_name}")
+      expect { nx.unavailable }.to nap(0)
+        .and change { vm.reload.restart_set? }.from(true).to(false)
+    end
+
+    it "hops to start when needed" do
+      vm.incr_start
+      expect { nx.unavailable }.to hop("start_after_stop")
+      frame = st.stack[0]
+      expect(frame["deadline_target"]).to eq "wait"
+      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+    end
+
+    it "hops to stopped when needed" do
+      vm.incr_stop
+      expect { nx.unavailable }.to hop("stopped")
     end
 
     it "naps if vm is still unavailable" do

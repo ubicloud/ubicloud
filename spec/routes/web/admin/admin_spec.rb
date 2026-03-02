@@ -1036,6 +1036,19 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
+  it "shows unavailable VMs" do
+    project = Project.create(name: "test")
+    vm = create_vm(project_id: project.id, name: "active-vm")
+    Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "unavailable")
+
+    visit "/"
+    click_link "Show Unavailable VMs"
+    click_link vm.ubid
+    expect(page.title).to eq "Ubicloud Admin - Strand #{vm.ubid}"
+    click_link "Subject"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+  end
+
   it "finds both active and archived VMs by IPv4" do
     host = create_vm_host
     project = Project.create(name: "test")
