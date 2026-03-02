@@ -16,9 +16,18 @@ class Clover
     name ||= typecast_params.nonempty_str!("name")
     Validation.validate_name(name)
     description = typecast_params.str("description") || ""
+    vm_id = typecast_params.str("vm_id")
 
     unless @location
       fail Validation::ValidationFailed.new({location: "Location is required"})
+    end
+
+    vm = nil
+    if vm_id
+      vm = @project.vms_dataset.first(Sequel[:vm][:id] => UBID.to_uuid(vm_id)) ||
+        @project.vms_dataset.first(Sequel[:vm][:id] => vm_id)
+      fail Validation::ValidationFailed.new({vm_id: "VM not found"}) unless vm
+      fail Validation::ValidationFailed.new({vm_id: "VM must be stopped"}) unless vm.display_state == "stopped"
     end
 
     machine_image = nil
@@ -28,9 +37,29 @@ class Clover
         description:,
         location_id: @location.id,
         project_id: @project.id,
-        arch: "x64"
+        arch: vm ? vm.arch : "x64"
       )
       audit_log(machine_image, "create")
+
+      if vm
+        next_version = MachineImage.next_auto_version(machine_image.versions_dataset)
+        s3_bucket = Config.machine_image_archive_bucket
+        s3_endpoint = Config.machine_image_archive_endpoint
+        s3_prefix = "#{machine_image.ubid}/#{next_version}/"
+
+        version = MachineImageVersion.create(
+          machine_image_id: machine_image.id,
+          version: next_version,
+          state: "creating",
+          vm_id: vm.id,
+          size_gib: vm.vm_storage_volumes.find(&:boot)&.size_gib || 0,
+          s3_bucket: s3_bucket,
+          s3_prefix: s3_prefix,
+          s3_endpoint: s3_endpoint
+        )
+        Prog::MachineImage::Nexus.assemble(version)
+        audit_log(machine_image, "update")
+      end
     end
 
     if api?

@@ -1852,6 +1852,9 @@ paths:
                 unix_user:
                   description: Unix user of the VM
                   type: string
+                arch:
+                  description: Architecture of the VM (x64 or arm64)
+                  type: string
               additionalProperties: false
               required:
                 - public_key
@@ -1898,6 +1901,21 @@ paths:
     post:
       operationId: restartVM
       summary: Restart a VM
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/stop':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    post:
+      operationId: stopVM
+      summary: Stop a VM
       responses:
         '200':
           $ref: '#/components/responses/Vm'
@@ -2746,8 +2764,8 @@ components:
           description: ID of the machine image version
           type: string
         version:
-          description: Version number
-          type: integer
+          description: Version string
+          type: string
         state:
           description: State of the version
           type: string
@@ -2801,8 +2819,8 @@ components:
           description: Location of the machine image
           type: string
         version:
-          description: Active version number (from active_version)
-          type: integer
+          description: Active version string (from active_version)
+          type: string
           nullable: true
         state:
           description: Active version state (from active_version)

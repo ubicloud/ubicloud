@@ -67,6 +67,17 @@ class Clover
           r.redirect vm, "/settings"
         end
       end
+
+      r.post api?, "stop" do
+        authorize("Vm:edit", vm)
+
+        DB.transaction do
+          vm.incr_stop
+          audit_log(vm, "stop")
+        end
+
+        Serializers::Vm.serialize(vm, {detailed: true})
+      end
     end
   end
 end

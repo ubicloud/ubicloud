@@ -39,11 +39,14 @@ class Clover
     end
 
     assemble_params = typecast_params.convert!(symbolize: true) do |tp|
-      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script", "machine_image"])
+      tp.nonempty_str(["size", "unix_user", "boot_image", "private_subnet_id", "gpu", "init_script", "machine_image", "arch"])
       tp.pos_int("storage_size")
       tp.bool("enable_ip4")
     end
     assemble_params.compact!
+    arch = assemble_params.delete(:arch) || "x64"
+    fail Validation::ValidationFailed.new({arch: "\"#{arch}\" is not a valid architecture"}) unless %w[x64 arm64].include?(arch)
+    assemble_params[:arch] = arch
 
     if (mi_ubid = assemble_params.delete(:machine_image))
       mi = dataset_authorize(@project.machine_images_dataset, "MachineImage:view")
@@ -69,11 +72,11 @@ class Clover
     # Same as above, moved the size validation here to not allow users to
     # pass gpu instance while creating a VM.
     if assemble_params[:size]
-      parsed_size = Validation.validate_vm_size(assemble_params[:size], "x64", only_visible: true)
+      parsed_size = Validation.validate_vm_size(assemble_params[:size], arch)
     end
 
     if assemble_params[:storage_size]
-      storage_size = Validation.validate_vm_storage_size(assemble_params[:size] || Prog::Vm::Nexus::DEFAULT_SIZE, "x64", assemble_params[:storage_size])
+      storage_size = Validation.validate_vm_storage_size(assemble_params[:size] || Prog::Vm::Nexus::DEFAULT_SIZE, arch, assemble_params[:storage_size])
       assemble_params[:storage_volumes] = [{size_gib: storage_size, encrypted: true}]
       assemble_params.delete(:storage_size)
     end
