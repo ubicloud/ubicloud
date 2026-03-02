@@ -31,5 +31,10 @@ RSpec.describe Vm do
       end
     end
 
+    describe "#update_firewall_rules_prog" do
+      it "returns the GCP UpdateFirewallRules prog class" do
+        expect(vm.update_firewall_rules_prog).to eq(Prog::Vnet::Gcp::UpdateFirewallRules)
+      end
+    end
   end
 end
