@@ -3461,6 +3461,9 @@ components:
                 type: string
               upgrade_status:
                 type: string
+              upgrade_stage:
+                type: string
+                nullable: true
             additionalProperties: false
             required:
               - current_version

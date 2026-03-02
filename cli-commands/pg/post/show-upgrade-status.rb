@@ -10,6 +10,7 @@ UbiCli.on("pg").run_on("show-upgrade-status") do
     body = []
     body << "Major version upgrade of PostgreSQL database #{sdk_object.id} to version #{upgrade_status[:target_version]}\n"
     body << "Status: #{upgrade_status[:upgrade_status]}\n"
+    body << "Stage: #{upgrade_status[:upgrade_stage] || "N/A"}\n"
     response(body)
   end
 end
