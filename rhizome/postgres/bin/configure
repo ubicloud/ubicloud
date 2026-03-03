@@ -63,9 +63,9 @@ local   all             pgbouncer                               peer map=system2
 local   all             ubi_monitoring                          peer
 
 # "local" is for Unix domain socket connections only
-# Use SCRAM authentication for all local connections to allow pgbouncer
+# Use md5 authentication for all local connections to allow pgbouncer
 # passthrough to work for all non-unix users
-local   all             all                                     scram-sha-256
+local   all             all                                     md5
 # IPv4 local connections:
 host    all             all             127.0.0.1/32            scram-sha-256
 # IPv6 local connections:
