@@ -41,6 +41,15 @@ RSpec.describe Clover, "project" do
       get "/project"
       expect(last_response.status).to eq(401)
     end
+
+    it "recognizes personal access tokens with case insensitive bearer" do
+      account = Account[email: user.email]
+      pat = ApiKey.create(owner_table: "accounts", owner_id: account.id, used_for: "api", project_id: project.id)
+
+      header "Authorization", "BEARER pat-#{pat.ubid}-#{pat.key}"
+      get "/project"
+      expect(last_response.status).to eq(200)
+    end
   end
 
   describe "authenticated" do
