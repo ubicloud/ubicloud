@@ -124,11 +124,66 @@ RSpec.describe MachineImageVersion do
     it "belongs to machine_image" do
       expect(miv.machine_image.id).to eq(mi.id)
     end
+
+    it "belongs to a vm" do
+      vm = create_vm(project_id: project.id)
+      miv.update(vm_id: vm.id)
+      expect(miv.reload.vm.id).to eq(vm.id)
+    end
+
+    it "has many active_billing_records" do
+      expect(miv.active_billing_records).to be_empty
+    end
   end
 
   describe "ResourceMethods" do
     it "generates a UBID" do
       expect(miv.ubid).to start_with("mv")
+    end
+  end
+
+  describe "SemaphoreMethods" do
+    it "has destroy semaphore" do
+      expect(miv).to respond_to(:incr_destroy)
+    end
+  end
+
+  describe "#before_destroy" do
+    it "destroys the record" do
+      miv.destroy
+      expect(described_class[miv.id]).to be_nil
+    end
+
+    it "finalizes active billing records" do
+      BillingRecord.create(
+        resource_id: miv.id,
+        resource_name: "test",
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
+        project_id: project.id,
+        amount: 10,
+        span: Sequel.pg_range(Time.now - 3600..nil)
+      )
+      expect(miv.reload.active_billing_records.count).to eq(1)
+      miv.destroy
+      expect(BillingRecord.active.where(resource_id: miv.id).count).to eq(0)
+    end
+
+    it "destroys key_encryption_key_1 if present" do
+      kek = StorageKeyEncryptionKey.create(
+        algorithm: "aes-256-gcm",
+        key: "testkey",
+        init_vector: "iv",
+        auth_data: "test-auth"
+      )
+      miv.update(key_encryption_key_1_id: kek.id)
+      miv.destroy
+      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
+    end
+
+    it "does not fail when no key_encryption_key_1" do
+      expect(miv.key_encryption_key_1).to be_nil
+      miv.destroy
+      expect(described_class[miv.id]).to be_nil
     end
   end
 
