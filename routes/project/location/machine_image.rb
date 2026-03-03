@@ -77,6 +77,7 @@ class Clover
         end
 
         vm_ubid = typecast_params.nonempty_str!("vm_ubid")
+        version = typecast_params.nonempty_str("version")
         vm = stopped_vms_in_location(@project, machine_image.location_id)
           .find { it.ubid == vm_ubid }
 
@@ -84,7 +85,11 @@ class Clover
           fail Validation::ValidationFailed.new({vm_ubid: "VM not found or not stopped"})
         end
 
-        next_version = MachineImage.next_auto_version(machine_image.versions_dataset)
+        next_version = version || MachineImage.next_auto_version(machine_image.versions_dataset)
+
+        if machine_image.versions_dataset.where(version: next_version).any?
+          fail Validation::ValidationFailed.new({version: "Version '#{next_version}' already exists"})
+        end
         s3_bucket = Config.machine_image_archive_bucket
         s3_endpoint = Config.machine_image_archive_endpoint
         s3_prefix = "#{machine_image.ubid}/#{next_version}/"

@@ -26,6 +26,11 @@
   <% else %>
     <% form(action: "#{mi_path}/create-version", method: :post) do %>
       <div class="mb-4">
+        <label for="version" class="block text-sm font-medium text-gray-700 mb-1">Version</label>
+        <input type="text" name="version" id="version" placeholder="(auto: YYYYMMDD-N)" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
+        <p class="mt-1 text-xs text-gray-500">Leave blank for automatic versioning.</p>
+      </div>
+      <div class="mb-4">
         <label for="vm_ubid" class="block text-sm font-medium text-gray-700 mb-1">Source VM</label>
         <select name="vm_ubid" id="vm_ubid" required class="block w-full rounded-md border-gray-300 shadow-sm focus:border-orange-500 focus:ring-orange-500 sm:text-sm">
           <option value="">Select a stopped VM...</option>

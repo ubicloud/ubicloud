@@ -19,11 +19,11 @@ class MachineImage < Sequel::Model
   end
 
   def self.next_auto_version(versions_dataset)
-    max_num = versions_dataset
+    today = Date.today.strftime("%Y%m%d")
+    count = versions_dataset
       .select_map(:version)
-      .filter_map { |v| v[/\Av(\d+)\z/, 1]&.to_i }
-      .max || 0
-    "v#{max_num + 1}"
+      .count { |v| v.to_s.start_with?("#{today}-") }
+    "#{today}-#{count + 1}"
   end
 
   def display_location

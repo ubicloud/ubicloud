@@ -220,8 +220,9 @@ RSpec.describe Clover, "machine_image" do
 
         click_button "Create Version"
 
-        expect(page).to have_flash_notice("Version 2 is being created")
-        ver = MachineImageVersion.where(machine_image_id: mi.id, version: 2).first
+        today = Date.today.strftime("%Y%m%d")
+        expect(page).to have_flash_notice("Version #{today}-1 is being created")
+        ver = MachineImageVersion.where(machine_image_id: mi.id, version: "#{today}-1").first
         expect(ver).not_to be_nil
         expect(ver.state).to eq("creating")
         expect(ver.vm_id).to eq(vm.id)
