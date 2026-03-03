@@ -104,10 +104,6 @@ class Clover
               fail Validation::ValidationFailed.new({version: "Version not found"})
             end
 
-            if version.active?
-              fail Validation::ValidationFailed.new({version: "Cannot delete the active version"})
-            end
-
             DB.transaction do
               version.incr_destroy
               audit_log(machine_image, "update")
