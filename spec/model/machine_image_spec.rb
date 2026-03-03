@@ -192,6 +192,21 @@ RSpec.describe MachineImage do
     end
   end
 
+  describe ".for_project" do
+    it "filters images by project" do
+      mi # trigger creation
+      other_project = Project.create(name: "other-project")
+      other_mi = described_class.create(
+        name: "other-image", project_id: other_project.id,
+        location_id: Location::HETZNER_FSN1_ID
+      )
+
+      results = described_class.for_project(project.id).all
+      expect(results.map(&:id)).to include(mi.id)
+      expect(results.map(&:id)).not_to include(other_mi.id)
+    end
+  end
+
   it "has a project association" do
     expect(mi.project.id).to eq(project.id)
   end

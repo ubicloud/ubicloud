@@ -138,8 +138,37 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "#before_destroy" do
-    it "nullifies vm_storage_volume references and destroys cleanly" do
-      miv
+    it "nullifies vm_storage_volume references" do
+      vm = create_vm(project_id: project.id)
+      vol = VmStorageVolume.create(
+        vm_id: vm.id, boot: true, size_gib: 10,
+        disk_index: 0, machine_image_version_id: miv.id
+      )
+      miv.destroy
+      expect(vol.reload.machine_image_version_id).to be_nil
+    end
+
+    it "finalizes active billing records" do
+      BillingRecord.create(
+        project_id: project.id,
+        resource_id: miv.id,
+        resource_name: "test-image",
+        billing_rate_id: BillingRate.from_resource_properties("MachineImageStorage", "standard", mi.location.name)["id"],
+        amount: 10
+      )
+      expect(miv.active_billing_records).not_to be_empty
+      miv.active_billing_records.each { expect(_1).to receive(:finalize).and_call_original }
+      miv.destroy
+    end
+
+    it "destroys associated key_encryption_key" do
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth")
+      miv.update(key_encryption_key_1_id: kek.id)
+      miv.destroy
+      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
+    end
+
+    it "destroys cleanly without KEK" do
       miv.destroy
       expect(described_class[miv.id]).to be_nil
     end
