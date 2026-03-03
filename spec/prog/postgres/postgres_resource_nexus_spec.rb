@@ -359,7 +359,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   describe "#refresh_certificates" do
     before do
       cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
-      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem)
+      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem, client_root_cert_1: cert_pem, client_root_cert_key_1: key_pem, client_root_cert_2: cert_pem, client_root_cert_key_2: key_pem, client_cert: cert_pem, client_cert_key: key_pem)
     end
 
     it "rotates root certificate if root_cert_1 is close to expiration" do
@@ -370,12 +370,21 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect { nx.refresh_certificates }.to hop("wait")
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
     end
+
+    it "rotates client root certificate if client_root_cert_1 is close to expiration" do
+      postgres_server
+      short_cert_pem, short_key_pem = Util.create_root_certificate(common_name: "Test Client Root CA", duration: 60 * 60 * 24 * 30 * 4)
+      postgres_resource.update(client_root_cert_1: short_cert_pem, client_root_cert_key_1: short_key_pem)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
   end
 
   describe "#refresh_certificates", "with dns_zone" do
     before do
       cert_pem, key_pem = Util.create_root_certificate(common_name: "Test Root CA", duration: 60 * 60 * 24 * 365 * 5)
-      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem)
+      postgres_resource.update(root_cert_1: cert_pem, root_cert_key_1: key_pem, root_cert_2: cert_pem, root_cert_key_2: key_pem, server_cert: cert_pem, server_cert_key: key_pem, client_root_cert_1: cert_pem, client_root_cert_key_1: key_pem, client_root_cert_2: cert_pem, client_root_cert_key_2: key_pem, client_cert: cert_pem, client_cert_key: key_pem)
       DnsZone.create(project_id: postgres_project.id, name: "postgres.ubicloud.com")
       allow(Config).to receive(:postgres_service_hostname).and_return("postgres.ubicloud.com")
     end
@@ -414,6 +423,22 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
       ).map(&:to_pem)
       postgres_resource.update(root_cert_1: short_cert_pem, root_cert_key_1: short_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
+
+      expect { nx.refresh_certificates }.to hop("wait")
+      expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist
+    end
+
+    it "rotates client certificate using client_root_cert_2 if client_root_cert_1 is close to expiration" do
+      postgres_server
+      short_client_root_pem, short_client_root_key_pem = Util.create_root_certificate(common_name: "Test Client Root CA", duration: 60 * 60 * 24 * 360)
+      short_server_cert_pem, short_server_key_pem = Util.create_certificate(
+        subject: "/CN=Test Server",
+        extensions: ["keyUsage=digitalSignature"],
+        duration: 60 * 60 * 24 * 29,
+        issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+      ).map(&:to_pem)
+      postgres_resource.update(client_root_cert_1: short_client_root_pem, client_root_cert_key_1: short_client_root_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
 
       expect { nx.refresh_certificates }.to hop("wait")
       expect(Semaphore.where(strand_id: postgres_server.strand.id, name: "refresh_certificates").first).to exist

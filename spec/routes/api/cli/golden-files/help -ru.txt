@@ -53,11 +53,13 @@ ubi lb (location/lb-name | lb-id) update algorithm src-port dst-port health-chec
 ubi pg command [...]
 ubi pg (location/pg-name | pg-id) [post-options] post-command [...]
 ubi pg list [options]
+ubi pg (location/pg-name | pg-id) add-cert-auth-user name
 ubi pg (location/pg-name | pg-id) add-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) add-firewall-rule [options] cidr
 ubi pg (location/pg-name | pg-id) add-metric-destination username password url
 ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]
 ubi pg (location/pg-name | pg-id) ca-certificates
+ubi pg (location/pg-name | pg-id) create-client-cert-keypair common-name duration
 ubi pg (location/pg-name | pg-id) create-read-replica [options] name
 ubi pg location/pg-name create [options]
 ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
@@ -71,6 +73,7 @@ ubi pg (location/pg-name | pg-id) [options] pg_dumpall [pg_dumpall-options]
 ubi pg (location/pg-name | pg-id) promote-read-replica
 ubi pg (location/pg-name | pg-id) [options] psql [psql-options]
 ubi pg (location/pg-name | pg-id) recycle
+ubi pg (location/pg-name | pg-id) remove-cert-auth-user name
 ubi pg (location/pg-name | pg-id) remove-config-entries key [...]
 ubi pg (location/pg-name | pg-id) remove-pgbouncer-config-entries key [...]
 ubi pg (location/pg-name | pg-id) rename new-name

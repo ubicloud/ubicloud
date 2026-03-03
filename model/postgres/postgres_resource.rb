@@ -19,8 +19,8 @@ class PostgresResource < Sequel::Model
   plugin :association_dependencies, metric_destinations: :destroy, init_script: :destroy
   dataset_module Pagination
 
-  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs],
-    encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key]
+  plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs, :client_root_cert_1, :client_root_cert_2, :client_cert],
+    encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key, :client_root_cert_key_1, :client_root_cert_key_2, :client_cert_key]
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
@@ -111,9 +111,9 @@ class PostgresResource < Sequel::Model
 
   def replication_connection_string(application_name:)
     query_parameters = {
-      sslrootcert: "/etc/ssl/certs/ca.crt",
-      sslcert: "/etc/ssl/certs/server.crt",
-      sslkey: "/etc/ssl/certs/server.key",
+      sslrootcert: "/etc/ssl/certs/server-ca.crt",
+      sslcert: "/etc/ssl/certs/client.crt",
+      sslkey: "/etc/ssl/certs/client.key",
       sslmode: dns_zone ? "verify-full" : "require",
       dbname: "postgres",
       application_name:
@@ -194,6 +194,28 @@ class PostgresResource < Sequel::Model
 
   def ca_certificates
     [root_cert_1, root_cert_2].join("\n") if root_cert_1 && root_cert_2
+  end
+
+  def client_ca_certificates
+    [client_root_cert_1, client_root_cert_2].join("\n") if client_root_cert_1 && client_root_cert_2
+  end
+
+  def signing_key
+    active_signing_key(root_cert_1, root_cert_key_1, root_cert_2, root_cert_key_2)
+  end
+
+  def client_signing_key
+    active_signing_key(client_root_cert_1, client_root_cert_key_1, client_root_cert_2, client_root_cert_key_2)
+  end
+
+  private def active_signing_key(cert_pem_1, key_pem_1, cert_pem_2, key_pem_2)
+    root_cert = OpenSSL::X509::Certificate.new(cert_pem_1)
+    root_cert_key = OpenSSL::PKey::EC.new(key_pem_1)
+    if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
+      root_cert = OpenSSL::X509::Certificate.new(cert_pem_2)
+      root_cert_key = OpenSSL::PKey::EC.new(key_pem_2)
+    end
+    [root_cert, root_cert_key]
   end
 
   def validate
