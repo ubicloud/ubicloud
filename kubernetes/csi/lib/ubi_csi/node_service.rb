@@ -18,9 +18,6 @@ module Csi
 
       MAX_VOLUMES_PER_NODE = 8
       VOLUME_BASE_PATH = "/var/lib/ubicsi"
-      OLD_PV_NAME_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
-      OLD_PVC_OBJECT_ANNOTATION_KEY = "csi.ubicloud.com/old-pvc-object"
-      MIGRATION_RETRY_COUNT_ANNOTATION_KEY = "csi.ubicloud.com/migration-retry-count"
       MAX_MIGRATION_RETRIES = 3
       ACCEPTABLE_FS = ["ext4", "xfs"].freeze
 
@@ -340,20 +337,6 @@ module Csi
           # the csi.ubicloud.com/old-pv-name annotation is set.
           client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace: pvc_namespace)
         end
-      end
-
-      def trim_pvc(pvc, pv_name)
-        pvc["metadata"]["annotations"] ||= {}
-        %W[#{OLD_PVC_OBJECT_ANNOTATION_KEY} volume.kubernetes.io/selected-node pv.kubernetes.io/bind-completed].each do |key|
-          pvc["metadata"]["annotations"].delete(key)
-        end
-        %w[resourceVersion uid creationTimestamp deletionTimestamp deletionGracePeriodSeconds].each do |key|
-          pvc["metadata"].delete(key)
-        end
-        pvc["spec"].delete("volumeName")
-        pvc.delete("status")
-        pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = pv_name
-        pvc
       end
 
       def node_publish_volume(req, _call)

@@ -4,6 +4,7 @@ require "grpc"
 require "json"
 require "securerandom"
 require_relative "../csi_services_pb"
+require_relative "stuck_volume_detector"
 
 module Csi
   module V1
@@ -24,6 +25,16 @@ module Csi
         @logger = logger
         @volume_store = {} # Maps volume name to volume details
         @mutex = Mutex.new
+        start_stuck_volume_detector
+      end
+
+      def shutdown!
+        @stuck_volume_detector&.shutdown!
+      end
+
+      def start_stuck_volume_detector
+        @stuck_volume_detector = Csi::StuckVolumeDetector.new(logger: @logger)
+        @stuck_volume_detector.start
       end
 
       def controller_get_capabilities(req, _call)
