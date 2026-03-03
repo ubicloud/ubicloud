@@ -3,7 +3,7 @@
 require_relative "../../lib/util"
 
 class Prog::Test::Kubernetes < Prog::Test::Base
-  MIGRATION_TRIES = 2
+  MIGRATION_TRIES = 1
 
   def self.assemble
     kubernetes_test_project = Project.create(name: "Kubernetes-Test-Project")
@@ -30,7 +30,7 @@ class Prog::Test::Kubernetes < Prog::Test::Base
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
       name: "kubernetes-test-standard-nodepool",
-      node_count: 2,
+      node_count: 3,
       kubernetes_cluster_id: kc.id,
       target_node_size: "standard-2"
     )
@@ -237,8 +237,9 @@ STS
   end
 
   label def kill_rsync_process
-    source_node_name = strand.stack.first["rsync_retry_source_node"]
-    target_node = nodepool.nodes.find { it.name != source_node_name }
+    target_node_name = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    nap 1 if target_node_name.empty?
+    target_node = nodepool.nodes.find { it.name == target_node_name }
     nap 1 if target_node.vm.sshable.cmd("pgrep rsync || true").strip.empty?
     target_node.vm.sshable.cmd("sudo pkill -9 rsync")
     hop_verify_rsync_retry
@@ -247,6 +248,34 @@ STS
   label def verify_rsync_retry
     nap 5 unless pod_status == "Running"
     verify_data_hashes("rsync retry")
+    hop_test_chained_migration
+  end
+
+  label def test_chained_migration
+    client = kubernetes_cluster.client
+    nodepool.nodes.each { client.kubectl("uncordon :name", name: it.name) }
+    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    client.kubectl("cordon :pod_node_name", pod_node_name:)
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    update_stack({"chained_migration_source_node" => pod_node_name})
+    hop_cordon_chained_target
+  end
+
+  label def cordon_chained_target
+    target_node_name = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    nap 1 if target_node_name.empty?
+    target_node = nodepool.nodes.find { it.name == target_node_name }
+    # Wait for rsync to start so we know the first migration is in progress
+    # before we cordon the target and force the chain to the third node
+    nap 1 if target_node.vm.sshable.cmd("pgrep rsync || true").strip.empty?
+    kubernetes_cluster.client.kubectl("cordon :name", name: target_node.name)
+    kubernetes_cluster.client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    hop_verify_chained_migration
+  end
+
+  label def verify_chained_migration
+    nap 5 unless pod_status == "Running"
+    verify_data_hashes("chained migration")
     hop_test_node_not_deleted_during_copy
   end
 
