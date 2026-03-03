@@ -64,6 +64,8 @@ RSpec.describe Clover, "machine_image" do
     before do
       login_api
       project.set_ff_machine_image(true)
+      allow(Config).to receive(:machine_image_archive_bucket).and_return("test-bucket")
+      allow(Config).to receive(:machine_image_archive_endpoint).and_return("https://r2.example.com")
     end
 
     it "success get all location machine images" do

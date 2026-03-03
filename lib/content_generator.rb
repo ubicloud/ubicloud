@@ -75,6 +75,16 @@ module ContentGenerator
     end
   end
 
+  module MachineImage
+    def self.location(location)
+      location.ui_name
+    end
+
+    def self.vm_id(location, vm)
+      vm[:display_name]
+    end
+  end
+
   module Postgres
     def self.location(flavor, location)
       location.ui_name

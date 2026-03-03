@@ -67,6 +67,8 @@ RSpec.describe Clover, "machine_image" do
     before do
       project.set_ff_machine_image(true)
       project_wo_permissions.set_ff_machine_image(true)
+      allow(Config).to receive(:machine_image_archive_bucket).and_return("test-bucket")
+      allow(Config).to receive(:machine_image_archive_endpoint).and_return("https://r2.example.com")
       login(user.email)
     end
 
@@ -204,9 +206,6 @@ RSpec.describe Clover, "machine_image" do
 
     describe "create version" do
       it "can create a version from a stopped VM" do
-        allow(Config).to receive(:machine_image_archive_bucket).and_return("test-bucket")
-        allow(Config).to receive(:machine_image_archive_endpoint).and_return("https://r2.example.com")
-
         mi = machine_image
         vm = Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "stopped-vm", location_id: Location::HETZNER_FSN1_ID).subject
         vm.strand.update(label: "stopped")

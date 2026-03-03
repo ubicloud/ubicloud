@@ -77,39 +77,15 @@ class Clover
         end
 
         vm_ubid = typecast_params.nonempty_str!("vm_ubid")
-        version = typecast_params.nonempty_str("version")
-        vm = stopped_vms_in_location(@project, machine_image.location_id)
-          .find { it.ubid == vm_ubid }
+        version_str = typecast_params.nonempty_str("version")
 
-        unless vm
-          fail Validation::ValidationFailed.new({vm_ubid: "VM not found or not stopped"})
-        end
-
-        next_version = version || MachineImage.next_auto_version(machine_image.versions_dataset)
-
-        if machine_image.versions_dataset.where(version: next_version).any?
-          fail Validation::ValidationFailed.new({version: "Version '#{next_version}' already exists"})
-        end
-        s3_bucket = Config.machine_image_archive_bucket
-        s3_endpoint = Config.machine_image_archive_endpoint
-        s3_prefix = "#{machine_image.ubid}/#{next_version}/"
-
+        version = nil
         DB.transaction do
-          version = MachineImageVersion.create(
-            machine_image_id: machine_image.id,
-            version: next_version,
-            state: "creating",
-            vm_id: vm.id,
-            size_gib: vm.vm_storage_volumes.find(&:boot)&.size_gib || 0,
-            s3_bucket: s3_bucket,
-            s3_prefix: s3_prefix,
-            s3_endpoint: s3_endpoint
-          )
-          Prog::MachineImage::Nexus.assemble(version)
+          version = create_version_from_vm(machine_image, vm_ubid, version_str)
           audit_log(machine_image, "update")
         end
 
-        flash["notice"] = "Version #{next_version} is being created"
+        flash["notice"] = "Version #{version.version} is being created"
         r.redirect machine_image, "/overview"
       end
 

@@ -17,10 +17,22 @@
   form_elements = [
     {name: "name", type: "text", label: "Name", required: "required", placeholder: "Enter name", opening_tag: "<div class='sm:col-span-2'>"},
     {name: "description", type: "text", label: "Description", placeholder: "Enter description", opening_tag: "<div class='sm:col-span-2'>"},
-    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::Vm.method(:location)},
+    {name: "location", type: "radio_small_cards", label: "Location", required: "required", content_generator: ContentGenerator::MachineImage.method(:location)},
+    {name: "vm_id", type: "select", label: "Source VM", placeholder: "None (create without a version)", content_generator: ContentGenerator::MachineImage.method(:vm_id),
+     description_html: "<p class='mt-1 text-xs text-gray-500'>Optionally select a stopped VM to create the first version from.</p>"},
+    {name: "version", type: "text", label: "Version", placeholder: "(auto: YYYYMMDD-N)", opening_tag: "<div class='sm:col-span-2'>"},
   ]
 
   action = "#{@project.path}/machine-image"
 %>
 
 <%== part("components/form/resource_creation_form", action:, form_elements:, option_tree: @option_tree, option_parents: @option_parents)%>
+
+<div class="mt-6 rounded-md bg-blue-50 p-4">
+  <h4 class="text-sm font-medium text-blue-800">Before creating an image</h4>
+  <ul class="mt-2 text-sm text-blue-700 list-disc pl-5 space-y-1">
+    <li>Cloud-init will run on VMs launched from this image. Run <code class="font-mono text-xs bg-blue-100 px-1 rounded">sudo cloud-init clean</code> on the VM before imaging to reset cloud-init state.</li>
+    <li>Remove any user-specific data from <code class="font-mono text-xs bg-blue-100 px-1 rounded">/home/ubi</code> and other user directories.</li>
+    <li>Shut down the VM cleanly before creating an image.</li>
+  </ul>
+</div>

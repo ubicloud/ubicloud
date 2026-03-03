@@ -974,14 +974,15 @@ paths:
               type: object
               properties:
                 vm_id:
-                  description: UBID of the source VM (must be stopped)
+                  description: UBID of the source VM (must be stopped). If provided, the first version will be created from this VM.
+                  type: string
+                version:
+                  description: Version label for the first version (auto-generated if omitted)
                   type: string
                 description:
                   description: Description of the machine image
                   type: string
               additionalProperties: false
-              required:
-                - vm_id
       responses:
         '200':
           $ref: '#/components/responses/MachineImage'
@@ -2746,8 +2747,8 @@ components:
           description: ID of the machine image version
           type: string
         version:
-          description: Version number
-          type: integer
+          description: Version label
+          type: string
         state:
           description: State of the version
           type: string
@@ -2801,8 +2802,8 @@ components:
           description: Location of the machine image
           type: string
         version:
-          description: Active version number (from active_version)
-          type: integer
+          description: Active version label (from active_version)
+          type: string
           nullable: true
         state:
           description: Active version state (from active_version)
