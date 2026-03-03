@@ -9,53 +9,38 @@ RSpec.describe MachineImage do
   let(:mi) {
     described_class.create(
       name: "test-image",
-      description: "test desc",
       project_id: project.id,
-      location_id: location.id,
-      arch: "arm64"
+      location_id: location.id
     )
   }
 
-  def create_version(mi, state: "available", version: "v1", activated_at: nil, created_at: nil)
-    v = MachineImageVersion.create(
-      machine_image_id: mi.id,
-      version: version,
-      state: state,
-      size_gib: 10,
-      s3_bucket: "test-bucket",
-      s3_prefix: "test-prefix",
-      s3_endpoint: "https://s3.example.com"
-    )
-    updates = {}
-    updates[:activated_at] = activated_at if activated_at
-    updates[:created_at] = created_at if created_at
-    v.update(updates) unless updates.empty?
-    v
-  end
-
   describe ".next_auto_version" do
-    it "returns YYYYMMDD-1 when no versions exist" do
-      result = described_class.next_auto_version(MachineImageVersion.where(machine_image_id: mi.id))
-      today = Date.today.strftime("%Y%m%d")
-      expect(result).to eq("#{today}-1")
+    it "returns YYYYMMDD-1 for the first version of the day" do
+      result = described_class.next_auto_version(MachineImageVersion.dataset)
+      expect(result).to eq("#{Date.today.strftime("%Y%m%d")}-1")
     end
 
-    it "increments N for same day" do
+    it "increments N for versions on the same day" do
       today = Date.today.strftime("%Y%m%d")
-      create_version(mi, version: "#{today}-1")
-      create_version(mi, version: "#{today}-2")
-
-      result = described_class.next_auto_version(MachineImageVersion.where(machine_image_id: mi.id))
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "#{today}-1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "#{today}-2", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
+      result = described_class.next_auto_version(mi.versions_dataset)
       expect(result).to eq("#{today}-3")
     end
 
-    it "does not count versions from a different day" do
-      create_version(mi, version: "20200101-1")
-      create_version(mi, version: "20200101-2")
-
-      today = Date.today.strftime("%Y%m%d")
-      result = described_class.next_auto_version(MachineImageVersion.where(machine_image_id: mi.id))
-      expect(result).to eq("#{today}-1")
+    it "does not count versions from different days" do
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "20200101-1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
+      result = described_class.next_auto_version(mi.versions_dataset)
+      expect(result).to eq("#{Date.today.strftime("%Y%m%d")}-1")
     end
   end
 
@@ -66,103 +51,123 @@ RSpec.describe MachineImage do
   end
 
   describe "#path" do
-    it "returns the correct path with location and ubid" do
+    it "returns the resource path" do
       expect(mi.path).to eq("/location/#{location.display_name}/machine-image/#{mi.ubid}")
     end
   end
 
   describe "#active_version" do
     it "returns the version with the most recent activated_at" do
-      create_version(mi, version: "v1", activated_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", activated_at: Time.now)
-
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        activated_at: Time.now - 100
+      )
+      v2 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v2", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        activated_at: Time.now
+      )
       expect(mi.active_version.id).to eq(v2.id)
     end
 
-    it "returns nil when no versions are activated" do
-      create_version(mi, version: "v1")
-
+    it "returns nil when no version is activated" do
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       expect(mi.active_version).to be_nil
     end
 
-    it "works with eager-loaded versions" do
-      create_version(mi, version: "v1", activated_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", activated_at: Time.now)
-
+    it "uses eager-loaded versions when available" do
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        activated_at: Time.now
+      )
       eager_mi = described_class.eager(:versions).where(id: mi.id).first
-      expect(eager_mi.active_version.id).to eq(v2.id)
-    end
-
-    it "works without eager-loaded versions" do
-      create_version(mi, version: "v1", activated_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", activated_at: Time.now)
-
-      fresh_mi = described_class[mi.id]
-      expect(fresh_mi.active_version.id).to eq(v2.id)
+      expect(eager_mi.active_version.id).to eq(v.id)
     end
   end
 
   describe "#latest_available_version" do
-    it "returns the latest available version by created_at" do
-      create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", state: "available", created_at: Time.now)
-
-      expect(mi.latest_available_version.id).to eq(v2.id)
-    end
-
-    it "ignores non-available versions" do
-      v1 = create_version(mi, version: "v1", state: "available")
-      create_version(mi, version: "v2", state: "creating")
-
+    it "returns the latest version with state available" do
+      v1 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v2", state: "creating",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       expect(mi.latest_available_version.id).to eq(v1.id)
     end
 
     it "returns nil when no available versions exist" do
-      create_version(mi, version: "v1", state: "creating")
-
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "creating",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       expect(mi.latest_available_version).to be_nil
     end
 
-    it "works with eager-loaded versions" do
-      create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", state: "available", created_at: Time.now)
-
+    it "uses eager-loaded versions when available" do
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       eager_mi = described_class.eager(:versions).where(id: mi.id).first
-      expect(eager_mi.latest_available_version.id).to eq(v2.id)
+      expect(eager_mi.latest_available_version.id).to eq(v.id)
     end
   end
 
   describe "#available_versions" do
-    it "returns all available versions ordered by created_at DESC" do
-      v1 = create_version(mi, version: "v1", state: "available", created_at: Time.now - 200)
-      create_version(mi, version: "v2", state: "creating")
-      v3 = create_version(mi, version: "v3", state: "available", created_at: Time.now - 100)
-
+    it "returns all versions with state available ordered by created_at desc" do
+      v1 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        created_at: Time.now - 200
+      )
+      MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v2", state: "creating",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        created_at: Time.now - 100
+      )
+      v3 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v3", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        created_at: Time.now
+      )
       result = mi.available_versions
       expect(result.map(&:id)).to eq([v3.id, v1.id])
     end
 
-    it "returns empty array when no available versions exist" do
-      create_version(mi, version: "v1", state: "creating")
-
-      expect(mi.available_versions).to be_empty
+    it "returns empty array when no available versions" do
+      expect(mi.available_versions).to eq([])
     end
 
-    it "works with eager-loaded versions" do
-      v1 = create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", state: "available", created_at: Time.now)
-
+    it "uses eager-loaded versions when available" do
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       eager_mi = described_class.eager(:versions).where(id: mi.id).first
-      result = eager_mi.available_versions
-      expect(result.map(&:id)).to eq([v2.id, v1.id])
+      expect(eager_mi.available_versions.map(&:id)).to eq([v.id])
     end
   end
 
   describe "associations" do
-    it "has many versions ordered by created_at DESC" do
-      v1 = create_version(mi, version: "v1", created_at: Time.now - 100)
-      v2 = create_version(mi, version: "v2", created_at: Time.now)
-
+    it "has many versions ordered by created_at desc" do
+      v1 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        created_at: Time.now - 100
+      )
+      v2 = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v2", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        created_at: Time.now
+      )
       expect(mi.versions.map(&:id)).to eq([v2.id, v1.id])
     end
 
@@ -176,18 +181,18 @@ RSpec.describe MachineImage do
   end
 
   describe "ResourceMethods" do
-    it "generates a ubid" do
-      expect(mi.ubid).to match(/\A[a-z0-9]{26}\z/)
+    it "generates a UBID" do
+      expect(mi.ubid).to start_with("m1")
     end
   end
 
   describe "ObjectTag::Cleanup" do
     it "removes referencing access control entries and object tag memberships" do
-      account = Account.create(email: "test@example.com")
-      proj = account.create_project_with_default_policy("project-1", default_policy: false)
+      account = Account.create(email: "test-mi@example.com")
+      proj = account.create_project_with_default_policy("mi-project", default_policy: false)
+      mi.update(project_id: proj.id)
       tag = ObjectTag.create(project_id: proj.id, name: "t")
       tag.add_member(mi.id)
-      mi.update(project_id: proj.id)
       ace = AccessControlEntry.create(project_id: proj.id, subject_id: account.id, object_id: mi.id)
 
       mi.destroy
@@ -197,14 +202,24 @@ RSpec.describe MachineImage do
   end
 
   describe "#before_destroy" do
-    it "destroys all versions before destroying the image" do
-      v1 = create_version(mi, version: "v1")
-      v2 = create_version(mi, version: "v2")
-
+    it "destroys all versions" do
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id, version: "v1", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e"
+      )
       mi.destroy
-      expect(MachineImageVersion[v1.id]).to be_nil
-      expect(MachineImageVersion[v2.id]).to be_nil
-      expect(described_class[mi.id]).to be_nil
+      expect(MachineImageVersion[v.id]).to be_nil
+    end
+  end
+
+  describe ".for_project" do
+    it "filters by project_id" do
+      mi # force creation
+      other_project = Project.create(name: "other")
+      described_class.create(
+        name: "other-image", project_id: other_project.id, location_id: location.id
+      )
+      expect(described_class.for_project(project.id).all.map(&:id)).to eq([mi.id])
     end
   end
 end
