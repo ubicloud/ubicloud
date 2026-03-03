@@ -4,7 +4,7 @@ require "rodauth"
 
 module Rodauth
   Feature.define(:personal_access_token, :PersonalAccessToken) do
-    auth_value_method :pat_authorization_remove, /\ABearer:?\s+pat-/
+    auth_value_method :pat_authorization_remove, /\ABearer:?\s+pat-/i
     session_key :session_pat_key, :pat_id
 
     def session
