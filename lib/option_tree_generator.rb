@@ -40,6 +40,8 @@ class OptionTreeGenerator
   end
 
   def self.generate_allowed_options(name, option_tree, parents)
+    return [] unless parents[name]
+
     allowed_options = []
 
     traverse = lambda do |tree, path_to_follow, current_path|
