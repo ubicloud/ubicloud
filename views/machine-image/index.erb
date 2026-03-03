@@ -11,7 +11,7 @@
           [mi.name, {link: path(mi)}],
           mi.display_location,
           mi.versions.count,
-          latest_ver ? "#{latest_ver.version} (#{latest_ver.state})" : "None",
+          latest_ver ? latest_ver.version : "None",
           mi.created_at&.strftime("%B %d, %Y")
         ],
         {id: "mi-#{mi.ubid}"}
