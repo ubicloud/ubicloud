@@ -89,29 +89,6 @@ class Clover
         r.redirect machine_image, "/overview"
       end
 
-      r.post web?, "set-active" do
-        authorize("MachineImage:edit", machine_image)
-        handle_validation_failure("machine-image/show") { @page = "overview" }
-
-        version_ubid = typecast_params.str!("version_id")
-        version = MachineImageVersion.where(
-          machine_image_id: machine_image.id,
-          id: UBID.to_uuid(version_ubid)
-        ).first
-
-        unless version
-          fail Validation::ValidationFailed.new({version_id: "Version not found"})
-        end
-
-        DB.transaction do
-          version.activate!
-          audit_log(machine_image, "update")
-        end
-
-        flash["notice"] = "Version #{version.version} is now the active version"
-        r.redirect machine_image, "/overview"
-      end
-
       r.on web?, "version" do
         r.on UBID_REGEX do |version_ubid|
           version = MachineImageVersion.where(
