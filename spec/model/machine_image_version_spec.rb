@@ -150,7 +150,7 @@ RSpec.describe MachineImageVersion do
     end
 
     it "finalizes active billing records" do
-      br = BillingRecord.create(
+      BillingRecord.create(
         project_id: project.id,
         resource_id: miv.id,
         resource_name: "test",
