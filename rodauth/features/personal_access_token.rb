@@ -15,6 +15,7 @@ module Rodauth
       token = request.env["HTTP_AUTHORIZATION"].to_s.sub(pat_authorization_remove, "")
       token_id, key = token.split("-", 2)
 
+      return s unless key
       return s unless (uuid = UBID.to_uuid(token_id))
       return s unless (api_key = ApiKey[owner_table: "accounts", id: uuid, is_valid: true])
       return s unless timing_safe_eql?(api_key.key, key)
