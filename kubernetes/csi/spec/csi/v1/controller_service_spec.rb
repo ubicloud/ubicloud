@@ -5,11 +5,28 @@ require "spec_helper"
 
 RSpec.describe Csi::V1::ControllerService do
   let(:logger) { Logger.new(File::NULL) }
+  let(:stuck_volume_detector) { instance_double(Csi::StuckVolumeDetector, start: nil, shutdown!: nil) }
   let(:service) { described_class.new(logger:) }
+
+  before do
+    allow(Csi::StuckVolumeDetector).to receive(:new).and_return(stuck_volume_detector)
+  end
 
   describe "#log_with_id" do
     it "logs messages with request ID" do
       expect { service.log_with_id("test-id", "test message") }.not_to raise_error
+    end
+  end
+
+  describe "#shutdown!" do
+    it "shuts down the stuck volume detector" do
+      expect(stuck_volume_detector).to receive(:shutdown!)
+      service.shutdown!
+    end
+
+    it "handles nil stuck volume detector gracefully" do
+      service.instance_variable_set(:@stuck_volume_detector, nil)
+      expect { service.shutdown! }.not_to raise_error
     end
   end
 
