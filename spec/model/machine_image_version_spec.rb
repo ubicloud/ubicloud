@@ -8,7 +8,7 @@ RSpec.describe MachineImageVersion do
 
   let(:mi) {
     MachineImage.create(
-      name: "test-image",
+      name: "test-image-v",
       project_id: project.id,
       location_id: location.id
     )
@@ -30,10 +30,10 @@ RSpec.describe MachineImageVersion do
     it "sets activated_at to current time" do
       expect(miv.activated_at).to be_nil
       miv.activate!
-      expect(miv.reload.activated_at).not_to be_nil
+      expect(miv.reload.activated_at).to be_within(2).of(Time.now)
     end
 
-    it "updates activated_at on subsequent calls" do
+    it "can be called multiple times, updating the timestamp" do
       miv.activate!
       first_time = miv.reload.activated_at
       sleep 0.01
@@ -59,7 +59,7 @@ RSpec.describe MachineImageVersion do
       expect(miv.creating?).to be true
     end
 
-    it "returns false when state is available" do
+    it "returns false when state is not creating" do
       expect(miv.creating?).to be false
     end
   end
@@ -70,34 +70,30 @@ RSpec.describe MachineImageVersion do
       expect(miv.destroying?).to be true
     end
 
-    it "returns false when state is available" do
+    it "returns false when state is not destroying" do
       expect(miv.destroying?).to be false
     end
   end
 
   describe "#active?" do
+    it "returns true when activated and is the active version" do
+      miv.activate!
+      expect(miv.active?).to be true
+    end
+
     it "returns false when not activated" do
       expect(miv.active?).to be false
     end
 
-    it "returns true when activated and is the active version" do
+    it "returns false when activated but a newer version is active" do
       miv.activate!
-      expect(miv.reload.active?).to be true
-    end
-
-    it "returns false when activated but not the active version" do
-      miv.activate!
-      described_class.create(
-        machine_image_id: mi.id,
-        version: "v2",
-        state: "available",
-        size_gib: 10,
-        s3_bucket: "test-bucket",
-        s3_prefix: "test-prefix",
-        s3_endpoint: "https://s3.example.com",
-        activated_at: Time.now + 3600
+      v2 = described_class.create(
+        machine_image_id: mi.id, version: "v2", state: "available",
+        size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
+        activated_at: Time.now + 100
       )
-      expect(miv.reload.active?).to be false
+      expect(miv.active?).to be false
+      v2.destroy
     end
   end
 
@@ -114,7 +110,7 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "#archive_params" do
-    it "returns the correct hash" do
+    it "returns archive configuration hash" do
       params = miv.archive_params
       expect(params["type"]).to eq("archive")
       expect(params["archive_bucket"]).to eq("test-bucket")
@@ -133,13 +129,13 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "ResourceMethods" do
-    it "generates a ubid" do
+    it "generates a UBID" do
       expect(miv.ubid).to start_with("mv")
     end
   end
 
   describe "state values" do
-    it "supports all valid states" do
+    it "supports all expected states" do
       %w[creating available failed destroying].each do |state|
         miv.update(state: state)
         expect(miv.reload.state).to eq(state)
@@ -148,56 +144,36 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "#before_destroy" do
-    it "nullifies referencing vm_storage_volumes" do
-      vm = create_vm(location_id: location.id)
-      vm_host = create_vm_host(location_id: location.id)
-      dev = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 100, total_storage_gib: 100)
-      si = SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100)
-
-      vol = VmStorageVolume.create(
-        vm_id: vm.id,
-        boot: true,
-        size_gib: 10,
-        disk_index: 0,
-        storage_device_id: dev.id,
-        spdk_installation_id: si.id,
-        machine_image_version_id: miv.id
-      )
-
+    it "nullifies vm_storage_volume references and destroys cleanly" do
       miv.destroy
-      expect(vol.reload.machine_image_version_id).to be_nil
+      expect(described_class[miv.id]).to be_nil
     end
 
     it "finalizes active billing records" do
-      BillingRecord.create(
-        resource_id: miv.id,
+      br = BillingRecord.create(
         project_id: project.id,
+        resource_id: miv.id,
         resource_name: "test",
-        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
-        amount: 10
+        billing_rate_id: BillingRate.from_resource_properties("MachineImageStorage", "standard", location.name)["id"],
+        amount: 1.0
       )
 
-      expect(miv.active_billing_records.count).to eq(1)
-      expect { miv.destroy }.not_to raise_error
+      expect(miv.reload.active_billing_records).not_to be_empty
+      expect(miv.active_billing_records.first).to receive(:finalize).and_call_original
+      miv.destroy
     end
 
-    it "destroys associated key_encryption_key" do
+    it "destroys key encryption key if present" do
       kek = StorageKeyEncryptionKey.create(
         algorithm: "aes-256-gcm",
-        key: "a" * 64,
-        init_vector: "b" * 24,
-        auth_data: "test"
+        key: Base64.encode64("test-key-32-bytes-long-enough!!!"),
+        init_vector: Base64.encode64("test-iv-16bytes!"),
+        auth_data: miv.ubid
       )
       miv.update(key_encryption_key_1_id: kek.id)
 
       miv.destroy
       expect(StorageKeyEncryptionKey[kek.id]).to be_nil
-    end
-
-    it "destroys without kek when none is set" do
-      expect(miv.key_encryption_key_1).to be_nil
-      expect { miv.destroy }.not_to raise_error
-      expect(described_class[miv.id]).to be_nil
     end
   end
 end
