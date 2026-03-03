@@ -73,7 +73,7 @@ RSpec.describe MachineImage do
 
   describe "#active_version" do
     it "returns the version with the most recent activated_at" do
-      v1 = create_version(mi, version: "v1", activated_at: Time.now - 100)
+      create_version(mi, version: "v1", activated_at: Time.now - 100)
       v2 = create_version(mi, version: "v2", activated_at: Time.now)
 
       expect(mi.active_version.id).to eq(v2.id)
@@ -86,7 +86,7 @@ RSpec.describe MachineImage do
     end
 
     it "works with eager-loaded versions" do
-      v1 = create_version(mi, version: "v1", activated_at: Time.now - 100)
+      create_version(mi, version: "v1", activated_at: Time.now - 100)
       v2 = create_version(mi, version: "v2", activated_at: Time.now)
 
       eager_mi = described_class.eager(:versions).where(id: mi.id).first
@@ -94,7 +94,7 @@ RSpec.describe MachineImage do
     end
 
     it "works without eager-loaded versions" do
-      v1 = create_version(mi, version: "v1", activated_at: Time.now - 100)
+      create_version(mi, version: "v1", activated_at: Time.now - 100)
       v2 = create_version(mi, version: "v2", activated_at: Time.now)
 
       fresh_mi = described_class[mi.id]
@@ -104,7 +104,7 @@ RSpec.describe MachineImage do
 
   describe "#latest_available_version" do
     it "returns the latest available version by created_at" do
-      v1 = create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
+      create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
       v2 = create_version(mi, version: "v2", state: "available", created_at: Time.now)
 
       expect(mi.latest_available_version.id).to eq(v2.id)
@@ -112,7 +112,7 @@ RSpec.describe MachineImage do
 
     it "ignores non-available versions" do
       v1 = create_version(mi, version: "v1", state: "available")
-      v2 = create_version(mi, version: "v2", state: "creating")
+      create_version(mi, version: "v2", state: "creating")
 
       expect(mi.latest_available_version.id).to eq(v1.id)
     end
@@ -124,7 +124,7 @@ RSpec.describe MachineImage do
     end
 
     it "works with eager-loaded versions" do
-      v1 = create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
+      create_version(mi, version: "v1", state: "available", created_at: Time.now - 100)
       v2 = create_version(mi, version: "v2", state: "available", created_at: Time.now)
 
       eager_mi = described_class.eager(:versions).where(id: mi.id).first
@@ -135,7 +135,7 @@ RSpec.describe MachineImage do
   describe "#available_versions" do
     it "returns all available versions ordered by created_at DESC" do
       v1 = create_version(mi, version: "v1", state: "available", created_at: Time.now - 200)
-      v2 = create_version(mi, version: "v2", state: "creating")
+      create_version(mi, version: "v2", state: "creating")
       v3 = create_version(mi, version: "v3", state: "available", created_at: Time.now - 100)
 
       result = mi.available_versions
