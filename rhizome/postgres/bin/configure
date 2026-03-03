@@ -124,8 +124,40 @@ r "mkdir -p /etc/systemd/system/postgresql@.service.d"
 execstartpre_hugepages_conf = <<-HUGEPAGES_CONF
 [Service]
 ExecStartPre=/home/ubi/postgres/bin/configure-hugepages %i
+# Enable cgroup delegation to allow I/O throttling with child cgroups
+Delegate=yes
 HUGEPAGES_CONF
 safe_write_to_file("/etc/systemd/system/postgresql@.service.d/hugepages.conf", execstartpre_hugepages_conf)
+
+# Install systemd timer to enforce I/O throttling every 15 seconds.
+# The timer runs apply-io-throttle which reads the archival backlog locally
+# and adjusts cgroup I/O limits without any control plane interaction.
+safe_write_to_file("/etc/systemd/system/io-throttle@.service", <<~SERVICE)
+  [Unit]
+  Description=PostgreSQL I/O Throttle Enforcement for %i
+  After=postgresql@%i.service
+
+  [Service]
+  Type=oneshot
+  ExecStart=/home/ubi/postgres/bin/apply-io-throttle %i #{configure_hash["disk_throughput_baseline_mbps"]}
+  User=root
+SERVICE
+
+safe_write_to_file("/etc/systemd/system/io-throttle@.timer", <<~TIMER)
+  [Unit]
+  Description=Run PostgreSQL I/O Throttle every 15 seconds for %i
+
+  [Timer]
+  OnBootSec=30s
+  OnUnitActiveSec=15s
+  AccuracySec=1s
+
+  [Install]
+  WantedBy=timers.target
+TIMER
+
+r "systemctl daemon-reload"
+r "systemctl enable --now io-throttle@#{v}-main.timer"
 
 # Reload the postmaster to apply changes
 r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
