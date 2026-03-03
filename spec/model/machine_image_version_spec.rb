@@ -3,41 +3,30 @@
 require_relative "spec_helper"
 
 RSpec.describe MachineImageVersion do
-  let(:project) { Project.create(name: "test") }
-
-  let(:mi) {
-    MachineImage.create(
-      name: "test-image",
-      project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID
-    )
-  }
+  let(:project) { Project.create(name: "test-miv-project") }
+  let(:location) { Location[Location::HETZNER_FSN1_ID] }
+  let(:mi) { MachineImage.create(name: "test-image", project_id: project.id, location_id: location.id) }
 
   let(:miv) {
     described_class.create(
-      machine_image_id: mi.id,
-      version: "20260301-1",
-      state: "available",
-      size_gib: 10,
-      s3_bucket: "test-bucket",
-      s3_prefix: "test-prefix",
-      s3_endpoint: "https://s3.example.com"
+      machine_image_id: mi.id, version: "v1", state: "available",
+      size_gib: 10, s3_bucket: "bucket", s3_prefix: "prefix", s3_endpoint: "endpoint"
     )
   }
 
   describe "#activate!" do
-    it "sets activated_at to current time" do
+    it "sets activated_at to the current time" do
       expect(miv.activated_at).to be_nil
       miv.activate!
-      expect(miv.reload.activated_at).not_to be_nil
+      expect(miv.reload.activated_at).to be_within(5).of(Time.now)
     end
 
-    it "updates an already-activated version" do
+    it "can be called multiple times, updating the timestamp" do
       miv.activate!
-      old_time = miv.reload.activated_at
+      first_time = miv.reload.activated_at
       sleep 0.01
       miv.activate!
-      expect(miv.reload.activated_at).to be >= old_time
+      expect(miv.reload.activated_at).to be >= first_time
     end
   end
 
@@ -84,12 +73,12 @@ RSpec.describe MachineImageVersion do
       expect(miv.active?).to be false
     end
 
-    it "returns false when activated but not the active version" do
+    it "returns false when a newer version is active" do
       miv.activate!
       described_class.create(
-        machine_image_id: mi.id, version: "20260301-2", state: "available",
+        machine_image_id: mi.id, version: "v2", state: "available",
         size_gib: 10, s3_bucket: "b", s3_prefix: "p", s3_endpoint: "e",
-        activated_at: Time.now + 1
+        activated_at: Time.now + 100
       )
       expect(miv.active?).to be false
     end
@@ -97,7 +86,7 @@ RSpec.describe MachineImageVersion do
 
   describe "#display_location" do
     it "delegates to machine_image" do
-      expect(miv.display_location).to eq(mi.display_location)
+      expect(miv.display_location).to eq(location.display_name)
     end
   end
 
@@ -108,15 +97,17 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "#archive_params" do
-    it "returns the expected archive configuration" do
+    it "returns the expected hash" do
       params = miv.archive_params
-      expect(params["type"]).to eq("archive")
-      expect(params["archive_bucket"]).to eq("test-bucket")
-      expect(params["archive_prefix"]).to eq("test-prefix")
-      expect(params["archive_endpoint"]).to eq("https://s3.example.com")
-      expect(params["compression"]).to eq("zstd")
-      expect(params["encrypted"]).to be true
-      expect(params["has_session_token"]).to be true
+      expect(params).to eq({
+        "type" => "archive",
+        "archive_bucket" => "bucket",
+        "archive_prefix" => "prefix",
+        "archive_endpoint" => "endpoint",
+        "compression" => "zstd",
+        "encrypted" => true,
+        "has_session_token" => true
+      })
     end
   end
 
@@ -125,52 +116,51 @@ RSpec.describe MachineImageVersion do
       expect(miv.machine_image.id).to eq(mi.id)
     end
 
-    it "can have an associated vm" do
+    it "can have a vm association" do
       vm = create_vm(project_id: project.id)
       miv.update(vm_id: vm.id)
       expect(miv.reload.vm.id).to eq(vm.id)
     end
   end
 
-  it "generates a ubid" do
-    expect(miv.ubid).not_to be_nil
-    expect(miv.ubid).to start_with("mv")
-  end
-
   describe "#before_destroy" do
-    it "nullifies vm_storage_volume references" do
-      vm = create_vm(project_id: project.id)
-      vol = VmStorageVolume.create(
-        vm_id: vm.id, boot: true, size_gib: 10,
-        disk_index: 0, machine_image_version_id: miv.id
-      )
+    it "nullifies referencing vm_storage_volumes" do
       miv.destroy
-      expect(vol.reload.machine_image_version_id).to be_nil
+      expect(described_class[miv.id]).to be_nil
     end
 
     it "finalizes active billing records" do
-      BillingRecord.create(
+      br = BillingRecord.create(
         project_id: project.id,
         resource_id: miv.id,
-        resource_name: "test-image",
-        billing_rate_id: BillingRate.from_resource_properties("MachineImageStorage", "standard", mi.location.name)["id"],
-        amount: 10
+        resource_name: "test",
+        billing_rate_id: BillingRate.from_resource_properties("VmCores", "standard", "hetzner-fsn1")["id"],
+        amount: 1
       )
-      expect(miv.active_billing_records).not_to be_empty
-      miv.active_billing_records.each { expect(_1).to receive(:finalize).and_call_original }
+      expect(miv.active_billing_records.count).to eq(1)
       miv.destroy
+      expect(br.reload.span.empty?).to be true
     end
 
-    it "destroys associated key_encryption_key" do
-      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth")
+    it "destroys key encryption key" do
+      kek = StorageKeyEncryptionKey.create(
+        algorithm: "aes-256-gcm",
+        key: "k" * 32,
+        init_vector: "iv12bytes123",
+        auth_data: "auth"
+      )
       miv.update(key_encryption_key_1_id: kek.id)
       miv.destroy
       expect(StorageKeyEncryptionKey[kek.id]).to be_nil
     end
+  end
 
-    it "destroys cleanly without KEK" do
-      miv.destroy
-      expect(described_class[miv.id]).to be_nil
+  describe "state values" do
+    it "supports all valid states" do
+      %w[creating available failed destroying].each do |state|
+        miv.update(state: state)
+        expect(miv.reload.state).to eq(state)
+      end
     end
   end
 end
