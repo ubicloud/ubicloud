@@ -10,12 +10,14 @@ Commands:
     list                               List PostgreSQL databases
 
 Post Commands:
+    add-cert-auth-user                 Add user to list of users authenticating with client certificate authentication
     add-config-entries                 Add configuration entries to a PostgreSQL database
     add-firewall-rule                  Add a PostgreSQL firewall rule
     add-metric-destination             Add a PostgreSQL metric destination
     add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
     ca-certificates                    Print CA certificates for a PostgreSQL database
     create                             Create a PostgreSQL database
+    create-client-cert-keypair         Create client certificate keypair with given common name, expiring after a duration of seconds
     create-read-replica                Create a read replica for a PostgreSQL database
     delete-firewall-rule               Delete a PostgreSQL firewall rule
     delete-metric-destination          Delete a PostgreSQL metric destination
@@ -28,6 +30,7 @@ Post Commands:
     promote-read-replica               Promote a read replica PostgreSQL database to a primary
     psql                               Connect to a PostgreSQL database using `psql`
     recycle                            Request recycle of primary
+    remove-cert-auth-user              Remove user from list of users authenticating with client certificate authentication
     remove-config-entries              Remove configuration entries from a PostgreSQL database
     remove-pgbouncer-config-entries    Remove pgbouncer configuration entries from a PostgreSQL database
     rename                             Rename a PostgreSQL database

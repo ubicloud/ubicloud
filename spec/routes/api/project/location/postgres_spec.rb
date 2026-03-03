@@ -40,6 +40,7 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/ca-certificates"],
+        [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/create-client-cert-keypart"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"]
@@ -884,6 +885,86 @@ RSpec.describe Clover, "postgres" do
         header "Content-Type", "application/x-pem-file"
         header "Content-Disposition", "attachment; filename=\"#{pg.name}.pem\""
         expect(last_response.body).to eq("root_cert_1\nroot_cert_2")
+      end
+    end
+
+    describe "create-client-cert-keypair" do
+      before do
+        pg.root_cert_1, pg.root_cert_key_1 = Util.create_root_certificate(common_name: "#{pg.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+        pg.root_cert_2, pg.root_cert_key_2 = Util.create_root_certificate(common_name: "#{pg.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+        pg.client_root_cert_1, pg.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+        pg.client_root_cert_2, pg.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{pg.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+        pg.save_changes
+      end
+
+      it "can download custom keypair" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
+          common_name: "name",
+          duration: 3600
+        }.to_json
+        expect(last_response.status).to eq(200)
+        header "Content-Type", "application/x-pem-file"
+        header "Content-Disposition", "attachment; filename=\"name.pem\""
+        cert = OpenSSL::X509::Certificate.new(last_response.body)
+        expect(cert.subject.to_s).to eq("/C=US/O=None/CN=name")
+      end
+
+      it "rejects reserved names" do
+        %w[postgres ubi_replication].each do
+          post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
+            common_name: "postgres",
+            duration: 3600
+          }.to_json
+          expect(last_response).to have_api_error(400, "Common Name must not be postgres or ubi_replication.")
+        end
+      end
+
+      it "rejects duration over 366 days" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
+          common_name: "name",
+          duration: 60 * 60 * 24 * 366 + 1
+        }.to_json
+        expect(last_response).to have_api_error(400, "Certificate expiry should be less than 367 days.")
+      end
+
+      it "rejects invalid common name" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
+          common_name: "pound#",
+          duration: 3600
+        }.to_json
+        expect(last_response).to have_api_error(400, "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
+      end
+
+      it "rejects common names longer than 64 characters" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
+          common_name: "a" * 65,
+          duration: 3600
+        }.to_json
+        expect(last_response).to have_api_error(400, "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
+      end
+    end
+
+    describe "cert_auth_users endpoints" do
+      it "adds or removes requested user to cert_auth_users" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
+          name: "test"
+        }.to_json
+        expect(pg.reload.cert_auth_users).to eq(["test"])
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
+          name: "test"
+        }.to_json
+        expect(pg.reload.cert_auth_users).to eq(["test"])
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/remove-auth-user", {
+          name: "test"
+        }.to_json
+        expect(pg.reload.cert_auth_users).to eq([])
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/remove-auth-user", {
+          name: "test"
+        }.to_json
+        expect(pg.reload.cert_auth_users).to eq([])
       end
     end
 

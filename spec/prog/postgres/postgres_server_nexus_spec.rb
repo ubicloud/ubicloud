@@ -438,12 +438,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "pushes certificates to vm and hops to configure_prometheus during initial provisioning" do
       nx.incr_initial_provisioning
       nx.postgres_server.resource.update(trusted_ca_certs: nil)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "client_root_cert_1\nclient_root_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server-ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/client.crt > /dev/null", stdin: "client_cert")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/client.key > /dev/null", stdin: "client_cert_key")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server-ca.crt && sudo chmod 640 /etc/ssl/certs/server-ca.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/client.crt && sudo chmod 640 /etc/ssl/certs/client.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/client.key && sudo chmod 640 /etc/ssl/certs/client.key")
 
       expect(nx.postgres_server).to receive(:refresh_walg_credentials)
 
@@ -452,12 +458,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait at times other than the initial provisioning" do
       server.resource.update(trusted_ca_certs: nil)
-      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/ca.crt > /dev/null", stdin: "client_root_cert_1\nclient_root_cert_2")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server-ca.crt > /dev/null", stdin: "root_cert_1\nroot_cert_2")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.crt > /dev/null", stdin: "server_cert")
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/server.key > /dev/null", stdin: "server_cert_key")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/client.crt > /dev/null", stdin: "client_cert")
+      expect(sshable).to receive(:_cmd).with("sudo tee /etc/ssl/certs/client.key > /dev/null", stdin: "client_cert_key")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server-ca.crt && sudo chmod 640 /etc/ssl/certs/server-ca.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
       expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/client.crt && sudo chmod 640 /etc/ssl/certs/client.crt")
+      expect(sshable).to receive(:_cmd).with("sudo chgrp cert_readers /etc/ssl/certs/client.key && sudo chmod 640 /etc/ssl/certs/client.key")
       expect(sshable).to receive(:_cmd).with("sudo -u postgres pg_ctlcluster 17 main reload")
       expect(sshable).to receive(:_cmd).with("sudo systemctl reload pgbouncer@*.service")
       expect(server).to receive(:refresh_walg_credentials)

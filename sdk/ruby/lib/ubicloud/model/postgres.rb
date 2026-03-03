@@ -169,5 +169,21 @@ module Ubicloud
     def backups
       adapter.get(_path("/backup"))[:items]
     end
+
+    # Create a client certificate keypair with the given common name, expiring after duration seconds.
+    # Returns a PEM string containing the certificate and key.
+    def create_client_cert_keypair(common_name:, duration:)
+      adapter.post(_path("/cert/create-client-keypair"), common_name:, duration:)
+    end
+
+    # Add a user to cert_auth_users. Returns a hash with :items key listing all cert auth users.
+    def add_cert_auth_user(name)
+      adapter.post(_path("/cert/add-auth-user"), name:)
+    end
+
+    # Remove a user from cert_auth_users. Returns a hash with :items key listing remaining cert auth users.
+    def remove_cert_auth_user(name)
+      adapter.post(_path("/cert/remove-auth-user"), name:)
+    end
   end
 end
