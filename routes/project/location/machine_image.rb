@@ -90,10 +90,10 @@ class Clover
       end
 
       r.on web?, "version" do
-        r.on UBID_REGEX do |version_ubid|
+        r.on :ubid_uuid do |version_id|
           version = MachineImageVersion.where(
             machine_image_id: machine_image.id,
-            id: UBID.to_uuid(version_ubid)
+            id: version_id
           ).first
 
           r.post "delete" do
