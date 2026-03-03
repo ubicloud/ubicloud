@@ -140,8 +140,13 @@ class PostgresServer < Sequel::Model
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
-      metrics_config:
+      metrics_config:,
+      disk_throughput_baseline_mbps:
     }
+  end
+
+  def disk_throughput_baseline_mbps
+    DISK_THROUGHPUT_BASELINE_MBPS.fetch(resource.location.provider, 100)
   end
 
   def trigger_failover(mode:)
@@ -494,6 +499,11 @@ class PostgresServer < Sequel::Model
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
+  DISK_THROUGHPUT_BASELINE_MBPS = {
+    "hetzner" => 128,
+    "aws" => 448,
+    "leaseweb" => 100
+  }.freeze
 end
 
 # Table: postgres_server
