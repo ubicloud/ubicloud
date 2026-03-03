@@ -52,8 +52,10 @@ logger.debug("Registering services")
 server.handle(Csi::V1::IdentityService.new(logger:))
 
 node_service = nil
+controller_service = nil
 if role == "controller"
-  server.handle(Csi::V1::ControllerService.new(logger:))
+  controller_service = Csi::V1::ControllerService.new(logger:)
+  server.handle(controller_service)
 else
   Csi::V1::NodeService.mkdir_p
   node_service = Csi::V1::NodeService.new(logger:, node_id:)
@@ -64,6 +66,7 @@ end
   Signal.trap(signal) do
     logger.info("Received #{signal}, shutting down gracefully...")
     node_service&.shutdown!
+    controller_service&.shutdown!
     server.stop
   end
 end
