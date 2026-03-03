@@ -25,7 +25,11 @@ module PostgresTestHelpers
       root_cert_1: "root_cert_1",
       root_cert_2: "root_cert_2",
       server_cert: "server_cert",
-      server_cert_key: "server_cert_key"
+      server_cert_key: "server_cert_key",
+      client_root_cert_1: "client_root_cert_1",
+      client_root_cert_2: "client_root_cert_2",
+      client_cert: "client_cert",
+      client_cert_key: "client_cert_key"
     )
     Strand.create_with_id(pg, prog: "Postgres::PostgresResourceNexus", label: "start")
     pg

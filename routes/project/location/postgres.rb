@@ -488,6 +488,75 @@ class Clover
         certs
       end
 
+      r.on api?, "cert" do
+        authorize("Postgres:edit", pg)
+
+        r.post "create-client-keypair" do
+          common_name = typecast_params.nonempty_str!("common_name")
+          duration = typecast_params.pos_int!("duration")
+
+          if duration > 60 * 60 * 24 * 366 # cap duration to ~1 year
+            raise CloverError.new(400, "InvalidRequest", "Certificate expiry should be less than 367 days.")
+          elsif !common_name.match?(/\A[a-zA-Z0-9_-]{1,64}\z/)
+            raise CloverError.new(400, "InvalidRequest", "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
+          elsif %w[postgres ubi_replication].include?(common_name)
+            raise CloverError.new(400, "InvalidRequest", "Common Name must not be postgres or ubi_replication.")
+          end
+
+          issuer_cert, issuer_key = pg.client_signing_key
+
+          cert_key = Util.create_certificate(
+            subject: "/C=US/O=None/CN=#{common_name}",
+            extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
+            duration:,
+            issuer_cert:,
+            issuer_key:
+          ).map(&:to_pem)
+
+          audit_log(pg, "create_cert")
+
+          response.headers["content-disposition"] = "attachment; filename=\"#{common_name}.pem\""
+          response.content_type = :pem
+          cert_key.join
+        end
+
+        r.post "add-auth-user" do
+          name = typecast_params.nonempty_str!("name")
+          cert_auth_users = Sequel.pg_jsonb_op(:cert_auth_users)
+          DB.transaction do
+            n = pg.this
+              .exclude(cert_auth_users.contains([name]))
+              .update(cert_auth_users: cert_auth_users.concat([name]))
+            if n == 1
+              pg.servers.each(&:incr_configure)
+              audit_log(pg, "add_cert_auth_user")
+              pg.refresh
+            else
+              no_audit_log
+            end
+          end
+          {items: pg.cert_auth_users}
+        end
+
+        r.post "remove-auth-user" do
+          name = typecast_params.nonempty_str!("name")
+          cert_auth_users = Sequel.pg_jsonb_op(:cert_auth_users)
+          DB.transaction do
+            n = pg.this
+              .where(cert_auth_users.contains([name]))
+              .update(cert_auth_users: cert_auth_users - name)
+            if n == 1
+              pg.servers.each(&:incr_configure)
+              audit_log(pg, "remove_cert_auth_user")
+              pg.refresh
+            else
+              no_audit_log
+            end
+          end
+          {items: pg.cert_auth_users}
+        end
+      end
+
       r.get api?, "backup" do
         authorize("Postgres:view", pg)
 

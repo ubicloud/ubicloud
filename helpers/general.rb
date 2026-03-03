@@ -106,6 +106,7 @@ class Clover < Roda
   SUPPORTED_ACTIONS = Set.new(<<~ACTIONS.split.each(&:freeze)).freeze
     accept_invitation
     add_aaaa_record
+    add_cert_auth_user
     add_invitation
     add_member
     associate
@@ -113,6 +114,7 @@ class Clover < Roda
     cancel_storage_auto_scale
     connect
     create
+    create_cert
     create_replica
     decline_invitation
     delete_all_cache_entries
@@ -126,6 +128,7 @@ class Clover < Roda
     promote_read_replica
     recycle
     remove_account
+    remove_cert_auth_user
     remove_member
     reset_superuser_password
     restart
