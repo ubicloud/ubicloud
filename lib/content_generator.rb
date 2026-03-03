@@ -73,6 +73,10 @@ module ContentGenerator
     def self.machine_image(location, mi)
       mi[:display_name]
     end
+
+    def self.machine_image_version(location, mi, mi_version)
+      mi_version[:display_name]
+    end
   end
 
   module MachineImage

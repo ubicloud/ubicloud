@@ -54,7 +54,8 @@ current_usage = @project.current_resource_usage("VmVCpu")
 
   if @project.get_ff_machine_image
     form_elements.push(
-      {name: "machine_image", type: "select", label: "Or use a Machine Image", placeholder: "None (use boot image above)", content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-2'>"}
+      {name: "machine_image", type: "select", label: "Or use a Machine Image", placeholder: "None (use boot image above)", content_generator: ContentGenerator::Vm.method(:machine_image), opening_tag: "<div class='sm:col-span-2'>"},
+      {name: "machine_image_version", type: "select", label: "Image Version", placeholder: "Latest", content_generator: ContentGenerator::Vm.method(:machine_image_version), opening_tag: "<div class='sm:col-span-2'>"}
     )
   end
 

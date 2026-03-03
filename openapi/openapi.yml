@@ -1829,6 +1829,9 @@ paths:
                 boot_image:
                   description: Boot image of the VM
                   type: string
+                machine_image:
+                  description: 'Machine image UBID or name. Accepts optional @version suffix (e.g. "my-image@v1", "my-image@latest"). Defaults to latest available version if no version specified.'
+                  type: string
                 init_script:
                   description: VM init script
                   type: string

@@ -46,6 +46,26 @@ class MachineImage < Sequel::Model
     end
   end
 
+  def latest_available_version
+    if associations.key?(:versions)
+      versions.select(&:available?).max_by(&:created_at)
+    else
+      MachineImageVersion.where(machine_image_id: id, state: "available")
+        .order(Sequel.desc(:created_at))
+        .first
+    end
+  end
+
+  def available_versions
+    if associations.key?(:versions)
+      versions.select(&:available?).sort_by(&:created_at).reverse
+    else
+      MachineImageVersion.where(machine_image_id: id, state: "available")
+        .order(Sequel.desc(:created_at))
+        .all
+    end
+  end
+
   def before_destroy
     versions.each(&:destroy)
     super
