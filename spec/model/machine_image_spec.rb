@@ -200,4 +200,19 @@ RSpec.describe MachineImage do
     expect(mi.ubid).not_to be_nil
     expect(mi.ubid).to start_with("m1")
   end
+
+  describe "ObjectTag::Cleanup" do
+    it "removes referencing access control entries and object tag memberships on destroy" do
+      account = Account.create(email: "mi-cleanup@example.com")
+      proj = account.create_project_with_default_policy("proj-mi-cleanup", default_policy: false)
+      mi.update(project_id: proj.id)
+      tag = ObjectTag.create(project_id: proj.id, name: "t")
+      tag.add_member(mi.id)
+      ace = AccessControlEntry.create(project_id: proj.id, subject_id: account.id, object_id: mi.id)
+
+      mi.destroy
+      expect(tag.member_ids).to be_empty
+      expect(ace).not_to be_exists
+    end
+  end
 end
