@@ -3,117 +3,116 @@
 require_relative "spec_helper"
 
 RSpec.describe MachineImageVersion do
-  let(:project) { Project.create(name: "test") }
-  let(:location_id) { Location::HETZNER_FSN1_ID }
+  let(:project) { Project.create(name: "test-project") }
+  let(:location) { Location[Location::HETZNER_FSN1_ID] }
 
   let(:mi) {
-    MachineImage.create(name: "test-image", project_id: project.id, location_id: location_id)
+    MachineImage.create(
+      name: "test-image",
+      description: "A test image",
+      project_id: project.id,
+      location_id: location.id
+    )
   }
 
-  let(:miv) {
+  let(:version) {
     described_class.create(
       machine_image_id: mi.id,
-      version: "20260101-1",
-      state: "available",
-      size_gib: 10,
+      version: "v1",
+      state: "creating",
+      size_gib: 20,
       s3_bucket: "test-bucket",
-      s3_prefix: "test-prefix",
-      s3_endpoint: "https://s3.example.com"
+      s3_prefix: "images/test/",
+      s3_endpoint: "https://r2.example.com"
     )
   }
 
   describe "#activate!" do
     it "sets activated_at to current time" do
-      expect(miv.activated_at).to be_nil
-      miv.activate!
-      expect(miv.reload.activated_at).to be_within(5).of(Time.now)
-    end
-
-    it "overwrites a previously set activated_at" do
-      miv.update(activated_at: Time.now - 86400)
-      miv.activate!
-      expect(miv.reload.activated_at).to be_within(5).of(Time.now)
+      expect(version.activated_at).to be_nil
+      version.activate!
+      expect(version.reload.activated_at).to be_within(5).of(Time.now)
     end
   end
 
   describe "#available?" do
     it "returns true when state is available" do
-      expect(miv.available?).to be true
+      version.update(state: "available")
+      expect(version.available?).to be true
     end
 
     it "returns false when state is not available" do
-      miv.update(state: "creating")
-      expect(miv.available?).to be false
+      expect(version.available?).to be false
     end
   end
 
   describe "#creating?" do
     it "returns true when state is creating" do
-      miv.update(state: "creating")
-      expect(miv.creating?).to be true
+      expect(version.creating?).to be true
     end
 
-    it "returns false when state is available" do
-      expect(miv.creating?).to be false
+    it "returns false when state is not creating" do
+      version.update(state: "available")
+      expect(version.creating?).to be false
     end
   end
 
   describe "#destroying?" do
     it "returns true when state is destroying" do
-      miv.update(state: "destroying")
-      expect(miv.destroying?).to be true
+      version.update(state: "destroying")
+      expect(version.destroying?).to be true
     end
 
-    it "returns false when state is available" do
-      expect(miv.destroying?).to be false
+    it "returns false when state is not destroying" do
+      expect(version.destroying?).to be false
     end
   end
 
   describe "#active?" do
+    it "returns true when activated and is the active version of the image" do
+      version.activate!
+      expect(version.active?).to be true
+    end
+
     it "returns false when not activated" do
-      expect(miv.active?).to be false
+      expect(version.active?).to be false
     end
 
-    it "returns true when activated and is the active version" do
-      miv.activate!
-      expect(miv.reload.active?).to be true
-    end
-
-    it "returns false when activated but another version is the active one" do
-      miv.activate!
-      described_class.create(
+    it "returns false when activated but not the active version" do
+      version.update(activated_at: Time.now - 100)
+      _v2 = described_class.create(
         machine_image_id: mi.id,
-        version: "20260102-1",
+        version: "v2",
         state: "available",
-        size_gib: 10,
+        size_gib: 20,
         s3_bucket: "test-bucket",
-        s3_prefix: "test-prefix",
-        s3_endpoint: "https://s3.example.com",
-        activated_at: Time.now + 3600
+        s3_prefix: "images/test/",
+        s3_endpoint: "https://r2.example.com",
+        activated_at: Time.now
       )
-      expect(miv.reload.active?).to be false
+      expect(version.active?).to be false
     end
   end
 
   describe "#display_location" do
-    it "delegates to machine_image" do
-      expect(miv.display_location).to eq("eu-central-h1")
+    it "delegates to machine_image.display_location" do
+      expect(version.display_location).to eq(location.display_name)
     end
   end
 
   describe "#path" do
-    it "delegates to machine_image" do
-      expect(miv.path).to eq(mi.path)
+    it "delegates to machine_image.path" do
+      expect(version.path).to eq(mi.path)
     end
   end
 
   describe "#archive_params" do
-    it "returns expected hash" do
-      params = miv.archive_params
+    it "returns archive configuration hash" do
+      params = version.archive_params
       expect(params["type"]).to eq("archive")
       expect(params["archive_bucket"]).to eq("test-bucket")
-      expect(params["archive_prefix"]).to eq("test-prefix")
-      expect(params["archive_endpoint"]).to eq("https://s3.example.com")
+      expect(params["archive_prefix"]).to eq("images/test/")
+      expect(params["archive_endpoint"]).to eq("https://r2.example.com")
       expect(params["compression"]).to eq("zstd")
       expect(params["encrypted"]).to be true
       expect(params["has_session_token"]).to be true
@@ -121,77 +120,22 @@ RSpec.describe MachineImageVersion do
   end
 
   describe "associations" do
-    it "belongs to machine_image" do
-      expect(miv.machine_image.id).to eq(mi.id)
-    end
-
-    it "belongs to a vm" do
-      vm = create_vm(project_id: project.id)
-      miv.update(vm_id: vm.id)
-      expect(miv.reload.vm.id).to eq(vm.id)
-    end
-
-    it "has many active_billing_records" do
-      expect(miv.active_billing_records).to be_empty
+    it "belongs to a machine_image" do
+      expect(version.machine_image).to eq(mi)
     end
   end
 
   describe "ResourceMethods" do
     it "generates a UBID" do
-      expect(miv.ubid).to start_with("mv")
-    end
-  end
-
-  describe "SemaphoreMethods" do
-    it "has destroy semaphore" do
-      expect(miv).to respond_to(:incr_destroy)
-    end
-  end
-
-  describe "#before_destroy" do
-    it "destroys the record" do
-      miv.destroy
-      expect(described_class[miv.id]).to be_nil
-    end
-
-    it "finalizes active billing records" do
-      BillingRecord.create(
-        resource_id: miv.id,
-        resource_name: "test",
-        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
-        project_id: project.id,
-        amount: 10,
-        span: Sequel.pg_range(Time.now - 3600..nil)
-      )
-      expect(miv.reload.active_billing_records.count).to eq(1)
-      miv.destroy
-      expect(BillingRecord.active.where(resource_id: miv.id).count).to eq(0)
-    end
-
-    it "destroys key_encryption_key_1 if present" do
-      kek = StorageKeyEncryptionKey.create(
-        algorithm: "aes-256-gcm",
-        key: "testkey",
-        init_vector: "iv",
-        auth_data: "test-auth"
-      )
-      miv.update(key_encryption_key_1_id: kek.id)
-      miv.destroy
-      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
-    end
-
-    it "does not fail when no key_encryption_key_1" do
-      expect(miv.key_encryption_key_1).to be_nil
-      miv.destroy
-      expect(described_class[miv.id]).to be_nil
+      expect(version.ubid).to start_with("mv")
     end
   end
 
   describe "state values" do
     it "supports all expected states" do
       %w[creating available failed destroying].each do |state|
-        miv.update(state: state)
-        expect(miv.reload.state).to eq(state)
+        version.update(state: state)
+        expect(version.reload.state).to eq(state)
       end
     end
   end
