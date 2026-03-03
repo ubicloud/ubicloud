@@ -146,4 +146,58 @@ RSpec.describe MachineImageVersion do
       end
     end
   end
+
+  describe "#before_destroy" do
+    it "nullifies referencing vm_storage_volumes" do
+      vm = create_vm(location_id: location.id)
+      vm_host = create_vm_host(location_id: location.id)
+      dev = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", available_storage_gib: 100, total_storage_gib: 100)
+      si = SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100)
+
+      vol = VmStorageVolume.create(
+        vm_id: vm.id,
+        boot: true,
+        size_gib: 10,
+        disk_index: 0,
+        storage_device_id: dev.id,
+        spdk_installation_id: si.id,
+        machine_image_version_id: miv.id
+      )
+
+      miv.destroy
+      expect(vol.reload.machine_image_version_id).to be_nil
+    end
+
+    it "finalizes active billing records" do
+      BillingRecord.create(
+        resource_id: miv.id,
+        project_id: project.id,
+        resource_name: "test",
+        billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
+        amount: 10
+      )
+
+      expect(miv.active_billing_records.count).to eq(1)
+      expect { miv.destroy }.not_to raise_error
+    end
+
+    it "destroys associated key_encryption_key" do
+      kek = StorageKeyEncryptionKey.create(
+        algorithm: "aes-256-gcm",
+        key: "a" * 64,
+        init_vector: "b" * 24,
+        auth_data: "test"
+      )
+      miv.update(key_encryption_key_1_id: kek.id)
+
+      miv.destroy
+      expect(StorageKeyEncryptionKey[kek.id]).to be_nil
+    end
+
+    it "destroys without kek when none is set" do
+      expect(miv.key_encryption_key_1).to be_nil
+      expect { miv.destroy }.not_to raise_error
+      expect(described_class[miv.id]).to be_nil
+    end
+  end
 end
