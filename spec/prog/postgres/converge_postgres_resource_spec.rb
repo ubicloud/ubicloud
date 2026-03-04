@@ -334,15 +334,14 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     before do
       strand.update(label: "update_metadata")
-      candidate # force lazy let to create the candidate
+      nx.instance_variable_set(:@upgrade_candidate, candidate)
     end
 
-    it "creates new timeline and updates candidate server metadata" do
-      expect { nx.update_metadata }.to hop("wait_upgrade_candidate").and change(PostgresTimeline, :count).by(1)
+    it "switches to new timeline with credentials and hops to wait_upgrade_candidate" do
+      expect(candidate).to receive(:switch_to_new_timeline).with(parent_id: nil)
+      expect { nx.update_metadata }.to hop("wait_upgrade_candidate")
       expect(candidate.reload).to have_attributes(
         version: "17",
-        timeline_access: "push",
-        refresh_walg_credentials_set?: true,
         configure_set?: true,
         restart_set?: true
       )
