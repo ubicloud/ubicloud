@@ -102,7 +102,7 @@ RSpec.describe MonitorRunner do
 
       monitor_runner.emit_metrics
       hash = q.pop(timeout: 1)
-      expect(hash.keys).to eq [:monitor_metrics]
+      expect(hash.keys).to eq [:monitor_metrics, :message, :time]
       hash = hash[:monitor_metrics]
       expect(hash.delete(:active_threads_count)).to be_a Integer
       expect(hash.delete(:monitor_idle_worker_threads)).to be <= 1
@@ -128,7 +128,7 @@ RSpec.describe MonitorRunner do
 
       monitor_runner.emit_metrics
       hash = q.pop(timeout: 1)
-      expect(hash.keys).to eq [:monitor_metrics]
+      expect(hash.keys).to eq [:monitor_metrics, :message, :time]
       hash = hash[:monitor_metrics]
       expect(hash.delete(:active_threads_count)).to be_a Integer
       expect(hash).to eq({

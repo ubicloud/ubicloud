@@ -34,8 +34,6 @@ class Clog
       {invalid_type: metadata.class.to_s}
     end
 
-    return if Config.test?
-
     out[:message] = message
     out[:time] = Time.now
 
@@ -43,10 +41,18 @@ class Clog
       out[:thread] = thread_name
     end
 
+    write(out)
+  end
+
+  private_class_method def self.write(out)
     raw = (JSON.generate(out) << "\n").freeze
+
+    return if Config.test?
+
     MUTEX.synchronize do
       $stdout.write(raw)
     end
+
     nil
   end
 
