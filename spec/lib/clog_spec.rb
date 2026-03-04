@@ -27,13 +27,14 @@ RSpec.describe Clog do
   end
 
   it "returns the key with redacted values for Sequel::Model" do
-    expect(described_class).to receive(:write).with({vm: {id: "123"}, message: "model", time: now})
-    described_class.emit("model", Vm.new(public_key: "redacted_key").tap { it.id = "123" })
+    vm = Vm.new_with_id(public_key: "redacted_key", name: "A")
+    expect(described_class).to receive(:write).with({vm: {id: vm.ubid, name: "A"}, message: "model", time: now})
+    described_class.emit("model", vm)
   end
 
   it "returns a combined hash when the metadata is an array" do
-    expect(described_class).to receive(:write).with({vm: {id: "123"}, field1: "custom", invalid_type: "String", message: "model", time: now})
-    vm = Vm.new(public_key: "redacted_key").tap { it.id = "123" }
+    vm = Vm.new_with_id(public_key: "redacted_key", name: "A")
+    expect(described_class).to receive(:write).with({vm: {id: vm.ubid, name: "A"}, field1: "custom", invalid_type: "String", message: "model", time: now})
     described_class.emit("model", [vm, {field1: "custom"}, "invalid"])
   end
 end

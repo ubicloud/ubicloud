@@ -56,7 +56,10 @@ class Clog
     nil
   end
 
+  # Only works for models using the ResourceMethods plugin.
   private_class_method def self.serialize_model(model)
-    model.values.except(*model.class.redacted_columns)
+    hash = model.inspect_values_hash
+    hash[:id] = model.ubid
+    hash
   end
 end
