@@ -439,6 +439,18 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - Add Custom Label")
     end
 
+    it "fails to create with name starting with ubicloud" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      fill_in "name", with: "ubicloud-my-label"
+      select "ubicloud-standard-4-ubuntu-2404", from: "alias_for"
+      click_button "Add Custom Label"
+
+      expect(page.status_code).to eq(400)
+      expect(page).to have_flash_error("name is reserved. Custom labels cannot start with 'ubicloud'")
+      expect(page.title).to eq("Ubicloud - Add Custom Label")
+    end
+
     it "renders edit form with existing values" do
       label = GithubCustomLabel.create(installation_id: installation.id, name: "my-label", alias_for: "ubicloud-standard-4-ubuntu-2404", concurrent_runner_count_limit: 5)
 
