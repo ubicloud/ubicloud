@@ -4,6 +4,11 @@ require_relative "../../model"
 
 class GithubCustomLabel < Sequel::Model
   plugin ResourceMethods
+
+  def validate
+    super
+    errors.add(:name, "is reserved: custom labels cannot start with 'ubicloud'") if name&.start_with?("ubicloud")
+  end
 end
 
 # Table: github_custom_label
