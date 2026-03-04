@@ -112,11 +112,10 @@ class UBID
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 
-  CURRENT_TIMESTAMP_TYPES = [TYPE_STRAND, TYPE_SEMAPHORE]
+  CURRENT_TIMESTAMP_TYPES = [TYPE_SEMAPHORE].freeze
 
   def self.generate(type)
-    case type
-    when *CURRENT_TIMESTAMP_TYPES
+    if type == TYPE_SEMAPHORE
       generate_from_current_ts(type)
     else
       generate_random(type)
