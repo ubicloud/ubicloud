@@ -7,7 +7,7 @@ class PostgresTimeline < Sequel::Model
   one_to_one :strand, key: :id, read_only: true
   many_to_one :parent, class: self
   one_to_one :leader, class: :PostgresServer, key: :timeline_id, conditions: {timeline_access: "push"}, is_used: true
-  many_to_one :location
+  many_to_one :location, read_only: true
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin ProviderDispatcher, __FILE__
