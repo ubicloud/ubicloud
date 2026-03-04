@@ -29,7 +29,7 @@ RSpec.describe PrivateSubnet do
   describe "random ip generation" do
     it "returns random private ipv4" do
       private_subnet
-      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
+      expect(SecureRandom).to receive(:random_number).with(58).and_return(5)
       expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
     end
 
@@ -53,7 +53,7 @@ RSpec.describe PrivateSubnet do
       end
 
       it "returns random private ipv4" do
-        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
+        expect(SecureRandom).to receive(:random_number).with(58).and_return(1, 2)
         expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
       end
 
