@@ -110,12 +110,19 @@ RSpec.describe MonitorRunner do
       expect(hash).to eq({
         threads_waiting_for_db_connection: 0,
         total_monitor_resources: 0,
+        total_monitor_attached_resources: 0,
         total_metric_export_resources: 0,
         monitor_submit_queue_length: 0,
         metric_export_submit_queue_length: 0
       })
 
-      monitor_resources.resources["a0000000-0000-0000-0000-000000000000"] = true
+      vmh = VmHost.new_with_id
+      vm = Vm.new_with_id
+      pg = PostgresResource.new_with_id
+      mvmh = MonitorableResource.new(vmh)
+      mvmh.attached_resources[vm.id] = MonitorableResource.new(vm)
+      monitor_resources.resources[vmh.id] = mvmh
+      monitor_resources.resources[pg.id] = MonitorableResource.new(pg)
       metric_export_resources.resources["90000000-0000-0000-0000-000000000000"] = true
       metric_export_resources.resources["a0000000-0000-0000-0000-000000000000"] = true
 
@@ -133,8 +140,9 @@ RSpec.describe MonitorRunner do
       expect(hash.delete(:active_threads_count)).to be_a Integer
       expect(hash).to eq({
         threads_waiting_for_db_connection: 0,
-        total_monitor_resources: 1,
+        total_monitor_resources: 2,
         total_metric_export_resources: 2,
+        total_monitor_attached_resources: 1,
         monitor_submit_queue_length: 1,
         metric_export_submit_queue_length: 0,
         monitor_idle_worker_threads: 0,
