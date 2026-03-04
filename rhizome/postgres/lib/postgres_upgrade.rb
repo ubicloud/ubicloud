@@ -18,9 +18,14 @@ class PostgresUpgrade
     r "sudo chown postgres:postgres /dat/upgrade/#{@version}"
   end
 
-  def disable_archive_mode
-    r "echo 'archive_command = true' | sudo tee /etc/postgresql/#{@prev_version}/main/conf.d/100-upgrade.conf"
-    r "sudo pg_ctlcluster #{@prev_version} main reload"
+  def disable_archiving(version, reload: false)
+    r "echo 'archive_command = false' | sudo tee /etc/postgresql/#{version}/main/conf.d/100-upgrade.conf"
+    r "sudo pg_ctlcluster #{version} main reload" if reload
+  end
+
+  def remove_walg_credentials
+    r "sudo rm -f /etc/postgresql/wal-g.env"
+    r "sudo systemctl stop wal-g", expect: [0, 1, 4, 5]
   end
 
   def promote(version)
@@ -97,8 +102,10 @@ class PostgresUpgrade
   def upgrade
     @logger.info("Creating upgrade directory")
     create_upgrade_dir
-    @logger.info("Disabling archive mode")
-    disable_archive_mode
+    @logger.info("Removing WAL-G credentials")
+    remove_walg_credentials
+    @logger.info("Disabling archiving for previous version")
+    disable_archiving(@prev_version, reload: true)
     @logger.info("Waiting for postgres to start")
     wait_for_postgres_to_start
     @logger.info("Promoting previous version")
@@ -111,6 +118,8 @@ class PostgresUpgrade
     run_check
     @logger.info("Running pg upgrade")
     run_pg_upgrade
+    @logger.info("Disabling archiving for new version")
+    disable_archiving(@version)
     @logger.info("Enabling new version")
     enable_new_version
     @logger.info("Waiting for postgres to start")
