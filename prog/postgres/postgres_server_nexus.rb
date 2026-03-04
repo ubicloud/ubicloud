@@ -534,7 +534,8 @@ SQL
 
     when_checkup_set? do
       unless available?
-        register_deadline("wait", 5 * 60)
+        deadline = postgres_server.needs_recycling? ? 30 * 60 : 5 * 60
+        register_deadline("wait", deadline)
         hop_unavailable
       end
 

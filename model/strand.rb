@@ -203,6 +203,9 @@ SQL
             {vm_host: vm_host.ubid, data_center: vm_host.data_center, location: vm_host.location.display_name, arch: vm_host.arch}
           when GithubRunner
             {label: sbj.label, installation: sbj.installation.ubid, vm: sbj.vm&.ubid, vm_host: sbj.vm&.vm_host&.ubid, data_center: sbj.vm&.vm_host&.data_center}
+          when PostgresServer
+            {resource_name: sbj.resource.name, role: sbj.primary? ? "primary" : "standby",
+             location: sbj.resource.location.display_name, needs_recycling: sbj.needs_recycling?}
           else
             {}
           end

@@ -443,6 +443,34 @@ RSpec.describe Prog::Base do
       expect(page.details["vm"]).to eq(vm.ubid)
       expect(page.details["data_center"]).to eq(vm.vm_host.data_center)
     end
+
+    it "can create a page with extra data from a postgres server" do
+      project = Project.create(name: "test-project")
+      resource = create_postgres_resource(project:, location_id: Location[name: "hetzner-fsn1"].id)
+      server = create_postgres_server(resource:)
+      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      server.strand.unsynchronized_run
+      page = Page.first
+      expect(page).not_to be_nil
+      expect(page.details["resource_name"]).to eq(resource.name)
+      expect(page.details["role"]).to eq("primary")
+      expect(page.details["location"]).to eq(resource.location.display_name)
+      expect(page.details).to have_key("needs_recycling")
+    end
+
+    it "can create page with extra data as standby from a postgres server" do
+      project = Project.create(name: "test-project")
+      resource = create_postgres_resource(project:, location_id: Location[name: "hetzner-fsn1"].id)
+      server = create_postgres_server(resource:, is_representative: false)
+      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      server.strand.unsynchronized_run
+      page = Page.first
+      expect(page).not_to be_nil
+      expect(page.details["resource_name"]).to eq(resource.name)
+      expect(page.details["role"]).to eq("standby")
+      expect(page.details["location"]).to eq(resource.location.display_name)
+      expect(page.details).to have_key("needs_recycling")
+    end
   end
 
   describe "#before_run" do

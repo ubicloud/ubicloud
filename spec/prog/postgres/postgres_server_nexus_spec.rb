@@ -955,6 +955,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.wait }.to hop("unavailable")
     end
 
+    it "registers a longer deadline when server needs recycling" do
+      nx.incr_checkup
+      expect(nx).to receive(:available?).and_return(false)
+      expect(nx.postgres_server).to receive(:needs_recycling?).and_return(true)
+      expect(nx).to receive(:register_deadline).with("wait", 30 * 60)
+      expect { nx.wait }.to hop("unavailable")
+    end
+
     it "naps if checkup is set but the server is available" do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(true)
