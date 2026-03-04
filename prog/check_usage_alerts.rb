@@ -6,7 +6,7 @@ class Prog::CheckUsageAlerts < Prog::Base
 
     alerts = UsageAlert.eager(:project).where { last_triggered_at < begin_time }.all
     alerts.group_by(&:project).each do |project, project_alerts|
-      cost = project.current_invoice.content["cost"]
+      cost = project.current_invoice(since: begin_time).content["cost"]
       project_alerts.each do |alert|
         alert.trigger(cost) if cost > alert.limit
       end
