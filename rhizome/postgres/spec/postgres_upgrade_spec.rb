@@ -38,11 +38,17 @@ RSpec.describe PostgresUpgrade do
     end
   end
 
-  describe "#disable_archive_mode" do
-    it "disables archive mode and reloads configuration" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = true' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
+  describe "#disable_archiving" do
+    it "disables archiving without reload by default" do
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/17/main/conf.d/100-upgrade.conf")
+      expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster 17 main reload")
+      postgres_upgrade.disable_archiving(17)
+    end
+
+    it "disables archiving and reloads when reload: true" do
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
       expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster 16 main reload")
-      postgres_upgrade.disable_archive_mode
+      postgres_upgrade.disable_archiving(16, reload: true)
     end
   end
 
@@ -58,6 +64,14 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
       expect(logger).to receive(:info).with("Server is already promoted (not in recovery mode)")
       postgres_upgrade.promote(16)
+    end
+  end
+
+  describe "#remove_walg_credentials" do
+    it "stops wal-g daemon and removes credentials file" do
+      expect(postgres_upgrade).to receive(:r).with("sudo systemctl stop wal-g", expect: [0, 1, 4, 5])
+      expect(postgres_upgrade).to receive(:r).with("sudo rm -f /etc/postgresql/wal-g.env")
+      postgres_upgrade.remove_walg_credentials
     end
   end
 
@@ -183,13 +197,15 @@ RSpec.describe PostgresUpgrade do
   describe "#upgrade" do
     it "executes complete upgrade workflow in correct order" do
       expect(postgres_upgrade).to receive(:create_upgrade_dir).ordered
-      expect(postgres_upgrade).to receive(:disable_archive_mode).ordered
+      expect(postgres_upgrade).to receive(:remove_walg_credentials).ordered
+      expect(postgres_upgrade).to receive(:disable_archiving).with(16, reload: true).ordered
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:promote).with(16).ordered
       expect(postgres_upgrade).to receive(:initialize_new_version).ordered
       expect(postgres_upgrade).to receive(:stop_new_version).ordered
       expect(postgres_upgrade).to receive(:run_check).ordered
       expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
+      expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered
       expect(postgres_upgrade).to receive(:enable_new_version).ordered
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:run_post_upgrade_scripts).ordered
