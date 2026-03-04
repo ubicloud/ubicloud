@@ -139,5 +139,6 @@ module ThawedMock
   allow_mocking(ThreadPrinter, :puts, :run)
   allow_mocking(Util, :calculate_ips_v4, :create_certificate, :create_root_certificate, :send_email)
   allow_mocking(UBID, :class_match?)
+  allow_mocking(Validation, :validate_billing_rate)
   allow_mocking(VictoriaMetrics::Client, :new)
 end

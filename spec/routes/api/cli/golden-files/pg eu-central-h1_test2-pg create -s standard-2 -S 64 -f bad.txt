@@ -37,6 +37,14 @@ Allowed Option Values:
           r6gd.medium r6gd.large r6gd.xlarge r6gd.2xlarge r6gd.4xlarge
           r6gd.8xlarge r6gd.12xlarge r6gd.16xlarge r6id.large r6id.xlarge
           r6id.2xlarge r6id.4xlarge r6id.8xlarge r6id.12xlarge r6id.16xlarge
-          r6id.24xlarge r6id.32xlarge
+          r6id.24xlarge r6id.32xlarge c4a-standard-4 c4a-standard-8
+          c4a-standard-16 c4a-standard-32 c4a-standard-48 c4a-standard-64
+          c4a-standard-72 c4a-highmem-4 c4a-highmem-8 c4a-highmem-16
+          c4a-highmem-32 c4a-highmem-48 c4a-highmem-64 c4a-highmem-72
+          c3-standard-4 c3-standard-8 c3-standard-22 c3-standard-44
+          c3-standard-88 c3-standard-176 c3d-standard-8 c3d-standard-16
+          c3d-standard-30 c3d-standard-60 c3d-standard-90 c3d-standard-180
+          c3d-standard-360 c3d-highmem-8 c3d-highmem-16 c3d-highmem-30
+          c3d-highmem-60 c3d-highmem-90 c3d-highmem-180 c3d-highmem-360
     Storage Size: 16 32 64 128 256 512 1024 2048 4096
     Version: 18 17 16
