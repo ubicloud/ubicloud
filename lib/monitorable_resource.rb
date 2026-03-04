@@ -18,6 +18,10 @@ class MonitorableResource
     end
   end
 
+  def num_attached_resources
+    @attached_resources&.size || 0
+  end
+
   def attached_resources_sync(&)
     @attached_resources_mutex.synchronize(&)
   end

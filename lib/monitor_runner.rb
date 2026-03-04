@@ -80,6 +80,7 @@ class MonitorRunner
         active_threads_count: Thread.list.count - @internal_threads,
         threads_waiting_for_db_connection: DB.pool.num_waiting,
         total_monitor_resources: @monitor_resources.resources.size,
+        total_monitor_attached_resources: @monitor_resources.resources.each_value.sum(&:num_attached_resources),
         total_metric_export_resources: @metric_export_resources.resources.size,
         monitor_submit_queue_length: @monitor_resources.submit_queue.length,
         metric_export_submit_queue_length: @metric_export_resources.submit_queue.length,
