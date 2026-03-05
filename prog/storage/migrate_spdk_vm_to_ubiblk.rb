@@ -164,8 +164,8 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
     storage_unit = vm_storage_volume.vhost_backend_systemd_unit_name
     vm_unit_path = "/etc/systemd/system/#{vm.inhost_name}.service"
-    vm.vm_host.sshable.cmd("sudo sed -i 's/After=spdk-.*\\.service/After=:storage_unit/' :vm_unit_path", storage_unit:, vm_unit_path:)
-    vm.vm_host.sshable.cmd("sudo sed -i 's/Requires=spdk-.*\\.service/Requires=:storage_unit/' :vm_unit_path", storage_unit:, vm_unit_path:)
+    vm.vm_host.sshable.cmd("sudo sed -i 's/After=spdk-.*\\.service/After=':storage_unit'/' :vm_unit_path", storage_unit:, vm_unit_path:)
+    vm.vm_host.sshable.cmd("sudo sed -i 's/Requires=spdk-.*\\.service/Requires=':storage_unit'/' :vm_unit_path", storage_unit:, vm_unit_path:)
     vm.vm_host.sshable.cmd("sudo systemctl daemon-reload")
 
     hop_start_vm
