@@ -61,9 +61,9 @@ class Vm < Sequel::Model
   def load_balancer_state
     return nil unless load_balancer
     if load_balancer.stack == "dual"
-      %w[ipv4 ipv6].map! { |stack| load_balancer_vm_ports.find { it.stack == stack }.state }
+      %w[ipv4 ipv6].map! { |stack| load_balancer_vm_ports.find { it.stack == stack }&.state }
     else
-      [load_balancer_vm_ports.first.state]
+      [load_balancer_vm_ports.first&.state]
     end
   end
 

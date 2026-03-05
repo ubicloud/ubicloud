@@ -82,6 +82,18 @@ RSpec.describe Vm do
     it "returns nil if there is related object" do
       expect(vm.load_balancer_state).to be_nil
     end
+
+    it "handles load balancer without vm ports" do
+      project_id = Project.create(name: "test").id
+      private_subnet_id = PrivateSubnet.create(name: "test", project_id:, net6: "1234::/16", net4: "10.0.0.0/8", location_id: Location::HETZNER_FSN1_ID).id
+      load_balancer = LoadBalancer.create(name: "test", health_check_endpoint: "/", project_id:, private_subnet_id:)
+      vm = create_vm
+      LoadBalancerVm.create(vm_id: vm.id, load_balancer_id: load_balancer.id)
+      expect(vm.load_balancer_state).to eq [nil, nil]
+
+      vm.load_balancer.update(stack: LoadBalancer::Stack::IPV4)
+      expect(vm.load_balancer_state).to eq [nil]
+    end
   end
 
   describe "#cloud_hypervisor_cpu_topology" do
