@@ -49,7 +49,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
 
   label def wait_vm_stop
     vm_state = begin
-      vm.vm_host.sshable.cmd("systemctl is-active :inhost_name", inhost_name:)
+      vm.vm_host.sshable.cmd("systemctl is-active :inhost_name", inhost_name:).strip
     rescue Sshable::SshError => ex
       # systemctl returns exit code 3 when a unit is inactive but writes
       # the result to the stdout. based on the way sshable.cmd work,
@@ -57,7 +57,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       # on non-zero exit codes, it wouldn't return the stdout directly.
       ex.stdout.strip
     end
-    nap 5 unless vm_state == "inactive"
+    nap 5 unless %w[inactive failed].include?(vm_state)
     hop_remove_spdk_controller
   end
 

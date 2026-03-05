@@ -111,7 +111,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
 
   describe "wait_vm_stop" do
     it "naps if vm has not stopped yet" do
-      expect(vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name}").and_return("")
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name}").and_return("active\n")
       expect { prog.wait_vm_stop }.to nap(5)
     end
 
