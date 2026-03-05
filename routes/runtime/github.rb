@@ -183,7 +183,7 @@ class Clover
             upload_id:,
             multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
           })
-        rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload => ex
+        rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload, Aws::S3::Errors::EntityTooSmall => ex
           Clog.emit("could not complete multipart upload", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
         rescue Aws::S3::Errors::ServiceUnavailable => ex
