@@ -100,6 +100,8 @@ r "tar xvf htcat.tar.gz -C /usr/local/bin/"
 
 SpdkSetup.prep
 
+r File.join(__dir__, "encrypt-swap")
+
 # cron job to store serial.log files
 FileUtils.mkdir_p("/var/log/ubicloud/serials")
 File.write("/etc/cron.d/ubicloud-clean-serial-logs", <<CRON)

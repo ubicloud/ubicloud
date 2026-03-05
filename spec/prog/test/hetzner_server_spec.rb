@@ -99,9 +99,22 @@ RSpec.describe Prog::Test::HetznerServer do
       expect { hs_test.wait_setup_host }.to nap(15)
     end
 
-    it "hops to install_integration_specs if the host is ready" do
+    it "hops to verify_encrypted_swap if the host is ready" do
       expect(vm_host.strand).to receive(:label).and_return("wait").at_least(:once)
-      expect { hs_test.wait_setup_host }.to hop("install_integration_specs")
+      expect { hs_test.wait_setup_host }.to hop("verify_encrypted_swap")
+    end
+  end
+
+  describe "#verify_encrypted_swap" do
+    it "hops to install_integration_specs if swap is on dm-crypt" do
+      expect(vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/dm-0\n")
+      expect { hs_test.verify_encrypted_swap }.to hop("install_integration_specs")
+    end
+
+    it "fails if swap is not on dm-crypt" do
+      expect(vm_host.sshable).to receive(:_cmd).with("swapon --show=NAME --noheadings").and_return("/dev/nvme0n1p2\n")
+      expect(hs_test.strand).to receive(:update).with(hash_including(exitval: {msg: "swap is not on a dm-crypt device: /dev/nvme0n1p2"}))
+      expect { hs_test.verify_encrypted_swap }.to hop("failed")
     end
   end
 
