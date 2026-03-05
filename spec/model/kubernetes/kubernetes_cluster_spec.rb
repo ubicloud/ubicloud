@@ -240,7 +240,7 @@ RSpec.describe KubernetesCluster do
     def stub_kubectl(session, command, return_value)
       cmd = "sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf #{command}"
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(return_value, 0)
-      expect(session).to receive(:_exec!).with(match(cmd)).and_return(response)
+      expect(session).to receive(:_exec!).with(cmd).and_return(response)
     end
 
     def stub_connectivity_checks(session, fleet)
@@ -252,7 +252,7 @@ RSpec.describe KubernetesCluster do
             "ubicsi-nodeplugin-#{nodename} ubicsi-something-else")
 
           stub_kubectl(session,
-            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c .*",
+            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c timeout\\ 3\\ bash\\ -c\\ echo\\\\\\ \\\\\\>\\\\\\ /dev/tcp/example.com/443\\ \\&\\&\\ echo\\ OK-test-vm\\ \\|\\|\\ echo\\ FAIL",
             "OK-#{nodename}")
         when :failure
           stub_kubectl(session,
@@ -260,7 +260,7 @@ RSpec.describe KubernetesCluster do
             "ubicsi-nodeplugin-#{nodename} ubicsi-something-else")
 
           stub_kubectl(session,
-            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c .*",
+            "exec -n ubicsi ubicsi-nodeplugin-#{nodename} -- sh -c timeout\\ 3\\ bash\\ -c\\ echo\\\\\\ \\\\\\>\\\\\\ /dev/tcp/example.com/443\\ \\&\\&\\ echo\\ OK-test-vm\\ \\|\\|\\ echo\\ FAIL",
             "FAIL")
         when :nocsi
           stub_kubectl(session,
