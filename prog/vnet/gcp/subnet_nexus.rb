@@ -329,7 +329,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       existing.action == action &&
       (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
       (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort &&
-      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs)
+      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs || [])
   end
 
   def normalize_layer4_configs(configs)
