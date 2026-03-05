@@ -194,7 +194,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         if id #{nx.vm_name} &>/dev/null; then
           procs=$(ps -u #{nx.vm_name} -o pid,comm,args --no-headers) || [ $? -eq 1 ]
           if [ -n "$procs" ]; then
-            echo "Terminating #{nx.vm_name} processes:"
+            echo "Terminating "#{nx.vm_name}" processes:"
             echo "$procs"
             sudo pkill -u #{nx.vm_name} || [ $? -eq 1 ]
             sleep 1

@@ -123,7 +123,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       if id :vm_name &>/dev/null; then
         procs=$(ps -u :vm_name -o pid,comm,args --no-headers) || [ $? -eq 1 ]
         if [ -n "$procs" ]; then
-          echo "Terminating :vm_name processes:"
+          echo "Terminating ":vm_name" processes:"
           echo "$procs"
           sudo pkill -u :vm_name || [ $? -eq 1 ]
           sleep 1
