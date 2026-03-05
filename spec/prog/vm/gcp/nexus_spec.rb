@@ -845,6 +845,28 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.send(:cleanup_vm_policy_rules)
     end
 
+    it "skips adding IPv6 dest range when private_ipv6 is nil" do
+      ensure_nic_gcp_resource(vm.nics.first)
+      vm_ip = vm.nic.private_ipv4.network.to_s
+      vm_dest = "#{vm_ip}/32"
+
+      allow(vm.nic).to receive(:private_ipv6).and_return(nil)
+
+      matching_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 12345,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [vm_dest]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [matching_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 12345))
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
     it "skips non-INGRESS and non-allow rules" do
       vm_ip = vm.nics.first.private_ipv4.network.to_s
       vm_dest = "#{vm_ip}/32"

@@ -710,4 +710,81 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /GCP global operation op-12345 failed/)
     end
   end
+
+  describe "nil-safe navigation coverage" do
+    let(:empty_policy) {
+      Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, rules: [])
+    }
+
+    it "raises when nic_gcp_resource is nil (covers &.nic_gcp_resource nil branch)" do
+      nic = instance_double(Nic)
+      allow(nic).to receive_messages(private_ipv4: nil, private_ipv6: nil, nic_gcp_resource: nil)
+      allow(vm).to receive(:nics).and_return([nic])
+      nx.instance_variable_set(:@vm_rule_base_priority, nil)
+
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(22..23), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /NIC has no firewall_base_priority/)
+    end
+
+    it "returns empty existing rules when private_ipv4 is nil (covers &.private_ipv4 nil branch)" do
+      nic = instance_double(Nic)
+      nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: 10000)
+      allow(nic).to receive_messages(private_ipv4: nil, private_ipv6: nil, nic_gcp_resource:)
+      allow(vm).to receive(:nics).and_return([nic])
+
+      expect(vm).to receive(:firewall_rules).and_return([])
+      # list_existing_vm_policy_rules returns [] early when vm_private_ip is nil
+      expect(nfp_client).not_to receive(:get)
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "falls back to IPv4 dest when private_ipv6 is nil (covers &.private_ipv6 nil branch)" do
+      nic = instance_double(Nic)
+      nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: 10000)
+      private_ipv4 = instance_double(NetAddr::IPv4Net)
+      network = instance_double(NetAddr::IPv4, to_s: "10.0.0.1")
+      allow(private_ipv4).to receive(:network).and_return(network)
+      allow(nic).to receive_messages(private_ipv4:, private_ipv6: nil, nic_gcp_resource:)
+      allow(vm).to receive(:nics).and_return([nic])
+
+      rules = [
+        instance_double(FirewallRule, ip6?: true, cidr: NetAddr::IPv6Net.parse("::/0"),
+          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+
+      expect(nfp_client).to receive(:add_rule) do |args|
+        rule = args[:firewall_policy_rule_resource]
+        # vm_private_ipv6 is nil, so vm_dest_ipv6_range falls back to vm_dest_ip_range
+        expect(rule.match.dest_ip_ranges).to eq(["10.0.0.1/32"])
+      end
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "skips update when existing.match is nil after add_rule collision (covers &.match nil branch)" do
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+
+      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+      # Existing rule has nil match — triggers &.dest_ip_ranges nil branch at line 156
+      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new
+      expect(nfp_client).to receive(:get_rule).and_return(existing_rule)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, skipping update", anything)
+      expect(nfp_client).not_to receive(:patch_rule)
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+  end
 end

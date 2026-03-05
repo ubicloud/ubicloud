@@ -316,6 +316,65 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect { nx.create_firewall_policy }.to raise_error(Google::Cloud::InvalidArgumentError, /Invalid CIDR/)
     end
+
+    # rubocop:disable RSpec/VerifiedDoubles
+    it "adds association when verify finds nil associations (nil-safe &. branch)" do
+      # Trigger verify_firewall_policy_association via AlreadyExistsError on insert
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # verify_firewall_policy_association: get returns policy with nil associations
+      policy_nil_assoc = double("policy", associations: nil)
+      expect(nfp_client).to receive(:get).and_return(policy_nil_assoc)
+
+      assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-verify")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(nfp_client).to receive(:add_association).and_return(assoc_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-assoc-verify"
+      ).and_return(done_op)
+
+      expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
+    end
+
+    it "re-raises InvalidArgumentError from verify_firewall_policy_association when unrelated error" do
+      # Trigger verify_firewall_policy_association via AlreadyExistsError on insert
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # verify_firewall_policy_association: get returns policy without our VPC association
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      )
+
+      # add_association in verify raises InvalidArgumentError with non-"already exists" message
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::InvalidArgumentError.new("Quota exceeded"))
+
+      expect { nx.create_firewall_policy }.to raise_error(Google::Cloud::InvalidArgumentError, /Quota exceeded/)
+    end
+
+    it "raises when refetched policy has nil associations after concurrent conflict" do
+      # Trigger verify_firewall_policy_association via AlreadyExistsError on insert
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # verify_firewall_policy_association: first get returns policy without our association
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      )
+
+      # add_association raises AlreadyExistsError (concurrent strand)
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # refetch returns policy with nil associations (nil-safe &. branch at line 297)
+      policy_nil_assoc = double("policy", associations: nil)
+      expect(nfp_client).to receive(:get).and_return(policy_nil_assoc)
+
+      expect { nx.create_firewall_policy }.to raise_error(RuntimeError, /not associated with VPC/)
+    end
+    # rubocop:enable RSpec/VerifiedDoubles
   end
 
   describe "#create_vpc_deny_rules" do
@@ -916,6 +975,42 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "handles non-operation objects" do
       op = double("plain_op") # rubocop:disable RSpec/VerifiedDoubles
       expect { nx.send(:wait_for_compute_global_op, op) }.not_to raise_error
+    end
+  end
+
+  describe "#policy_rule_matches_desired?" do
+    it "returns false and covers nil-match &. branches when existing.match is nil" do
+      rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        direction: "EGRESS", action: "deny"
+        # match is nil — triggers &.src_ip_ranges, &.dest_ip_ranges, &.layer4_configs nil paths
+      )
+      all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
+      result = nx.send(:policy_rule_matches_desired?, rule_no_match,
+        direction: "EGRESS", action: "deny",
+        src_ip_ranges: nil, dest_ip_ranges: nil,
+        layer4_configs: [all_proto])
+      expect(result).to be(false)
+    end
+  end
+
+  describe "#normalize_layer4_configs" do
+    # rubocop:disable RSpec/VerifiedDoubles
+    it "handles layer4 configs with nil ports (covers &.to_a nil branch)" do
+      config = double("layer4_config", ip_protocol: "tcp", ports: nil)
+      result = nx.send(:normalize_layer4_configs, [config])
+      expect(result).to eq([["tcp", []]])
+    end
+    # rubocop:enable RSpec/VerifiedDoubles
+  end
+
+  describe "#delete_subnet_policy_rules" do
+    it "skips rule when existing rule has nil match (covers &.dest_ip_ranges nil branch)" do
+      rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new
+      # match is nil — match&.dest_ip_ranges&.any? returns nil → next is executed
+      expect(nfp_client).to receive(:get_rule).twice.and_return(rule_no_match)
+      expect(nfp_client).not_to receive(:remove_rule)
+
+      nx.send(:delete_subnet_policy_rules)
     end
   end
 

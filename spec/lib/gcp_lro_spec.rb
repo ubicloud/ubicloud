@@ -22,6 +22,15 @@ RSpec.describe GcpLro do
     allow(nx).to receive_messages(credential:, gcp_project_id: "test-gcp-project")
   end
 
+  # rubocop:disable RSpec/VerifiedDoubles
+  describe "#wait_for_compute_regional_op" do
+    it "returns immediately for non-operation objects" do
+      op = double("plain_op")
+      expect { nx.send(:wait_for_compute_regional_op, op, "us-central1") }.not_to raise_error
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles
+
   describe "#poll_gcp_op" do
     it "raises for unknown scope" do
       strand.stack.first["gcp_op_name"] = "op-123"
