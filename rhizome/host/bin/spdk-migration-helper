@@ -24,9 +24,15 @@ when "create-vhost-backend-service-file"
 when "remove-spdk-controller"
   disk_index = params.fetch("disk_index")
   spdk_version = params.fetch("spdk_version")
+  device_id = "#{vm_name}_#{disk_index}"
   client_rpc = SpdkRpc.new(SpdkPath.rpc_sock(spdk_version))
+
   vhost_controller = SpdkPath.vhost_controller(vm_name, disk_index)
   client_rpc.vhost_delete_controller(vhost_controller)
+  client_rpc.bdev_ubi_delete(device_id)
+  client_rpc.bdev_crypto_delete("#{device_id}_base")
+  client_rpc.bdev_aio_delete("#{device_id}_aio")
+  client_rpc.accel_crypto_key_destroy("#{device_id}_key")
 
 else
   puts "Unknown action: #{action}"

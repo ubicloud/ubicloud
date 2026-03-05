@@ -64,6 +64,20 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
         }.to raise_error("This prog only supports Vms with exactly one disk")
       end
 
+      it "fails if the vm storage volume does not use bdev_ubi" do
+        vm.vm_storage_volumes.first.update(use_bdev_ubi: false)
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("Vm storage volume does not use bdev_ubi")
+      end
+
+      it "fails if the vm storage volume is not encrypted" do
+        vm.vm_storage_volumes.first.update(key_encryption_key_1_id: nil)
+        expect {
+          described_class.assemble(vm.id)
+        }.to raise_error("Vm storage volume is not encrypted")
+      end
+
       it "fails if the vm has a ubiblk disk" do
         vm.vm_storage_volumes.first.update(vhost_block_backend_id: vm_host.vhost_block_backends.first.id, vring_workers: 1)
         expect {

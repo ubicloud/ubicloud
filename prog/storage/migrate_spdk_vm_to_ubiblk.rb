@@ -12,15 +12,25 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       fail "This prog only supports Vms with exactly one disk"
     end
 
-    if vm.vm_storage_volumes.first.vhost_block_backend_id
+    sv = vm.vm_storage_volumes.first
+
+    if sv.vhost_block_backend_id
       fail "Vm is already using Ubiblk"
+    end
+
+    unless sv.use_bdev_ubi
+      fail "Vm storage volume does not use bdev_ubi"
+    end
+
+    unless sv.key_encryption_key_1
+      fail "Vm storage volume is not encrypted"
     end
 
     unless vm.vm_host.vhost_block_backends.find { |b| b.version == Config.vhost_block_backend_version }
       fail "VmHost does not have the right vhost block backend installed"
     end
 
-    storage_device_name = vm.vm_storage_volumes.first.storage_device.name
+    storage_device_name = sv.storage_device.name
     storage_dir = (storage_device_name == "DEFAULT") ? "/var/storage/#{vm.inhost_name}/0" : "/var/storage/devices/#{storage_device_name}/#{vm.inhost_name}/0"
     begin
       vm.vm_host.sshable.cmd("test -d :storage_dir", storage_dir:)
