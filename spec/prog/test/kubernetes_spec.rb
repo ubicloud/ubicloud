@@ -303,7 +303,7 @@ RSpec.describe Prog::Test::Kubernetes do
       (1..3).each do |i|
         expect(sshable).to receive(:_cmd).with("cat /dev/shm/csi_data_write_#{i}.hash").and_return("hash#{i}")
         read_response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(read_response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
         expect(sshable).to receive(:d_clean).with("csi_data_write_#{i}")
       end
       expect(kubernetes_test).to receive(:update_stack).with({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
@@ -313,7 +313,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "fails on the first file if write and read hashes don't match" do
       expect(sshable).to receive(:_cmd).with("cat /dev/shm/csi_data_write_1.hash").and_return("hash1")
       read_response = Net::SSH::Connection::Session::StringWithExitstatus.new("wrong_hash", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-1 | awk '{print \\$1}'\"").and_return(read_response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(read_response)
       expect(sshable).to receive(:d_clean).with("csi_data_write_1")
       expect { kubernetes_test.verify_data_write }.to hop("destroy_kubernetes")
       expect(kubernetes_test.strand.stack.first["fail_message"]).to eq("wrong read hash for random-data-1, expected: hash1, got: wrong_hash")
@@ -359,7 +359,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect(kubernetes_test).to receive(:increment_migration_number)
       expect { kubernetes_test.verify_data_after_migration }.to hop("test_pod_data_migration")
@@ -370,7 +370,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_data_after_migration }.to hop("test_normal_pod_restart")
     end
@@ -504,7 +504,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_rsync_retry }.to hop("test_node_not_deleted_during_copy")
     end
@@ -611,7 +611,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").and_return(response)
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_data_after_drain }.to hop("test_reboot_nftables")
     end
@@ -868,7 +868,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       kubernetes_test.verify_data_hashes("migration")
     end
@@ -876,7 +876,7 @@ RSpec.describe Prog::Test::Kubernetes do
     it "sets fail_message when a hash does not match" do
       kubernetes_test.update_stack({"read_hashes" => {"random-data-1" => "hash1", "random-data-2" => "hash2", "random-data-3" => "hash3"}})
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("wronghash", 0)
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-1 | awk '{print \\$1}'\"").and_return(response)
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-1\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       expect(kubernetes_test).to receive(:update_stack).with({"fail_message" => "data hash changed after migration for random-data-1, expected: hash1, got: wronghash"})
       expect { kubernetes_test.verify_data_hashes("migration") }.to hop("destroy_kubernetes")
     end

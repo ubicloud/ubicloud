@@ -168,7 +168,8 @@ STS
       unit_name = "csi_data_write_#{i}"
       hash_path = "/dev/shm/#{unit_name}.hash"
       write_hash = kubernetes_cluster.sshable.cmd("cat :hash_path", hash_path:).strip
-      read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
+      command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
+      read_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
       kubernetes_cluster.sshable.d_clean(unit_name)
       if write_hash != read_hash
         update_stack({"fail_message" => "wrong read hash for #{file}, expected: #{write_hash}, got: #{read_hash}"})
@@ -430,7 +431,8 @@ STS
   def verify_data_hashes(context)
     expected_hashes = strand.stack.first["read_hashes"]
     expected_hashes.each do |file, expected_hash|
-      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/:file | awk '{print \\$1}'\"", file:).strip
+      command = NetSsh.command("sha256sum /etc/data/:file | awk '{print $1}'", file:)
+      new_hash = kubernetes_cluster.client.kubectl("exec -t ubuntu-statefulset-0 -- sh -c :command", command:).strip
       if new_hash != expected_hash
         update_stack({"fail_message" => "data hash changed after #{context} for #{file}, expected: #{expected_hash}, got: #{new_hash}"})
         hop_destroy_kubernetes
