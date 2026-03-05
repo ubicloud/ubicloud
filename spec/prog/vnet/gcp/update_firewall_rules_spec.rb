@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "zlib"
 require "google/cloud/compute/v1"
 
 RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
@@ -23,13 +22,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   before do
     nx.instance_variable_set(:@vm, vm)
     nic = instance_double(Nic)
+    nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: 10000)
     private_ipv4 = instance_double(NetAddr::IPv4Net)
     network = instance_double(NetAddr::IPv4, to_s: "10.0.0.1")
     allow(private_ipv4).to receive(:network).and_return(network)
     private_ipv6 = instance_double(NetAddr::IPv6Net)
     ipv6_network = instance_double(NetAddr::IPv6, to_s: "fd00::")
     allow(private_ipv6).to receive(:network).and_return(ipv6_network)
-    allow(nic).to receive_messages(private_ipv4:, private_ipv6:)
+    allow(nic).to receive_messages(private_ipv4:, private_ipv6:, nic_gcp_resource:)
     allow(vm).to receive_messages(location:, nics: [nic])
   end
 
@@ -55,6 +55,37 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).to receive(:get).and_return(empty_policy)
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "raises when desired rules exceed VM_STRIDE" do
+      # Build VM_STRIDE+1 rules (each from a different CIDR to produce one rule per CIDR)
+      rules = (0..described_class::VM_STRIDE).map do |i|
+        instance_double(FirewallRule, ip6?: false,
+          cidr: NetAddr::IPv4Net.parse("10.#{i / 256}.#{i % 256}.0/24"),
+          port_range: Sequel.pg_range(80..81), protocol: "tcp")
+      end
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /exceeds VM_STRIDE/)
+    end
+
+    it "raises when NIC has no firewall_base_priority allocated" do
+      nic = instance_double(Nic)
+      nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: nil)
+      private_ipv4 = instance_double(NetAddr::IPv4Net)
+      network = instance_double(NetAddr::IPv4, to_s: "10.0.0.1")
+      allow(private_ipv4).to receive(:network).and_return(network)
+      allow(nic).to receive_messages(private_ipv4:, private_ipv6: nil, nic_gcp_resource:)
+      allow(vm).to receive(:nics).and_return([nic])
+      nx.instance_variable_set(:@vm_rule_base_priority, nil)
+
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(22..23), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /NIC has no firewall_base_priority/)
     end
 
     it "creates a policy rule for IPv4 rules" do
@@ -147,7 +178,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       ]
       expect(vm).to receive(:firewall_rules).and_return(rules)
 
-      base_priority = described_class::VM_RULE_BASE_PRIORITY + (Zlib.crc32("testvm") % described_class::VM_RULE_PRIORITY_RANGE)
+      base_priority = 10000
       existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: base_priority,
         direction: "INGRESS",
@@ -380,7 +411,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       ]
       expect(vm).to receive(:firewall_rules).and_return(rules)
 
-      base_priority = described_class::VM_RULE_BASE_PRIORITY + (Zlib.crc32("testvm") % described_class::VM_RULE_PRIORITY_RANGE)
+      base_priority = 10000
       existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: base_priority,
         direction: "INGRESS",
@@ -462,10 +493,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "falls back to IPv4 dest when VM has no private IPv6" do
       nic = instance_double(Nic)
+      nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: 10000)
       private_ipv4 = instance_double(NetAddr::IPv4Net)
       network = instance_double(NetAddr::IPv4, to_s: "10.0.0.1")
       allow(private_ipv4).to receive(:network).and_return(network)
-      allow(nic).to receive_messages(private_ipv4:, private_ipv6: nil)
+      allow(nic).to receive_messages(private_ipv4:, private_ipv6: nil, nic_gcp_resource:)
       allow(vm).to receive(:nics).and_return([nic])
       nx.instance_variable_set(:@vm_private_ip, nil)
       nx.instance_variable_set(:@vm_private_ipv6, nil)

@@ -20,7 +20,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   let(:ps) {
     credential
     PrivateSubnet.create(name: "ps", location_id: location.id, net6: "fd10:9b0b:6b4b:8fbb::/64",
-      net4: "10.0.0.0/26", state: "waiting", project_id: project.id)
+      net4: "10.0.0.0/26", state: "waiting", project_id: project.id, firewall_priority: 1000)
   }
   let(:vpc_name) { "ubicloud-gcp-us-central1" }
   let(:networks_client) { instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client) }
@@ -468,6 +468,89 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice
 
       expect { nx.create_subnet_allow_rules }.to hop("wait")
+    end
+
+    it "allocates firewall_priority when not yet set" do
+      ps.update(firewall_priority: nil)
+
+      expect(nfp_client).to receive(:get_rule).twice
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-rule")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get).twice.and_return(done_op)
+      expect(nfp_client).to receive(:add_rule).twice.and_return(op)
+
+      expect { nx.create_subnet_allow_rules }.to hop("wait")
+      expect(ps.reload.firewall_priority).to eq(1000)
+    end
+  end
+
+  describe "#allocate_subnet_firewall_priority" do
+    before do
+      ps.update(firewall_priority: nil)
+    end
+
+    it "allocates the lowest available even slot starting at 1000" do
+      nx.send(:allocate_subnet_firewall_priority)
+      expect(ps.reload.firewall_priority).to eq(1000)
+    end
+
+    it "gap-fills: uses lowest available slot when 1000 is taken" do
+      other_ps = PrivateSubnet.create(name: "ps2", location_id: location.id, net6: "fd11::/64",
+        net4: "10.0.1.0/26", state: "waiting", project_id: project.id, firewall_priority: 1000)
+
+      nx.send(:allocate_subnet_firewall_priority)
+      expect(ps.reload.firewall_priority).to eq(1002)
+
+      other_ps.destroy
+    end
+
+    it "gap-fills when middle slot is free" do
+      ps1 = PrivateSubnet.create(name: "ps1", location_id: location.id, net6: "fd11::/64",
+        net4: "10.0.1.0/26", state: "waiting", project_id: project.id, firewall_priority: 1000)
+      ps3 = PrivateSubnet.create(name: "ps3", location_id: location.id, net6: "fd12::/64",
+        net4: "10.0.2.0/26", state: "waiting", project_id: project.id, firewall_priority: 1004)
+
+      nx.send(:allocate_subnet_firewall_priority)
+      expect(ps.reload.firewall_priority).to eq(1002)
+
+      ps1.destroy
+      ps3.destroy
+    end
+
+    it "raises when all slots are exhausted" do
+      fake_ds = instance_double(Sequel::Dataset)
+      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_map: (1000..8998).step(2).to_a)
+      allow(DB).to receive(:[]).and_call_original
+      allow(DB).to receive(:[]).with(:private_subnet).and_return(fake_ds)
+
+      expect { nx.send(:allocate_subnet_firewall_priority) }
+        .to raise_error(RuntimeError, /GCP firewall priority range exhausted/)
+    end
+
+    it "retries on unique constraint violation" do
+      attempt = 0
+      allow(ps).to receive(:update).and_wrap_original do |m, hash|
+        attempt += 1
+        raise Sequel::UniqueConstraintViolation, "dup" if attempt == 1 && hash[:firewall_priority]
+        m.call(hash)
+      end
+
+      nx.send(:allocate_subnet_firewall_priority)
+      expect(ps.reload.firewall_priority).to eq(1000)
+    end
+
+    it "silently ignores errors during nil-reset on retry" do
+      attempt = 0
+      allow(ps).to receive(:update).and_wrap_original do |m, hash|
+        attempt += 1
+        raise Sequel::UniqueConstraintViolation, "dup" if attempt == 1 && hash[:firewall_priority]
+        raise Sequel::Error, "reset failed" if attempt == 2 && hash[:firewall_priority].nil?
+        m.call(hash)
+      end
+
+      nx.send(:allocate_subnet_firewall_priority)
+      expect(ps.reload.firewall_priority).to eq(1000)
     end
   end
 

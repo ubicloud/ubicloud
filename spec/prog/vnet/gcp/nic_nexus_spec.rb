@@ -47,12 +47,66 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   end
 
   describe "#start" do
-    it "creates a NicGcpResource with network config and hops to allocate_static_ip" do
+    it "creates a NicGcpResource with network config, allocates firewall priority, and hops to allocate_static_ip" do
       expect { nx.start }.to hop("allocate_static_ip")
       gcp_res = NicGcpResource[nic.id]
       expect(gcp_res).not_to be_nil
       expect(gcp_res.network_name).to eq("ubicloud-gcp-us-central1")
       expect(gcp_res.subnet_name).to eq("ubicloud-#{private_subnet.ubid}")
+      expect(gcp_res.firewall_base_priority).to eq(10000)
+      expect(gcp_res.location_id).to eq(private_subnet.location_id)
+    end
+
+    it "allocates sequential firewall_base_priority for multiple NICs" do
+      expect { nx.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic.id].firewall_base_priority).to eq(10000)
+
+      nic2 = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic2").subject
+      st2 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic2.id}], label: "start")
+      nx2 = described_class.new(st2)
+      allow(nx2).to receive(:nic).and_return(nic2)
+      nx2.instance_variable_set(:@credential, location_credential)
+
+      expect { nx2.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic2.id].firewall_base_priority).to eq(10064)
+    end
+
+    it "raises when VM firewall priority range is exhausted" do
+      fake_ds = instance_double(Sequel::Dataset)
+      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_map: (10000..59999).step(64).to_a)
+      allow(DB).to receive(:[]).and_call_original
+      allow(DB).to receive(:[]).with(:nic_gcp_resource).and_return(fake_ds)
+
+      expect { nx.start }.to raise_error(RuntimeError, /GCP VM firewall priority range exhausted/)
+    end
+
+    it "retries allocate_vm_firewall_priority on unique constraint violation" do
+      nic_resource = NicGcpResource.create_with_id(nic.id)
+      allow(NicGcpResource).to receive(:create_with_id).and_return(nic_resource)
+      attempt = 0
+      allow(nic_resource).to receive(:update).and_wrap_original do |m, hash|
+        attempt += 1
+        raise Sequel::UniqueConstraintViolation, "dup" if attempt == 1 && hash[:firewall_base_priority]
+        m.call(hash)
+      end
+
+      expect { nx.start }.to hop("allocate_static_ip")
+      expect(nic_resource.reload.firewall_base_priority).to eq(10000)
+    end
+
+    it "silently ignores errors during nil-reset on retry" do
+      nic_resource = NicGcpResource.create_with_id(nic.id)
+      allow(NicGcpResource).to receive(:create_with_id).and_return(nic_resource)
+      attempt = 0
+      allow(nic_resource).to receive(:update).and_wrap_original do |m, hash|
+        attempt += 1
+        raise Sequel::UniqueConstraintViolation, "dup" if attempt == 1 && hash[:firewall_base_priority]
+        raise Sequel::Error, "reset failed" if attempt == 2 && hash[:firewall_base_priority].nil?
+        m.call(hash)
+      end
+
+      expect { nx.start }.to hop("allocate_static_ip")
+      expect(nic_resource.reload.firewall_base_priority).to eq(10000)
     end
   end
 

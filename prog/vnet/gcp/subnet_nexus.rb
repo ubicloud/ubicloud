@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "zlib"
 require "google/cloud/compute/v1"
 require_relative "../../../lib/gcp_lro"
 
@@ -159,6 +158,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_subnet_allow_rules
+    allocate_subnet_firewall_priority unless private_subnet.firewall_priority
+
     # Allow same-subnet IPv4 egress (overrides the VPC-wide deny-egress)
     ensure_policy_rule(
       priority: subnet_allow_priority,
@@ -373,10 +374,38 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   # --- Shared helpers ---
 
-  # Deterministic priority for subnet allow rules. Each subnet gets a unique
-  # pair of priorities (IPv4 egress, IPv6 egress) based on a hash of its ubid.
   def subnet_allow_priority
-    @subnet_allow_priority ||= ALLOW_SUBNET_BASE_PRIORITY + (Zlib.crc32(private_subnet.ubid) % 4000) * 2
+    private_subnet.firewall_priority or
+      raise "subnet firewall_priority not allocated for #{private_subnet.ubid}"
+  end
+
+  def allocate_subnet_firewall_priority
+    location_id = private_subnet.location_id
+    used = DB[:private_subnet]
+      .where(location_id:)
+      .exclude(id: private_subnet.id)
+      .where(Sequel.~(firewall_priority: nil))
+      .select_map(:firewall_priority)
+      .to_set
+
+    slot = nil
+    (1000..8998).step(2) do |p|
+      unless used.include?(p)
+        slot = p
+        break
+      end
+    end
+
+    raise "GCP firewall priority range exhausted for location #{location_id}" unless slot
+
+    private_subnet.update(firewall_priority: slot)
+  rescue Sequel::UniqueConstraintViolation
+    begin
+      private_subnet.update(firewall_priority: nil)
+    rescue
+      nil
+    end
+    retry
   end
 
   def gcp_vpc_name

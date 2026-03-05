@@ -1,15 +1,12 @@
 # frozen_string_literal: true
 
-require "zlib"
 require "google/cloud/compute/v1"
 
 class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   subject_is :vm
 
-  # Per-VM firewall policy rules use priorities in this range.
-  # Each VM gets a block of priorities derived from its name hash.
-  VM_RULE_BASE_PRIORITY = 10000
-  VM_RULE_PRIORITY_RANGE = 50000
+  # Each VM gets a block of VM_STRIDE priority slots in the range 10000–59999.
+  VM_STRIDE = 64
 
   def before_run
     pop "firewall rule is added" if vm.destroy_set?
@@ -22,6 +19,10 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     ip4_desired = build_desired_policy_rules(ip4_rules, ip6: false)
     ip6_desired = build_desired_policy_rules(ip6_rules, ip6: true, priority_offset: ip4_desired.length)
     desired_rules = ip4_desired + ip6_desired
+
+    if desired_rules.length > VM_STRIDE
+      raise "VM #{vm.name} exceeds VM_STRIDE=#{VM_STRIDE} firewall rules (#{desired_rules.length})"
+    end
 
     existing_rules = list_existing_vm_policy_rules
 
@@ -93,7 +94,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def vm_rule_base_priority
-    @vm_rule_base_priority ||= VM_RULE_BASE_PRIORITY + (Zlib.crc32(vm.name) % VM_RULE_PRIORITY_RANGE)
+    @vm_rule_base_priority ||= begin
+      base = vm.nics.first&.nic_gcp_resource&.firewall_base_priority
+      raise "VM #{vm.name} NIC has no firewall_base_priority allocated" unless base
+      base
+    end
   end
 
   def vm_private_ip

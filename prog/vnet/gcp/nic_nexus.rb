@@ -8,15 +8,21 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
 
   subject_is :nic
 
+  VM_STRIDE = 64
+  VM_BASE = 10000
+  VM_MAX = 59999
+
   label def start
     register_deadline("wait", 5 * 60)
 
     ps = nic.private_subnet
-    NicGcpResource.create_with_id(
+    location_id = ps.location_id
+    nic_resource = NicGcpResource.create_with_id(
       nic.id,
       network_name: Prog::Vnet::Gcp::SubnetNexus.vpc_name(ps.location),
       subnet_name: "ubicloud-#{ps.ubid}"
     )
+    allocate_vm_firewall_priority(nic_resource, location_id)
 
     hop_allocate_static_ip
   end
@@ -107,5 +113,33 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
   rescue Google::Cloud::NotFoundError
     # Already released
+  end
+
+  def allocate_vm_firewall_priority(nic_resource, location_id)
+    used = DB[:nic_gcp_resource]
+      .where(location_id:)
+      .exclude(id: nic_resource.id)
+      .where(Sequel.~(firewall_base_priority: nil))
+      .select_map(:firewall_base_priority)
+      .to_set
+
+    slot = nil
+    (VM_BASE..VM_MAX).step(VM_STRIDE) do |p|
+      unless used.include?(p)
+        slot = p
+        break
+      end
+    end
+
+    raise "GCP VM firewall priority range exhausted for location #{location_id}" unless slot
+
+    nic_resource.update(firewall_base_priority: slot, location_id:)
+  rescue Sequel::UniqueConstraintViolation
+    begin
+      nic_resource.update(firewall_base_priority: nil)
+    rescue
+      nil
+    end
+    retry
   end
 end
