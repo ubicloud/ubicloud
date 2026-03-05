@@ -63,7 +63,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "raises when desired rules exceed VM_STRIDE" do
       # Build VM_STRIDE+1 rules (each from a different CIDR to produce one rule per CIDR)
-      rules = (0..described_class::VM_STRIDE).map do |i|
+      rules = (0..Prog::Vnet::Gcp::NicNexus::VM_STRIDE).map do |i|
         instance_double(FirewallRule, ip6?: false,
           cidr: NetAddr::IPv4Net.parse("10.#{i / 256}.#{i % 256}.0/24"),
           port_range: Sequel.pg_range(80..81), protocol: "tcp")

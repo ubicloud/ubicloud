@@ -8,9 +8,6 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   subject_is :vm
 
-  # Each VM gets a block of VM_STRIDE priority slots in the range 10000–59999.
-  VM_STRIDE = 64
-
   def before_run
     pop "firewall rule is added" if vm.destroy_set?
   end
@@ -23,8 +20,9 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     ip6_desired = build_desired_policy_rules(ip6_rules, ip6: true, priority_offset: ip4_desired.length)
     desired_rules = ip4_desired + ip6_desired
 
-    if desired_rules.length > VM_STRIDE
-      raise "VM #{vm.name} exceeds VM_STRIDE=#{VM_STRIDE} firewall rules (#{desired_rules.length})"
+    vm_stride = Prog::Vnet::Gcp::NicNexus::VM_STRIDE
+    if desired_rules.length > vm_stride
+      raise "VM #{vm.name} exceeds VM_STRIDE=#{vm_stride} firewall rules (#{desired_rules.length})"
     end
 
     existing_rules = list_existing_vm_policy_rules
