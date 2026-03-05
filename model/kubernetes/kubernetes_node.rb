@@ -115,8 +115,20 @@ class KubernetesNode < Sequel::Model
     vm.name
   end
 
+  # TLA \* Models KubernetesNode#pending_pvs: PVs with old-pvc-object annotation,
+  # TLA \* Retain reclaim policy, and nodeAffinity targeting this node.
+  # TLA \* The Retain filter (added in fix-chained-migration) excludes intermediate
+  # TLA \* PVs rolled back to Delete during chained migration.
+  # TLA PendingPVs(n) ==
+  # TLA     {v ∈ Volumes :
+  # TLA         ∧ migState[v] ∈ {MigPrepared, MigCopying, MigFailed, MigDone}
+  # TLA         ∧ migReclaimRetain[v] = TRUE
+  # TLA         ∧ migSource[v] = n}
   def pending_pvs
     pvs = JSON.parse(kubernetes_cluster.client.kubectl("get pv -ojson"))["items"]
+    # TLA \* migState ∈ {MigPrepared..MigDone} = old-pvc-object present
+    # TLA \* migReclaimRetain = TRUE              = reclaimPolicy == "Retain"
+    # TLA \* migSource = n                        = nodeAffinity targets this node
     pvs.select do |pv|
       pv.dig("metadata", "annotations", "csi.ubicloud.com/old-pvc-object") &&
         pv.dig("spec", "persistentVolumeReclaimPolicy") == "Retain" &&

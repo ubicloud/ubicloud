@@ -47,5 +47,6 @@ mise.local.toml
 proof/coverage
 proof/*.map
 proof/**/*.map
+proof/csi/states
 
 .agents

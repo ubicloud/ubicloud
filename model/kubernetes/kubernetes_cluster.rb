@@ -137,6 +137,10 @@ class KubernetesCluster < Sequel::Model
       k8s_client = client(session: session[:ssh_session])
       incr_sync_kubernetes_services if k8s_client.any_lb_services_modified?
 
+      # NOTE: PageStuckMigration, ResolveStuckMigration, and the MigStuck
+      # state are intentionally omitted from the TLA+ proof.  The proof
+      # assumes rsync is eventually reliable, so the retry budget and
+      # paging path cannot fire.  See proof/csi/header.tla for rationale.
       pvs = JSON.parse(k8s_client.kubectl("get pv -ojson"))["items"]
       stuck_pvs = pvs.select { Integer(it.dig("metadata", "annotations", "csi.ubicloud.com/migration-retry-count") || "0", 10) >= 3 }
 
