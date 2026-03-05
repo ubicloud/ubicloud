@@ -15,9 +15,11 @@ Sequel.migration do
       add_column :firewall_base_priority, Integer
     end
     run "CREATE UNIQUE INDEX nic_gcp_resource_location_firewall_base_priority_idx ON nic_gcp_resource (location_id, firewall_base_priority) WHERE firewall_base_priority IS NOT NULL"
+    run "ALTER TABLE nic_gcp_resource ADD CONSTRAINT nic_gcp_resource_firewall_base_priority_check CHECK (firewall_base_priority IS NULL OR (firewall_base_priority >= 10000 AND firewall_base_priority <= 59936 AND (firewall_base_priority - 10000) % 64 = 0))"
   end
 
   down do
+    run "ALTER TABLE nic_gcp_resource DROP CONSTRAINT IF EXISTS nic_gcp_resource_firewall_base_priority_check"
     run "DROP INDEX IF EXISTS nic_gcp_resource_location_firewall_base_priority_idx"
     alter_table(:nic_gcp_resource) do
       drop_column :firewall_base_priority
