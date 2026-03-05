@@ -303,7 +303,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       # We overwrite (rather than skip) because subnet allow rules only run
       # once during provisioning — skipping would permanently leave this
       # subnet without egress allow rules, breaking intra-subnet traffic.
-      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:)
+      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs: matcher_attrs[:layer4_configs])
         Clog.emit("GCP firewall priority collision, overwriting rule",
           {gcp_priority_collision: {priority:, direction:, action:}})
         op = credential.network_firewall_policies_client.patch_rule(
@@ -324,11 +324,16 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     end
   end
 
-  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:)
+  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:)
     existing.direction == direction &&
       existing.action == action &&
       (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
-      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort
+      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort &&
+      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs)
+  end
+
+  def normalize_layer4_configs(configs)
+    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort
   end
 
   # --- Destroy helpers ---

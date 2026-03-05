@@ -271,7 +271,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "skips creation when deny rules already exist and match" do
-      # Return rules that match the desired state (direction, action, src/dest ranges)
+      # Return rules that match the desired state (direction, action, src/dest ranges, layer4_configs)
+      all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
       expect(nfp_client).to receive(:get_rule).exactly(4).times do |args|
         prio = args[:priority]
         case prio
@@ -279,28 +280,32 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "INGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              src_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+              src_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+              layer4_configs: [all_proto]
             )
           )
         when 65533
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              dest_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+              dest_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"],
+              layer4_configs: [all_proto]
             )
           )
         when 65532
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "INGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              src_ip_ranges: ["fd20::/20"]
+              src_ip_ranges: ["fd20::/20"],
+              layer4_configs: [all_proto]
             )
           )
         when 65531
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              dest_ip_ranges: ["fd20::/20"]
+              dest_ip_ranges: ["fd20::/20"],
+              layer4_configs: [all_proto]
             )
           )
         end
@@ -427,25 +432,59 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "skips creation when rules already exist and match" do
       net4 = ps.net4.to_s
       net6 = ps.net6.to_s
+      all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
       expect(nfp_client).to receive(:get_rule).twice do |args|
         prio = args[:priority]
         if prio.even?
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "allow",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              src_ip_ranges: [net4], dest_ip_ranges: [net4]
+              src_ip_ranges: [net4], dest_ip_ranges: [net4],
+              layer4_configs: [all_proto]
             )
           )
         else
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "allow",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-              src_ip_ranges: [net6], dest_ip_ranges: [net6]
+              src_ip_ranges: [net6], dest_ip_ranges: [net6],
+              layer4_configs: [all_proto]
             )
           )
         end
       end
       expect(nfp_client).not_to receive(:add_rule)
+
+      expect { nx.create_subnet_allow_rules }.to hop("wait")
+    end
+
+    it "detects mismatch when rule has correct IPs but wrong protocol" do
+      net4 = ps.net4.to_s
+      net6 = ps.net6.to_s
+      tcp_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp")
+      wrong_proto_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        direction: "EGRESS", action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: [net4], dest_ip_ranges: [net4],
+          layer4_configs: [tcp_proto]
+        )
+      )
+      wrong_proto_rule6 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        direction: "EGRESS", action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: [net6], dest_ip_ranges: [net6],
+          layer4_configs: [tcp_proto]
+        )
+      )
+      expect(nfp_client).to receive(:get_rule).twice do |args|
+        args[:priority].even? ? wrong_proto_rule : wrong_proto_rule6
+      end
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-rule")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get).twice.and_return(done_op)
+      expect(nfp_client).to receive(:patch_rule).twice.and_return(op)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice
 
       expect { nx.create_subnet_allow_rules }.to hop("wait")
     end
