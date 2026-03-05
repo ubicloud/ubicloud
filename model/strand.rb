@@ -24,6 +24,23 @@ class Strand < Sequel::Model
     @subject = UBID.decode(ubid)
   end
 
+  # Wrapper class used for exceptions raised while running the strand.
+  # This is used to ensure that the strand that caused the exception is
+  # the strand logged, and any parent strands running the strand through
+  # reap are not logged.
+  class RunError < StandardError
+    attr_reader :strand
+
+    def initialize(strand)
+      @strand = strand
+      super("")
+    end
+  end
+
+  # Class raised for internal errors. These aren't wrapped in RunError.
+  class InternalError < RuntimeError
+  end
+
   RespirateMetrics = Struct.new(:scheduled, :scan_picked_up, :worker_started, :lease_checked, :lease_acquired, :queue_size, :available_workers, :old_strand, :lease_expired) do
     def scan_delay
       scan_picked_up - scheduled
@@ -110,13 +127,13 @@ SQL
     ensure
       if @deleted
         if exists?
-          fail "BUG: strand with @deleted set still exists in the database"
+          raise InternalError, "BUG: strand with @deleted set still exists in the database"
         end
       else
         begin
           unless RELEASE_LEASE_PS.call(id:, lease_time:) == 1
             Clog.emit("lease violated data", {lease_clear_debug_snapshot: this.all})
-            fail "BUG: lease violated"
+            raise InternalError, "BUG: lease violated"
           end
         ensure
           if @exited
@@ -149,7 +166,7 @@ SQL
     when /\AProg::(.*)\z/
       $1
     else
-      fail "BUG: prog must be in Prog module"
+      raise InternalError, "BUG: prog must be in Prog module"
     end
   end
 
@@ -228,7 +245,7 @@ SQL
       e
     rescue Prog::Base::Hop => hp
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("hopped", {strand_hopped: {duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
+      Clog.emit("hopped", {strand_hopped: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label, to: "#{hp.new_prog}.#{hp.new_label}"}})
       top_frame["last_label_changed_at"] = Time.now.to_s
       modified!(:stack)
 
@@ -237,7 +254,7 @@ SQL
       hp
     rescue Prog::Base::Exit => ext
       last_changed_at = Time.parse(top_frame["last_label_changed_at"])
-      Clog.emit("exited", {strand_exited: {duration: Time.now - last_changed_at, from: prog_label}})
+      Clog.emit("exited", {strand_exited: {strand: ubid, duration: Time.now - last_changed_at, from: prog_label}})
 
       update(exitval: ext.exitval, retval: nil)
       if parent_id
@@ -250,16 +267,26 @@ SQL
       end
 
       ext
+    rescue RunError, InternalError, Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+      raise
+    rescue => ex
+      # Do not wrap errors in pry
+      raise if Sshable.repl?
+
+      # Wrap errors in non-pry, and emit for the strand actually causing the error.
+      duration = Time.now - start_time
+      Clog.emit("exception terminates strand run", Util.exception_to_hash(ex, into: {strand_error: {strand: ubid, try:, duration:, from: prog_label}}))
+      raise RunError.new(self)
     else
-      fail "BUG: Prog #{prog}##{label} did not provide flow control"
+      raise InternalError, "BUG: Prog #{prog}##{label} did not provide flow control"
     end
   ensure
     duration = Time.now - start_time
-    Clog.emit("finished strand", [self, {strand_finished: {duration:, prog_label:}}]) if duration > 1
+    Clog.emit("finished strand", {strand_finished: {strand: ubid, try:, duration:, prog_label:}}) if duration > 1
   end
 
   def run(seconds = 0)
-    fail "already deleted" if @deleted
+    raise InternalError, "already deleted" if @deleted
 
     deadline = Time.now + seconds
     take_lease_and_reload do

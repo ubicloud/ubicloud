@@ -1404,6 +1404,22 @@ paths:
       - $ref: '#/components/parameters/postgres_database_reference'
     post:
       operationId: promotePostgresDatabase
+      summary: 'Promote a PostgreSQL read replica (deprecated, use promote-read-replica)'
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      deprecated: true
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/promote-read-replica':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: promoteReadReplicaPostgresDatabase
       summary: Promote a PostgreSQL read replica
       responses:
         '200':
@@ -1902,6 +1918,36 @@ paths:
     post:
       operationId: restartVM
       summary: Restart a VM
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/start':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    post:
+      operationId: startVM
+      summary: Start a VM
+      responses:
+        '200':
+          $ref: '#/components/responses/Vm'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Virtual Machine
+  '/project/{project_id}/location/{location}/vm/{vm_reference}/stop':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/vm_reference'
+    post:
+      operationId: stopVm
+      summary: Stop a VM
       responses:
         '200':
           $ref: '#/components/responses/Vm'
@@ -3660,6 +3706,9 @@ components:
                 type: string
               upgrade_status:
                 type: string
+              upgrade_stage:
+                type: string
+                nullable: true
             additionalProperties: false
             required:
               - current_version

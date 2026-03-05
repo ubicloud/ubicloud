@@ -22,11 +22,12 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
 
   it "shows upgrade status when database needs upgrade" do
     @pg.update(target_version: 17)
-    @pg.strand.children_dataset.where(prog: "Postgres::ConvergePostgresResource").first&.update(label: "start")
+    Strand.create(parent_id: @pg.strand.id, prog: "Postgres::ConvergePostgresResource", label: "start")
 
     output = cli(%W[pg #{@ref} show-upgrade-status])
     expect(output).to include("Major version upgrade of PostgreSQL database #{@pg.ubid} to version 17")
     expect(output).to include("Status: running")
+    expect(output).to include("Stage: start")
   end
 
   it "shows upgrade status when upgrade failed" do
@@ -36,5 +37,15 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
     output = cli(%W[pg #{@ref} show-upgrade-status])
     expect(output).to include("Major version upgrade of PostgreSQL database #{@pg.ubid} to version 17")
     expect(output).to include("Status: failed")
+    expect(output).to include("Stage: upgrade_failed")
+  end
+
+  it "shows upgrade stage N/A when strand unavailable" do
+    @pg.update(target_version: 17)
+
+    output = cli(%W[pg #{@ref} show-upgrade-status])
+    expect(output).to include("Major version upgrade of PostgreSQL database #{@pg.ubid} to version 17")
+    expect(output).to include("Status: running")
+    expect(output).to include("Stage: N/A")
   end
 end

@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 class MonitorableResource
-  attr_reader :deleted, :resource
+  attr_reader :deleted, :resource, :attached_resources
   attr_accessor :monitor_job_started_at, :monitor_job_finished_at
+  attr_writer :session
 
   def initialize(resource)
     @resource = resource
@@ -11,6 +12,14 @@ class MonitorableResource
     @pulse_check_started_at = Time.now
     @pulse_thread = nil
     @deleted = false
+    if resource.is_a?(VmHost)
+      @attached_resources = {}
+      @attached_resources_mutex = Mutex.new
+    end
+  end
+
+  def attached_resources_sync(&)
+    @attached_resources_mutex.synchronize(&)
   end
 
   def open_resource_session
@@ -65,12 +74,48 @@ class MonitorableResource
         @session.merge!(@resource.init_health_monitor_session)
         retry
       end
-      Clog.emit("Pulse checking has failed.", {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
+
+      begin
+        @resource.reload
+      rescue Sequel::NoExistingObject
+        @deleted = true
+        Clog.emit("Resource is deleted.", {resource_deleted: {ubid: resource.ubid}})
+      else
+        Clog.emit("Pulse checking has failed.", {pulse_check_failure: Util.exception_to_hash(ex, into: {ubid: @resource.ubid})})
+      end
       # TODO: Consider raising the exception here, and let the caller handle it.
     end
 
     run_event_loop = false
     pulse_thread&.join
     @session = nil if event_loop_failed
+
+    return unless @session && @session[:ssh_session] && @attached_resources
+
+    delete_attached_resource_ids = []
+
+    attached_resources_sync { @attached_resources.values }.each do |resource|
+      resource.session = @session
+      resource.check_pulse
+      unless @session[:ssh_session]
+        # If checking the pulse for an attached resource drops the SSH session,
+        # remove the resource temporarily. It will be added back on the next scan
+        # (within 60s).  Also emit a log message so we can track this information.
+        # This is done so a problem with a particular attached resource does not
+        # cause monitoring to stop for all attached resources following it.
+        delete_attached_resource_ids << resource.resource.id
+        Clog.emit("monitor VmHost worker SSH connection lost", {monitor_vm_host_ssh_connection_lost: {host: @resource.ubid, resource: resource.resource.ubid}})
+        break
+      end
+      delete_attached_resource_ids << resource.resource.id if resource.deleted
+    end
+
+    attached_resources_sync do
+      delete_attached_resource_ids.each do
+        @attached_resources.delete(it)
+      end
+    end
+
+    nil
   end
 end

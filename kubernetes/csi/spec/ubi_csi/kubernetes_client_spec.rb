@@ -47,6 +47,12 @@ RSpec.describe Csi::KubernetesClient do
       expect { client.run_kubectl(*args) }.to raise_error(ObjectNotFoundError, "resource not found")
     end
 
+    it "raises AlreadyExistsError for 'already exists' failures" do
+      pvc = {"metadata" => {"name" => "test-pvc"}}
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(pvc)).and_return(["persistentvolumeclaims \"test-pvc\" already exists", failure_status])
+      expect { client.create_pvc(pvc) }.to raise_error(AlreadyExistsError)
+    end
+
     it "raises generic error for other failures" do
       expect(client).to receive(:run_cmd).and_return(["other error", failure_status]).at_least(:once)
       expect { client.run_kubectl(*args) }.to raise_error(/Command failed: kubectl get pods/)
@@ -183,6 +189,57 @@ RSpec.describe Csi::KubernetesClient do
       expect(result["metadata"]["name"]).to eq("pv2")
 
       expect { client.find_pv_by_volume_id("vol-999") }.to raise_error(ObjectNotFoundError)
+    end
+  end
+
+  describe "#find_retained_pv_for_pvc" do
+    let(:success_status) { instance_double(Process::Status, success?: true) }
+    let(:retained_pv) do
+      {
+        "metadata" => {
+          "name" => "old-pv-123",
+          "annotations" => {"csi.ubicloud.com/old-pvc-object" => "base64data"}
+        },
+        "spec" => {
+          "persistentVolumeReclaimPolicy" => "Retain",
+          "claimRef" => {"namespace" => "default", "name" => "test-pvc"}
+        }
+      }
+    end
+
+    it "returns the matching retained PV" do
+      pv_list = {"items" => [retained_pv]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+
+      result = client.find_retained_pv_for_pvc("default", "test-pvc")
+      expect(result["metadata"]["name"]).to eq("old-pv-123")
+    end
+
+    it "returns nil when no PV has the old-pvc-object annotation" do
+      pv_list = {"items" => [
+        {"metadata" => {"name" => "pv1", "annotations" => {}}, "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+      ]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+
+      expect(client.find_retained_pv_for_pvc("default", "test-pvc")).to be_nil
+    end
+
+    it "returns nil when PV has wrong claimRef" do
+      pv = retained_pv.dup
+      pv["spec"] = retained_pv["spec"].merge("claimRef" => {"namespace" => "other-ns", "name" => "other-pvc"})
+      pv_list = {"items" => [pv]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+
+      expect(client.find_retained_pv_for_pvc("default", "test-pvc")).to be_nil
+    end
+
+    it "returns nil when PV reclaim policy is not Retain" do
+      pv = retained_pv.dup
+      pv["spec"] = retained_pv["spec"].merge("persistentVolumeReclaimPolicy" => "Delete")
+      pv_list = {"items" => [pv]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+
+      expect(client.find_retained_pv_for_pvc("default", "test-pvc")).to be_nil
     end
   end
 

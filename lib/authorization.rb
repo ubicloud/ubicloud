@@ -7,17 +7,36 @@ module Authorization
     end
   end
 
-  def self.has_permission?(project_id, subject_id, actions, object_id)
+  extend self
+
+  def has_permission?(project_id, subject_id, actions, object_id)
     !matched_policies_dataset(project_id, subject_id, actions, object_id).empty?
   end
 
-  def self.authorize(project_id, subject_id, actions, object_id)
-    unless has_permission?(project_id, subject_id, actions, object_id)
+  # Add private alias, for internal calls. This allows classes including
+  # Authorization to override has_permission? to accept different arguments.
+  private alias_method(:_has_permission?, :has_permission?)
+
+  def authorize(project_id, subject_id, actions, object_id)
+    unless _has_permission?(project_id, subject_id, actions, object_id)
       fail Unauthorized
     end
   end
 
-  def self.all_permissions(project_id, subject_id, object_id)
+  def allowed_accounts_dataset(project_id, actions, object_id)
+    DB[:accounts]
+      .with(:subject_ids, matched_policies_dataset(project_id, nil, actions, object_id).select(:subject_id))
+      .with_recursive(:rec_subject_ids,
+        DB[:applied_subject_tag].select(:subject_id, 0).where(tag_id: DB[:subject_ids]),
+        DB[:applied_subject_tag].join(:rec_subject_ids, subject_id: :tag_id)
+          .select(Sequel[:applied_subject_tag][:subject_id], Sequel[:level] + 1)
+          .where { level < Config.recursive_tag_limit },
+        args: [:subject_id, :level],
+        cycle: {columns: :subject_id})
+      .where(Sequel.or([DB[:subject_ids], DB[:rec_subject_ids].exclude(:is_cycle).select(:subject_id)].map { [:id, it] }))
+  end
+
+  def all_permissions(project_id, subject_id, object_id)
     DB[:action_type]
       .with(:action_ids, matched_policies_dataset(project_id, subject_id, nil, object_id).select(:action_id))
       .with_recursive(:rec_action_ids,
@@ -31,13 +50,19 @@ module Authorization
       .select_order_map(:name)
   end
 
+  private def ace_base_query(project_id)
+    DB[:access_control_entry]
+      .where(project_id:)
+  end
+
   # Used to avoid dynamic symbol creation at runtime
   RECURSIVE_TAG_QUERY_MAP = {
     subject: [:applied_subject_tag, :subject_id],
     action: [:applied_action_tag, :action_id],
     object: [:applied_object_tag, :object_id]
   }.freeze
-  private_class_method def self.recursive_tag_query(type, values, project_id: nil)
+  RECURSIVE_TAG_QUERY_MAP.each_value(&:freeze)
+  private def recursive_tag_query(type, values, project_id: nil)
     table, column = RECURSIVE_TAG_QUERY_MAP.fetch(type, values)
 
     base_ds = DB[table]
@@ -63,13 +88,15 @@ module Authorization
       .select(:tag_id)
   end
 
-  def self.matched_policies_dataset(project_id, subject_id, actions = nil, object_id = nil)
+  def matched_policies_dataset(project_id, subject_id = nil, actions = nil, object_id = nil)
     project_id = project_id.id if project_id.is_a?(Project)
-    subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
 
-    dataset = DB[:access_control_entry]
-      .where(project_id:)
-      .where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+    dataset = ace_base_query(project_id)
+
+    if subject_id
+      subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
+      dataset = dataset.where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+    end
 
     if actions
       actions = Array(actions).map { ActionType::NAME_MAP.fetch(it) }
@@ -118,18 +145,18 @@ module Authorization
     dataset
   end
 
-  def self.matched_policies(project_id, subject_id, actions = nil, object_id = nil)
+  def matched_policies(project_id, subject_id, actions = nil, object_id = nil)
     matched_policies_dataset(project_id, subject_id, actions, object_id).all
   end
 
-  def self.dataset_authorize(dataset, project_id, subject_id, actions)
+  def dataset_authorize(dataset, project_id, subject_id, actions)
     # We can't use "id" column directly, because it's ambiguous in big joined queries.
     # We need to determine table of id explicitly.
     from = dataset.opts[:from].first
 
     ds = DB[:object_ids]
       .with_recursive(:object_ids,
-        Authorization.matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
+        matched_policies_dataset(project_id, subject_id, actions).select(:object_id, 0),
         DB[:applied_object_tag].join(:object_ids, object_id: :tag_id)
           .select(Sequel[:applied_object_tag][:object_id], Sequel[:level] + 1)
           .where { level < Config.recursive_tag_limit },

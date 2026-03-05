@@ -42,10 +42,10 @@ gem "rodauth-omniauth", ">= 0.6.2"
 gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
-gem "sequel", github: "jeremyevans/sequel", ref: "4bce3850a2b0199e3ad57dc80abe8b907f956fcd"
+gem "sequel", github: "jeremyevans/sequel", ref: "1540a8f3a9522e307605adab2e2f85023a319711"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "shellwords"
-gem "stripe"
+gem "stripe", ">= 13"
 gem "tilt", ">= 2.6.1"
 gem "warning"
 gem "webauthn"
@@ -67,7 +67,7 @@ group :development do
 end
 
 group :rubocop do
-  gem "rubocop-capybara", "< 2.22"
+  gem "rubocop-capybara"
   gem "rubocop-erb"
   gem "rubocop-performance"
   gem "rubocop-rake"

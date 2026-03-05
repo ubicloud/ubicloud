@@ -20,6 +20,8 @@ module Csi
       VOLUME_BASE_PATH = "/var/lib/ubicsi"
       OLD_PV_NAME_ANNOTATION_KEY = "csi.ubicloud.com/old-pv-name"
       OLD_PVC_OBJECT_ANNOTATION_KEY = "csi.ubicloud.com/old-pvc-object"
+      MIGRATION_RETRY_COUNT_ANNOTATION_KEY = "csi.ubicloud.com/migration-retry-count"
+      MAX_MIGRATION_RETRIES = 3
       ACCEPTABLE_FS = ["ext4", "xfs"].freeze
 
       def self.mkdir_p
@@ -124,9 +126,21 @@ module Csi
       end
 
       def fetch_and_migrate_pvc(req_id, client, req)
-        pvc = client.get_pvc(req.volume_context["csi.storage.k8s.io/pvc/namespace"],
-          req.volume_context["csi.storage.k8s.io/pvc/name"])
+        pvc_namespace = req.volume_context["csi.storage.k8s.io/pvc/namespace"]
+        pvc_name = req.volume_context["csi.storage.k8s.io/pvc/name"]
+        pvc = client.get_pvc(pvc_namespace, pvc_name)
         if pvc_needs_migration?(pvc)
+          migrate_pvc_data(req_id, client, pvc, req)
+
+        # Fallback: during node drain, recreate_pvc may race with the StatefulSet controller,
+        # which can recreate the PVC without the migration annotation. The old PV's
+        # old-pvc-object annotation is set before any PVC deletion, so check it as a safety net.
+        elsif (old_pv = client.find_retained_pv_for_pvc(pvc_namespace, pvc_name))
+          old_pv_name = old_pv.dig("metadata", "name")
+          log_with_id(req_id, "PVC missing migration annotation, found retained PV: #{old_pv_name}")
+          pvc["metadata"]["annotations"] ||= {}
+          pvc["metadata"]["annotations"][OLD_PV_NAME_ANNOTATION_KEY] = old_pv_name
+          client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, old_pv_name, namespace: pvc_namespace)
           migrate_pvc_data(req_id, client, pvc, req)
         end
         pvc
@@ -220,6 +234,9 @@ module Csi
         case run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", daemonizer_unit_name, req_id:)
         when "Succeeded"
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
+          if pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY)
+            client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, nil)
+          end
         when "NotStarted"
           copy_command = ["rsync", "-az", "--inplace", "--compress-level=9", "--partial", "--whole-file", "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519", "ubi@#{old_node_ip}:#{old_data_path}", current_data_path]
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", daemonizer_unit_name, *copy_command, req_id:)
@@ -227,7 +244,15 @@ module Csi
         when "InProgress"
           raise CopyNotFinishedError, "Old PV data is not copied yet"
         when "Failed"
-          raise "Copy old PV data failed"
+          retry_count = Integer(pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY) || "0", 10)
+          if retry_count >= MAX_MIGRATION_RETRIES
+            raise "Migration copy failed after #{MAX_MIGRATION_RETRIES} attempts, please contact support"
+          end
+          retry_count += 1
+          client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, retry_count.to_s)
+          run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
+          log_with_id(req_id, "Migration copy failed, retrying (attempt #{retry_count})")
+          raise CopyNotFinishedError, "Old PV data copy failed, retrying (attempt #{retry_count})"
         else
           raise "Daemonizer2 returned unknown status"
         end
@@ -300,8 +325,14 @@ module Csi
             client.remove_pvc_finalizers(pvc_namespace, pvc_name)
             log_with_id(req_id, "Removed PVC finalizers #{pvc_namespace}/#{pvc_name}")
           end
-          client.create_pvc(pvc)
-          log_with_id(req_id, "Recreated PVC with the new spec")
+          begin
+            client.create_pvc(pvc)
+          rescue AlreadyExistsError
+            log_with_id(req_id, "PVC already recreated by StatefulSet controller, patching migration annotation")
+            client.patch_resource("pvc", pvc_name, OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace: pvc_namespace)
+          else
+            log_with_id(req_id, "Recreated PVC with the new spec")
+          end
         else
           # PVC is recreated now.
           # At this stage we don't know whether we have created the PVC or

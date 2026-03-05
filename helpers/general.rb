@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 class Clover < Roda
+  include Authorization
+
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
@@ -119,7 +121,7 @@ class Clover < Roda
     detach_vm
     disassociate
     disconnect
-    promote
+    promote_read_replica
     recycle
     remove_account
     remove_member
@@ -128,13 +130,15 @@ class Clover < Roda
     restore
     restrict
     set_maintenance_window
+    start
+    stop
     unrestrict
     update
     update_billing
     update_invitation
     upgrade
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote recycle reset_superuser_password restart restore update cancel_storage_auto_scale]).freeze
+  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote_read_replica recycle reset_superuser_password restart restore update cancel_storage_auto_scale]).freeze
 
   def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
@@ -237,26 +241,26 @@ class Clover < Roda
       fail Authorization::Unauthorized unless has_project_permission(actions)
     else
       each_authorization_id do |id|
-        Authorization.authorize(@project, id, actions, object_id)
+        super(@project, id, actions, object_id)
       end
     end
   end
 
   def has_permission?(actions, object_id)
     each_authorization_id.all? do |id|
-      Authorization.has_permission?(@project, id, actions, object_id)
+      super(@project, id, actions, object_id)
     end
   end
 
   def all_permissions(object_id)
     each_authorization_id.map do |id|
-      Authorization.all_permissions(@project, id, object_id)
+      super(@project, id, object_id)
     end.reduce(:&)
   end
 
   def dataset_authorize(ds, actions)
     each_authorization_id do |id|
-      ds = Authorization.dataset_authorize(ds, @project.id, id, actions)
+      ds = super(ds, @project.id, id, actions)
     end
     ds
   end

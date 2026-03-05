@@ -173,7 +173,6 @@ RSpec.describe Csi::V1::NodeService do
   end
 
   describe "#fetch_and_migrate_pvc" do
-    let(:client) { instance_double(Csi::KubernetesClient) }
     let(:req) do
       Csi::V1::NodeStageVolumeRequest.new(
         volume_context: {
@@ -182,25 +181,46 @@ RSpec.describe Csi::V1::NodeService do
         }
       )
     end
+    let(:success_status) { instance_double(Process::Status, success?: true) }
 
     it "migrates PVC data when migration is needed" do
       pvc_with_migration = {"metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv"}}}
-      expect(client).to receive(:get_pvc).with("default", "test-pvc").and_return(pvc_with_migration)
-      expect(service).to receive(:pvc_needs_migration?).with(pvc_with_migration).and_return(true)
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_with_migration), success_status])
       expect(service).to receive(:migrate_pvc_data).with(req_id, client, pvc_with_migration, req)
 
       result = service.fetch_and_migrate_pvc(req_id, client, req)
       expect(result).to eq(pvc_with_migration)
     end
 
-    it "does not migrate PVC data when not needed" do
-      pvc_with_migration = {"metadata" => {"annotations" => {}}}
-      expect(client).to receive(:get_pvc).with("default", "test-pvc").and_return(pvc_with_migration)
-      expect(service).to receive(:pvc_needs_migration?).with(pvc_with_migration).and_return(false)
-      expect(service).not_to receive(:migrate_pvc_data).with(req_id, client, pvc_with_migration, req)
+    it "does not migrate PVC data when not needed and no retained PV exists" do
+      pvc_without_migration = {"metadata" => {"annotations" => {}}}
+      pv_list = {"items" => [
+        {"metadata" => {"name" => "pvc-abc", "annotations" => {}},
+         "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+      ]}
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_migration), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+      expect(service).not_to receive(:migrate_pvc_data)
 
       result = service.fetch_and_migrate_pvc(req_id, client, req)
-      expect(result).to eq(pvc_with_migration)
+      expect(result).to eq(pvc_without_migration)
+    end
+
+    it "migrates PVC data via fallback when PVC lacks annotation but retained PV exists" do
+      pvc_without_annotation = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {}}}
+      retained_pv = {"metadata" => {"name" => "old-pv-123", "annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
+                     "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+      pv_list = {"items" => [retained_pv]}
+      pvc_annotation_patch = {metadata: {annotations: {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}.to_json
+
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_annotation), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "patch", "pvc", "test-pvc", "--type=merge", "-p", pvc_annotation_patch, stdin_data: nil).and_return(["patched", success_status])
+      expected_pvc = {"metadata" => {"namespace" => "default", "name" => "test-pvc", "annotations" => {"csi.ubicloud.com/old-pv-name" => "old-pv-123"}}}
+      expect(service).to receive(:migrate_pvc_data).with(req_id, client, expected_pvc, req)
+
+      result = service.fetch_and_migrate_pvc(req_id, client, req)
+      expect(result.dig("metadata", "annotations", "csi.ubicloud.com/old-pv-name")).to eq("old-pv-123")
     end
   end
 
@@ -507,6 +527,9 @@ RSpec.describe Csi::V1::NodeService do
     end
     let(:pv) do
       {
+        "metadata" => {
+          "annotations" => {}
+        },
         "spec" => {
           "csi" => {
             "volumeHandle" => "vol-old-123"
@@ -521,6 +544,18 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
       expect(service).to receive(:run_cmd_output).and_return("Succeeded")
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+
+      service.migrate_pvc_data(req_id, client, pvc, req)
+    end
+
+    it "cleans up retry count annotation on Succeeded" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "2"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+      expect(service).to receive(:run_cmd_output).and_return("Succeeded")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", nil)
 
       service.migrate_pvc_data(req_id, client, pvc, req)
     end
@@ -553,8 +588,34 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
 
       expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", "1")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
 
-      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(RuntimeError, "Copy old PV data failed")
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data copy failed, retrying (attempt 1)")
+    end
+
+    it "increments retry count on subsequent failures" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "2"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+      expect(client).to receive(:patch_resource).with("pv", "old-pv-123", "csi.ubicloud.com/migration-retry-count", "3")
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", "copy_old-pv-123", req_id:)
+
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(CopyNotFinishedError, "Old PV data copy failed, retrying (attempt 3)")
+    end
+
+    it "raises a hard error after exceeding max retries" do
+      pv["metadata"]["annotations"]["csi.ubicloud.com/migration-retry-count"] = "3"
+      expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
+      expect(client).to receive(:extract_node_from_pv).with(pv).and_return("worker-1")
+      expect(client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1")
+
+      expect(service).to receive(:run_cmd_output).with("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", "copy_old-pv-123", req_id:).and_return("Failed")
+
+      expect { service.migrate_pvc_data(req_id, client, pvc, req) }.to raise_error(RuntimeError, "Migration copy failed after 3 attempts, please contact support")
     end
 
     it "handles migration when daemonizer check returns unknown status" do
@@ -826,6 +887,25 @@ RSpec.describe Csi::V1::NodeService do
       expect(client).to receive(:get_pvc).with(namespace, pvc_name).and_return(pvc)
       expect(client).to receive(:patch_resource).with("pv", pv_name, Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY, "base64_content")
       expect(client).to receive(:patch_resource).with("pvc", pvc_name, Csi::V1::NodeService::OLD_PV_NAME_ANNOTATION_KEY, pv_name, namespace:)
+
+      service.recreate_pvc(req_id, client, pv)
+    end
+
+    it "patches annotation when create_pvc fails with AlreadyExistsError" do
+      success = instance_double(Process::Status, success?: true)
+      failure = instance_double(Process::Status, success?: false)
+      pvc_yaml = YAML.dump(pvc)
+      pv_patch = {metadata: {annotations: {Csi::V1::NodeService::OLD_PVC_OBJECT_ANNOTATION_KEY => "base64_content"}}}.to_json
+      pvc_finalizer_patch = {metadata: {finalizers: nil}}.to_json
+      pvc_annotation_patch = {metadata: {annotations: {Csi::V1::NodeService::OLD_PV_NAME_ANNOTATION_KEY => pv_name}}}.to_json
+
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "get", "pvc", pvc_name, "-oyaml", stdin_data: nil).and_return([pvc_yaml, success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "patch", "pv", pv_name, "--type=merge", "-p", pv_patch, stdin_data: nil).and_return(["patched", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "delete", "pvc", pvc_name, "--wait=false", "--ignore-not-found=true", stdin_data: nil).and_return(["deleted", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "get", "pvc", pvc_name, "-oyaml", stdin_data: nil).and_return([pvc_yaml, success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "patch", "pvc", pvc_name, "--type=merge", "-p", pvc_finalizer_patch, stdin_data: nil).and_return(["patched", success])
+      expect(Open3).to receive(:capture2e).with("kubectl", "create", "-f", "-", stdin_data: YAML.dump(service.trim_pvc(pvc.dup, pv_name))).and_return(["pvc already exists", failure])
+      expect(Open3).to receive(:capture2e).with("kubectl", "-n", namespace, "patch", "pvc", pvc_name, "--type=merge", "-p", pvc_annotation_patch, stdin_data: nil).and_return(["patched", success])
 
       service.recreate_pvc(req_id, client, pv)
     end

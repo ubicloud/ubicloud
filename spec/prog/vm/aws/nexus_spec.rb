@@ -334,6 +334,7 @@ usermod -L ubuntu
           enable_resource_name_dns_a_record: false,
           enable_resource_name_dns_aaaa_record: false
         },
+        metadata_options: {http_tokens: "required"},
         min_count: 1,
         max_count: 1,
         tag_specifications: Util.aws_tag_specifications("instance", vm.name),

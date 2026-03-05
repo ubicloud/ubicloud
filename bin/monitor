@@ -42,19 +42,23 @@ if Config.test?
   monitor_models = [MonitorResourceStub]
   metric_export_models = [MonitorResourceStub]
   runner_args = {scan_every: 1, report_every: 1, enqueue_every: 1, check_stuck_pulses_every: 1}
+  host_attached_types = []
 else
   runner_args = {ignore_threads: 2}
   monitor_models = [
     VmHost,
     PostgresServer,
-    Vm.exclude(vm_host_id: nil).exclude(unix_user: "runneradmin").eager(:vm_host, :sshable, :vm_storage_volumes),
     MinioServer,
     GithubRunner.exclude(ready_at: nil),
-    VmHostSlice.eager(:vm_host),
     LoadBalancerVmPort,
     KubernetesCluster,
     VictoriaMetricsServer,
     KubernetesNode.eager(:vm, :kubernetes_cluster)
+  ]
+  host_attached_types = [
+    Vm.exclude(unix_user: "runneradmin").eager(:vm_storage_volumes)
+      .exclude(Strand.where(id: Sequel[:vm][:id], label: %w[stopped stopped_by_admin unavailable]).exists),
+    VmHostSlice.exclude(id: Vm.where(unix_user: "runneradmin").exclude(vm_host_slice_id: nil).select(:vm_host_slice_id))
   ]
 
   metric_export_models = [
@@ -69,6 +73,7 @@ monitor_resources = MonitorResourceType.create(
   monitor_pulse_info,
   Config.max_health_monitor_threads,
   monitor_models,
+  host_attached_types:,
   &:check_pulse
 )
 metric_export_resources = MonitorResourceType.create(
@@ -83,7 +88,15 @@ repartitioner = Repartitioner.new(partition_number:, channel: :monitor, listen_t
 
 runner = MonitorRunner.new(monitor_resources:, metric_export_resources:, repartitioner:, **runner_args)
 
-repartition_thread = Thread.new { repartitioner.listen }
+repartition_thread = Thread.new do
+  repartitioner.listen
+rescue Sequel::DatabaseDisconnectError, Sequel::DatabaseConnectionError
+  sleep(1 + rand)
+  retry
+rescue => ex
+  Clog.emit("unexpected monitor repartition thread failure", Util.exception_to_hash(ex))
+  raise
+end
 
 # Only NOTIFY for the first 3-5 seconds, so that by the time we actually start monitoring,
 # all monitor processes know the expected partitioning. The rand is to avoid thundering herd issues.

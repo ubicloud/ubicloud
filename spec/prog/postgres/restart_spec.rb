@@ -6,8 +6,8 @@ RSpec.describe Prog::Postgres::Restart do
   subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-project") }
-  let(:postgres_resource) { create_postgres_resource(location_id:) }
-  let(:postgres_timeline) { create_postgres_timeline }
+  let(:postgres_resource) { create_postgres_resource(project:, location_id:) }
+  let(:postgres_timeline) { create_postgres_timeline(location_id:) }
   let(:postgres_server) { create_postgres_server(resource: postgres_resource, timeline: postgres_timeline) }
   let(:st) { postgres_server.strand }
   let(:server) { nx.postgres_server }
@@ -40,7 +40,7 @@ RSpec.describe Prog::Postgres::Restart do
   describe "#restart" do
     it "runs restart command when not started" do
       expect(sshable).to receive(:d_check).with("postgres_restart").and_return("NotStarted")
-      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", "16")
+      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", "17")
       expect { nx.restart }.to nap(5)
     end
 

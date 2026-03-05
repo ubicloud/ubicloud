@@ -27,9 +27,39 @@ RSpec.describe Vm do
       expect(vm.display_state).to eq("restarting")
     end
 
-    it "returns stopped if stop semaphore increased" do
+    it "returns starting if start semaphore increased" do
+      vm.incr_start
+      expect(vm.display_state).to eq("starting")
+    end
+
+    it "returns starting if at start_after_stop_label" do
+      vm.strand.update(label: "start_after_stop")
+      expect(vm.display_state).to eq("starting")
+    end
+
+    it "returns stopping if stop semaphore increased" do
       vm.incr_stop
+      expect(vm.display_state).to eq("stopping")
+    end
+
+    it "returns stopping if stopping semaphore increased" do
+      vm.incr_stopping
+      expect(vm.display_state).to eq("stopping")
+    end
+
+    it "returns stopped if at stopped label" do
+      vm.strand.update(label: "stopped")
       expect(vm.display_state).to eq("stopped")
+    end
+
+    it "returns stopped by admin if admin_stop semaphore increased" do
+      vm.incr_admin_stop
+      expect(vm.display_state).to eq("stopped by admin")
+    end
+
+    it "returns unavailable if strand is at unavailable label" do
+      vm.strand.update(label: "unavailable")
+      expect(vm.display_state).to eq("unavailable")
     end
 
     it "returns waiting for capacity if semaphore increased" do
@@ -194,16 +224,6 @@ RSpec.describe Vm do
       vm2 = create_vm(project_id: project.id, name: "vm-ipv4-test-2")
       nic2.update(vm_id: vm2.id)
       expect(vm2.private_ipv4.to_s).to eq("10.10.240.1")
-    end
-  end
-
-  describe "#init_health_monitor_session" do
-    it "initiates a new health monitor session" do
-      vmh = create_vm_host
-      vm = create_vm(vm_host_id: vmh.id)
-      sshable = vm.vm_host.sshable
-      expect(sshable).to receive(:start_fresh_session)
-      vm.init_health_monitor_session
     end
   end
 

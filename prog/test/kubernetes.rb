@@ -3,8 +3,6 @@
 require_relative "../../lib/util"
 
 class Prog::Test::Kubernetes < Prog::Test::Base
-  semaphore :destroy
-
   MIGRATION_TRIES = 2
 
   def self.assemble
@@ -225,6 +223,30 @@ STS
       update_stack({"fail_message" => e.message})
       hop_destroy_kubernetes
     end
+    hop_test_rsync_retry
+  end
+
+  label def test_rsync_retry
+    client = kubernetes_cluster.client
+    nodepool.nodes.each { client.kubectl("uncordon :name", name: it.name) }
+    pod_node_name = client.kubectl("get pods ubuntu-statefulset-0 -ojsonpath={.spec.nodeName}").strip
+    client.kubectl("cordon :pod_node_name", pod_node_name:)
+    client.kubectl("delete pod ubuntu-statefulset-0 --wait=false")
+    update_stack({"rsync_retry_source_node" => pod_node_name})
+    hop_kill_rsync_process
+  end
+
+  label def kill_rsync_process
+    source_node_name = strand.stack.first["rsync_retry_source_node"]
+    target_node = nodepool.nodes.find { it.name != source_node_name }
+    nap 1 if target_node.vm.sshable.cmd("pgrep rsync || true").strip.empty?
+    target_node.vm.sshable.cmd("sudo pkill -9 rsync")
+    hop_verify_rsync_retry
+  end
+
+  label def verify_rsync_retry
+    nap 5 unless pod_status == "Running"
+    verify_data_hashes("rsync retry")
     hop_test_node_not_deleted_during_copy
   end
 
@@ -303,10 +325,10 @@ STS
 
   label def destroy_kubernetes
     kubernetes_cluster.incr_destroy
-    hop_destroy
+    hop_finish
   end
 
-  label def destroy
+  label def finish
     nap 5 if kubernetes_cluster
     kubernetes_test_project.destroy
 
@@ -393,7 +415,16 @@ STS
   # to keep the query simple, we let the kubectl do the processing and observe the system from the eyes of a
   # customer. This also keeps the logic simpler
   def pod_status
-    kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
+    status = kubernetes_cluster.client.kubectl("get pods ubuntu-statefulset-0 | grep -v NAME | awk '{print $3}'").strip
+    if status != "Running"
+      client = kubernetes_cluster.client
+      Clog.emit("pod not running", {
+        pod_status: status,
+        events: begin; client.kubectl("get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp"); rescue => e; e.message; end,
+        pv_pvc: begin; client.kubectl("get pv,pvc"); rescue => e; e.message; end
+      })
+    end
+    status
   end
 
   def verify_data_hashes(context)

@@ -3,13 +3,14 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Test::GithubRunner do
-  subject(:gr_test) { described_class.new(described_class.assemble([{"name" => "github_runner_ubuntu_2204", "images" => ["github-ubuntu-2204"], "details" => {"repo_name" => "tahcloud/github-e2e-tests", "workflow_name" => "test_2204.yml", "branch_name" => "main"}}])) }
+  subject(:gr_test) {
+    described_class.new(described_class.assemble([{"name" => "github_runner_ubuntu_2204"}]))
+  }
 
   let(:client) { instance_double(Octokit::Client) }
 
   before do
-    expect(Config).to receive(:github_runner_service_project_id).and_return("fabd95f8-d002-8ed2-9f4c-00625eb7f574")
-    expect(Config).to receive(:vm_pool_project_id).and_return("c3fd495f-9888-82d2-8100-7fae94e87e27")
+    allow(Config).to receive_messages(github_runner_service_project_id: "fabd95f8-d002-8ed2-9f4c-00625eb7f574", vm_pool_project_id: "c3fd495f-9888-82d2-8100-7fae94e87e27")
     expect(Config).to receive(:e2e_github_installation_id).and_return(123456).at_least(:once)
     allow(Github).to receive(:installation_client).with(Config.e2e_github_installation_id, auto_paginate: true).and_return(client)
   end
@@ -24,8 +25,12 @@ RSpec.describe Prog::Test::GithubRunner do
       described_class.assemble([], provider: "aws")
       expect(Location[location_id]).not_to be_nil
       expect(LocationCredential[location_id].access_key).to eq("access_key")
-      expect(LocationCredential[location_id].access_key).to eq("access_key")
       expect(GithubInstallation.first.project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
+    end
+
+    it "assembles labels based on test case names" do
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}])
+      expect(strand.stack.first["labels"]).to eq(["ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404"])
     end
   end
 
@@ -34,29 +39,29 @@ RSpec.describe Prog::Test::GithubRunner do
       expect { gr_test.start }.to hop("create_vm_pool")
     end
 
-    it "hops to trigger_test_runs when provider is aws" do
+    it "hops to trigger_test_run when provider is aws" do
       expect(gr_test).to receive(:frame).and_return({"provider" => "aws"})
-      expect { gr_test.start }.to hop("trigger_test_runs")
+      expect { gr_test.start }.to hop("trigger_test_run")
     end
   end
 
   describe "#create_vm_pool" do
     it "creates pool and hops to wait_vm_pool_to_be_ready" do
-      label_data = Github.runner_labels["ubicloud"]
+      label_data = Github.runner_labels["ubicloud-standard-2-ubuntu-2204"]
       expect(Prog::Vm::VmPool).to receive(:assemble)
-        .with(hash_including(size: 1, vm_size: label_data["vm_size"]))
+        .with(hash_including(size: 2, vm_size: label_data["vm_size"]))
         .and_return(instance_double(Strand, subject: instance_double(VmPool, id: 12345)))
       expect { gr_test.create_vm_pool }.to hop("wait_vm_pool_to_be_ready")
     end
   end
 
   describe "#wait_vm_pool_to_be_ready" do
-    it "hops to trigger_test_runs when the pool is ready" do
+    it "hops to trigger_test_run when the pool is ready" do
       pool = instance_double(VmPool, size: 1)
       expect(VmPool).to receive(:[]).and_return(pool)
       expect(pool).to receive(:vms_dataset).and_return(instance_double(Sequel::Dataset, exclude: [instance_double(Vm)]))
       expect(pool).to receive(:update).with(size: 0)
-      expect { gr_test.wait_vm_pool_to_be_ready }.to hop("trigger_test_runs")
+      expect { gr_test.wait_vm_pool_to_be_ready }.to hop("trigger_test_run")
     end
 
     it "naps if the vm in the pool not provisioned yet" do
@@ -67,66 +72,66 @@ RSpec.describe Prog::Test::GithubRunner do
     end
   end
 
-  describe "#trigger_test_runs" do
-    it "triggers test runs" do
+  describe "#trigger_test_run" do
+    it "triggers test run and stores run id from response" do
       allow(ENV).to receive(:[]).and_call_original
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
-      expect(client).to receive(:post).with("repos/tahcloud/github-e2e-tests-metal/actions/workflows/test_2204.yml/dispatches", {ref: "main", inputs: {triggered_by: "12345"}}).and_return({workflow_run_id: 123456789})
-      expect(gr_test).to receive(:sleep).with(30)
-      expect { gr_test.trigger_test_runs }.to hop("check_test_runs")
+      expect(client).to receive(:post).with(
+        "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
+        {ref: "enes/simply-tests", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+      ).and_return({workflow_run_id: 123456789})
+      expect { gr_test.trigger_test_run }.to hop("check_test_run")
     end
 
-    it "can not triggers test runs" do
+    it "hops to clean_resources when trigger fails" do
       allow(ENV).to receive(:[]).and_call_original
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
-      expect(client).to receive(:post).with("repos/tahcloud/github-e2e-tests-metal/actions/workflows/test_2204.yml/dispatches", {ref: "main", inputs: {triggered_by: "12345"}}).and_return(false)
-      expect { gr_test.trigger_test_runs }.to hop("clean_resources")
+      expect(client).to receive(:post).with(
+        "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
+        {ref: "enes/simply-tests", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+      ).and_return(false)
+      expect { gr_test.trigger_test_run }.to hop("clean_resources")
     end
   end
 
-  describe "#check_test_runs" do
-    it "check test runs completed" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "success", created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
+  describe "#check_test_run" do
+    before { refresh_frame(gr_test, new_values: {"test_run_id" => 99}) }
+
+    it "hops to clean_resources on success" do
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: "success"})
+      expect { gr_test.check_test_run }.to hop("clean_resources")
     end
 
-    it "check test runs completed for alien runners" do
-      expect(gr_test).to receive(:frame).and_return(gr_test.frame.merge({"github_runner_aws_location_id" => "c4cf8b4c-70ec-8820-b311-13284f205306"})).at_least(:once)
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "success", created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
+    it "naps when conclusion is nil" do
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: nil})
+      expect { gr_test.check_test_run }.to nap(15)
     end
 
-    it "check test runs in progress with nil" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: nil, created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to nap(15)
+    it "naps when conclusion is in_progress" do
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: "in_progress"})
+      expect { gr_test.check_test_run }.to nap(15)
     end
 
-    it "check test runs in progress state" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "in_progress", created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to nap(15)
-    end
-
-    it "check test runs failed" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "failure", created_at: Time.now + 10}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
-    end
-
-    it "check test runs created before" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{conclusion: "failure", created_at: Time.now - 2 * 60 * 60}]})
-      expect { gr_test.check_test_runs }.to hop("clean_resources")
+    it "hops to clean_resources on failure" do
+      expect(client).to receive(:workflow_run).with("tahcloud/github-e2e-tests-metal", 99)
+        .and_return({conclusion: "failure"})
+      expect { gr_test.check_test_run }.to hop("clean_resources")
     end
   end
 
   describe "#clean_resources" do
     it "waits runners to finish their jobs" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       GithubRunner.create(repository_name: "test-repo", label: "ubicloud")
       expect { gr_test.clean_resources }.to nap(15)
     end
 
     it "waits vm pools to be destroyed" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, storage_encrypted: true,
         arch: "x64").subject
@@ -135,7 +140,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "waits repositories to be destroyed" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User")
       repo = Prog::Github::GithubRepositoryNexus.assemble(installation, "ubicloud/ubicloud", "master").subject
@@ -144,7 +149,7 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "cleans resources and hop finish" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
       expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [], incr_destroy: nil))
@@ -153,19 +158,23 @@ RSpec.describe Prog::Test::GithubRunner do
     end
 
     it "cleans resources and hop failed" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10, "fail_message" => "Failed test"})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
       expect(GithubRunner).to receive(:any?).and_return(false)
       expect(VmPool).to receive(:[]).with(anything).and_return(instance_double(VmPool, vms: [instance_double(Vm)], incr_destroy: nil))
       expect(Project).to receive(:[]).with(anything).and_return(nil).at_least(:once)
-      refresh_frame(gr_test, new_values: {"fail_message" => "Failed test"})
-      # expect(gr_test).to receive(:frame).and_return({"fail_message" => "Failed test", "test_cases" => gr_test.frame["test_cases"]}).at_least(:once)
       expect { gr_test.clean_resources }.to hop("failed")
     end
 
-    it "cleans resources already cancelled" do
-      expect(client).to receive(:workflow_runs).with("tahcloud/github-e2e-tests-metal", "test_2204.yml", {branch: "main"}).and_return({workflow_runs: [{id: 10}]})
-      expect(client).to receive(:cancel_workflow_run).and_raise(StandardError)
+    it "skips cancel when no test_run_id" do
+      expect(client).not_to receive(:cancel_workflow_run)
+      expect(GithubRunner).to receive(:any?).and_return(true)
+      expect { gr_test.clean_resources }.to nap(15)
+    end
+
+    it "handles already cancelled workflow run" do
+      refresh_frame(gr_test, new_values: {"test_run_id" => 10})
+      expect(client).to receive(:cancel_workflow_run).and_raise(Octokit::Error)
       expect(GithubRunner).to receive(:any?).and_return(true)
       expect { gr_test.clean_resources }.to nap(15)
     end

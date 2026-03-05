@@ -17,6 +17,7 @@ load_db = lambda do |env|
 
   loaded_environment = env
   ENV["RACK_ENV"] = env
+  ENV["SKIP_LIT_REQUIRE_FROZEN"] = "1"
   require "bundler"
   Bundler.setup(:default, :development)
   require "logger"

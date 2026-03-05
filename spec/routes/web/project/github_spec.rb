@@ -70,8 +70,11 @@ RSpec.describe Clover, "github" do
 
     it "shows new billing info button instead of connect account if project has no valid payment method" do
       expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+      sessions_service = instance_double(Stripe::Checkout::SessionService)
+      allow(StripeClient).to receive(:checkout).and_return(instance_double(Stripe::CheckoutService, sessions: sessions_service))
+
       # rubocop:disable RSpec/VerifiedDoubles
-      expect(Stripe::Checkout::Session).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
+      expect(sessions_service).to receive(:create).and_return(double(Stripe::Checkout::Session, url: ""))
       # rubocop:enable RSpec/VerifiedDoubles
 
       visit "#{project.path}/github"
@@ -178,6 +181,34 @@ RSpec.describe Clover, "github" do
 
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be false
+    end
+
+    it "enables cache scope protection for installation" do
+      installation.update(cache_scope_protected: false)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: true, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_scope_protected).to be true
+    end
+
+    it "disables cache scope protection for installation" do
+      installation.update(cache_scope_protected: true)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: false, _csrf:}
+      end
+
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_scope_protected).to be false
     end
 
     it "raises not found when installation doesn't exist" do

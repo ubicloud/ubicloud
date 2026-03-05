@@ -166,23 +166,23 @@ RSpec.describe Prog::Test::HaPostgresResource do
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
-    it "hops to destroy if the postgres resource destroyed" do
+    it "hops to finish if the postgres resource destroyed" do
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil})
-      expect { pgr_test.wait_resources_destroyed }.to hop("destroy")
+      expect { pgr_test.wait_resources_destroyed }.to hop("finish")
     end
   end
 
-  describe "#destroy" do
+  describe "#finish" do
     it "exits if no failure happened" do
       project = Project[pgr_test.frame["postgres_test_project_id"]]
-      expect { pgr_test.destroy }.to exit({"msg" => "Postgres tests are finished!"})
+      expect { pgr_test.finish }.to exit({"msg" => "Postgres tests are finished!"})
       expect(Project[project.id]).to be_nil
     end
 
     it "hops to failed if a failure happened" do
       refresh_frame(pgr_test, new_values: {"fail_message" => "Test failed"})
       project_id = pgr_test.frame["postgres_test_project_id"]
-      expect { pgr_test.destroy }.to hop("failed")
+      expect { pgr_test.finish }.to hop("failed")
       expect(Project[project_id]).to be_nil
     end
   end

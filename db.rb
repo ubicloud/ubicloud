@@ -15,16 +15,18 @@ end
 db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "db_ca_bundle.crt")
 Util.safe_write_to_file(db_ca_bundle_filename, Config.clover_database_root_certs)
 
-max_connections = if ENV["SHARED_CONNECTION"] == "1"
-  1
+if ENV["SHARED_CONNECTION"] == "1"
+  max_connections = 1
 elsif (process_type = ENV["PROCESS_TYPE"])
-  Config.send(:"db_pool_#{process_type}") - 1
-else
-  Config.db_pool - 1
+  max_connections = Config.send(:"db_pool_#{process_type}") - 1
+  pool_timeout = Config.send(:"database_timeout_#{process_type}")
 end
 
+max_connections ||= Config.db_pool - 1
+pool_timeout ||= Config.database_timeout
+
 pg_auto_parameterize_min_array_size = 1 if Config.frozen_test?
-DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout: Config.database_timeout, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:)
+DB = Sequel.connect(Config.clover_database_url, max_connections:, pool_timeout:, treat_string_list_as_untyped_array: true, pg_auto_parameterize_min_array_size:, driver_options:)
 
 postgres_monitor_db_ca_bundle_filename = File.join(Dir.pwd, "var", "ca_bundles", "postgres_monitor_db.crt")
 Util.safe_write_to_file(postgres_monitor_db_ca_bundle_filename, Config.postgres_monitor_database_root_certs)
@@ -34,6 +36,7 @@ POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_c
 # DB.extension :date_arithmetic
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_auto_parameterize_in_array, :pg_timestamptz, :pg_range, :pg_enum
 Sequel.extension :pg_range_ops, :pg_json_ops
+DB.extension :lit_require_frozen if Config.unfrozen_test? && !ENV["SKIP_LIT_REQUIRE_FROZEN"]
 
 if Config.development? || Config.unfrozen_test?
   DB.extension :pg_auto_parameterize_duplicate_query_detection

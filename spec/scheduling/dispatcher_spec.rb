@@ -18,6 +18,30 @@ RSpec.describe Scheduling::Dispatcher do
     described_class.new(partition_number: 1, listen_timeout: 0.01, pool_size: 1, recheck_seconds: 10, stale_seconds: 20, telemetry_db:, **)
   end
 
+  describe "#handle_disconnects" do
+    it "automatically retries block on disconnect error" do
+      i = 0
+      expect(di).to receive(:sleep).twice
+      v = di.handle_disconnects("") do
+        i += 1
+        case i
+        when 1
+          raise Sequel::DatabaseDisconnectError
+        when 2
+          raise Sequel::DatabaseConnectionError
+        else
+          i
+        end
+      end
+      expect(v).to eq 3
+    end
+
+    it "raises and emits for other exceptions" do
+      expect(Clog).to receive(:emit)
+      expect { di.handle_disconnects("foo") { raise "bar" } }.to raise_error(RuntimeError)
+    end
+  end
+
   describe "#shutdown" do
     it "sets shutting_down flag" do
       expect { di.shutdown }.to change(di, :shutting_down).from(false).to(true)
@@ -384,28 +408,36 @@ RSpec.describe Scheduling::Dispatcher do
   end
 
   describe "#strand_thread" do
-    it "runs strands pushed onto queue" do
-      Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
-      st = di.scan.first
-      strand_queue = Queue.new
-      start_queue = Queue.new
-      finish_queue = Queue.new
-      current_strands = di.instance_variable_get(:@current_strands)
-      current_strands[st.id] = true
-      session = Net::SSH::Connection::Session.allocate
-      expect(session).to receive(:close).and_raise(RuntimeError)
-      Thread.current[:clover_ssh_cache] = {nil => session}
-      strand_queue.push(st)
-      strand_queue.push(nil)
-      expect(di.strand_thread(strand_queue, start_queue, finish_queue)).to be_nil
-      expect(Time.now - st.respirate_metrics.worker_started).to be_within(1).of(0)
-      expect(st.respirate_metrics.queue_size).to eq 1
-      expect(st.respirate_metrics.available_workers).to eq 0
-      expect(start_queue.pop(true)).to eq st.ubid
-      expect(start_queue.pop(true)).to be_nil
-      expect(finish_queue.pop(true)).to be true
-      expect(current_strands).to be_empty
-      expect(Thread.current[:clover_ssh_cache]).to be_empty
+    [true, false].each do |disconnect|
+      it "runs strands pushed onto queue#{", handling disconnects" if disconnect}" do
+        Strand.create(prog: "Test", label: "napper", schedule: Time.now - 10)
+        st = di.scan.first
+        strand_queue = Queue.new
+        start_queue = Queue.new
+        finish_queue = Queue.new
+        current_strands = di.instance_variable_get(:@current_strands)
+        current_strands[st.id] = true
+        session = Net::SSH::Connection::Session.allocate
+        expect(session).to receive(:close).and_raise(RuntimeError)
+        Thread.current[:clover_ssh_cache] = {nil => session}
+        strand_queue.push(st)
+        strand_queue.push(nil)
+        if disconnect
+          expect(st).to receive(:run).and_raise(Sequel::DatabaseDisconnectError)
+          expect { di.strand_thread(strand_queue, start_queue, finish_queue) }.to raise_error(Sequel::DatabaseDisconnectError)
+        else
+          expect(di.strand_thread(strand_queue, start_queue, finish_queue)).to be_nil
+        end
+        expect(Time.now - st.respirate_metrics.worker_started).to be_within(1).of(0)
+        expect(st.respirate_metrics.queue_size).to eq 1
+        expect(st.respirate_metrics.available_workers).to eq 0
+        expect(start_queue.size).to eq(disconnect ? 1 : 2)
+        expect(start_queue.pop(true)).to eq st.ubid
+        expect(start_queue.pop(true)).to be_nil unless disconnect
+        expect(finish_queue.pop(true)).to be true
+        expect(current_strands).to be_empty
+        expect(Thread.current[:clover_ssh_cache]).to be_empty
+      end
     end
   end
 
@@ -438,6 +470,30 @@ RSpec.describe Scheduling::Dispatcher do
       expect(start_queue.pop(true)).to eq st.ubid
       expect(finish_queue.pop(true)).to be true
       expect(current_strands).to be_empty
+    end
+
+    it "does not print Strand::RunError exceptions, as those are already logged" do
+      st = Strand.create(prog: "Test", label: "bud_failer", schedule: Time.now - 10, lease: Time.now - 10)
+      telemetry_db
+
+      msgs = []
+      expect(Clog).to receive(:emit) do |msg, args|
+        msgs << msg
+        if msg == "exception terminates strand run"
+          expect(Strand[args[:strand_error][:strand]].parent_id).to eq st.id
+        end
+      end.at_least(:once)
+
+      start_queue = Queue.new
+      finish_queue = Queue.new
+      current_strands = di.instance_variable_get(:@current_strands)
+      current_strands[st.id] = true
+      expect(di.run_strand(st, start_queue, finish_queue)).to be_a RuntimeError
+      expect(start_queue.pop(true)).to eq st.ubid
+      expect(finish_queue.pop(true)).to be true
+      expect(current_strands).to be_empty
+
+      expect(msgs).to eq ["hopped", "exception terminates strand run"]
     end
   end
 end

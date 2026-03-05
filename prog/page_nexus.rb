@@ -8,7 +8,7 @@ class Prog::PageNexus < Prog::Base
       details = extra_data.merge({"related_resources" => Array(related_resources)})
       tag = Page.generate_tag(tag_parts)
 
-      if (existing_page = Page.active.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
+      if (existing_page = Page.first(tag:)) && Page.severity_order(severity) > Page.severity_order(existing_page.severity)
         existing_page.incr_retrigger
       end
 

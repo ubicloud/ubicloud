@@ -3,8 +3,6 @@
 require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::Base
-  semaphore :destroy
-
   def self.assemble
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
 
@@ -191,10 +189,10 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   label def wait_resources_destroyed
     nap 5 if read_replica || postgres_resource
-    hop_destroy
+    hop_finish
   end
 
-  label def destroy
+  label def finish
     postgres_test_project.destroy
 
     fail_test(frame["fail_message"]) if frame["fail_message"]

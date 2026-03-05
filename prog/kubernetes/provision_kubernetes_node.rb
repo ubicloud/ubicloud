@@ -236,7 +236,12 @@ CONFIG
   end
 
   label def approve_new_csr
-    kubernetes_cluster.sshable.cmd("sudo kubectl --kubeconfig /etc/kubernetes/admin.conf get csr | awk '/Pending/ && /kubelet-serving/ && /':name'/ {print $1}' | xargs -r sudo kubectl --kubeconfig /etc/kubernetes/admin.conf certificate approve", name: node.name)
+    approved_csr = kubernetes_cluster.client.get_csr(node.name, csr_status: "Approved")
+    if approved_csr.empty?
+      pending_csr = kubernetes_cluster.client.get_csr(node.name, csr_status: "Pending")
+      nap 5 if pending_csr.empty?
+      kubernetes_cluster.client.approve_csr(pending_csr)
+    end
     kubernetes_cluster.incr_sync_internal_dns_config
     kubernetes_cluster.incr_sync_worker_mesh
     pop({node_id: node.id})

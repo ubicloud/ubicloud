@@ -47,12 +47,6 @@ class VmHostSlice < Sequel::Model
     name + ".slice"
   end
 
-  def init_health_monitor_session
-    {
-      ssh_session: vm_host.sshable.start_fresh_session
-    }
-  end
-
   def up?(session)
     # We let callers handle exceptions, as each calling method may have opt to handle them differently
     session.exec!("systemctl is-active :inhost_name", inhost_name:).split("\n").all?("active") &&

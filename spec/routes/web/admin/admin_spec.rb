@@ -365,9 +365,11 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows stripe data for billing info as extra" do
-    expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    customers_service = instance_double(Stripe::CustomerService)
+    allow(StripeClient).to receive(:customers).and_return(customers_service)
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
-    expect(Stripe::Customer).to receive(:retrieve).with("cus_test123").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
+    expect(customers_service).to receive(:retrieve).with("cus_test123").and_return({"name" => "ACME Inc.", "metadata" => {"tax_id" => "123456"}, "address" => {"line1" => "123 Main St", "country" => "US"}}).at_least(:once)
     visit "/model/BillingInfo/#{billing_info.ubid}"
     expect(page.title).to eq "Ubicloud Admin - BillingInfo #{billing_info.ubid}"
     expect(page).to have_content "Stripe Data"
@@ -393,10 +395,12 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows stripe data for payment method as extra" do
-    expect(Config).to receive(:stripe_secret_key).and_return("secret_key")
+    expect(Config).to receive(:stripe_secret_key).and_return("secret_key").at_least(:once)
+    payment_methods_service = instance_double(Stripe::PaymentMethodService)
+    allow(StripeClient).to receive(:payment_methods).and_return(payment_methods_service)
     billing_info = BillingInfo.create(stripe_id: "cus_test123")
     payment_method = PaymentMethod.create(billing_info_id: billing_info.id, stripe_id: "pm_1234567890")
-    expect(Stripe::PaymentMethod).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from(id: "pm_1234567890", card: {brand: "Visa", last4: "1234", exp_month: 12, exp_year: 2023, country: "NL", funding: "debit", wallet: {type: "apple_pay"}, checks: {address_line1_check: "pass", cvc_check: "pass"}}))
+    expect(payment_methods_service).to receive(:retrieve).with("pm_1234567890").and_return(Stripe::StripeObject.construct_from(id: "pm_1234567890", card: {brand: "Visa", last4: "1234", exp_month: 12, exp_year: 2023, country: "NL", funding: "debit", wallet: {type: "apple_pay"}, checks: {address_line1_check: "pass", cvc_check: "pass"}}))
     visit "/model/PaymentMethod/#{payment_method.ubid}"
     expect(page.title).to eq "Ubicloud Admin - PaymentMethod #{payment_method.ubid}"
     expect(page).to have_content "Stripe Data"
@@ -746,7 +750,7 @@ RSpec.describe CloverAdmin do
     click_button "Stop"
     expect(page).to have_flash_notice("Stop scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
-    expect(vm.semaphores_dataset.select_map(:name)).to eq ["stop"]
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
   end
 
   it "supports restarting PostgresResource" do
@@ -902,7 +906,6 @@ RSpec.describe CloverAdmin do
 
     [
       ["allocator_diagnostics", "", nil],
-      ["access_all_cache_scopes", "true", true],
       ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
       ["gpu_runner", "1", 1],
@@ -1032,6 +1035,19 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
+  it "shows unavailable VMs" do
+    project = Project.create(name: "test")
+    vm = create_vm(project_id: project.id, name: "active-vm")
+    Strand.create_with_id(vm, prog: "Vm::Metal::Nexus", label: "unavailable")
+
+    visit "/"
+    click_link "Show Unavailable VMs"
+    click_link vm.ubid
+    expect(page.title).to eq "Ubicloud Admin - Strand #{vm.ubid}"
+    click_link "Subject"
+    expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
+  end
+
   it "finds both active and archived VMs by IPv4" do
     host = create_vm_host
     project = Project.create(name: "test")
@@ -1048,10 +1064,12 @@ RSpec.describe CloverAdmin do
 
     visit "/vm-by-ipv4"
     fill_in "ips", with: "172.16.0.1, 172.16.1.1,,invalid-ip"
+    fill_in "days", with: "10"
     click_button "Show Virtual Machines"
 
     expect(page).to have_content("active-vm")
     expect(page).to have_content("archived-vm")
+    expect(page.find_field("days").value).to eq "10"
   end
 
   it "shows a message when no data available" do
@@ -1060,6 +1078,7 @@ RSpec.describe CloverAdmin do
     click_button "Show Virtual Machines"
 
     expect(page).to have_content("No data available for Virtual Machines table")
+    expect(page.find_field("days").value).to eq "5"
   end
 
   describe "archived-record-by-id" do

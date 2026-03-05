@@ -254,7 +254,12 @@ class CloverAdmin < Roda
     },
     "Vm" => {
       "restart" => object_action("Restart", "Restart scheduled for Vm", &:incr_restart),
-      "stop" => object_action("Stop", "Stop scheduled for Vm", &:incr_stop)
+      "stop" => object_action("Stop", "Stop scheduled for Vm") do |obj|
+        DB.transaction do
+          obj.incr_admin_stop
+          obj.incr_stop
+        end
+      end
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", "Host allocation state changed to accepting") do |obj|
@@ -688,6 +693,7 @@ class CloverAdmin < Roda
     end
 
     r.get "vm-by-ipv4" do
+      @days = (typecast_params.pos_int("days") || 5).clamp(1, 15)
       if (@ips_param = typecast_params.nonempty_str("ips"))
         ips = @ips_param.split(",").filter_map {
           begin
@@ -708,7 +714,7 @@ class CloverAdmin < Roda
             project_id: it.project.ubid
           }
         }
-        archived_vms = ArchivedRecord.vms_by_ips(ips).map {
+        archived_vms = ArchivedRecord.vms_by_ips(ips, days: @days).map {
           {
             ip: it[:ip],
             created_at: it[:created_at],
@@ -734,7 +740,7 @@ class CloverAdmin < Roda
         flash.now["error"] = "Invalid ubid/uuid provided"
       end
 
-      @grouped_pages = Page.active.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
+      @grouped_pages = Page.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
       @classes = available_classes
       @info_pages = Page.where(severity: "info").reverse(:created_at).all
 

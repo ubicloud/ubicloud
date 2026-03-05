@@ -67,12 +67,8 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   end
 
   label def update_metadata
-    new_timeline_id = Prog::Postgres::PostgresTimelineNexus.assemble(
-      location_id: postgres_resource.location_id
-    ).id
-    upgrade_candidate.update(version: postgres_resource.target_version, timeline_id: new_timeline_id, timeline_access: "push")
-
-    upgrade_candidate.incr_refresh_walg_credentials
+    upgrade_candidate.update(version: postgres_resource.target_version)
+    upgrade_candidate.switch_to_new_timeline(parent_id: nil)
     upgrade_candidate.incr_configure
     upgrade_candidate.incr_restart
 

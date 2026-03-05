@@ -1,12 +1,14 @@
 <% @page_title = "Find VM by IPv4 Address" %>
 
 <p>
-  This page allows you to find virtual machines associated with given IPv4 addresses, including archived ones from the
-  last 15 days. It's especially useful when investigating abuse reports.
+  This page allows you to find virtual machines associated with given IPv4 addresses, including archived ones. It's
+  especially useful when investigating abuse reports.
 </p>
 
-<% form(id: "vm_by_ipv4_form") do |f| %>
-  <%== f.input("textarea", key: "ips", placeholder: "Comma seperated IP list", value: @ips_param) %>
+<% form(id: "vm_by_ipv4_form", class: "form-vertical") do |f| %>
+  <%== f.input("textarea", key: "ips", placeholder: "Comma seperated IP list", rows: 4, value: @ips_param) %>
+  <%== f.input("number", key: "days", label: "Days", placeholder: "1-15", value: @days, min: 1, max: 15) %>
+  Higher day values will increase query duration significantly. Use the smallest value possible.
   <%== f.button("Show Virtual Machines") %>
 <% end %>
 

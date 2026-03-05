@@ -83,7 +83,11 @@ module Config
   override :smtp_tls, true, bool
 
   override :base_url, "http://localhost:9292", string
+  override :admin_url, "http://admin.localhost:9292", string
   override :database_timeout, 10, int
+  override :database_timeout_web, Config.database_timeout, int
+  override :database_timeout_respirate, Config.database_timeout, int
+  override :database_timeout_monitor, Config.database_timeout, int
   override :db_pool, 5, int
   override :db_pool_web, Config.db_pool, int
   override :db_pool_respirate, Config.db_pool, int
@@ -106,6 +110,7 @@ module Config
   optional :cloudflare_turnstile_secret_key, string
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
+  optional :git_commit_hash, string
 
   # GitHub Runner App
   optional :github_app_name, string

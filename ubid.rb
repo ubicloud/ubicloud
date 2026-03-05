@@ -114,11 +114,10 @@ class UBID
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
 
-  CURRENT_TIMESTAMP_TYPES = [TYPE_STRAND, TYPE_SEMAPHORE]
+  CURRENT_TIMESTAMP_TYPES = [TYPE_SEMAPHORE].freeze
 
   def self.generate(type)
-    case type
-    when *CURRENT_TIMESTAMP_TYPES
+    if type == TYPE_SEMAPHORE
       generate_from_current_ts(type)
     else
       generate_random(type)
@@ -134,6 +133,11 @@ class UBID
   def self.generate_from_current_ts(type)
     random_value = SecureRandom.random_number(MAX_ENTROPY)
     from_parts(current_milliseconds, type, random_value & 0b11, random_value >> 2)
+  end
+
+  def self.generate_from_time(type, time)
+    random_value = SecureRandom.random_number(MAX_ENTROPY)
+    from_parts((time.to_f * 1000).round, type, random_value & 0b11, random_value >> 2)
   end
 
   # InferenceApiKey does not have a type, and using et (TYPE_ETC) seems like a bad idea

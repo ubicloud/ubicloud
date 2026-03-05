@@ -222,6 +222,16 @@ RSpec.describe MonitorRunner do
         end
       end
 
+      it "handles disconnect errors during scan" do
+        i = 0
+        expect(monitor_runner).to receive(phased_initial_scan ? :initial_scan : :scan) do
+          i += 1
+          raise Sequel::DatabaseDisconnectError if i == 1
+        end.at_least(:once)
+        expect(monitor_runner).to receive(:sleep)
+        expect(monitor_runner.run(phased_initial_scan:)).to be_nil
+      end
+
       it "runs scan/report/check_stuck_pulse/enqueue loop with no resources" do
         expect(monitor_runner.run(phased_initial_scan:)).to be_nil
       end

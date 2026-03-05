@@ -1,6 +1,6 @@
 {
   "devDependencies": {
-    "@redocly/cli": "^2.15.1",
+    "@redocly/cli": "^2.18.2",
     "@stoplight/spectral-cli": "^6.15.0",
     "openapi-format": "^1.29.3",
     "tailwindcss": "^3.4.19",
@@ -11,6 +11,9 @@
     "dev": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css",
     "prod": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --minify",
     "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch"
+  },
+  "overrides": {
+    "rollup": "^2.80.0"
   },
   "engines": {
     "node": "24.12.0",

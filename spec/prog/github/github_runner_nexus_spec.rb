@@ -727,7 +727,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys the runner if generate request fails due to self runners disabled error" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.register_runner }.to nap(0)
-        .and change { Page.active.count }.by(1)
+        .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
 
@@ -739,7 +739,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "destroys the runner if generate request fails due to IP allowlist enabled error" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "your IP address is not permitted to access this resource"}))
       expect { nx.register_runner }.to nap(0)
-        .and change { Page.active.count }.by(1)
+        .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
   end

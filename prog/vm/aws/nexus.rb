@@ -167,6 +167,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         enable_resource_name_dns_a_record: false,
         enable_resource_name_dns_aaaa_record: false
       },
+      metadata_options: {http_tokens: "required"},
       min_count: 1,
       max_count: 1,
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),

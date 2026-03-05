@@ -193,11 +193,6 @@ code {
   }
 }
 
-#vm_by_ipv4_form {
-  display: flex;
-  gap: 10px;
-
-  & textarea {
-    flex-grow: 1;
-  }
+#vm_by_ipv4_form textarea {
+  width: 100%;
 }
