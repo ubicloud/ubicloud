@@ -56,7 +56,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     primary.vm.sshable.cmd("echo -e '\nfoobar' | sudo tee -a /etc/postgresql/:version/main/conf.d/001-service.conf", version:)
 
     # Get postgres pid and send SIGKILL
-    primary.vm.sshable.cmd("ps aux | grep -v grep | grep '/usr/lib/postgresql/:version/bin/postgres' | awk '{print $2}' | xargs sudo kill -9", version:)
+    primary.vm.sshable.cmd("ps aux | grep -v grep | grep /usr/lib/postgresql/:version/bin/postgres | awk '{print $2}' | xargs sudo kill -9", version:)
 
     hop_wait_failover
   end
