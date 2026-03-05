@@ -269,32 +269,19 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def verify_firewall_policy_association
+    # Re-fetch the policy and verify our VPC is associated.
+    # If the association isn't visible yet (GCP eventual consistency),
+    # the strand will retry on the next iteration via create_firewall_policy.
     policy = credential.network_firewall_policies_client.get(
       project: gcp_project_id,
       firewall_policy: firewall_policy_name
     )
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}"
-    return if policy.associations&.any? { |a| a.attachment_target == vpc_target }
-
-    assoc_op = credential.network_firewall_policies_client.add_association(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      firewall_policy_association_resource: Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
-        name: gcp_vpc_name,
-        attachment_target: vpc_target
-      )
-    )
-    wait_for_compute_global_op(assoc_op)
-  rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
-    raise if e.is_a?(Google::Cloud::InvalidArgumentError) && !e.message.include?("already exists")
-    # Another strand may have added an association concurrently. Re-fetch and
-    # confirm our VPC is actually associated — the name collision could be from
-    # a different VPC using the same association name.
-    refetched = credential.network_firewall_policies_client.get(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name
-    )
-    raise "GCP firewall policy #{firewall_policy_name} not associated with VPC #{gcp_vpc_name}" unless refetched.associations&.any? { |a| a.attachment_target == vpc_target }
+    unless policy.associations&.any? { |a| a.attachment_target == vpc_target }
+      Clog.emit("GCP firewall policy association not yet visible, will retry",
+        {gcp_association_pending: {policy: firewall_policy_name, vpc: gcp_vpc_name}})
+      nap 5
+    end
   end
 
   def ensure_policy_rule(priority:, direction:, action:, src_ip_ranges: nil, dest_ip_ranges: nil, layer4_configs: nil)
