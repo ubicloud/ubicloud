@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "zlib"
 require "google/cloud/compute/v1"
 require_relative "../../../lib/gcp_lro"
 
@@ -14,6 +15,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   # Priority assignments for firewall policy rules.
   # Lower number = higher priority. Range: 0–65535.
+  # Layout: subnet-allow EGRESS 1000..8999, VM INGRESS 10000..59999, deny 65531..65534
   DENY_RULE_BASE_PRIORITY = 65534
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
@@ -263,12 +265,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def ensure_policy_rule(priority:, direction:, action:, src_ip_ranges: nil, dest_ip_ranges: nil, layer4_configs: nil)
-    credential.network_firewall_policies_client.get_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      priority:
-    )
-  rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
     matcher_attrs = {}
     matcher_attrs[:src_ip_ranges] = src_ip_ranges if src_ip_ranges
     matcher_attrs[:dest_ip_ranges] = dest_ip_ranges if dest_ip_ranges
@@ -290,18 +286,63 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs)
     )
 
-    op = credential.network_firewall_policies_client.add_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      firewall_policy_rule_resource: rule
-    )
-    wait_for_compute_global_op(op)
+    existing = begin
+      credential.network_firewall_policies_client.get_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        priority:
+      )
+    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
+      nil
+    end
+
+    if existing
+      # If an existing rule at this priority doesn't match our desired state
+      # (e.g., hash collision from another subnet), overwrite it with ours.
+      # We overwrite (rather than skip) because subnet allow rules only run
+      # once during provisioning — skipping would permanently leave this
+      # subnet without egress allow rules, breaking intra-subnet traffic.
+      unless policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:)
+        Clog.emit("GCP firewall priority collision, overwriting rule",
+          {gcp_priority_collision: {priority:, direction:, action:}})
+        op = credential.network_firewall_policies_client.patch_rule(
+          project: gcp_project_id,
+          firewall_policy: firewall_policy_name,
+          priority:,
+          firewall_policy_rule_resource: rule
+        )
+        wait_for_compute_global_op(op)
+      end
+    else
+      op = credential.network_firewall_policies_client.add_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        firewall_policy_rule_resource: rule
+      )
+      wait_for_compute_global_op(op)
+    end
+  end
+
+  def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:)
+    existing.direction == direction &&
+      existing.action == action &&
+      (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
+      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort
   end
 
   # --- Destroy helpers ---
 
   def delete_subnet_policy_rules
+    subnet_cidrs = [private_subnet.net4.to_s, private_subnet.net6.to_s]
     [subnet_allow_priority, subnet_allow_priority + 1].each do |priority|
+      existing = credential.network_firewall_policies_client.get_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        priority:
+      )
+      # Only delete if the rule belongs to this subnet (avoid deleting
+      # another subnet's rule in case of a hash collision)
+      next unless existing.match&.dest_ip_ranges&.any? { |r| subnet_cidrs.include?(r) }
       credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
@@ -335,7 +376,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # Deterministic priority for subnet allow rules. Each subnet gets a unique
   # pair of priorities (IPv4 egress, IPv6 egress) based on a hash of its ubid.
   def subnet_allow_priority
-    @subnet_allow_priority ||= ALLOW_SUBNET_BASE_PRIORITY + (private_subnet.ubid.hash.abs % 30000) * 2
+    @subnet_allow_priority ||= ALLOW_SUBNET_BASE_PRIORITY + (Zlib.crc32(private_subnet.ubid) % 4000) * 2
   end
 
   def gcp_vpc_name

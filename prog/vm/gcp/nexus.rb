@@ -361,11 +361,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm_ip = nic&.private_ipv4&.network&.to_s
     return unless vm_ip
 
-    vm_dest = "#{vm_ip}/32"
+    vm_dest_ranges = ["#{vm_ip}/32"]
+    vm_ipv6 = nic&.private_ipv6&.network&.to_s
+    vm_dest_ranges << "#{vm_ipv6}/128" if vm_ipv6
 
     (policy.rules || []).each do |rule|
       next unless rule.direction == "INGRESS" && rule.action == "allow"
-      next unless rule.match&.dest_ip_ranges&.include?(vm_dest)
+      next unless rule.match&.dest_ip_ranges&.any? { |r| vm_dest_ranges.include?(r) }
       credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,
         firewall_policy: policy_name,

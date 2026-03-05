@@ -270,9 +270,41 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_vpc_deny_rules }.to hop("create_subnet")
     end
 
-    it "skips creation when deny rules already exist" do
-      rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new
-      expect(nfp_client).to receive(:get_rule).exactly(4).times.and_return(rule)
+    it "skips creation when deny rules already exist and match" do
+      # Return rules that match the desired state (direction, action, src/dest ranges)
+      expect(nfp_client).to receive(:get_rule).exactly(4).times do |args|
+        prio = args[:priority]
+        case prio
+        when 65534
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "INGRESS", action: "deny",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              src_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+            )
+          )
+        when 65533
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "EGRESS", action: "deny",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              dest_ip_ranges: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+            )
+          )
+        when 65532
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "INGRESS", action: "deny",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              src_ip_ranges: ["fd20::/20"]
+            )
+          )
+        when 65531
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "EGRESS", action: "deny",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              dest_ip_ranges: ["fd20::/20"]
+            )
+          )
+        end
+      end
       expect(nfp_client).not_to receive(:add_rule)
 
       expect { nx.create_vpc_deny_rules }.to hop("create_subnet")
@@ -392,10 +424,48 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
     end
 
-    it "skips creation when rules already exist" do
-      rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new
-      expect(nfp_client).to receive(:get_rule).twice.and_return(rule)
+    it "skips creation when rules already exist and match" do
+      net4 = ps.net4.to_s
+      net6 = ps.net6.to_s
+      expect(nfp_client).to receive(:get_rule).twice do |args|
+        prio = args[:priority]
+        if prio.even?
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "EGRESS", action: "allow",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              src_ip_ranges: [net4], dest_ip_ranges: [net4]
+            )
+          )
+        else
+          Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+            direction: "EGRESS", action: "allow",
+            match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+              src_ip_ranges: [net6], dest_ip_ranges: [net6]
+            )
+          )
+        end
+      end
       expect(nfp_client).not_to receive(:add_rule)
+
+      expect { nx.create_subnet_allow_rules }.to hop("wait")
+    end
+
+    it "overwrites foreign rule on priority collision and logs warning" do
+      # Simulate another subnet owning the priority slot
+      foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        direction: "EGRESS", action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: ["10.99.0.0/24"], dest_ip_ranges: ["10.99.0.0/24"]
+        )
+      )
+      expect(nfp_client).to receive(:get_rule).twice.and_return(foreign_rule)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-rule")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get).twice.and_return(done_op)
+      expect(nfp_client).to receive(:patch_rule).twice.and_return(op)
+
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything).twice
 
       expect { nx.create_subnet_allow_rules }.to hop("wait")
     end
@@ -432,7 +502,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      # delete_subnet_policy_rules
+      # delete_subnet_policy_rules — get_rule returns matching rule, then remove
+      matching_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [ps.net4.to_s]
+        )
+      )
+      expect(nfp_client).to receive(:get_rule).twice.and_return(matching_rule)
       expect(nfp_client).to receive(:remove_rule).twice
 
       # delete_gcp_subnet
@@ -446,13 +522,32 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
 
+    it "skips deleting rules that belong to a foreign subnet (collision)" do
+      expect(ps).to receive(:nics).and_return([]).at_least(:once)
+      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
+      expect(ps).to receive(:remove_all_firewalls)
+
+      # get_rule returns a rule belonging to a different subnet
+      foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: ["10.99.0.0/24"]
+        )
+      )
+      expect(nfp_client).to receive(:get_rule).twice.and_return(foreign_rule)
+      expect(nfp_client).not_to receive(:remove_rule)
+
+      expect(subnetworks_client).to receive(:delete)
+      expect(ps).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
+    end
+
     it "handles already-deleted GCP subnet" do
       expect(ps).to receive(:nics).and_return([]).at_least(:once)
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      # delete_subnet_policy_rules — already deleted
-      expect(nfp_client).to receive(:remove_rule).twice
+      # delete_subnet_policy_rules — rules already deleted
+      expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -465,7 +560,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      expect(nfp_client).to receive(:remove_rule).twice
+      expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete).and_raise(
@@ -479,7 +574,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      expect(nfp_client).to receive(:remove_rule).twice
+      expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete).and_raise(
@@ -505,8 +600,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      # Both priority rules not found (inner rescue catches each one)
-      expect(nfp_client).to receive(:remove_rule).twice
+      # get_rule not found for both priorities
+      expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete)
@@ -519,7 +614,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
       expect(ps).to receive(:remove_all_firewalls)
 
-      expect(nfp_client).to receive(:remove_rule).twice
+      expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::InvalidArgumentError.new("does not contain a rule"))
 
       expect(subnetworks_client).to receive(:delete)

@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "zlib"
 require "google/cloud/compute/v1"
 
 class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
@@ -92,7 +93,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def vm_rule_base_priority
-    @vm_rule_base_priority ||= VM_RULE_BASE_PRIORITY + (vm.name.hash.abs % VM_RULE_PRIORITY_RANGE)
+    @vm_rule_base_priority ||= VM_RULE_BASE_PRIORITY + (Zlib.crc32(vm.name) % VM_RULE_PRIORITY_RANGE)
   end
 
   def vm_private_ip
@@ -137,7 +138,20 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       firewall_policy_rule_resource: rule
     )
   rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
-    update_policy_rule(desired)
+    # Only update if the existing rule belongs to this VM (check dest IP).
+    # If another VM owns this priority (hash collision), log and skip.
+    existing = credential.network_firewall_policies_client.get_rule(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name,
+      priority: desired[:priority]
+    )
+    vm_dest_ranges = [vm_dest_ip_range, vm_dest_ipv6_range].compact.uniq
+    if existing.match&.dest_ip_ranges&.any? { |r| vm_dest_ranges.include?(r) }
+      update_policy_rule(desired)
+    else
+      Clog.emit("GCP firewall priority collision, skipping update",
+        {gcp_priority_collision: {vm: vm.name, priority: desired[:priority]}})
+    end
   end
 
   def update_policy_rule(desired)

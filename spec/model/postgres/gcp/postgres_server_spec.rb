@@ -85,7 +85,7 @@ RSpec.describe PostgresServer do
 
       it "writes SA key JSON to the server" do
         expect(postgres_server.vm.sshable).to receive(:_cmd).with(
-          "sudo -u postgres tee /etc/postgresql/gcs-sa-key.json > /dev/null",
+          "sudo -u postgres install -m 600 /dev/stdin /etc/postgresql/gcs-sa-key.json",
           stdin: '{"type":"service_account","key":"data"}'
         )
 
