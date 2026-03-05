@@ -46,7 +46,7 @@ class Kubernetes::Client
   end
 
   def get_csr(node_name, csr_status:)
-    kubectl("get csr --sort-by=.metadata.creationTimestamp | awk '/:csr_status/ && /kubelet-serving/ && /':node_name'/ {print $1}' | tail -1", node_name:, csr_status:).chomp
+    kubectl("get csr --sort-by=.metadata.creationTimestamp | awk /:csr_status/' && /kubelet-serving/ && /':node_name'/ {print $1}' | tail -1", node_name:, csr_status:).chomp
   end
 
   def approve_csr(csr_name)
