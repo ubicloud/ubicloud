@@ -374,8 +374,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         firewall_policy: policy_name,
         priority: rule.priority
       )
-    rescue Google::Cloud::NotFoundError
-      # Already deleted
+    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
+      # Already deleted or rule rejected as invalid — skip and continue
     end
   rescue Google::Cloud::Error => e
     Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})

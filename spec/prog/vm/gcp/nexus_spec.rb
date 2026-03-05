@@ -781,6 +781,35 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.send(:cleanup_vm_policy_rules)
     end
 
+    it "continues cleaning up remaining rules when one raises InvalidArgumentError" do
+      vm_ip = vm.nics.first.private_ipv4.network.to_s
+      vm_dest = "#{vm_ip}/32"
+
+      rule1 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 11111,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [vm_dest]
+        )
+      )
+      rule2 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 22222,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [vm_dest]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [rule1, rule2])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 11111))
+        .and_raise(Google::Cloud::InvalidArgumentError.new("invalid priority"))
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 22222))
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
     it "returns when nic is nil" do
       # Override nic method to return nil (||= can't cache nil)
       allow(nx).to receive(:nic).and_return(nil)
