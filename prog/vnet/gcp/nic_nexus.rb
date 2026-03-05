@@ -110,36 +110,43 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     address_name = nic.nic_gcp_resource&.address_name
     return unless address_name
 
-    addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
+    op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
+    wait_for_compute_regional_op(op, gcp_region)
   rescue Google::Cloud::NotFoundError
     # Already released
   end
 
   def allocate_vm_firewall_priority(nic_resource, location_id)
-    used = DB[:nic_gcp_resource]
-      .where(location_id:)
-      .exclude(id: nic_resource.id)
-      .where(Sequel.~(firewall_base_priority: nil))
-      .select_map(:firewall_base_priority)
-      .to_set
-
-    slot = nil
-    (VM_BASE..VM_MAX).step(VM_STRIDE) do |p|
-      unless used.include?(p)
-        slot = p
-        break
-      end
-    end
-
-    raise "GCP VM firewall priority range exhausted for location #{location_id}" unless slot
-
-    nic_resource.update(firewall_base_priority: slot, location_id:)
-  rescue Sequel::UniqueConstraintViolation
+    retries = 0
     begin
-      nic_resource.update(firewall_base_priority: nil)
-    rescue
-      nil
+      used = DB[:nic_gcp_resource]
+        .where(location_id:)
+        .exclude(id: nic_resource.id)
+        .where(Sequel.~(firewall_base_priority: nil))
+        .select_map(:firewall_base_priority)
+        .to_set
+
+      slot = nil
+      max_base = VM_MAX - VM_STRIDE + 1
+      (VM_BASE..max_base).step(VM_STRIDE) do |p|
+        unless used.include?(p)
+          slot = p
+          break
+        end
+      end
+
+      raise "GCP VM firewall priority range exhausted for location #{location_id}" unless slot
+
+      nic_resource.update(firewall_base_priority: slot, location_id:)
+    rescue Sequel::UniqueConstraintViolation
+      begin
+        nic_resource.update(firewall_base_priority: nil)
+      rescue
+        nil
+      end
+      retries += 1
+      raise "GCP VM firewall priority allocation failed after #{retries} concurrent retries" if retries > 5
+      retry
     end
-    retry
   end
 end

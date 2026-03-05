@@ -644,11 +644,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:remove_rule).twice
 
       # delete_gcp_subnet
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
       expect(subnetworks_client).to receive(:delete).with(
         project: "test-gcp-project",
         region: "us-central1",
         subnetwork: "ubicloud-#{ps.ubid}"
-      )
+      ).and_return(delete_op)
+      allow(region_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
 
       expect(ps).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
@@ -668,7 +670,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:get_rule).twice.and_return(foreign_rule)
       expect(nfp_client).not_to receive(:remove_rule)
 
-      expect(subnetworks_client).to receive(:delete)
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      allow(region_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
       expect(ps).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
@@ -724,7 +728,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).not_to receive(:get_rule)
       expect(nfp_client).not_to receive(:remove_rule)
 
-      expect(subnetworks_client).to receive(:delete)
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      allow(region_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
       expect(ps).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
@@ -750,7 +756,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      expect(subnetworks_client).to receive(:delete)
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      allow(region_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
       expect(ps).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
@@ -763,7 +771,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::InvalidArgumentError.new("does not contain a rule"))
 
-      expect(subnetworks_client).to receive(:delete)
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      allow(region_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
       expect(ps).to receive(:destroy)
       expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
@@ -816,6 +826,42 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "handles non-operation objects" do
       op = double("plain_op") # rubocop:disable RSpec/VerifiedDoubles
       expect { nx.send(:wait_for_compute_global_op, op) }.not_to raise_error
+    end
+  end
+
+  describe "#delete_gcp_subnet (LRO wait)" do
+    it "waits for the delete LRO before returning" do
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      done = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(region_ops_client).to receive(:get).with(
+        project: "test-gcp-project", region: "us-central1", operation: "op-delete-subnet"
+      ).and_return(done)
+
+      expect(nx.send(:delete_gcp_subnet)).to be(true)
+    end
+
+    it "raises when delete LRO fails" do
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-fail")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+      )
+      expect(region_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.send(:delete_gcp_subnet) }.to raise_error(RuntimeError, /op-delete-fail.*failed/)
+    end
+
+    it "raises when delete LRO times out" do
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-timeout")
+      expect(subnetworks_client).to receive(:delete).and_return(delete_op)
+      running = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(region_ops_client).to receive(:get).exactly(5).times.and_return(running)
+      allow(nx).to receive(:sleep)
+
+      expect { nx.send(:delete_gcp_subnet) }.to raise_error(RuntimeError, /op-delete-timeout.*did not complete within timeout/)
     end
   end
 end

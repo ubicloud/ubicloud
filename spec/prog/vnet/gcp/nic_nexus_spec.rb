@@ -72,8 +72,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "raises when VM firewall priority range is exhausted" do
+      max_base = described_class::VM_MAX - described_class::VM_STRIDE + 1
       fake_ds = instance_double(Sequel::Dataset)
-      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_map: (10000..59999).step(64).to_a)
+      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_map: (10000..max_base).step(64).to_a)
       allow(DB).to receive(:[]).and_call_original
       allow(DB).to receive(:[]).with(:nic_gcp_resource).and_return(fake_ds)
 
@@ -92,6 +93,58 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
       expect { nx.start }.to hop("allocate_static_ip")
       expect(nic_resource.reload.firewall_base_priority).to eq(10000)
+    end
+
+    it "gap-fills freed slot after NIC deletion" do
+      expect { nx.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic.id].firewall_base_priority).to eq(10000)
+
+      nic2 = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic2").subject
+      st2 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic2.id}], label: "start")
+      nx2 = described_class.new(st2)
+      allow(nx2).to receive(:nic).and_return(nic2)
+      nx2.instance_variable_set(:@credential, location_credential)
+      expect { nx2.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic2.id].firewall_base_priority).to eq(10064)
+
+      # Delete first NIC's GCP resource to free slot 10000
+      NicGcpResource[nic.id].destroy
+
+      nic3 = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic3").subject
+      st3 = Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic3.id}], label: "start")
+      nx3 = described_class.new(st3)
+      allow(nx3).to receive(:nic).and_return(nic3)
+      nx3.instance_variable_set(:@credential, location_credential)
+      expect { nx3.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic3.id].firewall_base_priority).to eq(10000)
+    end
+
+    it "allocates last valid base without overflow" do
+      # Fill all slots except the last valid base (59920)
+      max_base = described_class::VM_MAX - described_class::VM_STRIDE + 1
+      all_bases = (10000..max_base).step(64).to_a
+      last_base = all_bases.pop
+
+      fake_ds = instance_double(Sequel::Dataset)
+      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_map: all_bases)
+      allow(DB).to receive(:[]).and_call_original
+      allow(DB).to receive(:[]).with(:nic_gcp_resource).and_return(fake_ds)
+
+      expect { nx.start }.to hop("allocate_static_ip")
+      expect(NicGcpResource[nic.id].firewall_base_priority).to eq(last_base)
+      # Verify last rule doesn't exceed VM_MAX
+      expect(last_base + described_class::VM_STRIDE - 1).to be <= described_class::VM_MAX
+    end
+
+    it "raises after exceeding retry limit on persistent unique constraint violations" do
+      nic_resource = NicGcpResource.create_with_id(nic.id)
+      allow(NicGcpResource).to receive(:create_with_id).and_return(nic_resource)
+      allow(nic_resource).to receive(:update).and_wrap_original do |m, hash|
+        raise Sequel::UniqueConstraintViolation, "dup" if hash.key?(:firewall_base_priority) && !hash[:firewall_base_priority].nil?
+        m.call(hash)
+      end
+
+      expect { nx.start }.to raise_error(RuntimeError, /allocation failed after .* concurrent retries/)
     end
 
     it "silently ignores errors during nil-reset on retry" do
@@ -226,8 +279,13 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "releases static IP, destroys NicGcpResource, and pops" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1")
 
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-addr")
       expect(addresses_client).to receive(:delete)
         .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
+        .and_return(delete_op)
+      expect(region_ops_client).to receive(:get).with(
+        project: "test-gcp-project", region: "us-central1", operation: "op-delete-addr"
+      ).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
 
       expect { nx.destroy }.to exit({"msg" => "nic deleted"})
       expect(NicGcpResource[nic.id]).to be_nil
@@ -244,6 +302,22 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
     it "destroys nic even without NicGcpResource" do
       expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+    end
+
+    it "raises when delete LRO fails, leaving NicGcpResource intact for retry" do
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1")
+
+      delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-fail")
+      expect(addresses_client).to receive(:delete).and_return(delete_op)
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+      )
+      expect(region_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.destroy }.to raise_error(RuntimeError, /op-delete-fail.*failed/)
+      expect(NicGcpResource[nic.id]).not_to be_nil
     end
   end
 end

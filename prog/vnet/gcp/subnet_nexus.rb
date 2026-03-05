@@ -365,11 +365,12 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   def delete_gcp_subnet
     subnet_name = "ubicloud-#{private_subnet.ubid}"
-    credential.subnetworks_client.delete(
+    op = credential.subnetworks_client.delete(
       project: gcp_project_id,
       region: gcp_region,
       subnetwork: subnet_name
     )
+    wait_for_compute_regional_op(op, gcp_region)
     true
   rescue Google::Cloud::NotFoundError
     true # Already deleted

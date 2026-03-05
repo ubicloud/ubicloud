@@ -91,4 +91,23 @@ module GcpLro
     return nil unless err.respond_to?(:errors)
     err.errors&.first&.code
   end
+
+  # Synchronously poll a regional GCP operation until it completes or times out.
+  # Raises if the operation fails or does not complete within ~5 seconds.
+  def wait_for_compute_regional_op(op, region)
+    return unless op.respond_to?(:name)
+    5.times do
+      result = credential.region_operations_client.get(
+        project: gcp_project_id,
+        region:,
+        operation: op.name
+      )
+      if result.status == :DONE
+        raise "GCP regional operation #{op.name} failed: #{op_error_message(result)}" if op_error?(result)
+        return result
+      end
+      sleep 1
+    end
+    raise "GCP regional operation #{op.name} did not complete within timeout"
+  end
 end
