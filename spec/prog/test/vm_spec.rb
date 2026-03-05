@@ -363,7 +363,31 @@ RSpec.describe Prog::Test::Vm do
     it "hops if VM is down" do
       expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
-      expect { vm_test.check_stopped_by_shutdown_command }.to hop("start_semaphore_after_shutdown")
+      expect { vm_test.check_stopped_by_shutdown_command }.to hop("verify_systemd_unit_status_after_shutdown")
+    end
+  end
+
+  describe "#verify_systemd_unit_status_after_shutdown" do
+    before {
+      sshable = Sshable.create
+      vm_host = instance_double(VmHost, sshable:)
+      allow(vm_test.vm).to receive_messages(vm_host:, inhost_name: "vm123456")
+    }
+
+    it "verifies systemd unit status and hops" do
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_raise(Sshable::SshError.new("systemctl is-active vm123456", "inactive\n", "", nil, nil))
+      expect { vm_test.verify_systemd_unit_status_after_shutdown }.to hop("start_semaphore_after_shutdown")
+    end
+
+    it "naps if VM is still active" do
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_return("active\n")
+      expect { vm_test.verify_systemd_unit_status_after_shutdown }.to nap(5)
+    end
+
+    it "fails if systemd unit status is unexpected" do
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_return("unknown\n")
+      expect { vm_test.verify_systemd_unit_status_after_shutdown }.to hop("failed")
+      expect(vm_test.strand.exitval).to eq({msg: "VM should be inactive after shutdown command, but is unknown"})
     end
   end
 
