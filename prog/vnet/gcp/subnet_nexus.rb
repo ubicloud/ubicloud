@@ -262,10 +262,19 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     # Re-fetch and verify our VPC is actually associated.
     verify_firewall_policy_association
   rescue Google::Cloud::InvalidArgumentError => e
-    raise unless e.message.include?("already exists")
-    # GCP returns InvalidArgumentError (not AlreadyExistsError) when the
-    # association name is already taken — re-fetch and verify the association.
-    verify_firewall_policy_association
+    if e.message.include?("already exists")
+      # GCP returns InvalidArgumentError (not AlreadyExistsError) when the
+      # association name is already taken — re-fetch and verify the association.
+      verify_firewall_policy_association
+    elsif e.message.include?("is not ready")
+      # VPC network may not be fully propagated after creation LRO completes.
+      # Nap and let the strand retry from create_firewall_policy.
+      Clog.emit("GCP resource not ready for association, will retry",
+        {gcp_resource_not_ready: {policy: firewall_policy_name, vpc: gcp_vpc_name, error: e.message}})
+      nap 5
+    else
+      raise
+    end
   end
 
   def verify_firewall_policy_association

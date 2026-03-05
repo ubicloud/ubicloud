@@ -289,7 +289,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "re-raises InvalidArgumentError when not about association already existing" do
+    it "naps when VPC resource is not ready for association" do
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      )
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::InvalidArgumentError.new("The resource 'projects/test/global/networks/ubicloud-gcp-us-central1' is not ready"))
+
+      expect { nx.create_firewall_policy }.to nap(5)
+    end
+
+    it "re-raises InvalidArgumentError when not about association already existing or resource not ready" do
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
