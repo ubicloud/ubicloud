@@ -334,6 +334,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   # --- Destroy helpers ---
 
   def delete_subnet_policy_rules
+    return unless private_subnet.firewall_priority
+
     subnet_cidrs = [private_subnet.net4.to_s, private_subnet.net6.to_s]
     [subnet_allow_priority, subnet_allow_priority + 1].each do |priority|
       existing = credential.network_firewall_policies_client.get_rule(
@@ -380,32 +382,37 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def allocate_subnet_firewall_priority
+    retries = 0
     location_id = private_subnet.location_id
-    used = DB[:private_subnet]
-      .where(location_id:)
-      .exclude(id: private_subnet.id)
-      .where(Sequel.~(firewall_priority: nil))
-      .select_map(:firewall_priority)
-      .to_set
-
-    slot = nil
-    (1000..8998).step(2) do |p|
-      unless used.include?(p)
-        slot = p
-        break
-      end
-    end
-
-    raise "GCP firewall priority range exhausted for location #{location_id}" unless slot
-
-    private_subnet.update(firewall_priority: slot)
-  rescue Sequel::UniqueConstraintViolation
     begin
-      private_subnet.update(firewall_priority: nil)
-    rescue
-      nil
+      used = DB[:private_subnet]
+        .where(location_id:)
+        .exclude(id: private_subnet.id)
+        .where(Sequel.~(firewall_priority: nil))
+        .select_map(:firewall_priority)
+        .to_set
+
+      slot = nil
+      (1000..8998).step(2) do |p|
+        unless used.include?(p)
+          slot = p
+          break
+        end
+      end
+
+      raise "GCP firewall priority range exhausted for location #{location_id}" unless slot
+
+      private_subnet.update(firewall_priority: slot)
+    rescue Sequel::UniqueConstraintViolation
+      begin
+        private_subnet.update(firewall_priority: nil)
+      rescue
+        nil
+      end
+      retries += 1
+      raise "GCP subnet firewall priority allocation failed after #{retries} concurrent retries" if retries > 5
+      retry
     end
-    retry
   end
 
   def gcp_vpc_name

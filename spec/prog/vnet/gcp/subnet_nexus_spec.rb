@@ -540,6 +540,16 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(ps.reload.firewall_priority).to eq(1000)
     end
 
+    it "raises after exceeding retry limit on persistent unique constraint violations" do
+      allow(ps).to receive(:update).and_wrap_original do |m, hash|
+        raise Sequel::UniqueConstraintViolation, "dup" if hash.key?(:firewall_priority) && !hash[:firewall_priority].nil?
+        m.call(hash)
+      end
+
+      expect { nx.send(:allocate_subnet_firewall_priority) }
+        .to raise_error(RuntimeError, /allocation failed after .* concurrent retries/)
+    end
+
     it "silently ignores errors during nil-reset on retry" do
       attempt = 0
       allow(ps).to receive(:update).and_wrap_original do |m, hash|
@@ -664,6 +674,20 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         Google::Cloud::InvalidArgumentError.new("Invalid CIDR range")
       )
       expect { nx.destroy }.to raise_error(Google::Cloud::InvalidArgumentError)
+    end
+
+    it "skips rule deletion when firewall_priority is nil (early destroy)" do
+      ps.update(firewall_priority: nil)
+      expect(ps).to receive(:nics).and_return([]).at_least(:once)
+      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
+      expect(ps).to receive(:remove_all_firewalls)
+
+      expect(nfp_client).not_to receive(:get_rule)
+      expect(nfp_client).not_to receive(:remove_rule)
+
+      expect(subnetworks_client).to receive(:delete)
+      expect(ps).to receive(:destroy)
+      expect { nx.destroy }.to exit({"msg" => "subnet destroyed"})
     end
 
     it "destroys nics and load balancers first" do
