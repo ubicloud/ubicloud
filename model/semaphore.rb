@@ -31,6 +31,12 @@ class Semaphore < Sequel::Model
   def set_at
     Semaphore.set_at(id)
   end
+
+  def inspect_values_hash
+    hash = super
+    hash[:set_at] = set_at.strftime("%F %T")
+    hash
+  end
 end
 
 # Table: semaphore
