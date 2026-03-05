@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 require "google/cloud/compute/v1"
+require_relative "../../../lib/gcp_lro"
 
 class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
+  include GcpLro
+
   subject_is :vm
 
   # Each VM gets a block of VM_STRIDE priority slots in the range 10000–59999.
@@ -137,11 +140,12 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   def create_policy_rule(desired)
     rule = build_policy_rule(desired)
-    credential.network_firewall_policies_client.add_rule(
+    op = credential.network_firewall_policies_client.add_rule(
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
       firewall_policy_rule_resource: rule
     )
+    wait_for_compute_global_op(op)
   rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
     # Only update if the existing rule belongs to this VM (check dest IP).
     # If another VM owns this priority (hash collision), log and skip.
@@ -161,20 +165,22 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   def update_policy_rule(desired)
     rule = build_policy_rule(desired)
-    credential.network_firewall_policies_client.patch_rule(
+    op = credential.network_firewall_policies_client.patch_rule(
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
       priority: desired[:priority],
       firewall_policy_rule_resource: rule
     )
+    wait_for_compute_global_op(op)
   end
 
   def delete_policy_rule(priority)
-    credential.network_firewall_policies_client.remove_rule(
+    op = credential.network_firewall_policies_client.remove_rule(
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
       priority:
     )
+    wait_for_compute_global_op(op)
   rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
     # Already deleted
   end

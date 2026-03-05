@@ -10,11 +10,15 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   let(:location) { instance_double(Location, name: "us-central1", location_credential: credential) }
   let(:vpc_name) { "ubicloud-us-central1" }
   let(:nfp_client) { instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client) }
+  let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }
   let(:credential) {
     instance_double(LocationCredential,
       network_firewall_policies_client: nfp_client,
+      global_operations_client: global_ops_client,
       project_id: "test-gcp-project")
   }
+  let(:lro_op) { instance_double(Gapic::GenericLRO::Operation, name: "op-12345") }
+  let(:done_op) { Google::Cloud::Compute::V1::Operation.new(status: :DONE) }
   let(:vm_dest_ip_range) { "10.0.0.1/32" }
 
   let(:vm_dest_ipv6_range) { "fd00::/128" }
@@ -566,6 +570,144 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).not_to receive(:remove_rule)
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "waits for LRO when creating a rule" do
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(22..23), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+      expect(nfp_client).to receive(:add_rule).and_return(lro_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-12345"
+      ).and_return(done_op)
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "raises when add_rule LRO fails" do
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(22..23), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+      expect(nfp_client).to receive(:add_rule).and_return(lro_op)
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(
+          errors: [Google::Cloud::Compute::V1::Errors.new(code: "RESOURCE_NOT_FOUND", message: "not found")]
+        )
+      )
+      expect(global_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /GCP global operation op-12345 failed/)
+    end
+
+    it "waits for LRO when updating a rule" do
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 10000,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: ["10.0.0.0/8"],
+          dest_ip_ranges: [vm_dest_ip_range],
+          layer4_configs: [Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, rules: [existing_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:patch_rule).and_return(lro_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-12345"
+      ).and_return(done_op)
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "raises when patch_rule LRO fails" do
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 10000,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          src_ip_ranges: ["10.0.0.0/8"],
+          dest_ip_ranges: [vm_dest_ip_range],
+          layer4_configs: [Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, rules: [existing_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:patch_rule).and_return(lro_op)
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(
+          errors: [Google::Cloud::Compute::V1::Errors.new(code: "RESOURCE_NOT_FOUND", message: "not found")]
+        )
+      )
+      expect(global_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /GCP global operation op-12345 failed/)
+    end
+
+    it "waits for LRO when deleting a stale rule" do
+      expect(vm).to receive(:firewall_rules).and_return([])
+
+      stale_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 12345,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [vm_dest_ip_range]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, rules: [stale_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).and_return(lro_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-12345"
+      ).and_return(done_op)
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "raises when remove_rule LRO fails" do
+      expect(vm).to receive(:firewall_rules).and_return([])
+
+      stale_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 12345,
+        direction: "INGRESS",
+        action: "allow",
+        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
+          dest_ip_ranges: [vm_dest_ip_range]
+        )
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, rules: [stale_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).and_return(lro_op)
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(
+          errors: [Google::Cloud::Compute::V1::Errors.new(code: "RESOURCE_IN_USE", message: "in use")]
+        )
+      )
+      expect(global_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /GCP global operation op-12345 failed/)
     end
   end
 end

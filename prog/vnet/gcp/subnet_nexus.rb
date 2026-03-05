@@ -437,21 +437,4 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   def gcp_region
     @gcp_region ||= private_subnet.location.name.delete_prefix("gcp-")
   end
-
-  def wait_for_compute_global_op(op)
-    # Poll until done, with a short timeout for inline waits
-    return unless op.respond_to?(:name)
-    5.times do
-      result = credential.global_operations_client.get(
-        project: gcp_project_id,
-        operation: op.name
-      )
-      if result.status == :DONE
-        raise "GCP global operation #{op.name} failed: #{op_error_message(result)}" if op_error?(result)
-        return
-      end
-      sleep 1
-    end
-    raise "GCP global operation #{op.name} did not complete within timeout"
-  end
 end
