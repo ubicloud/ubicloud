@@ -312,6 +312,30 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
       expect { nx.start }.to hop("wait_create_op")
     end
+
+    it "base64-encodes SSH keys so single quotes in key material do not break the startup script" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      tricky_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAA user's key with 'single' quotes"
+      allow_any_instance_of(Sshable).to receive(:keys).and_return([double(public_key: tricky_key)])
+
+      captured_startup = nil
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-b64")
+      expect(compute_client).to receive(:insert) do |args|
+        captured_startup = args[:instance_resource].metadata.items.find { |i| i.key == "startup-script" }.value
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+
+      # Script must pipe through base64 -d so single quotes in key material are safe
+      expect(captured_startup).to include("| base64 -d >")
+      # The embedded b64 must decode back to the original key (preserving special chars)
+      b64 = captured_startup[/echo '([A-Za-z0-9+\/=]+)'/, 1]
+      expect(Base64.strict_decode64(b64)).to eq(tricky_key)
+    end
   end
 
   describe "#wait_create_op" do
