@@ -25,11 +25,16 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     @polling_interval ||= 5 * 60
   end
 
+  def clock_time
+    Process.clock_gettime(Process::CLOCK_MONOTONIC)
+  end
+
   def check_queued_jobs
     unless github_repository.installation.project.active?
       @polling_interval = 24 * 60 * 60
       return
     end
+    deadline = clock_time + 80
     client = github_repository.installation.client(auto_paginate: true)
     queued_runs = client.repository_workflow_runs(github_repository.name, {status: "queued"})[:workflow_runs]
     Clog.emit("polled queued runs", {polled_queued_runs: {repository_name: github_repository.name, count: queued_runs.count}})
@@ -47,6 +52,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
 
     queued_labels = Hash.new(0)
     queued_runs.first(200).each do |run|
+      raise "strand runtime too long, exiting to avoid apoptosis" if deadline < clock_time
       jobs = client.workflow_run_attempt_jobs(github_repository.name, run[:id], run[:run_attempt])[:jobs]
 
       jobs.each do |job|

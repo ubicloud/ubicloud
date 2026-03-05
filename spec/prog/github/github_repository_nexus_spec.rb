@@ -76,6 +76,15 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       expect(nx.polling_interval).to eq(5 * 60)
     end
 
+    it "raises if runtime is too long" do
+      expect(nx).to receive(:clock_time).and_return(0, 81)
+      expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
+        {id: 1, run_attempt: 2, status: "queued"}
+      ]})
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
+      expect { nx.check_queued_jobs }.to raise_error(RuntimeError)
+    end
+
     it "naps until the resets_at if remaining quota is low" do
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: []})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 8, limit: 100, resets_at: now + 8 * 60)).at_least(:once)
