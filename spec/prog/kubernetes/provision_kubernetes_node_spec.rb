@@ -344,21 +344,21 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
     end
 
     it "naps if no pending or approved csr exists yet" do
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Pending/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk /Approved/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk /Pending/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
       expect { prog.approve_new_csr }.to nap(5)
     end
 
     it "skips approve if the csr is already approved" do
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk /Approved/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
       expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
       expect(kubernetes_cluster.reload.sync_worker_mesh_set?).to be true
     end
 
     it "approves the csr when it is pending" do
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Approved/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
-      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk '/Pending/ && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk /Approved/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("\n", 0))
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get csr --sort-by=.metadata.creationTimestamp | awk /Pending/' && /kubelet-serving/ && /'test-vm'/ {print $1}' | tail -1").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("csr-abc123\n", 0))
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf certificate approve csr-abc123").and_return(Net::SSH::Connection::Session::StringWithExitstatus.new("approved", 0))
       expect { prog.approve_new_csr }.to exit({node_id: prog.node.id})
       expect(kubernetes_cluster.reload.sync_internal_dns_config_set?).to be true
