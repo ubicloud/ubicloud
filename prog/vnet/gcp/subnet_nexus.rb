@@ -439,8 +439,12 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         project: gcp_project_id,
         operation: op.name
       )
-      return if result.status == :DONE
+      if result.status == :DONE
+        raise "GCP global operation #{op.name} failed: #{op_error_message(result)}" if op_error?(result)
+        return
+      end
       sleep 1
     end
+    raise "GCP global operation #{op.name} did not complete within timeout"
   end
 end

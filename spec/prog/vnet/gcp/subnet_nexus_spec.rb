@@ -750,6 +750,30 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       nx.send(:wait_for_compute_global_op, op)
     end
 
+    it "raises when operation completes with an error" do
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-test")
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "RESOURCE_ALREADY_EXISTS", message: "already exists")
+      failed_op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+      )
+      expect(global_ops_client).to receive(:get).and_return(failed_op)
+
+      expect { nx.send(:wait_for_compute_global_op, op) }
+        .to raise_error(RuntimeError, /op-test.*failed/)
+    end
+
+    it "raises when operation does not complete within polling timeout" do
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-test")
+      running = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+
+      expect(global_ops_client).to receive(:get).exactly(5).times.and_return(running)
+      allow(nx).to receive(:sleep)
+
+      expect { nx.send(:wait_for_compute_global_op, op) }
+        .to raise_error(RuntimeError, /op-test.*did not complete within timeout/)
+    end
+
     it "handles non-operation objects" do
       op = double("plain_op") # rubocop:disable RSpec/VerifiedDoubles
       expect { nx.send(:wait_for_compute_global_op, op) }.not_to raise_error
