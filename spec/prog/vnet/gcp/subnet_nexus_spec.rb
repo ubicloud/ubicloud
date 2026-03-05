@@ -641,7 +641,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
       )
       expect(nfp_client).to receive(:get_rule).twice.and_return(matching_rule)
-      expect(nfp_client).to receive(:remove_rule).twice
+      remove_op = instance_double(Gapic::GenericLRO::Operation, name: "op-remove-rule")
+      expect(nfp_client).to receive(:remove_rule).twice.and_return(remove_op)
+      allow(global_ops_client).to receive(:get).and_return(Google::Cloud::Compute::V1::Operation.new(status: :DONE))
 
       # delete_gcp_subnet
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")

@@ -351,11 +351,12 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       # Only delete if the rule belongs to this subnet (avoid deleting
       # another subnet's rule in case of a hash collision)
       next unless existing.match&.dest_ip_ranges&.any? { |r| subnet_cidrs.include?(r) }
-      credential.network_firewall_policies_client.remove_rule(
+      op = credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
         priority:
       )
+      wait_for_compute_global_op(op)
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       # Already deleted
     end
