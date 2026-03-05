@@ -348,7 +348,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
     if installation.cache_enabled
       command << NetSsh.command(<<~COMMAND, private_ipv4: vm.private_ipv4)
-        echo "CUSTOM_ACTIONS_CACHE_URL=http://:private_ipv4:51123/random_token/" | sudo tee -a /etc/environment > /dev/null
+        echo "CUSTOM_ACTIONS_CACHE_URL=http://":private_ipv4":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
       COMMAND
     end
 
