@@ -285,11 +285,16 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       )
     )
     wait_for_compute_global_op(assoc_op)
-  rescue Google::Cloud::AlreadyExistsError
-    # Another strand added the association concurrently — we're done
-  rescue Google::Cloud::InvalidArgumentError => e
-    raise unless e.message.include?("already exists")
-    # Same — association was just created by another strand
+  rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
+    raise if e.is_a?(Google::Cloud::InvalidArgumentError) && !e.message.include?("already exists")
+    # Another strand may have added an association concurrently. Re-fetch and
+    # confirm our VPC is actually associated — the name collision could be from
+    # a different VPC using the same association name.
+    refetched = credential.network_firewall_policies_client.get(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name
+    )
+    raise "GCP firewall policy #{firewall_policy_name} not associated with VPC #{gcp_vpc_name}" unless refetched.associations&.any? { |a| a.attachment_target == vpc_target }
   end
 
   def ensure_policy_rule(priority:, direction:, action:, src_ip_ranges: nil, dest_ip_ranges: nil, layer4_configs: nil)

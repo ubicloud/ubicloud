@@ -220,26 +220,31 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "adds association after AlreadyExistsError when VPC not yet associated" do
+    it "raises when association name is taken by a different VPC (name conflict edge case)" do
+      # ensure_firewall_policy: get returns policy without our association
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
 
-      # verify_firewall_policy_association re-fetches and finds the association missing
+      # verify_firewall_policy_association: first get shows policy without our association
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
+      # add_association also fails — then rescue re-fetches and finds our VPC still unassociated
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name, attachment_target: "projects/test-gcp-project/global/networks/other-vpc"
+            )
+          ])
+      )
 
-      assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-retry")
-      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
-      expect(nfp_client).to receive(:add_association).and_return(assoc_op)
-      expect(global_ops_client).to receive(:get).with(
-        project: "test-gcp-project", operation: "op-assoc-retry"
-      ).and_return(done_op)
-
-      expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
+      expect { nx.create_firewall_policy }.to raise_error(RuntimeError, /not associated with VPC/)
     end
 
     it "handles InvalidArgumentError with 'already exists' on association, verifies association present" do
