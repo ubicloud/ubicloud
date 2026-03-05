@@ -331,7 +331,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     if existing
       # If an existing rule at this priority doesn't match our desired state
-      # (e.g., hash collision from another subnet), overwrite it with ours.
+      # (e.g., priority collision from concurrent allocation), overwrite it with ours.
       # We overwrite (rather than skip) because subnet allow rules only run
       # once during provisioning — skipping would permanently leave this
       # subnet without egress allow rules, breaking intra-subnet traffic.
@@ -381,7 +381,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         priority:
       )
       # Only delete if the rule belongs to this subnet (avoid deleting
-      # another subnet's rule in case of a hash collision)
+      # another subnet's rule in case of a priority collision)
       next unless existing.match&.dest_ip_ranges&.any? { |r| subnet_cidrs.include?(r) }
       op = credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,

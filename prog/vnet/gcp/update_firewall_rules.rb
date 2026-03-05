@@ -146,7 +146,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       )
     rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
       # Only update if the existing rule belongs to this VM (check dest IP).
-      # If another VM owns this priority (hash collision), log and skip.
+      # If another VM owns this priority (concurrent allocation conflict), log and skip.
       existing = credential.network_firewall_policies_client.get_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
