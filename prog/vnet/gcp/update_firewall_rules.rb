@@ -140,27 +140,30 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   def create_policy_rule(desired)
     rule = build_policy_rule(desired)
-    op = credential.network_firewall_policies_client.add_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      firewall_policy_rule_resource: rule
-    )
-    wait_for_compute_global_op(op)
-  rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
-    # Only update if the existing rule belongs to this VM (check dest IP).
-    # If another VM owns this priority (hash collision), log and skip.
-    existing = credential.network_firewall_policies_client.get_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      priority: desired[:priority]
-    )
-    vm_dest_ranges = [vm_dest_ip_range, vm_dest_ipv6_range].compact.uniq
-    if existing.match&.dest_ip_ranges&.any? { |r| vm_dest_ranges.include?(r) }
-      update_policy_rule(desired)
-    else
-      Clog.emit("GCP firewall priority collision, skipping update",
-        {gcp_priority_collision: {vm: vm.name, priority: desired[:priority]}})
+    op = begin
+      credential.network_firewall_policies_client.add_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        firewall_policy_rule_resource: rule
+      )
+    rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
+      # Only update if the existing rule belongs to this VM (check dest IP).
+      # If another VM owns this priority (hash collision), log and skip.
+      existing = credential.network_firewall_policies_client.get_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        priority: desired[:priority]
+      )
+      vm_dest_ranges = [vm_dest_ip_range, vm_dest_ipv6_range].compact.uniq
+      if existing.match&.dest_ip_ranges&.any? { |r| vm_dest_ranges.include?(r) }
+        update_policy_rule(desired)
+      else
+        Clog.emit("GCP firewall priority collision, skipping update",
+          {gcp_priority_collision: {vm: vm.name, priority: desired[:priority]}})
+      end
+      return
     end
+    wait_for_compute_global_op(op)
   end
 
   def update_policy_rule(desired)
@@ -175,14 +178,16 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def delete_policy_rule(priority)
-    op = credential.network_firewall_policies_client.remove_rule(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-      priority:
-    )
+    op = begin
+      credential.network_firewall_policies_client.remove_rule(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        priority:
+      )
+    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
+      return # Already deleted
+    end
     wait_for_compute_global_op(op)
-  rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-    # Already deleted
   end
 
   def build_policy_rule(desired)
