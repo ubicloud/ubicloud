@@ -152,6 +152,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         project: "test-gcp-project", operation: "op-policy"
       ).and_return(done_op)
 
+      # Re-fetch after creation to check associations
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      )
+
       assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc")
       expect(nfp_client).to receive(:add_association) do |args|
         expect(args[:firewall_policy]).to eq(vpc_name)
@@ -199,83 +204,52 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "handles AlreadyExistsError on association from concurrent strands, verifies association present" do
-      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+    it "proceeds when association raises AlreadyExistsError from concurrent strand" do
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
-
-      # verify_firewall_policy_association re-fetches and finds the association present
-      expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
-          associations: [
-            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
-              name: vpc_name, attachment_target: vpc_target
-            )
-          ])
-      )
 
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "naps when verify finds association not yet visible after AlreadyExistsError" do
-      expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
-      )
-      expect(nfp_client).to receive(:add_association)
-        .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
-
-      # verify_firewall_policy_association re-fetches but association not visible yet
-      expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
-      )
-
-      expect { nx.create_firewall_policy }.to nap(5)
-    end
-
-    it "handles InvalidArgumentError with 'already exists' on association, verifies association present" do
-      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+    it "proceeds when association raises InvalidArgumentError with 'already exists'" do
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
 
-      # verify_firewall_policy_association re-fetches and finds the association present
-      expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
-          associations: [
-            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
-              name: vpc_name, attachment_target: vpc_target
-            )
-          ])
-      )
-
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "naps when verify finds no association after AlreadyExistsError from policy insert" do
+    it "re-fetches and adds association after AlreadyExistsError from policy insert" do
       expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("policy already exists"))
 
-      # verify_firewall_policy_association re-fetches but association not visible yet
+      # Re-fetch returns policy without association → adds association
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
       )
+      assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-recovery")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(nfp_client).to receive(:add_association).and_return(assoc_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-assoc-recovery"
+      ).and_return(done_op)
 
-      expect { nx.create_firewall_policy }.to nap(5)
+      expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "finds association present after AlreadyExistsError from policy insert" do
+    it "skips association after AlreadyExistsError from policy insert when already associated" do
       vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
       expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("policy already exists"))
 
-      # verify_firewall_policy_association re-fetches and finds the association already present
+      # Re-fetch returns policy with association already present
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
           associations: [
@@ -310,16 +284,22 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     # rubocop:disable RSpec/VerifiedDoubles
-    it "naps when verify finds nil associations (nil-safe &. branch)" do
-      # Trigger verify_firewall_policy_association via AlreadyExistsError on insert
+    it "adds association when re-fetch after insert AlreadyExistsError returns nil associations" do
       expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
 
-      # verify_firewall_policy_association: get returns policy with nil associations
+      # Re-fetch returns policy with nil associations
       policy_nil_assoc = double("policy", associations: nil)
       expect(nfp_client).to receive(:get).and_return(policy_nil_assoc)
 
-      expect { nx.create_firewall_policy }.to nap(5)
+      assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-nil")
+      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(nfp_client).to receive(:add_association).and_return(assoc_op)
+      expect(global_ops_client).to receive(:get).with(
+        project: "test-gcp-project", operation: "op-assoc-nil"
+      ).and_return(done_op)
+
+      expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
     # rubocop:enable RSpec/VerifiedDoubles
   end

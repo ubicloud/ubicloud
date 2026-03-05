@@ -233,20 +233,33 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         firewall_policy: firewall_policy_name
       )
     rescue Google::Cloud::NotFoundError
-      op = credential.network_firewall_policies_client.insert(
-        project: gcp_project_id,
-        firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
-          name: firewall_policy_name,
-          description: "Ubicloud network firewall policy for #{gcp_vpc_name}"
+      begin
+        op = credential.network_firewall_policies_client.insert(
+          project: gcp_project_id,
+          firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
+            name: firewall_policy_name,
+            description: "Ubicloud network firewall policy for #{gcp_vpc_name}"
+          )
         )
-      )
-      wait_for_compute_global_op(op)
+        wait_for_compute_global_op(op)
+      rescue Google::Cloud::AlreadyExistsError
+        # Policy created by a concurrent strand between our GET and INSERT.
+      end
       nil
     end
 
+    # Re-fetch when we just created the policy (or a concurrent strand did)
+    # so we can check existing associations.
+    policy ||= credential.network_firewall_policies_client.get(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name
+    )
+
     # Ensure the policy is associated with the VPC network
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}"
-    unless policy&.associations&.any? { |a| a.attachment_target == vpc_target }
+    return if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+
+    begin
       assoc_op = credential.network_firewall_policies_client.add_association(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
@@ -256,40 +269,20 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         )
       )
       wait_for_compute_global_op(assoc_op)
-    end
-  rescue Google::Cloud::AlreadyExistsError
-    # Policy or association may have been created by a concurrent strand.
-    # Re-fetch and verify our VPC is actually associated.
-    verify_firewall_policy_association
-  rescue Google::Cloud::InvalidArgumentError => e
-    if e.message.include?("already exists")
-      # GCP returns InvalidArgumentError (not AlreadyExistsError) when the
-      # association name is already taken — re-fetch and verify the association.
-      verify_firewall_policy_association
-    elsif e.message.include?("is not ready")
-      # VPC network may not be fully propagated after creation LRO completes.
-      # Nap and let the strand retry from create_firewall_policy.
-      Clog.emit("GCP resource not ready for association, will retry",
-        {gcp_resource_not_ready: {policy: firewall_policy_name, vpc: gcp_vpc_name, error: e.message}})
-      nap 5
-    else
-      raise
-    end
-  end
-
-  def verify_firewall_policy_association
-    # Re-fetch the policy and verify our VPC is associated.
-    # If the association isn't visible yet (GCP eventual consistency),
-    # the strand will retry on the next iteration via create_firewall_policy.
-    policy = credential.network_firewall_policies_client.get(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name
-    )
-    vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc_name}"
-    unless policy.associations&.any? { |a| a.attachment_target == vpc_target }
-      Clog.emit("GCP firewall policy association not yet visible, will retry",
-        {gcp_association_pending: {policy: firewall_policy_name, vpc: gcp_vpc_name}})
-      nap 5
+    rescue Google::Cloud::AlreadyExistsError
+      # Association created by a concurrent strand — proceed.
+    rescue Google::Cloud::InvalidArgumentError => e
+      if e.message.include?("already exists")
+        # GCP returns InvalidArgumentError (not AlreadyExistsError) when the
+        # association name is already taken — proceed.
+      elsif e.message.include?("is not ready")
+        # VPC network may not be fully propagated after creation LRO completes.
+        Clog.emit("GCP resource not ready for association, will retry",
+          {gcp_resource_not_ready: {policy: firewall_policy_name, vpc: gcp_vpc_name, error: e.message}})
+        nap 5
+      else
+        raise
+      end
     end
   end
 
