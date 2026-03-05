@@ -365,7 +365,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     return unless vm_ip
 
     vm_dest_ranges = ["#{vm_ip}/32"]
-    vm_ipv6 = nic&.private_ipv6&.network&.to_s
+    vm_ipv6 = nic.private_ipv6&.network&.to_s
     vm_dest_ranges << "#{vm_ipv6}/128" if vm_ipv6
 
     (policy.rules || []).each do |rule|

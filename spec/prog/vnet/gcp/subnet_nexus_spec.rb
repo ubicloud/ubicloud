@@ -374,6 +374,34 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       expect { nx.create_firewall_policy }.to raise_error(RuntimeError, /not associated with VPC/)
     end
+
+    it "succeeds when refetch finds our VPC associated after concurrent conflict (else branch line 297)" do
+      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+      # Trigger verify_firewall_policy_association via AlreadyExistsError on insert
+      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # verify_firewall_policy_association: get returns policy without our association
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      )
+
+      # add_association inside verify raises AlreadyExistsError (concurrent strand)
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
+
+      # refetch finds our VPC is now properly associated (else branch: don't raise)
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name, attachment_target: vpc_target
+            )
+          ])
+      )
+
+      expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
+    end
     # rubocop:enable RSpec/VerifiedDoubles
   end
 

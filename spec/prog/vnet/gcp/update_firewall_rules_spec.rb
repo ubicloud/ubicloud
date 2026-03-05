@@ -731,6 +731,20 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /NIC has no firewall_base_priority/)
     end
 
+    it "raises when vm has no nics (covers &.first nil branch at line 99)" do
+      # vm.nics returns empty array → nics.first returns nil → nil&.nic_gcp_resource is nil
+      allow(vm).to receive(:nics).and_return([])
+      nx.instance_variable_set(:@vm_rule_base_priority, nil)
+
+      rules = [
+        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
+          port_range: Sequel.pg_range(22..23), protocol: "tcp")
+      ]
+      expect(vm).to receive(:firewall_rules).and_return(rules)
+
+      expect { nx.update_firewall_rules }.to raise_error(RuntimeError, /NIC has no firewall_base_priority/)
+    end
+
     it "returns empty existing rules when private_ipv4 is nil (covers &.private_ipv4 nil branch)" do
       nic = instance_double(Nic)
       nic_gcp_resource = instance_double(NicGcpResource, firewall_base_priority: 10000)

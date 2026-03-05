@@ -847,10 +847,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "skips adding IPv6 dest range when private_ipv6 is nil" do
       ensure_nic_gcp_resource(vm.nics.first)
-      vm_ip = vm.nic.private_ipv4.network.to_s
+      nic = vm.nic
+      vm_ip = nic.private_ipv4.network.to_s
       vm_dest = "#{vm_ip}/32"
 
-      allow(vm.nic).to receive(:private_ipv6).and_return(nil)
+      allow(nic).to receive(:private_ipv6).and_return(nil)
+      nx.instance_variable_set(:@nic, nic)
 
       matching_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 12345,
