@@ -120,7 +120,8 @@ class KubernetesCluster < Sequel::Model
       next {node: kd.ubid, healthy: false} unless pod_name
 
       host, port = connectivity_check_target.split(":", 2)
-      cmd = NetSsh.command("timeout 3 bash -c \"echo > /dev/tcp/:host/:port\" && echo OK-:nodename || echo FAIL", host:, port:, nodename: kd.name)
+      cmd = NetSsh.command("echo > /dev/tcp/:host/:port", host:, port:)
+      cmd = NetSsh.command("timeout 3 bash -c :cmd && echo OK-:nodename || echo FAIL", nodename: kd.name, cmd:)
       res = client.kubectl("exec -n ubicsi :pod_name -- sh -c :cmd", pod_name:, cmd:)
       {node: kd.ubid, healthy: res[/OK-#{kd.name}/] ? true : false}
     end
