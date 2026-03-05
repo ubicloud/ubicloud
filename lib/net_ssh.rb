@@ -14,6 +14,14 @@ module NetSsh
     WarnUnsafe.convert(command, self, __callee__, **)
   end
 
+  # :nocov:
+  if Config.unfrozen_test?
+    # :nocov:
+    def self.prod_command(command, **)
+      WarnUnsafe.convert(command, self, nil, **)
+    end
+  end
+
   def self.combine(*commands, joiner: " ")
     # This will check that both command strings are already frozen before joining them.
     commands.map { WarnUnsafe.convert(it, self, __callee__) }.join(joiner).freeze
@@ -25,21 +33,78 @@ module NetSsh
 
       if command.frozen?
         unless kw.empty?
-          re = /:(#{Regexp.union(kw.keys.map(&:to_s))})\b/
-          result = +""
-          until command.empty?
-            pre, _, command = command.partition(re)
-            q = $1
-            result << pre
-            if q && !q.empty?
-              v = kw[q.to_sym]
-              result << if q.start_with?("shelljoin_")
-                v.shelljoin
+          if Config.unfrozen_test? && method
+            result = +""
+            mode = :unquoted
+            base_re = Regexp.union(kw.keys.map(&:to_s))
+            unquoted_re, single_re, double_re = nil
+            until command.empty?
+              re = case mode
+              when :unquoted
+                unquoted_re ||= /(\\.|['"]|#.*$)|:(#{base_re})\b/
+              when :single
+                single_re ||= /(')|:(#{base_re})\b/
+              else # :double
+                double_re ||= /(\\.|")|:(#{base_re})\b/
+              end
+
+              pre, _, command = command.partition(re)
+              ch = $1
+              q = $2
+
+              if ch
+                case mode
+                when :unquoted
+                  case ch
+                  when "'"
+                    mode = :single
+                  when '"'
+                    mode = :double
+                  end
+                when :single
+                  mode = :unquoted
+                else # :double
+                  mode = :unquoted if ch == '"'
+                end
+                result << pre << ch
+              elsif mode != :unquoted
+                if q && !q.empty?
+                  raise PotentialInsecurity, "Placeholder '#{q}' inside #{mode} quote in command at #{caller(2, 1).first}\nFix command to move the placeholder outside quotes, because shell escaping does not work correctly inside quotes."
+                end
               else
-                v.to_s.shellescape
+                result << pre
+                if q && !q.empty?
+                  v = kw[q.to_sym]
+                  result << if q.start_with?("shelljoin_")
+                    v.shelljoin
+                  else
+                    v.to_s.shellescape
+                  end
+                end
+              end
+            end
+
+            unless mode == :unquoted
+              raise PotentialInsecurity, "Unterminated #{mode} quote in command at #{caller(2, 1).first}\nFix command syntax."
+            end
+          else
+            re = /:(#{Regexp.union(kw.keys.map(&:to_s))})\b/
+            result = +""
+            until command.empty?
+              pre, _, command = command.partition(re)
+              q = $1
+              result << pre
+              if q && !q.empty?
+                v = kw[q.to_sym]
+                result << if q.start_with?("shelljoin_")
+                  v.shelljoin
+                else
+                  v.to_s.shellescape
+                end
               end
             end
           end
+
           command = result.freeze
         end
       else
