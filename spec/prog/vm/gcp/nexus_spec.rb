@@ -863,6 +863,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect { nx.wait_destroy_op }.to hop("finalize_destroy")
     end
+
+    it "raises when operation completes with an error" do
+      error = Google::Cloud::Compute::V1::Error.new(errors: [Google::Cloud::Compute::V1::Errors.new(code: "RESOURCE_NOT_FOUND", message: "instance not found")])
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE, error:)
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect { nx.wait_destroy_op }.to raise_error(RuntimeError, /GCE instance deletion failed/)
+    end
   end
 
   describe "#finalize_destroy" do

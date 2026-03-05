@@ -267,6 +267,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     unless op.status == :DONE
       nap 5
     end
+    raise "GCE instance deletion failed: #{op_error_message(op)}" if op_error?(op)
     clear_gcp_op
     hop_finalize_destroy
   end
