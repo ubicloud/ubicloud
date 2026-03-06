@@ -5,8 +5,10 @@ require "netaddr"
 
 RSpec.describe Prog::Test::Vm do
   subject(:vm_test) {
-    described_class.new(Strand.new(prog: "Test::Vm"))
+    described_class.new(Strand.create(prog: "Test::Vm", label: "start"))
   }
+
+  let(:strand) { vm_test.strand }
 
   let(:sshable) {
     Sshable.new
@@ -71,8 +73,8 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=~/1.txt bs=512 count=1000000")
       expect(sshable).to receive(:_cmd).with("sync ~/1.txt")
       expect(sshable).to receive(:_cmd).with("ls -s ~/1.txt").and_return "300 /home/xyz/1.txt"
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected size after dd"})
       expect { vm_test.verify_dd }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "unexpected size after dd"})
     end
   end
 
@@ -101,16 +103,16 @@ RSpec.describe Prog::Test::Vm do
     it "fails if number of files is unexpected" do
       expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\n")
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "persistence test: unexpected number of files"})
       expect { vm_test.storage_persistence }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "persistence test: unexpected number of files"})
     end
 
     it "fails if file content mismatches" do
       expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
       expect(sshable).to receive(:_cmd).with("sha256sum /home/ubi/persistence_test/sha256_1 | awk '{print $1}'").and_return("different_sha256")
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "persistence test: file content mismatch"})
       expect { vm_test.storage_persistence }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "persistence test: file content mismatch"})
     end
   end
 
@@ -138,8 +140,8 @@ RSpec.describe Prog::Test::Vm do
 
     it "fails to install packages if the vm has unexpected boot image" do
       expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "windows")).at_least(:once)
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "unexpected boot image: windows"})
       expect { vm_test.install_packages }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "unexpected boot image: windows"})
     end
   end
 
@@ -235,15 +237,15 @@ RSpec.describe Prog::Test::Vm do
 
     it "fails if read mbytes per sec exceeds the limit" do
       expect(vm_test).to receive(:get_read_bw_bytes).and_return 280 * 1024 * 1024
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "exceeded read bw limit: 293601280"})
       expect { vm_test.verify_io_rates }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "exceeded read bw limit: 293601280"})
     end
 
     it "fails if write mbytes per sec exceeds the limit" do
       expect(vm_test).to receive(:get_read_bw_bytes).and_return 200 * 1024 * 1024
       expect(vm_test).to receive(:get_write_bw_bytes).and_return 320 * 1024 * 1024
-      expect(vm_test.strand).to receive(:update).with(exitval: {msg: "exceeded write bw limit: 335544320"})
       expect { vm_test.verify_io_rates }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "exceeded write bw limit: 335544320"})
     end
   end
 
