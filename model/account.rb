@@ -58,6 +58,11 @@ class Account < Sequel::Model(:accounts)
     PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: true)
     ProjectInvitation.where(inviter_id: id).destroy
   end
+
+  def unsuspend
+    update(suspended_at: nil)
+    PaymentMethod.where(billing_info_id: projects_dataset.select(:billing_info_id)).update(fraud: false)
+  end
 end
 
 # Table: accounts

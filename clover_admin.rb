@@ -198,7 +198,8 @@ class CloverAdmin < Roda
 
   OBJECT_ACTIONS = {
     "Account" => {
-      "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend)
+      "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
+      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend)
     },
     "Invoice" => {
       "download_pdf" => object_action("Download PDF", type: :direct) do |obj|
