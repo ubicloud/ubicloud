@@ -102,4 +102,15 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("WebAuthn authentication is now setup")
     expect(page.title).to eq "Ubicloud Admin"
   end
+
+  it "supports admins closing their own accounts" do
+    admin_account_setup_and_login
+    click_link "Close Account"
+    fill_in "Password", with: @password
+    expect(Clog).to receive(:emit).with("Admin account closed", {admin_account_closed: {account_closed: "admin", closer: "admin"}}).and_call_original
+    click_button "Close Account"
+    expect(page).to have_flash_notice("Your account has been closed")
+    expect(page.title).to eq "Ubicloud Admin - Login"
+    expect(DB[:admin_account].count).to eq 0
+  end
 end
