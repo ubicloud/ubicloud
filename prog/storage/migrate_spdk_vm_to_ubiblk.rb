@@ -162,9 +162,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
   end
 
   label def start_vm
-    vm.vm_host.sshable.cmd("sudo systemctl start :inhost_name", inhost_name:)
-    vm.strand.update(label: "wait")
-
+    vm.incr_start
     pop "Vm successfully migrated to ubiblk"
   end
 
