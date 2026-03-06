@@ -197,6 +197,7 @@ class Clover < Roda
   def after_rodauth_create_account(account_id)
     account = Account[account_id]
     account.default_project = account.create_project_with_default_policy("Default")
+    Strand.create(prog: "CheckDomainBlacklist", label: "start", stack: [{subject_id: account_id}])
   end
 
   def current_account_id
