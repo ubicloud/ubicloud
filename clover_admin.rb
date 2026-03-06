@@ -658,9 +658,10 @@ class CloverAdmin < Roda
         if (actions = OBJECT_ACTIONS[@obj.class.name])
           r.is actions.keys do |key|
             action = actions[key]
+            action_type = action.type
 
-            r.get do
-              if action.type == :direct
+            r.get(action_type != :form) do
+              if action_type == :direct
                 url = action.call(@obj) || fail(CloverError.new(400, "InvalidRequest", "Action link is not available"))
                 r.redirect url
               end
@@ -669,10 +670,10 @@ class CloverAdmin < Roda
               view("object_action")
             end
 
-            r.post do
+            r.post(action_type != :direct) do
               params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
               result = action.call(@obj, *params)
-              if action.type == :content
+              if action_type == :content
                 view(content: result)
               else
                 flash["notice"] = action.flash
