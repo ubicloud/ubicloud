@@ -142,7 +142,7 @@ class CloverAdmin < Roda
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
 
   plugin :rodauth, route_csrf: true do
-    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account
+    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account, :internal_request
     accounts_table :admin_account
     password_hash_table :admin_password_hash
     webauthn_keys_table :admin_webauthn_key
@@ -171,7 +171,8 @@ class CloverAdmin < Roda
     close_account_redirect "/login"
     before_close_account do
       login = account_from_session[:login]
-      Clog.emit("Admin account closed", {admin_account_closed: {account_closed: login}})
+      closer = session[:closer] || login
+      Clog.emit("Admin account closed", {admin_account_closed: {account_closed: login, closer:}})
     end
 
     password_minimum_length 16
@@ -770,6 +771,20 @@ class CloverAdmin < Roda
     r.get "admin-list" do
       @admins = DB[:admin_account].select_order_map(:login)
       view("admin_list")
+    end
+
+    r.post "close-admin-account" do
+      login = typecast_params.nonempty_str!("login")
+
+      begin
+        CloverAdmin.rodauth.close_account(account_login: login, session: {closer: rodauth.account_from_session[:login]})
+      rescue Rodauth::InternalRequestError
+        flash["error"] = "Unable to close admin account for #{login.inspect}."
+      else
+        flash["notice"] = "Admin account #{login.inspect} closed."
+      end
+
+      r.redirect "/admin-list"
     end
 
     r.root do
