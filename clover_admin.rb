@@ -194,7 +194,7 @@ class CloverAdmin < Roda
       "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
     },
     "GithubRepository" => {
-      "show_job_log" => object_action("Show Job Log", params: {job_id: :pos_int!}) do |obj, job_id|
+      "show_job_log" => object_action("Show Job Log", params: {job_id: :pos_int!}, type: :content) do |obj, job_id|
         url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       end
@@ -672,8 +672,7 @@ class CloverAdmin < Roda
             r.post do
               params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
               result = action.call(@obj, *params)
-              case result
-              when /\A\s*</
+              if action.type == :content
                 view(content: result)
               else
                 flash["notice"] = action.flash
