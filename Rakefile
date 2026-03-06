@@ -257,7 +257,12 @@ task "coverage_pspec" do
   command = "bash -o pipefail -c 'bundle exec turbo_tests -n #{nproc.call} 2>&1 | tee #{output_file}'"
   sh({"RUBYOPT" => "-w", "RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1", "COVERAGE" => "1", "RODA_RENDER_COMPILED_METHOD_SUPPORT" => "no"}, command)
   command_output = File.binread(output_file)
-  unless command_output.include?("Line Coverage: 100.0%") && command_output.include?("Branch Coverage: 100.0%")
+  coverages = %w[Line Branch].map! do |type|
+    if (match = command_output.match(/#{type} Coverage: 100\.0% \((\d+) \/ (\d+)\)/))
+      match[1] == match[2]
+    end
+  end
+  unless coverages.all?
     warn "SimpleCov failed with exit 2 due to a coverage related error"
     exit(2)
   end
