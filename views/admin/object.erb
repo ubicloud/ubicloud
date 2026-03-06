@@ -33,11 +33,10 @@
 <% if actions = OBJECT_ACTIONS[@obj.class.name] %>
   <div id="action-list">Actions:
     <% actions.each do |key, action| %>
-      <% case action.type %>
-      <% when :normal, :direct %>
-        <a href="/model/<%= @obj.class.name %>/<%= @obj.ubid %>/<%= key %>"><%= action.label %></a>
-      <% when :form %>
+      <% if action.type == :form %>
         <%== form({action: "/model/#{@obj.class.name}/#{@obj.ubid}/#{key}", method: :post}, button: action.label) %>
+      <% else %>
+        <a href="/model/<%= @obj.class.name %>/<%= @obj.ubid %>/<%= key %>"><%= action.label %></a>
       <% end %>
     <% end %>
   </div>
