@@ -30,6 +30,17 @@ RSpec.describe Account do
       .and change { project.invitations_dataset.count }.from(1).to(0)
   end
 
+  it "unsuspend" do
+    project = account.create_project_with_default_policy("project-1")
+    project.update(billing_info_id: BillingInfo.create(stripe_id: "cus123").id)
+    payment_method = project.billing_info.add_payment_method(stripe_id: "pm123")
+    payment_method.update(fraud: true)
+    account.update(suspended_at: Time.now)
+    expect { account.unsuspend }
+      .to change(account, :suspended_at).to(nil)
+      .and change { payment_method.reload.fraud }.from(true).to(false)
+  end
+
   describe ".create_project_with_default_policy" do
     it "sets reputation new" do
       project = account.create_project_with_default_policy("project-2")

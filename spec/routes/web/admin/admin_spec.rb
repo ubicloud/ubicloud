@@ -884,7 +884,7 @@ RSpec.describe CloverAdmin do
     expect(page).to have_content("Job not found")
   end
 
-  it "supports suspending Accounts" do
+  it "supports suspending and unsuspending Accounts" do
     account = create_account(with_project: false)
     fill_in "UBID or UUID", with: account.ubid
     click_button "Show Object"
@@ -896,6 +896,12 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Account suspended")
     expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
     expect(account.reload.suspended_at).not_to be_nil
+
+    click_link "Unsuspend"
+    click_button "Unsuspend"
+    expect(page).to have_flash_notice("Account unsuspended")
+    expect(page.title).to eq "Ubicloud Admin - Account #{account.ubid}"
+    expect(account.reload.suspended_at).to be_nil
   end
 
   it "supports resolving Pages" do
