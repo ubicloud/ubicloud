@@ -38,6 +38,46 @@ jobs:
             platform: linux/amd64
           - runner: ubicloud-premium-8-ubuntu-2404
             platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2204
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
+          - runner: ubicloud-premium-8-ubuntu-2404
+            platform: linux/amd64
 
     steps:
       - name: Check out code
