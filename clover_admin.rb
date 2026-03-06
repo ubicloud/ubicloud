@@ -197,6 +197,8 @@ class CloverAdmin < Roda
       "show_job_log" => object_action("Show Job Log", params: {job_id: :pos_int!}, type: :content) do |obj, job_id|
         url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
+      rescue Octokit::NotFound
+        "Job not found"
       end
     },
     "Page" => {

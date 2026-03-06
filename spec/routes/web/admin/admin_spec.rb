@@ -868,6 +868,22 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link("Download Job Log", href: "https://example.com/logs/12345.zip")
   end
 
+  it "shows job not found for GithubRepository when job id is invalid" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    visit "/model/GithubRepository/#{repo.ubid}"
+    click_link "Show Job Log"
+
+    client = double
+    expect(Github).to receive(:installation_client).and_return(client)
+    expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 99999).and_raise(Octokit::NotFound)
+
+    fill_in "job_id", with: "99999"
+    click_button "Show Job Log"
+    expect(page).to have_content("Job not found")
+  end
+
   it "supports suspending Accounts" do
     account = create_account(with_project: false)
     fill_in "UBID or UUID", with: account.ubid
