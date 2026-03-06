@@ -106,6 +106,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
     it "deletes resource and pops" do
       # No repositories or runners - installation can be destroyed
       installation_id = github_installation.id
+      GithubCustomLabel.create(installation_id:, name: "custom-label", alias_for: "ubicloud-standard-2")
       expect { dgi.wait_resource_destroy }.to exit({"msg" => "github installation destroyed"})
       expect(GithubInstallation[installation_id]).to be_nil
     end
