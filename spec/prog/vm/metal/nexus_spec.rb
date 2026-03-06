@@ -740,6 +740,8 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#before_destroy" do
+    before { allow(nx).to receive(:collect_cpu_stats) }
+
     it "stops billing" do
       adr = Address.create(cidr: "192.168.1.0/24", routed_to_host_id: vm_host.id)
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
@@ -1205,6 +1207,45 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(nx).to receive(:host).and_return(nil).at_least(:once)
 
       expect { nx.destroy }.to hop("destroy_slice")
+    end
+  end
+
+  describe "#collect_cpu_stats" do
+    it "collects cpu stats for vm and vhost storage volumes" do
+      vbb = VhostBlockBackend.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100)
+      dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 80)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: dev.id, vhost_block_backend_id: vbb.id, vring_workers: 1)
+      slice = VmHostSlice.create(vm_host_id: vm_host.id, name: "standard", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 200, total_memory_gib: 8, used_memory_gib: 8)
+      vm.update(vm_host_slice_id: slice.id)
+
+      expect(sshable).to receive(:_cmd).with("cat /sys/fs/cgroup/standard.slice/#{nx.vm_name}.service/cpu.stat 2>/dev/null", timeout: 5).and_return("user_usec 100\nsystem_usec 200\nusage_usec 300\n")
+      expect(sshable).to receive(:_cmd).with("cat /sys/fs/cgroup/standard.slice/#{nx.vm_name}-0-storage.service/cpu.stat 2>/dev/null", timeout: 5).and_return("user_usec 50\nsystem_usec 60\nusage_usec 110\n")
+      expect(Clog).to receive(:emit).with("VM destroy stats", {vm_destroy_stats: {vm: {"user_usec" => 100, "system_usec" => 200, "usage_usec" => 300}, storage_0: {"user_usec" => 50, "system_usec" => 60, "usage_usec" => 110}}})
+
+      nx.collect_cpu_stats
+    end
+
+    it "uses system.slice when no vm_host_slice and skips non-vhost storage volumes" do
+      dev = StorageDevice.create(name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 80)
+      si = SpdkInstallation.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: true, storage_device_id: dev.id, spdk_installation_id: si.id)
+
+      expect(sshable).to receive(:_cmd).with("cat /sys/fs/cgroup/system.slice/#{nx.vm_name}.service/cpu.stat 2>/dev/null", timeout: 5).and_return("nr_periods 10\nuser_usec 100\n")
+      expect(Clog).to receive(:emit).with("VM destroy stats", {vm_destroy_stats: {vm: {"user_usec" => 100}}})
+
+      nx.collect_cpu_stats
+    end
+
+    it "returns nil when host is nil" do
+      expect(nx).to receive(:host).and_return(nil)
+      expect(nx.collect_cpu_stats).to be_nil
+    end
+
+    it "logs error if stats collection fails" do
+      expect(sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("cat", "", "connection refused", 1, nil))
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", hash_including(:failed_vm_destroy_stats))
+
+      nx.collect_cpu_stats
     end
   end
 

@@ -34,6 +34,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
     vm.assigned_vm_address&.active_billing_record&.finalize
+    collect_cpu_stats
   end
 
   label def start
@@ -624,5 +625,28 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def hard_stop
     host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
+  end
+
+  def collect_cpu_stats
+    return unless host
+
+    cgroup = vm.vm_host_slice&.inhost_name || "system.slice"
+    stats = {vm: read_cpu_stat(cgroup, "#{vm_name}.service")}
+    vm.vm_storage_volumes.each do |vol|
+      next unless vol.vhost_block_backend_id
+      stats[:"storage_#{vol.disk_index}"] = read_cpu_stat(cgroup, vol.vhost_backend_systemd_unit_name)
+    end
+
+    Clog.emit("VM destroy stats", vm_destroy_stats: stats)
+  rescue => e
+    Clog.emit("Failed to collect VM destroy stats", failed_vm_destroy_stats: {error: e.message})
+  end
+
+  def read_cpu_stat(slice, unit)
+    str = host.sshable.cmd("cat /sys/fs/cgroup/:slice/:unit/cpu.stat 2>/dev/null", slice:, unit:, timeout: 5)
+    str.each_line.with_object({}) do |line, h|
+      k, v = line.split
+      h[k] = v.to_i if %w[user_usec system_usec usage_usec].include?(k)
+    end
   end
 end
