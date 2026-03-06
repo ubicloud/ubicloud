@@ -1070,6 +1070,15 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
+  it "shows admin list" do
+    click_link "View Admin List"
+    expect(page.title).to eq "Ubicloud Admin - Admin List"
+    expect(page.all("#admin-list li").map(&:text)).to eq ["admin"]
+    DB[:admin_account].insert(login: "foo")
+    page.refresh
+    expect(page.all("#admin-list li").map(&:text)).to eq ["admin", "foo"]
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")
