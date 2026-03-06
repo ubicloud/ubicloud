@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "spec_helper"
+require "stripe"
 
 RSpec.describe CloverAdmin do
   def object_data
