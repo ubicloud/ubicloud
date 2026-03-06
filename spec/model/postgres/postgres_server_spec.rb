@@ -77,11 +77,11 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(archive_command: "'/usr/bin/walg-daemon-client /tmp/wal-g wal-push %f'")
     end
 
-    it "sets synchronous_standby_names for sync replication mode" do
+    it "sets synchronous_standby_names for sync replication mode with all standbys" do
       postgres_server
       resource.update(ha_type: PostgresResource::HaType::SYNC)
 
-      described_class.create(
+      standby1 = described_class.create(
         timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby1").id,
         synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
       )
@@ -90,7 +90,7 @@ RSpec.describe PostgresServer do
         synchronization_status: "ready", timeline_access: "fetch", version: "16"
       )
 
-      expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
+      expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby1.ubid},#{standby2.ubid})'")
     end
 
     it "sets synchronous_standby_names as empty if there is no caught up standby" do
@@ -106,6 +106,24 @@ RSpec.describe PostgresServer do
       )
 
       expect(postgres_server.configure_hash[:configs]).not_to include(:synchronous_standby_names)
+    end
+
+    it "creates physical slots for all standbys including catching_up ones to prevent replication slot deadlock" do
+      postgres_server
+      resource.update(ha_type: PostgresResource::HaType::SYNC)
+
+      standby1 = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby1").id,
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+      )
+      standby2 = described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby2").id,
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+      )
+
+      config = postgres_server.configure_hash
+      expect(config[:physical_slots]).to contain_exactly(standby1.ubid, standby2.ubid)
+      expect(config[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby1.ubid},#{standby2.ubid})'")
     end
 
     it "sets configs that are specific to standby" do

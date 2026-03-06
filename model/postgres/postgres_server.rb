@@ -85,7 +85,7 @@ class PostgresServer < Sequel::Model
       configs["allow_alter_system"] = "off"
     end
 
-    caught_up_standbys = nil
+    standbys_needing_slot = nil
     if timeline.blob_storage
       configs[:archive_mode] = "on"
       configs[:archive_timeout] = "60"
@@ -96,12 +96,13 @@ class PostgresServer < Sequel::Model
       end
 
       if primary?
-        caught_up_standbys = resource.servers.select { it.standby? && it.synchronization_status == "ready" }
+        # We always need standby slots
+        standbys_needing_slot = resource.servers.select(&:standby?)
         if resource.ha_type == PostgresResource::HaType::SYNC
-          configs[:synchronous_standby_names] = "'ANY 1 (#{caught_up_standbys.map(&:ubid).join(",")})'" unless caught_up_standbys.empty?
+          configs[:synchronous_standby_names] = "'ANY 1 (#{standbys_needing_slot.map(&:ubid).join(",")})'" unless standbys_needing_slot.empty?
         end
         if version.to_i >= 17
-          configs[:synchronized_standby_slots] = "'#{caught_up_standbys.map(&:ubid).join(",")}'"
+          configs[:synchronized_standby_slots] = "'#{standbys_needing_slot.map(&:ubid).join(",")}'"
         end
       end
 
@@ -125,7 +126,7 @@ class PostgresServer < Sequel::Model
       configs:,
       user_config: resource.user_config,
       pgbouncer_user_config: resource.pgbouncer_user_config,
-      physical_slots: caught_up_standbys&.map(&:ubid),
+      physical_slots: standbys_needing_slot&.map(&:ubid),
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
