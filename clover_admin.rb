@@ -26,6 +26,12 @@ class CloverAdmin < Roda
     extract_fixed_locals: true
   }
 
+  # :nocov:
+  if Config.test? && defined?(SimpleCov)
+    plugin :render_coverage, dir: "coverage/views/admin"
+  end
+  # :nocov:
+
   plugin :part
   plugin :public
   plugin :flash

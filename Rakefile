@@ -236,7 +236,7 @@ end
 
 coverage_setup = lambda do
   FileUtils.rm_rf("coverage/views")
-  FileUtils.mkdir_p("coverage/views")
+  FileUtils.mkdir_p("coverage/views/admin")
 end
 
 desc "Run specs with coverage"
