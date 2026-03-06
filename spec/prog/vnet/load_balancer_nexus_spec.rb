@@ -69,6 +69,11 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
       expect { nx.wait }.to nap(86400)
     end
 
+    it "hops to create_new_cert if refresh_cert set" do
+      expect(nx).to receive(:when_refresh_cert_set?).and_yield
+      expect { nx.wait }.to hop("create_new_cert")
+    end
+
     it "hops to update vm load balancers" do
       expect(nx.load_balancer).to receive(:need_certificates?).and_return(false)
       expect(nx).to receive(:when_update_load_balancer_set?).and_yield
