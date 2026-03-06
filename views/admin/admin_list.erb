@@ -1,0 +1,7 @@
+<% @page_title = "Admin List" %>
+
+<ul id="admin-list">
+  <% @admins.each do |login| %>
+    <li><%= login %></li>
+  <% end %>
+</ul>

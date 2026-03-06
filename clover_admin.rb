@@ -760,6 +760,11 @@ class CloverAdmin < Roda
       view("vm_by_ipv4")
     end
 
+    r.get "admin-list" do
+      @admins = DB[:admin_account].select_order_map(:login)
+      view("admin_list")
+    end
+
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
