@@ -135,7 +135,7 @@ class CloverAdmin < Roda
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
 
   plugin :rodauth, route_csrf: true do
-    enable :argon2, :login, :logout, :webauthn, :change_password
+    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account
     accounts_table :admin_account
     password_hash_table :admin_password_hash
     webauthn_keys_table :admin_webauthn_key
@@ -152,6 +152,7 @@ class CloverAdmin < Roda
 
     check_csrf? false
     require_bcrypt? false
+    skip_status_checks? true
     title_instance_variable :@page_title
     argon2_secret OpenSSL::HMAC.digest("SHA256", Config.clover_session_secret, "admin-argon2-secret")
     hmac_secret OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-rodauth-hmac-secret")
@@ -159,6 +160,12 @@ class CloverAdmin < Roda
       rodauth_get_salt: :rodauth_admin_get_salt,
       rodauth_valid_password_hash: :rodauth_admin_valid_password_hash
     }.to_proc)
+
+    close_account_redirect "/login"
+    before_close_account do
+      login = account_from_session[:login]
+      Clog.emit("Admin account closed", {admin_account_closed: {account_closed: login}})
+    end
 
     password_minimum_length 16
     password_maximum_bytes 72
