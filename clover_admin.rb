@@ -43,6 +43,7 @@ class CloverAdmin < Roda
 
   plugin :sessions,
     key: "_CloverAdmin.session",
+    env_key: "clover.admin.session",
     cookie_options: {secure: !(Config.development? || Config.test?)},
     secret: OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-site")
 
