@@ -892,7 +892,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-test")
       running = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
 
-      expect(global_ops_client).to receive(:get).exactly(5).times.and_return(running)
+      expect(global_ops_client).to receive(:get).exactly(30).times.and_return(running)
       allow(nx).to receive(:sleep)
 
       expect { nx.send(:wait_for_compute_global_op, op) }
@@ -970,7 +970,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-timeout")
       expect(subnetworks_client).to receive(:delete).and_return(delete_op)
       running = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
-      expect(region_ops_client).to receive(:get).exactly(5).times.and_return(running)
+      expect(region_ops_client).to receive(:get).exactly(30).times.and_return(running)
       allow(nx).to receive(:sleep)
 
       expect { nx.send(:delete_gcp_subnet) }.to raise_error(RuntimeError, /op-delete-timeout.*did not complete within timeout/)

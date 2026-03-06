@@ -347,7 +347,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
 
-    it "falls back to update when insert raises AlreadyExistsError and rule belongs to this VM" do
+    it "overwrites on AlreadyExistsError collision" do
       rules = [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
           port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
@@ -356,18 +356,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).to receive(:get).and_return(empty_policy)
 
       expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
-        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: [vm_dest_ip_range]
-        )
-      )
-      expect(nfp_client).to receive(:get_rule).and_return(existing_rule)
-      expect(nfp_client).to receive(:patch_rule)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything)
+      expect(nfp_client).to receive(:patch_rule).and_return(lro_op)
+      expect(global_ops_client).to receive(:get).and_return(done_op)
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
 
-    it "falls back to update when insert raises InvalidArgumentError and rule belongs to this VM" do
+    it "overwrites on InvalidArgumentError collision" do
       rules = [
         instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
           port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
@@ -376,34 +372,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).to receive(:get).and_return(empty_policy)
 
       expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::InvalidArgumentError.new("Cannot have rules with the same priorities"))
-      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
-        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: [vm_dest_ip_range]
-        )
-      )
-      expect(nfp_client).to receive(:get_rule).and_return(existing_rule)
-      expect(nfp_client).to receive(:patch_rule)
-
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
-    end
-
-    it "logs and skips when priority collision belongs to another VM" do
-      rules = [
-        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
-      ]
-      expect(vm).to receive(:firewall_rules).and_return(rules)
-      expect(nfp_client).to receive(:get).and_return(empty_policy)
-
-      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
-        match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: ["10.99.99.99/32"]
-        )
-      )
-      expect(nfp_client).to receive(:get_rule).and_return(foreign_rule)
-      expect(nfp_client).not_to receive(:patch_rule)
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, skipping update", anything)
+      expect(Clog).to receive(:emit).with("GCP firewall priority collision, overwriting rule", anything)
+      expect(nfp_client).to receive(:patch_rule).and_return(lro_op)
+      expect(global_ops_client).to receive(:get).and_return(done_op)
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
@@ -779,24 +750,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         # vm_private_ipv6 is nil, so vm_dest_ipv6_range falls back to vm_dest_ip_range
         expect(rule.match.dest_ip_ranges).to eq(["10.0.0.1/32"])
       end
-
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
-    end
-
-    it "skips update when existing.match is nil after add_rule collision (covers &.match nil branch)" do
-      rules = [
-        instance_double(FirewallRule, ip6?: false, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-          port_range: Sequel.pg_range(5432..5433), protocol: "tcp")
-      ]
-      expect(vm).to receive(:firewall_rules).and_return(rules)
-      expect(nfp_client).to receive(:get).and_return(empty_policy)
-
-      expect(nfp_client).to receive(:add_rule).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      # Existing rule has nil match — triggers &.dest_ip_ranges nil branch at line 156
-      existing_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new
-      expect(nfp_client).to receive(:get_rule).and_return(existing_rule)
-      expect(Clog).to receive(:emit).with("GCP firewall priority collision, skipping update", anything)
-      expect(nfp_client).not_to receive(:patch_rule)
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end

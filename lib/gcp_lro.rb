@@ -93,10 +93,10 @@ module GcpLro
   end
 
   # Synchronously poll a regional GCP operation until it completes or times out.
-  # Raises if the operation fails or does not complete within ~5 seconds.
+  # Raises if the operation fails or does not complete within ~30 seconds.
   def wait_for_compute_regional_op(op, region)
     return unless op.respond_to?(:name)
-    5.times do
+    30.times do
       result = credential.region_operations_client.get(
         project: gcp_project_id,
         region:,
@@ -112,10 +112,10 @@ module GcpLro
   end
 
   # Synchronously poll a global GCP operation until it completes or times out.
-  # Raises if the operation fails or does not complete within ~5 seconds.
+  # Raises if the operation fails or does not complete within ~30 seconds.
   def wait_for_compute_global_op(op)
     return unless op.respond_to?(:name)
-    5.times do
+    30.times do
       result = credential.global_operations_client.get(
         project: gcp_project_id,
         operation: op.name

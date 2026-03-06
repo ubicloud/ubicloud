@@ -145,20 +145,12 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         firewall_policy_rule_resource: rule
       )
     rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError
-      # Only update if the existing rule belongs to this VM (check dest IP).
-      # If another VM owns this priority (concurrent allocation conflict), log and skip.
-      existing = credential.network_firewall_policies_client.get_rule(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-        priority: desired[:priority]
-      )
-      vm_dest_ranges = [vm_dest_ip_range, vm_dest_ipv6_range].compact.uniq
-      if existing.match&.dest_ip_ranges&.any? { |r| vm_dest_ranges.include?(r) }
-        update_policy_rule(desired)
-      else
-        Clog.emit("GCP firewall priority collision, skipping update",
-          {gcp_priority_collision: {vm: vm.name, priority: desired[:priority]}})
-      end
+      # Priority collision with an existing rule. Since this VM was allocated
+      # this priority via DB unique constraint, any non-matching rule at this
+      # priority belongs to a stale/destroyed VM. Overwrite it.
+      Clog.emit("GCP firewall priority collision, overwriting rule",
+        {gcp_priority_collision: {vm: vm.name, priority: desired[:priority]}})
+      update_policy_rule(desired)
       return
     end
     wait_for_compute_global_op(op)

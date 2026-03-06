@@ -13,7 +13,7 @@ class PostgresServer < Sequel::Model
       # GOOGLE_APPLICATION_CREDENTIALS to access GCS.
       return unless timeline.access_key
 
-      vm.sshable.cmd("sudo -u postgres install -m 600 /dev/stdin /etc/postgresql/gcs-sa-key.json", stdin: timeline.secret_key)
+      vm.sshable.cmd("sudo install -m 600 -o postgres -g postgres /dev/stdin /etc/postgresql/gcs-sa-key.json", stdin: timeline.secret_key)
     end
 
     def gcp_storage_device_paths
