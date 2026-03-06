@@ -7,6 +7,7 @@ RSpec.describe Prog::Test::HetznerServer do
 
   let(:hetzner_api) { instance_double(Hosting::HetznerApis) }
   let(:vm_host) { Prog::Vm::HostNexus.assemble("1.1.1.1").subject }
+  let(:strand) { hs_test.strand }
 
   before {
     allow(Config).to receive(:e2e_hetzner_server_id).and_return("1.1.1.1")
@@ -230,20 +231,20 @@ RSpec.describe Prog::Test::HetznerServer do
 
     it "fails if used_cores not reclaimed" do
       vm_host.update(used_cores: 10)
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_cores is expected to be zero, actual: 10"})
       expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "used_cores is expected to be zero, actual: 10"})
     end
 
     it "fails if used_hugepages_1g not reclaimed" do
       vm_host.update(used_cores: 0, total_hugepages_1g: 384, used_hugepages_1g: 70)
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "used_hugepages_1g is expected to be zero, actual: 70"})
       expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "used_hugepages_1g is expected to be zero, actual: 70"})
     end
 
     it "fails if available_storage_gib not reclaimed" do
       expect(hs_test).to receive(:frame).and_return({"available_storage_gib" => 500}).at_least(:once)
-      expect(hs_test.strand).to receive(:update).with(exitval: {msg: "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
       expect { hs_test.verify_resources_reclaimed }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
     end
 
     it "hops to destroy after resource verified" do

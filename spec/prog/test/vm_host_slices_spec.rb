@@ -5,8 +5,10 @@ require "netaddr"
 
 RSpec.describe Prog::Test::VmHostSlices do
   subject(:vm_host_slices) {
-    described_class.new(Strand.new(prog: "Test::VmHostSlices", label: "start"))
+    described_class.new(Strand.create(prog: "Test::VmHostSlices", label: "start"))
   }
+
+  let(:strand) { vm_host_slices.strand }
 
   # rubocop:disable RSpec/IndexedLet
   let(:slice1) {
@@ -55,14 +57,6 @@ RSpec.describe Prog::Test::VmHostSlices do
       sshable: create_mock_sshable(start_fresh_session: instance_double(Net::SSH::Connection::Session, shutdown!: nil, close: nil)))
   }
 
-  let(:strand) {
-    instance_double(Strand)
-  }
-
-  before do
-    allow(vm_host_slices).to receive_messages(strand:)
-  end
-
   describe "#start" do
     it "hops to verify_separation" do
       expect { vm_host_slices.start }.to hop("verify_separation")
@@ -72,16 +66,14 @@ RSpec.describe Prog::Test::VmHostSlices do
   describe "#verify_separation" do
     it "fails the test if the slices are the same" do
       allow(vm_host_slices).to receive_messages(slices: [slice1, slice1, slice2])
-      expect(strand).to receive(:update).with(exitval: {msg: /Two Vm instances placed in the same slice;/})
-
       expect { vm_host_slices.verify_separation }.to hop("failed")
+      expect(strand.reload.exitval["msg"]).to match(/Two Vm instances placed in the same slice;/)
     end
 
     it "fails the test if the slices are on the same CPUs" do
       allow(vm_host_slices).to receive_messages(slices: [slice2, slice3, slice2_overlap])
-      expect(strand).to receive(:update).with(exitval: {msg: /Two Vm instances are sharing at least one cpu;/})
-
       expect { vm_host_slices.verify_separation }.to hop("failed")
+      expect(strand.reload.exitval["msg"]).to match(/Two Vm instances are sharing at least one cpu;/)
     end
 
     it "handles burstable slices" do
@@ -112,9 +104,8 @@ RSpec.describe Prog::Test::VmHostSlices do
 
     it "fails the test if the slice is not setup correctly" do
       expect(slice3).to receive(:up?).and_return(false)
-      expect(strand).to receive(:update).with(exitval: {msg: "Slice #{slice3.id} is not setup correctly"})
-
       expect { vm_host_slices.verify_on_host }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "Slice #{slice3.id} is not setup correctly"})
     end
 
     it "hops to finish" do

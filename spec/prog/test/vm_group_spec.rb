@@ -118,11 +118,8 @@ RSpec.describe Prog::Test::VmGroup do
         cpus: [])
       expect(vg_test).to receive_messages(vm_host:, frame: {"verify_host_capacity" => true})
 
-      strand = instance_double(Strand)
-      allow(vg_test).to receive_messages(strand:)
-      expect(strand).to receive(:update).with(exitval: {msg: "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
-
       expect { vg_test.verify_host_capacity }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "Host used cores does not match the allocated VMs cores (vm_cores=2, slice_cores=1, used_cores=5)"})
     end
   end
 
@@ -140,7 +137,7 @@ RSpec.describe Prog::Test::VmGroup do
 
     it "hops to verify_firewall_rules if tests are done" do
       expect(vg_test).to receive(:frame).and_return({"test_slices" => true})
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified VM Host Slices!"})
+      st.retval = {"msg" => "Verified VM Host Slices!"}
       expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
     end
   end
@@ -174,14 +171,14 @@ RSpec.describe Prog::Test::VmGroup do
 
       expect(vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/vm123456/0/rpc.sock -q 0", stdin: command).and_return("{\"error\": \"some error\"}\n")
 
-      expect(vg_test.strand).to receive(:update).with(exitval: {msg: "Failed to get vhost-block-backend version for VM vm1 using RPC"})
       expect { vg_test.verify_storage_rpc }.to hop("failed")
+      expect(st.reload.exitval).to eq({"msg" => "Failed to get vhost-block-backend version for VM vm1 using RPC"})
     end
   end
 
   describe "#verify_firewall_rules" do
     it "hops to test_reboot if tests are done" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Firewall Rules!"})
+      st.retval = {"msg" => "Verified Firewall Rules!"}
       expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
     end
 
@@ -195,7 +192,7 @@ RSpec.describe Prog::Test::VmGroup do
 
   describe "#verify_connected_subnets" do
     it "hops to test_reboot if tests are done" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
+      st.retval = {"msg" => "Verified Connected Subnets!"}
       expect { vg_test.verify_connected_subnets }.to hop("test_reboot")
     end
 
@@ -218,7 +215,7 @@ RSpec.describe Prog::Test::VmGroup do
     end
 
     it "hops to destroy_resources if tests are done and reboot is not set" do
-      expect(vg_test.strand).to receive(:retval).and_return({"msg" => "Verified Connected Subnets!"})
+      st.retval = {"msg" => "Verified Connected Subnets!"}
       expect(vg_test).to receive(:frame).and_return({"test_reboot" => false})
       expect { vg_test.verify_connected_subnets }.to hop("destroy_resources")
     end
