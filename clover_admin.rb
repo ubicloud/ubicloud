@@ -196,6 +196,10 @@ class CloverAdmin < Roda
     ObjectAction.define(...)
   end
 
+  github_page_action = object_action("GitHub Page", type: :direct) do |obj|
+    "http://github.com/#{obj.name}"
+  end
+
   OBJECT_ACTIONS = {
     "Account" => {
       "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend)
@@ -205,10 +209,14 @@ class CloverAdmin < Roda
         obj.generate_download_link
       end
     },
+    "GithubInstallation" => {
+      "github_page" => github_page_action
+    },
     "GithubRunner" => {
       "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
     },
     "GithubRepository" => {
+      "github_page" => github_page_action,
       "show_job_log" => object_action("Show Job Log", params: {job_id: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 2**63 - 1}}}, type: :content) do |obj, job_id|
         url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
