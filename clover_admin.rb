@@ -273,6 +273,9 @@ class CloverAdmin < Roda
       end
     },
     "Strand" => {
+      "subject" => object_action("Subject", type: :direct) do |obj|
+        "/model/#{obj.subject.class}/#{obj.subject.ubid}"
+      end,
       "schedule" => object_action("Schedule Strand to Run Immediately", flash: "Scheduled strand to run immediately", type: :form) do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
       end,

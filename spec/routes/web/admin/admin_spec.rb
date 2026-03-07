@@ -685,8 +685,8 @@ RSpec.describe CloverAdmin do
     fill_in "UBID or UUID", with: st.ubid
     click_button "Show Object"
 
-    find("#strand-info input[name=_csrf]", visible: false).set("")
-    click_button "Schedule Strand to Run Now"
+    find("#action-list input[name=_csrf]", visible: false).set("")
+    click_button "Schedule Strand to Run Immediately"
     expect(page.title).to eq "Ubicloud Admin - Invalid Security Token"
     expect(page).to have_flash_error("An invalid security token submitted with this request, please try again")
     expect(st.reload.schedule).not_to be_within(5).of(Time.now)
@@ -705,7 +705,7 @@ RSpec.describe CloverAdmin do
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
 
-    click_button "Schedule Strand to Run Now"
+    click_button "Schedule Strand to Run Immediately"
     expect(page).to have_flash_notice("Scheduled strand to run immediately")
     expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
     expect(st.reload.schedule).to be_within(5).of(Time.now)
