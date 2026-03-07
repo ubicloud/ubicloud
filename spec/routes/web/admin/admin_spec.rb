@@ -553,6 +553,7 @@ RSpec.describe CloverAdmin do
     expect(page.all(".project-quota-table tbody tr").map { it.all("td").map(&:text) }).to eq [
       ["VmVCpu", "32", "16"],
       ["GithubRunnerVCpu", "400", "0"],
+      ["GithubRunnerVCpuArm", "100", "0"],
       ["PostgresVCpu", "128", "0"],
       ["KubernetesVCpu", "32", "0"]
     ]

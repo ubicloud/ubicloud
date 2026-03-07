@@ -173,9 +173,12 @@ RSpec.describe Project do
     expect(project.current_resource_usage("GithubRunnerVCpu")).to eq 0
     grst = Strand.new(id: gr.id, label: "start", prog: "Prog::Github::GithubRunnerNexus")
     expect { grst.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(0).to(2)
-    gr2 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
+    gr2 = gi.add_runner(label: "ubicloud-standard-16-arm", repository_name: "a/a")
     grst2 = Strand.new(id: gr2.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
-    expect { grst2.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(2).to(62)
+    expect { grst2.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpuArm") }.from(0).to(16)
+    gr3 = gi.add_runner(label: "ubicloud-standard-60", repository_name: "a/a")
+    grst3 = Strand.new(id: gr3.id, label: "wait_concurrency_limit", prog: "Prog::Github::GithubRunnerNexus")
+    expect { grst3.update(label: "wait_vm") }.to change { project.current_resource_usage("GithubRunnerVCpu") }.from(2).to(62)
 
     expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
     expect {
@@ -203,17 +206,20 @@ RSpec.describe Project do
     project.add_quota(ProjectQuota.new(value: 1000).tap { it.quota_id = "14fa6820-bf63-41d2-b35e-4a4dcefd1b15" })
     expect(project.effective_quota_value("VmVCpu")).to eq 32
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000
+    expect(project.effective_quota_value("GithubRunnerVCpuArm")).to eq 100
     expect(project.effective_quota_value("PostgresVCpu")).to eq 128
 
     project.reputation = "verified"
     expect(project.effective_quota_value("VmVCpu")).to eq 256
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 1000
+    expect(project.effective_quota_value("GithubRunnerVCpuArm")).to eq 100
     expect(project.effective_quota_value("PostgresVCpu")).to eq 256
 
     project.reputation = "limited"
     project.quotas_dataset.destroy
     expect(project.effective_quota_value("VmVCpu")).to eq 16
     expect(project.effective_quota_value("GithubRunnerVCpu")).to eq 128
+    expect(project.effective_quota_value("GithubRunnerVCpuArm")).to eq 50
     expect(project.effective_quota_value("PostgresVCpu")).to eq 16
   end
 

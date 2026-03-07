@@ -452,7 +452,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       end
 
       it "allocates arm64 runners without checking premium utilization" do
-        expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(false)
+        expect(project).to receive(:quota_available?).with("GithubRunnerVCpuArm", 0).and_return(false)
         runner.update(label: "ubicloud-standard-4-arm")
         VmHost[arch: "arm64"].update(used_cores: 8)
         expect { nx.wait_concurrency_limit }.to hop("allocate_vm")
