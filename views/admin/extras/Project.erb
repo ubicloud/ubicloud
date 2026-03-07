@@ -3,7 +3,7 @@
 <%== part("components/collapsible_table",
   title: "Quotas",
   table_class: "project-quota-table",
-  data: ["VmVCpu", "GithubRunnerVCpu", "PostgresVCpu", "KubernetesVCpu"].map {
+  data: ["VmVCpu", "GithubRunnerVCpu", "GithubRunnerVCpuArm", "PostgresVCpu", "KubernetesVCpu"].map {
     {
       "Resource" => it,
       "Quota" => obj.effective_quota_value(it),

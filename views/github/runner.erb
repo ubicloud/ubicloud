@@ -21,7 +21,7 @@
   <% end %>
 </dl>
 
-<% if @installation.project.reputation == "limited" && !@installation.project.quota_available?("GithubRunnerVCpu", 0) %>
+<% if @installation.project.reputation == "limited" && !(@installation.project.quota_available?("GithubRunnerVCpu", 0) && @installation.project.quota_available?("GithubRunnerVCpuArm", 0)) %>
   <div class="mb-3 -mt-2 rounded-md bg-red-50 p-4 flex items-center gap-3">
     <%== part("components/icon", name: "hero-squares-plus", classes: "h-5 w-5 text-red-400") %>
     <h3 class="text-sm font-medium text-red-800">

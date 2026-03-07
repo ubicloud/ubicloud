@@ -150,7 +150,8 @@ class Project < Sequel::Model
   def current_resource_usage(resource_type)
     case resource_type
     when "VmVCpu" then vms_dataset.sum(:vcpus) || 0
-    when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).total_active_runner_vcpus
+    when "GithubRunnerVCpu" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).exclude(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).total_active_runner_vcpus
+    when "GithubRunnerVCpuArm" then GithubRunner.where(installation_id: github_installations_dataset.select(:id)).where(Sequel.like(Sequel[:github_runner][:label], "%-arm%")).total_active_runner_vcpus
     when "PostgresVCpu" then postgres_resources_dataset.association_join(servers: :vm).sum(:vcpus) || 0
     when "KubernetesVCpu" then kubernetes_clusters_dataset.select(Sequel[:kubernetes_cluster][:cp_node_count].as(:node_count), Sequel[:kubernetes_cluster][:target_node_size])
       .union(kubernetes_clusters_dataset.association_join(:nodepools).select(:node_count, Sequel[:nodepools][:target_node_size]), all: true)

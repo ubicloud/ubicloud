@@ -211,7 +211,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # requests. There are some remedies, but it would require some refactoring
     # that I'm not keen to do at the moment. Although it looks weird, passing 0
     # as requested_additional_usage keeps the existing behavior.
-    project.quota_available?("GithubRunnerVCpu", 0)
+    resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
+    project.quota_available?(resource_type, 0)
   end
 
   label def wait_concurrency_limit
