@@ -876,6 +876,29 @@ RSpec.describe CloverAdmin do
     expect(page.all("#autoforme_content td").map(&:text)).to eq ["test-org/test-repo", repo.created_at.to_s, repo.last_job_at.to_s]
   end
 
+  it "links to GitHub page for GithubInstallation" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    visit "/model/GithubInstallation/#{ins.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{ins.ubid}"
+    expect(page).to have_link "GitHub Page"
+
+    page.driver.get "/model/GithubInstallation/#{ins.ubid}/github_page"
+    expect(page.driver.response.status).to eq 302
+    expect(page.driver.response.headers["Location"]).to eq "http://github.com/test-org"
+  end
+
+  it "links to GitHub page for GithubRepository" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+    visit "/model/GithubRepository/#{repo.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+    expect(page).to have_link "GitHub Page"
+
+    page.driver.get "/model/GithubRepository/#{repo.ubid}/github_page"
+    expect(page.driver.response.status).to eq 302
+    expect(page.driver.response.headers["Location"]).to eq "http://github.com/test-org/test-repo"
+  end
+
   it "supports showing job log for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
