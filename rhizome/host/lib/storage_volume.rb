@@ -15,6 +15,7 @@ require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
 require_relative "storage_path"
+require_relative "toml"
 require_relative "vhost_block_backend"
 
 KEK_PIPE_WRITE_TIMEOUT_SEC = 5
@@ -412,39 +413,6 @@ class StorageVolume
       "copy_on_read" => @copy_on_read
     }
     toml_section("stripe_source", hash)
-  end
-
-  def toml_section(name, hash)
-    "[#{name}]\n#{hash.map { |k, v| "#{k} = #{toml_value(v)}" }.join("\n")}\n"
-  end
-
-  def toml_value(v)
-    case v
-    when String then toml_str(v)
-    when Array then "[#{v.map { |e| toml_value(e) }.join(", ")}]"
-    else v
-    end
-  end
-
-  def toml_str(value)
-    # From TOML specs:
-    # > Basic strings are surrounded by quotation marks ("). Any Unicode
-    # > character may be used except those that must be escaped: quotation mark,
-    # > backslash, and the control characters other than tab (U+0000 to U+0008,
-    # > U+000A to U+001F, U+007F).
-    #
-    # See https://toml.io/en/v1.0.0#string
-    h = {
-      "\b" => '\\b',
-      "\n" => '\\n',
-      "\f" => '\\f',
-      "\r" => '\\r',
-      '"' => '\\"',
-      "\\" => "\\\\"
-    }
-    h.default_proc = proc { |_, ch| format('\\u%04X', ch.ord) }
-    escaped = value.gsub(/[\x00-\x08\x0A-\x1F\x7F"\\]/, h)
-    "\"#{escaped}\""
   end
 
   def vhost_backend_kek(key_wrapping_secrets)
