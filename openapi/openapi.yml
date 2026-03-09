@@ -73,6 +73,32 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
+  '/project/{project_id}/audit-log':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: getProjectAuditLog
+      summary: List project audit log entries
+      parameters:
+        - in: query
+          name: subject
+          schema:
+            type: string
+          description: Filter by subject UBID
+          required: false
+        - in: query
+          name: object
+          schema:
+            type: string
+          description: Filter by object UBID
+          required: false
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditLogs'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Audit Log
   '/project/{project_id}/firewall':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2358,6 +2384,40 @@ components:
       schema:
         $ref: '#/components/schemas/Reference'
   schemas:
+    AuditLog:
+      type: object
+      properties:
+        id:
+          description: ID of the audit log entry
+          type: string
+          example: a1fg7td83em22qfw9pq5xyfqb7
+          pattern: '^a1[0-9a-hj-km-np-tv-z]{24}$'
+        at:
+          description: Timestamp of the action
+          type: string
+          format: date-time
+        action:
+          description: Action performed
+          type: string
+        ubid_type:
+          description: UBID type prefix of the primary object affected
+          type: string
+        subject_id:
+          description: UBID of the subject (user or token) that performed the action
+          type: string
+        object_ids:
+          description: UBIDs of the objects affected by the action
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      required:
+        - id
+        - at
+        - action
+        - ubid_type
+        - subject_id
+        - object_ids
     Error:
       type: object
       properties:
@@ -3159,6 +3219,20 @@ components:
         - node_count
         - node_size
   responses:
+    AuditLogs:
+      description: A list of audit log entries
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+            additionalProperties: false
+            required:
+              - items
     Delete:
       description: An empty response after successful resource delete
     Error:

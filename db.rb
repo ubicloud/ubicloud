@@ -35,7 +35,7 @@ POSTGRES_MONITOR_DB = Sequel.connect(Config.postgres_monitor_database_url, max_c
 # Load Sequel Database/Global extensions here
 # DB.extension :date_arithmetic
 DB.extension :pg_array, :pg_json, :pg_auto_parameterize, :pg_auto_parameterize_in_array, :pg_timestamptz, :pg_range, :pg_enum
-Sequel.extension :pg_range_ops, :pg_json_ops
+Sequel.extension :pg_range_ops, :pg_json_ops, :pg_array_ops
 DB.extension :lit_require_frozen if Config.unfrozen_test? && !ENV["SKIP_LIT_REQUIRE_FROZEN"]
 
 if Config.development? || Config.unfrozen_test?

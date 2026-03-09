@@ -1,0 +1,63 @@
+<% @page_title = "#{@project.name} - Audit Log" %>
+
+<%== part(
+  "components/page_header",
+  title: "Audit Log",
+  breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Audit Log", "#"]]
+) %>
+
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:p-6">
+      <% form(action: "#{@project.path}/audit-log", method: :get) do %>
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "subject",
+              label: "Subject ID",
+              value: typecast_params.nonempty_str("subject"),
+              attributes: { placeholder: "Filter by subject UBID" }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "object",
+              label: "Object ID",
+              value: typecast_params.nonempty_str("object"),
+              attributes: { placeholder: "Filter by object UBID" }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2 flex items-end">
+            <%== part("components/form/submit_button", text: "Search") %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%== part(
+    "components/table_card",
+    headers: ["ID", "Time", "Action", "Type", "Subject", "Objects"],
+    empty_state: {
+      icon: "hero-document-text",
+      title: "No audit log entries",
+      description: "No audit log entries found for this project."
+    },
+    rows:
+      @audit_logs.map do |entry|
+        [
+          [
+            [entry[:id], {}],
+            [entry[:at], {}],
+            [entry[:action], {}],
+            [entry[:ubid_type], {}],
+            [entry[:subject_id], {}],
+            [entry[:object_ids].join(", "), {}]
+          ],
+          { id: "audit-log-#{entry[:id]}" }
+        ]
+      end
+  ) %>
+</div>

@@ -11,6 +11,7 @@ Examples:
 
 Commands:
     ai         Manage AI features
+    al         View project audit log
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
