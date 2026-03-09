@@ -914,9 +914,8 @@ RSpec.describe Clover, "project" do
     end
 
     describe "audit log" do
-      def insert_audit_log(project_id:, subject_id:, object_ids: [], action: "create", ubid_type: "vm", at: Time.now)
+      def insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [], action: "create", ubid_type: "vm")
         DB[:audit_log].returning(:id).insert(
-          at:,
           ubid_type:,
           action:,
           project_id:,
@@ -926,7 +925,7 @@ RSpec.describe Clover, "project" do
       end
 
       it "can list audit log entries" do
-        id = insert_audit_log(project_id: project.id, subject_id: user.id)
+        id = insert_audit_log
         entry_ubid = UBID.from_uuidish(id).to_s
 
         visit project.path
@@ -939,8 +938,8 @@ RSpec.describe Clover, "project" do
 
       it "can filter by subject UBID" do
         other_account_id = Account.generate_uuid
-        id1 = insert_audit_log(project_id: project.id, subject_id: user.id)
-        insert_audit_log(project_id: project.id, subject_id: other_account_id)
+        id1 = insert_audit_log
+        insert_audit_log(subject_id: other_account_id)
 
         visit "#{project.path}/audit-log?subject=#{user.ubid}"
 
@@ -951,8 +950,8 @@ RSpec.describe Clover, "project" do
       it "can filter by object UBID" do
         vm_id = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject.id
         vm_ubid = UBID.from_uuidish(vm_id).to_s
-        id_with_obj = insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm_id])
-        id_without_obj = insert_audit_log(project_id: project.id, subject_id: user.id)
+        id_with_obj = insert_audit_log(object_ids: [vm_id])
+        id_without_obj = insert_audit_log
 
         visit "#{project.path}/audit-log?object=#{vm_ubid}"
 
