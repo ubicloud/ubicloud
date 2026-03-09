@@ -12,9 +12,9 @@ Sequel.migration do
 
   down do
     alter_table(:firewall_rule) do
-      drop_column :protocol
-      drop_constraint :firewall_rule_unique
       drop_constraint :valid_protocol
+      drop_constraint :firewall_rule_unique
+      drop_column :protocol
       add_unique_constraint [:cidr, :port_range, :firewall_id], name: :firewall_rule_cidr_port_range_firewall_id_key
     end
   end
