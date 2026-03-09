@@ -592,7 +592,7 @@ class CloverAdmin < Roda
     model Vm do
       order Sequel.desc(:created_at)
       eager do |type, _request|
-        [:location, :vm_host, :project] unless type == :association
+        [:location, :vm_host, :project, :strand, :semaphores] unless type == :association
       end
       columns [:name, :display_state, :project, :vm_host, :location, :arch, :boot_image, :family, :vcpus, :created_at]
       column_options display_state: {type: "select", options: ["running", "creating", "starting", "rebooting", "deleting"], add_blank: true},
