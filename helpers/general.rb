@@ -138,16 +138,9 @@ class Clover < Roda
     update_invitation
     upgrade
   ACTIONS
-  LOGGED_ACTIONS = Set.new(%w[create create_replica delete_all_cache_entries destroy promote_read_replica recycle reset_superuser_password restart restore update cancel_storage_auto_scale]).freeze
 
   def audit_log(object, action, objects = [], project_id: @project.id)
     raise "unsupported audit_log action: #{action}" unless SUPPORTED_ACTIONS.include?(action)
-
-    # Currently, only store create and destroy actions in non-test mode.
-    # This can be removed later if we decide to expand to logging all actions.
-    # :nocov:
-    return unless LOGGED_ACTIONS.include?(action) || Config.test?
-    # :nocov:
 
     subject_id = current_account.id
     ubid_type = object.class.ubid_type
