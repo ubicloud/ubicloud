@@ -39,7 +39,8 @@
 
   <%== part(
     "components/table_card",
-    headers: ["Time", "Action", "Type", "Subject", "Objects"],
+    id: "audit-log-table",
+    headers: ["Time", "Action", "Account", "Objects"],
     empty_state: {
       icon: "hero-document-text",
       title: "No audit log entries",
@@ -51,10 +52,9 @@
         [
           [
             [entry[:at], {}],
-            [entry[:action], {}],
-            [entry[:ubid_type], {}],
-            [entry[:subject_id], {}],
-            [entry[:object_ids].map { h(it) }.join("<br>"), {escape: false}]
+            ["#{entry[:ubid_type]}/#{entry[:action]}", {}],
+            [entry[:subject], {}],
+            [entry[:objects].join("<br>"), {escape: false}]
           ],
           { id: "audit-log-#{entry[:id]}" }
         ]

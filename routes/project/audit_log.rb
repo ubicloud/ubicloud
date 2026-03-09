@@ -28,7 +28,35 @@ class Clover
       if api?
         {items: Serializers::AuditLog.serialize(items)}
       else
-        @audit_logs = Serializers::AuditLog.serialize(items)
+        ubids = {}
+
+        items.each do |log|
+          ubids[log[:subject_id]] = nil
+          log[:object_ids].each do
+            ubids[it] = nil
+          end
+        end
+
+        UBID.resolve_map(ubids) do |ds|
+          ds = ds.eager(:location) if ds.model.association_reflection(:location)
+          ds
+        end
+
+        items.each do |log|
+          subject_id = log[:subject_id]
+          log[:at] = log[:at].iso8601
+          log[:subject] = ubids[subject_id]&.name || UBID.from_uuidish(subject_id).to_s
+
+          log[:objects] = log[:object_ids].filter_map do
+            if (obj = ubids[it]) && obj.respond_to?(:name) && obj.respond_to?(:path)
+              "<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">#{h(obj.name)}</a>"
+            else
+              UBID.from_uuidish(it)
+            end
+          end
+        end
+
+        @audit_logs = items
         view "project/audit_log"
       end
     end

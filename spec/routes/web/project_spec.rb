@@ -931,18 +931,17 @@ RSpec.describe Clover, "project" do
         click_link "View/Search Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page).to have_content user.ubid
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, ""]
       end
 
       it "can filter by subject UBID" do
         other_account_ubid = Account.generate_ubid
-        insert_audit_log
+        user.update(name: "Test User")
+        insert_audit_log(object_ids: [user.id])
         insert_audit_log(subject_id: other_account_ubid.to_uuid)
 
         visit "#{project.path}/audit-log?subject=#{user.ubid}"
-
-        expect(page).to have_content user.ubid.to_s
-        expect(page).to have_no_content other_account_ubid.to_s
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
       end
 
       it "can filter by object UBID" do
@@ -952,9 +951,9 @@ RSpec.describe Clover, "project" do
         insert_audit_log(object_ids: [vm2.id])
 
         visit "#{project.path}/audit-log?object=#{vm.ubid}"
-
-        expect(page).to have_content vm.ubid
-        expect(page).to have_no_content vm2.ubid
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test"]
+        click_link "vm-test"
+        expect(page.title).to eq("Ubicloud - vm-test")
       end
 
       it "shows empty state when no entries" do
