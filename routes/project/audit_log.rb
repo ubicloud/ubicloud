@@ -6,24 +6,31 @@ class Clover
 
     r.get true do
       ds = DB[:audit_log].where(project_id: @project.id).order(Sequel.desc(:at))
+      skip_query = false
 
       if (subject = typecast_params.nonempty_str("subject"))
-        ds = if (subject_uuid = UBID.to_uuid(subject))
-          ds.where(subject_id: subject_uuid)
+        if (subject_id = UBID.to_uuid(subject))
+          ds = ds.where(subject_id:)
+        elsif (subject_id = @project.accounts_dataset.where(Sequel[{name: subject}] | {email: subject}).get(:id))
+          ds = ds.where(subject_id:)
         else
-          ds.where(false)
+          skip_query = true
         end
       end
 
       if (object = typecast_params.nonempty_str("object"))
-        ds = if (object_uuid = UBID.to_uuid(object))
-          ds.where(Sequel.pg_array_op(:object_ids).contains(Sequel.pg_array([object_uuid], :uuid)))
+        if (object_id = UBID.to_uuid(object))
+          ds = ds.where(Sequel.pg_array_op(:object_ids).contains(Sequel.pg_array([object_id], :uuid)))
         else
-          ds.where(false)
+          skip_query = true
         end
       end
 
-      items = ds.limit(100).all
+      items = if skip_query
+        []
+      else
+        ds.limit(100).all
+      end
 
       if api?
         {items: Serializers::AuditLog.serialize(items)}
@@ -38,20 +45,25 @@ class Clover
         end
 
         UBID.resolve_map(ubids) do |ds|
+          ds = ds.where(projects: @project) if ds.model == Account
           ds = ds.eager(:location) if ds.model.association_reflection(:location)
           ds
         end
 
         items.each do |log|
-          subject_id = log[:subject_id]
           log[:at] = log[:at].iso8601
-          log[:subject] = ubids[subject_id]&.name || UBID.from_uuidish(subject_id).to_s
 
-          log[:objects] = log[:object_ids].filter_map do
-            if (obj = ubids[it]) && obj.respond_to?(:name) && obj.respond_to?(:path)
-              "<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">#{h(obj.name)}</a>"
+          subject_id = log[:subject_id]
+          subject_ubid = UBID.from_uuidish(subject_id).to_s
+          subject_name = ubids[subject_id]&.name || subject_ubid
+          log[:subject] = "<a class=\"text-orange-600\" href=\"?subject=#{subject_ubid}\">#{subject_name}</a>"
+
+          log[:objects] = log[:object_ids].filter_map do |object_id|
+            object_ubid = UBID.from_uuidish(object_id).to_s
+            if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path)
+              "<a class=\"text-orange-600\" href=\"?object=#{object_ubid}\">#{obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
             else
-              UBID.from_uuidish(it)
+              "<a class=\"text-orange-600\" href=\"?object=#{object_ubid}\">#{object_ubid}</a>"
             end
           end
         end

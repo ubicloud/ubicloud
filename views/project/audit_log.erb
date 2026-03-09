@@ -15,18 +15,18 @@
             <%== part(
               "components/form/text",
               name: "subject",
-              label: "Subject ID",
+              label: "Account",
               value: typecast_params.nonempty_str("subject"),
-              attributes: { placeholder: "Filter by subject UBID" }
+              attributes: { placeholder: "Filter by account name/email/ID" }
             ) %>
           </div>
           <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
               name: "object",
-              label: "Object ID",
+              label: "Object",
               value: typecast_params.nonempty_str("object"),
-              attributes: { placeholder: "Filter by object UBID" }
+              attributes: { placeholder: "Filter by object ID" }
             ) %>
           </div>
           <div class="col-span-12 sm:col-span-2 flex items-end">
@@ -43,8 +43,8 @@
     headers: ["Time", "Action", "Account", "Objects"],
     empty_state: {
       icon: "hero-document-text",
-      title: "No audit log entries",
-      description: "No audit log entries found for this project."
+      title: "No matching audit log entries",
+      description: "No matching audit log entries found for this project."
     },
     consistent_styling: true,
     rows:
@@ -53,7 +53,7 @@
           [
             [entry[:at], {}],
             ["#{entry[:ubid_type]}/#{entry[:action]}", {}],
-            [entry[:subject], {}],
+            [entry[:subject], {escape: false}],
             [entry[:objects].join("<br>"), {escape: false}]
           ],
           { id: "audit-log-#{entry[:id]}" }
