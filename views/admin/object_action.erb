@@ -2,14 +2,7 @@
 
 <% form(method: :post, id: "action-form", class: "form-vertical") do |f| %>
   <% @params.each do |name, value| %>
-    <%
-      type = "text"
-      if value.is_a?(Hash)
-        type = value.fetch(:type, "text")
-        value_opts = value
-      end
-    %>
-    <%== f.input(type, key: name, label: name, required: true, **value_opts) %>
+    <%== f.input(value.fetch(:type, "text"), key: name, label: name, required: true, **value) %>
   <% end %>
   <%== f.button(@label) %>
 <% end %>
