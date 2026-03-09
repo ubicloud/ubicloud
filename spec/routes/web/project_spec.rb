@@ -940,8 +940,30 @@ RSpec.describe Clover, "project" do
         insert_audit_log(object_ids: [user.id])
         insert_audit_log(subject_id: other_account_ubid.to_uuid)
 
-        visit "#{project.path}/audit-log?subject=#{user.ubid}"
+        visit "#{project.path}/audit-log"
+        fill_in "Account", with: user.ubid
+        click_button "Search"
         expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+
+        fill_in "Account", with: user.name
+        click_button "Search"
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+
+        fill_in "Account", with: user.email
+        click_button "Search"
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+
+        click_link "Test User"
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+
+        click_link user.ubid
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+
+        fill_in "Account", with: "NoMatch"
+        click_button "Search"
+        expect(page).to have_content "No matching audit log entries"
       end
 
       it "can filter by object UBID" do
@@ -950,16 +972,23 @@ RSpec.describe Clover, "project" do
         insert_audit_log(object_ids: [vm.id])
         insert_audit_log(object_ids: [vm2.id])
 
-        visit "#{project.path}/audit-log?object=#{vm.ubid}"
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test"]
+        visit "#{project.path}/audit-log"
+        fill_in "Object", with: vm.ubid
+        click_button "Search"
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test (View)"]
+
         click_link "vm-test"
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test (View)"]
+
+        click_link "View"
         expect(page.title).to eq("Ubicloud - vm-test")
       end
 
       it "shows empty state when no entries" do
         visit "#{project.path}/audit-log"
 
-        expect(page).to have_content "No audit log entries"
+        expect(page).to have_content "No matching audit log entries"
       end
 
       it "can not view audit log without permission" do
