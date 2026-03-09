@@ -1,0 +1,34 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "fileutils"
+require_relative "../../common/lib/util"
+require_relative "../lib/storage_archive"
+require_relative "../lib/vhost_block_backend"
+require_relative "../lib/storage_path"
+
+params = JSON.parse($stdin.read)
+
+validate_keys(
+  "archive-storage-volume parameters",
+  %w[vm_name device disk_index kek target_conf vhost_block_backend_version],
+  [],
+  params
+)
+
+vm_name = params.fetch("vm_name")
+device = params.fetch("device")
+disk_index = params.fetch("disk_index")
+kek = params.fetch("kek")
+target_conf = params.fetch("target_conf")
+vhost_block_backend_version = params.fetch("vhost_block_backend_version")
+
+storage_path = StoragePath.new(vm_name, device, disk_index)
+StorageArchive.new(
+  storage_path.disk_config_path,
+  storage_path.kek_pipe,
+  kek,
+  target_conf,
+  vhost_block_backend_version
+).archive
