@@ -914,14 +914,20 @@ RSpec.describe Clover, "project" do
     end
 
     describe "audit log" do
-      def insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [], action: "create", ubid_type: "vm")
+      def insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [], action: "create", ubid_type: "vm", at: Sequel::CURRENT_TIMESTAMP, id: Sequel::DEFAULT)
         DB[:audit_log].returning(:id).insert(
+          id:,
+          at:,
           ubid_type:,
           action:,
           project_id:,
           subject_id:,
           object_ids: Sequel.pg_array(object_ids, :uuid)
         ).first[:id]
+      end
+
+      def audit_log_content
+        page.all("#audit-log-table td:not(:first-child):not(:only-child)").map(&:text)
       end
 
       it "can list audit log entries" do
@@ -931,38 +937,66 @@ RSpec.describe Clover, "project" do
         click_link "View/Search Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, ""]
+        expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
       end
 
       it "can filter by action" do
-        insert_audit_log
-        insert_audit_log(action: "destroy")
-        insert_audit_log(ubid_type: "ps")
+        insert_audit_log(id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
+        insert_audit_log(action: "destroy", id: UBID.generate_from_time("a1", Time.now).to_uuid)
+        insert_audit_log(ubid_type: "ps", at: "2026-03-08")
 
         visit "#{project.path}/audit-log"
-        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
-          "ps/create", user.ubid, "",
+        expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/destroy", user.ubid, ""
+          "vm/destroy", user.ubid, "",
+          "ps/create", user.ubid, ""
         ]
 
         fill_in "Action", with: "vm"
         click_button "Search"
-        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
+        expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
           "vm/destroy", user.ubid, ""
         ]
 
         fill_in "Action", with: "create"
         click_button "Search"
-        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
-          "ps/create", user.ubid, "",
-          "vm/create", user.ubid, ""
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, "",
+          "ps/create", user.ubid, ""
         ]
 
         click_link "vm/create"
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq ["vm/create", user.ubid, ""]
+        expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
+
+        visit "#{project.path}/audit-log?limit=2"
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, "",
+          "vm/destroy", user.ubid, ""
+        ]
+
+        click_link "Next Page"
+        expect(audit_log_content).to eq [
+          "ps/create", user.ubid, ""
+        ]
+
+        visit "#{project.path}/audit-log?limit=1&action=create"
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, ""
+        ]
+
+        click_link "Next Page"
+        expect(audit_log_content).to eq [
+          "ps/create", user.ubid, ""
+        ]
+
+        visit "#{project.path}/audit-log?limit=a"
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, "",
+          "vm/destroy", user.ubid, "",
+          "ps/create", user.ubid, ""
+        ]
       end
 
       it "can filter by subject UBID" do
@@ -974,27 +1008,27 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log"
         fill_in "Account", with: user.ubid
         click_button "Search"
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+        expect(audit_log_content).to eq ["vm/create", "Test User", user.ubid]
 
         fill_in "Account", with: user.name
         click_button "Search"
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+        expect(audit_log_content).to eq ["vm/create", "Test User", user.ubid]
 
         fill_in "Account", with: user.email
         click_button "Search"
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+        expect(audit_log_content).to eq ["vm/create", "Test User", user.ubid]
 
         click_link "Test User"
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+        expect(audit_log_content).to eq ["vm/create", "Test User", user.ubid]
 
         click_link user.ubid
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", "Test User", user.ubid]
+        expect(audit_log_content).to eq ["vm/create", "Test User", user.ubid]
 
         fill_in "Account", with: "NoMatch"
         click_button "Search"
-        expect(page).to have_content "No matching audit log entries"
+        expect(audit_log_content).to eq []
       end
 
       it "can filter by object UBID" do
@@ -1006,20 +1040,78 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log"
         fill_in "Object", with: vm.ubid
         click_button "Search"
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test (View)"]
+        expect(audit_log_content).to eq ["vm/create", user.ubid, "vm-test (View)"]
 
         click_link "vm-test"
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, "vm-test (View)"]
+        expect(audit_log_content).to eq ["vm/create", user.ubid, "vm-test (View)"]
 
         click_link "View"
         expect(page.title).to eq("Ubicloud - vm-test")
       end
 
+      it "can filter by date, including correct pagination at same timestamp" do
+        other_account_ubid = Account.generate_ubid
+        date = Date.today
+        old_date = date << 3
+        al_ubid1 = UBID.generate_from_time("a1", Time.now - 10)
+        al_ubid2 = UBID.generate_from_time("a1", Time.now)
+        insert_audit_log(at: old_date, id: al_ubid1.to_uuid)
+        insert_audit_log(at: old_date, subject_id: other_account_ubid.to_uuid, id: al_ubid2.to_uuid)
+        insert_audit_log(action: "destroy")
+        insert_audit_log(at: old_date << 3)
+
+        visit "#{project.path}/audit-log"
+        expect(audit_log_content).to eq ["vm/destroy", user.ubid, ""]
+
+        fill_in "3 Months Prior To", with: (date << 1).strftime("%F")
+        click_button "Search"
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, "",
+          "vm/create", other_account_ubid.to_s, ""
+        ]
+
+        visit(page.current_url + "&limit=1")
+        expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
+
+        click_link "Next Page"
+        expect(audit_log_content).to eq ["vm/create", other_account_ubid.to_s, ""]
+
+        visit(page.current_url[0...-1])
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, ""
+        ]
+
+        fill_in "3 Months Prior To", with: date.strftime("%F")
+        click_button "Search"
+        expect(audit_log_content).to eq ["vm/destroy", user.ubid, ""]
+
+        click_link "Prior 3 Months"
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, "",
+          "vm/create", other_account_ubid.to_s, ""
+        ]
+
+        fill_in "3 Months Prior To", with: "2026-03-aa"
+        click_button "Search"
+        expect(audit_log_content).to eq []
+        expect(page).to have_content "No matching audit log entries in date range"
+
+        fill_in "3 Months Prior To", with: (date - 105).strftime("%F")
+        click_button "Search"
+        expect(audit_log_content).to eq []
+        expect(page).to have_content "No matching audit log entries in date range"
+
+        fill_in "3 Months Prior To", with: (date + 105).strftime("%F")
+        click_button "Search"
+        expect(audit_log_content).to eq []
+        expect(page).to have_content "No matching audit log entries in date range"
+      end
+
       it "shows empty state when no entries" do
         visit "#{project.path}/audit-log"
 
-        expect(page).to have_content "No matching audit log entries"
+        expect(audit_log_content).to eq []
       end
 
       it "can not view audit log without permission" do
