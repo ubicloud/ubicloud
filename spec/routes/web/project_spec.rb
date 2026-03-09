@@ -913,6 +913,67 @@ RSpec.describe Clover, "project" do
       end
     end
 
+    describe "audit log" do
+      def insert_audit_log(project_id:, subject_id:, object_ids: [], action: "create", ubid_type: "vm", at: Time.now)
+        DB[:audit_log].returning(:id).insert(
+          at:,
+          ubid_type:,
+          action:,
+          project_id:,
+          subject_id:,
+          object_ids: Sequel.pg_array(object_ids, :uuid)
+        ).first[:id]
+      end
+
+      it "can list audit log entries" do
+        id = insert_audit_log(project_id: project.id, subject_id: user.id)
+        entry_ubid = UBID.from_uuidish(id).to_s
+
+        visit "#{project.path}/audit-log"
+
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(page).to have_content entry_ubid
+        expect(page).to have_content user.ubid
+      end
+
+      it "can filter by subject UBID" do
+        other_account_id = Account.generate_uuid
+        id1 = insert_audit_log(project_id: project.id, subject_id: user.id)
+        insert_audit_log(project_id: project.id, subject_id: other_account_id)
+
+        visit "#{project.path}/audit-log?subject=#{user.ubid}"
+
+        expect(page).to have_content UBID.from_uuidish(id1).to_s
+        expect(page).not_to have_content UBID.from_uuidish(other_account_id).to_s
+      end
+
+      it "can filter by object UBID" do
+        vm_id = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject.id
+        vm_ubid = UBID.from_uuidish(vm_id).to_s
+        id_with_obj = insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm_id])
+        id_without_obj = insert_audit_log(project_id: project.id, subject_id: user.id)
+
+        visit "#{project.path}/audit-log?object=#{vm_ubid}"
+
+        expect(page).to have_content UBID.from_uuidish(id_with_obj).to_s
+        expect(page).not_to have_content UBID.from_uuidish(id_without_obj).to_s
+      end
+
+      it "shows empty state when no entries" do
+        visit "#{project.path}/audit-log"
+
+        expect(page).to have_content "No audit log entries"
+      end
+
+      it "can not view audit log without permission" do
+        AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
+
+        visit "#{project_wo_permissions.path}/audit-log"
+
+        expect(page.status_code).to eq(403)
+      end
+    end
+
     describe "delete" do
       it "can delete project" do
         visit project.path
