@@ -186,7 +186,7 @@ class Clover
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload, Aws::S3::Errors::EntityTooSmall => ex
           Clog.emit("could not complete multipart upload", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
           fail CloverError.new(400, "InvalidRequest", "Wrong parameters")
-        rescue Aws::S3::Errors::ServiceUnavailable => ex
+        rescue Aws::S3::Errors::ServiceUnavailable, Aws::S3::Errors::InternalError => ex
           Clog.emit("s3 service unavailable", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
           fail CloverError.new(503, "ServiceUnavailable", "Service unavailable")
         end
