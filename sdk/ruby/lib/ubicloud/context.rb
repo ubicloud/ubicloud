@@ -7,6 +7,7 @@ module Ubicloud
   # The following instance methods are defined via metaprogramming.  All
   # return instances of Ubicloud::ModelAdapter, for the related model.
   #
+  # +audit_log+ :: Ubicloud::AuditLog
   # +firewall+ :: Ubicloud::Firewall
   # +github_cache_entry+ :: Ubicloud::GithubCacheEntry
   # +github_installation+ :: Ubicloud::GithubInstallation
@@ -25,6 +26,7 @@ module Ubicloud
     end
 
     {
+      audit_log: AuditLog,
       vm: Vm,
       postgres: Postgres,
       firewall: Firewall,

@@ -9,6 +9,7 @@ Examples:
 
 Commands:
     ai         Manage AI features
+    al         View project audit log
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
@@ -97,6 +98,30 @@ Options:
 Allowed Option Values:
     Fields: name display-name hf-model capability multimodal context-length url
             input-price output-price
+
+
+View project audit log
+
+Usage:
+    ubi al command [...]
+
+Commands:
+    list    List project audit log entries
+
+
+List project audit log entries
+
+Usage:
+    ubi al list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -N, --no-headers                 do not show headers
+    -o, --object=object              only show entries affecting the given object UBID
+    -s, --subject=subject            only show entries with the given subject UBID
+
+Allowed Option Values:
+    Fields: id at action ubid_type subject_id object_ids
 
 
 Manage firewalls

@@ -20,12 +20,15 @@ module Ubicloud
     # Create a new rack request enviroment hash for the internal
     # request, and call the rack application with it.
     def call(method, path, params: nil, missing: :raise)
+      path_info, query_string = path.split("?", 2)
       env = @env.merge(
         "REQUEST_METHOD" => method,
-        "PATH_INFO" => "/project/#{@project_id}/#{path}",
+        "PATH_INFO" => "/project/#{@project_id}/#{path_info}",
         "rack.request.form_input" => nil,
-        "rack.request.form_hash" => nil
+        "rack.request.form_hash" => nil,
+        "rack.request.query_hash" => nil
       )
+      env["QUERY_STRING"] = query_string || ""
       params &&= params.to_json.force_encoding(Encoding::BINARY)
       env["rack.input"] = StringIO.new(params || "".b)
       env.delete("roda.json_params")
