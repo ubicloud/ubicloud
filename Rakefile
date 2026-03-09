@@ -37,6 +37,7 @@ task :_test_up do
 end
 
 migrate_version = lambda do
+  # Update .github/workflows/ci.yml when updating this
   last_irreversible_migration = 20250721
   version = ENV["VERSION"]
   unless version && File.file?(version)
