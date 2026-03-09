@@ -667,19 +667,25 @@ class CloverAdmin < Roda
           r.is actions.keys do |key|
             action = actions[key]
             action_type = action.type
+            @label = action.label
+            @params = action.params
 
             r.get(action_type != :form) do
               if action_type == :direct
                 url = action.call(@obj) || fail(CloverError.new(400, "InvalidRequest", "Action link is not available"))
                 r.redirect url
               end
-              @label = action.label
-              @params = action.params
               view("object_action")
             end
 
             r.post(action_type != :direct) do
-              params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
+              begin
+                params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
+              rescue Roda::RodaPlugins::TypecastParams::Error => e
+                flash.now["error"] = "Invalid parameter submitted: #{e.param_name}"
+                next view("object_action")
+              end
+
               result = action.call(@obj, *params)
               if action_type == :content
                 view(content: result)
