@@ -944,7 +944,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log?subject=#{user.ubid}"
 
         expect(page).to have_content UBID.from_uuidish(id1).to_s
-        expect(page).not_to have_content UBID.from_uuidish(other_account_id).to_s
+        expect(page).to have_no_content UBID.from_uuidish(other_account_id).to_s
       end
 
       it "can filter by object UBID" do
@@ -956,7 +956,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log?object=#{vm_ubid}"
 
         expect(page).to have_content UBID.from_uuidish(id_with_obj).to_s
-        expect(page).not_to have_content UBID.from_uuidish(id_without_obj).to_s
+        expect(page).to have_no_content UBID.from_uuidish(id_without_obj).to_s
       end
 
       it "shows empty state when no entries" do

@@ -8,18 +8,18 @@ class Clover
       ds = DB[:audit_log].where(project_id: @project.id).order(Sequel.desc(:at))
 
       if (subject = typecast_params.nonempty_str("subject"))
-        if (subject_uuid = UBID.to_uuid(subject))
-          ds = ds.where(subject_id: subject_uuid)
+        ds = if (subject_uuid = UBID.to_uuid(subject))
+          ds.where(subject_id: subject_uuid)
         else
-          ds = ds.where(false)
+          ds.where(false)
         end
       end
 
       if (object = typecast_params.nonempty_str("object"))
-        if (object_uuid = UBID.to_uuid(object))
-          ds = ds.where(Sequel.pg_array_op(:object_ids).contains(Sequel.pg_array([object_uuid], :uuid)))
+        ds = if (object_uuid = UBID.to_uuid(object))
+          ds.where(Sequel.pg_array_op(:object_ids).contains(Sequel.pg_array([object_uuid], :uuid)))
         else
-          ds = ds.where(false)
+          ds.where(false)
         end
       end
 
