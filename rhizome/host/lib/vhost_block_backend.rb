@@ -25,6 +25,10 @@ class VhostBlockBackend
     @v0_4_or_later
   end
 
+  def supports_archive?
+    @v0_4_or_later
+  end
+
   def sha256
     SHA256_BY_VERSION_AND_ARCH.fetch([@version, Arch.sym]) do
       fail "Unsupported version: #{@version}, #{Arch.sym}"
@@ -50,6 +54,10 @@ class VhostBlockBackend
 
   def init_metadata_path
     "#{dir}/init-metadata"
+  end
+
+  def archive_path
+    "#{dir}/archive"
   end
 
   def download
