@@ -81,17 +81,21 @@ PGDATA=/dat/17/data
     end
 
     it "returns true as backup needed if previous backup started more than a day ago and is succeeded" do
-      expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).twice
-      expect(sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage").twice
+      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 25).exactly(4).times
+      expect(sshable).to receive(:_cmd).and_return("Succeeded").twice
       expect(postgres_timeline.need_backup?).to be(true)
+      postgres_timeline.update(backup_period_hours: 30)
+      expect(postgres_timeline.need_backup?).to be(false)
     end
 
     it "returns false as backup needed if previous backup started less than a day ago" do
-      expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage")
-      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 23).twice
-      expect(sshable).to receive(:_cmd).and_return("Succeeded")
+      expect(postgres_timeline).to receive(:blob_storage).and_return("dummy-blob-storage").twice
+      expect(postgres_timeline).to receive(:latest_backup_started_at).and_return(Time.now - 60 * 60 * 23).exactly(4).times
+      expect(sshable).to receive(:_cmd).and_return("Succeeded").twice
       expect(postgres_timeline.need_backup?).to be(false)
+      postgres_timeline.update(backup_period_hours: 12)
+      expect(postgres_timeline.need_backup?).to be(true)
     end
 
     it "returns false as backup needed if previous backup started is in progress" do

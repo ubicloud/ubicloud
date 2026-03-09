@@ -43,7 +43,7 @@ PGDATA=/dat/#{version}/data
 
     status = leader.vm.sshable.cmd("common/bin/daemonizer --check take_postgres_backup")
     return true if ["Failed", "NotStarted"].include?(status)
-    return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * 24)
+    return true if status == "Succeeded" && (latest_backup_started_at.nil? || latest_backup_started_at < Time.now - 60 * 60 * backup_period_hours)
 
     false
   end
@@ -122,6 +122,7 @@ end
 #  latest_backup_started_at  | timestamp with time zone |
 #  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
+#  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:

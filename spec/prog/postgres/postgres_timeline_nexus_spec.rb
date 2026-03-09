@@ -98,6 +98,13 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       expect(st.subject).to exist
     end
 
+    it "inherits backup_period_hours from parent" do
+      st_parent = described_class.assemble(location_id: Location::HETZNER_FSN1_ID)
+      st_parent.subject.update(backup_period_hours: 6)
+      st_child = described_class.assemble(location_id: Location::HETZNER_FSN1_ID, parent_id: st_parent.subject.id)
+      expect(st_child.subject.backup_period_hours).to eq(6)
+    end
+
     it "does not generate access_key/secret_key when AWS & Config.aws_postgres_iam_access" do
       expect(Config).to receive(:aws_postgres_iam_access).and_return(true).twice
 
