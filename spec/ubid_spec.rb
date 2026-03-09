@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "spec_helper"
+
 RSpec.describe UBID do
   let(:type_constants) { described_class.constants.select { it.start_with?("TYPE_") } }
   let(:all_types) { type_constants.map { described_class.const_get(it) } }

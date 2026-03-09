@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "spec_helper"
+
 RSpec.describe "Database" do
   it "has no unexpectedly collated columns" do
     collated_columns = DB[:pg_class]
