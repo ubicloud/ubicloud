@@ -135,7 +135,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
 
       expect(kubernetes_cluster.nodes.count).to eq(3)
 
-      new_vm = kubernetes_cluster.cp_vms.last
+      new_vm = kubernetes_cluster.cp_vms_dataset.first(name: /#{kubernetes_cluster.ubid}-/)
       expect(new_vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq 80
     end
   end
