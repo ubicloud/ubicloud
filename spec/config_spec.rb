@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative "spec_helper"
+
 RSpec.describe Config do
   it "can have float config" do
     described_class.class_eval do

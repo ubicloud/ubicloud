@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require_relative "spec_helper"
 
 RSpec.describe ResourceMethods do
   let(:sa) { Sshable.create(host: "test.localhost", raw_private_key_1: SshKey.generate.keypair) }
