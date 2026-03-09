@@ -200,7 +200,7 @@ class CloverAdmin < Roda
       "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
     },
     "GithubRepository" => {
-      "show_job_log" => object_action("Show Job Log", params: {job_id: :pos_int!}, type: :content) do |obj, job_id|
+      "show_job_log" => object_action("Show Job Log", params: {job_id: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 2**63 - 1}}}, type: :content) do |obj, job_id|
         url = obj.installation.client.workflow_run_job_logs(obj.name, job_id)
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       rescue Octokit::NotFound
@@ -214,7 +214,7 @@ class CloverAdmin < Roda
       "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart)
     },
     "Project" => {
-      "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: "float!"}) do |obj, credit|
+      "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: {typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}}}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)
       end,
       "set_feature_flag" => object_action("Set Feature Flag", flash: "Set feature flag", params: {
@@ -267,7 +267,7 @@ class CloverAdmin < Roda
       "schedule" => object_action("Schedule Strand to Run Immediately", flash: "Scheduled strand to run immediately", type: :form) do |obj|
         obj.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
       end,
-      "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: :pos_int!}) do |obj, minutes|
+      "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 1440}}}) do |obj, minutes|
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
       end
     },
@@ -680,7 +680,7 @@ class CloverAdmin < Roda
 
             r.post(action_type != :direct) do
               begin
-                params = action.params.map { |k, v| typecast_params.send(v.is_a?(Hash) ? v[:typecast] : v, k.to_s) }
+                params = action.params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
               rescue Roda::RodaPlugins::TypecastParams::Error => e
                 flash.now["error"] = "Invalid parameter submitted: #{e.param_name}"
                 next view("object_action")
