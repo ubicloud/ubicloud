@@ -11,19 +11,6 @@ auto_parallel_tests = lambda do
   use_auto_parallel_tests
 end
 
-loaded_environment = nil
-load_db = lambda do |env|
-  raise "cannot load #{env} environment, already loaded #{loaded_environment} environment" if loaded_environment && loaded_environment != env
-
-  loaded_environment = env
-  ENV["RACK_ENV"] = env
-  ENV["SKIP_LIT_REQUIRE_FROZEN"] = "1"
-  require "bundler"
-  Bundler.setup(:default, :development)
-  require "logger"
-  require_relative "db"
-end
-
 ncpu = nil
 nproc = lambda do
   return ncpu if ncpu
@@ -33,56 +20,9 @@ nproc = lambda do
   ncpu = Etc.nprocessors.clamp(1, 10).to_s
 end
 
-clone_test_database = lambda do
-  Sequel::DATABASES.each(&:disconnect)
-  nproc.call.to_i.times do |i|
-    database_name = "clover_test#{i + 1}"
-    sh "dropdb --if-exists -U postgres #{database_name}"
-    sh "createdb -U postgres -O clover -T clover_test #{database_name}"
-  end
-end
-
-# Migrate
-migrate = lambda do |env, version|
-  load_db.call(env)
-  Sequel.extension :migration
-
-  DB.extension :pg_enum
-
-  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
-  if version.is_a?(String) && File.file?(version)
-    Sequel::TimestampMigrator.new(DB, "migrate").run_single(version, :down)
-  else
-    Sequel::TimestampMigrator.apply(DB, "migrate", version)
-  end
-
-  # Check if the alternate-user password hash user needs to run
-  # migrations.  It's desirable to avoid always connecting to run
-  # migrations, since, almost always, there will be nothing to do and
-  # it gluts output.
-  case DB[<<SQL].get
-SELECT count(*)
-FROM pg_class
-WHERE relnamespace = 'public'::regnamespace AND relname IN ('account_password_hashes', 'admin_password_hash')
-SQL
-  when 0, 1
-    user = DB.get(Sequel.lit("current_user"))
-    ph_user = "#{user}_password"
-
-    # NB: this grant/revoke cannot be transaction-isolated, so, in
-    # sensitive settings, it would be good to check role access.
-    DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
-    Sequel.postgres(**DB.opts, user: ph_user) do |ph_db|
-      ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
-      Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
-    end
-    DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
-  when 2
-    # Already ran the "ph" migrations as the alternate user.  This
-    # branch is taken nearly all the time in a production situation.
-  else
-    fail "BUG: account_password_hashes table probing query should return 0 or 1"
-  end
+task_runner = lambda do |env, *args|
+  env = env.is_a?(String) ? {"RACK_ENV" => env} : env
+  sh(env, FileUtils::RUBY, "bin/rake-task-runner", *args)
 end
 
 desc "Migrate test database to latest version"
@@ -93,11 +33,10 @@ task test_down: [:_test_down, :refresh_sequel_caches, :annotate]
 
 # rubocop:disable Rake/Desc
 task :_test_up do
-  migrate.call("test", nil)
-  clone_test_database.call if auto_parallel_tests.call
+  task_runner.call("test", "migrate", "", nproc.call)
 end
 
-migrate_version = lambda do |env|
+migrate_version = lambda do
   last_irreversible_migration = 20241011
   version = ENV["VERSION"]
   unless version && File.file?(version)
@@ -106,74 +45,57 @@ migrate_version = lambda do |env|
       raise "Must provide VERSION environment variable >= #{last_irreversible_migration} (or a migration filename) to migrate down"
     end
   end
-  migrate.call(env, version)
+  version.to_s
 end
 
 task :_test_down do
-  migrate_version.call("test")
-  clone_test_database.call if auto_parallel_tests.call
+  task_runner.call("test", "migrate", migrate_version.call, nproc.call)
 end
 # rubocop:enable Rake/Desc
 
 desc "Migrate development database to latest version"
 task :dev_up do
-  migrate.call("development", nil)
+  task_runner.call("development", "migrate", "", "0")
 end
 
 desc "Migrate development database down. Must specify VERSION environment variable."
 task :dev_down do
-  migrate_version.call("development")
+  task_runner.call("development", "migrate", migrate_version.call, "0")
 end
 
 desc "Migrate production database to latest version"
 task :prod_up do
-  migrate.call("production", nil)
+  task_runner.call("production", "migrate", "", "0")
 end
 
 desc "Refresh Sequel caches"
 task :refresh_sequel_caches do
-  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
-    filename = "cache/#{type}.cache"
-    File.delete(filename) if File.file?(filename)
-  end
-
-  sh({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "bundle", "exec", "ruby", "-r", "./loader", "-e", <<~END)
-     DB.dump_schema_cache("cache/schema.cache")
-     DB.dump_index_cache("cache/index.cache")
-     Sequel::Model.dump_static_cache_cache
-     Sequel::Model.dump_pg_auto_constraint_validations_cache
-  END
+  task_runner.call({"RACK_ENV" => "test", "FORCE_AUTOLOAD" => "1"}, "refresh_sequel_caches")
 end
 
 desc "Dump Sequel caches to text, useful for diffing"
 task :dump_sequel_caches do
-  load_db.call("test")
-  require "pp"
-  text_dir = "cache-text-#{Time.now.to_i}"
-  Dir.mkdir(text_dir)
-  puts "Writing diffable version of cache files to #{text_dir}"
-  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
-    File.write(File.join(text_dir, "#{type}.txt"), Marshal.load(File.binread("cache/#{type}.cache")).pretty_inspect)
-  end
+  task_runner.call("test", "dump_sequel_caches")
 end
 
 # Database setup
 
 desc "Setup database"
 task :setup_database, [:env, :parallel] do |_, args|
-  raise "env must be test or development" unless ["test", "development"].include?(args[:env])
+  env = args[:env]
+  raise "env must be test or development" unless ["test", "development"].include?(env)
 
   parallel = args[:parallel] && args[:parallel] != "false"
-  raise "parallel can only be used in test" if parallel && args[:env] != "test"
+  raise "parallel can only be used in test" if parallel && env != "test"
 
   File.binwrite(auto_parallel_tests_file, "1") if parallel && !File.file?(auto_parallel_tests_file)
 
-  database_name = "clover_#{args[:env]}"
+  database_name = "clover_#{env}"
   sh "dropdb --if-exists -U postgres #{database_name}"
   sh "createdb -U postgres -O clover #{database_name}"
   sh "psql -U postgres -c 'CREATE EXTENSION citext; CREATE EXTENSION btree_gist;' #{database_name}"
-  migrate.call(args[:env], nil)
-  clone_test_database.call if parallel
+
+  task_runner.call(env, "migrate", "", (env == "test") ? nproc.call : "0")
 end
 
 desc "Generate a new .env.rb"
@@ -295,9 +217,7 @@ end
 
 desc "Create admin account in production environment"
 task "create_prod_admin_account", [:login] do |_, args|
-  load_db.call("production")
-  require_relative "loader"
-  puts "Password for account is: #{CloverAdmin.create_admin_account(args[:login])}"
+  task_runner.call("production", "create_prod_admin_account", args[:login])
 end
 
 desc "Check generated SQL for parameterization"
@@ -336,44 +256,8 @@ end
 
 desc "Report associations that can be removed and association options that should be added"
 task :unused_associations_check do
-  ENV["UNUSED_ASSOCIATIONS"] = "1"
-  rspec.call({})
-
-  ENV["FORCE_AUTOLOAD"] = "1"
-  require "./loader"
-  Sequel::Model.update_unused_associations_data
-
-  # Do not complain about unused project, strand, or semaphore associations or options
-  keep_associations = %w[project strand semaphores]
-  keep = proc { |_, association| keep_associations.include?(association) }
-
-  unused = Sequel::Model.unused_associations
-  unused.reject!(&keep)
-  if unused.empty?
-    puts "All Associations Are Used."
-  else
-    puts "Associations That Can Be Removed:", unused.map! { |klass, association| "#{klass}##{association}" }.sort!
-  end
-  puts
-
-  options_data = Sequel::Model.unused_association_options
-  options_data.reject!(&keep)
-  options_data.each do |_, _, opts|
-    opts.delete(:no_dataset_method)
-    opts.delete(:no_association_method)
-  end
-  options_data.reject! { |_, _, opts| opts.empty? }
-  if options_data.empty?
-    puts "No Associations Need Option Changes."
-  else
-    options_data = options_data.map do |klass, association, opts|
-      "#{klass}##{association}: , #{opts.inspect[1...-1]}"
-    end.sort!
-    puts "Associations Option That Can Be Added:", options_data
-  end
-
-  Sequel::Model.delete_unused_associations_files
-  exit(1) unless unused.empty? && options_data.empty?
+  rspec.call({"UNUSED_ASSOCIATIONS" => "1"})
+  task_runner.call({"RACK_ENV" => "test", "UNUSED_ASSOCIATIONS" => "1", "FORCE_AUTOLOAD" => "1"}, "unused_associations_check")
 end
 
 desc "Run each spec file in a separate process"
@@ -475,16 +359,7 @@ end
 
 desc "Annotate Sequel models"
 task "annotate" do
-  load_db.call("test")
-  require_relative "loader"
-  require_relative "model"
-  DB.loggers.clear
-  require "sequel/annotate"
-  ignore_dirs = %w[aws metal]
-  files = Dir["model/**/*.rb"].reject do |file|
-    ignore_dirs.include?(File.basename(File.dirname(file)))
-  end
-  Sequel::Annotate.annotate(files)
+  task_runner.call("test", "annotate")
 end
 
 desc "Build sdk gem"
@@ -507,8 +382,7 @@ task "by" do
   by_content = File.binread(Gem.activate_bin_path("by", "by"))
   by_content.sub!(/\A#!.*/, "#!#{RbConfig.ruby} --disable-gems")
   File.binwrite(by_path, by_content)
-  ENV["PATH"] = "#{__dir__}/bin:#{ENV["PATH"]}"
-  sh("bundle", "exec", "by-session", "./.by-session-setup.rb")
+  sh({"PATH" => "#{__dir__}/bin:#{ENV["PATH"]}"}, "bundle", "exec", "by-session", "./.by-session-setup.rb")
 ensure
   File.delete(by_path) if File.file?(by_path)
 end

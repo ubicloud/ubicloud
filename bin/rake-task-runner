@@ -1,0 +1,162 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+unless ENV["RACK_ENV"]
+  warn "must set RACK_ENV environment variable before calling"
+  exit 1
+end
+
+load_db = lambda do
+  ENV["SKIP_LIT_REQUIRE_FROZEN"] = "1"
+  require "bundler"
+  Bundler.setup(:default, :development)
+  require "logger"
+  require_relative "../db"
+end
+
+command, *args = ARGV
+
+require_args = lambda do |n|
+  unless n.cover?(args.length)
+    warn "invalid arguments (expected: #{n}, given: #{args.length})"
+    exit 1
+  end
+
+  args
+end
+
+case command
+when "migrate"
+  version, ncpu = require_args.call(2..2)
+  version = nil if version&.empty?
+  ncpu = Integer(ncpu, 10)
+
+  load_db.call
+  Sequel.extension :migration
+
+  DB.extension :pg_enum
+
+  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
+  if version && File.file?(version)
+    Sequel::TimestampMigrator.new(DB, "migrate").run_single(version, :down)
+  else
+    version &&= Integer(version, 10)
+    Sequel::TimestampMigrator.apply(DB, "migrate", version)
+  end
+
+  # Check if the alternate-user password hash user needs to run
+  # migrations.  It's desirable to avoid always connecting to run
+  # migrations, since, almost always, there will be nothing to do and
+  # it gluts output.
+  case DB[<<SQL].get
+SELECT count(*)
+FROM pg_class
+WHERE relnamespace = 'public'::regnamespace AND relname IN ('account_password_hashes', 'admin_password_hash')
+SQL
+  when 0, 1
+    user = DB.get(Sequel.lit("current_user"))
+    ph_user = "#{user}_password"
+
+    # NB: this grant/revoke cannot be transaction-isolated, so, in
+    # sensitive settings, it would be good to check role access.
+    DB["GRANT CREATE ON SCHEMA public TO ?", ph_user.to_sym].get
+    Sequel.postgres(**DB.opts, user: ph_user) do |ph_db|
+      ph_db.loggers << Logger.new($stdout) if ph_db.loggers.empty?
+      Sequel::Migrator.run(ph_db, "migrate/ph", table: "schema_migrations_password")
+    end
+    DB["REVOKE ALL ON SCHEMA public FROM ?", ph_user.to_sym].get
+  when 2
+    # Already ran the "ph" migrations as the alternate user.  This
+    # branch is taken nearly all the time in a production situation.
+  else
+    fail "BUG: account_password_hashes table probing query should return 0 or 1"
+  end
+
+  if ENV["RACK_ENV"] == "test" && ncpu > 0
+    Sequel::DATABASES.each(&:disconnect)
+    ncpu.times do |i|
+      database_name = "clover_test#{i + 1}"
+      system "dropdb --if-exists -U postgres #{database_name}"
+      system "createdb -U postgres -O clover -T clover_test #{database_name}"
+    end
+  end
+when "refresh_sequel_caches"
+  require_args.call(0..0)
+  require_relative "../loader"
+
+  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+    filename = "cache/#{type}.cache"
+    File.delete(filename) if File.file?(filename)
+  end
+
+  DB.dump_schema_cache("cache/schema.cache")
+  DB.dump_index_cache("cache/index.cache")
+  Sequel::Model.dump_static_cache_cache
+  Sequel::Model.dump_pg_auto_constraint_validations_cache
+when "dump_sequel_caches"
+  require_args.call(0..0)
+  load_db.call
+  require "pp"
+  text_dir = "cache-text-#{Time.now.to_i}"
+  Dir.mkdir(text_dir)
+  puts "Writing diffable version of cache files to #{text_dir}"
+  %w[schema index static_cache pg_auto_constraint_validations].each do |type|
+    File.write(File.join(text_dir, "#{type}.txt"), Marshal.load(File.binread("cache/#{type}.cache")).pretty_inspect)
+  end
+when "unused_associations_check"
+  require_args.call(0..0)
+  require_relative "../loader"
+  Sequel::Model.update_unused_associations_data
+
+  # Do not complain about unused project, strand, or semaphore associations or options
+  keep_associations = %w[project strand semaphores]
+  keep = proc { |_, association| keep_associations.include?(association) }
+
+  unused = Sequel::Model.unused_associations
+  unused.reject!(&keep)
+  if unused.empty?
+    puts "All Associations Are Used."
+  else
+    puts "Associations That Can Be Removed:", unused.map! { |klass, association| "#{klass}##{association}" }.sort!
+  end
+  puts
+
+  options_data = Sequel::Model.unused_association_options
+  options_data.reject!(&keep)
+  options_data.each do |_, _, opts|
+    opts.delete(:no_dataset_method)
+    opts.delete(:no_association_method)
+  end
+  options_data.reject! { |_, _, opts| opts.empty? }
+  if options_data.empty?
+    puts "No Associations Need Option Changes."
+  else
+    options_data = options_data.map do |klass, association, opts|
+      "#{klass}##{association}: , #{opts.inspect[1...-1]}"
+    end.sort!
+    puts "Associations Option That Can Be Added:", options_data
+  end
+
+  Sequel::Model.delete_unused_associations_files
+  exit(1) unless unused.empty? && options_data.empty?
+when "create_prod_admin_account"
+  login, = require_args.call(1..1)
+  load_db.call
+  require_relative "../loader"
+  puts "Password for account is: #{CloverAdmin.create_admin_account(login)}"
+when "annotate"
+  require_args.call(0..0)
+  load_db.call
+  require_relative "../loader"
+  require_relative "../model"
+  DB.loggers.clear
+  require "sequel/annotate"
+  ignore_dirs = %w[aws metal]
+  files = Dir["model/**/*.rb"].reject do |file|
+    ignore_dirs.include?(File.basename(File.dirname(file)))
+  end
+  Sequel::Annotate.annotate(files)
+else
+  warn "Invalid command: #{command}"
+  exit 1
+end
