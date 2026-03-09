@@ -605,11 +605,9 @@ RSpec.describe StorageVolume do
       rpc_sock = "/var/storage/test/2/rpc.sock"
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(vhost_sock)
       expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(rpc_sock)
-      expect(encrypted_vhost_sv).to receive(:rm_if_exists).with(kek_pipe)
-      expect(File).to receive(:mkfifo).with(kek_pipe, 0o600)
-      expect(FileUtils).to receive(:chown).with("test", "test", kek_pipe)
       expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "stop", "test-2-storage.service")
       expect(encrypted_vhost_sv).to receive(:r).with("systemctl", "start", "test-2-storage.service")
+      expect(encrypted_vhost_sv).to receive(:with_kek_pipe).with(kek_pipe, owner: "test").and_yield(kek_pipe)
       expect(encrypted_vhost_sv).to receive(:write_kek_to_pipe).with(kek_pipe, /aes256-gcm/)
       encrypted_vhost_sv.vhost_backend_start(key_wrapping_secrets)
     end

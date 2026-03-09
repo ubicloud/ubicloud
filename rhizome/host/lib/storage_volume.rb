@@ -6,7 +6,6 @@ require "fileutils"
 require "json"
 require "openssl"
 require "base64"
-require "timeout"
 require "yaml"
 require_relative "boot_image"
 require_relative "vm_path"
@@ -14,13 +13,13 @@ require_relative "spdk_path"
 require_relative "spdk_rpc"
 require_relative "spdk_setup"
 require_relative "storage_key_encryption"
+require_relative "kek_pipe"
 require_relative "storage_path"
 require_relative "toml"
 require_relative "vhost_block_backend"
 
-KEK_PIPE_WRITE_TIMEOUT_SEC = 5
-
 class StorageVolume
+  include KekPipe
   include Toml
 
   attr_reader :image_path, :read_only
@@ -150,34 +149,18 @@ class StorageVolume
   end
 
   def vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
-    with_kek_pipe do |kek_pipe|
-      cmd = [
-        "sudo", "-u", @vm_name,
-        vhost_backend.init_metadata_path,
-        "-s", @stripe_sector_count_shift.to_s,
-        "--config", sp.vhost_backend_config
-      ]
+    cmd = [
+      "sudo", "-u", @vm_name,
+      vhost_backend.init_metadata_path,
+      "-s", @stripe_sector_count_shift.to_s,
+      "--config", sp.vhost_backend_config
+    ]
+    cmd.push("--kek", sp.kek_pipe) unless use_config_v2?
 
-      unless use_config_v2?
-        # Unlike v2, where the kek path is explicitly included in the TOML
-        # config, we need to pass the kek pipe path as a CLI arg in v1.
-        cmd.push("--kek", kek_pipe)
-      end
-
-      # Start backend (it should open the FIFO for reading)
-      pid = Process.spawn(*cmd)
-
-      begin
-        write_kek_to_pipe(kek_pipe, vhost_backend_kek(key_wrapping_secrets))
-      rescue => e
-        Process.kill("TERM", pid)
-        Process.waitpid(pid)
-        raise "init_metadata failed: error writing KEK to pipe: #{e.message}"
-      end
-
-      _, status = Process.wait2(pid)
-      raise "init_metadata failed" unless status.success?
-    end
+    run_with_kek_pipe(cmd,
+      kek_pipe: sp.kek_pipe,
+      kek_content: vhost_backend_kek(key_wrapping_secrets),
+      owner: @vm_name)
   end
 
   def vhost_backend_create_service_file
@@ -479,27 +462,9 @@ class StorageVolume
       return
     end
 
-    with_kek_pipe do |kek_pipe|
+    with_kek_pipe(sp.kek_pipe, owner: @vm_name) do |kek_pipe|
       r "systemctl", "start", vhost_user_block_service
       write_kek_to_pipe(kek_pipe, vhost_backend_kek(key_wrapping_secrets))
-    end
-  end
-
-  def with_kek_pipe
-    kek_pipe = sp.kek_pipe
-    rm_if_exists(kek_pipe)
-    File.mkfifo(kek_pipe, 0o600)
-    FileUtils.chown @vm_name, @vm_name, kek_pipe
-    yield kek_pipe
-  ensure
-    FileUtils.rm_f(kek_pipe)
-  end
-
-  def write_kek_to_pipe(kek_pipe, payload, timeout_sec: KEK_PIPE_WRITE_TIMEOUT_SEC)
-    Timeout.timeout(timeout_sec) do
-      File.open(kek_pipe, File::WRONLY) do |file|
-        file.write(payload)
-      end
     end
   end
 
