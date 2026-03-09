@@ -1,4 +1,4 @@
-<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil) %>
+<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false) %>
 
 <div>
   <% if title || right_items %>
@@ -24,9 +24,9 @@
             <% headers.each_with_index do |name, i| %>
               <th
                 scope="col"
-                <% if i == 0 %>
+                <% if i == 0 && !consistent_styling %>
                 class="pl-4 pr-3 sm:pl-6 py-3.5 text-left text-sm font-semibold text-gray-900"
-                <% elsif i + 1 == headers.length %>
+                <% elsif i + 1 == headers.length && !consistent_styling %>
                 class="pl-3 pr-4 sm:pr-6 py-3.5 text-left text-sm font-semibold text-gray-900"
                 <% else %>
                 class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900"
@@ -56,9 +56,9 @@
               <% columns.each_with_index do |(value, col_opts), i| %>
                 <% col_opts ||= {} %>
                 <td
-                  <% if i == 0
+                  <% if i == 0 && !consistent_styling
                       cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium whitespace-nowrap text-sm"
-                    elsif i + 1 == columns.length
+                    elsif i + 1 == columns.length && !consistent_styling
                       cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 whitespace-nowrap text-sm"
                     else
                       cls="px-3 py-4 text-gray-500 whitespace-nowrap text-sm"
