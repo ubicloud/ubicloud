@@ -1,4 +1,4 @@
-<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false) %>
+<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false, id: nil) %>
 
 <div>
   <% if title || right_items %>
@@ -17,7 +17,7 @@
   <% end %>
 
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-    <table class="min-w-full divide-y divide-gray-300">
+    <table class="min-w-full divide-y divide-gray-300" <% if id %> id="<%= id %>" <% end %>>
       <% unless headers.empty? || rows.empty? %>
         <thead class="bg-gray-50">
           <tr>
