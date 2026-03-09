@@ -39,22 +39,22 @@
 
   <%== part(
     "components/table_card",
-    headers: ["ID", "Time", "Action", "Type", "Subject", "Objects"],
+    headers: ["Time", "Action", "Type", "Subject", "Objects"],
     empty_state: {
       icon: "hero-document-text",
       title: "No audit log entries",
       description: "No audit log entries found for this project."
     },
+    consistent_styling: true,
     rows:
       @audit_logs.map do |entry|
         [
           [
-            [entry[:id], {}],
             [entry[:at], {}],
             [entry[:action], {}],
             [entry[:ubid_type], {}],
             [entry[:subject_id], {}],
-            [entry[:object_ids].join(", "), {}]
+            [entry[:object_ids].map { h(it) }.join("<br>"), {escape: false}]
           ],
           { id: "audit-log-#{entry[:id]}" }
         ]

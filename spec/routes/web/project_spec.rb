@@ -925,38 +925,36 @@ RSpec.describe Clover, "project" do
       end
 
       it "can list audit log entries" do
-        id = insert_audit_log
-        entry_ubid = UBID.from_uuidish(id).to_s
+        insert_audit_log
 
         visit project.path
         click_link "View/Search Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
-        expect(page).to have_content entry_ubid
         expect(page).to have_content user.ubid
       end
 
       it "can filter by subject UBID" do
-        other_account_id = Account.generate_uuid
-        id1 = insert_audit_log
-        insert_audit_log(subject_id: other_account_id)
+        other_account_ubid = Account.generate_ubid
+        insert_audit_log
+        insert_audit_log(subject_id: other_account_ubid.to_uuid)
 
         visit "#{project.path}/audit-log?subject=#{user.ubid}"
 
-        expect(page).to have_content UBID.from_uuidish(id1).to_s
-        expect(page).to have_no_content UBID.from_uuidish(other_account_id).to_s
+        expect(page).to have_content user.ubid.to_s
+        expect(page).to have_no_content other_account_ubid.to_s
       end
 
       it "can filter by object UBID" do
-        vm_id = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject.id
-        vm_ubid = UBID.from_uuidish(vm_id).to_s
-        id_with_obj = insert_audit_log(object_ids: [vm_id])
-        id_without_obj = insert_audit_log
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject
+        vm2 = Prog::Vm::Nexus.assemble("t y", project.id, name: "vm-test2").subject
+        insert_audit_log(object_ids: [vm.id])
+        insert_audit_log(object_ids: [vm2.id])
 
-        visit "#{project.path}/audit-log?object=#{vm_ubid}"
+        visit "#{project.path}/audit-log?object=#{vm.ubid}"
 
-        expect(page).to have_content UBID.from_uuidish(id_with_obj).to_s
-        expect(page).to have_no_content UBID.from_uuidish(id_without_obj).to_s
+        expect(page).to have_content vm.ubid
+        expect(page).to have_no_content vm2.ubid
       end
 
       it "shows empty state when no entries" do
