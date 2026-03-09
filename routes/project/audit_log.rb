@@ -5,8 +5,17 @@ class Clover
     authorize("Project:auditlog", @project)
 
     r.get true do
-      ds = DB[:audit_log].where(project_id: @project.id).order(Sequel.desc(:at))
+      ds = DB[:audit_log].where(project_id: @project.id).order(Sequel.desc(:at), :ubid_type, :action).limit(100)
       skip_query = false
+
+      if (action = typecast_params.nonempty_str("action"))
+        type, action = action.split("/")
+        ds = if action
+          ds.where(ubid_type: type, action:)
+        else
+          ds.where(type => [:ubid_type, :action])
+        end
+      end
 
       if (subject = typecast_params.nonempty_str("subject"))
         if (subject_id = UBID.to_uuid(subject))
@@ -29,7 +38,7 @@ class Clover
       items = if skip_query
         []
       else
-        ds.limit(100).all
+        ds.all
       end
 
       if api?
@@ -56,14 +65,14 @@ class Clover
           subject_id = log[:subject_id]
           subject_ubid = UBID.from_uuidish(subject_id).to_s
           subject_name = ubids[subject_id]&.name || subject_ubid
-          log[:subject] = "<a class=\"text-orange-600\" href=\"?subject=#{subject_ubid}\">#{subject_name}</a>"
+          log[:subject] = "<a class=\"text-orange-600\" href=\"?subject=#{h subject_ubid}\">#{h subject_name}</a>"
 
           log[:objects] = log[:object_ids].filter_map do |object_id|
             object_ubid = UBID.from_uuidish(object_id).to_s
             if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path)
-              "<a class=\"text-orange-600\" href=\"?object=#{object_ubid}\">#{obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
+              "<a class=\"text-orange-600\" href=\"?object=#{h object_ubid}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
             else
-              "<a class=\"text-orange-600\" href=\"?object=#{object_ubid}\">#{object_ubid}</a>"
+              "<a class=\"text-orange-600\" href=\"?object=#{h object_ubid}\">#{h object_ubid}</a>"
             end
           end
         end
