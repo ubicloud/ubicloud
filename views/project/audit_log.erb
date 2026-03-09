@@ -11,7 +11,7 @@
     <div class="px-4 py-5 sm:p-6">
       <% form(action: "#{@project.path}/audit-log", method: :get) do %>
         <div class="grid grid-cols-12 gap-3">
-          <div class="col-span-12 sm:col-span-2">
+          <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
               name: "action",
@@ -29,13 +29,23 @@
               attributes: { placeholder: "Filter by account name/email/ID" }
             ) %>
           </div>
-          <div class="col-span-12 sm:col-span-3">
+          <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
               name: "object",
               label: "Object",
               value: typecast_params.nonempty_str("object"),
               attributes: { placeholder: "Filter by object ID" }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "end",
+              type: "date",
+              label: "#{@month_limit} Months Prior To",
+              value: @end_date,
+              attributes: {required: true}
             ) %>
           </div>
           <div class="col-span-12 sm:col-span-2 flex items-end">
@@ -46,27 +56,42 @@
     </div>
   </div>
 
+  <% end_date = @end_date.to_s
+  rows =
+    @audit_logs.map do |entry|
+      [
+        [
+          [entry[:at].getutc.strftime("%F %T"), {}],
+          ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
+          [entry[:subject], {escape: false}],
+          [entry[:objects].join("<br>"), {escape: false}]
+        ],
+        { id: UBID.from_uuidish(entry[:id]).to_s }
+      ]
+    end
+
+    if @pagination_key
+      link_text = "Next Page"
+      @next_page_params["pagination_key"] = @pagination_key
+    elsif @next_end_date
+      link_text = "Prior 3 Months"
+      @next_page_params["end"] = @next_end_date
+    end
+
+    if link_text
+      rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
+    end %>
+
   <%== part(
     "components/table_card",
     id: "audit-log-table",
-    headers: ["Time", "Action", "Account", "Objects"],
+    headers: ["Time (in UTC)", "Action", "Account", "Objects"],
     empty_state: {
       icon: "hero-document-text",
-      title: "No matching audit log entries",
-      description: "No matching audit log entries found for this project."
+      title: "No matching audit log entries in date range",
+      description: "No matching audit log entries found for this project (access limited to prior 6 months)."
     },
     consistent_styling: true,
     rows:
-      @audit_logs.map do |entry|
-        [
-          [
-            [entry[:at], {}],
-            ["<a class=\"text-orange-600\" href=\"?action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
-            [entry[:subject], {escape: false}],
-            [entry[:objects].join("<br>"), {escape: false}]
-          ],
-          { id: "audit-log-#{entry[:id]}" }
-        ]
-      end
   ) %>
 </div>
