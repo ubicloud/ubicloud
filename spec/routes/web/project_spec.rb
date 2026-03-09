@@ -929,7 +929,8 @@ RSpec.describe Clover, "project" do
         id = insert_audit_log(project_id: project.id, subject_id: user.id)
         entry_ubid = UBID.from_uuidish(id).to_s
 
-        visit "#{project.path}/audit-log"
+        visit project.path
+        click_link "View/Search Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
         expect(page).to have_content entry_ubid
