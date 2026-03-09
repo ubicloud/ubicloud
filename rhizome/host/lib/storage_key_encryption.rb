@@ -5,6 +5,8 @@ require "openssl"
 require "base64"
 require "securerandom"
 
+KEK_PIPE_WRITE_TIMEOUT_SEC = 5
+
 class StorageKeyEncryption
   def initialize(key_encryption_cipher)
     @key_encryption_cipher = key_encryption_cipher
@@ -83,5 +85,39 @@ class StorageKeyEncryption
 
     decipher.auth_tag = auth_tag
     decipher.update(encrypted_key[0]) + decipher.final
+  end
+end
+
+def with_kek_pipe(kek_pipe)
+  rm_if_exists(kek_pipe)
+  File.mkfifo(kek_pipe, 0o600)
+  FileUtils.chown @vm_name, @vm_name, kek_pipe
+  yield kek_pipe
+ensure
+  FileUtils.rm_f(kek_pipe)
+end
+
+def write_kek_to_pipe(kek_pipe, payload, timeout_sec: KEK_PIPE_WRITE_TIMEOUT_SEC)
+  Timeout.timeout(timeout_sec) do
+    File.open(kek_pipe, File::WRONLY) do |file|
+      file.write(payload)
+    end
+  end
+end
+
+def run_with_kek_pipe(command, kek_pipe:, kek_content:, stdin: "", env: {})
+  with_kek_pipe(kek_pipe) do |pipe|
+    pid = Process.spawn(env, *command)
+
+    begin
+      write_kek_to_pipe(pipe, kek_content)
+    rescue => e
+      Process.kill("TERM", pid)
+      Process.waitpid(pid)
+      raise "error writing KEK to pipe: #{e.message}"
+    end
+
+    _, status = Process.wait2(pid)
+    fail CommandFail.new("command failed: #{command.join(" ")}", stdin, "") unless status.success?
   end
 end
