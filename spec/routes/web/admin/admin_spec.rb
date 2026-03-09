@@ -864,6 +864,10 @@ RSpec.describe CloverAdmin do
     expect(Github).to receive(:installation_client).and_return(client)
     expect(client).to receive(:workflow_run_job_logs).with("test-org/test-repo", 12345).and_return("https://example.com/logs/12345.zip")
 
+    fill_in "job_id", with: "bad"
+    click_button "Show Job Log"
+    expect(page).to have_flash_error("Invalid parameter submitted: job_id")
+
     fill_in "job_id", with: "12345"
     click_button "Show Job Log"
     expect(page).to have_link("Download Job Log", href: "https://example.com/logs/12345.zip")
