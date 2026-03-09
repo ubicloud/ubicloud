@@ -37,7 +37,7 @@ task :_test_up do
 end
 
 migrate_version = lambda do
-  last_irreversible_migration = 20241011
+  last_irreversible_migration = 20250721
   version = ENV["VERSION"]
   unless version && File.file?(version)
     version = version.to_i

@@ -16,11 +16,11 @@ Sequel.migration do
 
   down do
     alter_table(:postgres_server) do
-      set_column_null :version
+      set_column_allow_null :version
     end
 
     alter_table(:postgres_resource) do
-      set_column_null :target_version
+      set_column_allow_null :target_version
     end
   end
 end

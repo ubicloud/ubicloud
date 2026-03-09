@@ -68,13 +68,11 @@ Sequel.migration do
     # Drop CHECK constrained columns
     alter_table(:postgres_resource) do
       drop_constraint(:target_version_check)
-      set_column_not_null :target_version
       drop_column :target_version
     end
 
     alter_table(:postgres_server) do
       drop_constraint(:version_check)
-      set_column_not_null :version
       drop_column :version
     end
 

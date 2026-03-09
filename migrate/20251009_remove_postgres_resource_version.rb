@@ -1,9 +1,9 @@
 # frozen_string_literal: true
 
 Sequel.migration do
-  change do
+  revert do
     alter_table(:postgres_resource) do
-      drop_column :version
+      add_column :version, :postgres_version
     end
   end
 end
