@@ -80,3 +80,16 @@ end
 def curl_file(url, path)
   r("bash -c 'curl -f -L3 #{url.shellescape} | tee >(openssl dgst -sha256) > #{path.shellescape}'").split(" ").last
 end
+
+def validate_keys(context, required_keys, optional_keys, hash)
+  all_keys = required_keys + optional_keys
+  missing_keys = required_keys - hash.keys
+  extra_keys = hash.keys - all_keys
+  unless missing_keys.empty?
+    raise ArgumentError, "Missing required keys in #{context}: #{missing_keys.join(", ")}"
+  end
+
+  unless extra_keys.empty?
+    raise ArgumentError, "Unexpected keys in #{context}: #{extra_keys.join(", ")}"
+  end
+end
