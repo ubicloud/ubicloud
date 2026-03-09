@@ -934,6 +934,37 @@ RSpec.describe Clover, "project" do
         expect(page.all("#audit-log-table td").map(&:text)[1..]).to eq ["vm/create", user.ubid, ""]
       end
 
+      it "can filter by action" do
+        insert_audit_log
+        insert_audit_log(action: "destroy")
+        insert_audit_log(ubid_type: "ps")
+
+        visit "#{project.path}/audit-log"
+        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
+          "ps/create", user.ubid, "",
+          "vm/create", user.ubid, "",
+          "vm/destroy", user.ubid, ""
+        ]
+
+        fill_in "Action", with: "vm"
+        click_button "Search"
+        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
+          "vm/create", user.ubid, "",
+          "vm/destroy", user.ubid, ""
+        ]
+
+        fill_in "Action", with: "create"
+        click_button "Search"
+        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq [
+          "ps/create", user.ubid, "",
+          "vm/create", user.ubid, ""
+        ]
+
+        click_link "vm/create"
+        expect(page.title).to eq("Ubicloud - project-1 - Audit Log")
+        expect(page.all("#audit-log-table td:not(:first-child)").map(&:text)).to eq ["vm/create", user.ubid, ""]
+      end
+
       it "can filter by subject UBID" do
         other_account_ubid = Account.generate_ubid
         user.update(name: "Test User")

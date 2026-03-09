@@ -11,6 +11,15 @@
     <div class="px-4 py-5 sm:p-6">
       <% form(action: "#{@project.path}/audit-log", method: :get) do %>
         <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-12 sm:col-span-2">
+            <%== part(
+              "components/form/text",
+              name: "action",
+              label: "Action",
+              value: typecast_params.nonempty_str("action"),
+              attributes: { placeholder: "Filter by action" }
+            ) %>
+          </div>
           <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
@@ -20,7 +29,7 @@
               attributes: { placeholder: "Filter by account name/email/ID" }
             ) %>
           </div>
-          <div class="col-span-12 sm:col-span-4">
+          <div class="col-span-12 sm:col-span-3">
             <%== part(
               "components/form/text",
               name: "object",
@@ -52,7 +61,7 @@
         [
           [
             [entry[:at], {}],
-            ["#{entry[:ubid_type]}/#{entry[:action]}", {}],
+            ["<a class=\"text-orange-600\" href=\"?action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
             [entry[:subject], {escape: false}],
             [entry[:objects].join("<br>"), {escape: false}]
           ],
