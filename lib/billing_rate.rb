@@ -34,6 +34,12 @@ class BillingRate
     rates.find { it["id"] == billing_rate_id }
   end
 
+  def self.million_token_price(resource)
+    unit_price = unit_price_from_resource_properties("InferenceTokens", resource, "global")
+    return unless unit_price
+    (unit_price * 1_000_000).round(2)
+  end
+
   def self.line_item_description(resource_type, resource_family, amount)
     case resource_type
     when "VmCores"
