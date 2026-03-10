@@ -1,6 +1,7 @@
 body {
   font-size: 1em;
   font-family: sans-serif;
+  padding-bottom: 40px;
 }
 .container {
   max-width: 1200px;
@@ -37,6 +38,20 @@ nav div.container, .associations {
   font-weight: bold;
   text-decoration: none;
   font-size: 1.6em;
+}
+footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-top: 1px solid #ddd;
+  padding: 5px 0;
+  font-size: 85%;
+  & div {
+    display: flex;
+    justify-content: space-between;
+  }
 }
 
 .alert {

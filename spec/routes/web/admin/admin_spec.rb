@@ -1115,6 +1115,24 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
   end
 
+  it "shows footer with the commit hash" do
+    now = Time.now.utc
+    expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(Config).to receive(:git_commit_hash).and_return("abc1234").at_least(:once)
+    visit "/"
+    expect(page).to have_content(now.to_s)
+    expect(page).to have_content(/commit: abc1234/)
+  end
+
+  it "shows footer without the commit hash" do
+    now = Time.now.utc
+    expect(Time).to receive(:now).and_return(now).at_least(:once)
+    expect(Config).to receive(:git_commit_hash).and_return(nil).at_least(:once)
+    visit "/"
+    expect(page).to have_content(now.to_s)
+    expect(page).to have_no_content(/commit:/)
+  end
+
   it "finds both active and archived VMs by IPv4" do
     host = create_vm_host
     project = Project.create(name: "test")
