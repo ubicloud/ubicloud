@@ -24,6 +24,11 @@ class Clover
       .exclude(inference_router_model_id: nil)
   end
 
+  def all_inference_models
+    inference_endpoint_ds.eager(:location, load_balancer: :private_subnet).all +
+      inference_router_model_ds.eager(inference_router: {load_balancer: :private_subnet}).all
+  end
+
   def inference_api_key_ds
     dataset = dataset_authorize(@project.api_keys_dataset.where(used_for: "inference_endpoint"), "InferenceApiKey:view")
     dataset = dataset.where(is_valid: true)

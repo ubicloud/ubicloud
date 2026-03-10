@@ -48,9 +48,9 @@ curl #{ie.load_balancer.health_check_url(path:)} \\
       <div>
         <h3 class="text-sm font-semibold text-gray-900">Price</h3>
         <p class="text-gray-500">
-          Input: $<%= "%0.02f" % million_token_price(ie.prompt_billing_resource) %> / 1M tokens
+          Input: $<%= "%0.02f" % BillingRate.million_token_price(ie.prompt_billing_resource) %> / 1M tokens
           <br>
-          Output: $<%= "%0.02f" % million_token_price(ie.completion_billing_resource) %> / 1M tokens
+          Output: $<%= "%0.02f" % BillingRate.million_token_price(ie.completion_billing_resource) %> / 1M tokens
         </p>
       </div>
       <div>

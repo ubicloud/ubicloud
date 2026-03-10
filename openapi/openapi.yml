@@ -248,6 +248,19 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Inference Api Key
+  '/project/{project_id}/inference-endpoint':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: listInferenceEndpoints
+      summary: List all inference endpoints
+      responses:
+        '200':
+          $ref: '#/components/responses/InferenceEndpoints'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Inference Endpoint
   '/project/{project_id}/kubernetes-cluster':
     get:
       operationId: listProjectKubernetesClusters
@@ -2695,6 +2708,53 @@ components:
       required:
         - id
         - key
+    InferenceEndpointPrice:
+      type: object
+      properties:
+        per_million_prompt_tokens:
+          description: Price per million prompt tokens in USD
+          type: number
+          nullable: true
+        per_million_completion_tokens:
+          description: Price per million completion tokens in USD
+          type: number
+          nullable: true
+      additionalProperties: false
+      required:
+        - per_million_prompt_tokens
+        - per_million_completion_tokens
+    InferenceEndpoint:
+      type: object
+      properties:
+        id:
+          description: ID of the inference endpoint
+          type: string
+        name:
+          description: Name of the model
+          type: string
+        display_name:
+          description: Display name of the model
+          type: string
+        url:
+          description: URL of the inference endpoint
+          type: string
+        model_name:
+          description: Model name of the inference endpoint
+          type: string
+        tags:
+          description: Tags of the inference endpoint
+          type: object
+        price:
+          $ref: '#/components/schemas/InferenceEndpointPrice'
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - display_name
+        - url
+        - model_name
+        - tags
+        - price
     LoadBalancer:
       type: object
       properties:
@@ -3356,6 +3416,20 @@ components:
             additionalProperties: false
             required:
               - items
+    InferenceEndpoints:
+      description: A list of Inference Endpoints
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/InferenceEndpoint'
+            additionalProperties: false
+            required:
+              - items
     LoadBalancer:
       description: A Load Balancer
       content:
@@ -3715,6 +3789,8 @@ tags:
     name: Firewall Rule
   - description: Inference API Key Operations
     name: Inference Api Key
+  - description: Inference Endpoint Operations
+    name: Inference Endpoint
   - description: Load Balancer Operations
     name: Load Balancer
   - description: Login Operations

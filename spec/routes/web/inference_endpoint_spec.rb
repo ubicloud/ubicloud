@@ -78,12 +78,6 @@ RSpec.describe Clover, "inference-endpoint" do
         visible: true, tags: {capability: "Text Generation"}
       )
 
-      expect(BillingRate).to receive(:from_resource_properties)
-        .with("InferenceTokens", "llama-3-2-1b-it-input", "global")
-        .and_return({"unit_price" => 0.0000001})
-      expect(BillingRate).to receive(:from_resource_properties)
-        .with("InferenceTokens", "llama-3-2-1b-it-output", "global")
-        .and_return({"unit_price" => 0.0000002})
       visit "#{project.path}/inference-endpoint"
 
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
