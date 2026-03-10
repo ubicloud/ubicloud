@@ -44,13 +44,13 @@ class GithubCacheEntry < Sequel::Model
     if committed_at.nil?
       begin
         repository.blob_storage_client.abort_multipart_upload(bucket:, key:, upload_id:)
-      rescue Aws::S3::Errors::NoSuchUpload
+      rescue Aws::S3::Errors::NoSuchUpload, Aws::S3::Errors::NoSuchBucket
       end
     end
 
     begin
       repository.blob_storage_client.delete_object(bucket:, key:)
-    rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::Unauthorized
+    rescue Aws::S3::Errors::NoSuchKey, Aws::S3::Errors::Unauthorized, Aws::S3::Errors::NoSuchBucket
       nil
     end
   end
