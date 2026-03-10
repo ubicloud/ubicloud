@@ -1,0 +1,75 @@
+You are analyzing git commits for an upstream synchronization process.
+
+# Context
+We maintain an internal fork (ClickHouse/ubicloud) of the upstream repository (ubicloud/ubicloud).
+- `clickhouse` branch: our deployment branch with internal changes
+- `main` branch: tracks upstream with our changes on top
+- `ubi/main`: the upstream repository
+
+# Input
+Read `commits-for-analysis.md` which contains:
+1. **Internal Commits** (clickhouse..main): Commits on clickhouse not yet on main
+2. **Upstream Commits** (main..ubi/main): New commits from upstream
+
+# Task
+Analyze the commits and identify:
+1. Which internal commits are similar enough to upstream commits that they should be DROPPED during rebase
+2. Which commits might CONFLICT with each other
+3. Which commits require special attention (migrations, backfills, breaking changes)
+
+# Output
+Write your analysis to `commit-analysis.md` using EXACTLY this format:
+
+---START OF FORMAT---
+## 🔄 Commits Likely Upstreamed (DROP during rebase)
+
+_If no matches found, write: "No obvious matches found."_
+
+- **Internal**: `<hash>` - <subject>
+  **Upstream**: `<hash>` - <subject>
+  **Similarity**: <percentage or description>
+  **Recommendation**: DROP internal commit during interactive rebase
+  **Reason**: <brief explanation of why they're similar>
+
+## ⚠️ Potential Conflicts
+
+_If no conflicts expected, write: "No obvious conflicts detected."_
+
+- **Internal**: `<hash>` - <subject>
+  **Upstream**: `<hash>` - <subject>
+  **Conflict Risk**: <High/Medium/Low>
+  **Files Likely Affected**: <list files or "Unknown">
+  **Recommendation**: <specific guidance for resolving>
+
+## 🔍 Commits Requiring Special Attention
+
+_If none, write: "No special attention needed."_
+
+- **Commit**: `<hash>` - <subject>
+  **Type**: <Migration/Backfill/Breaking Change/Security/Other>
+  **Why**: <explanation>
+  **Action Needed**: <specific steps>
+
+## ✅ Safe Internal Commits (No conflicts expected)
+
+_List all internal commits not mentioned above_
+
+- `<hash>` - <subject>
+- `<hash>` - <subject>
+
+## 📊 Summary
+
+- Total internal commits: <number>
+- Total upstream commits: <number>
+- Commits to drop: <number>
+- Potential conflicts: <number>
+- Commits needing attention: <number>
+---END OF FORMAT---
+
+# Important Instructions
+- DO NOT make any git commits or repository changes
+- DO NOT run git commands
+- ONLY read `commits-for-analysis.md` and write to `commit-analysis.md`
+- Be specific with commit hashes (use the short hash from the log)
+- Be conservative: when uncertain, flag as potential conflict
+- Keep explanations concise but actionable

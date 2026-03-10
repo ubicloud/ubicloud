@@ -1,0 +1,225 @@
+name: ch-internal-weekly-upstream-sync
+
+on:
+  schedule:
+    # Every Tuesday at 14:30 UTC
+    - cron: '30 14 * * 2'
+  workflow_dispatch:
+    inputs:
+      skip_previous_issue:
+        description: 'Skip fetching previous issue (for testing fresh template)'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+  id-token: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  create-upstream-sync-issue:
+    runs-on: k8s-medium
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          ref: clickhouse
+          fetch-depth: 0
+
+      - name: Generate Token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.WORKFLOW_AUTH_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_AUTH_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ubicloud
+
+      - name: Setup remotes
+        run: |
+          set -eo pipefail
+
+          echo "Setting up git remotes..."
+          git remote -v
+
+          # Ensure ubi remote exists and points to upstream
+          if git remote | grep -q '^ubi$'; then
+            echo "ubi remote already exists"
+            git remote set-url ubi https://github.com/ubicloud/ubicloud
+          else
+            echo "Adding ubi remote"
+            git remote add ubi https://github.com/ubicloud/ubicloud
+          fi
+
+          git fetch origin
+          git fetch ubi
+
+          echo "Remotes configured:"
+          git remote -v
+
+      - name: Create backup branch
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -eo pipefail
+
+          BACKUP_BRANCH="clickhouse-backup-$(date +%Y%m%d-%H%M)"
+          echo "BACKUP_BRANCH=$BACKUP_BRANCH" >> $GITHUB_ENV
+
+          echo "Creating backup branch: $BACKUP_BRANCH"
+          git checkout -b "$BACKUP_BRANCH" origin/clickhouse
+          git push origin "$BACKUP_BRANCH"
+
+          echo "✓ Backup branch created: $BACKUP_BRANCH"
+
+      - name: Fetch previous issue via gh CLI
+        if: ${{ !inputs.skip_previous_issue }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -eo pipefail
+
+          echo "Fetching most recent pull-upstream issue..."
+
+          # Get most recent pull-upstream issue body
+          gh issue list \
+            --repo ${{ github.repository }} \
+            --label pull-upstream \
+            --limit 1 \
+            --json body \
+            --jq '.[0].body' > /tmp/previous-issue.md || echo "" > /tmp/previous-issue.md
+
+          if [ -s /tmp/previous-issue.md ]; then
+            echo "✓ Previous issue fetched successfully"
+            echo "Preview (first 10 lines):"
+            head -10 /tmp/previous-issue.md
+          else
+            echo "⚠ No previous issue found, will use empty previous issue"
+          fi
+
+      - name: Create empty previous issue file if skipped
+        if: ${{ inputs.skip_previous_issue }}
+        run: |
+          echo "Skipping previous issue fetch (manual run with skip_previous_issue=true)"
+          echo "" > /tmp/previous-issue.md
+
+      - name: Gather commits for analysis
+        run: |
+          set -eo pipefail
+
+          echo "Gathering internal commits (main..origin/clickhouse)..."
+          INTERNAL_COMMITS=$(git log --oneline --no-merges origin/main..origin/clickhouse 2>/dev/null || echo "")
+
+          echo "Gathering upstream commits (main..ubi/main)..."
+          UPSTREAM_COMMITS=$(git log --oneline --no-merges origin/main..ubi/main 2>/dev/null || echo "")
+
+          echo "=== Internal Commits (main..clickhouse) ===" > commits-for-analysis.md
+          echo '```' >> commits-for-analysis.md
+          if [ -n "$INTERNAL_COMMITS" ]; then
+            echo "$INTERNAL_COMMITS" >> commits-for-analysis.md
+          else
+            echo "No internal commits" >> commits-for-analysis.md
+          fi
+          echo '```' >> commits-for-analysis.md
+          echo "" >> commits-for-analysis.md
+          echo "=== Upstream Commits (main..ubi/main) ===" >> commits-for-analysis.md
+          echo '```' >> commits-for-analysis.md
+          if [ -n "$UPSTREAM_COMMITS" ]; then
+            echo "$UPSTREAM_COMMITS" >> commits-for-analysis.md
+          else
+            echo "No upstream commits" >> commits-for-analysis.md
+          fi
+          echo '```' >> commits-for-analysis.md
+
+          echo "Commits file created. Preview:"
+          cat commits-for-analysis.md
+
+      - name: Analyze commits with Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          prompt: |
+            Read commits-for-analysis.md and .github/scripts/claude-analysis-prompt.txt
+            Analyze the commits according to the instructions and write to commit-analysis.md
+          claude_args: "--max-turns 10 --allowedTools 'Read,Write'"
+
+      - name: Verify analysis was generated
+        run: |
+          if [ ! -f commit-analysis.md ]; then
+            echo "Error: Claude did not generate commit-analysis.md"
+            echo "Check Claude execution logs above for errors"
+            exit 1
+          fi
+
+          if [ ! -s commit-analysis.md ]; then
+            echo "Error: commit-analysis.md is empty"
+            exit 1
+          fi
+
+          echo "✓ Analysis file generated successfully"
+          echo "File size: $(wc -c < commit-analysis.md) bytes"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Process issues with Go helper
+        run: |
+          set -eo pipefail
+
+          DATE="$(date +%Y%m%d)"
+          echo "DATE=$DATE" >> $GITHUB_ENV
+
+          echo "Running Go helper to generate issue body..."
+
+          # Read commit analysis from Claude (from repo root)
+          COMMIT_ANALYSIS=$(cat commit-analysis.md 2>/dev/null || echo "_Analysis not available_")
+
+          cd .github/scripts/upstream-sync-helper
+
+          go run main.go \
+            --previous=/tmp/previous-issue.md \
+            --template=../../ISSUE_TEMPLATE/upstream-sync.md \
+            --backup-branch="$BACKUP_BRANCH" \
+            --date="$DATE" \
+            --commit-analysis="$COMMIT_ANALYSIS" \
+            --output=/tmp/new-issue.md
+
+          echo "✓ Issue body generated"
+          echo "Preview (first 20 lines):"
+          head -20 /tmp/new-issue.md
+
+      - name: Create new issue via gh CLI
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+        run: |
+          set -eo pipefail
+
+          TITLE="ubicloud upstream notes ($DATE)"
+
+          echo "Creating issue: $TITLE"
+
+          ISSUE_URL=$(gh issue create \
+            --repo ${{ github.repository }} \
+            --title "$TITLE" \
+            --body-file /tmp/new-issue.md \
+            --label pull-upstream)
+
+          echo "✓ Issue created: $ISSUE_URL"
+          echo "issue_url=$ISSUE_URL" >> $GITHUB_OUTPUT
+
+      - name: Summary
+        run: |
+          echo "# Upstream Sync Issue Created 🎉" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Backup Branch**: \`$BACKUP_BRANCH\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Date**: \`$DATE\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issue**: ${{ steps.create-new-issue.outputs.issue_url }}" >> $GITHUB_STEP_SUMMARY
