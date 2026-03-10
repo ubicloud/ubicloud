@@ -330,6 +330,7 @@ class PostgresServer < Sequel::Model
     if session[:export_count] % 12 == 1
       observe_disk_usage(session)
       observe_archival_backlog(session)
+      observe_io_throttle(session)
       observe_metrics_backlog(session)
     end
 
@@ -478,6 +479,26 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def observe_io_throttle(session)
+    # Make sure either the IO throttle file does not exist or if it exists, it
+    # has been updated in the last minute.
+    io_throttle_file = "/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@#{version}-main.service/throttled/io.max"
+    result = session[:ssh_session].exec!("stat -c '%Y' :io_throttle_file 2>/dev/null || echo missing; date +%s", io_throttle_file:).strip.split("\n")
+    io_max_stat, vm_now_unix = result
+    if io_max_stat != "missing"
+      io_max_mtime = Time.at(Integer(io_max_stat, 10))
+      vm_now = Time.at(Integer(vm_now_unix, 10))
+      if vm_now - io_max_mtime > 120
+        Prog::PageNexus.assemble("#{ubid} I/O throttle stale",
+          ["PGIOThrottleStale", id], ubid,
+          severity: "warning", extra_data: {io_max_mtime:})
+      else
+        Page.from_tag_parts("PGIOThrottleStale", id)&.incr_resolve
+        Clog.emit("I/O throttle applied", {postgres_server_id: id, io_max_mtime:})
+      end
+    end
   end
 
   def observe_disk_usage(session)
