@@ -28,21 +28,15 @@ module ProviderDispatcher
     end
 
     all_meths.each do |meth|
-      aws_meth = :"aws_#{meth}"
-      metal_meth = :"metal_#{meth}"
       model.define_method(meth) do |*a, **kw, &b|
-        if aws?
-          send(aws_meth, *a, **kw, &b)
-        else
-          send(metal_meth, *a, **kw, &b)
-        end
+        send(:"#{provider_dispatcher_group_name}_#{meth}", *a, **kw, &b)
       end
     end
   end
 
   module InstanceMethods
-    def aws?
-      location.aws?
+    def provider_dispatcher_group_name
+      location.provider_dispatcher_group_name
     end
   end
 end

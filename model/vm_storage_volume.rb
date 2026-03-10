@@ -16,8 +16,8 @@ class VmStorageVolume < Sequel::Model
   plugin ResourceMethods
   plugin ProviderDispatcher, __FILE__
 
-  def aws?
-    vm.location.aws?
+  def provider_dispatcher_group_name
+    vm.location.provider_dispatcher_group_name
   end
 
   def vhost_backend_systemd_unit_name

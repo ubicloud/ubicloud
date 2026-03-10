@@ -98,7 +98,11 @@ PGDATA=/dat/#{version}/data
   end
 
   def aws?
-    location&.aws?
+    location.aws?
+  end
+
+  def provider_dispatcher_group_name
+    location.provider_dispatcher_group_name
   end
 
   S3BlobStorage = Struct.new(:url)

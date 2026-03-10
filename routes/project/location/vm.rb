@@ -56,8 +56,8 @@ class Clover
         authorize("Vm:edit", vm)
         handle_validation_failure("vm/show") { @page = "settings" }
 
-        if vm.aws?
-          raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported for VMs running on AWS")
+        unless vm.location.provider_dispatcher_group_name == "metal"
+          raise CloverError.new(400, "InvalidRequest", "The #{action} action is not supported for VMs running on #{vm.location.display_name}")
         end
 
         unless vm.send(:"can_#{action}?")

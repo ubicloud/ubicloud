@@ -39,6 +39,12 @@ RSpec.describe Location do
     expect(described_class[name: "latitude-ai"].visible_or_for_project?(p1_id, ["latitude-ai"])).to be true
   end
 
+  it "#provider_dispatcher_group_name returns the provider dispatch name" do
+    expect(p2_loc.provider_dispatcher_group_name).to eq("aws")
+    p2_loc.update(provider: "hetzner")
+    expect(p2_loc.provider_dispatcher_group_name).to eq("metal")
+  end
+
   it "#azs raises if not aws location" do
     p1_loc.update(provider: "hetzner")
     expect { p1_loc.azs }.to raise_error("azs is only valid for aws locations")
