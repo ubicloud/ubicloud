@@ -16,7 +16,7 @@
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <!-- Restart Card -->
-    <% if edit_perm && !@vm.aws? %>
+    <% if edit_perm && @vm.location.provider_dispatcher_group_name == "metal" %>
       <% [
           ["restart", "This action will restart the virtual machine, causing it to be temporarily offline."],
           ["start", "This action will start the virtual machine if it is currently stopped."],

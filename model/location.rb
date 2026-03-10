@@ -55,6 +55,10 @@ class Location < Sequel::Model
   def aws?
     provider == "aws"
   end
+
+  def provider_dispatcher_group_name
+    aws? ? "aws" : "metal"
+  end
 end
 
 # Table: location

@@ -492,6 +492,14 @@ RSpec.describe PostgresServer do
     expect(postgres_server.storage_device_paths).to eq([vsv.device_path])
   end
 
+  it "#provider_dispatcher_group_name delegates to resource location" do
+    expect(postgres_server.provider_dispatcher_group_name).to eq("metal")
+  end
+
+  it "#aws? delegates to location" do
+    expect(postgres_server.aws?).to be(false)
+  end
+
   describe "#taking_over?" do
     it "returns true if the strand label is 'taking_over'" do
       expect(postgres_server).to receive(:strand).and_return(instance_double(Strand, label: "taking_over"))
