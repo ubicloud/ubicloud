@@ -566,7 +566,7 @@ RSpec.describe CloverAdmin do
 
     visit "/model/Project/#{project.ubid}"
     expect(page.title).to eq "Ubicloud Admin - Project #{project.ubid}"
-    find("summary", text: "Current Usage").click
+    find("summary", text: /Current Usage \(subtotal: \$[\d.]+, cost: \$[\d.]+\)/).click
     expect(page.all(".project-usage-table tbody tr").count).to eq 1
     expect(page.all(".project-usage-table tbody tr").first.all("td").map(&:text)).to eq ["test-vm", "VmVCpu", "standard", "61 minutes", "$0.037"]
   end
