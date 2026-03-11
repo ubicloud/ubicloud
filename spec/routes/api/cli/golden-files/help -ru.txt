@@ -7,7 +7,7 @@ ubi ai api-key list [options]
 ubi ai api-key api-key-id destroy [options]
 ubi ai api-key api-key-id show
 ubi al command [...]
-ubi al list [options]
+ubi al search [options]
 ubi fw command [...]
 ubi fw (location/fw-name | fw-id) post-command [...]
 ubi fw list [options]
