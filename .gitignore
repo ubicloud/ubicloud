@@ -43,3 +43,9 @@
 
 # mise "local" dependency specification that shouldn't be committed
 mise.local.toml
+
+proof/coverage
+proof/*.map
+proof/**/*.map
+
+.agents

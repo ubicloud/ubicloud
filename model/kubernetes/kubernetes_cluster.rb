@@ -137,15 +137,27 @@ class KubernetesCluster < Sequel::Model
       k8s_client = client(session: session[:ssh_session])
       incr_sync_kubernetes_services if k8s_client.any_lb_services_modified?
 
+      # TLA \* Models check_pulse paging: KubernetesCluster#check_pulse detects
+      # TLA \* stuck_pvs (retry count >= 3) and creates a Page.
+      # TLA PageStuckMigration(v) ==
+      # TLA     /\ migState[v] = MigStuck
+      # TLA     /\ paged[v] = FALSE
+      # TLA     /\ paged' = [paged EXCEPT ![v] = TRUE]
+      # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+      # TLA                    targetMounts, nodeSchedulable, nodeState, migState,
+      # TLA                    migTarget, migSource, migRetryCount, migReclaimRetain>>
       pvs = JSON.parse(k8s_client.kubectl("get pv -ojson"))["items"]
+      # TLA \* migState[v] = MigStuck ≡ retry_count ≥ MAX_MIGRATION_RETRIES
       stuck_pvs = pvs.select { Integer(it.dig("metadata", "annotations", "csi.ubicloud.com/migration-retry-count") || "0", 10) >= 3 }
 
       if stuck_pvs.any?
+        # TLA \* paged' = TRUE → Prog::PageNexus.assemble
         Prog::PageNexus.assemble("#{ubid} PV migration stuck",
           ["KubernetesClusterPVMigrationStuck", id], ubid,
           extra_data: {stuck_pvs: stuck_pvs.map { it.dig("metadata", "name") }})
         "down"
       else
+        # TLA \* ResolveStuckMigration: paged' = FALSE (see spec.tla)
         Page.from_tag_parts("KubernetesClusterPVMigrationStuck", id)&.incr_resolve
         "up"
       end

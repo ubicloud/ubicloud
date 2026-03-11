@@ -1,0 +1,18 @@
+# tla.yaml — TLA+ proof assemblies for proof-tool
+#
+# Each proof specifies:
+#   dir:     working directory for TLC
+#   config:  TLC configuration file
+#   sources: ordered list of input files (.tla and .rb)
+#   configs: named constant overrides (e.g. proof/tla check -c quick NAME)
+
+CSI:
+  dir: proof/csi
+  config: proof/csi/CSI.cfg
+  sources:
+    - proof/csi/header.tla
+    - kubernetes/csi/lib/ubi_csi/node_service.rb
+    - model/kubernetes/kubernetes_node.rb
+    - prog/kubernetes/kubernetes_node_nexus.rb
+    - model/kubernetes/kubernetes_cluster.rb
+    - proof/csi/spec.tla
