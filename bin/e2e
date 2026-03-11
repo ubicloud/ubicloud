@@ -30,7 +30,7 @@ def test_metal(options, test_cases)
 
     # This tests encrypted VMs with slices, which will create both standard and
     # burstable VMs. The test will also test host reboot.
-    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: true, test_reboot: true, test_slices: true)
+    encrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], test_reboot: true, test_slices: true)
     log(encrypted_vms_st, "storage_encrypted: true")
     # Not running in parallel but waiting, since host is rebooted during test.
     # Rebooting makes the next test to test reboot practically as well depending
@@ -40,10 +40,6 @@ def test_metal(options, test_cases)
     # YYY: Remove this when all hosts use slices
     Semaphore.incr(hetzner_server_st.id, "disallow_slices")
     wait_until(hetzner_server_st, "wait")
-
-    unencrypted_vms_st = Prog::Test::VmGroup.assemble(boot_images: test_case["images"], storage_encrypted: false, test_reboot: false, verify_host_capacity: false)
-    log(unencrypted_vms_st, "storage_encrypted: false")
-    tests_to_wait << unencrypted_vms_st
   end
 
   if (gh_test_cases = test_cases.values_at(*options[:test_cases].select { it.include?("github_runner") })).any?

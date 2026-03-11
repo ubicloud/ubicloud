@@ -35,7 +35,6 @@ RSpec.describe Prog::Test::VmGroup do
     it "hops to wait_children_ready if test_slices" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect(vg_test).to receive(:frame).and_return({
-        "storage_encrypted" => true,
         "test_reboot" => true,
         "test_slices" => true,
         "vms" => [],
