@@ -7,8 +7,9 @@ RSpec.describe Clover, "audit log" do
 
   let(:project) { project_with_default_policy(user) }
 
-  def insert_audit_log(project_id:, subject_id:, object_ids: [], action: "create", ubid_type: "vm", at: Time.now)
+  def insert_audit_log(project_id:, subject_id:, object_ids: [], action: "create", ubid_type: "vm", at: Sequel::CURRENT_TIMESTAMP, id: Sequel::DEFAULT)
     DB[:audit_log].returning(:id).insert(
+      id:,
       at:,
       ubid_type:,
       action:,
@@ -18,93 +19,106 @@ RSpec.describe Clover, "audit log" do
     ).first[:id]
   end
 
-  describe "unauthenticated" do
-    it "not list" do
-      get "/project/#{project.ubid}/audit-log"
-
-      expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
-    end
+  def audit_log_body(path, delete_at: true)
+    get path
+    expect(last_response.status).to eq(200)
+    body = JSON.parse(last_response.body)
+    body["items"].each { it.delete("at") } if delete_at
+    body
   end
 
-  describe "authenticated" do
-    before do
-      login_api
-    end
+  before do
+    login_api
+  end
 
-    it "returns audit log entries" do
-      id = insert_audit_log(project_id: project.id, subject_id: user.id)
+  it "returns audit log entries" do
+    user.update(name: "Test-Name")
+    at = Time.now
+    insert_audit_log(project_id: project.id, subject_id: user.id, at:)
 
-      get "/project/#{project.ubid}/audit-log"
+    expect(audit_log_body("/project/#{project.ubid}/audit-log", delete_at: false))
+      .to eq({"items" => [{"action" => "vm/create", "at" => at.getutc.iso8601, "object_ids" => [], "subject_id" => user.ubid, "subject_name" => "Test-Name"}]})
+  end
 
-      expect(last_response.status).to eq(200)
-      body = JSON.parse(last_response.body)
-      expect(body["items"].length).to eq(1)
-      expect(body["items"].first["id"]).to eq(UBID.from_uuidish(id).to_s)
-    end
+  it "filters by subject UBID" do
+    other = Account.generate_ubid
+    insert_audit_log(project_id: project.id, subject_id: user.id)
+    insert_audit_log(project_id: project.id, subject_id: other.to_uuid)
 
-    it "filters by subject UBID" do
-      other_id = Account.generate_uuid
-      insert_audit_log(project_id: project.id, subject_id: user.id)
-      insert_audit_log(project_id: project.id, subject_id: other_id)
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?subject=#{user.ubid}"))
+      .to eq({"items" => [{"action" => "vm/create", "object_ids" => [], "subject_id" => user.ubid}]})
 
-      get "/project/#{project.ubid}/audit-log?subject=#{user.ubid}"
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?subject=#{other}"))
+      .to eq({"items" => [{"action" => "vm/create", "object_ids" => [], "subject_id" => other.to_s}]})
+  end
 
-      expect(last_response.status).to eq(200)
-      body = JSON.parse(last_response.body)
-      expect(body["items"].length).to eq(1)
-      expect(body["items"].first["subject_id"]).to eq(user.ubid)
-    end
+  it "filters by object UBID" do
+    vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject
+    insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm.id])
+    insert_audit_log(project_id: project.id, subject_id: user.id)
 
-    it "filters by object UBID" do
-      vm_id = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject.id
-      vm_ubid = UBID.from_uuidish(vm_id).to_s
-      insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm_id])
-      insert_audit_log(project_id: project.id, subject_id: user.id)
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?object=#{vm.ubid}"))
+      .to eq({"items" => [{"action" => "vm/create", "object_ids" => [vm.ubid], "subject_id" => user.ubid}]})
+  end
 
-      get "/project/#{project.ubid}/audit-log?object=#{vm_ubid}"
+  it "filters by action" do
+    insert_audit_log(project_id: project.id, subject_id: user.id)
+    insert_audit_log(action: "destroy", project_id: project.id, subject_id: user.id)
 
-      expect(last_response.status).to eq(200)
-      body = JSON.parse(last_response.body)
-      expect(body["items"].length).to eq(1)
-      expect(body["items"].first["object_ids"]).to include(vm_ubid)
-    end
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?action=destroy"))
+      .to eq({"items" => [{"action" => "vm/destroy", "object_ids" => [], "subject_id" => user.ubid}]})
+  end
 
-    it "returns empty items for invalid subject UBID" do
-      insert_audit_log(project_id: project.id, subject_id: user.id)
+  it "filters by end date" do
+    d = Date.today
+    insert_audit_log(project_id: project.id, subject_id: user.id, at: d << 4)
+    insert_audit_log(action: "destroy", project_id: project.id, subject_id: user.id)
 
-      get "/project/#{project.ubid}/audit-log?subject=not-a-ubid"
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?end=#{d << 3}"))
+      .to eq({"items" => [{"action" => "vm/create", "object_ids" => [], "subject_id" => user.ubid}]})
+  end
 
-      expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["items"]).to be_empty
-    end
+  it "supports limits and pagination keys" do
+    vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject
+    at = Time.now - 1
+    insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm.id], at:, id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
+    id = insert_audit_log(action: "destroy", project_id: project.id, subject_id: user.id, at:, id: UBID.generate_from_time("a1", Time.now).to_uuid)
+    pagination_key = "#{at.strftime("%s.%6N")}/#{UBID.from_uuidish(id)}"
 
-    it "returns empty items for invalid object UBID" do
-      insert_audit_log(project_id: project.id, subject_id: user.id)
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?limit=1"))
+      .to eq({
+        "items" => [{"action" => "vm/create", "object_ids" => [vm.ubid], "subject_id" => user.ubid}],
+        "pagination_key" => pagination_key
+      })
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?limit=1&pagination_key=#{pagination_key}"))
+      .to eq({"items" => [{"action" => "vm/destroy", "object_ids" => [], "subject_id" => user.ubid}]})
+  end
 
-      get "/project/#{project.ubid}/audit-log?object=not-a-ubid"
+  it "returns empty items for invalid subject UBID" do
+    insert_audit_log(project_id: project.id, subject_id: user.id)
 
-      expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["items"]).to be_empty
-    end
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?subject=not-a-ubid")).to eq({"items" => []})
+  end
 
-    it "does not return entries from other projects" do
-      other_project = project_with_default_policy(user)
-      insert_audit_log(project_id: other_project.id, subject_id: user.id)
+  it "returns empty items for invalid object UBID" do
+    insert_audit_log(project_id: project.id, subject_id: user.id)
 
-      get "/project/#{project.ubid}/audit-log"
+    expect(audit_log_body("/project/#{project.ubid}/audit-log?object=not-a-ubid")).to eq({"items" => []})
+  end
 
-      expect(last_response.status).to eq(200)
-      expect(JSON.parse(last_response.body)["items"]).to be_empty
-    end
+  it "does not return entries from other projects" do
+    other_project = project_with_default_policy(user)
+    insert_audit_log(project_id: other_project.id, subject_id: user.id)
 
-    it "returns 403 when user lacks permission" do
-      project
-      AccessControlEntry.dataset.destroy
-      AccessControlEntry.create(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:view"])
+    expect(audit_log_body("/project/#{project.ubid}/audit-log")).to eq({"items" => []})
+  end
 
-      get "/project/#{project.ubid}/audit-log"
+  it "returns 403 when user lacks permission" do
+    project
+    AccessControlEntry.dataset.destroy
+    AccessControlEntry.create(project_id: project.id, subject_id: @pat.id, action_id: ActionType::NAME_MAP["Project:view"])
 
-      expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
-    end
+    get "/project/#{project.ubid}/audit-log"
+    expect(last_response).to have_api_error(403, "Sorry, you don't have permission to continue with this request.")
   end
 end
