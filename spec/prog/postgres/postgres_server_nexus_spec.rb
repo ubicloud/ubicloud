@@ -705,7 +705,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       server.incr_use_physical_slot
       expect { nx.configure }.to nap(5)
       expect(server.use_physical_slot_set?).to be true
-      expect(server.physical_slot_ready).to be true
+      expect(server.physical_slot_ready_id).to eq server.id
     end
 
     it "hops to update_superuser_password if configure command is succeeded during the initial provisioning and if the server is primary" do
