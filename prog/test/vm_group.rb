@@ -3,12 +3,11 @@
 require_relative "../../lib/net_ssh"
 
 class Prog::Test::VmGroup < Prog::Test::Base
-  def self.assemble(boot_images:, storage_encrypted: true, test_reboot: true, test_slices: false, verify_host_capacity: true)
+  def self.assemble(boot_images:, test_reboot: true, test_slices: false, verify_host_capacity: true)
     Strand.create(
       prog: "Test::VmGroup",
       label: "start",
       stack: [{
-        "storage_encrypted" => storage_encrypted,
         "test_reboot" => test_reboot,
         "first_boot" => true,
         "test_slices" => test_slices,
@@ -29,7 +28,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
 
     size_options = test_slices ? ["standard-2", "burstable-1"] : ["standard-2"]
     subnets = Array.new(2) { Prog::Vnet::SubnetNexus.assemble(project.id, name: "subnet-#{it}", location_id: Location::HETZNER_FSN1_ID) }
-    encrypted = frame.fetch("storage_encrypted", true)
+    encrypted = true
     boot_images = frame.fetch("boot_images")
     storage_options = [
       [{encrypted:}, {encrypted:, size_gib: 5}],
