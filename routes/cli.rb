@@ -13,7 +13,7 @@ class Clover
       end
 
       project_id = env["clover.project_id"] = ApiKey.project_id_for_personal_access_token(rodauth.session["pat_id"])
-      env["clover.project_ubid"] = UBID.from_uuidish(project_id).to_s
+      env["clover.project_ubid"] = UBID.to_ubid(project_id)
       r.halt UbiCli.process(argv, env)
     end
   end

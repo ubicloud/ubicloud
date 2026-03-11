@@ -801,10 +801,10 @@ class CloverAdmin < Roda
             ip: it[:ip],
             created_at: it[:created_at],
             archived_at: it[:archived_at],
-            vm_id: UBID.from_uuidish(it[:vm_id]).to_s,
+            vm_id: UBID.to_ubid(it[:vm_id]),
             vm_name: it[:vm_name],
             boot_image: it[:boot_image],
-            project_id: UBID.from_uuidish(it[:project_id]).to_s
+            project_id: UBID.to_ubid(it[:project_id])
           }
         }
         @vms = (active_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }

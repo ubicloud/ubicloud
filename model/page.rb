@@ -84,7 +84,7 @@ class Page < Sequel::Model
         when VmHost
           host_map[it.ubid] = it.ubid
         when Vm, VmHostSlice, VhostBlockBackend, StorageDevice, SpdkInstallation, PciDevice
-          host_map[it.ubid] = UBID.from_uuidish(it.vm_host_id).to_s if it.vm_host_id
+          host_map[it.ubid] = UBID.to_ubid(it.vm_host_id) if it.vm_host_id
         when VmStorageVolume, VictoriaMetricsServer, Nic, MinioServer, GithubRunner, PostgresServer, InferenceEndpointReplica, InferenceRouterReplica
           (vm_id_map[it.vm_id] ||= []) << it.ubid if it.vm_id
         end
@@ -95,7 +95,7 @@ class Page < Sequel::Model
         .where(id: vm_id_map.keys)
         .to_hash(:id, :vm_host_id)
         .compact
-        .transform_values! { UBID.from_uuidish(it).to_s }
+        .transform_values! { UBID.to_ubid(it) }
 
       vm_id_map.each do |vm_id, ubids|
         ubids.each do |ubid|

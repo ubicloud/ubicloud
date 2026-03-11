@@ -317,7 +317,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         "Arch" => vm.arch,
         "Image" => vm.boot_image,
         "VM Host" => vmh&.ubid,
-        "VM Pool" => vm.pool_id ? UBID.from_uuidish(vm.pool_id).to_s : nil,
+        "VM Pool" => vm.pool_id ? UBID.to_ubid(vm.pool_id) : nil,
         "Location" => vmh&.location&.name,
         "Datacenter" => vmh&.data_center,
         "Project" => project.ubid,

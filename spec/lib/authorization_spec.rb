@@ -139,8 +139,8 @@ RSpec.describe Authorization do
 
       [
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: api_key_id}, users[0].id, "Vm:view", api_key_id, 1],
-        [{}, SecureRandom.uuid, "Vm:view", UBID.from_uuidish(SecureRandom.uuid).to_s.sub(/\A../, "00"), 0],
-        [{}, SecureRandom.uuid, ["Vm:view"], UBID.from_uuidish(SecureRandom.uuid).to_s.sub(/\A../, "00"), 0],
+        [{}, SecureRandom.uuid, "Vm:view", UBID.to_ubid(SecureRandom.uuid).sub(/\A../, "00"), 0],
+        [{}, SecureRandom.uuid, ["Vm:view"], UBID.to_ubid(SecureRandom.uuid).sub(/\A../, "00"), 0],
         [{}, SecureRandom.uuid, ["Vm:view"], vms[0].id, 0],
         [{}, users[0].id, ["Vm:view"], vms[0].id, 0],
         [{subjects: users[0].id, actions: "Vm:all", objects: [nil]}, users[0].id, "Vm:view", vms[0].id, 1],
