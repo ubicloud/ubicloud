@@ -227,6 +227,10 @@ class UBID
     new(value)
   end
 
+  def self.to_ubid(uuidish)
+    from_uuidish(uuidish).to_s
+  end
+
   def self.to_uuid(ubid_str)
     parse(ubid_str).to_uuid
   rescue UBIDParseError
