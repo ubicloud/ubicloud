@@ -84,8 +84,9 @@ class Clover
         next_page_params["limit"] = limit
       end
 
-      limit ||= 100
-      limit = limit.clamp(1, 100) + 1
+      default_limit = api? ? 1000 : 100
+      limit ||= default_limit
+      limit = limit.clamp(1, default_limit) + 1
 
       if skip_query
         items = []
@@ -97,11 +98,9 @@ class Clover
         end
       end
 
-      if api?
-        {items: Serializers::AuditLog.serialize(items)}
-      else
-        ubids = {}
+      ubids = {}
 
+      if web?
         items.each do |log|
           ubids[log[:subject_id]] = nil
           log[:object_ids].each do
@@ -114,7 +113,36 @@ class Clover
           ds = ds.eager(:location) if ds.model.association_reflection(:location)
           ds
         end
+      else
+        items.each do |log|
+          ubids[log[:subject_id]] = nil
+        end
 
+        UBID.resolve_map(ubids) do |ds|
+          ds.where(projects: @project)
+        end
+      end
+
+      if api?
+        result = {}
+        result["pagination_key"] = @pagination_key if @pagination_key
+        result["items"] = items.map do |row|
+          subject_id = row[:subject_id]
+          item = {
+            at: row[:at].getutc.iso8601,
+            action: "#{row[:ubid_type]}/#{row[:action]}",
+            subject_id: UBID.from_uuidish(subject_id).to_s,
+            object_ids: row[:object_ids].map { UBID.from_uuidish(it).to_s }
+          }
+
+          if (subject_name = ubids[subject_id]&.name)
+            item[:subject_name] = subject_name
+          end
+
+          item
+        end
+        result
+      else
         items.each do |log|
           subject_id = log[:subject_id]
           subject_ubid = UBID.from_uuidish(subject_id).to_s
