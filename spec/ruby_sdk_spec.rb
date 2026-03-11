@@ -433,6 +433,19 @@ RSpec.describe Ubicloud do
     expect(pg.values[:metric_destinations]).to eq([])
   end
 
+  it "AuditLog.search result is a page supporting pagination" do
+    called = 0
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      called += 1
+      [200, {"content-type" => "application/json"}, [(called == 2) ? "{\"items\": []}" : "{\"items\": [], \"pagination_key\": \"123\"}"]]
+    end)
+    page = ubi.audit_log.search
+    expect(page).to be_a Ubicloud::AuditLog::Page
+    next_page = page.next_page
+    expect(next_page).to be_a Ubicloud::AuditLog::Page
+    expect(next_page.next_page).to be_nil
+  end
+
   describe Ubicloud::Adapter::NetHttp do
     let(:adapter) { described_class.new(token: "foo", project_id: "pj", base_uri: "http://localhost") }
 

@@ -106,22 +106,22 @@ Usage:
     ubi al command [...]
 
 Commands:
-    list    List project audit log entries
+    search    Search project audit log entries in CSV format
 
 
-List project audit log entries
+Search project audit log entries in CSV format
 
 Usage:
-    ubi al list [options]
+    ubi al search [options]
 
 Options:
-    -f, --fields=fields              show specific fields (comma separated)
     -N, --no-headers                 do not show headers
-    -o, --object=object              only show entries affecting the given object UBID
-    -s, --subject=subject            only show entries with the given subject UBID
-
-Allowed Option Values:
-    Fields: id at action ubid_type subject_id object_ids
+    -a, --action=action              only show entries for the given action
+    -e, --end=end-date               only show prior to end date
+    -o, --object=object              only show entries affecting the given object ID
+    -s, --subject=account            only show entries with the given account name/email/ID
+        --limit=limit                limit number of records returned
+        --pagination-key=key         continue a previous search
 
 
 Manage firewalls
