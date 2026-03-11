@@ -102,6 +102,33 @@ RSpec.describe Clover, "cli" do
     KubernetesNode.create(vm_id: vms[1].id, kubernetes_cluster_id: kubernetes_cluster.id, kubernetes_nodepool_id: KubernetesNodepool.first.id)
     expect(KubernetesCluster).to receive(:kubeconfig).and_return("example-kubeconfig").at_least(:once)
 
+    ie_lb = LoadBalancer.create_with_id("5294a529-4a52-942b-5294-a5294a5294a5", private_subnet_id: @ps.id, name: "ie-lb", health_check_endpoint: "/up", project_id: postgres_project.id)
+    InferenceEndpoint.create(
+      name: "test-model", model_name: "test-model", project_id: postgres_project.id,
+      is_public: true, visible: true, load_balancer_id: ie_lb.id,
+      location_id: Location::LEASEWEB_WDC02_ID, vm_size: "standard-2",
+      replica_count: 1, boot_image: "image", storage_volumes: [],
+      engine_params: "", engine: "vllm", private_subnet_id: @ps.id,
+      tags: {"capability" => "Text Generation", "display_name" => "Test Model", "hf_model" => "test-org/test-model"}
+    )
+    ir = InferenceRouter.create(
+      name: "ir-name", location_id: Location::LEASEWEB_WDC02_ID, vm_size: "standard-2",
+      replica_count: 1, project_id: postgres_project.id, load_balancer_id: ie_lb.id, private_subnet_id: @ps.id
+    )
+    irm = InferenceRouterModel.create(
+      model_name: "Qwen/Qwen3-VL-235B-Instruct",
+      prompt_billing_resource: "qwen-3-vl-235b-input",
+      completion_billing_resource: "qwen-3-vl-235b-output",
+      project_inflight_limit: 100, project_prompt_tps_limit: 10_000,
+      project_completion_tps_limit: 10_000, visible: true,
+      tags: {"capability" => "Text Generation", "hf_model" => "Qwen/Qwen3-VL-235B-Instruct", "multimodal" => true, "context_length" => "64k"}
+    )
+    InferenceRouterTarget.create(
+      name: "test-target", host: "test-host", api_key: "test-key",
+      inflight_limit: 10, priority: 1,
+      inference_router_model_id: irm.id, inference_router_id: ir.id, enabled: true
+    )
+
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vmz7b0dxt40t4g7rnmag9hct7c")).at_least(:once)
     expect(PrivateSubnet).to receive(:generate_ubid).and_return(UBID.parse("ps9a8v5tm1020qn73f0c7db0x7")).at_least(:once)
     fw_uuids = %w[2b4ae5cf-1aac-8dfc-bc80-c87e3e381e10 f5e6cb31-e580-81fc-88d6-a379f13494bf].cycle

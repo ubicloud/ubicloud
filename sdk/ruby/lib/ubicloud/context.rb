@@ -34,6 +34,7 @@ module Ubicloud
       github_installation: GithubInstallation,
       github_repository: GithubRepository,
       inference_api_key: InferenceApiKey,
+      inference_endpoint: InferenceEndpoint,
       kubernetes_cluster: KubernetesCluster,
       ssh_public_key: SshPublicKey
     }.each do |meth, model|

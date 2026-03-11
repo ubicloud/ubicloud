@@ -1,0 +1,14 @@
+! Invalid field(s) given in ai endpoint list -f option: invalid
+
+List inference endpoints
+
+Usage:
+    ubi ai endpoint list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: name display-name hf-model capability multimodal context-length url
+            input-price output-price
