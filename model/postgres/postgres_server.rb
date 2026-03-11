@@ -555,6 +555,7 @@ end
 #  version                | text                     | NOT NULL
 #  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
+#  physical_slot_ready_id | uuid                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
