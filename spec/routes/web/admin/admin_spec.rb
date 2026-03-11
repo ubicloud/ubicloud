@@ -850,6 +850,26 @@ RSpec.describe CloverAdmin do
       .to eq ["id", "60587328050", "name", "ubicloud-standard-2", "status", "in_progress"]
   end
 
+  it "allows browsing and searching GithubRepository" do
+    ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
+    repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)
+
+    click_link "GithubRepository"
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["test-org/test-repo", repo.created_at.to_s, repo.last_job_at.to_s]
+
+    click_link repo.name
+    expect(page.title).to eq "Ubicloud Admin - GithubRepository #{repo.ubid}"
+
+    click_link "Ubicloud Admin"
+    click_link "GithubRepository"
+    click_link "Search"
+    fill_in "Installation", with: ins.ubid
+    fill_in "Created at", with: repo.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq ["test-org/test-repo", repo.created_at.to_s, repo.last_job_at.to_s]
+  end
+
   it "supports showing job log for GithubRepository" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-org", type: "Organization")
     repo = GithubRepository.create(name: "test-org/test-repo", installation_id: ins.id)

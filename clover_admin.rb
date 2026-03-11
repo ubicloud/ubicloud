@@ -344,7 +344,7 @@ class CloverAdmin < Roda
       case column
       when :name, :ubid, :invoice_number
         link.call(obj, label: column)
-      when :project, :location, :vm_host, :billing_info, :resource, :parent
+      when :project, :location, :vm_host, :billing_info, :resource, :parent, :installation
         link.call(obj.send(column))
       when :vm
         link.call(obj.send(column), label: :ubid)
@@ -447,6 +447,29 @@ class CloverAdmin < Roda
           end
         when :allocator_preferences, :created_at
           column_grep.call(ds, column, value)
+        end
+      end
+    end
+
+    model GithubRepository do
+      order Sequel.desc(:created_at)
+      eager [:installation]
+      columns do |type_symbol, request|
+        if type_symbol == :search_form
+          [:installation, :name, :created_at]
+        else
+          [:name, :created_at, :last_job_at]
+        end
+      end
+      column_options installation: ubid_input.call("Installation"),
+        created_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :installation
+          ubid_uuid_grep.call(ds, :installation_id, value)
+        else
+          framework
         end
       end
     end
