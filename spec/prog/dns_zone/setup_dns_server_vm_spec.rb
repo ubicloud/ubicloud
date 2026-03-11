@@ -226,6 +226,26 @@ zone-flush zone2.domain.io
 
       expect { prog.sync_zones }.to hop("validate")
     end
+
+    it "syncs all existing VMs along with the new VM" do
+      dummy_vm = create_vm_with_sshable
+      dzs
+      Semaphore.where(name: "refresh_dns_servers").destroy
+      prog
+      ds.add_vm(dummy_vm)
+      dummy_sshable = prog.ds.vms.first.sshable
+
+      # Expect zone files, restart, and knotc commands on both sshables
+      expect(prog.sshable).to receive(:_cmd).with(/sudo -u knot tee.*\.zone > \/dev\/null/, stdin: anything).exactly(3).times
+      expect(prog.sshable).to receive(:_cmd).with("sudo systemctl restart knot")
+      expect(prog.sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: anything)
+
+      expect(dummy_sshable).to receive(:_cmd).with(/sudo -u knot tee.*\.zone > \/dev\/null/, stdin: anything).exactly(3).times
+      expect(dummy_sshable).to receive(:_cmd).with("sudo systemctl restart knot")
+      expect(dummy_sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: anything)
+
+      expect { prog.sync_zones }.to hop("validate")
+    end
   end
 
   describe "#validate" do
