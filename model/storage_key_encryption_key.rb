@@ -43,5 +43,6 @@ end
 # Indexes:
 #  storage_key_encryption_key_pkey | PRIMARY KEY btree (id)
 # Referenced By:
-#  vm_storage_volume | vm_storage_volume_key_encryption_key_1_id_fkey | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
-#  vm_storage_volume | vm_storage_volume_key_encryption_key_2_id_fkey | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
+#  machine_image_version_metal | machine_image_version_metal_archive_kek_id_fkey | (archive_kek_id) REFERENCES storage_key_encryption_key(id)
+#  vm_storage_volume           | vm_storage_volume_key_encryption_key_1_id_fkey  | (key_encryption_key_1_id) REFERENCES storage_key_encryption_key(id)
+#  vm_storage_volume           | vm_storage_volume_key_encryption_key_2_id_fkey  | (key_encryption_key_2_id) REFERENCES storage_key_encryption_key(id)
