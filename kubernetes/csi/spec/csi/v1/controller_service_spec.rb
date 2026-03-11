@@ -303,6 +303,32 @@ RSpec.describe Csi::V1::ControllerService do
       end
     end
 
+    context "when migration is in progress" do
+      let(:request) { Csi::V1::DeleteVolumeRequest.new(volume_id: "vol-123") }
+
+      before do
+        expect(SecureRandom).to receive(:uuid).and_return("test-uuid")
+        expect(Csi::KubernetesClient).to receive(:new).and_return(kubernetes_client)
+        service.instance_variable_get(:@volume_store)["test-volume"] = {
+          volume_id: "vol-123",
+          name: "test-volume"
+        }
+
+        expect(kubernetes_client).to receive(:get_pv).with("test-volume").and_return({
+          "metadata" => {
+            "annotations" => {
+              "csi.ubicloud.com/old-pvc-object" => "eyJtZXRhZGF0YSI6e319"
+            }
+          }
+        })
+      end
+
+      it "fails so the sidecar retries after migration completes" do
+        expect(service).not_to receive(:run_cmd)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::FailedPrecondition, /migration in progress/)
+      end
+    end
+
     context "when SSH command fails" do
       let(:request) { Csi::V1::DeleteVolumeRequest.new(volume_id: "vol-789") }
 
@@ -321,7 +347,7 @@ RSpec.describe Csi::V1::ControllerService do
 
       it "raises Internal error" do
         expect(service).to receive(:log_with_id).at_least(:once)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:DeleteVolume error: 13:Could not delete the PV's backing file")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:Could not delete the PV's backing file")
       end
     end
 
