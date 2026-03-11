@@ -71,12 +71,38 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     hop_drain
   end
 
+  # TLA \* Models KubernetesNodeNexus: retire -> drain transition.
+  # TLA \* The node transitions to Draining state (kubectl drain --ignore-daemonsets).
+  # TLA StartDrain(n) ==
+  # TLA     /\ n \in Nodes
+  # TLA     /\ nodeState[n] = NodeActive
+  # TLA     /\ nodeSchedulable[n] = FALSE
+  # TLA     /\ nodeState' = [nodeState EXCEPT ![n] = NodeDraining]
+  # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+  # TLA                    targetMounts, nodeSchedulable, migState, migTarget,
+  # TLA                    migSource, migRetryCount, migReclaimRetain, paged>>
+  # TLA
+  # TLA \* Models KubernetesNodeNexus: drain -> wait_for_copy transition.
+  # TLA \* Drain has completed: kubectl drain evicts all pods on this node, which
+  # TLA \* triggers NodeUnpublish + NodeUnstage for every volume.  Drain only
+  # TLA \* completes when all pods are evicted, so no volumes can have active
+  # TLA \* staging/target mounts on this node.
+  # TLA CompleteDrain(n) ==
+  # TLA     /\ n \in Nodes
+  # TLA     /\ nodeState[n] = NodeDraining
+  # TLA     /\ ¬∃ v \in Volumes : ⟨v, n⟩ \in stagingMounts \/ ⟨v, n⟩ \in targetMounts
+  # TLA     /\ nodeState' = [nodeState EXCEPT ![n] = NodeWaitForCopy]
+  # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+  # TLA                    targetMounts, nodeSchedulable, migState, migTarget,
+  # TLA                    migSource, migRetryCount, migReclaimRetain, paged>>
   label def drain
     unit_name = "drain_node_#{kubernetes_node.name}"
     sshable = cluster.sshable
     case sshable.d_check(unit_name)
+    # TLA \* CompleteDrain: d_check == "Succeeded" → hop_wait_for_copy
     when "Succeeded"
       hop_wait_for_copy
+    # TLA \* StartDrain: d_check == "NotStarted" → d_run kubectl drain
     when "NotStarted"
       sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
         "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
@@ -92,7 +118,18 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     end
   end
 
+  # TLA \* Models KubernetesNodeNexus: wait_for_copy -> remove_node_from_cluster.
+  # TLA \* Only proceeds when pending_pvs is empty (no more volumes migrating from this node).
+  # TLA RemoveNode(n) ==
+  # TLA     /\ n \in Nodes
+  # TLA     /\ nodeState[n] = NodeWaitForCopy
+  # TLA     /\ PendingPVs(n) = {}
+  # TLA     /\ nodeState' = [nodeState EXCEPT ![n] = NodeRemoved]
+  # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+  # TLA                    targetMounts, nodeSchedulable, migState, migTarget,
+  # TLA                    migSource, migRetryCount, migReclaimRetain, paged>>
   label def wait_for_copy
+    # TLA \* PendingPVs(n) = {} → hop_remove_node_from_cluster
     pending = kubernetes_node.pending_pvs
     if pending.any?
       pv_names = pending.map { |pv| pv.dig("metadata", "name") }

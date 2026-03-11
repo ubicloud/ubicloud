@@ -109,11 +109,36 @@ module Csi
         output.strip
       end
 
+      # TLA \* Models NodeService#node_stage_volume with migration path:
+      # TLA \* fetch_and_migrate_pvc -> migrate_pvc_data returns "Succeeded".
+      # TLA \* The rsync source is migSource (original data node, preserved by ||=).
+      # TLA \* After staging, roll_back_reclaim_policy reverts old PV to Delete,
+      # TLA \* and remove_old_pv_annotation_from_pvc clears the annotation.
+      # TLA \* Only on nodes where kubelet is running (Active or Draining).
+      # TLA NodeStageVolumeWithMigration(v) ==
+      # TLA     /\ phase[v] = Created
+      # TLA     /\ migState[v] = MigDone
+      # TLA     /\ migTarget[v] \in Nodes
+      # TLA     /\ LET newNode == migTarget[v] IN
+      # TLA        /\ nodeState[newNode] \in {NodeActive, NodeDraining}
+      # TLA        /\ <<v, newNode>> \in backingFiles
+      # TLA        /\ phase'         = [phase EXCEPT ![v] = Staged]
+      # TLA        /\ owner'         = [owner EXCEPT ![v] = newNode]
+      # TLA        /\ loopDevices'   = loopDevices   \cup {<<v, newNode>>}
+      # TLA        /\ stagingMounts' = stagingMounts \cup {<<v, newNode>>}
+      # TLA        /\ migState'      = [migState  EXCEPT ![v] = MigNone]
+      # TLA        /\ migTarget'     = [migTarget EXCEPT ![v] = NoNode]
+      # TLA        /\ migSource'     = [migSource EXCEPT ![v] = NoNode]
+      # TLA        /\ migRetryCount' = [migRetryCount EXCEPT ![v] = 0]
+      # TLA        /\ migReclaimRetain' = [migReclaimRetain EXCEPT ![v] = FALSE]
+      # TLA        /\ paged'         = [paged EXCEPT ![v] = FALSE]
+      # TLA        /\ UNCHANGED <<backingFiles, targetMounts, nodeSchedulable, nodeState>>
       def node_stage_volume(req, _call)
         log_request_response(req, "node_stage_volume") do |req_id|
           client = KubernetesClient.new(req_id:, logger: @logger)
           pvc = fetch_and_migrate_pvc(req_id, client, req)
           perform_node_stage_volume(req_id, pvc, req, _call)
+          # migState' = MigNone ∧ migReclaimRetain' = FALSE  \* roll_back + remove annotation
           roll_back_reclaim_policy(req_id, client, req, pvc)
           remove_old_pv_annotation_from_pvc(req_id, client, pvc)
           NodeStageVolumeResponse.new
@@ -143,12 +168,29 @@ module Csi
         pvc
       end
 
+      # TLA \* Models NodeService#node_stage_volume (no migration path):
+      # TLA \* Creates backing file, sets up loop device, formats filesystem, mounts.
+      # TLA \* Only on nodes where kubelet is running (Active or Draining).
+      # TLA NodeStageVolume(v) ==
+      # TLA     /\ phase[v] = Created
+      # TLA     /\ owner[v] \in Nodes
+      # TLA     /\ migState[v] = MigNone
+      # TLA     /\ LET n == owner[v] IN
+      # TLA        /\ nodeState[n] \in {NodeActive, NodeDraining}
+      # TLA        /\ phase'         = [phase EXCEPT ![v] = Staged]
+      # TLA        /\ backingFiles'  = backingFiles  \cup {<<v, n>>}
+      # TLA        /\ loopDevices'   = loopDevices   \cup {<<v, n>>}
+      # TLA        /\ stagingMounts' = stagingMounts \cup {<<v, n>>}
+      # TLA        /\ UNCHANGED <<owner, targetMounts, nodeSchedulable, nodeState,
+      # TLA                       migState, migTarget, migSource, migRetryCount,
+      # TLA                       migReclaimRetain, paged>>
       def perform_node_stage_volume(req_id, pvc, req, _call)
         volume_id = req.volume_id
         staging_path = req.staging_target_path
         size_bytes = Integer(req.volume_context["size_bytes"], 10)
         backing_file = NodeService.backing_file_path(volume_id)
 
+        # backingFiles' ∪= {⟨v, n⟩}   \* fallocate backing file
         unless File.exist?(backing_file)
           output, ok = run_cmd("fallocate", "-l", size_bytes.to_s, backing_file, req_id:)
           unless ok
@@ -161,6 +203,7 @@ module Csi
           end
         end
 
+        # loopDevices' ∪= {⟨v, n⟩}    \* losetup --find --show
         loop_device = find_loop_device(backing_file, req_id:)
         is_new_loop_device = loop_device.nil?
         if is_new_loop_device
@@ -190,6 +233,7 @@ module Csi
             end
           end
         end
+        # stagingMounts' ∪= {⟨v, n⟩}  \* mount loop_device staging_path
         unless is_mounted?(staging_path, req_id:)
           FileUtils.mkdir_p(staging_path)
           output, ok = run_cmd("mount", loop_device, staging_path, req_id:)
@@ -229,12 +273,34 @@ module Csi
 
         daemonizer_unit_name = Shellwords.shellescape("copy_#{old_pv_name}")
         case run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "check", daemonizer_unit_name, req_id:)
+        # TLA \* CompleteMigrationCopy: daemonizer2 "Succeeded" → backingFiles' ∪= {⟨v, newNode⟩}
         when "Succeeded"
+          # TLA CompleteMigrationCopy(v) ==
+          # TLA     /\ migState[v] = MigCopying
+          # TLA     /\ migTarget[v] \in Nodes
+          # TLA     /\ migSource[v] \in Nodes
+          # TLA     /\ <<v, migSource[v]>> \in backingFiles
+          # TLA     /\ LET newNode == migTarget[v] IN
+          # TLA        /\ backingFiles' = backingFiles \cup {<<v, newNode>>}
+          # TLA        /\ migState'     = [migState EXCEPT ![v] = MigDone]
+          # TLA        /\ UNCHANGED <<phase, owner, loopDevices, stagingMounts, targetMounts,
+          # TLA                       nodeSchedulable, nodeState, migTarget, migSource,
+          # TLA                       migRetryCount, migReclaimRetain, paged>>
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
           if pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY)
             client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, nil)
           end
+        # TLA \* StartMigrationCopy: daemonizer2 "NotStarted" → run rsync
         when "NotStarted"
+          # TLA StartMigrationCopy(v) ==
+          # TLA     /\ migState[v] = MigPrepared
+          # TLA     /\ migTarget[v] \in Nodes
+          # TLA     /\ migSource[v] \in Nodes
+          # TLA     /\ <<v, migSource[v]>> \in backingFiles    \* source data must exist
+          # TLA     /\ migState' = [migState EXCEPT ![v] = MigCopying]
+          # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+          # TLA                    targetMounts, nodeSchedulable, nodeState, migTarget,
+          # TLA                    migSource, migRetryCount, migReclaimRetain, paged>>
           copy_command = ["rsync", "-az", "--inplace", "--compress-level=9", "--partial", "--whole-file", "-e", "ssh -T -c aes128-gcm@openssh.com -o Compression=no -x -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /home/ubi/.ssh/id_ed25519", "ubi@#{old_node_ip}:#{old_data_path}", current_data_path]
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "run", daemonizer_unit_name, *copy_command, req_id:)
           raise CopyNotFinishedError, "Old PV data is not copied yet"
@@ -242,9 +308,28 @@ module Csi
           raise CopyNotFinishedError, "Old PV data is not copied yet"
         when "Failed"
           retry_count = Integer(pv.dig("metadata", "annotations", MIGRATION_RETRY_COUNT_ANNOTATION_KEY) || "0", 10)
+          # TLA \* ExhaustMigrationRetries: retry_count ≥ MAX → MigStuck (hard error)
           if retry_count >= MAX_MIGRATION_RETRIES
+            # TLA ExhaustMigrationRetries(v) ==
+            # TLA     /\ migState[v] = MigCopying
+            # TLA     /\ migTarget[v] \in Nodes
+            # TLA     /\ migRetryCount[v] >= MaxRetries
+            # TLA     /\ migState' = [migState EXCEPT ![v] = MigStuck]
+            # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+            # TLA                    targetMounts, nodeSchedulable, nodeState, migTarget,
+            # TLA                    migSource, migRetryCount, migReclaimRetain, paged>>
             raise "Migration copy failed after #{MAX_MIGRATION_RETRIES} attempts, please contact support"
           end
+          # TLA \* FailMigrationCopy: retry_count < MAX → increment + CopyNotFinishedError
+          # TLA FailMigrationCopy(v) ==
+          # TLA     /\ migState[v] = MigCopying
+          # TLA     /\ migTarget[v] \in Nodes
+          # TLA     /\ migRetryCount[v] < MaxRetries
+          # TLA     /\ migState'      = [migState EXCEPT ![v] = MigFailed]
+          # TLA     /\ migRetryCount' = [migRetryCount EXCEPT ![v] = migRetryCount[v] + 1]
+          # TLA     /\ UNCHANGED <<phase, owner, backingFiles, loopDevices, stagingMounts,
+          # TLA                    targetMounts, nodeSchedulable, nodeState, migTarget,
+          # TLA                    migSource, migReclaimRetain, paged>>
           retry_count += 1
           client.patch_resource("pv", old_pv_name, MIGRATION_RETRY_COUNT_ANNOTATION_KEY, retry_count.to_s)
           run_cmd_output("nsenter", "-t", "1", "-a", "/home/ubi/common/bin/daemonizer2", "clean", daemonizer_unit_name, req_id:)
@@ -255,14 +340,31 @@ module Csi
         end
       end
 
+      # TLA \* Models NodeService#node_unstage_volume when node IS schedulable:
+      # TLA \* Tears down loop device and unmounts staging path.
+      # TLA NodeUnstageVolumeNormal(v) ==
+      # TLA     /\ phase[v] = Staged
+      # TLA     /\ owner[v] \in Nodes
+      # TLA     /\ LET n == owner[v] IN
+      # TLA        /\ <<v, n>> \notin targetMounts
+      # TLA        /\ nodeSchedulable[n] = TRUE
+      # TLA        /\ phase'         = [phase EXCEPT ![v] = Created]
+      # TLA        /\ loopDevices'   = loopDevices   \ {<<v, n>>}
+      # TLA        /\ stagingMounts' = stagingMounts \ {<<v, n>>}
+      # TLA        /\ UNCHANGED <<owner, backingFiles, targetMounts,
+      # TLA                       nodeSchedulable, nodeState, migState, migTarget,
+      # TLA                       migSource, migRetryCount, migReclaimRetain, paged>>
       def node_unstage_volume(req, _call)
         log_request_response(req, "node_unstage_volume") do |req_id|
           backing_file = NodeService.backing_file_path(req.volume_id)
           client = KubernetesClient.new(req_id:, logger: @logger)
           if !client.node_schedulable?(@node_id)
+            # TLA \* → NodeUnstageVolumeWithMigration (see prepare_data_migration)
             prepare_data_migration(client, req_id, req.volume_id)
           end
+          # loopDevices' \= {⟨v, n⟩}     \* remove_loop_device
           remove_loop_device(backing_file, req_id:)
+          # stagingMounts' \= {⟨v, n⟩}   \* umount staging_path
           staging_path = req.staging_target_path
           if is_mounted?(staging_path, req_id:)
             output, ok = run_cmd("umount", "-q", staging_path, req_id:)
@@ -276,7 +378,30 @@ module Csi
         end
       end
 
+      # TLA \* Models NodeService#node_unstage_volume when node is NOT schedulable:
+      # TLA \* Calls prepare_data_migration -> retain_pv -> recreate_pvc.
+      # TLA \* For the first migration: no existing old-pv-name annotation.
+      # TLA NodeUnstageVolumeWithMigration(v, newNode) ==
+      # TLA     /\ phase[v] = Staged
+      # TLA     /\ owner[v] \in Nodes
+      # TLA     /\ migState[v] = MigNone
+      # TLA     /\ LET oldNode == owner[v] IN
+      # TLA        /\ <<v, oldNode>> \notin targetMounts
+      # TLA        /\ nodeSchedulable[oldNode] = FALSE
+      # TLA        /\ newNode \in Nodes
+      # TLA        /\ newNode /= oldNode
+      # TLA        /\ nodeSchedulable[newNode] = TRUE
+      # TLA        /\ phase'         = [phase EXCEPT ![v] = Created]
+      # TLA        /\ loopDevices'   = loopDevices   \ {<<v, oldNode>>}
+      # TLA        /\ stagingMounts' = stagingMounts \ {<<v, oldNode>>}
+      # TLA        /\ migState'      = [migState  EXCEPT ![v] = MigPrepared]
+      # TLA        /\ migTarget'     = [migTarget EXCEPT ![v] = newNode]
+      # TLA        /\ migSource'     = [migSource EXCEPT ![v] = oldNode]
+      # TLA        /\ migReclaimRetain' = [migReclaimRetain EXCEPT ![v] = TRUE]
+      # TLA        /\ UNCHANGED <<owner, backingFiles, targetMounts, nodeSchedulable,
+      # TLA                       nodeState, migRetryCount, paged>>
       def prepare_data_migration(client, req_id, volume_id)
+        # migReclaimRetain' = TRUE  \* retain_pv sets Retain policy
         log_with_id(req_id, "Retaining pv with volume_id #{volume_id}")
         pv = retain_pv(req_id, client, volume_id)
         log_with_id(req_id, "Recreating pvc with volume_id #{volume_id}")
@@ -339,11 +464,23 @@ module Csi
         end
       end
 
+      # TLA \* Models NodeService#node_publish_volume: bind mount from staging to target.
+      # TLA NodePublishVolume(v) ==
+      # TLA     /\ phase[v] = Staged
+      # TLA     /\ owner[v] \in Nodes
+      # TLA     /\ LET n == owner[v] IN
+      # TLA        /\ <<v, n>> \in stagingMounts
+      # TLA        /\ phase'        = [phase EXCEPT ![v] = Published]
+      # TLA        /\ targetMounts' = targetMounts \cup {<<v, n>>}
+      # TLA        /\ UNCHANGED <<owner, backingFiles, loopDevices, stagingMounts,
+      # TLA                       nodeSchedulable, nodeState, migState, migTarget,
+      # TLA                       migSource, migRetryCount, migReclaimRetain, paged>>
       def node_publish_volume(req, _call)
         log_request_response(req, "node_publish_volume") do |req_id|
           staging_path = req.staging_target_path
           target_path = req.target_path
 
+          # targetMounts' ∪= {⟨v, n⟩}  \* mount --bind staging → target
           unless is_mounted?(target_path, req_id:)
             FileUtils.mkdir_p(target_path)
             output, ok = run_cmd("mount", "--bind", staging_path, target_path, req_id:)
@@ -358,10 +495,22 @@ module Csi
         end
       end
 
+      # TLA \* Models NodeService#node_unpublish_volume: unmounts the bind mount.
+      # TLA NodeUnpublishVolume(v) ==
+      # TLA     /\ phase[v] = Published
+      # TLA     /\ owner[v] \in Nodes
+      # TLA     /\ LET n == owner[v] IN
+      # TLA        /\ <<v, n>> \in targetMounts
+      # TLA        /\ phase'        = [phase EXCEPT ![v] = Staged]
+      # TLA        /\ targetMounts' = targetMounts \ {<<v, n>>}
+      # TLA        /\ UNCHANGED <<owner, backingFiles, loopDevices, stagingMounts,
+      # TLA                       nodeSchedulable, nodeState, migState, migTarget,
+      # TLA                       migSource, migRetryCount, migReclaimRetain, paged>>
       def node_unpublish_volume(req, _call)
         log_request_response(req, "node_unpublish_volume") do |req_id|
           target_path = req.target_path
 
+          # targetMounts' \= {⟨v, n⟩}  \* umount target_path
           if is_mounted?(target_path, req_id:)
             output, ok = run_cmd("umount", "-q", target_path, req_id:)
             unless ok
