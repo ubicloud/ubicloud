@@ -121,10 +121,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:recovery_target_time, :restore_command)
     end
 
-    it "sets primary_slot_name to ubid on standby when physical_slot_ready" do
+    it "sets primary_slot_name to ubid on standby when physical slot ready" do
       postgres_server.timeline_access = "fetch"
       expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to be_nil
-      postgres_server.physical_slot_ready = true
+      postgres_server.physical_slot_ready_id = postgres_server.id
       expect(postgres_server.configure_hash.dig(:configs, :primary_slot_name)).to eq("'#{postgres_server.ubid}'")
     end
 
@@ -190,9 +190,9 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:read_replica?).and_return(false)
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready")
       ])
     end
 
@@ -248,20 +248,20 @@ RSpec.describe PostgresServer do
       POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
-    it "returns standby with physical_slot_ready false as fallback" do
+    it "returns standby with physical_slot_ready_id nil as fallback" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready")
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
 
-    it "prefers standby with physical_slot_ready true over higher lsn without" do
+    it "prefers standby with physical_slot_ready_id set over higher lsn without" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready")
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -275,9 +275,9 @@ RSpec.describe PostgresServer do
 
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: true, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready")
       ])
     end
 
@@ -300,10 +300,10 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby3")
     end
 
-    it "returns the replica even if physical_slot_ready is false" do
+    it "returns the replica even if physical_slot_ready_id is nil" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready: false, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready")
       ])
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
