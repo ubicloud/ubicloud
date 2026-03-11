@@ -796,7 +796,7 @@ class CloverAdmin < Roda
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
-      elsif (uuid = typecast_params.uuid("id")) && (ubid = UBID.from_uuidish(uuid).to_s) && (klass = UBID.class_for_ubid(ubid))
+      elsif (uuid = typecast_params.uuid("id")) && (ubid = UBID.to_ubid(uuid)) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
       elsif typecast_params.nonempty_str("id")
         flash.now["error"] = "Invalid ubid/uuid provided"

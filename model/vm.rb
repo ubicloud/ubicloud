@@ -232,7 +232,7 @@ class Vm < Sequel::Model
   end
 
   def inhost_name
-    self.class.ubid_to_name(UBID.from_uuidish(id))
+    self.class.ubid_to_name(UBID.to_ubid(id))
   end
 
   def storage_size_gib
