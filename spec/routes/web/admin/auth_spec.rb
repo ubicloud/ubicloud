@@ -65,6 +65,17 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin"
   end
 
+  it "requires account to still exist" do
+    admin_account_setup_and_login
+    expect(page.title).to eq "Ubicloud Admin"
+    DB[:admin_webauthn_key].delete
+    DB[:admin_webauthn_user_id].delete
+    DB[:admin_password_hash].delete
+    DB[:admin_account].delete
+    page.refresh
+    expect(page.title).to eq "Ubicloud Admin - Login"
+  end
+
   it "supports changing password" do
     admin_account_setup_and_login
     click_link "Change Password"

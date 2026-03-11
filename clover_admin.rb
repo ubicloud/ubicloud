@@ -632,6 +632,7 @@ class CloverAdmin < Roda
     check_csrf!
     r.rodauth
     rodauth.require_authentication
+    rodauth.require_account
 
     # :nocov:
     rodauth.require_two_factor_setup unless skip_webauthn_requirement
