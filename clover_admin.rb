@@ -317,8 +317,11 @@ class CloverAdmin < Roda
 
   OBJECT_ASSOC_TABLE_PARAMS = {
     ["GithubInstallation", :runners] => "installation",
+    ["GithubInstallation", :repositories] => "installation",
+    ["GithubRepository", :runners] => "repository",
     ["Project", :vms] => "project",
     ["Project", :postgres_resources] => "project",
+    ["Project", :invoices] => "project",
     ["PostgresResource", :servers] => "resource"
   }.freeze
 
@@ -480,21 +483,22 @@ class CloverAdmin < Roda
       eager [:installation]
       columns do |type_symbol, request|
         cs = [:repository_name, :label, :strand_label, :created_at]
-        cs.prepend(:installation) if type_symbol == :search_form
+        cs.prepend(:repository, :installation) if type_symbol == :search_form
         cs.prepend(:ubid) unless type_symbol == :search_form
         cs
       end
 
       column_options strand_label: {type: "text"},
         created_at: {type: "text"},
-        installation: ubid_input.call("Installation")
+        installation: ubid_input.call("Installation"),
+        repository: ubid_input.call("Repository")
 
       column_search_filter do |ds, column, value|
         case column
         when :strand_label
           column_grep.call(ds, Sequel[:strand][:label], value)
-        when :installation
-          ubid_uuid_grep.call(ds, :installation_id, value)
+        when :installation, :repository
+          ubid_uuid_grep.call(ds, :"#{column}_id", value)
         else
           framework
         end

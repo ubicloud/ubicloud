@@ -273,6 +273,12 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GithubRunner - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [runner.ubid, "ubicloud/test", "ubicloud", "start", runner.created_at.to_s]
 
+    repo = runner.repository
+    visit "/model/GithubRepository/#{repo.ubid}"
+    within(".association", text: "runners") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - GithubRunner - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [runner.ubid, "ubicloud/test", "ubicloud", "start", runner.created_at.to_s]
+
     project = Project.create(name: "assoc-table-test")
     vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "assoc-table-vm").subject
 
