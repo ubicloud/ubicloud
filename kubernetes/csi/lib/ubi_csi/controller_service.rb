@@ -166,6 +166,16 @@ module Csi
           # Since we would have at most 8 PVCs per node, searching by value will not cause overhead
           pv_name = @mutex.synchronize { @volume_store.find { |_, d| d[:volume_id] == req.volume_id }&.first }
           pv = pv_name.nil? ? client.find_pv_by_volume_id(req.volume_id) : client.get_pv(pv_name)
+
+          # Guard: do not delete the backing file while a migration is in
+          # progress.  The old-pvc-object annotation is set by retain_pv
+          # during prepare_data_migration and cleared after the new node
+          # stages the volume.  Deleting the source backing file during
+          # rsync would destroy the only copy of the data.
+          if pv.dig("metadata", "annotations", OLD_PVC_OBJECT_ANNOTATION_KEY)
+            fail GRPC::FailedPrecondition, "migration in progress for #{req.volume_id}, backing file deletion deferred"
+          end
+
           pv_node = client.extract_node_from_pv(pv)
           pv_node_ip = client.get_node_ip(pv_node)
           file_path = NodeService.backing_file_path(req.volume_id)
@@ -179,8 +189,8 @@ module Csi
           @mutex.synchronize { @volume_store.delete(pv_name) }
 
           DeleteVolumeResponse.new
-        rescue GRPC::InvalidArgument => e
-          log_with_id(req_id, "Handled gRPC validation error in delete_volume: #{e.class} - #{e.message}")
+        rescue GRPC::BadStatus => e
+          log_with_id(req_id, "gRPC error in delete_volume: #{e.class} - #{e.message}")
           raise
         rescue => e
           log_with_id(req_id, "Internal error in delete_volume: #{e.class} - #{e.message}\n#{e.backtrace.join("\n")}")
