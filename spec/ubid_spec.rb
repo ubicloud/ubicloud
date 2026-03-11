@@ -112,6 +112,12 @@ RSpec.describe UBID do
     expect(uuid2).to eq(uuid1)
   end
 
+  it ".to_ubid can convert directly from uuid string to ubid string" do
+    ubid1 = described_class.generate(UBID::TYPE_VM)
+    ubid2 = described_class.to_ubid(ubid1.to_uuid)
+    expect(ubid2).to eq(ubid1.to_s)
+  end
+
   it "fails to parse if length is not 26" do
     expect {
       described_class.parse("123456")
