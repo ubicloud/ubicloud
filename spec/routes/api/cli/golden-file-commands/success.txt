@@ -9,6 +9,8 @@
 ai api-key list
 ai api-key list -N
 ai api-key create
+ai endpoint list
+ai endpoint list -N
 ai api-key ak2c0j48r8kj4nharh6yagf3eb show
 ai api-key ak2c0j48r8kj4nharh6yagf3eb destroy -f
 fw eu-central-h1/default-eu-central-h1-default delete-rule fr7cv7h5bz324maazy93ykn8s4

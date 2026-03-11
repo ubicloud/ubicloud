@@ -1,0 +1,3 @@
+name                         display-name                 hf-model                     capability       multimodal  context-length  url                  input-price  output-price
+test-model                   Test Model                   test-org/test-model          Text Generation                              http://ie-lb.dpqe2.  0.05         0.05        
+Qwen/Qwen3-VL-235B-Instruct  Qwen/Qwen3-VL-235B-Instruct  Qwen/Qwen3-VL-235B-Instruct  Text Generation  true        64k             http://ie-lb.dpqe2.  0.5          2.5         

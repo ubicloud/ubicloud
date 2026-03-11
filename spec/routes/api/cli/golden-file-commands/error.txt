@@ -9,6 +9,7 @@
 --confirm foo sk spk destroy
 --confirm foo vm eu-central-h1/test-vm destroy
 ai api-key badc0j48r8kj4nharh6yagf3eb show
+ai endpoint list -f invalid
 fw eu-central-h1/default-eu-central-h1-default add-rule foo
 fw eu-central-h1/default-eu-central-h1-default add-rule -s a 10.10.10.0
 fw eu-central-h1/default-eu-central-h1-default add-rule -e a 10.10.10.0

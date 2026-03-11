@@ -6,6 +6,8 @@ ubi ai api-key create
 ubi ai api-key list [options]
 ubi ai api-key api-key-id destroy [options]
 ubi ai api-key api-key-id show
+ubi ai endpoint [command] ...
+ubi ai endpoint list [options]
 ubi fw command [...]
 ubi fw (location/fw-name | fw-id) post-command [...]
 ubi fw list [options]

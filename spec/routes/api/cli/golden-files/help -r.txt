@@ -27,7 +27,8 @@ Usage:
     ubi ai [command] ...
 
 Commands:
-    api-key    Manage AI inference API keys
+    api-key     Manage AI inference API keys
+    endpoint    Manage AI inference endpoints
 
 
 Manage AI inference API keys
@@ -73,6 +74,29 @@ Show details for an inference API key
 
 Usage:
     ubi ai api-key api-key-id show
+
+
+Manage AI inference endpoints
+
+Usage:
+    ubi ai endpoint [command] ...
+
+Commands:
+    list    List inference endpoints
+
+
+List inference endpoints
+
+Usage:
+    ubi ai endpoint list [options]
+
+Options:
+    -f, --fields=fields              show specific fields (comma separated)
+    -N, --no-headers                 do not show headers
+
+Allowed Option Values:
+    Fields: name display-name hf-model capability multimodal context-length url
+            input-price output-price
 
 
 Manage firewalls
