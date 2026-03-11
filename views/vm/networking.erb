@@ -3,7 +3,7 @@
 viewable_fws =
   dataset_authorize(@project.firewalls_dataset.where(id: @vm.firewalls.map(&:id)), "Firewall:view")
     .select_hash(:id, Sequel.as(true, :v))
-    .transform_keys! { UBID.from_uuidish(it).to_s } %>
+    .transform_keys! { UBID.to_ubid(it) } %>
 
 <div id="vm-firewall-rules" class="p-6">
   <%== part(

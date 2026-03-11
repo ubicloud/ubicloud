@@ -19,7 +19,7 @@ class AccessControlEntry < Sequel::Model
       {subject_id:, action_id:, object_id:}.each do |field, value|
         next unless value
 
-        ubid = UBID.from_uuidish(value).to_s
+        ubid = UBID.to_ubid(value)
 
         model = case field
         when :subject_id

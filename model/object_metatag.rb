@@ -13,11 +13,11 @@ class ObjectMetatag < DelegateClass(ObjectTag)
   end
 
   def self.from_meta_uuid(uuid)
-    UBID.to_uuid(from_meta(UBID.from_uuidish(uuid).to_s))
+    UBID.to_uuid(from_meta(UBID.to_ubid(uuid)))
   end
 
   def self.to_meta_uuid(uuid)
-    UBID.to_uuid(to_meta(UBID.from_uuidish(uuid).to_s))
+    UBID.to_uuid(to_meta(UBID.to_ubid(uuid)))
   end
 
   # Designed solely for use with UBID.resolve_map

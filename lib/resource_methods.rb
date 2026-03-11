@@ -31,7 +31,7 @@ module ResourceMethods
     end
 
     def ubid
-      @ubid ||= UBID.from_uuidish(id).to_s.downcase
+      @ubid ||= UBID.to_ubid(id)
     end
 
     def admin_label
@@ -65,7 +65,7 @@ module ResourceMethods
     end
 
     INSPECT_CONVERTERS = {
-      "uuid" => lambda { |v| UBID.from_uuidish(v).to_s },
+      "uuid" => lambda { |v| UBID.to_ubid(v) },
       "cidr" => :to_s.to_proc,
       "inet" => :to_s.to_proc,
       "numeric" => :to_f.to_proc,

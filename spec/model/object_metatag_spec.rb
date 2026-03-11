@@ -25,7 +25,7 @@ RSpec.describe ObjectMetatag do
 
   it ".from_meta_uuid should convert uuid from ObjectMetatag to ObjectTag" do
     id = described_class.from_meta_uuid(metatag.id)
-    expect(UBID.from_uuidish(id).to_s).to start_with("t0")
+    expect(UBID.to_ubid(id)).to start_with("t0")
     expect(id).to eq tag.id
   end
 
@@ -76,7 +76,7 @@ RSpec.describe ObjectMetatag do
 
   it "#id should return metatag uuid" do
     id = metatag.id
-    expect(UBID.from_uuidish(id).to_s).to start_with("t2")
+    expect(UBID.to_ubid(id)).to start_with("t2")
     expect(id).to eq tag.metatag_uuid
   end
 

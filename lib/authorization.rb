@@ -109,7 +109,7 @@ module Authorization
         object_id = object_id.id
       elsif /\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\z/.match?(object_id)
         # Recognize UUID format
-        ubid = UBID.from_uuidish(object_id).to_s
+        ubid = UBID.to_ubid(object_id)
       else
         ubid = object_id
         # Otherwise, should be valid UBID, raise error if not

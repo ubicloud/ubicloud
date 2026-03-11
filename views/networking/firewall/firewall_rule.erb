@@ -13,7 +13,7 @@
       .where("net#{family}": fwr.cidr)
       .get(:id)
     source_type = if ps_id
-      ps_ubid = UBID.from_uuidish(ps_id).to_s
+      ps_ubid = UBID.to_ubid(ps_id)
       "subnet#{family}"
     else
       fwr.source_type
@@ -76,7 +76,7 @@
               .where(location_id: @firewall.location_id)
               .order(:name)
               .select_map([:id, :name])
-              .each { it[0] = UBID.from_uuidish(it[0]).to_s }
+              .each { it[0] = UBID.to_ubid(it[0]) }
           ) %>
         </div>
         <div id="custom-source">
