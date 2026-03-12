@@ -58,11 +58,11 @@ footer {
   padding: 10px;
   margin-bottom: 10px;
 }
-#flash-notice {
+.alert-success {
   background-color: #dff0d8;
   border-color: #d6e9c6;
 }
-#flash-error {
+.alert-danger {
   background-color: #f2dede;
   border-color: #ebccd1;
 }

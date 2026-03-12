@@ -1,0 +1,22 @@
+<% @page_title = "Search" %>
+
+<% if @search_results&.empty? %>
+  <p>
+    No results found for
+    <strong><%= @query %></strong>
+  </p>
+<% elsif @search_results %>
+  <p>
+    <%= @search_results.length %>
+    results for
+    <strong><%= @query %></strong>
+  </p>
+  <% if @search_results.length >= 10 %>
+    <div class="alert alert-danger" role="alert">Results may be truncated. Try a more specific search term.</div>
+  <% end %>
+  <ul id="search-results">
+    <% @search_results.each do |obj| %>
+      <li><a href="/model/<%= obj.class.name %>/<%= obj.ubid %>"><%= obj.admin_label %></a></li>
+    <% end %>
+  </ul>
+<% end %>
