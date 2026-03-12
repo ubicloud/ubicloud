@@ -959,7 +959,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "does not stop if already stopped" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("inactive\nactive\n")
-      expect { nx.stopped }.to nap(15 * 60)
+      expect { nx.stopped }.to nap(5 * 60)
     end
 
     it "hops to unavailable if available" do
