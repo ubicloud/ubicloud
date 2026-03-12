@@ -136,8 +136,13 @@ class Clover
         # check if certificates are getting enabled or they were already enabled
         if lb.cert_enabled != cert_enabled
           DB.transaction do
-            cert_enabled ? lb.enable_cert_server : lb.disable_cert_server
-            audit_log(lb, "update")
+            if cert_enabled
+              lb.enable_cert_server
+              audit_log(lb, "enable_ssl")
+            else
+              lb.disable_cert_server
+              audit_log(lb, "disable_ssl")
+            end
           end
         else
           no_audit_log

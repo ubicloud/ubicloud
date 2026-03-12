@@ -119,8 +119,10 @@ class Clover < Roda
     destroy
     destroy_invitation
     detach_vm
+    disable_ssl
     disassociate
     disconnect
+    enable_ssl
     promote_read_replica
     recycle
     remove_account
@@ -135,6 +137,7 @@ class Clover < Roda
     unrestrict
     update
     update_billing
+    update_config
     update_invitation
     upgrade
   ACTIONS

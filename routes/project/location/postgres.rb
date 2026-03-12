@@ -628,7 +628,7 @@ class Clover
 
           pg.servers.each(&:incr_configure)
 
-          audit_log(pg, "update")
+          audit_log(pg, "update_config")
 
           validator = Validation::PostgresConfigValidator.new(pg.version)
           restart_requiring_changed_params = (pg_config.keys | old_pg_config.keys).select { |k|
