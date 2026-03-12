@@ -37,10 +37,12 @@
     end
 
     it "#remove_members moves deleted records to archived_records" do
+      column = model.table_name.to_s.sub("tag", "id")
+      ds = DB[:archived_record].where(model_name: "applied_#{model.table_name}")
+      ds.delete
       tag.add_members([tag1.id, tag2.id])
       tag.remove_members([tag1.id, tag2.id])
-      column = model.table_name.to_s.sub("tag", "id")
-      rows = DB[:archived_record].where(model_name: "applied_#{model.table_name}").select_map(:model_values)
+      rows = ds.select_map(:model_values)
       expect(rows.length).to eq 2
       expect(rows.map { it["tag_id"] }.uniq).to eq [tag.id]
       expect(rows.map { it[column] }.sort).to eq [tag1.id, tag2.id].sort
