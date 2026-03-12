@@ -8,6 +8,17 @@ require "tilt/erubi"
 require "openssl"
 
 class CloverAdmin < Roda
+  include AuditLog
+
+  Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
+
+  MIN_AUDIT_LOG_END_DATE = Date.new(2025, 6)
+
+  AUDIT_LOG_PARAM_MAP = Hash.new("object")
+  AUDIT_LOG_PARAM_MAP["Project"] = "project"
+  AUDIT_LOG_PARAM_MAP["Account"] = "subject"
+  AUDIT_LOG_PARAM_MAP.freeze
+
   # :nocov:
   if Config.development?
     plugin :exception_page
@@ -839,6 +850,17 @@ class CloverAdmin < Roda
       end
 
       view("vm_by_ipv4")
+    end
+
+    r.get "audit-log" do
+      ds = DB[:audit_log]
+
+      if (project_id = typecast_params.ubid_uuid("project"))
+        ds = ds.where(project_id:)
+      end
+
+      audit_log_search(ds, resolve: nil, accounts_dataset: Account.dataset, month_limit: 6, min_end_date: MIN_AUDIT_LOG_END_DATE)
+      view("audit_log")
     end
 
     r.get "admin-list" do
