@@ -61,13 +61,20 @@ module AuditLog
       end
       start_date += 1
 
-      # 1746082800.0 is May 1, 2025, before audit logging was added
-      ds = if (key = typecast_params.nonempty_str("pagination_key")) &&
+      if (key = typecast_params.nonempty_str("pagination_key")) &&
           (before, start_id = key.split("/", 2)) &&
           start_id &&
-          (start_id = UBID.to_uuid(start_id)) &&
-          (before = before.to_f) > 1746082800
-        end_time = Time.at(before.to_r.round(6))
+          (start_id = UBID.to_uuid(start_id))
+
+        begin
+          end_time = Time.strptime(before, "%s.%N")
+        rescue ArgumentError
+          nil
+        end
+      end
+
+      # 1746082800 is May 1, 2025, before audit logging was added
+      ds = if start_id && end_time && end_time.to_i > 1746082800
         ds.where(Sequel[at: start_date.to_time...end_time] | (Sequel[at: end_time] & (Sequel[:id] >= start_id)))
       else
         ds.where(at: start_date...(end_date + 1))
