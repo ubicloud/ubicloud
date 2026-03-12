@@ -298,6 +298,46 @@ module AdminModelSpecHelper
       LoadBalancer.create(name: "test-lb", project_id: project.id, private_subnet_id: ps.id, health_check_endpoint: "/health")
     end
 
+    def create_machine_image
+      project = Project.create(name: "test-project")
+      MachineImage.create(name: "test-image", arch: "x64", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    end
+
+    def create_machine_image_version
+      mi = create_machine_image
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id,
+        version: "20240101",
+        actual_size_mib: 1024
+      )
+      store = create_machine_image_store(project: mi.project)
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "a" * 64, init_vector: "b" * 24, auth_data: "test")
+      MachineImageVersionMetal.create_with_id(v,
+        store_id: store.id,
+        store_prefix: "test-prefix",
+        archive_kek_id: kek.id)
+      v
+    end
+
+    def create_machine_image_version_metal
+      v = create_machine_image_version
+      MachineImageVersionMetal[v.id]
+    end
+
+    def create_machine_image_store(project: nil)
+      project ||= Project.create(name: "test-project")
+      MachineImageStore.create(
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        provider: "minio",
+        region: "eu",
+        endpoint: "https://minio.example.com/",
+        bucket: "test-bucket",
+        access_key: "test-access-key",
+        secret_key: "test-secret-key"
+      )
+    end
+
     def create_load_balancer_port
       lb = create_load_balancer
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 8080)
