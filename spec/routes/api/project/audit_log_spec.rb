@@ -83,7 +83,7 @@ RSpec.describe Clover, "audit log" do
     at = Time.now - 1
     insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [vm.id], at:, id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
     id = insert_audit_log(action: "destroy", project_id: project.id, subject_id: user.id, at:, id: UBID.generate_from_time("a1", Time.now).to_uuid)
-    pagination_key = "#{at.strftime("%s.%6N")}/#{UBID.from_uuidish(id)}"
+    pagination_key = "#{at.strftime("%s.%6N")}/#{UBID.to_ubid(id)}"
 
     expect(audit_log_body("/project/#{project.ubid}/audit-log?limit=1"))
       .to eq({

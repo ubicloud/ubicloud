@@ -66,7 +66,7 @@
           [entry[:subject], {escape: false}],
           [entry[:objects].join("<br>"), {escape: false}]
         ],
-        { id: UBID.from_uuidish(entry[:id]).to_s }
+        { id: UBID.to_ubid(entry[:id]) }
       ]
     end
 
