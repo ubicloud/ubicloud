@@ -87,6 +87,8 @@ module Prog::Github; end
 
 module Prog::Kubernetes; end
 
+module Prog::MachineImage; end
+
 module Prog::Minio; end
 
 module Prog::Postgres; end
@@ -240,6 +242,7 @@ def clover_freeze
     Prog::DnsZone,
     Prog::Github,
     Prog::Kubernetes,
+    Prog::MachineImage,
     Prog::Minio,
     Prog::Postgres,
     Prog::Storage,
