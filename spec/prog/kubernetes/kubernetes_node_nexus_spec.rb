@@ -173,9 +173,49 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       expect { nx.drain }.to nap(3 * 60 * 60)
     end
 
-    it "drains the old node and hops to wait_for_copy" do
+    it "drains the old node and hops to wait_for_detach" do
       expect(cluster_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check drain_node_vm").and_return("Succeeded")
-      expect { nx.drain }.to hop("wait_for_copy")
+      expect { nx.drain }.to hop("wait_for_detach")
+    end
+  end
+
+  describe "#wait_for_detach" do
+    let(:session) { Net::SSH::Connection::Session.allocate }
+    let(:client) { Kubernetes::Client.new(nx.cluster, session) }
+    let(:success_response) { Net::SSH::Connection::Session::StringWithExitstatus.new("", 0) }
+
+    before do
+      expect(nx.cluster).to receive(:client).and_return(client)
+    end
+
+    it "naps when ubicsi VolumeAttachments still reference this node" do
+      va_list = {"items" => [{
+        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "csi.ubicloud.com"}
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect { nx.wait_for_detach }.to nap(5)
+    end
+
+    it "hops to wait_for_copy when no VolumeAttachments reference this node" do
+      va_list = {"items" => []}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect { nx.wait_for_detach }.to hop("wait_for_copy")
+    end
+
+    it "hops to wait_for_copy when only non-ubicsi VolumeAttachments remain on this node" do
+      va_list = {"items" => [{
+        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "other-csi-driver"}
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect { nx.wait_for_detach }.to hop("wait_for_copy")
+    end
+
+    it "hops to wait_for_copy when ubicsi VolumeAttachments reference a different node" do
+      va_list = {"items" => [{
+        "spec" => {"nodeName" => "other-node", "attacher" => "csi.ubicloud.com"}
+      }]}
+      expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
+      expect { nx.wait_for_detach }.to hop("wait_for_copy")
     end
   end
 
