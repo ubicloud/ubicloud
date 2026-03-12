@@ -604,7 +604,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:pod_status).and_return("Running")
       (1..3).each do |i|
         response = Net::SSH::Connection::Session::StringWithExitstatus.new("hash#{i}", 0)
-        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"sha256sum /etc/data/random-data-#{i} | awk '{print \\$1}'\"").and_return(response)
+        expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c sha256sum\\ /etc/data/random-data-#{i}\\ \\|\\ awk\\ \\'\\{print\\ \\$1\\}\\'").and_return(response)
       end
       expect { kubernetes_test.verify_chained_migration }.to hop("test_node_not_deleted_during_copy")
     end
