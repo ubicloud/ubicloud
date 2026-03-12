@@ -48,6 +48,7 @@ class Clover < Roda
   plugin :hooks
   plugin :Integer_matcher_max
   plugin :json
+  plugin :response_attachment
   plugin :invalid_request_body, :raise
   plugin :json_parser, wrap: :unless_hash, error_handler: lambda { |r| raise Roda::RodaPlugins::InvalidRequestBody::Error, "invalid JSON uploaded" }
   plugin :public

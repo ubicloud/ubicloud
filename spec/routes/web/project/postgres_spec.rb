@@ -893,6 +893,19 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "ca-certificates" do
+      it "sets maintenance window to nil when empty string is passed" do
+        pg.update(root_cert_1: "a", root_cert_2: "b")
+        pg.strand.update(label: "wait")
+        visit "#{project.path}#{pg.path}/connection"
+
+        page.find(".download-btn").click
+        expect(page.response_headers["content-type"]).to eq("application/x-pem-file")
+        expect(page.response_headers["content-disposition"]).to include("attachment; filename=\"#{pg.name}.pem\"")
+        expect(page.body).to eq("a\nb")
+      end
+    end
+
     describe "set-maintenance-window" do
       it "sets maintenance window to nil when empty string is passed" do
         pg.update(maintenance_window_start_at: 9)

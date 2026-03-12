@@ -582,6 +582,8 @@ RSpec.describe Clover, "billing" do
         visit "#{project.path}/billing"
         click_link invoice.name
 
+        expect(page.response_headers["content-disposition"]).to match(/\Ainline; filename="Ubicloud-2023-06-[-\h]+-0001.pdf"/)
+        expect(page.response_headers["content-type"]).to eq("application/pdf")
         expect(page.status_code).to eq(200)
         text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join(" ")
         expect(text).to include("Ubicloud Inc.")
