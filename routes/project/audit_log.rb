@@ -93,7 +93,7 @@ class Clover
       else
         items = ds.limit(limit).all
         if items.length == limit
-          before_id = UBID.from_uuidish(items.pop[:id]).to_s
+          before_id = UBID.to_ubid(items.pop[:id])
           @pagination_key = "#{items.last[:at].strftime("%s.%6N")}/#{before_id}"
         end
       end
@@ -131,8 +131,8 @@ class Clover
           item = {
             at: row[:at].getutc.iso8601,
             action: "#{row[:ubid_type]}/#{row[:action]}",
-            subject_id: UBID.from_uuidish(subject_id).to_s,
-            object_ids: row[:object_ids].map { UBID.from_uuidish(it).to_s }
+            subject_id: UBID.to_ubid(subject_id),
+            object_ids: row[:object_ids].map { UBID.to_ubid(it) }
           }
 
           if (subject_name = ubids[subject_id]&.name)
@@ -145,12 +145,12 @@ class Clover
       else
         items.each do |log|
           subject_id = log[:subject_id]
-          subject_ubid = UBID.from_uuidish(subject_id).to_s
+          subject_ubid = UBID.to_ubid(subject_id)
           subject_name = ubids[subject_id]&.name || subject_ubid
           log[:subject] = "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;subject=#{h subject_ubid}\">#{h subject_name}</a>"
 
           log[:objects] = log[:object_ids].filter_map do |object_id|
-            object_ubid = UBID.from_uuidish(object_id).to_s
+            object_ubid = UBID.to_ubid(object_id)
             if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path)
               "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;object=#{h object_ubid}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
             else

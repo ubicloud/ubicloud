@@ -21,7 +21,7 @@ RSpec.describe Clover, "cli al search" do
 
   before do
     @entry_id = insert_audit_log
-    @entry_ubid = UBID.from_uuidish(@entry_id).to_s
+    @entry_ubid = UBID.to_ubid(@entry_id)
     @subject_ubid = @account.ubid
   end
 
@@ -67,7 +67,7 @@ RSpec.describe Clover, "cli al search" do
     at = Time.now
     insert_audit_log(action: "destroy", ubid_type: "ps", id: UBID.generate_from_time("a1", at - 10).to_uuid, at:)
     id = insert_audit_log(action: "destroy", ubid_type: "vm", id: UBID.generate_from_time("a1", at).to_uuid, at:)
-    args = %W[al search --action=destroy --limit=1 --pagination-key=#{at.strftime("%s.%6N")}/#{UBID.from_uuidish(id)}]
+    args = %W[al search --action=destroy --limit=1 --pagination-key=#{at.strftime("%s.%6N")}/#{UBID.to_ubid(id)}]
 
     expect(search_result(%W[al search -N -a destroy --limit=1])).to eq <<~END
       ps/destroy,#{@subject_ubid},
