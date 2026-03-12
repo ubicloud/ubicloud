@@ -9,6 +9,7 @@ Examples:
 
 Commands:
     ai         Manage AI features
+    al         View project audit log
     fw         Manage firewalls
     gh         Manage GitHub integration
     help       Get command help
@@ -73,6 +74,30 @@ Show details for an inference API key
 
 Usage:
     ubi ai api-key api-key-id show
+
+
+View project audit log
+
+Usage:
+    ubi al command [...]
+
+Commands:
+    search    Search project audit log entries in CSV format
+
+
+Search project audit log entries in CSV format
+
+Usage:
+    ubi al search [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+    -a, --action=action              only show entries for the given action
+    -e, --end=end-date               only show prior to end date
+    -o, --object=object              only show entries affecting the given object ID
+    -s, --subject=account            only show entries with the given account name/email/ID
+        --limit=limit                limit number of records returned
+        --pagination-key=key         continue a previous search
 
 
 Manage firewalls

@@ -73,6 +73,57 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Project
+  '/project/{project_id}/audit-log':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+    get:
+      operationId: searchProjectAuditLog
+      summary: Search project audit log entries
+      parameters:
+        - name: action
+          in: query
+          description: Filter by action type
+          required: false
+          schema:
+            type: string
+          example: 'vm, create, vm/create'
+        - name: end
+          in: query
+          description: Filter by end_date (shows 3 months prior)
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Limit the number of returned records (1-1000)
+          required: false
+          schema:
+            type: number
+        - name: subject
+          in: query
+          description: Filter by account name/email/ID
+          required: false
+          schema:
+            type: string
+        - name: object
+          in: query
+          description: Filter by object ID
+          required: false
+          schema:
+            type: string
+        - name: pagination_key
+          in: query
+          description: Key for paginating results
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AuditLogs'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Audit Log
   '/project/{project_id}/firewall':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -2358,6 +2409,33 @@ components:
       schema:
         $ref: '#/components/schemas/Reference'
   schemas:
+    AuditLog:
+      type: object
+      properties:
+        at:
+          description: Timestamp of the action
+          type: string
+          format: date-time
+        action:
+          description: Action performed
+          type: string
+        subject_id:
+          description: ID of the account that performed the action
+          type: string
+        subject_name:
+          description: Name of the account that performed the action (if still member of project)
+          type: string
+        object_ids:
+          description: IDs of the objects affected by the action
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      required:
+        - at
+        - action
+        - subject_id
+        - object_ids
     Error:
       type: object
       properties:
@@ -3159,6 +3237,23 @@ components:
         - node_count
         - node_size
   responses:
+    AuditLogs:
+      description: A list of audit log entries
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditLog'
+              pagination_key:
+                description: Key to pass to get next page (only present if additional pages)
+                type: string
+            additionalProperties: false
+            required:
+              - items
     Delete:
       description: An empty response after successful resource delete
     Error:
@@ -3739,5 +3834,7 @@ tags:
     name: SSH Public Key
   - description: GitHub Operations
     name: GitHub
+  - description: Audit Log Operations
+    name: Audit Log
 security:
   - BearerAuth: []
