@@ -17,6 +17,10 @@ class Clover < Roda
   end
   # :nocov:
 
+  include AuditLog
+
+  Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
+
   OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
