@@ -5,7 +5,30 @@ require "json"
 
 class CloudflareClient
   def initialize(api_key)
-    @connection = Excon.new("https://api.cloudflare.com", headers: {"Authorization" => "Bearer #{api_key}"})
+    @connection = Excon.new("https://api.cloudflare.com", headers: {
+      "Authorization" => "Bearer #{api_key}",
+      "Content-Type" => "application/json"
+    })
+  end
+
+  def generate_temp_credentials(account_id:, bucket:, permission:, parent_access_key_id:, ttl_seconds: 86400)
+    response = @connection.post(
+      path: "/client/v4/accounts/#{account_id}/r2/temp-access-credentials",
+      body: {
+        bucket:,
+        parentAccessKeyId: parent_access_key_id,
+        permission:,
+        ttlSeconds: ttl_seconds
+      }.to_json,
+      expects: 200
+    )
+
+    result = JSON.parse(response.body).fetch("result")
+    {
+      access_key_id: result.fetch("accessKeyId"),
+      secret_access_key: result.fetch("secretAccessKey"),
+      session_token: result.fetch("sessionToken")
+    }
   end
 
   def create_token(name, policies)
