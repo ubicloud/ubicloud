@@ -1329,4 +1329,215 @@ RSpec.describe CloverAdmin do
       expect(page.find_field("days").value).to eq "5"
     end
   end
+
+  describe "audit log" do
+    let(:project) { Project.create(name: "Test") }
+    let(:user) { Account.create(email: "test@example.com") }
+
+    def insert_audit_log(project_id: project.id, subject_id: user.id, object_ids: [], action: "create", ubid_type: "vm", at: Sequel::CURRENT_TIMESTAMP, id: Sequel::DEFAULT)
+      DB[:audit_log].returning(:id).insert(
+        id:,
+        at:,
+        ubid_type:,
+        action:,
+        project_id:,
+        subject_id:,
+        object_ids: Sequel.pg_array(object_ids, :uuid)
+      ).first[:id]
+    end
+
+    def audit_log_content
+      page.all("#audit-log-search-results td:not(:first-child):not(:only-child)").map(&:text)
+    end
+
+    it "can list audit log entries" do
+      insert_audit_log
+
+      visit "/"
+      click_link "View/Search Audit Logs"
+
+      expect(page.title).to eq("Ubicloud Admin - Audit Log")
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, ""]
+    end
+
+    it "can filter by project" do
+      project2 = Project.create(name: "Test2")
+      insert_audit_log(id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
+      insert_audit_log(project_id: project2.id, action: "destroy", id: UBID.generate_from_time("a1", Time.now).to_uuid)
+
+      visit "/audit-log"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project2.ubid, "vm/destroy", user.ubid, ""
+      ]
+
+      fill_in "Project", with: project2.ubid
+      click_button "Search"
+      expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
+
+      click_link project2.ubid
+      expect(page.title).to eq("Ubicloud Admin - Project #{project2.ubid}")
+
+      click_link "View Audit Log"
+      expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
+    end
+
+    it "can filter by action" do
+      insert_audit_log(id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
+      insert_audit_log(action: "destroy", id: UBID.generate_from_time("a1", Time.now).to_uuid)
+      insert_audit_log(ubid_type: "ps", at: "2026-03-08")
+
+      visit "/audit-log"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project.ubid, "vm/destroy", user.ubid, "",
+        project.ubid, "ps/create", user.ubid, ""
+      ]
+
+      fill_in "Action", with: "vm"
+      click_button "Search"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project.ubid, "vm/destroy", user.ubid, ""
+      ]
+
+      fill_in "Action", with: "create"
+      click_button "Search"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project.ubid, "ps/create", user.ubid, ""
+      ]
+
+      fill_in "Action", with: "vm/create"
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, ""]
+
+      visit "/audit-log?limit=2"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project.ubid, "vm/destroy", user.ubid, ""
+      ]
+
+      click_link "Next Page"
+      expect(audit_log_content).to eq [
+        project.ubid, "ps/create", user.ubid, ""
+      ]
+
+      visit "/audit-log?limit=1&action=create"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, ""
+      ]
+
+      click_link "Next Page"
+      expect(audit_log_content).to eq [
+        project.ubid, "ps/create", user.ubid, ""
+      ]
+
+      visit "/audit-log?limit=a"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/create", user.ubid, "",
+        project.ubid, "vm/destroy", user.ubid, "",
+        project.ubid, "ps/create", user.ubid, ""
+      ]
+    end
+
+    it "can filter by subject UBID" do
+      other_account_ubid = Account.generate_ubid
+      insert_audit_log(object_ids: [other_account_ubid.to_uuid])
+      insert_audit_log(subject_id: other_account_ubid.to_uuid)
+
+      visit "/audit-log"
+      fill_in "Account", with: user.ubid
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, other_account_ubid.to_s]
+
+      user.update(name: "Test User")
+      fill_in "Account", with: user.name
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, other_account_ubid.to_s]
+
+      fill_in "Account", with: user.email
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, other_account_ubid.to_s]
+
+      click_link user.ubid
+      expect(page.title).to eq("Ubicloud Admin - Account #{user.ubid}")
+
+      click_link "View Audit Log"
+      expect(page.title).to eq("Ubicloud Admin - Audit Log")
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, other_account_ubid.to_s]
+
+      fill_in "Account", with: "NoMatch"
+      click_button "Search"
+      expect(audit_log_content).to eq []
+    end
+
+    it "can filter by object UBID" do
+      vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "vm-test").subject
+      vm2 = Prog::Vm::Nexus.assemble("t y", project.id, name: "vm-test2").subject
+      insert_audit_log(object_ids: [vm.id])
+      insert_audit_log(object_ids: [vm2.id])
+
+      visit "/audit-log"
+      fill_in "Object", with: vm.ubid
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, vm.ubid]
+
+      click_link vm.ubid
+      expect(page.title).to eq("Ubicloud Admin - Vm #{vm.ubid}")
+
+      click_link "View Audit Log"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, vm.ubid]
+    end
+
+    it "can filter by date, including correct pagination at same timestamp" do
+      other_account_ubid = Account.generate_ubid
+      Date.today
+      really_old_date = Date.new(2025, 7)
+      old_date = Date.new(2026)
+      new_date = Date.new(2026, 5)
+      al_ubid1 = UBID.generate_from_time("a1", Time.now - 10)
+      al_ubid2 = UBID.generate_from_time("a1", Time.now)
+      insert_audit_log(at: really_old_date, action: "update", id: al_ubid1.to_uuid)
+      insert_audit_log(at: really_old_date, subject_id: other_account_ubid.to_uuid, id: al_ubid2.to_uuid)
+      insert_audit_log(at: old_date)
+      insert_audit_log(at: new_date, action: "destroy")
+
+      visit "/audit-log"
+      fill_in "End Date", with: "2026-08-01"
+      click_button "Search"
+      expect(audit_log_content).to eq [project.ubid, "vm/destroy", user.ubid, ""]
+
+      click_link "Older Results"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, ""]
+
+      click_link "Older Results"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/update", user.ubid, "",
+        project.ubid, "vm/create", other_account_ubid.to_s, ""
+      ]
+
+      fill_in "End Date", with: "2025-09-01"
+      click_button "Search"
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/update", user.ubid, "",
+        project.ubid, "vm/create", other_account_ubid.to_s, ""
+      ]
+
+      visit(page.current_url + "&limit=1")
+      expect(audit_log_content).to eq [project.ubid, "vm/update", user.ubid, ""]
+
+      click_link "Next Page"
+      expect(audit_log_content).to eq [project.ubid, "vm/create", other_account_ubid.to_s, ""]
+
+      visit(page.current_url[0...-1])
+      expect(audit_log_content).to eq [
+        project.ubid, "vm/update", user.ubid, ""
+      ]
+
+      fill_in "End Date", with: "2026-03-aa"
+      click_button "Search"
+      expect(audit_log_content).to eq []
+    end
+  end
 end

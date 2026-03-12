@@ -1,0 +1,45 @@
+<% @page_title = "Audit Log" %>
+
+<% form({id: "audit-log-search"}, wrapper: :div) do |f| %>
+  <%== f.input(:text, key: "project", label: "Project", value: typecast_params.nonempty_str("project")) %>
+  <%== f.input(:text, key: "action", label: "Action", value: typecast_params.nonempty_str("action")) %>
+  <%== f.input(:text, key: "subject", label: "Account", value: typecast_params.nonempty_str("subject")) %>
+  <%== f.input(:text, key: "object", label: "Object", value: typecast_params.nonempty_str("object")) %>
+  <%== f.input(:date, key: "end", label: "End Date", value: @end_date) %>
+  <%== f.button("Search") %>
+<% end %>
+
+<% if @pagination_key
+  link_text = "Next Page"
+  @next_page_params["pagination_key"] = @pagination_key
+elsif @next_end_date
+  link_text = "Older Results"
+  @next_page_params["end"] = @next_end_date
+end %>
+
+<table id="audit-log-search-results">
+  <thead>
+    <tr>
+      <th>At (UTC)</th>
+      <th>Project</th>
+      <th>Action</th>
+      <th>Account</th>
+      <th>Object</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% @audit_logs.each do %>
+      <tr>
+        <td><%= it[:at].getutc.strftime("%F %T") %></td>
+        <td><%== linkify_ubids(UBID.to_ubid(it[:project_id])) %></td>
+        <td><%= it[:ubid_type] %>/<%= it[:action] %></td>
+        <td><%== linkify_ubids(UBID.to_ubid(it[:subject_id])) %></td>
+        <td><%== linkify_ubids(it[:object_ids].map { |id| UBID.to_ubid(id) }.join(", ")) %></td>
+      </tr>
+    <% end %>
+    <% if link_text %>
+      <% link_params_html = @next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;") %>
+      <tr><td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td></tr>
+    <% end %>
+  </tbody>
+</table>
