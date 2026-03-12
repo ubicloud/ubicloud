@@ -213,6 +213,13 @@ module Config
   override :kubernetes_v1_33_version, "20250506.1.0", string
   override :kubernetes_v1_34_version, "20250828.1.0", string
 
+  # Machine Images
+  optional :machine_image_r2_account_id, string
+  optional :machine_image_r2_api_token, string, clear: true
+  optional :machine_image_r2_access_key, string, clear: true
+  optional :machine_image_r2_secret_key, string, clear: true
+  override :machine_image_r2_bucket, "ubicloud-machine-images", string
+
   # Allocator
   override :allocator_target_host_utilization, 0.72, float
   override :allocator_target_premium_host_utilization, 0.85, float
