@@ -682,17 +682,7 @@ module Scheduling::Allocator
         end
 
         key_encryption_key = if volume["encrypted"]
-          key_wrapping_algorithm = "aes-256-gcm"
-          cipher = OpenSSL::Cipher.new(key_wrapping_algorithm)
-          key_wrapping_key = cipher.random_key
-          key_wrapping_iv = cipher.random_iv
-
-          StorageKeyEncryptionKey.create(
-            algorithm: key_wrapping_algorithm,
-            key: Base64.encode64(key_wrapping_key),
-            init_vector: Base64.encode64(key_wrapping_iv),
-            auth_data: "#{vm.inhost_name}_#{disk_index}"
-          )
+          StorageKeyEncryptionKey.create_random(auth_data: "#{vm.inhost_name}_#{disk_index}")
         end
 
         image_id = if volume["boot"]
