@@ -76,7 +76,7 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
     sshable = cluster.sshable
     case sshable.d_check(unit_name)
     when "Succeeded"
-      hop_wait_for_copy
+      hop_wait_for_detach
     when "NotStarted"
       sshable.d_run(unit_name, "sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf",
         "drain", kubernetes_node.name, "--ignore-daemonsets", "--delete-emptydir-data")
@@ -90,6 +90,18 @@ class Prog::Kubernetes::KubernetesNodeNexus < Prog::Base
       register_deadline("destroy", 0)
       nap 3 * 60 * 60
     end
+  end
+
+  label def wait_for_detach
+    attachments = JSON.parse(cluster.client.kubectl("get volumeattachments -ojson"))["items"]
+    node_attachments = attachments.select { |va|
+      va.dig("spec", "nodeName") == kubernetes_node.name &&
+        va.dig("spec", "attacher") == "csi.ubicloud.com"
+    }
+    if node_attachments.any?
+      nap 5
+    end
+    hop_wait_for_copy
   end
 
   label def wait_for_copy
