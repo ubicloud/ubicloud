@@ -47,7 +47,7 @@ jobs:
     name: E2E - ${{ matrix.provider }}
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
-    timeout-minutes: 85
+    timeout-minutes: 93
     concurrency: E2E-${{ matrix.provider }}
 
     steps:
@@ -296,6 +296,10 @@ jobs:
                 - title: "Last Line"
                   short: false
                   value: "${{ steps.extract_last.outputs.LAST_LINE }}"
+
+    - name: Sleep 10 minutes after failed notification
+      if: ${{ failure() && github.ref_name == 'main' }}
+      run: sleep 600
 
     - name: Cleanup AWS resources
       if: always() && matrix.provider == 'aws'
