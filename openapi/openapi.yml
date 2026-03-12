@@ -1509,8 +1509,10 @@ paths:
               properties:
                 name:
                   type: string
+                  description: Name for the newly restored Postgres database.
                 restore_target:
                   type: string
+                  description: The point in time at which to recover, as either date/time, named restore point, or a specific transaction ID.
                 pg_config:
                   type: object
                   example:
