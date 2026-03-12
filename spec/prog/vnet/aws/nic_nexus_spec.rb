@@ -75,6 +75,26 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
       expect(client).to receive(:create_network_interface).with({subnet_id: "subnet-0123456789abcdefg", private_ip_address: nic.private_ipv4.network.to_s, ipv_6_prefix_count: 1, groups: ["sg-0123456789abcdefg"], tag_specifications: Util.aws_tag_specifications("network-interface", nic.name), client_token: nic.id}).and_call_original
       expect { nx.create_network_interface }.to hop("assign_ipv6_address")
     end
+
+    it "finds existing network interface when IP is already in use" do
+      expect(client).to receive(:create_network_interface).and_raise(Aws::EC2::Errors::InvalidIPAddressInUse.new(nil, "The IP address '10.0.0.1' is already in use."))
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [{network_interface_id: "eni-existing123", status: "available"}])
+      expect(client).to receive(:describe_network_interfaces).with({
+        filters: [
+          {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
+          {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
+          {name: "status", values: ["available"]}
+        ]
+      }).and_call_original
+      expect { nx.create_network_interface }.to hop("assign_ipv6_address")
+      expect(nic.nic_aws_resource.reload.network_interface_id).to eq("eni-existing123")
+    end
+
+    it "fails when IP is in use but no available network interface found" do
+      expect(client).to receive(:create_network_interface).and_raise(Aws::EC2::Errors::InvalidIPAddressInUse.new(nil, "The IP address '10.0.0.1' is already in use."))
+      client.stub_responses(:describe_network_interfaces, network_interfaces: [])
+      expect { nx.create_network_interface }.to raise_error(RuntimeError, /No available network interface found for IP/)
+    end
   end
 
   describe "#assign_ipv6_address" do
