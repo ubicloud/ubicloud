@@ -14,6 +14,34 @@ RSpec.describe CloudflareClient do
     expect(client.delete_token(token_id)).to eq(200)
   end
 
+  it "generate_temp_credentials" do
+    Excon.stub(
+      {path: "/client/v4/accounts/account-id/r2/temp-access-credentials", method: :post},
+      {
+        status: 200,
+        body: {
+          result: {
+            accessKeyId: "access-key",
+            secretAccessKey: "secret-key",
+            sessionToken: "session-token"
+          }
+        }.to_json
+      }
+    )
+
+    expect(client.generate_temp_credentials(
+      account_id: "account-id",
+      bucket: "bucket",
+      permission: "object-read-write",
+      parent_access_key_id: "parent-key",
+      ttl_seconds: 10
+    )).to eq(
+      access_key_id: "access-key",
+      secret_access_key: "secret-key",
+      session_token: "session-token"
+    )
+  end
+
   describe "when setting Config.github_cache_blob_storage_use_account_token" do
     before do
       expect(Config).to receive(:github_cache_blob_storage_use_account_token).and_return(true)
