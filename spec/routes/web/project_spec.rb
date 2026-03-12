@@ -1077,7 +1077,19 @@ RSpec.describe Clover, "project" do
         click_link "Next Page"
         expect(audit_log_content).to eq ["vm/create", other_account_ubid.to_s, ""]
 
-        visit(page.current_url[0...-1])
+        url = page.current_url
+        visit(url.sub(/pagination_key=\d+/, "pagination_key=1746082800"))
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, ""
+        ]
+
+        url = page.current_url
+        visit(url.sub(/pagination_key=\d+/, "pagination_key=a"))
+        expect(audit_log_content).to eq [
+          "vm/create", user.ubid, ""
+        ]
+
+        visit(url[0...-1])
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, ""
         ]
