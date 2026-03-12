@@ -33,7 +33,7 @@ spec:
             - name: CSI_ENDPOINT
               value: "unix:///csi/csi.sock"
             - name: EXTERNAL_ENDPOINTS
-              value: ""
+              value: "ipv4.google.com:443"
           securityContext:
             privileged: true
             capabilities:
