@@ -314,6 +314,17 @@ class CloverAdmin < Roda
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
 
+  SEARCH_QUERIES = {
+    "Account" => [:email, :name],
+    "BillingInfo" => [:stripe_id],
+    "GithubInstallation" => [:name],
+    "GithubRepository" => [:name],
+    "Invoice" => [:invoice_number],
+    "KubernetesCluster" => [:name],
+    "PostgresResource" => [:name],
+    "Vm" => [:name]
+  }.freeze
+
   OBJECTS_WITH_UI = {
     "Vm" => lambda { |vm| "project/#{vm.project.ubid}/location/#{vm.location.display_name}/vm/#{vm.ubid}/overview" },
     "PostgresResource" => lambda { |pg| "project/#{pg.project.ubid}/location/#{pg.location.display_name}/postgres/#{pg.name}/overview" }
@@ -833,13 +844,41 @@ class CloverAdmin < Roda
       r.redirect "/admin-list"
     end
 
+    r.get "search" do
+      @query = typecast_params.str!("q")
+      prefix, term = @query.split(":", 2)
+
+      if term.nil? || term.empty?
+        flash.now["error"] = "Use prefix:term syntax to search (e.g. vm:name). Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
+        next view("search")
+      end
+      term.strip!
+
+      klass = UBID.class_for_ubid(prefix)
+      columns = klass && SEARCH_QUERIES[klass.name]
+      unless columns
+        flash.now["error"] = "Unknown prefix: #{h(prefix)}. Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
+        next view("search")
+      end
+      pattern = "%#{klass.dataset.escape_like(term)}%"
+      condition = columns.map { Sequel.cast(it, :text).ilike(pattern) }.reduce(:|)
+      @search_results = klass.where(condition).limit(10).all
+
+      if @search_results.length == 1
+        obj = @search_results.first
+        r.redirect("/model/#{obj.class.name}/#{obj.ubid}")
+      end
+
+      view("search")
+    end
+
     r.root do
       if (ubid = typecast_params.ubid("id")) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
       elsif (uuid = typecast_params.uuid("id")) && (ubid = UBID.to_ubid(uuid)) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
       elsif typecast_params.nonempty_str("id")
-        flash.now["error"] = "Invalid ubid/uuid provided"
+        r.redirect("/search?q=#{Rack::Utils.escape(typecast_params.nonempty_str("id"))}")
       end
 
       @grouped_pages = Page.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
