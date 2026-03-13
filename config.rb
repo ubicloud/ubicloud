@@ -212,6 +212,7 @@ module Config
   override :kubernetes_v1_32_version, "20250320.1.0", string
   override :kubernetes_v1_33_version, "20250506.1.0", string
   override :kubernetes_v1_34_version, "20250828.1.0", string
+  override :kubernetes_v1_35_version, "20260313.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float
