@@ -15,7 +15,7 @@ RSpec.describe Prog::InstallRhizome do
       expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
         expect(args).to eq ["tar xf -"]
 
-        expect(kwargs[:stdin].scan("Gemfile.lock").count).to be < 2
+        expect(kwargs[:stdin].scan("Gemfile.lock").count).to eq 1
 
         # Take offset from
         # https://www.gnu.org/software/tar/manual/html_node/Standard.html
