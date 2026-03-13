@@ -56,7 +56,7 @@ RSpec.describe PostgresResource do
   it "returns replication_connection_string" do
     expect(postgres_resource).to receive(:dns_zone).and_return(instance_double(DnsZone)).at_least(:once)
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
+    expect(s).to include("ubi_replication@#{postgres_resource.ubid}.postgres.ubicloud.com", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt")
   end
 
   it "returns replication_connection_string with ip when no dns_zone exists" do
@@ -65,7 +65,16 @@ RSpec.describe PostgresResource do
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: "1.2.3.4/32")
     expect(postgres_resource.dns_zone).to be_nil
     s = postgres_resource.replication_connection_string(application_name: "pgubidstandby")
-    expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/server.crt")
+    expect(s).to include("ubi_replication@1.2.3.4", "application_name=pgubidstandby", "sslcert=/etc/ssl/certs/client.crt")
+  end
+
+  it "client_ca_certificates is nil while either client_root_cert_1 or client_root_cert_2 also nil" do
+    postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: "2")
+    expect(postgres_resource.client_ca_certificates).not_to be_nil
+    postgres_resource.update(client_root_cert_1: nil, client_root_cert_2: "2")
+    expect(postgres_resource.client_ca_certificates).to be_nil
+    postgres_resource.update(client_root_cert_1: "1", client_root_cert_2: nil)
+    expect(postgres_resource.client_ca_certificates).to be_nil
   end
 
   describe "#provision_new_standby" do

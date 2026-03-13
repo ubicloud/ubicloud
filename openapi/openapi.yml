@@ -1095,7 +1095,7 @@ paths:
       summary: Download CA certificates for a PostgreSQL database
       responses:
         '200':
-          description: CA certificate file
+          description: CA certificate file in pem format
           headers:
             Content-Disposition:
               schema:
@@ -1106,6 +1106,87 @@ paths:
               schema:
                 type: string
                 format: binary
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/add-auth-user':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: addCertAuthUser
+      summary: Add provided name to list of users with certificate authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertAuthUserRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CertAuthUserList'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/create-client-keypair':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: createClientCertKeypair
+      summary: Create and return client certificate keypair with requested common name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                common_name:
+                  description: CN for cert
+                  type: string
+                duration:
+                  description: 'Duration before expiry, in seconds'
+                  type: integer
+              additionalProperties: false
+      responses:
+        '200':
+          description: certificate keypair file in pem format
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: attachment; filename="certificate-key.pem"
+          content:
+            application/x-pem-file:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/cert/remove-auth-user':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: removeCertAuthUser
+      summary: Remove provided name from list of users with certificate authentication
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CertAuthUserRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/CertAuthUserList'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -2524,6 +2605,25 @@ components:
           additionalProperties: false
           required:
             - pgbouncer_config
+    CertAuthUserRequest:
+      type: object
+      properties:
+        name:
+          description: name of user
+          type: string
+      additionalProperties: false
+      required:
+        - name
+    CertAuthUserList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+      additionalProperties: false
+      required:
+        - items
     PostgresTag:
       type: object
       properties:
@@ -3635,6 +3735,12 @@ components:
             required:
               - count
               - items
+    CertAuthUserList:
+      description: full list of users using client certificate authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CertAuthUserList'
     PrivateSubnet:
       description: A Private Subnet
       content:

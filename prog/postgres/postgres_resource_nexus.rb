@@ -170,6 +170,11 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.root_cert_1, postgres_resource.root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
     postgres_resource.root_cert_2, postgres_resource.root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Root Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
     postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+
+    postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 5)
+    postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+    postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
+
     postgres_resource.save_changes
 
     reap(:wait_servers, nap: 5)
@@ -189,6 +194,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       servers.each(&:incr_refresh_certificates)
     end
 
+    if OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2
+      postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      servers.each(&:incr_refresh_certificates)
+    end
+
     refresh = false
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       refresh = true
@@ -198,6 +209,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     end
     if refresh
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
+      postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
       servers.each(&:incr_refresh_certificates)
     end
 
@@ -321,19 +333,26 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   end
 
   def create_certificate
-    root_cert = OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1)
-    root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
-    if root_cert.not_after < Time.now + 60 * 60 * 24 * 365 * 1
-      root_cert = OpenSSL::X509::Certificate.new(postgres_resource.root_cert_2)
-      root_cert_key = OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_2)
-    end
+    root_cert, root_cert_key = postgres_resource.signing_key
 
     Util.create_certificate(
       subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.identity}",
-      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private.#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth,clientAuth"],
+      extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private.#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
       issuer_key: root_cert_key
+    ).map(&:to_pem)
+  end
+
+  def create_client_certificate
+    issuer_cert, issuer_key = postgres_resource.client_signing_key
+
+    Util.create_certificate(
+      subject: "/C=US/O=Ubicloud/CN=#{postgres_resource.identity}",
+      extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
+      duration: 60 * 60 * 24 * 30 * 6, # ~6 months
+      issuer_cert:,
+      issuer_key:
     ).map(&:to_pem)
   end
 end
