@@ -583,6 +583,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).to receive(:observe_archival_backlog).with(session)
       expect(postgres_server).to receive(:observe_metrics_backlog).with(session)
       expect(postgres_server).to receive(:observe_disk_usage).with(session)
+      expect(postgres_server).to receive(:observe_io_throttle).with(session)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
@@ -593,6 +594,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server).not_to receive(:observe_archival_backlog)
       expect(postgres_server).not_to receive(:observe_metrics_backlog)
       expect(postgres_server).not_to receive(:observe_disk_usage)
+      expect(postgres_server).not_to receive(:observe_io_throttle)
 
       postgres_server.export_metrics(session:, tsdb_client:)
     end
@@ -601,6 +603,7 @@ RSpec.describe PostgresServer do
       allow(postgres_server).to receive(:observe_archival_backlog).with(session)
       allow(postgres_server).to receive(:observe_metrics_backlog).with(session)
       allow(postgres_server).to receive(:observe_disk_usage).with(session)
+      allow(postgres_server).to receive(:observe_io_throttle).with(session)
       allow(postgres_server).to receive(:scrape_endpoints).and_return([])
 
       expect(session[:export_count]).to be_nil
@@ -986,6 +989,48 @@ RSpec.describe PostgresServer do
       expect(session[:ssh_session]).to receive(:_exec!).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe disk usage", instance_of(Hash)).and_call_original
       postgres_server.observe_disk_usage(session)
+    end
+  end
+
+  describe "#observe_io_throttle" do
+    let(:session) {
+      {ssh_session: Net::SSH::Connection::Session.allocate}
+    }
+    let(:io_throttle_cmd) { "stat -c '%Y' /sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@16-main.service/throttled/io.max || echo 'missing'" }
+
+    it "does nothing when io.max file is missing" do
+      expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("missing\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      postgres_server.observe_io_throttle(session)
+    end
+
+    it "creates a stale page when io.max mtime is older than 60 seconds" do
+      old_mtime = (Time.now - 120).to_i
+      expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("#{old_mtime}\n")
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        "#{postgres_server.ubid} I/O throttle stale",
+        ["PGIOThrottleStale", postgres_server.id],
+        postgres_server.ubid,
+        severity: "warning",
+        extra_data: {io_max_mtime: Time.at(old_mtime)}
+      )
+      postgres_server.observe_io_throttle(session)
+    end
+
+    it "resolves stale page and logs when io.max mtime is recent" do
+      recent_mtime = (Time.now - 10).to_i
+      expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("#{recent_mtime}\n")
+      page = Prog::PageNexus.assemble("#{postgres_server.ubid} I/O throttle stale",
+        ["PGIOThrottleStale", postgres_server.id], postgres_server.ubid, severity: "warning")
+      postgres_server.observe_io_throttle(session)
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
+    it "does not fail resolving stale page when no existing page" do
+      recent_mtime = (Time.now - 10).to_i
+      expect(session[:ssh_session]).to receive(:_exec!).with(io_throttle_cmd).and_return("#{recent_mtime}\n")
+      expect(Prog::PageNexus).not_to receive(:assemble)
+      postgres_server.observe_io_throttle(session)
     end
   end
 

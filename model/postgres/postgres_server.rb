@@ -140,8 +140,13 @@ class PostgresServer < Sequel::Model
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
-      metrics_config:
+      metrics_config:,
+      disk_throughput_baseline_mbps:
     }
+  end
+
+  def disk_throughput_baseline_mbps
+    DISK_THROUGHPUT_BASELINE_MBPS.fetch(resource.location.provider, 100)
   end
 
   def trigger_failover(mode:)
@@ -325,6 +330,7 @@ class PostgresServer < Sequel::Model
     if session[:export_count] % 12 == 1
       observe_disk_usage(session)
       observe_archival_backlog(session)
+      observe_io_throttle(session)
       observe_metrics_backlog(session)
     end
 
@@ -475,6 +481,24 @@ class PostgresServer < Sequel::Model
     Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
+  def observe_io_throttle(session)
+    # Make sure either the IO throttle file does not exist or if it exists, it
+    # has been updated in the last minute.
+    io_throttle_file = "/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@#{version}-main.service/throttled/io.max"
+    io_max_stat = session[:ssh_session].exec!("stat -c '%Y' :io_throttle_file || echo 'missing'", io_throttle_file:).strip
+    if io_max_stat != "missing"
+      io_max_mtime = Time.at(Integer(io_max_stat, 10))
+      if Time.now - io_max_mtime > 60
+        Prog::PageNexus.assemble("#{ubid} I/O throttle stale",
+          ["PGIOThrottleStale", id], ubid,
+          severity: "warning", extra_data: {io_max_mtime:})
+      else
+        Page.from_tag_parts("PGIOThrottleStale", id)&.incr_resolve
+        Clog.emit("I/O throttle applied", {postgres_server_id: id, io_max_mtime:})
+      end
+    end
+  end
+
   def observe_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     session[:disk_usage_percent] = disk_usage_percent
@@ -494,6 +518,11 @@ class PostgresServer < Sequel::Model
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
+  DISK_THROUGHPUT_BASELINE_MBPS = {
+    "hetzner" => 128,
+    "aws" => 448,
+    "leaseweb" => 100
+  }.freeze
 end
 
 # Table: postgres_server

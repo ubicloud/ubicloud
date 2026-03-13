@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../lib/io_throttle"
+require "logger"
+
+# Called by systemd timer every 15 seconds.
+# Reads the archival backlog, calculates the appropriate throttle tier, and applies it.
+
+if ARGV.count != 2
+  fail "Usage: apply-io-throttle <instance> <disk_throughput_baseline_mbps>"
+end
+
+instance = ARGV[0]
+disk_throughput_baseline_mbps = Integer(ARGV[1], 10)
+
+logger = Logger.new($stdout)
+logger.level = Logger::INFO
+
+IoThrottle.new(instance, logger, disk_throughput_baseline_mbps).run
