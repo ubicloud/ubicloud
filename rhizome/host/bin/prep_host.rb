@@ -84,7 +84,7 @@ r "sysctl --system"
 # driver.
 # acl is for setfacl, which is used to set permissions and not installed
 # by default in Leaseweb servers.
-r "apt-get -y install qemu-utils mtools acl"
+r "apt-get -y install qemu-utils mtools acl ethtool"
 
 # We need nvme-cli to inspect installed NVMe cards in prod servers when
 # looking into I/O performance issues. systemd-coredump is useful when
