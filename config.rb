@@ -6,6 +6,7 @@ begin
   require_relative ".env"
 rescue LoadError
   # .env.rb is optional
+  nil
 end
 
 # :nocov:

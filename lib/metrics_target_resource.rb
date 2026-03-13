@@ -46,6 +46,7 @@ class MetricsTargetResource
     begin
       @session[:ssh_session].close
     rescue
+      nil
     end
     @session = nil
   end

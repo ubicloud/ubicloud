@@ -234,6 +234,7 @@ class UBID
   def self.to_uuid(ubid_str)
     parse(ubid_str).to_uuid
   rescue UBIDParseError
+    nil
   end
 
   def self.uuid_class_match?(uuid, klass)

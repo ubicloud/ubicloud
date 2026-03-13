@@ -51,6 +51,7 @@ class MonitorableResource
         begin
           @session[:ssh_session].close
         rescue
+          nil
         end
       end
     end
@@ -74,6 +75,7 @@ class MonitorableResource
         begin
           @session[:ssh_session].shutdown!
         rescue
+          nil
         end
         @session.merge!(@resource.init_health_monitor_session)
         retry
