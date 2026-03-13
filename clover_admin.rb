@@ -324,6 +324,8 @@ class CloverAdmin < Roda
     "PostgresResource" => [:name],
     "Vm" => [:name]
   }.freeze
+  SEARCH_QUERIES.each_value(&:freeze)
+  SEARCH_PREFIXES = SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ").freeze
 
   OBJECTS_WITH_UI = {
     "Vm" => lambda { |vm| "project/#{vm.project.ubid}/location/#{vm.location.display_name}/vm/#{vm.ubid}/overview" },
@@ -850,21 +852,21 @@ class CloverAdmin < Roda
 
       terms = term&.split(",")&.map(&:strip)&.reject(&:empty?)
       if terms.nil? || terms.empty?
-        flash.now["error"] = "Use prefix:term syntax to search (e.g. vm:name). Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
+        flash.now["error"] = "Use prefix:term syntax to search (e.g. vm:name). Available prefixes: #{SEARCH_PREFIXES}"
         next view("search")
       end
 
       klass = UBID.class_for_ubid(prefix)
       columns = klass && SEARCH_QUERIES[klass.name]
       unless columns
-        flash.now["error"] = "Unknown prefix: #{h(prefix)}. Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
+        flash.now["error"] = "Unknown prefix: #{prefix}. Available prefixes: #{SEARCH_PREFIXES}"
         next view("search")
       end
-      condition = terms.map { |t|
-        pattern = "%#{klass.dataset.escape_like(t)}%"
-        columns.map { Sequel.cast(it, :text).ilike(pattern) }.reduce(:|)
-      }.reduce(:|)
-      @search_results = klass.where(condition).limit(10).all
+      patterns = terms.map { "%#{klass.dataset.escape_like(it)}%" }
+      @search_results = klass.grep(columns, patterns).limit(11).all
+      if @search_results.length > 10
+        @truncated = @search_results.pop
+      end
 
       if @search_results.length == 1
         obj = @search_results.first
@@ -879,8 +881,8 @@ class CloverAdmin < Roda
         r.redirect("/model/#{klass.name}/#{ubid}")
       elsif (uuid = typecast_params.uuid("id")) && (ubid = UBID.to_ubid(uuid)) && (klass = UBID.class_for_ubid(ubid))
         r.redirect("/model/#{klass.name}/#{ubid}")
-      elsif typecast_params.nonempty_str("id")
-        r.redirect("/search?q=#{Rack::Utils.escape(typecast_params.nonempty_str("id"))}")
+      elsif (id = typecast_params.nonempty_str("id"))
+        r.redirect("/search?q=#{Rack::Utils.escape(id)}")
       end
 
       @grouped_pages = Page.reverse(:created_at, :summary).exclude(severity: "info").group_by_vm_host
