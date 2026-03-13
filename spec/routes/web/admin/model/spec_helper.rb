@@ -298,6 +298,25 @@ module AdminModelSpecHelper
       LoadBalancer.create(name: "test-lb", project_id: project.id, private_subnet_id: ps.id, health_check_endpoint: "/health")
     end
 
+    def create_machine_image
+      project = Project.create(name: "test-project")
+      MachineImage.create(name: "test-image", arch: "x64", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    end
+
+    def create_machine_image_version
+      mi = create_machine_image
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "a" * 64, init_vector: "b" * 24, auth_data: "test")
+      MachineImageVersion.create(
+        machine_image_id: mi.id,
+        version: "20240101",
+        actual_size_mib: 1024,
+        key_encryption_key_id: kek.id,
+        s3_endpoint: "https://s3.example.com",
+        s3_bucket: "test-bucket",
+        s3_prefix: "test-prefix"
+      )
+    end
+
     def create_load_balancer_port
       lb = create_load_balancer
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 80, dst_port: 8080)

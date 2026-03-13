@@ -108,6 +108,8 @@ class UBID
   TYPE_LOCATION_AWS_AZ = "1a"
   TYPE_AWS_SUBNET = "as"
   # TYPE_AUDIT_LOG = "a1"
+  TYPE_MACHINE_IMAGE = "m1"
+  TYPE_MACHINE_IMAGE_VERSION = "mv"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
