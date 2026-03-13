@@ -55,7 +55,6 @@ class Clover
         authorize("KubernetesCluster:edit", kc)
 
         response.attachment "#{kc.name}-kubeconfig.yaml"
-        response.content_type = :text
         kc.kubeconfig
       end
 
