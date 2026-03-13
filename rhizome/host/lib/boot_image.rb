@@ -6,9 +6,10 @@ require "uri"
 require_relative "../../common/lib/arch"
 
 class BootImage
-  def initialize(name, version)
+  def initialize(name, version, image_root: "/var/storage/images")
     @name = name
     @version = version
+    @image_root = image_root
   end
 
   def image_path
@@ -16,20 +17,16 @@ class BootImage
     # code when we want to recreate storage. We can remove this check once we
     # have removed all unversioned images from production.
     @image_path ||= if @version.nil?
-      "#{image_root}/#{@name}.raw"
+      "#{@image_root}/#{@name}.raw"
     else
-      "#{image_root}/#{@name}-#{@version}.raw"
+      "#{@image_root}/#{@name}-#{@version}.raw"
     end
-  end
-
-  def image_root
-    "/var/storage/images"
   end
 
   def download(url:, ca_path: nil, sha256sum: nil, use_htcat: false)
     return if File.exist?(image_path)
 
-    FileUtils.mkdir_p image_root
+    FileUtils.mkdir_p @image_root
 
     # If image URL has query parameter such as SAS token, File.extname returns
     # it too. We need to remove them and only get extension.
@@ -40,7 +37,7 @@ class BootImage
     # condition if two VMs are lazily getting their images at the
     # same time.
     temp_file_name = @version.nil? ? @name : "#{@name}-#{@version}"
-    temp_path = File.join(image_root, "#{temp_file_name}#{ext}.tmp")
+    temp_path = File.join(@image_root, "#{temp_file_name}#{ext}.tmp")
     begin
       file_sha256sum = if use_htcat
         htcat_image(url, temp_path)
