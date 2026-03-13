@@ -42,6 +42,24 @@ RSpec.describe StorageArchive do
       }.to raise_error(RuntimeError, "unsupported key encryption algorithm rsa for disk_kek")
     end
 
+    it "does not require disk KEK" do
+      expect {
+        described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0")
+      }.not_to raise_error
+    end
+
+    it "fails when disk KEK is provided without path" do
+      expect {
+        described_class.new(disk_config_path, nil, disk_kek, target_conf, "v0.4.0")
+      }.to raise_error(RuntimeError, "disk KEK provided without path")
+    end
+
+    it "fails when disk KEK path is provided without KEK" do
+      expect {
+        described_class.new(disk_config_path, disk_kek_path, nil, target_conf, "v0.4.0")
+      }.to raise_error(RuntimeError, "disk KEK path provided without KEK")
+    end
+
     it "fails when target archive KEK algorithm is unsupported" do
       invalid_target_conf = target_conf.merge("archive_kek" => {"algorithm" => "rsa", "key" => "Zm9v"})
 
@@ -114,6 +132,60 @@ allow_inline_plaintext_secrets = true
       )
 
       archive.archive
+    end
+
+    it "runs archive command directly when disk KEK path is not set" do
+      archive = described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0")
+      built_config = "[target]\n"
+      allow(archive).to receive(:build_target_config).and_return(built_config)
+
+      expect(archive).to receive(:r).with(
+        {"RUST_LOG" => "info"},
+        "/opt/vhost-block-backend/v0.4.0/archive",
+        "--config", disk_config_path,
+        "--target-config", "/dev/stdin",
+        "--compression", "zstd",
+        "--zstd-level", "3",
+        stdin: built_config
+      )
+
+      archive.archive
+    end
+  end
+
+  describe ".archive_url" do
+    it "downloads image, creates disk with rounded-up size, writes config, and archives" do
+      tmpdir = "/tmp/test-archive-url"
+      boot_image = instance_double(BootImage, image_path: "#{tmpdir}/image.raw")
+      archive_instance = instance_double(described_class)
+      vp = instance_double(VhostBlockBackend, init_metadata_path: "/opt/vhost-block-backend/v0.4.0/init-metadata")
+
+      allow(Dir).to receive(:mktmpdir).and_yield(tmpdir)
+      allow(BootImage).to receive(:new).with("image", nil, image_root: tmpdir).and_return(boot_image)
+      allow(File).to receive(:size).with(boot_image.image_path).and_return(1024 * 1024 * 5 + 1)
+
+      expect(boot_image).to receive(:download).with(url: "https://example.com/image.raw", sha256sum: "abc123")
+      expect(described_class).to receive(:r).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw")
+      expect(described_class).to receive(:safe_write_to_file).with("#{tmpdir}/vhost-backend.conf", <<~CONFIG
+[device]
+data_path = "/tmp/test-archive-url/disk.raw"
+metadata_path = "/tmp/test-archive-url/metadata"
+
+[stripe_source]
+type = "raw"
+image_path = "/tmp/test-archive-url/image.raw"
+
+[danger_zone]
+enabled = true
+allow_unencrypted_disk = true
+      CONFIG
+      )
+      expect(VhostBlockBackend).to receive(:new).with("v0.4.0").and_return(vp)
+      expect(described_class).to receive(:r).with({"RUST_LOG" => "info"}, vp.init_metadata_path, "--config", "#{tmpdir}/vhost-backend.conf")
+      expect(described_class).to receive(:new).with("#{tmpdir}/vhost-backend.conf", nil, nil, target_conf, "v0.4.0").and_return(archive_instance)
+      expect(archive_instance).to receive(:archive)
+
+      described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0")
     end
   end
 end

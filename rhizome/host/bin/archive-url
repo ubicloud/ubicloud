@@ -1,0 +1,29 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/storage_archive"
+
+unless (url = ARGV.shift)
+  puts "expected url as argument"
+  exit 1
+end
+
+unless (sha256sum = ARGV.shift)
+  puts "expected sha256sum as argument"
+  exit 1
+end
+
+unless (vhost_block_backend_version = ARGV.shift)
+  puts "expected vhost_block_backend_version as argument"
+  exit 1
+end
+
+params = JSON.parse($stdin.read)
+
+unless (target_conf = params["target_conf"])
+  puts "expected target_conf in params"
+  exit 1
+end
+
+StorageArchive.archive_url(url, sha256sum, target_conf, vhost_block_backend_version)
