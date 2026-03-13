@@ -95,7 +95,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def destroy
-    register_deadline(nil, 5 * 60)
+    register_deadline(nil, 10 * 60)
     hop_destroy_entities unless nic.nic_aws_resource
 
     begin
