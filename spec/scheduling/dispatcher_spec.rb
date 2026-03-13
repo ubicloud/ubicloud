@@ -304,6 +304,12 @@ RSpec.describe Scheduling::Dispatcher do
       expect(di.instance_variable_get(:@current_strands)).to be_empty
     end
 
+    it "handles ClosedQueueError when strand queue is closed" do
+      Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
+      di.instance_variable_get(:@strand_queue).close
+      expect(di.start_cohort).to be false
+    end
+
     it "returns false and pushes to strand queue if there are strands" do
       st = Strand.create(prog: "Test", label: "wait_exit", schedule: Time.now - 10)
       old_queue = di.instance_variable_get(:@strand_queue)

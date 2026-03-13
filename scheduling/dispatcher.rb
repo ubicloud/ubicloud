@@ -547,6 +547,7 @@ class Scheduling::Dispatcher
         # does, we want to ignore it so the strand thread doesn't exit.
         it.close
       rescue
+        nil
       end
       cache.clear
     end
@@ -564,6 +565,7 @@ class Scheduling::Dispatcher
       @mutex.synchronize { current_strands[strand.id] = true }
       strand_queue.push(strand)
     rescue ClosedQueueError
+      nil
     end
 
     strands.size == 0

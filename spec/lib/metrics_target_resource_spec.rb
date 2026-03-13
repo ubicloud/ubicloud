@@ -172,5 +172,13 @@ RSpec.describe MetricsTargetResource do
       expect(session).to receive(:close)
       expect { resource.close_resource_session }.to change { resource.instance_variable_get(:@session) }.from({ssh_session: session}).to(nil)
     end
+
+    it "does not raise if close raises when closing the session" do
+      session = Net::SSH::Connection::Session.allocate
+      resource.instance_variable_set(:@session, {ssh_session: session})
+      expect(session).to receive(:shutdown!)
+      expect(session).to receive(:close).and_raise(RuntimeError)
+      expect { resource.close_resource_session }.not_to raise_error
+    end
   end
 end

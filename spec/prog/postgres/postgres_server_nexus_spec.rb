@@ -1424,6 +1424,12 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_return("")
       expect(nx.available?).to be(false)
     end
+
+    it "returns false if both health check and log check raise" do
+      expect(server).to receive(:_run_query).with("SELECT 1").and_raise(Sshable::SshError)
+      expect(sshable).to receive(:_cmd).with(a_string_matching(/find.*-mmin -5.*tail -n 50.*grep.*redo in progress/)).and_raise(Sshable::SshError)
+      expect(nx.available?).to be(false)
+    end
   end
 
   describe ".update_stack_lsn" do
