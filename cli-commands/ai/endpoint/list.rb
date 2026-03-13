@@ -4,6 +4,7 @@ UbiCli.on("ai", "endpoint", "list") do
   desc "List inference endpoints"
 
   fields = %w[name display-name hf-model capability multimodal context-length url input-price output-price].freeze
+  default_fields = %w[name capability multimodal context-length input-price output-price].freeze
 
   key = :endpoint_list
 
@@ -30,7 +31,8 @@ UbiCli.on("ai", "endpoint", "list") do
         output_price: price[:per_million_completion_tokens]
       }
     end
-    keys = underscore_keys(check_fields(opts[:fields], fields, "ai endpoint list -f option", command))
+    given = opts[:fields]
+    keys = underscore_keys(given ? check_fields(given, fields, "ai endpoint list -f option", command) : default_fields)
     response(format_rows(keys, items, headers: opts[:"no-headers"] != false))
   end
 end

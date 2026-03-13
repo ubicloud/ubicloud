@@ -1,0 +1,3 @@
+name                         hf-model                     url                
+test-model                   test-org/test-model          http://ie-lb.dpqe2.
+Qwen/Qwen3-VL-235B-Instruct  Qwen/Qwen3-VL-235B-Instruct  http://ie-lb.dpqe2.
