@@ -1,0 +1,60 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "fileutils"
+
+fstab = File.read("/etc/fstab")
+swap_line = fstab.lines.find { |l| l.match?(/\bswap\b/) && !l.match?(/^\s*#/) }
+
+unless swap_line
+  warn "No swap line found in /etc/fstab"
+  exit 1
+end
+
+swap_source = swap_line.split.first
+
+if swap_source == "/dev/mapper/cryptswap"
+  warn "Swap source is already /dev/mapper/cryptswap"
+  exit 1
+end
+
+# Resolve fstab swap source to a concrete device path we can realpath().
+swap_device = swap_source
+  .sub(/\AUUID=/, "/dev/disk/by-uuid/")
+  .sub(/\ALABEL=/, "/dev/disk/by-label/")
+
+# Pick a /dev/disk/by-id symlink that points to swap_device.
+swap_real = File.realpath(swap_device)
+by_id = Dir["/dev/disk/by-id/*"]
+  .find { |p| File.identical?(p, swap_real) }
+
+unless by_id
+  warn "No /dev/disk/by-id entry found for #{swap_device} (real=#{swap_real})"
+  exit 1
+end
+
+r "swapoff", swap_real
+
+# Ephemeral key via /dev/urandom (regenerated each boot); size=512 means AES-256-XTS (XTS halves the key).
+crypttab_entry = "cryptswap #{by_id} /dev/urandom cipher=aes-xts-plain64,size=512,swap,discard\n"
+if File.exist?("/etc/crypttab")
+  # backup crypttab before modifying in case something goes wrong
+  FileUtils.cp("/etc/crypttab", "/etc/crypttab.bak.#{Time.now.to_i}")
+  crypttab = File.read("/etc/crypttab")
+end
+safe_write_to_file("/etc/crypttab", crypttab.gsub(/^cryptswap\s.*\n?/, "") + crypttab_entry.to_s)
+
+# backup fstab before modifying in case something goes wrong
+FileUtils.cp("/etc/fstab", "/etc/fstab.bak.#{Time.now.to_i}")
+safe_write_to_file("/etc/fstab",
+  fstab.sub(swap_line, "/dev/mapper/cryptswap none swap sw 0 0\n"))
+
+# Prevent interactive prompt about existing swap signature on the backing device.
+r "wipefs", "-a", swap_real
+
+# Activate now (boot will recreate via crypttab)
+r "systemctl daemon-reload"
+r "systemctl restart systemd-cryptsetup@cryptswap.service"
+r "mkswap -f /dev/mapper/cryptswap"
+r "swapon -a"
