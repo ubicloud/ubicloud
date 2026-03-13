@@ -339,7 +339,7 @@ class RegenScreenshots
 
     k8s_cluster = KubernetesCluster.create(
       name: "kubernetes-demo",
-      version: "v1.34",
+      version: Option.kubernetes_versions.first,
       cp_node_count: 3,
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",
@@ -395,7 +395,7 @@ class RegenScreenshots
         location_id: k8s_cluster.location.id,
         size: k8s_cluster.target_node_size,
         storage_volumes: nil,
-        boot_image: "kubernetes-v1_34",
+        boot_image: "kubernetes-v1_35",
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,
@@ -410,7 +410,7 @@ class RegenScreenshots
         location_id: k8s_cluster.location.id,
         size: k8s_nodepool.target_node_size,
         storage_volumes: nil,
-        boot_image: "kubernetes-v1_34",
+        boot_image: "kubernetes-v1_35",
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,

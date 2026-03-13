@@ -4,7 +4,7 @@ location: eu-central-h1
 display-state: creating
 cp-node-count: 1
 node-size: standard-2
-version: v1.34
+version: v1.35
 nodepool 1:
   node-size: standard-2
   vm 1:

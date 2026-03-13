@@ -280,6 +280,11 @@ class Prog::DownloadBootImage < Prog::Base
         "20250828.1.0" => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c",
       },
     },
+    "kubernetes-v1_35" => {
+      "x64" => {
+        "20260407.1.0" => "f1a985b5b977a054cb75a0fd4437cb16394fad9777e8fe9b09a4796cc1105cdd",
+      },
+    },
     "gpu-ubuntu-noble" => {
       "x64" => {
         "20251017.1.0" => "b87829c6bc71718ff0dffe2948d2586ca7ff95a02dbb03f68d18ec8c223b312c",
