@@ -56,7 +56,7 @@ end
 #  project_id            | uuid                     |
 #  cache_enabled         | boolean                  | NOT NULL DEFAULT true
 #  use_docker_mirror     | boolean                  | NOT NULL DEFAULT false
-#  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{}'::jsonb
+#  allocator_preferences | jsonb                    | NOT NULL DEFAULT '{"family_filter": ["premium", "standard"]}'::jsonb
 #  created_at            | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
 #  cache_scope_protected | boolean                  | NOT NULL DEFAULT true
 # Indexes:
