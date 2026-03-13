@@ -124,10 +124,29 @@ class Prog::Test::Vm < Prog::Test::Base
 
   label def check_stopped_by_shutdown_command
     if vm.strand.label == "stopped" && !up?
-      hop_start_semaphore_after_shutdown
+      hop_verify_systemd_unit_status_after_shutdown
     end
 
     nap 5
+  end
+
+  label def verify_systemd_unit_status_after_shutdown
+    vm_state = begin
+      vm.vm_host.sshable.cmd("systemctl is-active :inhost_name", inhost_name: vm.inhost_name).strip
+    rescue Sshable::SshError => ex
+      ex.stdout.strip
+    end
+
+    case vm_state
+    when "active"
+      nap 5
+    when "inactive"
+      # nothing
+    else
+      fail_test "VM should be inactive after shutdown command, but is #{vm_state}"
+    end
+
+    hop_start_semaphore_after_shutdown
   end
 
   label def start_semaphore_after_shutdown
