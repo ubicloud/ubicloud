@@ -152,6 +152,17 @@ RSpec.describe MonitorableResource do
       r_w_event_loop.check_pulse
     end
 
+    it "swallows exception if close raises when event loop fails" do
+      session = {ssh_session: Net::SSH::Connection::Session.allocate}
+      r_w_event_loop.instance_variable_set(:@session, session)
+      expect(session[:ssh_session]).to receive(:shutdown!)
+      expect(session[:ssh_session]).to receive(:close).and_raise(RuntimeError)
+      expect(Thread).to receive(:new).and_call_original
+      expect(session[:ssh_session]).to receive(:loop).and_raise(StandardError)
+      expect(Clog).to receive(:emit).at_least(:once).and_call_original
+      r_w_event_loop.check_pulse
+    end
+
     it "swallows exception and logs it if check_pulse fails" do
       session = {ssh_session: Net::SSH::Connection::Session.allocate}
       r_without_event_loop.instance_variable_set(:@session, session)
@@ -264,6 +275,17 @@ RSpec.describe MonitorableResource do
         expect(postgres_server).to receive(:check_pulse).and_raise(ex.class.new("something else"))
         expect(Clog).to receive(:emit).and_call_original
         expect { r_w_event_loop.check_pulse }.not_to raise_error
+      end
+
+      it "continues stale retry even if shutdown! raises" do
+        session[:last_pulse] = Time.now - 10
+        expect(postgres_server).to receive(:check_pulse).and_raise(ex)
+        second_session = Net::SSH::Connection::Session.allocate
+        expect(postgres_server).to receive(:init_health_monitor_session).and_return(second_session)
+        expect(session[:ssh_session]).to receive(:shutdown!).and_raise(RuntimeError)
+        expect(session).to receive(:merge!).with(second_session)
+        expect(postgres_server).to receive(:check_pulse).and_return({reading: "up", reading_rpt: 1})
+        r_w_event_loop.check_pulse
       end
     end
   end

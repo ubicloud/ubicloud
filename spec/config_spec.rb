@@ -41,4 +41,9 @@ RSpec.describe Config do
       end
     }.to raise_error("invalid uuid invalid")
   end
+
+  it "ignores LoadError when .env.rb is not present" do
+    allow_any_instance_of(Object).to receive(:require_relative).with(".env").and_raise(LoadError)
+    expect { load(File.expand_path("../config.rb", __dir__)) }.not_to raise_error
+  end
 end
