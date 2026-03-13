@@ -435,7 +435,7 @@ RSpec.describe VmSetup do
         %w[
           --api-socket path=/tmp/ch.sock \
           --kernel /opt/fw/CLOUDHV-202311.fd \
-          --disk path=/vm/test/cloudinit.img \
+          --disk path=/vm/test/cloudinit.img,readonly=on \
           --console off --serial file=/vm/test/serial.log \
           --cpus boot=2,topology=1:1:1:2 \
           --memory size=2G,hugepages=on,hugepage_size=1G \
