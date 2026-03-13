@@ -9,7 +9,17 @@ require "openssl"
 
 class CloverAdmin < Roda
   # :nocov:
-  plugin :exception_page if Config.development?
+  if Config.development?
+    plugin :exception_page
+
+    class RodaRequest
+      def assets
+        exception_page_assets
+        super
+      end
+    end
+  end
+
   default_fixed_locals = if Config.production? || Config.frozen_test?
     "()"
   # :nocov:
@@ -88,6 +98,10 @@ class CloverAdmin < Roda
   end
 
   plugin :error_handler do |e|
+    # :nocov:
+    next exception_page(e, assets: true) if Config.development?
+    # :nocov:
+
     raise e if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
 
     Clog.emit("admin route exception", Util.exception_to_hash(e))
