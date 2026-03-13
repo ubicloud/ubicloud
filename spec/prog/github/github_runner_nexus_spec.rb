@@ -76,6 +76,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "uses the existing vm if pool can pick one" do
+      installation.update(allocator_preferences: {})
       pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
       vm = create_vm(pool_id: pool.id, display_state: "running")
       picked_vm = nx.pick_vm
