@@ -19,24 +19,6 @@ class PostgresTimeline < Sequel::Model
     ubid
   end
 
-  def generate_walg_config(version)
-    walg_credentials = if access_key
-      <<-WALG_CONF
-AWS_ACCESS_KEY_ID=#{access_key}
-AWS_SECRET_ACCESS_KEY=#{secret_key}
-      WALG_CONF
-    end
-    <<-WALG_CONF
-WALG_S3_PREFIX=s3://#{ubid}
-AWS_ENDPOINT=#{blob_storage_endpoint}
-#{walg_credentials}
-AWS_REGION=#{walg_config_region}
-AWS_S3_FORCE_PATH_STYLE=true
-PGHOST=/var/run/postgresql
-PGDATA=/dat/#{version}/data
-    WALG_CONF
-  end
-
   def need_backup?
     return false if blob_storage.nil?
     return false if leader.nil?
@@ -126,7 +108,6 @@ end
 #  latest_backup_started_at  | timestamp with time zone |
 #  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
-#  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
