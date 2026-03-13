@@ -848,11 +848,11 @@ class CloverAdmin < Roda
       @query = typecast_params.str!("q")
       prefix, term = @query.split(":", 2)
 
-      if term.nil? || term.empty?
+      terms = term&.split(",")&.map(&:strip)&.reject(&:empty?)
+      if terms.nil? || terms.empty?
         flash.now["error"] = "Use prefix:term syntax to search (e.g. vm:name). Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
         next view("search")
       end
-      term.strip!
 
       klass = UBID.class_for_ubid(prefix)
       columns = klass && SEARCH_QUERIES[klass.name]
@@ -860,8 +860,10 @@ class CloverAdmin < Roda
         flash.now["error"] = "Unknown prefix: #{h(prefix)}. Available prefixes: #{SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ")}"
         next view("search")
       end
-      pattern = "%#{klass.dataset.escape_like(term)}%"
-      condition = columns.map { Sequel.cast(it, :text).ilike(pattern) }.reduce(:|)
+      condition = terms.map { |t|
+        pattern = "%#{klass.dataset.escape_like(t)}%"
+        columns.map { Sequel.cast(it, :text).ilike(pattern) }.reduce(:|)
+      }.reduce(:|)
       @search_results = klass.where(condition).limit(10).all
 
       if @search_results.length == 1
