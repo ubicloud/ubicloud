@@ -37,17 +37,29 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   label def create_network_interface
-    network_interface_response = client.create_network_interface({
-      subnet_id: nic.nic_aws_resource.subnet_id,
-      private_ip_address: nic.private_ipv4.network.to_s,
-      ipv_6_prefix_count: 1,
-      groups: [
-        private_subnet.private_subnet_aws_resource.security_group_id
-      ],
-      tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
-      client_token: nic.id
-    })
-    network_interface_id = network_interface_response.network_interface.network_interface_id
+    begin
+      network_interface_response = client.create_network_interface({
+        subnet_id: nic.nic_aws_resource.subnet_id,
+        private_ip_address: nic.private_ipv4.network.to_s,
+        ipv_6_prefix_count: 1,
+        groups: [
+          private_subnet.private_subnet_aws_resource.security_group_id
+        ],
+        tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
+        client_token: nic.id
+      })
+      network_interface_id = network_interface_response.network_interface.network_interface_id
+    rescue Aws::EC2::Errors::InvalidIPAddressInUse
+      network_interfaces = client.describe_network_interfaces({
+        filters: [
+          {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
+          {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
+          {name: "status", values: ["available"]}
+        ]
+      }).network_interfaces
+      fail "No available network interface found for IP #{nic.private_ipv4.network}" if network_interfaces.empty?
+      network_interface_id = network_interfaces[0].network_interface_id
+    end
     nic.nic_aws_resource.update(network_interface_id:)
 
     hop_assign_ipv6_address
