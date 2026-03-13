@@ -29,8 +29,7 @@ RSpec.describe Clover, "cli ai endpoint list" do
   it "shows list of inference endpoints" do
     ie
 
-    url = ie.load_balancer.health_check_url
-    expect(cli(%w[ai endpoint list -N])).to eq "test-model  Test Model  test-org/test-model  Text Generation      #{url}  0.05  0.05\n"
+    expect(cli(%w[ai endpoint list -N])).to eq "test-model  Text Generation      0.05  0.05\n"
   end
 
   it "-f name option shows only name" do
@@ -42,9 +41,8 @@ RSpec.describe Clover, "cli ai endpoint list" do
   it "headers are shown by default" do
     ie
 
-    url = ie.load_balancer.health_check_url
     expect(cli(%w[ai endpoint list])).to eq \
-      "name        display-name  hf-model             capability       multimodal  context-length  url#{" " * (url.length - 3)}  input-price  output-price\n" \
-      "test-model  Test Model    test-org/test-model  Text Generation                              #{url}  0.05         0.05        \n"
+      "name        capability       multimodal  context-length  input-price  output-price\n" \
+      "test-model  Text Generation                              0.05         0.05        \n"
   end
 end
