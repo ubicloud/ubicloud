@@ -15,7 +15,7 @@ module Option
   end
 
   def self.kubernetes_versions
-    ["v1.34", "v1.33"].freeze
+    ["v1.35", "v1.34", "v1.33"].freeze
   end
 
   def self.families
