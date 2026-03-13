@@ -2,27 +2,40 @@
 # frozen_string_literal: true
 
 require "json"
-require "fileutils"
-require_relative "../../common/lib/util"
 require_relative "../lib/storage_archive"
-require_relative "../lib/vhost_block_backend"
 require_relative "../lib/storage_path"
+
+unless (vm_name = ARGV.shift)
+  puts "expected vm_name as argument"
+  exit 1
+end
+
+unless (device = ARGV.shift)
+  puts "expected device as argument"
+  exit 1
+end
+
+unless (disk_index = ARGV.shift)
+  puts "expected disk_index as argument"
+  exit 1
+end
+
+unless (vhost_block_backend_version = ARGV.shift)
+  puts "expected vhost_block_backend_version as argument"
+  exit 1
+end
 
 params = JSON.parse($stdin.read)
 
-validate_keys(
-  "archive-storage-volume parameters",
-  %w[vm_name device disk_index kek target_conf vhost_block_backend_version],
-  [],
-  params
-)
+unless (target_conf = params["target_conf"])
+  puts "expected target_conf in parameters"
+  exit 1
+end
 
-vm_name = params.fetch("vm_name")
-device = params.fetch("device")
-disk_index = params.fetch("disk_index")
-kek = params.fetch("kek")
-target_conf = params.fetch("target_conf")
-vhost_block_backend_version = params.fetch("vhost_block_backend_version")
+unless (kek = params["kek"])
+  puts "expected kek in parameters"
+  exit 1
+end
 
 storage_path = StoragePath.new(vm_name, device, disk_index)
 StorageArchive.new(
