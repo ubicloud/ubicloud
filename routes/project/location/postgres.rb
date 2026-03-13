@@ -483,7 +483,7 @@ class Clover
 
         next unless (certs = pg.ca_certificates)
 
-        response.headers["content-disposition"] = "attachment; filename=\"#{pg.name}.pem\""
+        response.attachment "#{pg.name}.pem"
         response.content_type = :pem
         certs
       end

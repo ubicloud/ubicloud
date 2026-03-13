@@ -329,7 +329,7 @@ RSpec.describe Clover, "Kubernetes" do
 
         visit "#{project.path}#{kc.path}/kubeconfig"
 
-        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Type"]).to eq("text/yaml")
         expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
         expect(page.body).to eq("kubeconfig content")
       end
@@ -354,7 +354,7 @@ RSpec.describe Clover, "Kubernetes" do
         expect(KubernetesCluster).to receive(:kubeconfig).and_return "mocked kubeconfig content"
 
         visit "#{project.path}#{kc.path}/kubeconfig"
-        expect(page.response_headers["Content-Type"]).to eq("text/plain")
+        expect(page.response_headers["Content-Type"]).to eq("text/yaml")
         expect(page.response_headers["Content-Disposition"]).to include("attachment; filename=\"#{kc.name}-kubeconfig.yaml\"")
         expect(page.body).to eq("mocked kubeconfig content")
       end
