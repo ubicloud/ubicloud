@@ -55,6 +55,10 @@ module Authorization
       .where(project_id:)
   end
 
+  private def subject_match_predicate(subject_id)
+    Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] })
+  end
+
   # Used to avoid dynamic symbol creation at runtime
   RECURSIVE_TAG_QUERY_MAP = {
     subject: [:applied_subject_tag, :subject_id],
@@ -95,7 +99,7 @@ module Authorization
 
     if subject_id
       subject_id = subject_id.id if subject_id.is_a?(Sequel::Model)
-      dataset = dataset.where(Sequel.or([subject_id, recursive_tag_query(:subject, subject_id)].map { [:subject_id, it] }))
+      dataset = dataset.where(subject_match_predicate(subject_id))
     end
 
     if actions
