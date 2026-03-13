@@ -783,6 +783,7 @@ SQL
       postgres_server.run_query("SELECT 1")
       return true
     rescue
+      nil
     end
     # Do not declare unavailability if Postgres is in crash recovery.
     # Check if log file was modified recently and last 50 lines contain recovery messages.
@@ -790,6 +791,7 @@ SQL
       log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/postgresql.log -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
       return true unless log_output.empty?
     rescue
+      nil
     end
 
     false
