@@ -17,7 +17,7 @@ UbiCli.on("vm").run_on("create") do
     on("-u", "--unix-user=username", "username (default: ubi)")
   end
   help_option_values("Boot Image:", Option::BootImages.map(&:name))
-  help_option_values("Size:", server_sizes)
+  help_option_values("Size:") { server_sizes }
   help_option_values("Storage Size:", storage_sizes)
 
   help_example 'ubi vm eu-central-h1/my-vm-name create "$(cat ~/.ssh/id_ed25519.pub)"'
