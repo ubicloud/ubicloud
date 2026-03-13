@@ -777,7 +777,7 @@ SQL
     vm.sshable.invalidate_cache_entry
 
     # Don't declare unavailability if we are upgrading.
-    return true if resource.version != resource.target_version && postgres_server == resource.upgrade_candidate_server
+    return true if resource.version != resource.target_version && postgres_server.id == resource.upgrade_candidate_server.id
 
     begin
       postgres_server.run_query("SELECT 1")
