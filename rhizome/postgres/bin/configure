@@ -27,11 +27,11 @@ safe_write_to_file("/etc/hosts", hosts)
 
 # Update postgresql.conf
 configs = configure_hash["configs"].map { |k, v| "#{k} = #{v}" }.join("\n")
-safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/001-service.conf", configs)
+safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/001-service.conf", configs + "\n")
 
 # Update postgresql.conf with custom settings
 user_configs = configure_hash["user_config"].map { |k, v| "#{k} = #{v}" }.join("\n")
-safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/099-user.conf", user_configs)
+safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/099-user.conf", user_configs + "\n")
 
 # Update pg_hba.conf
 private_subnets = configure_hash["private_subnets"].flat_map {
