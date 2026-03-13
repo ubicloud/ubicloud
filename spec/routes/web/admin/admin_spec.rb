@@ -168,13 +168,13 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link(account2.admin_label)
   end
 
-  it "shows truncation warning when a model has 10 or more results" do
-    10.times { |i| GithubInstallation.create(name: "trunctest-#{i}", installation_id: 800 + i, type: "User") }
+  it "shows truncation warning when a model has more than 10 results" do
+    11.times { |i| GithubInstallation.create(name: "trunctest-#{i}", installation_id: 800 + i, type: "User") }
 
     fill_in "UBID, UUID, or prefix:term", with: "g1:trunctest"
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Search"
-    expect(page).to have_content "Results may be truncated"
+    expect(page).to have_content "Results are truncated"
   end
 
   it "shows error for unknown search prefix" do
