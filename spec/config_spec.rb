@@ -43,7 +43,15 @@ RSpec.describe Config do
   end
 
   it "ignores LoadError when .env.rb is not present" do
-    allow_any_instance_of(Object).to receive(:require_relative).with(".env").and_raise(LoadError)
-    expect { load(File.expand_path("../config.rb", __dir__)) }.not_to raise_error
+    main = TOPLEVEL_BINDING.eval("self")
+    expect(main).to receive(:require_relative).with("lib/casting_config_helpers")
+    expect(main).to receive(:require_relative).with(".env").and_raise(LoadError)
+    expect(ENV).to receive(:[]) do |k|
+      throw :skip, k
+    end
+    value = catch(:skip) do
+      expect { load(File.expand_path("../config.rb", __dir__)) }.not_to raise_error
+    end
+    expect(value).to eq "SYNC"
   end
 end
