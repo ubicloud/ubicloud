@@ -3740,7 +3740,7 @@ components:
     Kubeconfig:
       description: A Kubernetes Cluster configuration file
       content:
-        text/plain:
+        text/yaml:
           schema: {}
     KubernetesCluster:
       description: A KubernetesCluster
