@@ -9,7 +9,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   extend Forwardable
 
-  def_delegators :postgres_server, :vm
+  def_delegators :postgres_server, :vm, :resource
 
   def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
     DB.transaction do
@@ -82,7 +82,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def before_run
     when_destroy_set? do
-      is_destroying = ["destroy", nil].include?(postgres_server.resource&.strand&.label)
+      is_destroying = ["destroy", nil].include?(resource&.strand&.label)
 
       if is_destroying || !postgres_server.taking_over?
         if !%w[destroy wait_children_destroy destroy_vm_and_pg].include?(strand.label)
@@ -156,12 +156,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def run_init_script
-    hop_configure_walg_credentials unless postgres_server.resource.init_script
+    hop_configure_walg_credentials unless resource.init_script
     case vm.sshable.d_check("run_init_script")
     when "Succeeded"
       hop_configure_walg_credentials
     when "Failed", "NotStarted"
-      vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: postgres_server.resource.init_script.init_script.gsub("\r\n", "\n"))
+      vm.sshable.cmd("sudo tee postgres/bin/init_script.sh > /dev/null", stdin: resource.init_script.init_script.gsub("\r\n", "\n"))
       vm.sshable.cmd("sudo chmod +x postgres/bin/init_script.sh")
       role = if postgres_server.primary?
         "primary"
@@ -172,7 +172,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         "restore"
       end
-      vm.sshable.d_run("run_init_script", "./postgres/bin/init_script.sh", role, stdin: postgres_server.resource.name)
+      vm.sshable.d_run("run_init_script", "./postgres/bin/init_script.sh", role, stdin: resource.name)
     end
 
     nap 5
@@ -204,7 +204,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
       else
-        postgres_server.timeline.latest_backup_label_before_target(target: postgres_server.resource.restore_target)
+        postgres_server.timeline.latest_backup_label_before_target(target: resource.restore_target)
       end
       vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label)
     end
@@ -215,12 +215,12 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def refresh_certificates
     decr_refresh_certificates
 
-    nap 5 if postgres_server.resource.server_cert.nil?
+    nap 5 if resource.server_cert.nil?
 
-    ca_bundle = [postgres_server.resource.ca_certificates, postgres_server.resource.trusted_ca_certs].compact.join("\n")
+    ca_bundle = [resource.ca_certificates, resource.trusted_ca_certs].compact.join("\n")
     vm.sshable.write_file("/etc/ssl/certs/ca.crt", ca_bundle)
-    vm.sshable.write_file("/etc/ssl/certs/server.crt", postgres_server.resource.server_cert)
-    vm.sshable.write_file("/etc/ssl/certs/server.key", postgres_server.resource.server_cert_key)
+    vm.sshable.write_file("/etc/ssl/certs/server.crt", resource.server_cert)
+    vm.sshable.write_file("/etc/ssl/certs/server.key", resource.server_cert_key)
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/ca.crt && sudo chmod 640 /etc/ssl/certs/ca.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.crt && sudo chmod 640 /etc/ssl/certs/server.crt")
     vm.sshable.cmd("sudo chgrp cert_readers /etc/ssl/certs/server.key && sudo chmod 640 /etc/ssl/certs/server.key")
@@ -247,7 +247,7 @@ tls_server_config:
 CONFIG
     vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
-    metric_destinations = postgres_server.resource.metric_destinations.map {
+    metric_destinations = resource.metric_destinations.map {
       <<METRIC_DESTINATION
 - url: '#{it.url}'
   basic_auth:
@@ -260,8 +260,8 @@ METRIC_DESTINATION
 global:
   scrape_interval: 10s
   external_labels:
-    ubicloud_resource_id: #{postgres_server.resource.ubid}
-    ubicloud_resource_role: #{(postgres_server.id == postgres_server.resource.representative_server.id) ? "primary" : "standby"}
+    ubicloud_resource_id: #{resource.ubid}
+    ubicloud_resource_role: #{(postgres_server.id == resource.representative_server.id) ? "primary" : "standby"}
 
 scrape_configs:
 - job_name: node
@@ -320,9 +320,9 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now node_exporter")
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
-      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !postgres_server.resource.use_old_walg_command_set?
+      vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
 
-      hop_setup_cloudwatch if postgres_server.timeline.aws? && postgres_server.resource.project.get_ff_aws_cloudwatch_logs
+      hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
       hop_setup_hugepages
     end
 
@@ -392,7 +392,7 @@ CONFIG
       hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
 
       if postgres_server.primary?
-        postgres_server.resource.servers.select { it.standby? && it.synchronization_status == "ready" && !it.physical_slot_ready }.each do |standby|
+        resource.servers.select { it.standby? && it.synchronization_status == "ready" && !it.physical_slot_ready }.each do |standby|
           standby.incr_use_physical_slot
           standby.incr_configure
         end
@@ -418,7 +418,7 @@ CONFIG
       # This uses PostgreSQL's PQencryptPasswordConn function, but it needs a connection, because
       # the encryption is made by PostgreSQL, not by control plane. We use our own control plane
       # database to do the encryption.
-      conn.encrypt_password(postgres_server.resource.superuser_password, "postgres", "scram-sha-256")
+      conn.encrypt_password(resource.superuser_password, "postgres", "scram-sha-256")
     end
     commands = DB[<<SQL, encrypted_password:]
 BEGIN;
@@ -465,14 +465,14 @@ SQL
 
     postgres_server.update(synchronization_status: "ready")
 
-    postgres_server.resource.representative_server.incr_configure
-    hop_wait_synchronization if postgres_server.resource.ha_type == PostgresResource::HaType::SYNC
+    resource.representative_server.incr_configure
+    hop_wait_synchronization if resource.ha_type == PostgresResource::HaType::SYNC
     hop_wait
   end
 
   label def wait_synchronization
     query = DB["SELECT sync_state FROM pg_stat_replication WHERE application_name = :ubid", ubid: postgres_server.ubid]
-    sync_state = postgres_server.resource.representative_server.run_query(query).chomp
+    sync_state = resource.representative_server.run_query(query).chomp
     hop_wait if ["quorum", "sync"].include?(sync_state)
 
     nap 30
@@ -567,7 +567,7 @@ SQL
       postgres_server.attach_s3_policy_if_needed
     end
 
-    if postgres_server.read_replica? && postgres_server.resource.parent
+    if postgres_server.read_replica? && resource.parent
       nap 60 if postgres_server.lsn_caught_up
 
       lsn = postgres_server.current_lsn
@@ -601,7 +601,7 @@ SQL
       hop_lockout
     end
 
-    nap 0 if postgres_server.resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
+    nap 0 if resource.ongoing_failover? || postgres_server.trigger_failover(mode: "unplanned")
 
     when_configure_set? do
       decr_configure
@@ -669,13 +669,13 @@ SQL
   label def prepare_for_unplanned_take_over
     decr_unplanned_take_over
 
-    postgres_server.resource.representative_server.incr_lockout
+    resource.representative_server.incr_lockout
 
     hop_wait_representative_lockout
   end
 
   label def wait_representative_lockout
-    hop_taking_over if postgres_server.resource.representative_server.strand.label == "wait_locked_out"
+    hop_taking_over if resource.representative_server.strand.label == "wait_locked_out"
 
     nap 1
   end
@@ -685,7 +685,7 @@ SQL
 
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless postgres_server.resource.location.aws?
+    unless resource.location.aws?
       bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
     end
 
@@ -712,36 +712,36 @@ SQL
   label def prepare_for_planned_take_over
     decr_planned_take_over
 
-    postgres_server.resource.representative_server.incr_fence
+    resource.representative_server.incr_fence
     hop_wait_fencing_of_old_primary
   end
 
   label def wait_fencing_of_old_primary
-    hop_taking_over if postgres_server.resource.representative_server.strand.label == "wait_in_fence"
+    hop_taking_over if resource.representative_server.strand.label == "wait_in_fence"
 
     nap 1
   end
 
   label def taking_over
     if postgres_server.read_replica?
-      postgres_server.resource.representative_server.update(is_representative: false)
+      resource.representative_server.update(is_representative: false)
       postgres_server.reload.update(is_representative: true, synchronization_status: "ready")
-      postgres_server.resource.servers.each(&:incr_configure_metrics)
-      postgres_server.resource.incr_refresh_dns_record
+      resource.servers.each(&:incr_configure_metrics)
+      resource.incr_refresh_dns_record
       hop_configure
     end
 
     case vm.sshable.d_check("promote_postgres")
     when "Succeeded"
       Page.from_tag_parts("PGPromotionFailed", postgres_server.id)&.incr_resolve
-      postgres_server.resource.representative_server.update(is_representative: false)
-      postgres_server.resource.representative_server.incr_destroy
+      resource.representative_server.update(is_representative: false)
+      resource.representative_server.incr_destroy
       postgres_server.update(timeline_access: "push", is_representative: true, synchronization_status: "ready")
-      postgres_server.resource.incr_refresh_dns_record
-      postgres_server.resource.servers.each(&:incr_configure)
-      postgres_server.resource.servers.each(&:incr_configure_metrics)
-      postgres_server.resource.servers.each(&:incr_restart)
-      postgres_server.resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
+      resource.incr_refresh_dns_record
+      resource.servers.each(&:incr_configure)
+      resource.servers.each(&:incr_configure_metrics)
+      resource.servers.each(&:incr_restart)
+      resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed"
       Prog::PageNexus.assemble("#{postgres_server.ubid} promotion failed",
@@ -777,7 +777,7 @@ SQL
     vm.sshable.invalidate_cache_entry
 
     # Don't declare unavailability if we are upgrading.
-    return true if postgres_server.resource.version != postgres_server.resource.target_version && postgres_server == postgres_server.resource.upgrade_candidate_server
+    return true if resource.version != resource.target_version && postgres_server.id == resource.upgrade_candidate_server.id
 
     begin
       postgres_server.run_query("SELECT 1")
