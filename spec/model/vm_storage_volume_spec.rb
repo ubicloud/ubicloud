@@ -14,6 +14,24 @@ RSpec.describe VmStorageVolume do
     expect(described_class.new(disk_index: 2, vm:).device_path).to eq("/dev/nvme2n1")
   end
 
+  it "can render a boot disk device_path for gcp" do
+    prj = Project.create(name: "test-project-gcp")
+    vm = Vm.new(family: "c3d-standard", vcpus: 8, location: Location.create(name: "us-central1", provider: "gcp", project_id: prj.id, display_name: "gcp-us-central1", ui_name: "GCP US Central 1", visible: true)).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
+    expect(described_class.new(disk_index: 0, boot: true, vm:).device_path).to eq("/dev/disk/by-id/google-persistent-disk-0")
+  end
+
+  it "can render a data disk device_path for gcp with local NVMe SSD" do
+    prj = Project.create(name: "test-project-gcp-lssd")
+    vm = Vm.new(family: "c3d-standard", vcpus: 8, location: Location.create(name: "us-central1-lssd", provider: "gcp", project_id: prj.id, display_name: "gcp-us-central1", ui_name: "GCP US Central 1", visible: true)).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
+    expect(described_class.new(disk_index: 1, boot: false, vm:).device_path).to eq("/dev/disk/by-id/google-local-nvme-ssd-0")
+  end
+
+  it "#provider_dispatcher_group_name delegates through vm location" do
+    vm = Vm.new(location: Location[Location::HETZNER_FSN1_ID]).tap { it.id = "eb3dbcb3-2c90-8b74-8fb4-d62a244d7ae5" }
+    v = described_class.new(disk_index: 0, vm:)
+    expect(v.provider_dispatcher_group_name).to eq("metal")
+  end
+
   it "returns correct spdk version if exists associated installation" do
     si = SpdkInstallation.new(version: "some-version")
     v = described_class.new(disk_index: 7)

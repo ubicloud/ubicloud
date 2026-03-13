@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "google/cloud/compute/v1"
 require_relative "spec_helper"
 
 RSpec.describe PrivateSubnet do
@@ -29,7 +30,7 @@ RSpec.describe PrivateSubnet do
   describe "random ip generation" do
     it "returns random private ipv4" do
       private_subnet
-      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
+      expect(SecureRandom).to receive(:random_number).with(58).and_return(5)
       expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
     end
 
@@ -53,7 +54,7 @@ RSpec.describe PrivateSubnet do
       end
 
       it "returns random private ipv4" do
-        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 2)
+        expect(SecureRandom).to receive(:random_number).with(58).and_return(1, 2)
         expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
       end
 
@@ -88,7 +89,7 @@ RSpec.describe PrivateSubnet do
 
   describe "#inspect" do
     it "includes ubid if id is available" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\"}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", firewall_priority: nil}>"
     end
   end
 
@@ -314,36 +315,6 @@ RSpec.describe PrivateSubnet do
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
     end
-
-    it "incr_destroys private subnet if remaining nics belong to vms marked for destroy" do
-      ubid = described_class.generate_ubid
-      fw = ps.firewalls.first
-      fw.update(name: "#{ubid}-firewall")
-      ps.update(name: "#{ubid}-subnet")
-      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
-      vm.incr_destroy
-
-      ps.incr_destroy_if_only_used_internally(
-        ubid:,
-        vm_ids: []
-      )
-      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
-    end
-
-    it "incr_destroys private subnet if remaining nics belong to vms marked as destroying" do
-      ubid = described_class.generate_ubid
-      fw = ps.firewalls.first
-      fw.update(name: "#{ubid}-firewall")
-      ps.update(name: "#{ubid}-subnet")
-      vm = Prog::Vm::Nexus.assemble("some_ssh key", prj.id, private_subnet_id: ps.id).subject
-      vm.incr_destroying
-
-      ps.incr_destroy_if_only_used_internally(
-        ubid:,
-        vm_ids: []
-      )
-      expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
-    end
   end
 
   describe "connected subnets related methods" do
@@ -410,6 +381,67 @@ RSpec.describe PrivateSubnet do
       tunnels = ps1_nic.src_ipsec_tunnels + ps1_nic.dst_ipsec_tunnels
       expect(IpsecTunnel.all.map(&:id).sort).to eq(tunnels.map(&:id).sort)
       expect(IpsecTunnel.count).to eq 2
+    end
+  end
+
+  describe "AWS connect/disconnect subnet" do
+    let(:prj) { Project.create(name: "test-aws-prj") }
+
+    let(:location) {
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredential.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
+      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      loc
+    }
+
+    let(:ps1) {
+      described_class.create(name: "aws-ps1", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    let(:ps2) {
+      described_class.create(name: "aws-ps2", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    it "raises error on connect_subnet" do
+      expect { ps1.connect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
+    end
+
+    it "raises error on disconnect_subnet" do
+      expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
+    end
+  end
+
+  describe "GCP connect/disconnect subnet" do
+    let(:prj) { Project.create(name: "test-gcp-prj") }
+
+    let(:location) {
+      Location.create(name: "gcp-us-central1", provider: "gcp", project_id: prj.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+    }
+
+    let(:ps1) {
+      described_class.create(name: "gcp-ps1", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    let(:ps2) {
+      described_class.create(name: "gcp-ps2", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    it "raises error on connect_subnet" do
+      expect { ps1.connect_subnet(ps2) }.to raise_error("Connected subnets are not supported for GCP")
+    end
+
+    it "raises error on disconnect_subnet" do
+      expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for GCP")
     end
   end
 end

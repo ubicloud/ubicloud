@@ -127,6 +127,7 @@ end
 #  location_id               | uuid                     |
 #  cached_earliest_backup_at | timestamp with time zone |
 #  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
+#  backup_period_hours       | smallint                 | NOT NULL DEFAULT 24
 # Indexes:
 #  postgres_timeline_pkey | PRIMARY KEY btree (id)
 # Foreign key constraints:
