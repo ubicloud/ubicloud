@@ -490,7 +490,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard", "premium"]
+        family_filter: ["premium", "standard"]
       )
       expect { nx.start }.to hop("create_unix_user")
     end

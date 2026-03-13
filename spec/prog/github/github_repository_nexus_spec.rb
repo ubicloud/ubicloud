@@ -149,28 +149,29 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     end
 
     it "deletes oldest cache entries if the total usage exceeds the default limit" do
-      twenty_nine_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 29 * 1024 * 1024 * 1024)
+      ninety_nine_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 99 * 1024 * 1024 * 1024)
       two_gib_cache = create_cache_entry(created_at: now - 11 * 60, size: 2 * 1024 * 1024 * 1024)
       three_gib_cache = create_cache_entry(created_at: now - 12 * 60, size: 3 * 1024 * 1024 * 1024)
-      expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: twenty_nine_gib_cache.blob_key)
+      expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: ninety_nine_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: two_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: three_gib_cache.blob_key)
       nx.cleanup_cache
     end
 
     it "excludes uncommitted cache entries" do
-      thirty_two_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 32 * 1024 * 1024 * 1024)
+      hundred_two_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 102 * 1024 * 1024 * 1024)
       create_cache_entry(created_at: now - 13 * 60, size: nil)
-      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: thirty_two_gib_cache.blob_key)
+      expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: hundred_two_gib_cache.blob_key)
       nx.cleanup_cache
     end
 
     it "deletes oldest cache entries if the total usage exceeds the custom limit" do
+      repository.installation.update(allocator_preferences: {})
       repository.installation.project.add_quota(quota_id: ProjectQuota.default_quotas["GithubRunnerCacheStorage"]["id"], value: 20)
-      nine_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 19 * 1024 * 1024 * 1024)
+      nineteen_gib_cache = create_cache_entry(created_at: now - 10 * 60, size: 19 * 1024 * 1024 * 1024)
       two_gib_cache = create_cache_entry(created_at: now - 11 * 60, size: 2 * 1024 * 1024 * 1024)
       three_gib_cache = create_cache_entry(created_at: now - 12 * 60, size: 3 * 1024 * 1024 * 1024)
-      expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: nine_gib_cache.blob_key)
+      expect(blob_storage_client).not_to receive(:delete_object).with(bucket:, key: nineteen_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: two_gib_cache.blob_key)
       expect(blob_storage_client).to receive(:delete_object).with(bucket:, key: three_gib_cache.blob_key)
       nx.cleanup_cache
