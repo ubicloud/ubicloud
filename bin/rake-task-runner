@@ -82,12 +82,13 @@ SQL
   end
 when "refresh_sequel_caches"
   require_args.call(0..0)
-  require_relative "../loader"
 
   %w[schema index static_cache pg_auto_constraint_validations].each do |type|
     filename = "cache/#{type}.cache"
     File.delete(filename) if File.file?(filename)
   end
+
+  require_relative "../loader"
 
   DB.dump_schema_cache("cache/schema.cache")
   DB.dump_index_cache("cache/index.cache")
