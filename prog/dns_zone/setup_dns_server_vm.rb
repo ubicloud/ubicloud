@@ -148,15 +148,17 @@ zone:
   label def sync_zones
     nap 5 if ds.dns_zones.any?(&:refresh_dns_servers_set?)
 
+    all_sshables = ds.vms.map(&:sshable) + [sshable]
+
     ds.dns_zones.each do |dz|
       zone_config = <<-CONF
 #{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
 #{dz.name}.          3600    NS      #{ds.name}.
       CONF
-      sshable.write_file("/var/lib/knot/#{dz.name}.zone", zone_config, user: "knot")
+      all_sshables.each { |s| s.write_file("/var/lib/knot/#{dz.name}.zone", zone_config, user: "knot") }
     end
 
-    sshable.cmd "sudo systemctl restart knot"
+    all_sshables.each { |s| s.cmd "sudo systemctl restart knot" }
 
     ds.dns_zones.each(&:purge_obsolete_records)
 
@@ -167,8 +169,8 @@ zone:
         end + ["zone-commit #{dz.name}", "zone-flush #{dz.name}"]
     end
 
-    # Put records
-    sshable.cmd("sudo -u knot knotc", stdin: commands.join("\n"))
+    # Put records on all VMs
+    all_sshables.each { |s| s.cmd("sudo -u knot knotc", stdin: commands.join("\n")) }
 
     hop_validate
   end
