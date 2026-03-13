@@ -111,7 +111,7 @@ class PostgresServer < Sequel::Model
 
       if standby?
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
-        configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready
+        configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready_id == resource.representative_server.id
       end
 
       if doing_pitr?
@@ -210,7 +210,7 @@ class PostgresServer < Sequel::Model
       .reject { it.is_representative }
       .select { it.strand.label == "wait" && !it.needs_recycling? }
       .map { {server: it, lsn: it.current_lsn} }
-      .max_by { [it[:server].physical_slot_ready ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
+      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
 
     return nil if target.nil?
 
@@ -506,8 +506,8 @@ end
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
 #  version                | text                     | NOT NULL
-#  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
+#  physical_slot_ready_id | uuid                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE
