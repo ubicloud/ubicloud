@@ -157,6 +157,17 @@ RSpec.describe CloverAdmin do
     expect(page).to have_link(account2.admin_label)
   end
 
+  it "searches with multiple comma-separated terms" do
+    account1 = create_account("alice@example.com")
+    account2 = create_account("bob@test.com")
+
+    fill_in "UBID, UUID, or prefix:term", with: "ac:alice@example.com,bob@test.com"
+    click_button "Show Object"
+    expect(page.title).to eq "Ubicloud Admin - Search"
+    expect(page).to have_link(account1.admin_label)
+    expect(page).to have_link(account2.admin_label)
+  end
+
   it "shows truncation warning when a model has 10 or more results" do
     10.times { |i| GithubInstallation.create(name: "trunctest-#{i}", installation_id: 800 + i, type: "User") }
 
