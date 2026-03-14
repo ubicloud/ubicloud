@@ -36,8 +36,8 @@ class PostgresServer < Sequel::Model
     rescue ::Aws::IAM::Errors::NoSuchEntity
     end
 
-    def aws_increment_s3_new_timeline
-      incr_configure_s3_new_timeline
+    def aws_lockout_mechanisms
+      ["pg_stop", "hba"]
     end
 
     def client

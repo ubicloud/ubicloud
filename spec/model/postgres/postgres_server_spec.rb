@@ -42,6 +42,38 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
+  describe "#aws_lockout_mechanisms" do
+    it "returns pg_stop and hba for AWS servers" do
+      aws_location = Location.create(
+        name: "us-east-1", project:, display_name: "us-east-1",
+        ui_name: "us-east-1", provider: "aws", visible: true
+      )
+      aws_timeline = PostgresTimeline.create(location_id: aws_location.id)
+      aws_resource = PostgresResource.create(
+        name: "aws-postgres-resource", project:, location_id: aws_location.id,
+        ha_type: PostgresResource::HaType::NONE, user_config: {},
+        pgbouncer_user_config: {}, target_version: "16",
+        target_vm_size: "standard-2", target_storage_size_gib: 64,
+        superuser_password: "super"
+      )
+      aws_ps = PrivateSubnet.create(
+        name: "aws-pg-subnet", project:, location: aws_location,
+        net4: NetAddr::IPv4Net.parse("172.0.1.0/26"),
+        net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a4d::/64")
+      )
+      aws_vm = Prog::Vm::Nexus.assemble_with_sshable(
+        project.id, name: "aws-pg-vm", private_subnet_id: aws_ps.id,
+        location_id: aws_location.id, unix_user: "ubi"
+      ).subject
+      aws_server = described_class.create(
+        timeline: aws_timeline, resource: aws_resource, vm_id: aws_vm.id,
+        is_representative: true, synchronization_status: "ready",
+        timeline_access: "push", version: "16"
+      )
+      expect(aws_server.lockout_mechanisms).to eq(["pg_stop", "hba"])
+    end
+  end
+
   describe "#configure" do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
@@ -529,7 +561,7 @@ RSpec.describe PostgresServer do
       location.update(provider: "aws")
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
       expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push", synchronization_status: "ready")
-      expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+      expect(postgres_server).to receive(:attach_s3_policy_if_needed)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl stop wal-g")
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { postgres_server.switch_to_new_timeline }.not_to raise_error

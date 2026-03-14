@@ -1114,4 +1114,52 @@ RSpec.describe PostgresResource do
       expect(read_replica.reload.target_storage_size_gib).to eq(64)
     end
   end
+
+  describe ".generate_postgres_options" do
+    let(:gcp_location) {
+      Location.create(name: "gcp-us-central1", provider: "gcp", display_name: "us-central1", ui_name: "Iowa, US (GCP)", visible: false)
+    }
+
+    it "allows GCP families for GCP locations" do
+      option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
+      allowed_families = OptionTreeGenerator.generate_allowed_options("family", option_tree, parents)
+      family_names = allowed_families.map { it["family"] }.uniq
+
+      Option::GCP_FAMILY_OPTIONS.each do |family|
+        expect(family_names).to include(family)
+      end
+
+      expect(family_names).not_to include("standard")
+      expect(family_names).not_to include("hobby")
+      expect(family_names).not_to include("m8gd")
+    end
+
+    it "allows metal families for metal locations" do
+      option_tree, parents = described_class.generate_postgres_options(project, location: [location])
+      allowed_families = OptionTreeGenerator.generate_allowed_options("family", option_tree, parents)
+      family_names = allowed_families.map { it["family"] }.uniq
+
+      expect(family_names).to include("standard", "hobby")
+      Option::GCP_FAMILY_OPTIONS.each do |family|
+        expect(family_names).not_to include(family)
+      end
+    end
+
+    it "provides fixed storage sizes for GCP families" do
+      option_tree, parents = described_class.generate_postgres_options(project, location: [gcp_location])
+      allowed_storage = OptionTreeGenerator.generate_allowed_options("storage_size", option_tree, parents)
+
+      # Check c4a-standard-8: should have exactly 750 GiB (2 × 375)
+      c4a_8_options = allowed_storage.select { it["size"] == "c4a-standard-8" }
+      expect(c4a_8_options.map { it["storage_size"] }).to eq([750])
+
+      # Check c3d-standard-30: should have exactly 750 GiB (2 × 375)
+      c3d_30_options = allowed_storage.select { it["size"] == "c3d-standard-30" }
+      expect(c3d_30_options.map { it["storage_size"] }).to eq([750])
+
+      # Check c3-standard-176: should have exactly 12000 GiB (32 × 375)
+      c3_176_options = allowed_storage.select { it["size"] == "c3-standard-176" }
+      expect(c3_176_options.map { it["storage_size"] }).to eq([12000])
+    end
+  end
 end
