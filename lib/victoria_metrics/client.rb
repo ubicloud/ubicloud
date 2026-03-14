@@ -44,6 +44,22 @@ class VictoriaMetrics::Client
       {"Content-Encoding" => "gzip", "Content-Type" => "application/octet-stream"})
   end
 
+  def query(query:)
+    query_params = [["query", query]]
+    query_encoded = URI.encode_www_form(query_params)
+    query_results = send_request("GET", "/api/v1/query?#{query_encoded}")
+    data = JSON.parse(query_results.body)
+
+    return [] unless data["status"] == "success" && data["data"]["resultType"] == "vector"
+
+    data["data"]["result"].map do |result|
+      {
+        "labels" => result["metric"] || {},
+        "value" => result["value"]
+      }
+    end
+  end
+
   def query_range(query:, start_ts:, end_ts:)
     query_params = [["query", query], ["start", start_ts], ["end", end_ts], ["step", step_seconds(start_ts, end_ts)]]
     query_encoded = URI.encode_www_form(query_params)

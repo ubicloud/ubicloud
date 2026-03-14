@@ -306,7 +306,9 @@ RSpec.describe Clover, "postgres" do
         pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_return("10000000\n")
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "5.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
@@ -318,8 +320,10 @@ RSpec.describe Clover, "postgres" do
       it "does not scale down storage if the requested size is too small for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_return("999999999\n")
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "95.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
@@ -340,18 +344,49 @@ RSpec.describe Clover, "postgres" do
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size")
       end
 
-      it "returns error message if invalid size is requested" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+      it "blocks scale down if metrics query fails" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_raise(StandardError.new("error"))
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_raise(StandardError.new("error"))
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
         }.to_json
 
-        expect(pg.reload.target_storage_size_gib).to eq(128)
-        expect(last_response).to have_api_error(400, "Database is not ready for update")
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics unavailable right now to verify scale down safety")
+      end
+
+      it "skips disk usage check if metrics client is unavailable" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(nil)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64
+        }.to_json
+
+        expect(pg.reload.target_storage_size_gib).to eq(64)
+      end
+
+      it "blocks scale down if no disk usage data available" do
+        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([])
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics unavailable right now to verify scale down safety")
       end
 
       it "fails to update read replica" do
