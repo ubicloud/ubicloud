@@ -1,0 +1,57 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+# Collects custom PostgreSQL metrics and writes them as prometheus textfile
+# for node_exporter's textfile collector. Runs periodically via systemd timer.
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1 (pg version), given #{ARGV.count}"
+end
+
+version = ARGV[0]
+output_path = "/var/lib/node_exporter/pg_metrics.prom"
+tmp_path = "#{output_path}.tmp"
+
+lines = []
+
+# Archival backlog: count of WAL files pending archival
+backlog = `sudo find /dat/#{version}/data/pg_wal/archive_status -name '*.ready' 2>/dev/null | wc -l`.strip.to_i
+lines << "# HELP ubicloud_pg_archival_backlog Number of WAL files pending archival"
+lines << "# TYPE ubicloud_pg_archival_backlog gauge"
+lines << "ubicloud_pg_archival_backlog #{backlog}"
+
+# Current WAL LSN as integer bytes
+begin
+  is_recovery = `sudo -u postgres psql -t -A -c "SELECT pg_is_in_recovery()"`.strip
+  lsn_func = if is_recovery == "t"
+    lsn = `sudo -u postgres psql -t -A -c "SELECT pg_last_wal_receive_lsn()"`.strip
+    (lsn.empty? || lsn == "") ? "pg_last_wal_replay_lsn" : "pg_last_wal_receive_lsn"
+  else
+    "pg_current_wal_lsn"
+  end
+
+  lsn = `sudo -u postgres psql -t -A -c "SELECT #{lsn_func}()"`.strip
+  unless lsn.empty?
+    high, low = lsn.split("/")
+    lsn_bytes = high.to_i(16) * (2**32) + low.to_i(16)
+    lines << "# HELP ubicloud_pg_wal_lsn_bytes Current WAL LSN position in bytes"
+    lines << "# TYPE ubicloud_pg_wal_lsn_bytes gauge"
+    lines << "ubicloud_pg_wal_lsn_bytes #{lsn_bytes}"
+  end
+
+  # Last replay timestamp (standbys/replicas only)
+  if is_recovery == "t"
+    ts = `sudo -u postgres psql -t -A -c "SELECT extract(epoch FROM pg_last_xact_replay_timestamp())"`.strip
+    unless ts.empty?
+      lines << "# HELP ubicloud_pg_last_xact_replay_timestamp_seconds Last transaction replay timestamp as Unix epoch"
+      lines << "# TYPE ubicloud_pg_last_xact_replay_timestamp_seconds gauge"
+      lines << "ubicloud_pg_last_xact_replay_timestamp_seconds #{ts}"
+    end
+  end
+rescue
+  nil
+end
+
+# Atomic write
+File.write(tmp_path, lines.join("\n") + "\n")
+File.rename(tmp_path, output_path)

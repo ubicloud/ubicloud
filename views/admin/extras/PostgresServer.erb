@@ -1,0 +1,58 @@
+<%# locals: (obj: nil) %>
+
+<% format_bytes = lambda do |bytes|
+  if bytes < 1024
+    "#{bytes.round} B"
+  elsif bytes < 1024**2
+    "#{(bytes / 1024.0).round(1)} KiB"
+  elsif bytes < 1024**3
+    "#{(bytes / 1024.0**2).round(1)} MiB"
+  else
+    "#{(bytes / 1024.0**3).round(1)} GiB"
+  end
+end
+
+format_seconds = lambda do |secs|
+  h = (secs / 3600).floor
+  m = ((secs % 3600) / 60).floor
+  s = (secs % 60).floor
+  "%02d:%02d:%02d" % [h, m, s]
+end
+
+query_metric = lambda do |tsdb_client, metric_key, resource_ubid|
+  next [] unless tsdb_client
+  metric = Metrics::POSTGRES_METRICS[metric_key]
+  next [] unless metric
+
+  query = metric.series[0].query.gsub("$ubicloud_resource_id", resource_ubid)
+  start_ts = Time.now.to_i - 6 * 3600
+  end_ts = Time.now.to_i
+  result = tsdb_client.query_range(query:, start_ts:, end_ts:)
+  next [] if result.empty?
+  result[0]["values"].map { |v| [v[0].to_f, v[1].to_f] }
+rescue
+  []
+end
+
+tsdb_client = PostgresServer.victoria_metrics_client
+resource_ubid = obj.resource.ubid
+backlog_points = query_metric.call(tsdb_client, :archival_backlog, resource_ubid)
+lag_points = query_metric.call(tsdb_client, :wal_lag, resource_ubid)
+replay_points = (obj.standby? || obj.read_replica?) ? query_metric.call(tsdb_client, :replay_lag, resource_ubid) : nil %>
+
+<div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px;">
+  <div style="flex: 1; min-width: 400px;">
+    <h3>Archival Backlog</h3>
+    <%== part("components/svg_chart", points: backlog_points) %>
+  </div>
+  <div style="flex: 1; min-width: 400px;">
+    <h3>WAL Lag</h3>
+    <%== part("components/svg_chart", points: lag_points, formatter: format_bytes) %>
+  </div>
+  <% if replay_points %>
+    <div style="flex: 1; min-width: 400px;">
+      <h3>Replay Lag</h3>
+      <%== part("components/svg_chart", points: replay_points, formatter: format_seconds) %>
+    </div>
+  <% end %>
+</div>
