@@ -333,6 +333,115 @@ RSpec.describe VictoriaMetrics::Client do
     end
   end
 
+  describe "#query" do
+    let(:query) { 'sum(rate(http_requests_total{job="api"}[5m]))' }
+
+    context "when the query is successful" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "vector",
+                "result" => [
+                  {
+                    "metric" => {"job" => "api", "instance" => "server1"},
+                    "value" => [1600000000, "10.5"]
+                  },
+                  {
+                    "metric" => {"job" => "api", "instance" => "server2"},
+                    "value" => [1600000000, "5.2"]
+                  }
+                ]
+              }
+            }.to_json
+          )
+      end
+
+      it "returns formatted instant data" do
+        result = client.query(query:)
+
+        expect(result.length).to eq(2)
+        expect(result[0]["labels"]).to eq({"job" => "api", "instance" => "server1"})
+        expect(result[0]["value"]).to eq([1600000000, "10.5"])
+        expect(result[1]["labels"]).to eq({"job" => "api", "instance" => "server2"})
+        expect(result[1]["value"]).to eq([1600000000, "5.2"])
+      end
+
+      it "constructs the correct query parameters" do
+        client.query(query:)
+
+        query_params = [["query", query]]
+        encoded_params = URI.encode_www_form(query_params)
+
+        expect(WebMock).to have_requested(:get, "#{endpoint}/api/v1/query?#{encoded_params}")
+      end
+    end
+
+    context "when the query returns no results" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "vector",
+                "result" => []
+              }
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns an error" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "error",
+              "errorType" => "execution",
+              "error" => "parse error: unexpected end of input"
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns a different result type" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "scalar",
+                "result" => [1600000000, "42"]
+              }
+            }.to_json
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
+        expect(result).to eq([])
+      end
+    end
+  end
+
   describe "#gzip" do
     it "compresses the input string" do
       input = "test string"

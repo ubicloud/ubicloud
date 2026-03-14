@@ -307,7 +307,7 @@ RSpec.describe Clover, "postgres" do
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         tsdb_client = instance_double(VictoriaMetrics::Client)
         expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
-        expect(tsdb_client).to receive(:query_range).and_return([{"values" => [[Time.now.to_i, "5.0"]]}])
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "5.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
@@ -322,7 +322,7 @@ RSpec.describe Clover, "postgres" do
         expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
         tsdb_client = instance_double(VictoriaMetrics::Client)
         expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
-        expect(tsdb_client).to receive(:query_range).and_return([{"values" => [[Time.now.to_i, "95.0"]]}])
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "95.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
@@ -349,7 +349,7 @@ RSpec.describe Clover, "postgres" do
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         tsdb_client = instance_double(VictoriaMetrics::Client)
         expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
-        expect(tsdb_client).to receive(:query_range).and_raise(StandardError.new("error"))
+        expect(tsdb_client).to receive(:query).and_raise(StandardError.new("error"))
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64
@@ -377,7 +377,7 @@ RSpec.describe Clover, "postgres" do
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
         tsdb_client = instance_double(VictoriaMetrics::Client)
         expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
-        expect(tsdb_client).to receive(:query_range).and_return([])
+        expect(tsdb_client).to receive(:query).and_return([])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           storage_size: 64

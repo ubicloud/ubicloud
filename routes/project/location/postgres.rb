@@ -77,13 +77,13 @@ class Clover
         if target_storage_size_gib < pg.representative_server.storage_size_gib && (tsdb_client = PostgresServer.victoria_metrics_client)
           disk_usage = begin
             query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", pg.ubid)
-            tsdb_client.query_range(query:, start_ts: Time.now.to_i - 60 * 60, end_ts: Time.now.to_i)[0]
+            tsdb_client.query(query:).last
           rescue
             nil
           end
 
           if disk_usage
-            disk_usage_percentage = disk_usage["values"].last[1].to_f
+            disk_usage_percentage = disk_usage["value"][1].to_f
             current_disk_usage = disk_usage_percentage * pg.representative_server.storage_size_gib / 100
 
             if target_storage_size_gib * 0.8 < current_disk_usage
