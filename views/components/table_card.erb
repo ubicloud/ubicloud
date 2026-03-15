@@ -1,6 +1,6 @@
 <%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false, id: nil) %>
 
-<div>
+<div class="grid grid-cols-1">
   <% if title || right_items %>
     <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
       <div class="min-w-0 flex-1">
@@ -17,6 +17,7 @@
   <% end %>
 
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-300" <% if id %> id="<%= id %>" <% end %>>
       <% unless headers.empty? || rows.empty? %>
         <thead class="bg-gray-50">
@@ -86,6 +87,7 @@
         <% end %>
       </tbody>
     </table>
+    </div>
     <%== allow_unescaped(footer) %>
   </div>
 </div>
