@@ -24,7 +24,7 @@ ps_map = {}
 firewall_path = path(@firewall)
 edit_perm = has_permission?("Firewall:edit", @firewall) %>
 
-<div class="p-6 grid gap-6">
+<div class="p-6 grid grid-cols-1 gap-6">
   <div class="min-w-0 md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <h3 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-2xl sm:tracking-tight">
       Firewall Rules
@@ -36,6 +36,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
     <% end %>
   </div>
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-300" id="firewall-rules">
       <thead class="bg-gray-50">
         <tr>
@@ -73,6 +74,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
         <% end %>
       </tbody>
     </table>
+    </div>
   </div>
   <div class="md:flex md:items-center md:justify-between pb-2 lg:pb-4">
     <div class="min-w-0 flex-1">
@@ -82,6 +84,7 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
     </div>
   </div>
   <div id="fw-private-subnets" class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-300">
       <thead class="bg-gray-50">
         <tr>
@@ -134,5 +137,6 @@ edit_perm = has_permission?("Firewall:edit", @firewall) %>
         <% end %>
       </tbody>
     </table>
+    </div>
   </div>
 </div>
