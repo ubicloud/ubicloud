@@ -12,10 +12,10 @@
 ) %>
 
 <main>
-  <div class="flex rounded-lg bg-white shadow divide-x p-8">
-    <div class="flex-none pr-8">
-      <aside class="lg:col-span-4 xl:col-span-3 2xl:col-span-2">
-        <nav id="<%= type %>-submenu" class="space-y-1">
+  <div class="flex flex-col lg:flex-row rounded-lg bg-white shadow lg:divide-x p-8">
+    <div class="flex-none pb-6 lg:pb-0 lg:pr-8">
+      <aside>
+        <nav id="<%= type %>-submenu" class="flex flex-row flex-wrap gap-1 lg:flex-col lg:gap-0 lg:space-y-1">
           <% tabs.each do |label, page, icon| %>
             <% if @page == page
                url_class = "border-orange-600 bg-orange-50 text-orange-600 hover:bg-orange-50 hover:text-orange-700 group flex items-center border-l-4 px-3 py-2 text-sm font-medium"
@@ -32,7 +32,7 @@
         </nav>
       </aside>
     </div>
-    <div class="flex-auto pl-8">
+    <div class="flex-auto border-t lg:border-t-0 pt-6 lg:pt-0 lg:pl-8">
       <div class="divide-y">
         <div class="pb-6 flex items-center justify-between">
           <div>
