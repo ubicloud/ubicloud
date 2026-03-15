@@ -2,8 +2,9 @@
 
 <%== render("github/tabbar") %>
 
-<div class="grid gap-6">
+<div class="grid grid-cols-1 gap-6">
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="overflow-x-auto">
     <table class="min-w-full divide-y divide-gray-300">
       <tbody class="divide-y divide-gray-200 bg-white">
         <% if @entries_by_repo.count > 0 %>
@@ -78,5 +79,6 @@
         <% end %>
       </tbody>
     </table>
+    </div>
   </div>
 </div>
