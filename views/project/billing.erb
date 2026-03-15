@@ -12,7 +12,7 @@ end
     breadcrumbs: [%w[Projects /project], [@project.name, @project.path], %w[Billing #]]
   ) %>
 
-  <div class="grid gap-6">
+  <div class="grid grid-cols-1 gap-6">
     <!-- Summary -->
     <div>
       <dl class="grid grid-cols-2 gap-5 <%= (@project.discount > 0) ? "sm:grid-cols-4" : "sm:grid-cols-3" %>">
@@ -198,6 +198,7 @@ end
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+      <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
@@ -247,6 +248,7 @@ end
             <% end %>
           </tbody>
         </table>
+      </div>
       </div>
     </div>
   </div>
@@ -325,6 +327,7 @@ end
       </div>
       <!-- List alerts -->
       <% if @usage_alerts.count > 0 %>
+        <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-300">
           <thead class="bg-gray-50">
             <tr>
@@ -354,6 +357,7 @@ end
             <% end %>
           </tbody>
         </table>
+        </div>
       <% else %>
         <div class="text-center p-4">
           No usage alerts...
