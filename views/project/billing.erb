@@ -198,57 +198,57 @@ end
         </div>
       </div>
       <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-300">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Invoice</th>
-              <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">Status</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% @invoices.each do |inv| %>
-              <tr id="invoice-<%= inv.path_id %>">
-                <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
-                  <a href="<%= path(inv) %>" target="_blank" class="text-orange-600 hover:text-orange-700">
-                    <%= inv.name %>
-                  </a>
-                  <span class="text-xs text-gray-400 italic">
-                    <% if inv.invoice_number %>
-                      #<%= inv.invoice_number %>
-                    <% else %>
-                      (not finalized)
-                    <% end %>
-                  </span>
-                </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                  <%= money(inv.cost) %>
-                  <% if inv.cost != inv.subtotal %>
-                    <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
-                  <% end %>
-                </td>
-                <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
-                  <%= inv.status %>
-                  <% if inv.payable? %>
-                    <% form(action: "#{path(inv)}/pay", method: :post) do %>
-                      <%== part("components/form/submit_button", text: "Pay Now") %>
-                    <% end %>
-                  <% end %>
-                </td>
-              </tr>
-            <% end %>
-            <% if @invoices.count == 1 %>
+        <div class="overflow-x-auto">
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
               <tr>
-                <td colspan="3">
-                  <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next
-                    month.</div>
-                </td>
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Invoice</th>
+                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Amount</th>
+                <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-6 text-left text-sm font-semibold text-gray-900">Status</th>
               </tr>
-            <% end %>
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              <% @invoices.each do |inv| %>
+                <tr id="invoice-<%= inv.path_id %>">
+                  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
+                    <a href="<%= path(inv) %>" target="_blank" class="text-orange-600 hover:text-orange-700">
+                      <%= inv.name %>
+                    </a>
+                    <span class="text-xs text-gray-400 italic">
+                      <% if inv.invoice_number %>
+                        #<%= inv.invoice_number %>
+                      <% else %>
+                        (not finalized)
+                      <% end %>
+                    </span>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                    <%= money(inv.cost) %>
+                    <% if inv.cost != inv.subtotal %>
+                      <span class="text-xs italic">(<%= money(inv.subtotal) %>)</span>
+                    <% end %>
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500 flex items-center gap-2 justify-between">
+                    <%= inv.status %>
+                    <% if inv.payable? %>
+                      <% form(action: "#{path(inv)}/pay", method: :post) do %>
+                        <%== part("components/form/submit_button", text: "Pay Now") %>
+                      <% end %>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+              <% if @invoices.count == 1 %>
+                <tr>
+                  <td colspan="3">
+                    <div class="text-center text-lg p-4">No invoices finalized yet. Invoice for the current month will be created on the first day of next
+                      month.</div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -328,35 +328,35 @@ end
       <!-- List alerts -->
       <% if @usage_alerts.count > 0 %>
         <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-300">
-          <thead class="bg-gray-50">
-            <tr>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Limit</th>
-              <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">E-mail</th>
-              <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
-                <span class="sr-only">Remove</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-200 bg-white">
-            <% @usage_alerts.each do |alert| %>
-              <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
-                <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
-                <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
-                  <%== part(
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Name</th>
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">Limit</th>
+                <th scope="col" class="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-4">E-mail</th>
+                <th scope="col" class="py-3.5 pl-3 pr-4 sm:pr-4">
+                  <span class="sr-only">Remove</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              <% @usage_alerts.each do |alert| %>
+                <tr id="alert-<%= alert.ubid %>" class="whitespace-nowrap text-sm font-medium">
+                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.name %></td>
+                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.limit %></td>
+                  <td class="py-4 pl-4 pr-3 text-gray-900 sm:pl-6" scope="row"><%= alert.user.email %></td>
+                  <td class="py-4 pl-3 pr-4 text-right sm:pr-6">
+                    <%== part(
                     "components/delete_button",
                     text: "Remove",
                     url: "#{@project.path}/usage-alert/#{alert.ubid}",
                     confirmation: alert.name
                   ) %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
         </div>
       <% else %>
         <div class="text-center p-4">
