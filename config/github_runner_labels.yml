@@ -56,5 +56,3 @@
 - { name: ubicloud-standard-4-ubuntu-2204-arm,  alias_for: ubicloud-standard-4-arm-ubuntu-2204 }
 - { name: ubicloud-standard-8-ubuntu-2204-arm,  alias_for: ubicloud-standard-8-arm-ubuntu-2204 }
 - { name: ubicloud-standard-16-ubuntu-2204-arm, alias_for: ubicloud-standard-16-arm-ubuntu-2204 }
-- { name: ubicloud-gpu,                         family: standard-gpu, vcpus: 6,     arch: x64,   storage_size_gib: 180, boot_image: github-gpu-ubuntu-2204 }
-- { name: ubicloud-gpu-standard-1-latest,       alias_for: ubicloud-gpu }
