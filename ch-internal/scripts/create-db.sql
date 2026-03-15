@@ -1,0 +1,4 @@
+CREATE DATABASE clover_test;
+CREATE DATABASE clover_monitor;
+GRANT ALL PRIVILEGES ON DATABASE clover_test TO clover;
+GRANT ALL PRIVILEGES ON DATABASE clover_monitor TO clover;

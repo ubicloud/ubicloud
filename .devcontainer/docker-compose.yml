@@ -1,0 +1,50 @@
+name: clickgres_devcontainer
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - ../..:/workspaces:cached
+      - postgres-run:/var/run/postgresql
+      - ~/.aws/sso:/home/vscode/.aws/sso
+    environment:
+      - AWS_ASSUME_ROLE=arn:aws:iam::248825820370:role/clickgres-pg-test-local-access-via-pg-dev-admin
+    ports:
+      - "3000:3000"
+    # command: sleep infinity  # Default CMD from Dockerfile; override for interactive use: bash
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ubicloud
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - postgres-run:/var/run/postgresql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d postgres" ]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+      start_period: 30s
+    networks:
+      - ubicloud
+
+volumes:
+  postgres-data:
+  postgres-run:
+
+
+networks:
+  ubicloud:
