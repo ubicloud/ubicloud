@@ -194,10 +194,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.destroy
       pop "Could not provision a runner for inactive project"
     end
-    if github_runner.label.include?("gpu") && !github_runner.installation.project.get_ff_gpu_runner
-      github_runner.destroy
-      pop "Could not provision a GPU runner for this project"
-    end
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
@@ -350,13 +346,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     if installation.cache_enabled
       command << NetSsh.command(<<~COMMAND, private_ipv4: vm.private_ipv4)
         echo "CUSTOM_ACTIONS_CACHE_URL=http://":private_ipv4":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
-      COMMAND
-    end
-
-    if github_runner.label.include?("gpu")
-      message = "The GPU runners will be deprecated on December 31, 2025. All jobs using these runners should be migrated to other runner types."
-      command << NetSsh.command(<<~COMMAND, message:)
-        echo "::warning::":message | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
     end
 

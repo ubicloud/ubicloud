@@ -195,20 +195,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.billed_vm_size).to eq("standard-2-arm")
     end
 
-    it "uses separate billing rate for gpu runners" do
-      vm.update(family: "standard-gpu", vcpus: 6)
-      runner.update(label: "ubicloud-gpu", ready_at: now - 5 * 60)
-
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-      expect(br.billing_rate["resource_family"]).to eq("standard-gpu-6")
-      expect(runner.billed_vm_size).to eq("standard-gpu-6")
-    end
-
     it "uses the premium billing rate for upgraded runners" do
       vm.update(family: "premium")
       runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
@@ -339,12 +325,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(project).to receive(:active?).and_return(false)
 
       expect { nx.start }.to exit({"msg" => "Could not provision a runner for inactive project"})
-      expect(GithubRunner[runner.id]).to be_nil
-    end
-
-    it "pops if GPU runners not enabled for the project" do
-      runner.label = "ubicloud-gpu"
-      expect { nx.start }.to exit({"msg" => "Could not provision a GPU runner for this project"})
       expect(GithubRunner[runner.id]).to be_nil
     end
   end
@@ -606,23 +586,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         echo "UBICLOUD_RUNTIME_TOKEN="my_token"
         UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
         echo "CUSTOM_ACTIONS_CACHE_URL=http://"10.0.0.1":51123/random_token/" | sudo tee -a /etc/environment > /dev/null
-      COMMAND
-
-      expect { nx.setup_environment }.to hop("register_runner")
-    end
-
-    it "hops to register_runner with GPU deprecation warning" do
-      expect(vm).to receive(:runtime_token).and_return("my_token")
-      runner.label = "ubicloud-gpu"
-      installation.update(use_docker_mirror: false, cache_enabled: false)
-      expect(vm.sshable).to receive(:_cmd).with("bash", stdin: <<~COMMAND)
-        set -ueo pipefail
-        echo "image version: $ImageVersion"
-        sudo usermod -a -G sudo,adm runneradmin
-        jq '. += ['\\{\\"group\\":\\"Ubicloud\\ Managed\\ Runner\\",\\"detail\\":\\"Name:\\ #{runner.ubid}\\\\nLabel:\\ ubicloud-gpu\\\\nVM\\ Family:\\ standard\\\\nArch:\\ x64\\\\nImage:\\ github-ubuntu-2204\\\\nVM\\ Host:\\ #{vm.vm_host.ubid}\\\\nVM\\ Pool:\\ \\\\nLocation:\\ hetzner-fsn1\\\\nDatacenter:\\ FSN1-DC8\\\\nProject:\\ #{project.ubid}\\\\nConsole\\ URL:\\ http://localhost:9292/project/#{project.ubid}/github\\"\\}']' /imagegeneration/imagedata.json | sudo -u runner tee /home/runner/actions-runner/.setup_info > /dev/null
-        echo "UBICLOUD_RUNTIME_TOKEN="my_token"
-        UBICLOUD_CACHE_URL="http://localhost:9292"/runtime/github/" | sudo tee -a /etc/environment > /dev/null
-        echo "::warning::"The\\ GPU\\ runners\\ will\\ be\\ deprecated\\ on\\ December\\ 31,\\ 2025.\\ All\\ jobs\\ using\\ these\\ runners\\ should\\ be\\ migrated\\ to\\ other\\ runner\\ types. | sudo -u runner tee /home/runner/actions-runner/.ubicloud_complete_message
       COMMAND
 
       expect { nx.setup_environment }.to hop("register_runner")

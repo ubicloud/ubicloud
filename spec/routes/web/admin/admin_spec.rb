@@ -1132,7 +1132,6 @@ RSpec.describe CloverAdmin do
       ["allocator_diagnostics", "", nil],
       ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
-      ["gpu_runner", "1", 1],
       ["visible_locations", '["eu-central-h1","eu-central-h2"]', ["eu-central-h1", "eu-central-h2"]],
       ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}]
     ].each do |name, value, expected_value|
