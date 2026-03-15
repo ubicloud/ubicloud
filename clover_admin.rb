@@ -231,6 +231,9 @@ class CloverAdmin < Roda
     "PostgresResource" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart)
     },
+    "PostgresServer" => {
+      "recycle" => object_action("Recycle", flash: "Recycle scheduled for PostgresServer", &:incr_recycle)
+    },
     "Project" => {
       "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: {typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}}}) do |obj, credit|
         obj.this.update(credit: Sequel[:credit] + credit)

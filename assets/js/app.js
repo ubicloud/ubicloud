@@ -849,6 +849,13 @@ function unitFormatter(unit, precision = 0) {
     return bytesFormatter(unit, precision);
   } else if (unit == "IOPS" || unit.startsWith("ops") || unit.startsWith("count") || unit.startsWith("deadlock")) {
     return opsFormatter(unit, precision);
+  } else if (unit == "seconds") {
+    return function (value) {
+      var h = Math.floor(value / 3600);
+      var m = Math.floor((value % 3600) / 60);
+      var s = Math.floor(value % 60);
+      return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
   } else {
     return function (value, index) {
       return value + ' ' + unit;

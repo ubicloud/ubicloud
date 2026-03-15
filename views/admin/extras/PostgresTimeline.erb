@@ -1,0 +1,9 @@
+<%# locals: (obj: nil) %>
+
+<%== part("components/table",
+  title: "Backups",
+  table_class: "timeline-backups-table",
+  data: obj.backups.map do |backup|
+    { "Last Modified" => backup.last_modified }
+  end
+) %>
