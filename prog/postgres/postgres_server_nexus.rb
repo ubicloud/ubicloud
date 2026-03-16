@@ -636,6 +636,10 @@ SQL
   label def fence
     decr_fence
 
+    when_lockout_set? do
+      hop_lockout
+    end
+
     # Use multiple checkpoints so the final shutdown checkpoint is
     # brief.
     #
@@ -707,7 +711,7 @@ SQL
       end
     end
 
-    reap(:wait_locked_out, fallthrough: true, reaper:)
+    reap(:wait_locked_out, fallthrough: true, reaper:, prog: "Postgres::PostgresLockout")
     hop_wait_locked_out if strand.stack.first["lockout_succeeded"]
 
     nap 0.5
@@ -725,7 +729,13 @@ SQL
   end
 
   label def wait_fencing_of_old_primary
-    hop_taking_over if resource.representative_server.strand.label == "wait_in_fence"
+    representative_server = resource.representative_server
+    hop_taking_over if representative_server.strand.label == "wait_in_fence"
+
+    if strand.stack.first["deadline_at"] && Time.now > Time.parse(strand.stack.first["deadline_at"].to_s)
+      representative_server.incr_lockout
+      hop_wait_representative_lockout
+    end
 
     nap 1
   end
