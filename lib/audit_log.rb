@@ -94,8 +94,9 @@ module AuditLog
     else
       items = ds.limit(limit).all
       if items.length == limit
-        before_id = UBID.to_ubid(items.pop[:id])
-        @pagination_key = "#{items.last[:at].strftime("%s.%6N")}/#{before_id}"
+        next_page_item = items.pop
+        before_id = UBID.to_ubid(next_page_item[:id])
+        @pagination_key = "#{next_page_item[:at].strftime("%s.%6N")}/#{before_id}"
       end
     end
 

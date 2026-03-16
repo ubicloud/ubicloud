@@ -941,9 +941,9 @@ RSpec.describe Clover, "project" do
       end
 
       it "can filter by action" do
-        insert_audit_log(id: UBID.generate_from_time("a1", Time.now - 10).to_uuid)
-        insert_audit_log(action: "destroy", id: UBID.generate_from_time("a1", Time.now).to_uuid)
-        insert_audit_log(ubid_type: "ps", at: "2026-03-08")
+        insert_audit_log(id: UBID.to_uuid("a106ef80v8e24ph9c69pmeb61n"))
+        insert_audit_log(action: "destroy", id: UBID.to_uuid("a106ef80wfg22j4aer4gxm2hz0"))
+        insert_audit_log(ubid_type: "ps", at: Date.today - 2, id: UBID.to_uuid("a105kqam7xvy3j7symz7j9xwc2"))
 
         visit "#{project.path}/audit-log"
         expect(audit_log_content).to eq [
@@ -977,19 +977,22 @@ RSpec.describe Clover, "project" do
         ]
 
         click_link "Next Page"
-        expect(audit_log_content).to eq [
-          "ps/create", user.ubid, ""
-        ]
+        expect(audit_log_content).to eq ["ps/create", user.ubid, ""]
 
-        visit "#{project.path}/audit-log?limit=1&action=create"
-        expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
-        ]
+        visit "#{project.path}/audit-log?limit=1"
+        expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
 
         click_link "Next Page"
-        expect(audit_log_content).to eq [
-          "ps/create", user.ubid, ""
-        ]
+        expect(audit_log_content).to eq ["vm/destroy", user.ubid, ""]
+
+        click_link "Next Page"
+        expect(audit_log_content).to eq ["ps/create", user.ubid, ""]
+
+        visit "#{project.path}/audit-log?limit=1&action=create"
+        expect(audit_log_content).to eq ["vm/create", user.ubid, ""]
+
+        click_link "Next Page"
+        expect(audit_log_content).to eq ["ps/create", user.ubid, ""]
 
         visit "#{project.path}/audit-log?limit=a"
         expect(audit_log_content).to eq [
