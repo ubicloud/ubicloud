@@ -248,9 +248,10 @@ end
   # * If fallthrough is given: returns nil
   # * If nap is given: naps for given time
   # * Otherwise, donates to run a child process
-  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand)
-    children = strand
-      .children_dataset
+  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand, prog: nil)
+    dataset = strand.children_dataset
+    dataset = dataset.where(prog:) if prog
+    children = dataset
       .order(:schedule)
       .select_append(Sequel.lit("lease < now() AND exitval IS NOT NULL").as(:reapable))
       .all
