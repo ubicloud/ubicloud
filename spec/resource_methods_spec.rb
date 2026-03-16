@@ -67,9 +67,9 @@ RSpec.describe ResourceMethods do
     expect(Sshable[sa.ubid]).to eq sa
   end
 
-  it "Model.[] handles invalid ubids by passing them to the database" do
+  it "Model.[] handles invalid ubid format by returning nil" do
     expect(Sshable["sh1lawjdkcj25gq7hhb8tj3v6p"]).to be_nil
-    expect { Sshable["sh4oc37mce4p3nsdy34qa0n9j8"] }.to raise_error(Sequel::DatabaseError)
+    expect(Sshable["sh4oc37mce4p3nsdy34qa0n9j8"]).to be_nil
   end
 
   it "dataset.destroy avoids duplicate query warnings" do
