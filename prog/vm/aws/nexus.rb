@@ -424,14 +424,16 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def retry_in_different_az(e)
-    if (retry_count = frame["retry_count"] || 0) >= 5
+    retry_count = frame["retry_count"] || 0
+    current_excluded_azs = frame["exclude_availability_zones"] || []
+    azs_excluded = (current_excluded_azs + [nic.nic_aws_resource.subnet_az]).uniq
+    if retry_count >= 5 || (azs_excluded.size >= nic.private_subnet.private_subnet_aws_resource.aws_subnets.count)
       Clog.emit("resetting excluding azs to retry", {retry_different_az_failed: {vm:, error: e.class.name, message: e.message, retry_count:}})
       update_stack({"exclude_availability_zones" => nil, "retry_count" => 0})
       nap 5 * 60
     end
 
     Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, retry_count: retry_count + 1}})
-    azs_excluded = ((nic.strand.stack.first["exclude_availability_zones"] || []) + [nic.nic_aws_resource.subnet_az]).uniq
     update_stack({"exclude_availability_zones" => azs_excluded, "retry_count" => retry_count + 1})
     nic.incr_destroy
     hop_wait_old_nic_deleted

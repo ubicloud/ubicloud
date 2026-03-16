@@ -22,6 +22,11 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   let(:location_credential) {
     loc = LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationAz.create(location_id: loc.id, az: "b", zone_id: "usw2-az2")
+    LocationAz.create(location_id: loc.id, az: "c", zone_id: "usw2-az3")
+    LocationAz.create(location_id: loc.id, az: "d", zone_id: "usw2-az4")
+    LocationAz.create(location_id: loc.id, az: "e", zone_id: "usw2-az5")
+    LocationAz.create(location_id: loc.id, az: "f", zone_id: "usw2-az6")
     loc
   }
 
@@ -497,8 +502,7 @@ usermod -L ubuntu
       end
 
       it "increments retry count on subsequent failures" do
-        refresh_frame(nx, new_values: {"retry_count" => 2})
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
+        refresh_frame(nx, new_values: {"retry_count" => 2, "exclude_availability_zones" => ["b", "c"]})
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
@@ -508,7 +512,7 @@ usermod -L ubuntu
       end
 
       it "avoids duplicate AZs in exclusion list" do
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
+        refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
       end
@@ -518,6 +522,13 @@ usermod -L ubuntu
         expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
         expect(st.stack.last["exclude_availability_zones"]).to be_nil
+      end
+
+      it "resets exclude_availability_zones when all AZs have been exhausted" do
+        refresh_frame(nx, new_values: {"retry_count" => 4, "exclude_availability_zones" => ["b", "c", "d", "e", "f"]})
+        expect { nx.create_instance }.to nap(300)
+        expect(st.stack.last["exclude_availability_zones"]).to be_nil
+        expect(st.stack.last["retry_count"]).to eq(0)
       end
 
       it "logs retry details in emission" do
@@ -553,8 +564,7 @@ usermod -L ubuntu
       end
 
       it "increments retry count on subsequent failures" do
-        refresh_frame(nx, new_values: {"retry_count" => 2})
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
+        refresh_frame(nx, new_values: {"retry_count" => 2, "exclude_availability_zones" => ["b", "c"]})
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
@@ -564,7 +574,7 @@ usermod -L ubuntu
       end
 
       it "avoids duplicate AZs in exclusion list" do
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
+        refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
       end
