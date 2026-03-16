@@ -23,6 +23,7 @@ coderay/scanners/ruby
 coderay/scanners/ruby/patterns
 coderay/scanners/ruby/string_state
 diff/lcs
+forme/template
 webmock/rspec
 tilt/erubi
 tilt/string
@@ -157,9 +158,12 @@ END
 <<END.split.each { |f| require "sequel/extensions/#{f}" }
 date_arithmetic
 index_caching
+lit_require_frozen
 pg_array
+pg_array_ops
 pg_auto_parameterize
 pg_auto_parameterize_in_array
+pg_auto_parameterize_duplicate_query_detection
 pg_enum
 pg_json
 pg_json_ops
@@ -171,9 +175,11 @@ END
 
 <<END.split.each { |f| require "sequel/plugins/#{f}" }
 association_dependencies
+association_lazy_eager_option
 auto_validations
 column_encryption
 defaults_setter
+forbid_lazy_load
 insert_conflict
 inspect_pk
 many_through_many
@@ -195,6 +201,8 @@ Integer_matcher_max
 _base64
 _before_hook
 _optimized_matching
+_symbol_class_matchers
+_symbol_regexp_matchers
 all_verbs
 assets
 autoload_hash_branches
@@ -230,6 +238,13 @@ typecast_params
 typecast_params_sized_integers
 view_options
 rodauth
+forme_route_csrf
+path
+plain_hash_response_headers
+redirect_path
+response_attachment
+response_content_type
+symbol_matchers
 END
 
 <<END.split.each { |f| require "rodauth/features/#{f}" }
@@ -254,6 +269,8 @@ logout
 omniauth
 omniauth_base
 otp
+otp_lockout_email
+otp_unlock
 password_grace_period
 recovery_codes
 remember
