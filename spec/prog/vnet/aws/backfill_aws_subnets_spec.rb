@@ -390,6 +390,31 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         expect(client).not_to receive(:create_subnet)
         expect { nx.create_missing_az_subnets }.to hop("associate_route_tables")
       end
+
+      it "recovers from InvalidSubnetConflict by finding the existing subnet" do
+        error = Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "conflict")
+        expect(client).to receive(:create_subnet).and_raise(error)
+        client.stub_responses(:describe_subnets, subnets: [{
+          subnet_id: "subnet-recovered-b",
+          cidr_block: "10.0.1.0/24",
+          availability_zone: "us-west-2b",
+          ipv_6_cidr_block_association_set: []
+        }])
+        expect(client).to receive(:modify_subnet_attribute)
+
+        expect { nx.create_missing_az_subnets }.to hop("associate_route_tables")
+
+        az_b_subnet = AwsSubnet.where(location_aws_az_id: az_b.id, private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id).first
+        expect(az_b_subnet.subnet_id).to eq("subnet-recovered-b")
+      end
+
+      it "raises when InvalidSubnetConflict occurs but no matching subnet is found" do
+        error = Aws::EC2::Errors::InvalidSubnetConflict.new(nil, "conflict")
+        expect(client).to receive(:create_subnet).and_raise(error)
+        client.stub_responses(:describe_subnets, subnets: [])
+
+        expect { nx.create_missing_az_subnets }.to raise_error(/Subnet conflict but no matching subnet found/)
+      end
     end
 
     describe "#associate_route_tables" do

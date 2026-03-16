@@ -26,7 +26,7 @@ elsif (suite = ENV.delete("COVERAGE"))
     else
       add_filter do |file|
         path = file.filename.delete_prefix(File.dirname(__dir__))
-        path.match?(/\A\/(coverage|rhizome|kubernetes|migrate|spec|var|vendor|(db|model|loader|\.env)\.rb)/)
+        path.match?(/\A\/(bin|coverage|rhizome|kubernetes|migrate|spec|var|vendor|(db|model|loader|\.env)\.rb)/)
       end
     end
 
