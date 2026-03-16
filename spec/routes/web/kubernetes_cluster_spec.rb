@@ -334,6 +334,17 @@ RSpec.describe Clover, "Kubernetes" do
         expect(page.body).to eq("kubeconfig content")
       end
 
+      it "shows error page if there is an error getting kubeconfig file from control plane node" do
+        expect(KubernetesCluster).to receive(:kubeconfig).and_raise(IOError)
+
+        visit "#{project.path}#{kc.path}/kubeconfig"
+
+        expect(page.response_headers["Content-Type"]).to include("text/html")
+        expect(page.response_headers["Content-Disposition"]).to be_nil
+        expect(page.title).to eq "Ubicloud - myk8s"
+        expect(page).to have_flash_error("Temporary error downloading kubeconfig.yaml. Please try again.")
+      end
+
       it "raises forbidden error when user does not have permission" do
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
