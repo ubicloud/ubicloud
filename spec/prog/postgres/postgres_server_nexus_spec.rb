@@ -1134,6 +1134,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop postgres-metrics.timer")
       expect { nx.fence }.to hop("wait_in_fence")
     end
+
+    it "hops to lockout if lockout semaphore is set" do
+      nx.incr_lockout
+      expect { nx.fence }.to hop("lockout")
+    end
   end
 
   describe "#wait_in_fence" do
@@ -1234,6 +1239,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "hops to wait_locked_out when all children complete without success" do
+      Strand.create(parent_id: st.id, prog: "Postgres::Restart", label: "start", stack: [{}])
       child1 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "pg_stop"}])
       child2 = Strand.create(parent_id: st.id, prog: "Postgres::PostgresLockout", label: "start", stack: [{"mechanism" => "hba"}])
       child1.update(exitval: Sequel.pg_jsonb_wrap("lockout_failed"))
@@ -1274,6 +1280,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps when representative server is not in wait_in_fence state" do
       postgres_server.strand.update(label: "fence")
       expect { @standby_nx.wait_fencing_of_old_primary }.to nap(1)
+    end
+
+    it "falls back to unplanned failover when deadline has passed" do
+      postgres_server.strand.update(label: "fence")
+      @standby_nx.strand.update(stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "wait"}])
+      expect { @standby_nx.wait_fencing_of_old_primary }.to hop("wait_representative_lockout")
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "lockout").count).to eq(1)
     end
   end
 
