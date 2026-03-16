@@ -140,7 +140,7 @@ module ResourceMethods
         begin
           ubid = UBID.parse(arg)
         rescue UBIDParseError
-          super
+          nil
         else
           super(ubid.to_uuid)
         end
