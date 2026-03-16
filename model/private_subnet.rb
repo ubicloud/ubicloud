@@ -169,17 +169,21 @@ end
 
 # Table: private_subnet
 # Columns:
-#  id            | uuid                     | PRIMARY KEY
-#  net6          | cidr                     | NOT NULL
-#  net4          | cidr                     | NOT NULL
-#  state         | text                     | NOT NULL DEFAULT 'creating'::text
-#  name          | text                     | NOT NULL
-#  last_rekey_at | timestamp with time zone | NOT NULL DEFAULT now()
-#  project_id    | uuid                     | NOT NULL
-#  location_id   | uuid                     | NOT NULL
+#  id                | uuid                     | PRIMARY KEY
+#  net6              | cidr                     | NOT NULL
+#  net4              | cidr                     | NOT NULL
+#  state             | text                     | NOT NULL DEFAULT 'creating'::text
+#  name              | text                     | NOT NULL
+#  last_rekey_at     | timestamp with time zone | NOT NULL DEFAULT now()
+#  project_id        | uuid                     | NOT NULL
+#  location_id       | uuid                     | NOT NULL
+#  firewall_priority | integer                  |
 # Indexes:
 #  vm_private_subnet_pkey                          | PRIMARY KEY btree (id)
+#  private_subnet_project_firewall_priority_idx    | UNIQUE btree (project_id, firewall_priority) WHERE firewall_priority IS NOT NULL
 #  private_subnet_project_id_location_id_name_uidx | UNIQUE btree (project_id, location_id, name)
+# Check constraints:
+#  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
 # Foreign key constraints:
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)

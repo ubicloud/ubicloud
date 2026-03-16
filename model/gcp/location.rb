@@ -1,63 +1,40 @@
 # frozen_string_literal: true
 
-require_relative "../model"
-
 class Location < Sequel::Model
-  plugin ResourceMethods
-  plugin ProviderDispatcher, __FILE__
-  dataset_module Pagination
+  one_to_many :location_gcp_azs, remover: nil, clearer: nil
 
-  one_to_one :location_credential, key: :id, read_only: true
-  many_to_one :project
-  one_to_many :postgres_resources, read_only: true
-
-  plugin :association_dependencies, location_credential: :destroy
-
-  HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
-  HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
-  GITHUB_RUNNERS_ID = "6b9ef786-b842-8420-8c65-c25e3d4bdf3d"
-  LEASEWEB_WDC02_ID = "e0865080-9a3d-8020-a812-f5817c7afe7f"
-
-  HETZNER_FSN1_UBID = "10saktg1sprp3mxefj1m3kppq2"
-  HETZNER_HEL1_UBID = "103wgmgmrbrj0q48dzyw6fvt4z"
-  GITHUB_RUNNERS_UBID = "10defff1nr8a2hhjw4qhx9ffkt"
-  LEASEWEB_WDC02_UBID = "10w235104t7p1n09fb0bwfbz7z"
-
-  dataset_module do
-    def for_project(project_id)
-      where(Sequel[project_id:] | {project_id: nil})
+  module Gcp
+    def pg_gce_image(arch)
+      image = PgGceImage.find(arch:)
+      raise "No GCE image found for arch #{arch}" unless image
+      "projects/#{image.gcp_project_id}/global/images/#{image.gce_image_name}"
     end
 
-    def visible_or_for_project(project_id, project_ff_visible_locations)
-      where(Sequel.|([project_id:], {project_id: nil, visible: true}, name: project_ff_visible_locations || []))
+    private
+
+    def gcp_pg_boot_image(pg_version, arch, flavor)
+      pg_gce_image(arch)
     end
-  end
 
-  def self.postgres_locations
-    where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
-      .or(provider: "aws", project_id: nil)
-      .all
-  end
+    def gcp_azs
+      v = location_gcp_azs_dataset.all
+      return v unless v.empty?
+      set_gcp_azs
+    end
 
-  def visible_or_for_project?(proj_id, project_ff_visible_locations)
-    (visible && project_id.nil?) || project_id == proj_id || project_ff_visible_locations&.include?(name)
-  end
+    def set_gcp_azs
+      region = name.delete_prefix("gcp-")
+      get_gcp_zones(region).map do |zone|
+        az = zone.name.delete_prefix("#{region}-")
+        LocationGcpAz.create(location_id: id, az:)
+      end
+    end
 
-  def path
-    "/private-location/#{ui_name}"
-  end
-
-  # Private Locations only support Postgres resources for now
-  def has_resources?
-    !postgres_resources_dataset.empty?
-  end
-
-  def aws?
-    provider == "aws"
-  end
-
-  def provider_dispatcher_group_name
-    aws? ? "aws" : "metal"
+    def get_gcp_zones(region)
+      credential = location_credential
+      zones = credential.zones_client.list(project: credential.project_id).to_a
+      zones.select { it.name.start_with?("#{region}-") }
+    end
   end
 end
 
