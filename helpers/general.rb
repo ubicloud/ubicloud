@@ -121,9 +121,15 @@ class Clover < Roda
     destroy
     destroy_invitation
     detach_vm
+    disable_cache
+    disable_cache_scope
+    disable_premium
     disable_ssl
     disassociate
     disconnect
+    enable_cache
+    enable_cache_scope
+    enable_premium
     enable_ssl
     promote_read_replica
     recycle

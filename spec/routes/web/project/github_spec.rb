@@ -103,32 +103,37 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - Active Runners")
     end
 
-    it "enables premium runners for installation" do
+    it "toggles premium runners for installation" do
       installation.update(allocator_preferences: {})
-      expect(installation.premium_runner_enabled?).to be false
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.premium_runner_enabled?).to be true
-    end
+      expect(DB[:audit_log].where(action: "enable_premium").count).to eq(1)
 
-    it "disables premium runners for installation" do
-      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      expect(installation.premium_runner_enabled?).to be true
-
+      # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: false, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_premium").count).to eq(1)
 
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#premium_runner_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: false, _csrf:}
+      end
       expect(page.status_code).to eq(302)
       expect(installation.reload.premium_runner_enabled?).to be false
+      expect(DB[:audit_log].where(action: "disable_premium").count).to eq(1)
     end
 
     it "shows badge for free premium runner upgrade" do
@@ -139,19 +144,37 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "You’re eligible for an exclusive 50% off premium runners"
     end
 
-    it "enables cache for installation" do
+    it "toggles cache for installation" do
       installation.update(cache_enabled: false)
-      expect(installation.cache_enabled).to be false
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be true
+      expect(DB[:audit_log].where(action: "enable_cache").count).to eq(1)
+
+      # no change
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
+      end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_cache").count).to eq(1)
+
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: false, _csrf:}
+      end
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be false
+      expect(DB[:audit_log].where(action: "disable_cache").count).to eq(1)
     end
 
     it "handles case where installation does not exist" do
@@ -162,53 +185,43 @@ RSpec.describe Clover, "github" do
       within("form#cache_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
         installation.destroy
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
 
       expect(page.status_code).to eq(404)
     end
 
-    it "disables cache for installation" do
-      installation.update(cache_enabled: true)
-      expect(installation.cache_enabled).to be true
-
-      visit "#{project.path}/github/#{installation.ubid}/setting"
-
-      within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: false, _csrf:}
-      end
-
-      expect(page.status_code).to eq(302)
-      expect(installation.reload.cache_enabled).to be false
-    end
-
-    it "enables cache scope protection for installation" do
+    it "toggles cache scope protection for installation" do
       installation.update(cache_scope_protected: false)
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_scope_protected_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_scope_protected).to be true
-    end
+      expect(DB[:audit_log].where(action: "enable_cache_scope").count).to eq(1)
 
-    it "disables cache scope protection for installation" do
-      installation.update(cache_scope_protected: true)
-
+      # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_scope_protected_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: false, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_cache_scope").count).to eq(1)
 
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: false, _csrf:}
+      end
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_scope_protected).to be false
+      expect(DB[:audit_log].where(action: "disable_cache_scope").count).to eq(1)
     end
 
     it "raises not found when installation doesn't exist" do
