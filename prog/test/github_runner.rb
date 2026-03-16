@@ -30,6 +30,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       name: "TestUser",
       type: "User",
       project_id: customer_project.id,
+      allocator_preferences: {},
       created_at: Time.now - 8 * 24 * 60 * 60
     )
 
