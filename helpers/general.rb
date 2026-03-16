@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  include Authorization
-
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
