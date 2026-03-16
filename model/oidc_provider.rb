@@ -85,6 +85,7 @@ end
 #  jwks_uri                  | text | NOT NULL
 #  registration_client_uri   | text |
 #  registration_access_token | text |
+#  group_prefix              | text |
 # Indexes:
 #  oidc_provider_pkey | PRIMARY KEY btree (id)
 # Referenced By:
