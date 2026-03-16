@@ -247,6 +247,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     vm.update(display_state: "deleting")
 
+    # Clean up per-VM firewall policy rules
+    cleanup_vm_policy_rules
 
     begin
       op = compute_client.delete(
@@ -345,4 +347,59 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @gcp_az_suffixes ||= vm.location.azs.map(&:az)
   end
 
+  # --- Cleanup ---
+  # Tag bindings are auto-cleaned when the GCE instance is deleted.
+  # This method cleans up legacy per-VM tag values and their associated
+  # firewall policy rules from previous implementations.
+
+  def cleanup_vm_policy_rules
+    return unless nic
+
+    policy_name = Prog::Vnet::Gcp::SubnetNexus.vpc_name(nic.private_subnet.project)
+
+    begin
+      policy = credential.network_firewall_policies_client.get(
+        project: gcp_project_id,
+        firewall_policy: policy_name
+      )
+    rescue Google::Cloud::NotFoundError
+      return # Policy already deleted
+    end
+
+    # Find old per-VM tag value name (if it exists) for tag-based rule cleanup
+    vm_tag_value_name = lookup_old_vm_tag_value_name
+    return unless vm_tag_value_name
+
+    (policy.rules || []).each do |rule|
+      next unless rule.direction == "INGRESS" && rule.action == "allow"
+      next unless rule.target_secure_tags.any? { |t| t.name == vm_tag_value_name }
+      credential.network_firewall_policies_client.remove_rule(
+        project: gcp_project_id,
+        firewall_policy: policy_name,
+        priority: rule.priority
+      )
+    rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
+      # Already deleted or rule rejected as invalid — skip and continue
+    end
+
+    # Delete the old per-VM tag value
+    credential.crm_client.delete_tag_value(vm_tag_value_name)
+  rescue Google::Cloud::Error => e
+    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
+  rescue Google::Apis::ClientError => e
+    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
+  end
+
+  def lookup_old_vm_tag_value_name
+    vpc_tag_key_short = "ubicloud-fw-#{nic.private_subnet.project.ubid}"
+    resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
+    vpc_tag_key = resp.tag_keys&.find { |tk| tk.short_name == vpc_tag_key_short }
+    return unless vpc_tag_key
+
+    vm_tag_short = "vm-#{vm.ubid}"
+    resp = credential.crm_client.list_tag_values(parent: vpc_tag_key.name)
+    resp.tag_values&.find { |v| v.short_name == vm_tag_short }&.name
+  rescue Google::Apis::ClientError
+    nil
+  end
 end

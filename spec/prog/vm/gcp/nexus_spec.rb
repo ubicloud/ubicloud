@@ -715,6 +715,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "deletes the GCE instance and hops to wait_destroy_op" do
+      expect(nx).to receive(:cleanup_vm_policy_rules)
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-del-123")
       expect(compute_client).to receive(:delete).with(
@@ -728,6 +729,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "handles already-deleted instances by hopping to finalize_destroy" do
+      expect(nx).to receive(:cleanup_vm_policy_rules)
       expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect { nx.destroy }.to hop("finalize_destroy")
     end
@@ -740,6 +742,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.instance_variable_set(:@nic, nil)
       allow(vm).to receive(:nic).and_return(nil)
 
+      expect(nx).to receive(:cleanup_vm_policy_rules)
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-del-zone")
       expect(compute_client).to receive(:delete).with(
@@ -750,9 +753,234 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.destroy }.to hop("wait_destroy_op")
     end
+
+    it "handles firewall cleanup errors gracefully" do
+      expect(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::Error.new("permission denied"))
+      allow(Clog).to receive(:emit).and_call_original
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+
+      expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect { nx.destroy }.to hop("finalize_destroy")
+    end
   end
 
+  describe "#cleanup_vm_policy_rules" do
+    before do
+      ensure_nic_gcp_resource(vm.nics.first)
+    end
 
+    it "returns when nic is nil" do
+      allow(nx).to receive(:nic).and_return(nil)
+      expect(nfp_client).not_to receive(:get)
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "returns when policy is not found" do
+      expect(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).not_to receive(:remove_rule)
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "returns when no old per-VM tag value exists" do
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(nil)
+      expect(nfp_client).not_to receive(:remove_rule)
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "removes per-VM tag rules and deletes the tag value" do
+      vm_tag_value_name = "tagValues/vm-456"
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+
+      tag_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 22222,
+        direction: "INGRESS",
+        action: "allow",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+      )
+      other_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 33333,
+        direction: "INGRESS",
+        action: "allow",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other")]
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [tag_rule, other_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 22222))
+      expect(nfp_client).not_to receive(:remove_rule).with(hash_including(priority: 33333))
+
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "skips non-INGRESS and non-allow rules" do
+      vm_tag_value_name = "tagValues/vm-456"
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+
+      egress_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 11111,
+        direction: "EGRESS",
+        action: "allow",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+      )
+      deny_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 22222,
+        direction: "INGRESS",
+        action: "deny",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [egress_rule, deny_rule])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).not_to receive(:remove_rule)
+
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "continues cleaning up remaining rules when one raises InvalidArgumentError" do
+      vm_tag_value_name = "tagValues/vm-456"
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+
+      rule1 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 11111,
+        direction: "INGRESS",
+        action: "allow",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+      )
+      rule2 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
+        priority: 22222,
+        direction: "INGRESS",
+        action: "allow",
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+      )
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [rule1, rule2])
+      expect(nfp_client).to receive(:get).and_return(policy)
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 11111))
+        .and_raise(Google::Cloud::InvalidArgumentError.new("invalid priority"))
+      expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 22222))
+
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "handles nil policy rules gracefully" do
+      vm_tag_value_name = "tagValues/vm-456"
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new
+      expect(nfp_client).to receive(:get).and_return(policy)
+
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "handles cleanup errors gracefully" do
+      expect(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::Error.new("permission denied"))
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "handles ClientError during tag value deletion gracefully" do
+      vm_tag_value_name = "tagValues/vm-456"
+      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
+      expect(nfp_client).to receive(:get).and_return(policy)
+
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(crm_client).to receive(:delete_tag_value)
+        .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+
+      nx.send(:cleanup_vm_policy_rules)
+    end
+  end
+
+  describe "#lookup_old_vm_tag_value_name" do
+    it "returns tag value name when VPC tag key and VM tag value exist" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      project_ubid = vm.nic.private_subnet.project.ubid
+      vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
+      vm_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "vm-#{vm.ubid}", name: "tagValues/vm-456")
+
+      allow(crm_client).to receive_messages(list_tag_keys: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vpc_tk]), list_tag_values: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [vm_tv]))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to eq("tagValues/vm-456")
+    end
+
+    it "returns nil when VPC tag key does not exist" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      allow(crm_client).to receive(:list_tag_keys)
+        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: []))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
+    end
+
+    it "returns nil when tag_keys response is nil" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      allow(crm_client).to receive(:list_tag_keys)
+        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: nil))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
+    end
+
+    it "returns nil when tag_values response is nil" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      project_ubid = vm.nic.private_subnet.project.ubid
+      vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
+      allow(crm_client).to receive_messages(list_tag_keys: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vpc_tk]), list_tag_values: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
+    end
+
+    it "returns nil when VM tag value not found among tag_values" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      project_ubid = vm.nic.private_subnet.project.ubid
+      vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
+      other_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "vm-other", name: "tagValues/other")
+      allow(crm_client).to receive_messages(list_tag_keys: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vpc_tk]), list_tag_values: instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [other_tv]))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
+    end
+
+    it "returns nil on ClientError" do
+      crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+
+      allow(crm_client).to receive(:list_tag_keys)
+        .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
+
+      expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
+    end
+  end
 
   describe "#wait_destroy_op" do
     before do
