@@ -36,7 +36,7 @@ when "migrate"
 
   DB.extension :pg_enum
 
-  DB.loggers << Logger.new($stdout) if DB.loggers.empty?
+  DB.loggers << Logger.new($stdout)
   if version && File.file?(version)
     Sequel::TimestampMigrator.new(DB, "migrate").run_single(version, :down)
   else
