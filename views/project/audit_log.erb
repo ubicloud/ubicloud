@@ -61,7 +61,7 @@
     @audit_logs.map do |entry|
       [
         [
-          [entry[:at].getutc.strftime("%F %T"), {}],
+          entry[:at].getutc.strftime("%F %T"),
           ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
           [entry[:subject], {escape: false}],
           [entry[:objects].join("<br>"), {escape: false}]
