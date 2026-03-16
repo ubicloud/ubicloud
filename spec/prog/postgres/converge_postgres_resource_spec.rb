@@ -77,7 +77,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
 
-      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
       expect { nx.start }.to hop("provision_servers")
     end
   end
@@ -184,10 +184,110 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_servers_to_be_ready }.to hop("wait_for_maintenance_window")
     end
 
-    it "waits if there are not enough ready servers" do
-      server = create_server(is_representative: true)
-      server.strand.update(label: "configure")
+    it "waits and extends deadline if disk usage increased" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+    end
+
+    it "waits and extends deadline if lsn advanced" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/1234567")
+      strand.stack.first["total_disk_usage"] = 2048000
+      strand.modified!(:stack)
+      strand.save_changes
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(2048000)
+    end
+
+    it "waits without extending deadline if neither disk usage nor lsn increased" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/1234567")
+      strand.stack.first["total_disk_usage"] = 2048000
+      strand.stack.first["total_lsn"] = standby.lsn2int("0/FFFFFFF")
+      strand.modified!(:stack)
+      strand.save_changes
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "treats last_known_lsn as zero when it is nil" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0\n")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "handles failures gracefully when checking progress" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
+      standby.update_last_known_lsn("0/0")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "sums disk usage and lsn across multiple standbys" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby1 = create_server
+      standby1.strand.update(label: "wait_catch_up")
+      standby2 = create_server
+      standby2.strand.update(label: "wait_catch_up")
+
+      standby1.update_last_known_lsn("0/100")
+      standby2.update_last_known_lsn("0/200")
+
+      servers = nx.postgres_resource.servers
+      servers.reject { it.is_representative }.each do |s|
+        expect(s.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("512000\n")
+      end
+
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.reload.stack.first["total_lsn"]).to eq(standby1.lsn2int("0/100") + standby2.lsn2int("0/200"))
+    end
+
+    it "ignores recycling standbys when checking progress" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      recycling_standby = create_server
+      recycling_standby.incr_recycle
+      fresh_standby = create_server
+      fresh_standby.strand.update(label: "wait_catch_up")
+      servers = nx.postgres_resource.servers
+      recycling_from_assoc = servers.find { it.id == recycling_standby.id }
+      fresh_from_assoc = servers.find { it.id == fresh_standby.id }
+      expect(recycling_from_assoc.vm.sshable).not_to receive(:_cmd)
+      recycling_standby.update_last_known_lsn("0/FFFFFFF")
+      expect(fresh_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      fresh_standby.update_last_known_lsn("0/0")
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
     end
   end
 

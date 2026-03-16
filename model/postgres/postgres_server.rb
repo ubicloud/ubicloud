@@ -230,7 +230,7 @@ class PostgresServer < Sequel::Model
   def lsn_function_name
     if primary?
       "pg_current_wal_lsn"
-    elsif standby?
+    elsif standby? && strand.label != "wait_catch_up"
       "pg_last_wal_receive_lsn"
     else
       "pg_last_wal_replay_lsn"

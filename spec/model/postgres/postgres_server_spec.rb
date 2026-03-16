@@ -422,6 +422,7 @@ RSpec.describe PostgresServer do
     expect(postgres_server).to receive(:incr_checkup)
     expect(postgres_server).to receive(:primary?).and_return(false)
     expect(postgres_server).to receive(:standby?).and_return(true)
+    Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
     postgres_server.check_pulse(session:, previous_pulse: pulse)
   end
 

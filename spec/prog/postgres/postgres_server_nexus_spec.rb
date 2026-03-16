@@ -208,14 +208,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:bud).with(Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => postgres_server.vm.id, "user" => "ubi", "no_bundler_install" => true})
       expect { nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
     end
-
-    it "sets longer deadline for non-primary servers" do
-      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
-      standby_nx = described_class.new(standby.strand)
-      expect { standby_nx.bootstrap_rhizome }.to hop("wait_bootstrap_rhizome")
-      expect(standby_nx.strand.stack.first["deadline_target"]).to eq("wait")
-      expect(standby_nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 120 * 60)
-    end
   end
 
   describe "#wait_bootstrap_rhizome" do
@@ -836,9 +828,22 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#wait_catch_up" do
-    it "naps if the lag is too high" do
-      expect(server).to receive(:lsn_caught_up).and_return(false, false)
+    it "naps if the lag is too high and extends deadline when lsn progresses" do
+      expect(server).to receive(:lsn_caught_up).and_return(false)
+      expect(server).to receive(:current_lsn).and_return("0/1000000")
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: true)
       expect { nx.wait_catch_up }.to nap(30)
+      expect(nx.strand.stack.first["current_lsn"]).to eq("0/1000000")
+    end
+
+    it "naps without extending deadline when lsn has not progressed" do
+      nx.strand.stack.first["current_lsn"] = "0/1000000"
+      nx.strand.modified!(:stack)
+      nx.strand.save_changes
+      expect(server).to receive(:lsn_caught_up).and_return(false)
+      expect(server).to receive(:current_lsn).and_return("0/1000000")
+      expect(server).to receive(:lsn_diff).with("0/1000000", "0/1000000").and_return(0)
+      expect(nx).not_to receive(:register_deadline)
       expect { nx.wait_catch_up }.to nap(30)
     end
 
@@ -964,14 +969,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_checkup
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
-      expect { nx.wait }.to hop("unavailable")
-    end
-
-    it "registers a longer deadline when server needs recycling" do
-      nx.incr_checkup
-      expect(nx).to receive(:available?).and_return(false)
-      expect(nx.postgres_server).to receive(:needs_recycling?).and_return(true)
-      expect(nx).to receive(:register_deadline).with("wait", 30 * 60)
       expect { nx.wait }.to hop("unavailable")
     end
 
