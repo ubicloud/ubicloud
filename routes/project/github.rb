@@ -50,26 +50,47 @@ class Clover
         view "github/setting"
       end
 
-      r.post web? do
-        if typecast_params.present?("cache_enabled")
-          @installation.cache_enabled = typecast_params.bool("cache_enabled")
-        end
-
-        if typecast_params.present?("cache_scope_protected")
-          @installation.cache_scope_protected = typecast_params.bool("cache_scope_protected")
-        end
-
-        if typecast_params.present?("premium_runner_enabled")
-          @installation.allocator_preferences["family_filter"] = if typecast_params.bool("premium_runner_enabled")
-            ["premium", "standard"]
+      r.post web?, "set-premium" do
+        enabled = typecast_params.bool("premium_runner_enabled")
+        if @installation.premium_runner_enabled? != enabled
+          flash["notice"] = "Premium runners #{enabled ? "enabled" : "disabled"}"
+          DB.transaction do
+            @installation.allocator_preferences["family_filter"] = enabled ? ["premium", "standard"] : nil
+            @installation.modified!(:allocator_preferences)
+            @installation.save_changes
+            audit_log(@installation, enabled ? "enable_premium" : "disable_premium")
           end
-          @installation.modified!(:allocator_preferences)
+        else
+          no_audit_log
         end
-        DB.transaction do
-          @installation.save_changes
-          audit_log(@installation, "update")
-        end
+        r.redirect @installation, "/setting"
+      end
 
+      r.post web?, "set-cache" do
+        enabled = typecast_params.bool("cache_enabled")
+        if @installation.cache_enabled != enabled
+          flash["notice"] = "Ubicloud transparent cache #{enabled ? "enabled" : "disabled"}"
+          DB.transaction do
+            @installation.update(cache_enabled: enabled)
+            audit_log(@installation, enabled ? "enable_cache" : "disable_cache")
+          end
+        else
+          no_audit_log
+        end
+        r.redirect @installation, "/setting"
+      end
+
+      r.post web?, "set-cache-scope" do
+        enabled = typecast_params.bool("cache_scope_protected")
+        if @installation.cache_scope_protected != enabled
+          flash["notice"] = "Cache branch protection #{enabled ? "enabled" : "disabled"}"
+          DB.transaction do
+            @installation.update(cache_scope_protected: enabled)
+            audit_log(@installation, enabled ? "enable_cache_scope" : "disable_cache_scope")
+          end
+        else
+          no_audit_log
+        end
         r.redirect @installation, "/setting"
       end
 
