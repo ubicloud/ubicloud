@@ -63,11 +63,9 @@ class Prog::Vnet::NicNexus < Prog::Base
     end
 
     # Fallback to any available subnet
-    AwsSubnet
-      .where(private_subnet_aws_resource_id: ps_aws_resource.id)
-      .exclude(location_aws_az_id: excluded_az_ids)
-      .order_by(Sequel.function(:random))
-      .first
+    base_ds = AwsSubnet.where(private_subnet_aws_resource_id: ps_aws_resource.id)
+    ds = excluded_az_ids.empty? ? base_ds : base_ds.exclude(location_aws_az_id: excluded_az_ids)
+    ds.order_by(Sequel.function(:random)).first || base_ds.order_by(Sequel.function(:random)).first
   end
 
   def self.allocate_ipv4_from_aws_subnet(subnet, aws_subnet)

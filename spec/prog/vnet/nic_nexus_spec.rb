@@ -134,6 +134,13 @@ RSpec.describe Prog::Vnet::NicNexus do
       result = described_class.select_aws_subnet(aws_ps, nil, ["a"])
       expect(result.location_aws_az_id).to eq(az_b.id)
     end
+
+    it "falls back to any subnet when all availability zones are excluded" do
+      aws_ps
+      result = described_class.select_aws_subnet(aws_ps, nil, ["a"])
+      expect(result).to be_an(AwsSubnet)
+      expect(result.location_aws_az_id).to eq(az_a.id)
+    end
   end
 
   describe ".allocate_ipv4_from_aws_subnet" do
