@@ -1,0 +1,18 @@
+<table>
+  <thead>
+    <tr>
+      <% @columns.each do %>
+        <th><%= it %></th>
+      <% end %>
+    </tr>
+  </thead>
+  <tbody>
+    <% @rows.each do |row| %>
+      <tr>
+        <% row.each do %>
+          <td><%= it %></td>
+        <% end %>
+      </tr>
+    <% end %>
+  </tbody>
+</table>

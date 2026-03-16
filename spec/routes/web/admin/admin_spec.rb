@@ -1287,6 +1287,16 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_error "Unable to close admin account for \"foo\"."
   end
 
+  it "shows GitHub runner x64 VM usage" do
+    click_link "GitHub Runner x64 VM Usage"
+    expect(page.all("#content td").map(&:text)).to eq []
+
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
+    page.refresh
+    expect(page.all("#content td").map(&:text)).to eq ["test-installation", "true", "1", "1", "2", "", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+  end
+
   it "shows unavailable VMs" do
     project = Project.create(name: "test")
     vm = create_vm(project_id: project.id, name: "active-vm")
