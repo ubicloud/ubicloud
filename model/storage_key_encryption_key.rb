@@ -1,9 +1,23 @@
 # frozen_string_literal: true
 
+require "openssl"
+require "base64"
 require_relative "../model"
 
 class StorageKeyEncryptionKey < Sequel::Model
   plugin ResourceMethods, encrypted_columns: [:key, :init_vector]
+
+  def self.create_random(auth_data:, algorithm: "aes-256-gcm")
+    cipher = OpenSSL::Cipher.new(algorithm)
+    key = cipher.random_key
+    init_vector = cipher.random_iv
+    create(
+      algorithm:,
+      key: Base64.strict_encode64(key),
+      init_vector: Base64.strict_encode64(init_vector),
+      auth_data:
+    )
+  end
 
   def secret_key_material_hash
     # default to_hash doesn't decrypt encrypted columns, so implement
