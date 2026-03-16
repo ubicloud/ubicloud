@@ -57,6 +57,8 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         ps_aws_resource = PrivateSubnetAwsResource.create_with_id(ps.id)
         create_aws_subnet_records(ps, ps_aws_resource, location, ipv4_range_size, preferred_azs:)
         "Vnet::Aws::VpcNexus"
+      elsif location.gcp?
+        "Vnet::Gcp::SubnetNexus"
       else
         "Vnet::Metal::SubnetNexus"
       end
