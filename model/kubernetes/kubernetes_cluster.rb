@@ -77,8 +77,10 @@ class KubernetesCluster < Sequel::Model
     kubeconfig.to_yaml
   end
 
-  def kubeconfig
+  def kubeconfig(swallow_connection_exception: false)
     self.class.kubeconfig(cp_vms.first)
+  rescue *Sshable::SSH_CONNECTION_ERRORS
+    raise unless swallow_connection_exception
   end
 
   def internal_cp_vm_firewall

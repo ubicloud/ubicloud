@@ -195,6 +195,15 @@ RSpec.describe KubernetesCluster do
         expect(user["user"]["token"]).to eq("mocked_rbac_token")
       end
     end
+
+    it "supports swallow_connection_exception: true to suppress connection errors" do
+      sshable = Sshable.new
+      KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kc.id)
+      expect(kc.cp_vms.first).to receive(:sshable).and_return(sshable).at_least(:once)
+      expect(sshable).to receive(:_cmd).with("kubectl --kubeconfig <(sudo cat /etc/kubernetes/admin.conf) -n kube-system get secret k8s-access -o jsonpath='{.data.token}' | base64 -d", log: false).and_raise(IOError).twice
+      expect { kc.kubeconfig }.to raise_error(IOError)
+      expect(kc.kubeconfig(swallow_connection_exception: true)).to be_nil
+    end
   end
 
   describe "vm_diff_for_lb" do
