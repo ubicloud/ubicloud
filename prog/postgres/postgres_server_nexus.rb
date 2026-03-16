@@ -550,11 +550,6 @@ SQL
       postgres_server.refresh_walg_credentials
     end
 
-    when_configure_s3_new_timeline_set? do
-      decr_configure_s3_new_timeline
-      postgres_server.attach_s3_policy_if_needed
-    end
-
     if postgres_server.read_replica? && postgres_server.resource.parent
       nap 60 if postgres_server.lsn_caught_up
 
@@ -671,10 +666,8 @@ SQL
   label def lockout
     decr_lockout
 
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless postgres_server.resource.location.aws?
-      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    postgres_server.lockout_mechanisms.each do |mechanism|
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 
     hop_wait_lockout_attempt

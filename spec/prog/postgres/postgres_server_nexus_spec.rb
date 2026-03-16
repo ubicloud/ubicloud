@@ -355,6 +355,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to initialize_empty_database if the server is primary" do
       expect(server).to receive(:refresh_walg_credentials)
       expect(server).to receive(:attach_s3_policy_if_needed)
+      expect(server).to receive(:refresh_walg_credentials)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
@@ -364,6 +365,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       standby_nx = described_class.new(standby.strand)
       expect(standby_nx.postgres_server).to receive(:refresh_walg_credentials)
       expect(standby_nx.postgres_server).to receive(:attach_s3_policy_if_needed)
+      expect(standby_nx.postgres_server).to receive(:refresh_walg_credentials)
 
       expect { standby_nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
     end
