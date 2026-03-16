@@ -1483,7 +1483,7 @@ RSpec.describe CloverAdmin do
       insert_audit_log
 
       visit "/"
-      click_link "View/Search Audit Logs"
+      click_link "View Audit Logs"
 
       expect(page.title).to eq("Ubicloud Admin - Audit Log")
       expect(audit_log_content).to eq [project.ubid, "vm/create", user.ubid, ""]

@@ -47,7 +47,7 @@
       if has_permission?("Project:auditlog", @project)
          rows.push([
            "View Audit Logs",
-           "<a href=\"#{@project.path}/audit-log\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">View/Search Audit Logs</a>",
+           "<a href=\"#{@project.path}/audit-log\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">View Audit Logs</a>",
            { escape: false}
          ])
       end %>
