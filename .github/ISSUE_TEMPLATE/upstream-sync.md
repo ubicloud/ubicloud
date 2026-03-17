@@ -19,17 +19,6 @@
 
 </details>
 
----
-
-# 🤖 Automated Commit Analysis
-
-<details>
-<summary><b>Commit Comparison Results</b> (click to expand)</summary>
-
-{{COMMIT_ANALYSIS}}
-
-</details>
-
 <details>
 <summary><b>📖 Developer Guide</b> (click to expand)</summary>
 

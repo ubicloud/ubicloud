@@ -18,52 +18,50 @@ Analyze the commits and identify:
 3. Which commits require special attention (migrations, backfills, breaking changes)
 
 # Output
-Write your analysis to `commit-analysis.md` using EXACTLY this format:
+Write your analysis to `commit-analysis.md` using EXACTLY this format.
+
+**CRITICAL: Your output MUST be under 20,000 characters total.** Use compact table format. Do NOT repeat commit subjects verbatim if they are long — abbreviate to ~40 chars. GitHub issues have a 65536 character body limit and the analysis is only one section.
 
 ---START OF FORMAT---
-## 🔄 Commits Likely Upstreamed (DROP during rebase)
+## Commits Likely Upstreamed (DROP during rebase)
 
 _If no matches found, write: "No obvious matches found."_
 
-- **Internal**: `<hash>` - <subject>
-  **Upstream**: `<hash>` - <subject>
-  **Similarity**: <percentage or description>
-  **Recommendation**: DROP internal commit during interactive rebase
-  **Reason**: <brief explanation of why they're similar>
+| Internal | Upstream | Similarity | Reason |
+|----------|----------|------------|--------|
+| `<hash>` <subject> | `<hash>` <subject> | High/Med | brief reason |
 
-## ⚠️ Potential Conflicts
+## Potential Conflicts
 
 _If no conflicts expected, write: "No obvious conflicts detected."_
 
-- **Internal**: `<hash>` - <subject>
-  **Upstream**: `<hash>` - <subject>
-  **Conflict Risk**: <High/Medium/Low>
-  **Files Likely Affected**: <list files or "Unknown">
-  **Recommendation**: <specific guidance for resolving>
+| Internal | Upstream | Risk | Files Affected | Resolution |
+|----------|----------|------|----------------|------------|
+| `<hash>` <subject> | `<hash>` <subject> | High/Med/Low | file list | guidance |
 
-## 🔍 Commits Requiring Special Attention
+## Commits Requiring Special Attention
 
 _If none, write: "No special attention needed."_
 
-- **Commit**: `<hash>` - <subject>
-  **Type**: <Migration/Backfill/Breaking Change/Security/Other>
-  **Why**: <explanation>
-  **Action Needed**: <specific steps>
+| Commit | Type | Why | Action |
+|--------|------|-----|--------|
+| `<hash>` <subject> | Migration/Backfill/Breaking/Security | brief | steps |
 
-## ✅ Safe Internal Commits (No conflicts expected)
+## Safe Internal Commits (No conflicts expected)
 
-_List all internal commits not mentioned above_
+| Commit |
+|--------|
+| `<hash>` <subject> |
 
-- `<hash>` - <subject>
-- `<hash>` - <subject>
+## Summary
 
-## 📊 Summary
-
-- Total internal commits: <number>
-- Total upstream commits: <number>
-- Commits to drop: <number>
-- Potential conflicts: <number>
-- Commits needing attention: <number>
+| Metric | Count |
+|--------|-------|
+| Internal commits | N |
+| Upstream commits | N |
+| Commits to drop | N |
+| Potential conflicts | N |
+| Needs attention | N |
 ---END OF FORMAT---
 
 # Important Instructions
@@ -73,3 +71,4 @@ _List all internal commits not mentioned above_
 - Be specific with commit hashes (use the short hash from the log)
 - Be conservative: when uncertain, flag as potential conflict
 - Keep explanations concise but actionable
+- HARD LIMIT: Output must be under 20,000 characters. Abbreviate commit subjects, keep reason/action columns brief. If there are many safe commits, group similar ones into a single row (e.g. "5 test-only commits: `abc`, `def`, ...")
