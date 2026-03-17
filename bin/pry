@@ -5,8 +5,8 @@ REPL = true
 
 require_relative "../loader"
 
-if Config.production? && !Config.is_e2e && ENV["INGEST_KEY"].nil?
-  puts "INGEST_KEY is not set in production environment. This is not allowed for auditing purposes."
+if Config.production? && !Config.is_e2e && Config.ingest_key.nil? && Config.otel_exporter_otlp_endpoint.nil?
+  puts "INGEST_KEY or OTEL_EXPORTER_OTLP_ENDPOINT is not set in production environment. This is not allowed for auditing purposes."
   exit(1)
 end
 
@@ -60,9 +60,13 @@ if Config.development?
   Pry.prepend(PryReloader)
 end
 
-if ENV["INGEST_KEY"]
-  PRY_LOGGER = LogDnaBatcher.new(ENV["INGEST_KEY"])
+PRY_LOGGER = if Config.ingest_key
+  LogDnaBatcher.new(Config.ingest_key)
+elsif Config.otel_exporter_otlp_endpoint
+  OtelBatcher.new(Config.otel_exporter_otlp_endpoint, default_resource_attrs: {"service.name" => "pry"})
+end
 
+if PRY_LOGGER
   module PryLogger
     def evaluate_ruby(code)
       @counter ||= 0
@@ -76,7 +80,8 @@ if ENV["INGEST_KEY"]
 
         # Log output
         output = result.inspect
-        output = "#{output[0..500]}..." if output.length > 500
+        truncate_limit = Config.pry_logger_truncate_limit
+        output = "#{output[0..truncate_limit]}..." if output.length > truncate_limit
         PRY_LOGGER.log(output, app: "pry", level: "info", type: "pry_output", counter: @counter)
 
         result

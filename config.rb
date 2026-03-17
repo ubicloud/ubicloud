@@ -179,6 +179,9 @@ module Config
 
   # Logging
   optional :database_logger_level, string
+  optional :ingest_key, string, clear: true
+  optional :otel_exporter_otlp_endpoint, string
+  override :pry_logger_truncate_limit, 500, int
 
   # Ubicloud Images (Minio)
   override :ubicloud_images_bucket_name, "ubicloud-images", string
