@@ -177,9 +177,35 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.cleanup_cache
     end
 
-    it "deletes blob storage if there are no cache entries" do
+    it "sets no_cache_since when cache entries become empty" do
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to eq(now)
+    end
+
+    it "does not overwrite no_cache_since if already set" do
+      purged_at = now - 3 * 24 * 60 * 60
+      repository.update(no_cache_since: purged_at)
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to eq(purged_at)
+    end
+
+    it "deletes blob storage if cache has been empty for more than 7 days" do
+      repository.update(no_cache_since: now - 8 * 24 * 60 * 60)
       expect(nx.github_repository).to receive(:destroy_blob_storage)
       nx.cleanup_cache
+    end
+
+    it "does not delete blob storage if cache has been empty for less than 7 days" do
+      repository.update(no_cache_since: now - 3 * 24 * 60 * 60)
+      expect(nx.github_repository).not_to receive(:destroy_blob_storage)
+      nx.cleanup_cache
+    end
+
+    it "clears no_cache_since when cache entries exist" do
+      repository.update(no_cache_since: now - 1 * 24 * 60 * 60)
+      create_cache_entry
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to be_nil
     end
   end
 
