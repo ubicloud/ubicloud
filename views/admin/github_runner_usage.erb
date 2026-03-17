@@ -1,0 +1,25 @@
+<% @page_title = "GitHub Runner #{@arch} VM Usage" %>
+
+<%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
+
+<% other_arch = (@arch == "x64") ? "arm64" : "x64" %>
+<h3><a href="/github-runner-usage?arch=<%= other_arch %>">Show
+    <%= other_arch %></a></h3>
+
+<h3>Columns</h3>
+<p><strong>premium:</strong>
+  Whether premium runners are enabled. Even when enabled, runners can still fall back to standard</p>
+<p><strong>runner:</strong>
+  Number of requested runners</p>
+<p><strong>runner_unalloc:</strong>
+  Number of unallocated runners, meaning they are waiting for the concurrency limit</p>
+<p><strong>runner_vcpus:</strong>
+  Total vCPUs of requested runners</p>
+<p><strong>vm_vcpus:</strong>
+  Total vCPUs of VMs, indicating they passed the concurrency limit</p>
+<p><strong>vm_vcpus_unalloc:</strong>
+  Total unallocated vCPUs of VMs, meaning they passed the concurrency limit but haven't found an available VM host yet</p>
+<p><strong>s*:</strong>
+  Number of runners with that standard label. If premium is enabled, these may be premium or standard</p>
+<p><strong>p*:</strong>
+  Number of runners explicitly requested with a premium label</p>

@@ -868,9 +868,8 @@ class CloverAdmin < Roda
       view("admin_list")
     end
 
-    r.get "github-runner-x64-usage" do
-      @columns = [:name, :premium, :runner, :runner_unalloc, :runner_vcpus, :vm_vcpus, :vm_vcpus_unalloc, :std_2, :std_4, :std_8, :std_16, :std_30, :std_60, :prm_2, :prm_4, :prm_8, :prm_16, :prm_30]
-      @rows = DB[<<~'SQL'].map(@columns)
+    github_runner_usage_sql = lambda do |arm_filter|
+      <<~SQL.freeze
         SELECT i.name,
           i.allocator_preferences->'family_filter' ? 'premium' AS premium,
           count(*) AS runner,
@@ -878,33 +877,39 @@ class CloverAdmin < Roda
           SUM(
             CASE
               WHEN r.label = 'ubicloud' THEN 2
-              ELSE REGEXP_REPLACE(r.label, '^.*(?:standard|premium)-(\d+).*$', '\1')::INT
+              WHEN r.label = 'ubicloud-arm' THEN 2
+              ELSE REGEXP_REPLACE(r.label, '^.*(?:standard|premium)-(\\d+).*$', '\\1')::INT
             END
           ) AS runner_vcpus,
           sum(v.vcpus) AS vm_vcpus,
           COALESCE(sum(v.vcpus) FILTER (WHERE v.allocated_at IS NULL), 0) AS vm_vcpus_unalloc,
-          count(*) FILTER (WHERE r.label = 'ubicloud' OR r.label LIKE '%standard-2%') AS std_2,
-          count(*) FILTER (WHERE r.label LIKE '%standard-4%') AS std_4,
-          count(*) FILTER (WHERE r.label LIKE '%standard-8%') AS std_8,
-          count(*) FILTER (WHERE r.label LIKE '%standard-16%') AS std_16,
-          count(*) FILTER (WHERE r.label LIKE '%standard-30%') AS std_30,
-          count(*) FILTER (WHERE r.label LIKE '%standard-60%') AS std_60,
-          count(*) FILTER (WHERE r.label LIKE '%premium-2%') AS prm_2,
-          count(*) FILTER (WHERE r.label LIKE '%premium-4%') AS prm_4,
-          count(*) FILTER (WHERE r.label LIKE '%premium-8%') AS prm_8,
-          count(*) FILTER (WHERE r.label LIKE '%premium-16%') AS prm_16,
-          count(*) FILTER (WHERE r.label LIKE '%premium-30%') AS prm_30
+          count(*) FILTER (WHERE r.label = 'ubicloud' OR r.label = 'ubicloud-arm' OR r.label LIKE '%standard-2%') AS s2,
+          count(*) FILTER (WHERE r.label LIKE '%standard-4%') AS s4,
+          count(*) FILTER (WHERE r.label LIKE '%standard-8%') AS s8,
+          count(*) FILTER (WHERE r.label LIKE '%standard-16%') AS s16,
+          count(*) FILTER (WHERE r.label LIKE '%standard-30%') AS s30,
+          count(*) FILTER (WHERE r.label LIKE '%standard-60%') AS s60,
+          count(*) FILTER (WHERE r.label LIKE '%premium-2%') AS p2,
+          count(*) FILTER (WHERE r.label LIKE '%premium-4%') AS p4,
+          count(*) FILTER (WHERE r.label LIKE '%premium-8%') AS p8,
+          count(*) FILTER (WHERE r.label LIKE '%premium-16%') AS p16,
+          count(*) FILTER (WHERE r.label LIKE '%premium-30%') AS p30
         FROM github_runner AS r
         LEFT JOIN github_installation AS i ON i.id = r.installation_id
         LEFT JOIN project AS p ON p.id = i.project_id
         LEFT JOIN vm AS v on v.id = r.vm_id
         LEFT JOIN strand AS s ON s.id = r.id
-        WHERE r.label NOT LIKE '%-arm%' AND r.label NOT LIKE '%-gpu%'
+        WHERE r.label #{arm_filter} '%-arm%'
         GROUP BY i.name, premium
         ORDER BY runner_vcpus DESC, vm_vcpus DESC NULLS LAST;
       SQL
-      @page_title = "GitHub Runner x64 VM Usage"
-      view("table")
+    end
+    github_runner_usage_sqls = {"x64" => github_runner_usage_sql.call("NOT LIKE"), "arm64" => github_runner_usage_sql.call("LIKE")}.freeze
+
+    r.get "github-runner-usage" do
+      @arch = (typecast_params.str("arch") == "arm64") ? "arm64" : "x64"
+      @data = DB[github_runner_usage_sqls[@arch]].all
+      view("github_runner_usage")
     end
 
     r.post "close-admin-account" do
