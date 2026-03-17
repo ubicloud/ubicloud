@@ -959,6 +959,25 @@ RSpec.describe Clover, "auth" do
         end
       end
 
+      it "can login via OIDC flow with with OIDC groups" do
+        oidc_provider.update(group_prefix: "foo-")
+        omniauth_key = oidc_provider.ubid.to_sym
+        AccountIdentity.create(account_id: Account.first.id, provider: oidc_provider.ubid, uid: "789")
+        OmniAuth.config.add_mock(omniauth_key, provider: oidc_provider.ubid, uid: "789",
+          info: {email: "user@example.com", groups: %w[group1 group2]})
+        click_button "Log out"
+
+        fill_in "Email Address", with: TEST_USER_EMAIL
+        click_button "Sign in"
+        expect(page).to have_content("Password")
+        expect(page).to have_content("Or login with:")
+        expect(Clog).to receive(:emit).with("OIDC groups login", oidc_groups_login: {groups: %w[group1 group2], group_prefix: "foo-"})
+        click_button "TestOIDC"
+
+        expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(page).to have_flash_notice("You have been logged in")
+      end
+
       it "can connect to existing account" do
         mock_provider(:github, "uSer@example.com")
 
