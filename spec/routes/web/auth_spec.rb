@@ -1307,6 +1307,49 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Default Dashboard")
         expect(page).to have_flash_notice("You have been logged in")
+
+        project = Project.first
+        visit project.path
+        click_link "View Audit Logs"
+        expect(page.title).to eq("Ubicloud - Default - Audit Log")
+
+        AccessControlEntry.dataset.destroy
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Forbidden")
+
+        subject_tag = SubjectTag.create(project_id: project.id, name: "bar-group1")
+        AccessControlEntry.create(project_id: project.id, subject_id: subject_tag.id)
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Forbidden")
+
+        subject_tag.update(name: "foo-group1")
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Default - Audit Log")
+
+        subject_tag.update(name: "foo-group2")
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Default - Audit Log")
+
+        subject_tag.update(name: "foo-group3")
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Forbidden")
+
+        subject_tag2 = SubjectTag.create(project_id: project.id, name: "bar-group1")
+        subject_tag.add_member(subject_tag2.id)
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Forbidden")
+
+        subject_tag2.update(name: "foo-group1")
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Default - Audit Log")
+
+        subject_tag2.update(name: "foo-group2")
+        page.refresh
+        expect(page.title).to eq("Ubicloud - Default - Audit Log")
+        expect(audit_log_hash).to eq({
+          "login" => ip_hash("via" => "TestOIDC"),
+          "logout" => ip_hash,
+        })
       end
 
       it "can connect to existing account" do
