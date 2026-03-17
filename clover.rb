@@ -481,12 +481,24 @@ class Clover < Roda
 
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
-      if omniauth_identity && omniauth_params["redirect_url"]
-        add_audit_log(session_value, :connect_provider, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
-        flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
-        # Don't trust the omniauth params, always redirect to the login methods page,
-        # as that is the only page that should be setting redirect_url
-        redirect "/account/login-method"
+      if omniauth_identity
+        if (groups = omniauth_info["groups"]) &&
+            omniauth_provider.to_s.bytesize == 26 &&
+            (provider = OidcProvider[omniauth_provider]) &&
+            (group_prefix = provider.group_prefix)
+          groups = groups.to_a.map(&:to_s)
+          session["oidc_groups"] = groups
+          session["oidc_group_prefix"] = group_prefix
+          Clog.emit("OIDC groups login", oidc_groups_login: {groups:, group_prefix:})
+        end
+
+        if omniauth_params["redirect_url"]
+          add_audit_log(session_value, :connect_provider, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
+          flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
+          # Don't trust the omniauth params, always redirect to the login methods page,
+          # as that is the only page that should be setting redirect_url
+          redirect "/account/login-method"
+        end
       end
     end
 
@@ -621,6 +633,7 @@ class Clover < Roda
             authorization_endpoint: provider.authorization_endpoint,
             token_endpoint: provider.token_endpoint,
             userinfo_endpoint: provider.userinfo_endpoint,
+            need_groups: provider.group_prefix,
           }
 
         builder.run builder_app
