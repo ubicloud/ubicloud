@@ -11,6 +11,6 @@ UbiCli.on("gh").run_on("list-cache-entries") do
 
   run do |opts|
     cache_entries = @repository.cache_entries.each { it.values[:size] = Clover.humanize_size(it[:size]) }
-    response(format_rows(%i[id size key], cache_entries, headers: opts[key][:"no-headers"] != false))
+    response(format_rows(%i[id size created_at last_accessed_at key], cache_entries, headers: opts[key][:"no-headers"] != false))
   end
 end

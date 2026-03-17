@@ -7,7 +7,9 @@ class Serializers::GithubCacheEntry < Serializers::Base
       installation_name: options[:installation].name,
       repository_name: options[:repository].name,
       key: cache_entry.key,
-      size: cache_entry.size
+      size: cache_entry.size,
+      created_at: cache_entry.created_at.utc.iso8601,
+      last_accessed_at: cache_entry.last_accessed_at&.utc&.iso8601
     }
   end
 end
