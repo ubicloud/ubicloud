@@ -92,6 +92,17 @@ RSpec.describe Clover, "github" do
     expect(page).to have_flash_error(/^GitHub App installation failed.*/)
   end
 
+  it "fails if Octokit::Unauthorized is raised when looking for installation" do
+    expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
+    expect(adhoc_client).to receive(:get).with("/user/installations").and_raise(Octokit::Unauthorized)
+
+    visit "/set_github_installation_project_id/#{project.ubid}"
+    visit "/github/callback?code=123123"
+
+    expect(page.title).to eq("Ubicloud - GitHub Runners Integration")
+    expect(page).to have_flash_error(/^GitHub App installation failed.*/)
+  end
+
   it "fails if the project is not active" do
     expect(oauth_client).to receive(:exchange_code_for_token).with("123123").and_return({access_token: "123"})
     expect(adhoc_client).to receive(:get).with("/user/installations").and_return({installations: [{id: 345, account: {login: "test-user", type: "User"}}]})

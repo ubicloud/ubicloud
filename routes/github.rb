@@ -37,9 +37,19 @@ class Clover
         r.redirect project, "/github"
       end
 
-      unless (installation_response = Octokit::Client.new(access_token:).get("/user/installations")[:installations].find { it[:id].to_s == installation_id })
+      begin
+        installation_response = Octokit::Client.new(access_token:).get("/user/installations")[:installations].find { it[:id].to_s == installation_id }
+      rescue Octokit::Unauthorized => e
+        installation_octokit_error = e
+      end
+
+      unless installation_response
         flash["error"] = "GitHub App installation failed. For any questions or assistance, reach out to our team at support@ubicloud.com"
-        Clog.emit("GitHub callback failed due to lack of installation", {installation_failed: {id: installation_id, account_ubid: current_account.ubid}})
+        installation_failed = {id: installation_id, account_ubid: current_account.ubid}
+        if installation_octokit_error
+          Util.exception_to_hash(installation_octokit_error, into: installation_failed)
+        end
+        Clog.emit("GitHub callback failed due to lack of installation", {installation_failed:})
         r.redirect project, "/github"
       end
 
