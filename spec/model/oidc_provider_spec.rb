@@ -30,34 +30,46 @@ RSpec.describe OidcProvider do
     expect(described_class.name_for_ubid(provider.ubid)).to eq "TestOIDC"
   end
 
-  it ".register registers a new provider" do
-    Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+  [true, false].each do |with_group_prefix|
+    it ".register registers a new provider#{" with group prefix" if with_group_prefix}" do
+      Excon.stub({path: "/.well-known/openid-configuration", method: :get}, {status: 200, body: registration_body})
+      scopes = "openid email"
+      if with_group_prefix
+        scopes += " groups"
+        group_prefix = "foo-"
+      end
 
-    request_body = {
-      client_name: "Ubicloud",
-      redirect_uris: ["#{Config.base_url}/auth/0pk8pg19vxe24gbdms7hmw780h/callback"],
-      scopes: "openid email"
-    }.to_json
-    response_body = {
-      client_id: "123",
-      client_secret: "456",
-      registration_client_uri: "https://host/rc",
-      registration_access_token: "789"
-    }.to_json
-    Excon.stub({path: "/register", method: :post, body: request_body}, {status: 201, body: response_body})
+      request_body = {
+        client_name: "Ubicloud",
+        redirect_uris: ["#{Config.base_url}/auth/0pk8pg19vxe24gbdms7hmw780h/callback"],
+        scopes:
+      }.to_json
+      response_body = {
+        client_id: "123",
+        client_secret: "456",
+        registration_client_uri: "https://host/rc",
+        registration_access_token: "789"
+      }.to_json
+      Excon.stub({path: "/register", method: :post, body: request_body}, {status: 201, body: response_body})
 
-    expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
-    oidc_provider = described_class.register("Test", "https://example.com")
-    expect(described_class.all).to eq [oidc_provider]
-    expect(oidc_provider.url).to eq "https://host/issuer"
-    expect(oidc_provider.client_id).to eq "123"
-    expect(oidc_provider.client_secret).to eq "456"
-    expect(oidc_provider.authorization_endpoint).to eq "/auth"
-    expect(oidc_provider.token_endpoint).to eq "/tok"
-    expect(oidc_provider.userinfo_endpoint).to eq "/ui"
-    expect(oidc_provider.jwks_uri).to eq "https://host/jw"
-    expect(oidc_provider.registration_client_uri).to eq "https://host/rc"
-    expect(oidc_provider.registration_access_token).to eq "789"
+      expect(described_class).to receive(:generate_uuid).and_return("9a2d00a7-7d70-8816-82db-4c9e34e1d008")
+      oidc_provider = described_class.register("Test", "https://example.com", group_prefix:)
+      expect(described_class.all).to eq [oidc_provider]
+      expect(oidc_provider.url).to eq "https://host/issuer"
+      expect(oidc_provider.client_id).to eq "123"
+      expect(oidc_provider.client_secret).to eq "456"
+      expect(oidc_provider.authorization_endpoint).to eq "/auth"
+      expect(oidc_provider.token_endpoint).to eq "/tok"
+      expect(oidc_provider.userinfo_endpoint).to eq "/ui"
+      expect(oidc_provider.jwks_uri).to eq "https://host/jw"
+      expect(oidc_provider.registration_client_uri).to eq "https://host/rc"
+      expect(oidc_provider.registration_access_token).to eq "789"
+      if group_prefix
+        expect(oidc_provider.group_prefix).to eq "foo-"
+      else
+        expect(oidc_provider.group_prefix).to be_nil
+      end
+    end
   end
 
   it ".register registers a new provider with given client_id and client_secret" do
