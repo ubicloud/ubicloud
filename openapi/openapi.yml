@@ -2760,6 +2760,15 @@ components:
         size:
           description: Size of the GitHub cache entry in bytes
           type: integer
+        created_at:
+          description: Timestamp of when the cache entry was created
+          type: string
+          format: date-time
+        last_accessed_at:
+          description: Timestamp of when the cache entry was last accessed
+          type: string
+          format: date-time
+          nullable: true
       additionalProperties: false
       required:
         - id
@@ -2767,6 +2776,8 @@ components:
         - repository_name
         - key
         - size
+        - created_at
+        - last_accessed_at
     GithubRepository:
       type: object
       properties:

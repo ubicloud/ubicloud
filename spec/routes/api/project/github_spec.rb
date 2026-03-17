@@ -32,6 +32,19 @@ RSpec.describe Clover, "github" do
     get "/project/#{project.ubid}/github/test-user/repository/test-repo/cache/#{cache_entry.ubid}"
 
     expect(last_response.status).to eq(200)
-    expect(JSON.parse(last_response.body)["key"]).to eq(cache_entry.key)
+    body = JSON.parse(last_response.body)
+    expect(body["key"]).to eq(cache_entry.key)
+    expect(body).to have_key("created_at")
+    expect(body).to have_key("last_accessed_at")
+  end
+
+  it "returns last_accessed_at when cache entry was accessed" do
+    cache_entry.update(last_accessed_at: Time.now)
+    get "/project/#{project.ubid}/github/test-user/repository/test-repo/cache/#{cache_entry.ubid}"
+
+    expect(last_response.status).to eq(200)
+    body = JSON.parse(last_response.body)
+    expect(body["last_accessed_at"]).not_to be_nil
+    expect { Time.iso8601(body["last_accessed_at"]) }.not_to raise_error
   end
 end

@@ -38,7 +38,7 @@ RSpec.describe Clover, "cli" do
 
     gi = GithubInstallation.create_with_id("6e3ae4a8-5474-8a01-b485-3b02ac649c5f", project_id: @project.id, installation_id: 12345678, name: "test-installation-name", type: "user")
     gp = GithubRepository.create_with_id("a58006b6-0879-8616-936a-62234e244f2f", installation_id: gi.id, name: "test-installation-name/test-repository-name")
-    GithubCacheEntry.create_with_id("967f7e02-68f8-8a0e-9917-fd13d5f33501", repository_id: gp.id, key: "test-key", version: "test-version", scope: "test-scope", size: 10987654321, created_by: gp.id)
+    GithubCacheEntry.create_with_id("967f7e02-68f8-8a0e-9917-fd13d5f33501", repository_id: gp.id, key: "test-key", version: "test-version", scope: "test-scope", size: 10987654321, created_by: gp.id, created_at: now, last_accessed_at: now)
 
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
     expect(Vm).to receive(:generate_ubid).and_return(UBID.parse("vma9rnygexga6jns6x3yj9a6b2"))
