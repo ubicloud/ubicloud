@@ -124,6 +124,7 @@ module OmniAuth
 
         @access_token = token_hash["access_token"]
         @access_token_expires_in = token_hash["expires_in"]
+        need_user_info = true
 
         if (@id_token = token_hash["id_token"])
           token = JWT.decode(@id_token, nil, false)
@@ -145,17 +146,30 @@ module OmniAuth
                 user_info["email_verified"] = token["email_verified"]
               end
               @user_info = user_info
+              need_user_info = false
+            end
+
+            if opts[:need_groups]
+              if (groups = token["groups"])
+                Clog.emit("OIDC groups found in token", oidc_groups_found: {groups:, user_info:})
+                user_info["groups"] = groups
+              else
+                Clog.emit("OIDC groups not found in token", oidc_groups_not_found: {keys: token.keys, user_info:})
+                need_user_info = true
+              end
             end
           end
         end
 
-        unless @user_info
+        unless need_user_info
           response = Excon.get(
             base_url_for(:userinfo_endpoint),
             headers: {'Authorization' => "Bearer #{@access_token}", "Accept" => "application/json"},
             expects: 200
           )
-          @user_info = JSON.parse(response.body)
+          user_info = JSON.parse(response.body)
+          @user_info ||= {}
+          @user_info.merge!(user_info)
         end
 
         super
