@@ -137,7 +137,7 @@ class Clover
               retry
             else
               Clog.emit("Could not authorize multipart upload", {could_not_authorize_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})
-              fail CloverError.new(400, "InvalidRequest", "Could not authorize multipart upload")
+              fail CloverError.new(503, "InvalidRequest", "Could not authorize multipart upload")
             end
           end
 
