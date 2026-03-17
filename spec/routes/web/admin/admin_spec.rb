@@ -1288,26 +1288,48 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows GitHub runner x64 VM usage" do
+    installation_id = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User").id
+    repository_name = "test-repo"
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-arm")
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-2", allocated_at: Time.now, vm_id: create_vm(vcpus: 2, allocated_at: Time.now).id)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-4", allocated_at: Time.now, vm_id: create_vm(vcpus: 4, family: "premium").id)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-8", allocated_at: Time.now, vm_id: create_vm(vcpus: 8, family: "m7a").id)
+    GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-standard-30")
+
+    click_link "GitHub Runner VM Usage"
+    expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
+    expect(page).to have_link "Show arm64"
+    expect(page.all("#content td").map(&:text)).to eq [
+      "test-installation", "true",
+      "2", "1", "1", "0", "1", "0",
+      "16/46", "2/14",
+      "1", "0", "0", "0", "0", "0",
+      "0", "1", "0", "0", "0",
+      "0", "0", "1", "0"
+    ]
+  end
+
+  it "shows GitHub runner arm64 VM usage" do
     click_link "GitHub Runner VM Usage"
     expect(page.all("#content td").map(&:text)).to eq []
 
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
-    GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
-    page.refresh
-    expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
-    expect(page).to have_link "Show arm64"
-    expect(page.all("#content td").map(&:text)).to eq ["test-installation", "true", "1", "1", "2", "", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
-  end
-
-  it "shows GitHub runner arm64 VM usage" do
-    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud-arm")
     GithubRunner.create(installation_id: installation.id, repository_name: "test-repo", label: "ubicloud")
 
-    visit "/github-runner-usage?arch=arm64"
+    click_link "Show arm64"
+
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
-    expect(page.all("#content td").map(&:text)).to eq ["test-installation", "true", "1", "1", "2", "", "0", "1", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"]
+    expect(page.all("#content td").map(&:text)).to eq [
+      "test-installation", "true",
+      "1", "0", "0", "0", "0", "0",
+      "0/2", "0/0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0"
+    ]
   end
 
   it "shows unavailable VMs" do

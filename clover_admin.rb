@@ -872,36 +872,45 @@ class CloverAdmin < Roda
       <<~SQL.freeze
         SELECT i.name,
           i.allocator_preferences->'family_filter' ? 'premium' AS premium,
-          count(*) AS runner,
-          count(*) FILTER (WHERE r.allocated_at IS NULL) AS runner_unalloc,
-          SUM(
-            CASE
-              WHEN r.label = 'ubicloud' THEN 2
-              WHEN r.label = 'ubicloud-arm' THEN 2
-              ELSE REGEXP_REPLACE(r.label, '^.*(?:standard|premium)-(\\d+).*$', '\\1')::INT
-            END
-          ) AS runner_vcpus,
-          sum(v.vcpus) AS vm_vcpus,
-          COALESCE(sum(v.vcpus) FILTER (WHERE v.allocated_at IS NULL), 0) AS vm_vcpus_unalloc,
-          count(*) FILTER (WHERE r.label = 'ubicloud' OR r.label = 'ubicloud-arm' OR r.label LIKE '%standard-2%') AS s2,
-          count(*) FILTER (WHERE r.label LIKE '%standard-4%') AS s4,
-          count(*) FILTER (WHERE r.label LIKE '%standard-8%') AS s8,
-          count(*) FILTER (WHERE r.label LIKE '%standard-16%') AS s16,
-          count(*) FILTER (WHERE r.label LIKE '%standard-30%') AS s30,
-          count(*) FILTER (WHERE r.label LIKE '%standard-60%') AS s60,
-          count(*) FILTER (WHERE r.label LIKE '%premium-2%') AS p2,
-          count(*) FILTER (WHERE r.label LIKE '%premium-4%') AS p4,
-          count(*) FILTER (WHERE r.label LIKE '%premium-8%') AS p8,
-          count(*) FILTER (WHERE r.label LIKE '%premium-16%') AS p16,
-          count(*) FILTER (WHERE r.label LIKE '%premium-30%') AS p30
-        FROM github_runner AS r
+          count(*) FILTER (WHERE r.vcpus = 2) AS r2,
+          count(*) FILTER (WHERE r.vcpus = 4) AS r4,
+          count(*) FILTER (WHERE r.vcpus = 8) AS r8,
+          count(*) FILTER (WHERE r.vcpus = 16) AS r16,
+          count(*) FILTER (WHERE r.vcpus = 30) AS r30,
+          count(*) FILTER (WHERE r.vcpus = 60) AS r60,
+          CONCAT(COALESCE(sum(r.vcpus) FILTER (WHERE r.allocated_at IS NOT NULL), 0), '/', sum(r.vcpus)) as runner_vcpus,
+          CONCAT(COALESCE(sum(v.vcpus) FILTER (WHERE v.allocated_at IS NOT NULL), 0), '/', COALESCE(sum(v.vcpus), 0)) as vm_vcpus,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 2) AS s2,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 4) AS s4,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 8) AS s8,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 16) AS s16,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 30) AS s30,
+          count(*) FILTER (WHERE v.family = 'standard' AND v.vcpus = 60) AS s60,
+          count(*) FILTER (WHERE v.family = 'premium' AND v.vcpus = 2) AS p2,
+          count(*) FILTER (WHERE v.family = 'premium' AND v.vcpus = 4) AS p4,
+          count(*) FILTER (WHERE v.family = 'premium' AND v.vcpus = 8) AS p8,
+          count(*) FILTER (WHERE v.family = 'premium' AND v.vcpus = 16) AS p16,
+          count(*) FILTER (WHERE v.family = 'premium' AND v.vcpus = 30) AS p30,
+          count(*) FILTER (WHERE v.family LIKE 'm%' AND v.vcpus = 2) AS a2,
+          count(*) FILTER (WHERE v.family LIKE 'm%' AND v.vcpus = 4) AS a4,
+          count(*) FILTER (WHERE v.family LIKE 'm%' AND v.vcpus = 8) AS a8,
+          count(*) FILTER (WHERE v.family LIKE 'm%' AND v.vcpus = 16) AS a16
+        FROM (
+          SELECT id, installation_id, label, vm_id, allocated_at,
+          CASE
+            WHEN label = 'ubicloud' THEN 2
+            WHEN label = 'ubicloud-arm' THEN 2
+            ELSE REGEXP_REPLACE(label, '^.*(?:standard|premium)-(\\d+).*$', '\\1')::INT
+          END as vcpus
+          FROM github_runner
+          WHERE label #{arm_filter} '%-arm%'
+        ) AS r
         LEFT JOIN github_installation AS i ON i.id = r.installation_id
         LEFT JOIN project AS p ON p.id = i.project_id
         LEFT JOIN vm AS v on v.id = r.vm_id
         LEFT JOIN strand AS s ON s.id = r.id
-        WHERE r.label #{arm_filter} '%-arm%'
         GROUP BY i.name, premium
-        ORDER BY runner_vcpus DESC, vm_vcpus DESC NULLS LAST;
+        ORDER BY sum(r.vcpus) DESC, sum(v.vcpus) DESC NULLS LAST;
       SQL
     end
     github_runner_usage_sqls = {"x64" => github_runner_usage_sql.call("NOT LIKE"), "arm64" => github_runner_usage_sql.call("LIKE")}.freeze

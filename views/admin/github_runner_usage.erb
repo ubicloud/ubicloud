@@ -8,18 +8,17 @@
 
 <h3>Columns</h3>
 <p><strong>premium:</strong>
-  Whether premium runners are enabled. Even when enabled, runners can still fall back to standard</p>
-<p><strong>runner:</strong>
-  Number of requested runners</p>
-<p><strong>runner_unalloc:</strong>
-  Number of unallocated runners, meaning they are waiting for the concurrency limit</p>
+  Whether premium runners are enabled. Even when enabled, runners can still fall back to standard.</p>
+<p><strong>r*:</strong>
+  Number of requested runners with the specified vCPU count.</p>
 <p><strong>runner_vcpus:</strong>
-  Total vCPUs of requested runners</p>
+  Total allocated vCPUs / total requested vCPUs. Unallocated runners are waiting for the concurrency limit.</p>
 <p><strong>vm_vcpus:</strong>
-  Total vCPUs of VMs, indicating they passed the concurrency limit</p>
-<p><strong>vm_vcpus_unalloc:</strong>
-  Total unallocated vCPUs of VMs, meaning they passed the concurrency limit but haven't found an available VM host yet</p>
+  Total allocated vCPUs / total vCPUs. Unallocated VMs have passed the concurrency limit but haven't found an available
+  VM host yet.</p>
 <p><strong>s*:</strong>
-  Number of runners with that standard label. If premium is enabled, these may be premium or standard</p>
+  Number of runners with that standard family, including ones that fell back from premium.</p>
 <p><strong>p*:</strong>
-  Number of runners explicitly requested with a premium label</p>
+  Number of runners with that premium family.</p>
+<p><strong>a*:</strong>
+  Number of alien runners.</p>
