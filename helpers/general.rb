@@ -240,6 +240,28 @@ class Clover < Roda
     nil
   end
 
+  private def oidc_group_subject_tags_ds
+    if web? && (groups = session["oidc_groups"])
+      prefix = session["oidc_group_prefix"]
+      @project.subject_tags_dataset.select(:id).where(name: groups.map { prefix + it })
+    end
+  end
+
+  private def subject_match_predicate(subject_id)
+    if (ds = oidc_group_subject_tags_ds)
+      super | {subject_id: ds}
+    else
+      super
+    end
+  end
+
+  private def recursive_tag_query(type, values, project_id: nil)
+    if type == :subject && (ds = oidc_group_subject_tags_ds)
+      values = ds.union(DB.values([[Sequel.cast(values, :uuid)]]), from_self: false, all: true)
+    end
+    super
+  end
+
   def authorize(actions, object_id)
     if @project_permissions && (object_id == @project || object_id == @project.id)
       fail Authorization::Unauthorized unless has_project_permission(actions)
