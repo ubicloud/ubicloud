@@ -85,7 +85,7 @@ end
 #  inference_router          | inference_router_location_id_fkey          | (location_id) REFERENCES location(id)
 #  kubernetes_cluster        | kubernetes_cluster_location_id_fkey        | (location_id) REFERENCES location(id)
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
-#  location_aws_az           | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
+#  location_az               | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
 #  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
 #  machine_image             | machine_image_location_id_fkey             | (location_id) REFERENCES location(id)
 #  machine_image_store       | machine_image_store_location_id_fkey       | (location_id) REFERENCES location(id)
