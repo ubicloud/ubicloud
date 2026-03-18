@@ -8,7 +8,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   IN_PROGRESS_CONCLUSIONS = %w[in_progress queued requested waiting pending neutral].freeze
   REPOSITORY_NAME_PREFIX = "tahcloud/github-e2e-tests"
   WORKFLOW_NAME = "test.yml"
-  BRANCH_NAME = "enes/simply-tests"
+  BRANCH_NAME = "main"
 
   def self.assemble(test_cases, provider: "metal")
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
