@@ -145,6 +145,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           resource_id: project.id,
           resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
           billing_rate_id: rate_id,
+          resource_type: "GitHubRunnerMinutes",
           span: Sequel.pg_range(begin_time...end_time),
           amount: used_amount
         )
