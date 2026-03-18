@@ -17,7 +17,7 @@ class Prog::InstallRhizome < Prog::Base
       base = Config.root + "/rhizome"
       Dir.glob(["Gemfile", "Gemfile.lock", "common/**/*", "#{frame["target_folder"]}/**/*"], base:) do |file|
         #:nocov:
-        next if file != "Gemfile.lock" && file.end_with?("Gemfile.lock")
+        next if file == "common/Gemfile.lock" || file == "host/Gemfile.lock"
         #:nocov:
         next if !frame["install_specs"] && file.end_with?("_spec.rb")
 
