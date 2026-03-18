@@ -5,6 +5,7 @@ PATH
       base64
       grpc (~> 1.76)
       grpc-tools (~> 1.76)
+      logger
 
 GEM
   remote: https://rubygems.org/
@@ -38,6 +39,7 @@ GEM
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
     grpc-tools (1.76.0)
+    logger (1.7.0)
     rake (13.3.1)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
