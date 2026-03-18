@@ -21,6 +21,7 @@ class Clover
             pat = ApiKey.create_personal_access_token(current_account, project: @project)
             @project.subject_tags_dataset.first(name: "Admin").add_subject(pat.id)
             audit_log(pat, "create")
+            rodauth.add_audit_log(current_account_id, :create_token, {"token" => pat.ubid})
           end
           flash["notice"] = "Created personal access token with id #{pat.ubid}"
           r.redirect @project, "/token"
@@ -36,6 +37,7 @@ class Clover
             token.destroy
             @project.disassociate_subject(token.id)
             audit_log(token, "destroy")
+            rodauth.add_audit_log(current_account_id, :delete_token, {"token" => token.ubid})
           end
           flash["notice"] = "Personal access token deleted successfully"
           r.redirect @project, "/token"

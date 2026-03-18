@@ -4,16 +4,31 @@ require_relative "spec_helper"
 require "webauthn/fake_client"
 
 RSpec.describe Clover, "account" do
+  def ip_hash(into = {})
+    into["ip"] = "127.0.0.1"
+    into
+  end
+
+  def audit_log_hash
+    DB[:account_authentication_audit_logs].select_hash(:message, :metadata)
+  end
+
+  before do
+    expect(self).to receive(:audit_log_hash).and_call_original
+  end
+
   it "can not access without login" do
     visit "/account"
 
     expect(page.title).to eq("Ubicloud - Login")
+    expect(audit_log_hash).to eq({})
   end
 
   describe "authenticated" do
     before do
       create_account
       login
+      DB[:account_authentication_audit_logs].delete
     end
 
     it "show password change page" do
@@ -21,6 +36,7 @@ RSpec.describe Clover, "account" do
 
       expect(page.title).to eq("Ubicloud - Change Password")
       expect(page).to have_content "Change Password"
+      expect(audit_log_hash).to eq({})
     end
 
     [true, false].each do |clear_last_password_entry|
@@ -103,6 +119,19 @@ RSpec.describe Clover, "account" do
         fill_in "Password", with: TEST_USER_PASSWORD if clear_last_password_entry
         click_button "Disable One-Time Password Authentication"
         expect(page).to have_flash_notice "One-time password authentication has been disabled"
+        if clear_last_password_entry
+          expect(audit_log_hash).to eq({
+            "login" => ip_hash("via" => "password"),
+            "logout" => ip_hash,
+            "otp_authentication_failure" => ip_hash,
+            "otp_disable" => ip_hash,
+            "otp_setup" => ip_hash,
+            "otp_unlock_auth_success" => ip_hash,
+            "two_factor_authentication" => ip_hash("via" => "totp")
+          })
+        else
+          expect(audit_log_hash).to eq({"otp_setup" => ip_hash, "otp_disable" => ip_hash})
+        end
       end
 
       it "allows setting up#{", authenticating," if clear_last_password_entry} and removing Webauthn authentication when password entry is #{"not " unless clear_last_password_entry}required" do
@@ -157,6 +186,17 @@ RSpec.describe Clover, "account" do
         choose "My Key 1"
         click_button "Remove Security Key"
         expect(page).to have_flash_notice "Security key has been removed"
+        if clear_last_password_entry
+          expect(audit_log_hash).to eq({
+            "login" => ip_hash("via" => "password"),
+            "logout" => ip_hash,
+            "webauthn_setup" => ip_hash("key_name" => "My Key 1"),
+            "webauthn_remove" => ip_hash("key_name" => "My Key 1"),
+            "two_factor_authentication" => ip_hash("via" => "webauthn", "key_name" => "My Key 0")
+          })
+        else
+          expect(audit_log_hash).to eq({"webauthn_setup" => ip_hash("key_name" => "My Key 1"), "webauthn_remove" => ip_hash("key_name" => "My Key 1")})
+        end
       end
     end
 
@@ -183,6 +223,7 @@ RSpec.describe Clover, "account" do
 
       recovery_codes = DB[:account_recovery_codes].select_map(:code)
       expect(page.all("#recovery-codes-text div").map(&:text).sort).to eq recovery_codes.sort
+      expect(audit_log_hash).to eq({"otp_setup" => ip_hash, "add_recovery_codes" => ip_hash})
     end
 
     it "allows removing all multifactor authentication methods" do
@@ -206,6 +247,11 @@ RSpec.describe Clover, "account" do
       expect(page.title).to eq("Ubicloud - Remove All Multifactor Authentication Methods")
       click_button "Remove All Multifactor Authentication Methods"
       expect(page).to have_flash_notice "All multifactor authentication methods have been disabled"
+      expect(audit_log_hash).to eq({
+        "otp_setup" => ip_hash,
+        "webauthn_setup" => ip_hash("key_name" => "My Key"),
+        "two_factor_disable" => ip_hash
+      })
     end
   end
 end

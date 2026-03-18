@@ -3,10 +3,24 @@
 require_relative "spec_helper"
 
 RSpec.describe Clover, "auth" do
+  def ip_hash(into = {})
+    into["ip"] = "127.0.0.1"
+    into
+  end
+
+  def audit_log_hash
+    DB[:account_authentication_audit_log].select_hash(:message, :metadata)
+  end
+
+  before do
+    expect(self).to receive(:audit_log_hash).and_call_original
+  end
+
   it "redirects root to login" do
     visit "/"
 
     expect(page).to have_current_path("/login")
+    expect(audit_log_hash).to eq({})
   end
 
   it "can not login new account without verification" do
@@ -26,6 +40,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
     expect(page).to have_flash_error("The account you tried to login with is currently awaiting verification")
     expect(page.title).to eq("Ubicloud - Resend Verification")
+    expect(audit_log_hash).to eq({"create_account" => ip_hash})
   end
 
   it "can not create new account with invalid name" do
@@ -39,6 +54,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Create Account")
     expect(Mail::TestMailer.deliveries.length).to eq 0
     expect(page).to have_content("Name must only contain letters, numbers, spaces, and hyphens and have max length 63.")
+    expect(audit_log_hash).to eq({})
   end
 
   it "can not create new account with invalid email" do
@@ -53,6 +69,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Create Account")
     expect(Mail::TestMailer.deliveries.length).to eq 0
     expect(page).to have_flash_error("Invalid email address used")
+    expect(audit_log_hash).to eq({})
   end
 
   it "can send email verification email again after 300 seconds" do
@@ -92,6 +109,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page).to have_flash_notice("An email has been sent to you with a link to verify your account")
     expect(Mail::TestMailer.deliveries.length).to eq 3
+    expect(audit_log_hash).to eq({"create_account" => ip_hash, "verify_account_email_resend" => ip_hash})
   end
 
   it "can create new account and verify it" do
@@ -112,6 +130,7 @@ RSpec.describe Clover, "auth" do
 
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - Default Dashboard")
+    expect(audit_log_hash).to eq({"create_account" => ip_hash, "verify_account" => ip_hash})
   end
 
   it "can not create new account without cloudflare turnstile key if turnstile usage enabled" do
@@ -126,6 +145,7 @@ RSpec.describe Clover, "auth" do
     expect(page.title).to eq("Ubicloud - Create Account")
     expect(Mail::TestMailer.deliveries.length).to eq 0
     expect(page).to have_content("Could not create account. Please ensure JavaScript is enabled and access to Cloudflare is not blocked, then try again.")
+    expect(audit_log_hash).to eq({})
   end
 
   it "can create new account and verify it when there are existing invitations" do
@@ -157,6 +177,7 @@ RSpec.describe Clover, "auth" do
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - Projects")
     expect(page).to have_content "Project Invitations"
+    expect(audit_log_hash).to eq({"create_account" => ip_hash, "verify_account" => ip_hash})
   end
 
   it "can remember login" do
@@ -171,6 +192,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page.title).to eq("Ubicloud - Default Dashboard")
     expect(DB[:account_remember_keys].first(id: account.id)).not_to be_nil
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   it "has correct current user when logged in via remember token" do
@@ -187,6 +209,7 @@ RSpec.describe Clover, "auth" do
     page.driver.browser.rack_mock_session.cookie_jar.delete("_Clover.session")
     page.refresh
     expect(page.title).to eq("Ubicloud - Default Dashboard")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "load_memory" => ip_hash})
   end
 
   it "can reset password" do
@@ -218,6 +241,7 @@ RSpec.describe Clover, "auth" do
     fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
 
     click_button "Sign in"
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "reset_password_request" => ip_hash, "reset_password" => ip_hash})
   end
 
   it "can not reset password if password disabled" do
@@ -235,6 +259,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page).to have_flash_error(/Login with password is not enabled for this account.*/)
     expect(DB[:account_password_reset_keys].count).to eq 0
+    expect(audit_log_hash).to eq({})
   end
 
   it "can login to an account when there are no omniauth_providers" do
@@ -249,6 +274,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Projects")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   it "can login to an account without projects" do
@@ -261,18 +287,25 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Projects")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
-  it "can not login if the account is suspended" do
-    account = create_account
+  it "can not login with incorrect password" do
+    create_account
 
     visit "/login"
     fill_in "Email Address", with: TEST_USER_EMAIL
     click_button "Sign in"
-    fill_in "Password", with: TEST_USER_PASSWORD
+    fill_in "Password", with: TEST_USER_PASSWORD + "1"
     click_button "Sign in"
-    expect(page.title).to eq("Ubicloud - Default Dashboard")
 
+    expect(page.title).to eq("Ubicloud - Login")
+    expect(page).to have_flash_error("There was an error logging in")
+    expect(audit_log_hash).to eq({"login_failure" => ip_hash("reason" => "incorrect password")})
+  end
+
+  it "can not login if the account is suspended" do
+    account = create_account
     account.suspend
 
     visit "/login"
@@ -283,6 +316,7 @@ RSpec.describe Clover, "auth" do
 
     expect(page.title).to eq("Ubicloud - Login")
     expect(page).to have_flash_error(/Your account has been suspended.*/)
+    expect(audit_log_hash).to eq({"login_failure" => ip_hash("reason" => "account suspended")})
   end
 
   it "can not login if the account is suspended via remember token" do
@@ -300,6 +334,7 @@ RSpec.describe Clover, "auth" do
     account.suspend
     page.refresh
     expect(page.title).to eq("Ubicloud - Login")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "login_failure" => ip_hash("reason" => "account suspended")})
   end
 
   it "redirects to otp page if the otp is only 2FA method" do
@@ -312,6 +347,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - 2FA - One-Time Password")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   it "redirects to webauthn page if the webauthn is only 2FA method" do
@@ -324,6 +360,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - 2FA - Security Keys")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   it "shows 2FA method list if there are multiple 2FA methods" do
@@ -336,6 +373,7 @@ RSpec.describe Clover, "auth" do
     click_button "Sign in"
 
     expect(page.title).to eq("Ubicloud - Two-factor Authentication")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   it "shows enter recovery codes page" do
@@ -350,18 +388,21 @@ RSpec.describe Clover, "auth" do
     click_link "Enter a recovery code"
 
     expect(page.title).to eq("Ubicloud - 2FA - Recovery Codes")
+    expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
   end
 
   describe "authenticated" do
     before do
       create_account
       login
+      DB[:account_authentication_audit_log].delete
     end
 
     it "redirects root to dashboard" do
       visit "/dashboard"
 
       expect(page).to have_current_path("/dashboard")
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
     end
 
     it "can logout" do
@@ -370,6 +411,7 @@ RSpec.describe Clover, "auth" do
       click_button "Log out"
 
       expect(page.title).to eq("Ubicloud - Login")
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "logout" => ip_hash})
     end
 
     [true, false].each do |logged_in|
@@ -408,6 +450,13 @@ RSpec.describe Clover, "auth" do
 
         click_button "Sign in"
         expect(page).to have_flash_notice "You have been logged in"
+        expect(audit_log_hash).to eq({
+          "change_login" => ip_hash,
+          "login" => ip_hash("via" => "password"),
+          "logout" => ip_hash,
+          "verify_login_change" => ip_hash("new_login" => "new@example.com", "previous_login" => "user@example.com"),
+          "verify_login_change_email" => ip_hash
+        })
       end
     end
 
@@ -432,6 +481,11 @@ RSpec.describe Clover, "auth" do
       fill_in "Password", with: "#{TEST_USER_PASSWORD}_new"
 
       click_button "Sign in"
+      expect(audit_log_hash).to eq({
+        "login" => ip_hash("via" => "password"),
+        "logout" => ip_hash,
+        "change_password" => ip_hash
+      })
     end
 
     it "does not allow duplicate passwords" do
@@ -464,6 +518,7 @@ RSpec.describe Clover, "auth" do
         expect(page.title).to eq("Ubicloud - Change Password")
         expect(page).to have_flash_notice("Your password has been changed")
       end
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "change_password" => ip_hash})
     end
 
     [true, false].each do |clear_last_password_entry|
@@ -499,6 +554,11 @@ RSpec.describe Clover, "auth" do
 
         click_button "Sign in"
         expect(page).to have_flash_notice("You have been logged in")
+        expect(audit_log_hash).to eq({
+          "login" => ip_hash("via" => "password"),
+          "logout" => ip_hash,
+          "change_password" => ip_hash
+        })
       end
 
       it "can close account when password entry is #{"not " unless clear_last_password_entry}required" do
@@ -516,6 +576,7 @@ RSpec.describe Clover, "auth" do
 
         expect(Account[email: TEST_USER_EMAIL]).to be_nil
         expect(DB[:access_tag].where(hyper_tag_id: account.id).count).to eq 0
+        expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password"), "close_account" => ip_hash})
       end
     end
 
@@ -530,6 +591,7 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Close Account")
       expect(page).to have_flash_error("'Default' project has some resources. Delete all related resources first.")
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "password")})
     end
   end
 
@@ -593,6 +655,7 @@ RSpec.describe Clover, "auth" do
         expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => provider.ubid)
         expect(page.title).to eq("Ubicloud - Default Dashboard")
         expect(page).to have_flash_notice("You have been logged in")
+        expect(audit_log_hash).to eq({"login" => ip_hash("via" => "TestOIDC"), "create_account" => ip_hash("provider" => "TestOIDC")})
       end
     end
 
@@ -607,6 +670,7 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error("Login via username and password is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(audit_log_hash).to eq({"login_failure" => ip_hash("reason" => "locked domain", "via" => "password")})
     end
 
     it "disallow attempting to verify an account in a locked domain" do
@@ -628,6 +692,11 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_flash_error("Verifying accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
       expect(Account.all).to eq []
+      expect(audit_log_hash).to eq({
+        "close_account" => ip_hash,
+        "create_account" => ip_hash,
+        "verify_account_failure" => ip_hash("reason" => "locked domain")
+      })
     end
 
     it "attempting to create an account in a locked domain redirects to required OIDC login page" do
@@ -643,6 +712,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 0
       expect(page).to have_flash_error("Creating accounts with a password is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(audit_log_hash).to eq({})
     end
 
     it "attempting to reset the password for an account in a locked domain redirects to required OIDC login page" do
@@ -667,6 +737,10 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(audit_log_hash).to eq({
+        "reset_password_request" => ip_hash,
+        "reset_password_failure" => ip_hash("reason" => "locked domain")
+      })
     end
 
     it "requesting a password reset for an account in a locked domain redirects to required OIDC login page" do
@@ -681,6 +755,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 0
       expect(page).to have_flash_error("Resetting passwords is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(audit_log_hash).to eq({"reset_password_request_failure" => ip_hash("reason" => "locked domain")})
     end
 
     it "attempting to unlock an account in a locked domain redirects to required OIDC login page" do
@@ -702,6 +777,10 @@ RSpec.describe Clover, "auth" do
 
       expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(audit_log_hash).to eq({
+        "unlock_account_request" => ip_hash,
+        "unlock_account_failure" => ip_hash("reason" => "locked domain")
+      })
     end
 
     it "requesting an account unlock for an account in a locked domain redirects to required OIDC login page" do
@@ -718,6 +797,7 @@ RSpec.describe Clover, "auth" do
       expect(Mail::TestMailer.deliveries.length).to eq 0
       expect(page).to have_flash_error("Unlocking accounts is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
+      expect(audit_log_hash).to eq({"unlock_account_request_failure" => ip_hash("reason" => "locked domain")})
     end
 
     it "cannot login to an account via an omniauth provider when domain is locked to a different provider" do
@@ -748,6 +828,12 @@ RSpec.describe Clover, "auth" do
       click_button "Login"
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error("Login via TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
+      expect(audit_log_hash).to eq({
+        "create_account" => ip_hash("provider" => "TestOIDC2"),
+        "logout" => ip_hash,
+        "login" => ip_hash("via" => "TestOIDC2"),
+        "login_failure" => ip_hash("reason" => "locked domain", "provider" => "TestOIDC2")
+      })
     end
 
     it "cannot create account via an omniauth provider when domain is locked to a different provider" do
@@ -772,6 +858,7 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_flash_error("Creating an account via authentication through TestOIDC2 is not supported for the example.com domain. You must authenticate using TestOIDC.")
       expect(Account.all).to eq []
       expect(AccountIdentity.all).to eq []
+      expect(audit_log_hash).to eq({})
     end
 
     it "shows error message if attempting to create an account where social login has no email" do
@@ -782,6 +869,7 @@ RSpec.describe Clover, "auth" do
 
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error(/Social login is only allowed if social login provider provides email/)
+      expect(audit_log_hash).to eq({})
     end
 
     it "can create new account even if social account doesn't have a name" do
@@ -791,6 +879,7 @@ RSpec.describe Clover, "auth" do
       click_button "GitHub"
 
       expect(Account[email: TEST_USER_EMAIL].name).to eq "user"
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
     it "can create new account even if social account has a name that isn't a valid Ubicloud name" do
@@ -800,6 +889,7 @@ RSpec.describe Clover, "auth" do
       click_button "GitHub"
 
       expect(Account[email: TEST_USER_EMAIL].name).to eq "Foo \u1234Bar"
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
     it "can create new account even if social account has a name is too long" do
@@ -809,6 +899,7 @@ RSpec.describe Clover, "auth" do
       click_button "GitHub"
 
       expect(Account[email: TEST_USER_EMAIL].name).to eq("F" * 63)
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
     it "can create new account even if name for social login cannot be determined" do
@@ -819,6 +910,7 @@ RSpec.describe Clover, "auth" do
       click_button "GitHub"
 
       expect(Account[email:].name).to eq "Unknown"
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
     it "can create new account" do
@@ -832,6 +924,7 @@ RSpec.describe Clover, "auth" do
       expect(account.identities_dataset.first(provider: "github", uid: "123456790")).not_to be_nil
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(audit_log_hash).to eq({"create_account" => ip_hash("provider" => "GitHub"), "login" => ip_hash("via" => "GitHub")})
     end
 
     it "can login existing account" do
@@ -846,6 +939,7 @@ RSpec.describe Clover, "auth" do
       expect(AccountIdentity.count).to eq(1)
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Default Dashboard")
+      expect(audit_log_hash).to eq({"login" => ip_hash("via" => "Google")})
     end
 
     it "can not login existing account before linking it" do
@@ -858,6 +952,7 @@ RSpec.describe Clover, "auth" do
       expect(page.status_code).to eq(200)
       expect(page.title).to eq("Ubicloud - Login")
       expect(page).to have_flash_error(/There is already an account with this email address.*/)
+      expect(audit_log_hash).to eq({"login_failure" => ip_hash("reason" => "unlinked existing account", "provider" => "GitHub")})
     end
 
     describe "authenticated" do
@@ -865,6 +960,7 @@ RSpec.describe Clover, "auth" do
 
       before do
         login(account.email)
+        DB[:account_authentication_audit_log].delete
       end
 
       it "can connect and disconnect existing account to OIDC provider" do
@@ -911,6 +1007,10 @@ RSpec.describe Clover, "auth" do
         expect(AccountIdentity).to be_empty
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_notice("Your account has been disconnected from TestOIDC")
+        expect(audit_log_hash).to eq({
+          "connect_provider" => ip_hash("provider" => "TestOIDC"),
+          "disconnect_provider" => ip_hash("provider" => "TestOIDC")
+        })
       ensure
         OmniAuth.config.mock_auth[omniauth_key] = nil
       end
@@ -932,6 +1032,10 @@ RSpec.describe Clover, "auth" do
 
           expect(page.title).to eq("Ubicloud - Default Dashboard")
           expect(page).to have_flash_notice("You have been logged in")
+          expect(audit_log_hash).to eq({
+            "login" => ip_hash("via" => "TestOIDC"),
+            "logout" => ip_hash
+          })
         end
 
         it "can login via OIDC flow with already connected account using normal login page when account does not have password#{" when domain is locked" if locked_domain}" do
@@ -955,6 +1059,10 @@ RSpec.describe Clover, "auth" do
 
           expect(page.title).to eq("Ubicloud - Default Dashboard")
           expect(page).to have_flash_notice("You have been logged in")
+          expect(audit_log_hash).to eq({
+            "login" => ip_hash("via" => "TestOIDC"),
+            "logout" => ip_hash
+          })
         end
       end
 
@@ -968,6 +1076,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_notice("You have successfully connected your account with GitHub.")
+        expect(audit_log_hash).to eq({"connect_provider" => ip_hash("provider" => "GitHub")})
       end
 
       it "can disconnect from existing account" do
@@ -981,6 +1090,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_notice("Your account has been disconnected from GitHub")
+        expect(audit_log_hash).to eq({"disconnect_provider" => ip_hash("provider" => "GitHub")})
       end
 
       it "can delete password if another login method is available" do
@@ -993,6 +1103,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_notice("Your password has been deleted")
+        expect(audit_log_hash).to eq({"remove_password" => ip_hash})
       end
 
       it "can not disconnect the last login method if has no password" do
@@ -1006,6 +1117,21 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("You must have at least one login method")
+        expect(audit_log_hash).to eq({"disconnect_provider_failure" => ip_hash("reason" => "only remaining authentication method")})
+      end
+
+      it "can not remove password if the account has no remaining social login" do
+        identity = account.add_identity(provider: "github", uid: "123456790")
+
+        visit "/account/login-method"
+        identity.destroy
+        within "#login-method-password" do
+          click_button "Delete"
+        end
+
+        expect(page.title).to eq("Ubicloud - Login Methods")
+        expect(page).to have_flash_error("You must have at least one login method")
+        expect(audit_log_hash).to eq({"remove_password_failure" => ip_hash("reason" => "only remaining authentication method")})
       end
 
       it "can not disconnect if it's already disconnected" do
@@ -1020,6 +1146,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("Your account already has been disconnected from GitHub")
+        expect(audit_log_hash).to eq({})
       end
 
       it "can not connect an account with different email" do
@@ -1032,6 +1159,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("Your account's email address is different from the email address associated with the GitHub account.")
+        expect(audit_log_hash).to eq({"connect_provider_failure" => ip_hash("reason" => "different email", "provider" => "GitHub")})
       end
 
       it "can not connect a social account with multiple accounts" do
@@ -1045,6 +1173,7 @@ RSpec.describe Clover, "auth" do
 
         expect(page.title).to eq("Ubicloud - Login Methods")
         expect(page).to have_flash_error("Your account's email address is different from the email address associated with the GitHub account.")
+        expect(audit_log_hash).to eq({"connect_provider_failure" => ip_hash("reason" => "different email", "provider" => "GitHub")})
       end
 
       it "disallows changing password for an account in a locked domain" do
@@ -1058,6 +1187,7 @@ RSpec.describe Clover, "auth" do
         expect(Mail::TestMailer.deliveries.length).to eq 0
         expect(page).to have_flash_error("Changing passwords is not supported for the example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(audit_log_hash).to eq({"change_password_failure" => ip_hash("reason" => "locked domain")})
       end
 
       it "disallows requesting a login change for an account in a locked domain" do
@@ -1070,6 +1200,7 @@ RSpec.describe Clover, "auth" do
         expect(Mail::TestMailer.deliveries.length).to eq 0
         expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(audit_log_hash).to eq({"change_login_failure" => ip_hash("reason" => "locked domain")})
       end
 
       it "disallows changing login for an account in a locked domain" do
@@ -1088,6 +1219,11 @@ RSpec.describe Clover, "auth" do
 
         expect(page).to have_flash_error("Changing email addresses is not supported for the example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(audit_log_hash).to eq({
+          "change_login" => ip_hash,
+          "verify_login_change_email" => ip_hash,
+          "verify_login_change_failure" => ip_hash("reason" => "locked domain")
+        })
       end
 
       it "disallows requesting a login change for an account to a locked domain" do
@@ -1100,6 +1236,7 @@ RSpec.describe Clover, "auth" do
         expect(Mail::TestMailer.deliveries.length).to eq 0
         expect(page).to have_flash_error("Changing email addresses is not supported for the other-example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(audit_log_hash).to eq({"change_login_failure" => ip_hash("reason" => "locked domain")})
       end
 
       it "disallows changing login for an account to a locked domain" do
@@ -1118,6 +1255,11 @@ RSpec.describe Clover, "auth" do
 
         expect(page).to have_flash_error("Changing email addresses is not supported for the other-example.com domain.")
         expect(page.title).to eq("Ubicloud - Default Dashboard")
+        expect(audit_log_hash).to eq({
+          "change_login" => ip_hash,
+          "verify_login_change_email" => ip_hash,
+          "verify_login_change_failure" => ip_hash("reason" => "locked domain")
+        })
       end
 
       it "hides login methods, change password, and change emails options on My Account page" do
@@ -1126,6 +1268,7 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_no_content("Login Methods")
         expect(page).to have_no_content("Change Password")
         expect(page).to have_no_content("Change Email")
+        expect(audit_log_hash).to eq({})
       end
     end
   end
