@@ -9,6 +9,7 @@ on:
     branches:
       - main
     paths:
+      - '.tool-versions'
       - 'bin/respirate'
       - 'scheduling/dispatcher.rb'
       - 'model/strand.rb'
@@ -18,6 +19,7 @@ on:
       - '.github/actions/setup-clover/action.yml'
   pull_request:
     paths:
+      - '.tool-versions'
       - 'bin/respirate'
       - 'scheduling/dispatcher.rb'
       - 'model/strand.rb'
