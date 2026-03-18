@@ -140,6 +140,7 @@
     <% installation_path = path(@installation) %>
     <%== part(
       "components/table_card",
+      id: "custom-labels-table",
       title: "Custom Labels",
       right_items: @custom_labels.empty? ? nil : [part("components/button", text: "Add Custom Label", link: "#{installation_path}/custom-label/create")],
       headers: ["Name", "Alias For", "Concurrency Limit", "Active Runners", "", ""],

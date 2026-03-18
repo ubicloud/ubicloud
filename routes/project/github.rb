@@ -115,7 +115,7 @@ class Clover
             audit_log(label, "create")
           end
           flash["notice"] = "Custom label '#{label.name}' created"
-          r.redirect @installation, "/setting"
+          r.redirect @installation, "/setting#custom-labels-table"
         end
 
         r.on :ubid_uuid do |id|
@@ -136,7 +136,7 @@ class Clover
               audit_log(@custom_label, "update")
             end
             flash["notice"] = "Custom label '#{@custom_label.name}' updated"
-            r.redirect @installation, "/setting"
+            r.redirect @installation, "/setting#custom-labels-table"
           end
 
           r.delete true do
@@ -145,7 +145,7 @@ class Clover
               audit_log(@custom_label, "destroy")
             end
             flash["notice"] = "Custom label '#{@custom_label.name}' deleted"
-            r.redirect @installation, "/setting"
+            r.redirect @installation, "/setting#custom-labels-table"
           end
         end
       end
