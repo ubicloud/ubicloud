@@ -1301,9 +1301,15 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
     expect(page.all("#content td").map(&:text)).to eq [
+      "TOTAL", "",
+      "2", "1", "1", "0", "1", "0",
+      "16 / 46", "2 / 14",
+      "1", "0", "0", "0", "0", "0",
+      "0", "1", "0", "0", "0",
+      "0", "0", "1", "0",
       "test-installation", "true",
       "2", "1", "1", "0", "1", "0",
-      "16/46", "2/14",
+      "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0"
@@ -1326,9 +1332,15 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
     expect(page.all("#content td").map(&:text)).to eq [
+      "TOTAL", "",
+      "1", "0", "0", "0", "0", "0",
+      "0 / 2", "0 / 0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0",
       "test-installation", "true",
       "1", "0", "0", "0", "0", "0",
-      "0/2", "0/0",
+      "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
       "0", "0", "0", "0"

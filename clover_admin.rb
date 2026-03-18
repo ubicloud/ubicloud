@@ -898,20 +898,18 @@ class CloverAdmin < Roda
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
-          *{r: :runner, v: :vm}.map { |k, prefix|
-            Sequel.function(
-              :concat,
-              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]).filter(~Sequel.expr(Sequel[k][:allocated_at] => nil)), 0),
-              Sequel.lit("'/'"),
-              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0)
-            ).as(:"#{prefix}_vcpus")
+          *{r: :runner, v: :vm}.flat_map { |k, prefix|
+            [
+              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]).filter(~Sequel.expr(Sequel[k][:allocated_at] => nil)), 0).as(:"allocated_#{prefix}_vcpus"),
+              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0).as(:"#{prefix}_vcpus")
+            ]
           },
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") }
         )
         .group(Sequel[:i][:id], Sequel[:i][:name], :premium)
-        .order(Sequel.desc(Sequel.function(:sum, r_vcpus)), Sequel.desc(Sequel.function(:coalesce, Sequel.function(:sum, v_vcpus), 0)))
+        .reverse(:runner_vcpus, :vm_vcpus)
         .all
 
       view("github_runner_usage")
