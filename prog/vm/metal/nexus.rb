@@ -202,6 +202,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+        resource_type: "VmVCpu",
         amount: vm.vcpus
       )
 
@@ -211,6 +212,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
           billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
+          resource_type: "VmStorage",
           amount: vol["size_gib"]
         )
       end
@@ -221,6 +223,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: vm.assigned_vm_address.ip,
           billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
+          resource_type: "IPAddress",
           amount: 1
         )
       end
@@ -234,6 +237,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: "GPUs of #{vm.name}",
           billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
+          resource_type: "Gpu",
           amount: gpu_count
         )
       end

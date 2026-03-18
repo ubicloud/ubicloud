@@ -246,6 +246,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
             resource_id: inference_endpoint.id,
             resource_name: "#{resource_family} #{begin_time.strftime("%Y-%m-%d")}",
             billing_rate_id: rate_id,
+            resource_type: "InferenceTokens",
             span: Sequel.pg_range(begin_time...end_time),
             amount: tokens
           )

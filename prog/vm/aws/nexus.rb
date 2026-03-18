@@ -273,6 +273,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       resource_id: vm.id,
       resource_name: vm.name,
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
+      resource_type: "VmVCpu",
       amount: vm.vcpus
     )
 

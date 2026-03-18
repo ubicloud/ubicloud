@@ -181,6 +181,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           resource_id: kubernetes_cluster.id,
           resource_name: kubernetes_cluster.name,
           billing_rate_id: billing_rate_for(record[:type], record[:family])["id"],
+          resource_type: record[:type],
           amount: record[:amount]
         )
       end

@@ -239,26 +239,28 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       new_billing_records = postgres_resource.target_server_count.times.flat_map do |index|
         resource_type = index.zero? ? "" : "Standby"
         [
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib}
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], resource_type: "Postgres#{resource_type}VCpu", amount: vcpu_count},
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], resource_type: "Postgres#{resource_type}Storage", amount: storage_size_gib}
         ]
       end
 
       existing_billing_records = postgres_resource.active_billing_records.map do |br|
-        {billing_rate_id: br.billing_rate_id, amount: br.amount}
+        {billing_rate_id: br.billing_rate_id, resource_type: br.resource_type, amount: br.amount}
       end
 
       if new_billing_records.sort_by { it.values } != existing_billing_records.sort_by { it.values }
         postgres_resource.active_billing_records.each(&:finalize)
 
         new_billing_records.each do |br|
-          BillingRecord.create(
+          billing_record = BillingRecord.create(
             project_id: postgres_resource.project_id,
             resource_id: postgres_resource.id,
             resource_name: postgres_resource.name,
             billing_rate_id: br[:billing_rate_id],
+            resource_type: br[:resource_type],
             amount: br[:amount]
           )
+          after_billing_record_created(billing_record, postgres_resource)
         end
       end
     end
@@ -330,6 +332,9 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
       pop "postgres resource is deleted"
     end
+  end
+
+  def after_billing_record_created(billing_record, postgres_resource)
   end
 
   def create_certificate
