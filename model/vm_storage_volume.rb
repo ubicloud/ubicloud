@@ -67,7 +67,6 @@ end
 #  key_encryption_key_2_id  | uuid    |
 #  spdk_installation_id     | uuid    |
 #  use_bdev_ubi             | boolean | NOT NULL DEFAULT false
-#  skip_sync                | boolean | NOT NULL DEFAULT false
 #  storage_device_id        | uuid    |
 #  boot_image_id            | uuid    |
 #  max_read_mbytes_per_sec  | integer |
