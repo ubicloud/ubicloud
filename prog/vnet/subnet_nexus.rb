@@ -135,9 +135,11 @@ class Prog::Vnet::SubnetNexus < Prog::Base
   private_class_method :_random_private_ipv4
 
   def self.until_random_ip(message)
-    1000.times do |i|
-      if (ip = yield)
-        return ip
+    DB.ignore_duplicate_queries do
+      1000.times do |i|
+        if (ip = yield)
+          return ip
+        end
       end
     end
     raise message
