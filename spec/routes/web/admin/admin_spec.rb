@@ -1287,7 +1287,8 @@ RSpec.describe CloverAdmin do
   end
 
   it "shows GitHub runner x64 VM usage" do
-    installation_id = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User").id
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    installation_id = installation.id
     repository_name = "test-repo"
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-arm")
@@ -1307,6 +1308,9 @@ RSpec.describe CloverAdmin do
       "0", "1", "0", "0", "0",
       "0", "0", "1", "0"
     ]
+
+    click_link "test-installation"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{installation.ubid}"
   end
 
   it "shows GitHub runner arm64 VM usage" do

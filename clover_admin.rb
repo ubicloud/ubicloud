@@ -892,6 +892,7 @@ class CloverAdmin < Roda
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:vm].as(:v), id: Sequel[:r][:vm_id])
         .select(
+          Sequel[:i][:id],
           Sequel[:i][:name],
           Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium)
         )
@@ -909,7 +910,7 @@ class CloverAdmin < Roda
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
           *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") }
         )
-        .group(Sequel[:i][:name], :premium)
+        .group(Sequel[:i][:id], Sequel[:i][:name], :premium)
         .order(Sequel.desc(Sequel.function(:sum, r_vcpus)), Sequel.desc(Sequel.function(:coalesce, Sequel.function(:sum, v_vcpus), 0)))
         .all
 
