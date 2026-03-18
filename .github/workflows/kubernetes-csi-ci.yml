@@ -1,0 +1,42 @@
+name: kubernetes/csi CI
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/csi/**'
+      - '.github/workflows/kubernetes-csi-ci.yml'
+  pull_request:
+    paths:
+      - 'kubernetes/csi/**'
+      - '.github/workflows/kubernetes-csi-ci.yml'
+
+jobs:
+  kubernetes-csi-ci:
+    strategy:
+      fail-fast: false
+      matrix:
+        runs-on: [ubicloud-standard-2, ubicloud-standard-2-arm]
+    name: Ruby CI - ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
+    timeout-minutes: 25
+
+    steps:
+    - name: Check out code
+      uses: actions/checkout@v6
+
+    - name: Set up Ruby for CSI gems
+      uses: ruby/setup-ruby@v1
+      env:
+        BUNDLE_GEMFILE: kubernetes/csi/Gemfile
+      with:
+        ruby-version: .tool-versions
+        bundler-cache: true
+
+    - name: Run CSI tests
+      run: rake csi_spec
