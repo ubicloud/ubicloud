@@ -351,11 +351,17 @@ class Clover < Roda
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
-      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email
+      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email,
+      :audit_logging
 
     title_instance_variable :@page_title
     check_csrf? false
     base_url Config.base_url
+
+    audit_logging_table :account_authentication_audit_log
+    audit_log_metadata do |action|
+      Sequel.pg_jsonb({"ip" => request.ip})
+    end
 
     # :nocov:
     unless Config.development?
