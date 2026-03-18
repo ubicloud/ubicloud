@@ -45,7 +45,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         access_key: "access-key-id",
         secret_key: "secret-access-key"
       ) { it.id = loc.id }
-      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     }
     let(:postgres_resource) {
@@ -1208,7 +1208,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         provider: "aws",
         project_id: project.id
       )
-      LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "az1")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "az1")
       aws_resource = create_postgres_resource(project:, location_id: aws_location.id)
       aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
       aws_nx = described_class.new(aws_server.strand)

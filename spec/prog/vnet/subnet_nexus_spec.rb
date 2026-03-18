@@ -162,7 +162,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
     it "raises error when VPC is too small for even a single subnet" do
       # /30 VPC with ipv4_range_size=30 -> ipv4_prefix=min(38,28)=28
       # Can't fit a /28 subnet in a /30 VPC
-      LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
       small_ps = PrivateSubnet.create(name: "small-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/30", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
 
@@ -175,7 +175,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       # /26 VPC can fit 4 /28 subnets (indices 0-3)
       # Create 5 AZs - the 5th should be skipped with a log
       5.times do |i|
-        LocationAwsAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
+        LocationAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
       end
       limited_ps = PrivateSubnet.create(name: "limited-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/26", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(limited_ps.id)

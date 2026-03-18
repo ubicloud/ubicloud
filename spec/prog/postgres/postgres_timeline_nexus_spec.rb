@@ -47,7 +47,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
     LocationCredential.create_with_id(loc,
       access_key: "access-key-id",
       secret_key: "secret-access-key")
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "az1")
     loc
   end
 

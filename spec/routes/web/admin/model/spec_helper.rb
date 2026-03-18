@@ -57,8 +57,8 @@ module AdminModelSpecHelper
 
     def create_aws_subnet
       ps_aws_resource = create_private_subnet_aws_resource
-      location_aws_az = create_location_aws_az
-      AwsSubnet.create(private_subnet_aws_resource_id: ps_aws_resource.id, location_aws_az_id: location_aws_az.id, ipv4_cidr: "10.0.0.0/24")
+      location_az = create_location_az
+      AwsSubnet.create(private_subnet_aws_resource_id: ps_aws_resource.id, location_aws_az_id: location_az.id, ipv4_cidr: "10.0.0.0/24")
     end
 
     def create_billing_info
@@ -359,9 +359,9 @@ module AdminModelSpecHelper
       Location.create(name: "test-loc", display_name: "Test Location", ui_name: "Test", visible: true, provider: "hetzner")
     end
 
-    def create_location_aws_az
+    def create_location_az
       location = Location.create(name: "us-east-1", display_name: "AWS US East 1", ui_name: "AWS US East", visible: true, provider: "aws", project_id: nil)
-      LocationAwsAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
+      LocationAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
     end
 
     def create_location_credential

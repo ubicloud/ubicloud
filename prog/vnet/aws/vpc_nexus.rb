@@ -104,7 +104,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       subnet = if aws_subnet.subnet_id
         client.describe_subnets({filters: [{name: "subnet-id", values: [aws_subnet.subnet_id]}]}).subnets[0]
       else
-        az_name = location.name + aws_subnet.location_aws_az.az
+        az_name = location.name + aws_subnet.location_az.az
         ipv6_cidr = vpc_ipv6.nth_subnet(64, idx)
 
         begin
@@ -113,7 +113,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
             cidr_block: aws_subnet.ipv4_cidr.to_s,
             ipv_6_cidr_block: ipv6_cidr.to_s,
             availability_zone: az_name,
-            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_aws_az.az}")
+            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}")
           }).subnet
         rescue Aws::EC2::Errors::InvalidSubnetConflict
           # Subnet was probably created in a previous attempt but database

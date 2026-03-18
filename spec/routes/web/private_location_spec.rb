@@ -23,7 +23,7 @@ RSpec.describe Clover, "location-credential" do
       access_key: "access_key",
       secret_key: "secret_key"
     ) { it.id = loc.id }
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
   end
 
@@ -41,7 +41,7 @@ RSpec.describe Clover, "location-credential" do
       access_key: "access_key",
       secret_key: "secret_key"
     ) { it.id = loc.id }
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw1-az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw1-az1")
     loc
   }
 

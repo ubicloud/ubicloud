@@ -9,9 +9,9 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
     LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
     loc
   }
-  let(:az_a) { LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1") }
-  let(:az_b) { LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
-  let(:az_c) { LocationAwsAz.create(location_id: location.id, az: "c", zone_id: "usw2-az3") }
+  let(:az_a) { LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1") }
+  let(:az_b) { LocationAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
+  let(:az_c) { LocationAz.create(location_id: location.id, az: "c", zone_id: "usw2-az3") }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
 
@@ -133,9 +133,9 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         expect { nx.backfill_old_subnet }.to raise_error("No subnets found in VPC vpc-old")
       end
 
-      it "fetches AZs from AWS if LocationAwsAz not cached" do
+      it "fetches AZs from AWS if LocationAz not cached" do
         # Remove the existing AZ record
-        LocationAwsAz.where(id: az_a.id).destroy
+        LocationAz.where(id: az_a.id).destroy
 
         client.stub_responses(:describe_subnets, subnets: [{
           subnet_id: "subnet-old",
@@ -149,11 +149,11 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         ])
 
         expect { nx.backfill_old_subnet }.to hop("link_nics")
-        expect(LocationAwsAz.where(location_id: location.id).count).to eq(2)
+        expect(LocationAz.where(location_id: location.id).count).to eq(2)
       end
 
       it "fails if AZ not found even after fetching from AWS" do
-        LocationAwsAz.where(id: az_a.id).destroy
+        LocationAz.where(id: az_a.id).destroy
 
         client.stub_responses(:describe_subnets, subnets: [{
           subnet_id: "subnet-old",
@@ -165,7 +165,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           {zone_name: "us-west-2b", zone_id: "usw2-az2"}
         ])
 
-        expect { nx.backfill_old_subnet }.to raise_error("Could not find LocationAwsAz for AZ x")
+        expect { nx.backfill_old_subnet }.to raise_error("Could not find LocationAz for AZ x")
       end
     end
 

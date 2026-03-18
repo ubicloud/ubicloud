@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Location < Sequel::Model
-  one_to_many :location_aws_azs, remover: nil, clearer: nil
+  one_to_many :location_azs, remover: nil, clearer: nil
 
   module Aws
     def pg_ami(pg_version, arch)
@@ -13,14 +13,14 @@ class Location < Sequel::Model
     private
 
     def aws_azs
-      v = location_aws_azs_dataset.all
+      v = location_azs_dataset.all
       return v unless v.empty?
       set_aws_azs
     end
 
     def set_aws_azs
       get_azs_from_aws.map do |az|
-        LocationAwsAz.create(location_id: id, zone_id: az.zone_id, az: az.zone_name.delete_prefix(name))
+        LocationAz.create(location_id: id, zone_id: az.zone_id, az: az.zone_name.delete_prefix(name))
       end
     end
 
