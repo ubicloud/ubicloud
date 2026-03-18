@@ -34,14 +34,6 @@ runs:
         ruby-version: .tool-versions
         bundler-cache: true
 
-    - name: Set up Ruby for CSI gems
-      uses: ruby/setup-ruby@v1
-      env:
-        BUNDLE_GEMFILE: kubernetes/csi/Gemfile
-      with:
-        ruby-version: .tool-versions
-        bundler-cache: true
-
     - name: Create .env.rb file
       shell: bash
       run: "bundle exec rake overwrite_envrb && echo '$stdout.sync = true' >> .env.rb"
