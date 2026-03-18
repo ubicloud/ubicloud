@@ -32,6 +32,19 @@ RSpec.describe Prog::Test::GithubRunner do
       strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}])
       expect(strand.stack.first["labels"]).to eq(["ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404"])
     end
+
+    it "includes arm64 labels for aws provider" do
+      location_id = "5f0db214-de30-8420-8a11-98014b01c5b5"
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location_id)
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      expect(Config).to receive(:e2e_cache_proxy_download_url).and_return("")
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}], provider: "aws")
+      expect(strand.stack.first["labels"]).to eq([
+        "ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404",
+        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404"
+      ])
+    end
   end
 
   describe "#start" do
