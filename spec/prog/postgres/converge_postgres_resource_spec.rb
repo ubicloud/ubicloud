@@ -115,8 +115,8 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server but excludes currently used az for aws" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
-      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "az2")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "az2")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server1 = create_server(is_representative: true, subnet_az: "a")
       server2 = create_server(subnet_az: "b")
@@ -129,7 +129,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
@@ -159,7 +159,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle

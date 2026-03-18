@@ -7,7 +7,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
     LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-    az_a = LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    az_a = LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
     # Update them with the test values
@@ -170,8 +170,8 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#create_az_subnets" do
-    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
-    let(:az_b) { LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
+    let(:az_a) { location.location_azs_dataset.where(az: "a").first }
+    let(:az_b) { LocationAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
 
     before do
       # Reset the AWS subnets to pre-creation state (no subnet_id, no ipv6_cidr)
@@ -241,7 +241,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#associate_az_route_tables" do
-    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
+    let(:az_a) { location.location_azs_dataset.where(az: "a").first }
 
     it "associates route tables for all subnets and hops to wait" do
       expect(client).to receive(:associate_route_table).with({

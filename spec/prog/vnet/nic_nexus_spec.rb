@@ -58,7 +58,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       project = Project.create(name: "test-aws-assemble")
       aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
       LocationCredential.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-      LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
       aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
       allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
       allow(Aws::EC2::Client).to receive(:new).and_return(Aws::EC2::Client.new(stub_responses: true))
@@ -85,8 +85,8 @@ RSpec.describe Prog::Vnet::NicNexus do
       LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
-    let(:az_a) { LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
-    let(:az_b) { LocationAwsAz.create(location_id: aws_location.id, az: "b", zone_id: "usw2-az2") }
+    let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
+    let(:az_b) { LocationAz.create(location_id: aws_location.id, az: "b", zone_id: "usw2-az2") }
     let(:aws_ps) {
       az_a
       aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
@@ -113,7 +113,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(result.location_aws_az_id).to eq(az_b.id)
     end
 
-    it "falls back to random subnet when preferred AZ has no LocationAwsAz" do
+    it "falls back to random subnet when preferred AZ has no LocationAz" do
       aws_ps
       result = described_class.select_aws_subnet(aws_ps, "z", [])
       expect(result).to be_an(AwsSubnet)
@@ -150,7 +150,7 @@ RSpec.describe Prog::Vnet::NicNexus do
       LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
-    let(:az_a) { LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
+    let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
     let(:aws_ps) {
       az_a
       aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")

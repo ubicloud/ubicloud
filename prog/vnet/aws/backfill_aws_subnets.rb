@@ -54,11 +54,11 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
     # this assumes there is only non-ha postgres resources
     subnet = subnets.min_by(&:cidr_block)
     az_suffix = subnet.availability_zone.delete_prefix(location.name)
-    location_aws_az = find_location_aws_az(az_suffix)
+    location_az = find_location_az(az_suffix)
 
     AwsSubnet.create(
       private_subnet_aws_resource_id: private_subnet_aws_resource.id,
-      location_aws_az_id: location_aws_az.id,
+      location_aws_az_id: location_az.id,
       ipv4_cidr: subnet.cidr_block,
       ipv6_cidr: subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block,
       subnet_id: subnet.subnet_id
@@ -118,7 +118,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
 
   label def link_nics
     aws_subnets_by_az = private_subnet_aws_resource.reload.aws_subnets.each_with_object({}) do |aws_subnet, hash|
-      hash[aws_subnet.location_aws_az.az] = aws_subnet
+      hash[aws_subnet.location_az.az] = aws_subnet
     end
 
     private_subnet.nics.each do |nic|
@@ -154,14 +154,14 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
       next if aws_subnet.subnet_id
 
       ipv6_cidr = vpc_ipv6.nth_subnet(64, idx)
-      full_az = location.name + aws_subnet.location_aws_az.az
+      full_az = location.name + aws_subnet.location_az.az
 
       subnet = client.create_subnet({
         vpc_id: private_subnet_aws_resource.vpc_id,
         cidr_block: aws_subnet.ipv4_cidr.to_s,
         ipv_6_cidr_block: ipv6_cidr.to_s,
         availability_zone: full_az,
-        tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_aws_az.az}")
+        tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}")
       }).subnet
 
       client.modify_subnet_attribute({
@@ -210,13 +210,13 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
     private_subnet.net4.netmask.prefix_len == PrivateSubnet::DEFAULT_SUBNET_PREFIX_LEN
   end
 
-  def find_location_aws_az(az_suffix)
-    location_aws_az = location.location_aws_azs_dataset.where(az: az_suffix).first
-    unless location_aws_az
+  def find_location_az(az_suffix)
+    location_az = location.location_azs_dataset.where(az: az_suffix).first
+    unless location_az
       location.azs
-      location_aws_az = location.location_aws_azs_dataset.where(az: az_suffix).first
-      fail "Could not find LocationAwsAz for AZ #{az_suffix}" unless location_aws_az
+      location_az = location.location_azs_dataset.where(az: az_suffix).first
+      fail "Could not find LocationAz for AZ #{az_suffix}" unless location_az
     end
-    location_aws_az
+    location_az
   end
 end

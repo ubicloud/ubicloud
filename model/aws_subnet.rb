@@ -3,11 +3,11 @@
 require_relative "../model"
 
 class AwsSubnet < Sequel::Model
-  many_to_one :location_aws_az, read_only: true
+  many_to_one :location_az, key: :location_aws_az_id, read_only: true
   plugin ResourceMethods
 
   def az_suffix
-    location_aws_az.az
+    location_az.az
   end
 end
 

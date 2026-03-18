@@ -21,7 +21,7 @@ RSpec.describe Prog::Vm::Aws::Nexus do
 
   let(:location_credential) {
     loc = LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
   }
 
@@ -83,7 +83,7 @@ usermod -L ubuntu
     let(:assemble_loc) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
       LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
-      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     }
 

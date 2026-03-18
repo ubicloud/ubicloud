@@ -48,19 +48,19 @@ RSpec.describe Location do
   it "#azs raises if not aws location" do
     p1_loc.update(provider: "hetzner")
     expect { p1_loc.azs }.to raise_error("azs is only valid for aws locations")
-    expect(LocationAwsAz.count).to eq(0)
+    expect(LocationAz.count).to eq(0)
   end
 
   it "returns the aws azs for an aws location" do
-    p1_loc.add_location_aws_az(az: "a", zone_id: "123")
-    p1_loc.add_location_aws_az(az: "b", zone_id: "456")
-    expect(p1_loc.azs).to eq([LocationAwsAz[az: "a"], LocationAwsAz[az: "b"]])
+    p1_loc.add_location_az(az: "a", zone_id: "123")
+    p1_loc.add_location_az(az: "b", zone_id: "456")
+    expect(p1_loc.azs).to eq([LocationAz[az: "a"], LocationAz[az: "b"]])
   end
 
   it "fetches aws azs from aws if not present" do
     expect(p1_loc).to receive(:get_azs_from_aws).and_return([instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1a", zone_id: "123"), instance_double(Aws::EC2::Types::AvailabilityZone, zone_name: "l1b", zone_id: "456")])
-    expect(p1_loc.azs).to eq([LocationAwsAz[location_id: p1_loc.id, az: "a", zone_id: "123"], LocationAwsAz[location_id: p1_loc.id, az: "b", zone_id: "456"]])
-    expect(LocationAwsAz.count).to eq(2)
+    expect(p1_loc.azs).to eq([LocationAz[location_id: p1_loc.id, az: "a", zone_id: "123"], LocationAz[location_id: p1_loc.id, az: "b", zone_id: "456"]])
+    expect(LocationAz.count).to eq(2)
   end
 
   it "raises descriptive error when AMI not found" do
