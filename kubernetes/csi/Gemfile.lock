@@ -14,17 +14,20 @@ GEM
     bigdecimal (4.0.1)
     diff-lcs (1.6.2)
     docile (1.4.1)
-    google-protobuf (4.33.4-aarch64-linux-gnu)
+    google-protobuf (4.34.0-aarch64-linux-gnu)
       bigdecimal
-      rake (>= 13)
-    google-protobuf (4.33.4-arm64-darwin)
+      rake (~> 13.3)
+    google-protobuf (4.34.0-arm64-darwin)
       bigdecimal
-      rake (>= 13)
-    google-protobuf (4.33.4-x86_64-linux-gnu)
+      rake (~> 13.3)
+    google-protobuf (4.34.0-x86_64-linux-gnu)
       bigdecimal
-      rake (>= 13)
+      rake (~> 13.3)
     googleapis-common-protos-types (1.22.0)
       google-protobuf (~> 4.26)
+    grpc (1.76.0)
+      google-protobuf (>= 3.25, < 5.0)
+      googleapis-common-protos-types (~> 1.0)
     grpc (1.76.0-aarch64-linux-gnu)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
@@ -77,4 +80,4 @@ DEPENDENCIES
   ubi-csi!
 
 BUNDLED WITH
-   2.6.9
+  4.0.6
