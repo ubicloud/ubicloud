@@ -1,5 +1,9 @@
 <% @page_title = "GitHub Runner #{@arch} VM Usage" %>
 
+<% @data.each do |row|
+    row[:name] = [row[:name], {link: "/model/GithubInstallation/#{UBID.from_uuidish(row[:id])}"}]
+    row.delete(:id)
+  end %>
 <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
 
 <% other_arch = (@arch == "x64") ? "arm64" : "x64" %>
