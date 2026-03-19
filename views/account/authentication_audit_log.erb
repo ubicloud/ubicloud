@@ -48,12 +48,10 @@
       [
        [
          entry[:at].getutc.strftime("%F %T"),
-         ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:message]}\">#{h entry[:message]}</a>", {escape: false}],
+         ["<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "action" => entry[:message])}\">#{h entry[:message]}</a>", {escape: false}],
          [
            entry[:metadata].map do |k, v|
-             k = h k
-             v = h v
-             "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;metadata=#{k}%3D#{v}\">#{k}: #{v}</a>"
+             "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "metadata" => "#{k}=#{v}")}\">#{h k}: #{h v}</a>"
            end.join(", "),
            {escape: false}
          ]
@@ -71,7 +69,7 @@
       end
 
       if link_text
-        rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
+        rows << [[["<a class=\"text-orange-600\" href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
       end %>
 
     <%== part(
