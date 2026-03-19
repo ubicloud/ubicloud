@@ -7,7 +7,7 @@ class Clover
     r.get true do
       accounts_dataset = @project.accounts_dataset
       authentication_audit_log_search(
-        DB[:admin_account_authentication_audit_log].where(account_id: accounts_dataset.select(:id)),
+        DB[:account_authentication_audit_logs].where(account_id: accounts_dataset.select(:id)),
         accounts_dataset:,
         resolve: :accounts,
         month_limit: 3

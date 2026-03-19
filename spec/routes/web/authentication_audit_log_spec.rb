@@ -15,15 +15,6 @@ RSpec.describe Clover, "authentication audit log" do
     ).first[:id]
   end
 
-  def insert_admin_audit_log(account_id:, message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
-    DB[:admin_account_authentication_audit_log].returning(:id).insert(
-      account_id:,
-      message:,
-      metadata: Sequel.pg_jsonb(metadata),
-      at:
-    ).first[:id]
-  end
-
   # Returns rows that correspond to audit log entries (rows with non-empty id attribute)
   def data_rows(table_id = "authentication-audit-log-table")
     page.all("##{table_id} tbody tr[id!='']")
@@ -111,7 +102,7 @@ RSpec.describe Clover, "authentication audit log" do
       end
 
       it "can view project authentication audit log entries" do
-        insert_admin_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+        insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
 
         visit "#{project.path}/authentication-audit-log"
 
@@ -123,7 +114,7 @@ RSpec.describe Clover, "authentication audit log" do
 
       it "does not show entries from accounts not in project" do
         other = create_account("other@example.com", with_project: false)
-        insert_admin_audit_log(account_id: other.id, message: "login_from_other")
+        insert_account_audit_log(account_id: other.id, message: "login_from_other")
 
         visit "#{project.path}/authentication-audit-log"
 
@@ -131,8 +122,8 @@ RSpec.describe Clover, "authentication audit log" do
       end
 
       it "can filter by message" do
-        insert_admin_audit_log(account_id: user.id, message: "login")
-        insert_admin_audit_log(account_id: user.id, message: "login_failure")
+        insert_account_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: user.id, message: "login_failure")
 
         visit "#{project.path}/authentication-audit-log?message=login_failure"
 
@@ -141,8 +132,8 @@ RSpec.describe Clover, "authentication audit log" do
       end
 
       it "can filter by metadata" do
-        insert_admin_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
-        insert_admin_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
+        insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+        insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
         visit "#{project.path}/authentication-audit-log?metadata=%7B%22ip%22%3A%221.2.3.4%22%7D"
 
@@ -154,8 +145,8 @@ RSpec.describe Clover, "authentication audit log" do
         user.update(name: "Test-Name")
         other = create_account("other@example.com", with_project: false)
         project.add_account(other)
-        insert_admin_audit_log(account_id: user.id, message: "login")
-        insert_admin_audit_log(account_id: other.id, message: "login_failure")
+        insert_account_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: other.id, message: "login_failure")
 
         visit "#{project.path}/authentication-audit-log?account=Test-Name"
 
@@ -167,8 +158,8 @@ RSpec.describe Clover, "authentication audit log" do
       it "can filter by account email" do
         other = create_account("other@example.com", with_project: false)
         project.add_account(other)
-        insert_admin_audit_log(account_id: user.id, message: "login")
-        insert_admin_audit_log(account_id: other.id, message: "login_failure")
+        insert_account_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: other.id, message: "login_failure")
 
         visit "#{project.path}/authentication-audit-log?account=#{user.email}"
 
@@ -180,8 +171,8 @@ RSpec.describe Clover, "authentication audit log" do
       it "can filter by account UBID" do
         other = create_account("other@example.com", with_project: false)
         project.add_account(other)
-        insert_admin_audit_log(account_id: user.id, message: "login")
-        insert_admin_audit_log(account_id: other.id, message: "login_failure")
+        insert_account_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: other.id, message: "login_failure")
 
         visit "#{project.path}/authentication-audit-log?account=#{user.ubid}"
 
@@ -191,7 +182,7 @@ RSpec.describe Clover, "authentication audit log" do
       end
 
       it "shows no data rows for unknown account filter" do
-        insert_admin_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: user.id, message: "login")
 
         visit "#{project.path}/authentication-audit-log?account=not-a-ubid-or-name"
 
@@ -200,7 +191,7 @@ RSpec.describe Clover, "authentication audit log" do
 
       it "resolves account name in results" do
         user.update(name: "Shown-Name")
-        insert_admin_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: user.id, message: "login")
 
         visit "#{project.path}/authentication-audit-log"
 
