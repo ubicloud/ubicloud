@@ -89,7 +89,7 @@ RSpec.describe Clover, "authentication audit log" do
   describe "project authentication audit log" do
     describe "unauthenticated" do
       it "redirects to login" do
-        visit "#{project.path}/authentication-audit-log"
+        visit "#{project.path}/audit-log/authentication"
 
         expect(page.title).to eq("Ubicloud - Login")
       end
@@ -104,7 +104,8 @@ RSpec.describe Clover, "authentication audit log" do
       it "can view project authentication audit log entries" do
         insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
 
-        visit "#{project.path}/authentication-audit-log"
+        visit project.path
+        click_link "View Authentication Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Authentication Audit Log")
         expect(data_rows.length).to eq(1)
@@ -116,7 +117,7 @@ RSpec.describe Clover, "authentication audit log" do
         other = create_account("other@example.com", with_project: false)
         insert_account_audit_log(account_id: other.id, message: "login_from_other")
 
-        visit "#{project.path}/authentication-audit-log"
+        visit "#{project.path}/audit-log/authentication"
 
         expect(data_rows).to be_empty
       end
@@ -125,7 +126,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
-        visit "#{project.path}/authentication-audit-log?message=login_failure"
+        visit "#{project.path}/audit-log/authentication?message=login_failure"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login_failure")
@@ -135,7 +136,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
         insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
-        visit "#{project.path}/authentication-audit-log?metadata=%7B%22ip%22%3A%221.2.3.4%22%7D"
+        visit "#{project.path}/audit-log/authentication?metadata=%7B%22ip%22%3A%221.2.3.4%22%7D"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
@@ -148,7 +149,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: other.id, message: "login_failure")
 
-        visit "#{project.path}/authentication-audit-log?account=Test-Name"
+        visit "#{project.path}/audit-log/authentication?account=Test-Name"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
@@ -161,7 +162,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: other.id, message: "login_failure")
 
-        visit "#{project.path}/authentication-audit-log?account=#{user.email}"
+        visit "#{project.path}/audit-log/authentication?account=#{user.email}"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
@@ -174,7 +175,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: other.id, message: "login_failure")
 
-        visit "#{project.path}/authentication-audit-log?account=#{user.ubid}"
+        visit "#{project.path}/audit-log/authentication?account=#{user.ubid}"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
@@ -184,7 +185,7 @@ RSpec.describe Clover, "authentication audit log" do
       it "shows no data rows for unknown account filter" do
         insert_account_audit_log(account_id: user.id, message: "login")
 
-        visit "#{project.path}/authentication-audit-log?account=not-a-ubid-or-name"
+        visit "#{project.path}/audit-log/authentication?account=not-a-ubid-or-name"
 
         expect(data_rows).to be_empty
       end
@@ -193,7 +194,7 @@ RSpec.describe Clover, "authentication audit log" do
         user.update(name: "Shown-Name")
         insert_account_audit_log(account_id: user.id, message: "login")
 
-        visit "#{project.path}/authentication-audit-log"
+        visit "#{project.path}/audit-log/authentication"
 
         expect(page).to have_content("Shown-Name")
       end
@@ -201,7 +202,7 @@ RSpec.describe Clover, "authentication audit log" do
       it "returns 403 when user lacks Project:auditlog permission" do
         project_wo_permissions = user.create_project_with_default_policy("project-2", default_policy: nil)
 
-        visit "#{project_wo_permissions.path}/authentication-audit-log"
+        visit "#{project_wo_permissions.path}/audit-log/authentication"
 
         expect(page.title).to eq("Ubicloud - Forbidden")
       end

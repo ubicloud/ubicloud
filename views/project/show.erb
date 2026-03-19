@@ -45,11 +45,13 @@
       end
 
       if has_permission?("Project:auditlog", @project)
-         rows.push([
-           "View Audit Logs",
-           "<a href=\"#{@project.path}/audit-log\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">View Audit Logs</a>",
-           { escape: false}
-         ])
+        links = ["<a href=\"#{@project.path}/audit-log\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">View Audit Logs</a>"]
+        links << "<a href=\"#{@project.path}/audit-log/authentication\" class=\"font-semibold leading-6 text-orange-500 hover:text-orange-700\">View Authentication Audit Logs</a>"
+        rows.push([
+          "View Audit Logs",
+          links.join(" | "),
+          { escape: false}
+        ])
       end %>
 
     <%== part("components/kv_data_card", data: rows) %>
