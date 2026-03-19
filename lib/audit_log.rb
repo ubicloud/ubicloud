@@ -36,6 +36,89 @@ module AuditLog
       end
     end
 
+    default_limit = (resolve == :subjects_and_objects) ? 100 : 1000
+    fetch_audit_log_entries(ds, next_page_params:, default_limit:, skip_query:, month_limit:, min_end_date:)
+
+    ubids = {}
+
+    case resolve
+    when :subjects_and_objects
+      @audit_logs.each do |log|
+        ubids[log[:subject_id]] = nil
+        log[:object_ids].each do
+          ubids[it] = nil
+        end
+      end
+
+      UBID.resolve_map(ubids) do |ds|
+        ds = ds.where(id: accounts_dataset.select(Sequel[:accounts][:id])) if ds.model == Account
+        ds = ds.eager(:location) if ds.model.association_reflection(:location)
+        ds
+      end
+    when :subjects
+      @audit_logs.each do |log|
+        ubids[log[:subject_id]] = nil
+      end
+
+      UBID.resolve_map(ubids) do |ds|
+        ds.where(id: accounts_dataset.select(Sequel[:accounts][:id]))
+      end
+    end
+
+    @ubids = ubids
+
+    nil
+  end
+
+  def authentication_audit_log_search(ds, accounts_dataset: nil, resolve: nil, month_limit:, min_end_date: Date.today << month_limit)
+    ds = ds.order(Sequel.desc(:at), :id)
+    skip_query = false
+    next_page_params = @next_page_params = {}
+
+    if (message = typecast_params.nonempty_str("message"))
+      next_page_params["message"] = message
+      ds = ds.where(message:)
+    end
+
+    if (metadata = typecast_params.nonempty_str("metadata"))
+      next_page_params["metadata"] = metadata
+      begin
+        ds = ds.where(Sequel.pg_jsonb_op(:metadata).contains(Sequel.pg_jsonb(JSON.parse(metadata))))
+      rescue JSON::ParserError
+        skip_query = true
+      end
+    end
+
+    if accounts_dataset && (account = typecast_params.nonempty_str("account"))
+      next_page_params["account"] = account
+      if (account_id = UBID.to_uuid(account))
+        ds = ds.where(account_id:)
+      elsif (account_id = accounts_dataset.where(Sequel[{name: account}] | {email: account}).get(:id))
+        ds = ds.where(account_id:)
+      else
+        skip_query = true
+      end
+    end
+
+    fetch_audit_log_entries(ds, next_page_params:, default_limit: 100, skip_query:, month_limit:, min_end_date:)
+
+    ubids = {}
+
+    if resolve == :accounts && accounts_dataset
+      @audit_logs.each { ubids[it[:account_id]] = nil }
+      UBID.resolve_map(ubids) do |ds|
+        ds.where(id: accounts_dataset.select(Sequel[:accounts][:id]))
+      end
+    end
+
+    @ubids = ubids
+
+    nil
+  end
+
+  private
+
+  def fetch_audit_log_entries(ds, next_page_params:, default_limit:, skip_query:, month_limit:, min_end_date:)
     # How many months to show for a single request
     @month_limit = month_limit
 
@@ -85,7 +168,6 @@ module AuditLog
       next_page_params["limit"] = limit
     end
 
-    default_limit = (resolve == :subjects_and_objects) ? 100 : 1000
     limit ||= default_limit
     limit = limit.clamp(1, default_limit) + 1
 
@@ -100,34 +182,7 @@ module AuditLog
       end
     end
 
-    ubids = {}
-
-    case resolve
-    when :subjects_and_objects
-      items.each do |log|
-        ubids[log[:subject_id]] = nil
-        log[:object_ids].each do
-          ubids[it] = nil
-        end
-      end
-
-      UBID.resolve_map(ubids) do |ds|
-        ds = ds.where(id: accounts_dataset.select(Sequel[:accounts][:id])) if ds.model == Account
-        ds = ds.eager(:location) if ds.model.association_reflection(:location)
-        ds
-      end
-    when :subjects
-      items.each do |log|
-        ubids[log[:subject_id]] = nil
-      end
-
-      UBID.resolve_map(ubids) do |ds|
-        ds.where(id: accounts_dataset.select(Sequel[:accounts][:id]))
-      end
-    end
-
     @audit_logs = items
-    @ubids = ubids
     @end_date = end_date
 
     nil
