@@ -208,6 +208,7 @@ class Project < Sequel::Model
 
   feature_flag(
     :allocator_diagnostics,
+    :authentication_audit_log,
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
     :enable_c6gd,

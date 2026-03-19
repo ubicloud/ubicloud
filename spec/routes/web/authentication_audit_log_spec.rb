@@ -98,7 +98,18 @@ RSpec.describe Clover, "authentication audit log" do
     describe "authenticated" do
       before do
         login(user.email)
+        project.set_ff_authentication_audit_log(true)
         DB[:account_authentication_audit_log].delete
+      end
+
+      it "cannot view project authentication audit log entries without authentication_audit_log feature flag" do
+        project.set_ff_authentication_audit_log(false)
+
+        visit project.path
+        expect(page).to have_no_content "View Authentication Audit Logs"
+
+        visit "#{project.path}/audit-log/authentication"
+        expect(page.title).to eq("Ubicloud - ResourceNotFound")
       end
 
       it "can view project authentication audit log entries" do
