@@ -59,7 +59,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
-        visit "/account/authentication-audit-log?message=login_failure"
+        visit "/account/authentication-audit-log?action=login_failure"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login_failure")
@@ -137,7 +137,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
-        visit "#{project.path}/audit-log/authentication?message=login_failure"
+        visit "#{project.path}/audit-log/authentication?action=login_failure"
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login_failure")
