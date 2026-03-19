@@ -56,18 +56,19 @@
     </div>
   </div>
 
-  <% rows =
-   @audit_logs.map do |entry|
-     [
-       [
-         entry[:at].getutc.strftime("%F %T"),
-         h(entry[:message]),
-         [entry[:account], {escape: false}],
-         entry[:metadata] ? entry[:metadata].map { |k, v| "#{h k}: #{h v.to_s}" }.join(", ") : ""
-       ],
-       { id: UBID.to_ubid(entry[:id]) }
-     ]
-   end
+  <% end_date = @end_date.to_s
+  rows =
+    @audit_logs.map do |entry|
+      [
+        [
+          entry[:at].getutc.strftime("%F %T"),
+          ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:message]}\">#{h entry[:message]}</a>", {escape: false}],
+          [entry[:account], {escape: false}],
+          entry[:metadata] ? entry[:metadata].map { |k, v| "#{h k}: #{h v.to_s}" }.join(", ") : ""
+        ],
+        { id: UBID.to_ubid(entry[:id]) }
+      ]
+    end
 
     if @pagination_key
       link_text = "Next Page"

@@ -55,14 +55,21 @@ RSpec.describe Clover, "authentication audit log" do
         expect(data_rows).to be_empty
       end
 
-      it "can filter by message" do
+      it "can filter by action" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
-        visit "/account/authentication-audit-log?action=login_failure"
+        visit "/account/authentication-audit-log"
+        expect(data_rows.length).to eq(2)
 
+        click_link "login_failure"
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login_failure")
+
+        fill_in "Action", with: "login"
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login")
       end
 
       it "can filter by metadata" do
@@ -133,14 +140,21 @@ RSpec.describe Clover, "authentication audit log" do
         expect(data_rows).to be_empty
       end
 
-      it "can filter by message" do
+      it "can filter by action" do
         insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
-        visit "#{project.path}/audit-log/authentication?action=login_failure"
+        visit "#{project.path}/audit-log/authentication"
+        expect(data_rows.length).to eq(2)
 
+        click_link "login_failure"
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login_failure")
+
+        fill_in "Action", with: "login"
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login")
       end
 
       it "can filter by metadata" do
