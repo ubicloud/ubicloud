@@ -34,6 +34,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     register_deadline(nil, 5 * 60)
     vm.active_billing_records.each(&:finalize)
     vm.assigned_vm_address&.active_billing_record&.finalize
+    log_vm_stats
   end
 
   label def start
@@ -624,5 +625,16 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
   def hard_stop
     host.sshable.cmd("sudo systemctl stop :vm_name", vm_name:)
+  end
+
+  def log_vm_stats
+    stats = host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name:, timeout: 10, log: false)
+  rescue Sshable::SshError, JSON::ParserError => e
+    # Collecting VM stats is best effort during destroy, so we catch and log any
+    # errors without preventing the destroy process. If there are bugs in vm-stats,
+    # they should be also reproduced in E2E tests which will notify us.
+    Clog.emit("Failed to collect VM destroy stats", failed_vm_destroy_stats: Util.exception_to_hash(e))
+  else
+    Clog.emit("VM destroy stats", vm_destroy_stats: stats)
   end
 end

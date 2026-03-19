@@ -740,12 +740,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
       vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
       expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
 
     it "skips stopping billing record if not found" do
       expect(vm.active_billing_records).to be_empty
       expect(vm.assigned_vm_address).to be_nil
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
 
@@ -754,6 +756,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(vm.assigned_vm_address).not_to be_nil
       expect(vm.assigned_vm_address.active_billing_record).to be_nil
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
   end
@@ -1281,6 +1284,26 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "fails when SSH fails" do
       expect(sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
       expect(nx.available?).to be false
+    end
+  end
+
+  describe "#log_vm_stats" do
+    it "logs stats" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("{\"stats\": \"stats\"}")
+      expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats"})
+      nx.log_vm_stats
+    end
+
+    it "logs an error when SSH fails" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "Sshable::SshError")})
+      nx.log_vm_stats
+    end
+
+    it "logs an error when vm-stats returns bad json" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("not a json")
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "JSON::ParserError")})
+      nx.log_vm_stats
     end
   end
 end
