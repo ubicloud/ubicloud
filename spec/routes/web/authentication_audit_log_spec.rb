@@ -167,61 +167,43 @@ RSpec.describe Clover, "authentication audit log" do
         expect(data_rows.first).to have_content("login")
       end
 
-      it "can filter by account name" do
+      it "can filter by account name, email, and ubid" do
         user.update(name: "Test-Name")
         other = create_account("other@example.com", with_project: false)
+        other.update(name: "Other-Name")
         project.add_account(other)
-        insert_account_audit_log(account_id: user.id, message: "login")
+        insert_account_audit_log(account_id: user.id, message: "login_success")
         insert_account_audit_log(account_id: other.id, message: "login_failure")
-
-        visit "#{project.path}/audit-log/authentication?account=Test-Name"
-
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_no_content("login_failure")
-      end
-
-      it "can filter by account email" do
-        other = create_account("other@example.com", with_project: false)
-        project.add_account(other)
-        insert_account_audit_log(account_id: user.id, message: "login")
-        insert_account_audit_log(account_id: other.id, message: "login_failure")
-
-        visit "#{project.path}/audit-log/authentication?account=#{user.email}"
-
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_no_content("login_failure")
-      end
-
-      it "can filter by account UBID" do
-        other = create_account("other@example.com", with_project: false)
-        project.add_account(other)
-        insert_account_audit_log(account_id: user.id, message: "login")
-        insert_account_audit_log(account_id: other.id, message: "login_failure")
-
-        visit "#{project.path}/audit-log/authentication?account=#{user.ubid}"
-
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_no_content("login_failure")
-      end
-
-      it "shows no data rows for unknown account filter" do
-        insert_account_audit_log(account_id: user.id, message: "login")
-
-        visit "#{project.path}/audit-log/authentication?account=not-a-ubid-or-name"
-
-        expect(data_rows).to be_empty
-      end
-
-      it "resolves account name in results" do
-        user.update(name: "Shown-Name")
-        insert_account_audit_log(account_id: user.id, message: "login")
 
         visit "#{project.path}/audit-log/authentication"
+        expect(data_rows.length).to eq(2)
 
-        expect(page).to have_content("Shown-Name")
+        click_link "Test-Name"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login_success")
+        expect(data_rows.first).to have_no_content("login_failure")
+
+        fill_in "Account", with: "Other-Name"
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_no_content("login_success")
+        expect(data_rows.first).to have_content("login_failure")
+
+        fill_in "Account", with: user.email
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login_success")
+        expect(data_rows.first).to have_no_content("login_failure")
+
+        fill_in "Account", with: other.ubid
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_no_content("login_success")
+        expect(data_rows.first).to have_content("login_failure")
+
+        fill_in "Account", with: "not-a-ubid-or-name"
+        click_button "Search"
+        expect(data_rows).to be_empty
       end
 
       it "returns 403 when user lacks Project:auditlog permission" do
