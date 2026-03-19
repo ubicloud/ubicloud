@@ -75,8 +75,8 @@ module AuditLog
     skip_query = false
     next_page_params = @next_page_params = {}
 
-    if (message = typecast_params.nonempty_str("message"))
-      next_page_params["message"] = message
+    if (message = typecast_params.nonempty_str("action"))
+      next_page_params["action"] = message
       ds = ds.where(message:)
     end
 

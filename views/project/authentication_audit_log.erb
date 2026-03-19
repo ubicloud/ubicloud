@@ -14,10 +14,10 @@
           <div class="col-span-12 sm:col-span-4">
             <%== part(
               "components/form/text",
-              name: "message",
-              label: "Message",
-              value: typecast_params.nonempty_str("message"),
-              attributes: { placeholder: "Filter by message" }
+              name: "action",
+              label: "Action",
+              value: typecast_params.nonempty_str("action"),
+              attributes: { placeholder: "Filter by action" }
             ) %>
           </div>
           <div class="col-span-12 sm:col-span-4">
@@ -84,7 +84,7 @@
   <%== part(
     "components/table_card",
     id: "authentication-audit-log-table",
-    headers: ["Time (in UTC)", "Message", "Account", "Metadata"],
+    headers: ["Time (in UTC)", "Action", "Account", "Metadata"],
     empty_state: {
       icon: "hero-document-text",
       title: "No matching authentication audit log entries in date range",
