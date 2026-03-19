@@ -14,7 +14,7 @@ class Clover
           DB[:account_authentication_audit_log].where(account_id: current_account_id),
           month_limit: 3
         )
-        view "account/authentication_audit_log"
+        view "project/authentication_audit_log"
       end
 
       r.on "login-method" do
