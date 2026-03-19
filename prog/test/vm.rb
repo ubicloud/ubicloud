@@ -83,6 +83,22 @@ class Prog::Test::Vm < Prog::Test::Base
       sshable.cmd("sync :test_file", test_file:)
     }
 
+    hop_verify_vm_stats
+  end
+
+  label def verify_vm_stats
+    result = vm.vm_host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name: vm.inhost_name)
+    fail_test "missing top-level key 'vm' in vm-stats output" unless result.key?("vm")
+    vm_stats = result["vm"]
+    fail_test "missing expected keys in vm stats" unless vm_stats.keys.sort == ["cpu_stats", "main_pid"]
+
+    vm.vm_storage_volumes.each { |vol|
+      disk_key = "disk_#{vol.disk_index}"
+      fail_test "missing expected key '#{disk_key}' in vm-stats output" unless result.key?(disk_key)
+      disk_stats = result[disk_key]
+      fail_test "missing expected keys in #{disk_key} stats" unless disk_stats.keys.sort == ["cpu_stats", "io_stats", "main_pid", "memory_peak_bytes", "memory_swap_peak_bytes"]
+    }
+
     hop_stop_semaphore
   end
 
