@@ -38,8 +38,7 @@ end %>
       </tr>
     <% end %>
     <% if link_text %>
-      <% link_params_html = @next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;") %>
-      <tr><td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td></tr>
+      <tr><td colspan="5"><a href="?<%= to_query_string(@next_page_params) %>"><%= link_text %></a></td></tr>
     <% end %>
   </tbody>
 </table>

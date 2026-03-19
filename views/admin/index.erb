@@ -58,7 +58,7 @@
     <li><a href="/github-runner-usage">GitHub Runner VM Usage</a></li>
     <li><a href="/audit-log">View Audit Logs</a></li>
     <li><a href="/admin-list">View Admin List</a></li>
-    <li><a href="/autoforme/Strand/search/1?prog=Vm%3A%3AMetal%3A%3ANexus&amp;label=unavailable">Show Unavailable VMs</a></li>
+    <li><a href="/autoforme/Strand/search/1?<%= to_query_string(prog: "Vm::Metal::Nexus", label: "unavailable") %>">Show Unavailable VMs</a></li>
   </ul>
 
   <% if @info_pages.any? %>

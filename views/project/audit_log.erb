@@ -62,7 +62,7 @@
       [
         [
           entry[:at].getutc.strftime("%F %T"),
-          ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
+          ["<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "action" => "#{entry[:ubid_type]}/#{entry[:action]}")}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
           [entry[:subject], {escape: false}],
           [entry[:objects].join("<br>"), {escape: false}]
         ],
@@ -79,7 +79,7 @@
     end
 
     if link_text
-      rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
+      rows << [[["<a class=\"text-orange-600\" href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
     end %>
 
   <%== part(

@@ -70,6 +70,12 @@ module AuditLog
     nil
   end
 
+  def to_query_string(params)
+    params.map do |k, v|
+      "#{Rack::Utils.escape(k.to_s)}=#{Rack::Utils.escape(v.to_s)}"
+    end.join("&")
+  end
+
   def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, resolve: nil, min_end_date: Date.today << month_limit)
     ds = ds.order(Sequel.desc(:at), :id)
     skip_query = false
