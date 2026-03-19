@@ -4,7 +4,14 @@
 # `BUNDLE_GEMFILE=rhizome/Gemfile bundle install` works from repository root,
 # as that is what rhizome CI uses.
 
-# Load Gemfiles
-Dir.glob("*/Gemfile", base: __dir__) do |file|
-  instance_eval File.read(File.join(__dir__, file))
+source "https://rubygems.org"
+
+gem "netaddr"
+
+if File.directory?(File.join(__dir__, "host"))
+  gem "base64"
+
+  group :test do
+    gem "rspec"
+  end
 end
