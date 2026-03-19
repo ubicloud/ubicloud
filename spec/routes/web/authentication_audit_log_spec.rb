@@ -161,7 +161,7 @@ RSpec.describe Clover, "authentication audit log" do
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).not_to have_content("login_failure")
+        expect(data_rows.first).to have_no_content("login_failure")
       end
 
       it "can filter by account email" do
@@ -174,7 +174,7 @@ RSpec.describe Clover, "authentication audit log" do
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).not_to have_content("login_failure")
+        expect(data_rows.first).to have_no_content("login_failure")
       end
 
       it "can filter by account UBID" do
@@ -187,7 +187,7 @@ RSpec.describe Clover, "authentication audit log" do
 
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).not_to have_content("login_failure")
+        expect(data_rows.first).to have_no_content("login_failure")
       end
 
       it "shows no data rows for unknown account filter" do
