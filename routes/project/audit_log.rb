@@ -51,7 +51,7 @@ class Clover
       end
     end
 
-    r.get web?, "authentication" do
+    r.get web?, @project.get_ff_authentication_audit_log, "authentication" do
       accounts_dataset = @project.accounts_dataset
       authentication_audit_log_search(
         DB[:account_authentication_audit_log].where(account_id: accounts_dataset.select(:id)),
