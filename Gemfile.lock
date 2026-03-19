@@ -169,7 +169,7 @@ GEM
     herb (0.8.9-x86_64-linux-musl)
     io-console (0.8.1)
     jmespath (1.6.2)
-    json (2.18.1)
+    json (2.19.2)
     json_schema (0.21.0)
     jwt (3.1.2)
       base64
