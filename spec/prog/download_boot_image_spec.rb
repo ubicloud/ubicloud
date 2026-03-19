@@ -184,7 +184,7 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "waits manual intervention if failed more than 10 times" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
-      refresh_frame(dbi, new_values: {"restarted" => 10})
+      refresh_frame(dbi, new_values: {"restarted" => 100})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
       expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
       expect { dbi.download }.to nap(15)

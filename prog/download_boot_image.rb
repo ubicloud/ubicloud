@@ -189,7 +189,7 @@ class Prog::DownloadBootImage < Prog::Base
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
     when "Failed"
       restarted = frame["restarted"] || 0
-      if restarted < 10
+      if restarted < 100
         sshable.cmd("cat var/log/:daemon_name.stderr || true", daemon_name:)
         sshable.cmd("cat var/log/:daemon_name.stdout || true", daemon_name:)
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
