@@ -49,7 +49,14 @@
        [
          entry[:at].getutc.strftime("%F %T"),
          ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:message]}\">#{h entry[:message]}</a>", {escape: false}],
-         entry[:metadata] ? entry[:metadata].map { |k, v| "#{h k}: #{h v.to_s}" }.join(", ") : ""
+         [
+           entry[:metadata].map do |k, v|
+             k = h k
+             v = h v
+             "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;metadata=#{k}%3D#{v}\">#{k}: #{v}</a>"
+           end.join(", "),
+           {escape: false}
+         ]
        ],
        { id: UBID.to_ubid(entry[:id]) }
       ]

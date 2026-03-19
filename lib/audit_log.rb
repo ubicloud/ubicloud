@@ -82,11 +82,9 @@ module AuditLog
 
     if (metadata = typecast_params.nonempty_str("metadata"))
       next_page_params["metadata"] = metadata
-      begin
-        ds = ds.where(Sequel.pg_jsonb_op(:metadata).contains(Sequel.pg_jsonb(JSON.parse(metadata))))
-      rescue JSON::ParserError
-        skip_query = true
-      end
+      md_key, md_value = metadata.split("=", 2)
+      md_value ||= ""
+      ds = ds.where(Sequel.pg_jsonb_op(:metadata).contains(Sequel.pg_jsonb(md_key => md_value)))
     end
 
     if accounts_dataset && (account = typecast_params.nonempty_str("account"))
