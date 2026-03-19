@@ -18,8 +18,8 @@ RSpec.describe Prog::Test::Vm do
     subnet1 = instance_double(PrivateSubnet, id: "subnet1")
     subnet2 = instance_double(PrivateSubnet, id: "subnet2")
 
-    main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0")
-    extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1")
+    main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0", disk_index: 0)
+    extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1", disk_index: 1)
 
     nic1 = instance_double(Nic,
       private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"),
@@ -176,7 +176,102 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("sudo chown ubi #{mount_path}")
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:_cmd).with("sync #{mount_path}/1.txt")
-      expect { vm_test.verify_extra_disks }.to hop("stop_semaphore")
+      expect { vm_test.verify_extra_disks }.to hop("verify_vm_stats")
+    end
+  end
+
+  describe "#verify_vm_stats" do
+    let(:vm_host) {
+      sshable = Sshable.create
+      instance_double(VmHost, sshable:)
+    }
+
+    before {
+      allow(vm_test.vm).to receive_messages(vm_host:, inhost_name: "vm123456")
+    }
+
+    it "verifies vm stats and hops to stop_semaphore" do
+      vm_stats_output = {
+        "disk_0" => {
+          "main_pid" => "3162",
+          "memory_peak_bytes" => 40050688,
+          "memory_swap_peak_bytes" => 0,
+          "cpu_stats" => {"user_time_ms" => 104430, "system_time_ms" => 4900, "total_time_ms" => 109330},
+          "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222}
+        },
+        "disk_1" => {
+          "main_pid" => "3163",
+          "memory_peak_bytes" => 30000000,
+          "memory_swap_peak_bytes" => 0,
+          "cpu_stats" => {"user_time_ms" => 50000, "system_time_ms" => 2000, "total_time_ms" => 52000},
+          "io_stats" => {"read_bytes" => 333333, "write_bytes" => 444444}
+        },
+        "vm" => {
+          "main_pid" => "1234",
+          "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690}
+        }
+      }
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats vm123456").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("stop_semaphore")
+    end
+
+    it "fails if top level key vm is missing in vm-stats output" do
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats vm123456").and_return({unexpected_key: "value"}.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing top-level key 'vm' in vm-stats output"})
+    end
+
+    it "fails if disk_1 key is missing in vm-stats output" do
+      vm_stats_output = {
+        "disk_0" => {
+          "main_pid" => "3162",
+          "memory_peak_bytes" => 40050688,
+          "memory_swap_peak_bytes" => 0,
+          "cpu_stats" => {"user_time_ms" => 104430, "system_time_ms" => 4900, "total_time_ms" => 109330},
+          "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222}
+        },
+        "vm" => {
+          "main_pid" => "1234",
+          "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690}
+        }
+      }
+
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats vm123456").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected key 'disk_1' in vm-stats output"})
+    end
+
+    it "fails if expected keys are missing in vm stats" do
+      vm_stats_output = {
+        "disk_0" => {
+          "main_pid" => "3162",
+          "memory_peak_bytes" => 40050688,
+          "memory_swap_peak_bytes" => 0,
+          "cpu_stats" => {"user_time_ms" => 104430, "system_time_ms" => 4900, "total_time_ms" => 109330},
+          "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222}
+        },
+        "vm" => {
+          "unexpected_key" => "value"
+        }
+      }
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats vm123456").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected keys in vm stats"})
+    end
+
+    it "fails if expected keys are missing in disk_0 stats" do
+      vm_stats_output = {
+        "disk_0" => {
+          "unexpected_key" => "value"
+        },
+        "vm" => {
+          "main_pid" => "1234",
+          "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690}
+        }
+      }
+      expect(vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats vm123456").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected keys in disk_0 stats"})
     end
   end
 
