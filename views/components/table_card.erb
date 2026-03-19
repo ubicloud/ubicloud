@@ -1,4 +1,4 @@
-<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false, id: nil) %>
+<%# locals: (title: nil, headers: [], rows:, empty_state: nil, right_items: nil, footer: nil, consistent_styling: false, id: nil, allow_wrap: false) %>
 
 <div class="grid grid-cols-1">
   <% if title || right_items %>
@@ -18,7 +18,12 @@
 
   <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
     <div class="overflow-x-auto">
-      <table class="min-w-full divide-y divide-gray-300" <% if id %> id="<%= id %>" <% end %>>
+      <table
+        class="min-w-full divide-y divide-gray-300<%= " w-full table-fixed" if allow_wrap %>"
+        <% if id %>
+        id="<%= id %>"
+        <% end %>
+      >
         <% unless headers.empty? || rows.empty? %>
           <thead class="bg-gray-50">
             <tr>
@@ -58,11 +63,17 @@
                   <% col_opts ||= {} %>
                   <td
                     <% if i == 0 && !consistent_styling
-                      cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium whitespace-nowrap text-sm"
+                      cls="pl-4 pr-3 sm:pl-6 py-4 text-gray-900 font-medium text-sm"
                     elsif i + 1 == columns.length && !consistent_styling
-                      cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 whitespace-nowrap text-sm"
+                      cls="pl-3 pr-4 sm:pr-6 py-4 text-gray-500 text-sm"
                     else
-                      cls="px-3 py-4 text-gray-500 whitespace-nowrap text-sm"
+                      cls="px-3 py-4 text-gray-500 text-sm"
+                    end
+
+                    if allow_wrap
+                      cls += " break-all"
+                    else
+                      cls += " whitespace-nowrap"
                     end
                   %>
                     class="<%= cls %> <%= col_opts[:extra_class] %>"
