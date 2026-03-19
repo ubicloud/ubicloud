@@ -76,11 +76,19 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
         insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
-        visit "/account/authentication-audit-log?metadata=%7B%22ip%22%3A%221.2.3.4%22%7D"
+        visit "/account/authentication-audit-log"
+        expect(data_rows.length).to eq(2)
 
+        click_link "ip: 1.2.3.4"
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
         expect(data_rows.first).to have_content("ip: 1.2.3.4")
+
+        fill_in "Metadata", with: "ip=9.9.9.9"
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login_failure")
+        expect(data_rows.first).to have_content("ip: 9.9.9.9")
       end
 
       it "shows no data rows for invalid metadata JSON" do
@@ -161,10 +169,19 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
         insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
-        visit "#{project.path}/audit-log/authentication?metadata=%7B%22ip%22%3A%221.2.3.4%22%7D"
+        visit "/account/authentication-audit-log"
+        expect(data_rows.length).to eq(2)
 
+        click_link "ip: 1.2.3.4"
         expect(data_rows.length).to eq(1)
         expect(data_rows.first).to have_content("login")
+        expect(data_rows.first).to have_content("ip: 1.2.3.4")
+
+        fill_in "Metadata", with: "ip=9.9.9.9"
+        click_button "Search"
+        expect(data_rows.length).to eq(1)
+        expect(data_rows.first).to have_content("login_failure")
+        expect(data_rows.first).to have_content("ip: 9.9.9.9")
       end
 
       it "can filter by account name, email, and ubid" do
