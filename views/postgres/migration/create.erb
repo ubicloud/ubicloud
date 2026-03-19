@@ -1,0 +1,139 @@
+<% @page_title = "Migrate PostgreSQL Database" %>
+
+<%== part(
+  "components/page_header",
+  breadcrumbs: [
+    %w[Projects /project],
+    [@project.name, @project.path],
+    ["PostgreSQL Databases", "#{@project.path}/postgres"],
+    [@pg.name, "#{@project.path}#{@pg.path}"],
+    %w[Migrate #]
+  ]
+) %>
+
+<div class="grid gap-6">
+  <% form(action: "#{@project.path}#{@pg.path}/migration", method: :post, id: "creation-form") do %>
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-8">
+          <div>
+            <h2 class="text-base font-semibold leading-7 text-gray-900">Source Database Connection</h2>
+            <p class="mt-1 text-sm leading-6 text-gray-600">
+              Enter the connection details of the PostgreSQL database you want to migrate to Ubicloud.
+            </p>
+          </div>
+
+          <!-- Connection mode toggle -->
+          <fieldset>
+            <legend class="text-sm font-medium leading-6 text-gray-900">Connection Method</legend>
+            <div class="mt-2 grid gap-3 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">
+              <label>
+                <input type="radio" name="connection_mode" value="connection_string" class="peer sr-only" checked>
+                <span class="radio-small-card justify-center p-3 text-sm font-semibold cursor-pointer">Connection String</span>
+              </label>
+              <label>
+                <input type="radio" name="connection_mode" value="separate_fields" class="peer sr-only">
+                <span class="radio-small-card justify-center p-3 text-sm font-semibold cursor-pointer">Individual Fields</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <!-- Connection String mode -->
+          <div id="connection-string-section">
+            <%== part("components/form/text",
+              name: "connection_string",
+              label: "Connection String",
+              attributes: { placeholder: "postgresql://user:password@host:5432/dbname" }
+            ) %>
+            <p class="mt-1 text-xs text-gray-500">Example: postgresql://myuser:mypassword@db.example.com:5432/mydb</p>
+          </div>
+
+          <!-- Separate Fields mode -->
+          <div id="separate-fields-section" class="hidden">
+            <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-6">
+              <div class="sm:col-span-4">
+                <%== part("components/form/text",
+                  name: "host",
+                  label: "Host",
+                  attributes: { placeholder: "db.example.com" }
+                ) %>
+              </div>
+              <div class="sm:col-span-2">
+                <%== part("components/form/text",
+                  name: "port",
+                  type: "number",
+                  label: "Port",
+                  value: "5432"
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== part("components/form/text",
+                  name: "username",
+                  label: "Username",
+                  attributes: { placeholder: "postgres" }
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== part("components/form/text",
+                  name: "password",
+                  type: "password",
+                  label: "Password"
+                ) %>
+              </div>
+              <div class="sm:col-span-3">
+                <%== part("components/form/text",
+                  name: "database",
+                  label: "Database (optional)",
+                  attributes: { placeholder: "postgres" }
+                ) %>
+              </div>
+            </div>
+          </div>
+
+          <!-- Firewall warning -->
+          <div class="rounded-md bg-yellow-50 p-4">
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                </svg>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-yellow-800">Firewall Configuration Required</h3>
+                <p class="mt-1 text-sm text-yellow-700">
+                  Ensure your source database's firewall allows inbound connections from Ubicloud IP ranges.
+                  The migration tool needs to connect to your source database over the public internet.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="border-t border-gray-200 px-4 py-4 sm:px-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= @project.path %><%= @pg.path %>" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: "Analyze Source Database") %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% nonce = SecureRandom.hex(32)
+content_security_policy.add_script_src [:nonce, nonce] %>
+<script nonce="<%= nonce %>">
+  document.querySelectorAll('input[name="connection_mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      const connStr = document.getElementById('connection-string-section');
+      const fields = document.getElementById('separate-fields-section');
+      if (this.value === 'connection_string') {
+        connStr.classList.remove('hidden');
+        fields.classList.add('hidden');
+      } else {
+        connStr.classList.add('hidden');
+        fields.classList.remove('hidden');
+      }
+    });
+  });
+</script>

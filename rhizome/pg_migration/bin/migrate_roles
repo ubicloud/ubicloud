@@ -1,0 +1,48 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+# Reads JSON config from stdin: { "source_conn": "...", "target_conn": "...", "exclude_roles": [...] }
+config = JSON.parse($stdin.read)
+
+source_conn = config["source_conn"]
+target_conn = config["target_conn"]
+exclude_roles = config.fetch("exclude_roles", ["postgres"])
+
+# Add Ubicloud system roles to exclusion list
+exclude_roles += ["ubi_replication", "ubi_monitoring", "pgbouncer"]
+exclude_roles.uniq!
+
+# Dump roles from source
+begin
+  role_sql = r("pg_dumpall", "--roles-only", "-d", source_conn,
+    env: {"PGCONNECT_TIMEOUT" => "30"})
+rescue CommandFail => e
+  $stderr.puts "Failed to dump roles: #{e.message}"
+  exit 1
+end
+
+# Filter out system roles and dangerous attributes
+filtered_lines = role_sql.split("\n").reject do |line|
+  # Skip lines that create/alter excluded roles
+  exclude_roles.any? { |role| line.match?(/^\s*(CREATE|ALTER)\s+ROLE\s+#{Regexp.escape(role)}\b/i) } ||
+    # Skip superuser/replication grants
+    line.match?(/\b(SUPERUSER|REPLICATION|BYPASSRLS)\b/) ||
+    # Skip lines starting with -- (comments about excluded roles)
+    false
+end
+
+filtered_sql = filtered_lines.join("\n")
+
+# Apply to target
+begin
+  r("psql", target_conn, stdin: filtered_sql,
+    env: {"PGCONNECT_TIMEOUT" => "30", "ON_ERROR_STOP" => "0"})
+rescue CommandFail => e
+  # Role creation failures are often benign (role already exists)
+  $stderr.puts "Warning during role migration (may be benign): #{e.message}"
+end
+
+puts "Role migration completed"

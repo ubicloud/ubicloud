@@ -145,4 +145,64 @@ class Clover
 
     Validation.validate_postgres_version(postgres_params["version"], postgres_params["flavor"])
   end
+
+  def migration_post(pg)
+    connection_mode = typecast_params.str("connection_mode")
+
+    if connection_mode == "separate_fields"
+      source_host = typecast_params.nonempty_str!("host")
+      source_port = typecast_params.pos_int("port") || 5432
+      source_user = typecast_params.nonempty_str!("username")
+      source_password = typecast_params.nonempty_str!("password")
+      source_database = typecast_params.str("database") || "postgres"
+
+      migration = Prog::Postgres::PostgresMigrationNexus.assemble(
+        project_id: pg.project_id,
+        source_host: source_host,
+        source_port: source_port,
+        source_user: source_user,
+        source_password: source_password,
+        source_database: source_database
+      ).subject
+    else
+      connection_string = typecast_params.nonempty_str!("connection_string")
+      validate_connection_string(connection_string)
+
+      migration = Prog::Postgres::PostgresMigrationNexus.assemble(
+        project_id: pg.project_id,
+        source_connection_string: connection_string
+      ).subject
+    end
+
+    migration
+  end
+
+  def validate_connection_string(str)
+    uri = URI.parse(str)
+    unless uri.scheme&.start_with?("postgres")
+      fail Validation::ValidationFailed.new({connection_string: "Must be a valid PostgreSQL connection string (postgresql://...)"})
+    end
+    unless uri.host && !uri.host.empty?
+      fail Validation::ValidationFailed.new({connection_string: "Connection string must include a host"})
+    end
+
+    # SSRF protection: block private/internal IPs
+    begin
+      resolved = Resolv.getaddresses(uri.host)
+      resolved.each do |ip|
+        addr = IPAddr.new(ip)
+        if addr.loopback? || addr.private? || addr.link_local?
+          fail Validation::ValidationFailed.new({connection_string: "Connection to private or internal IP addresses is not allowed"})
+        end
+        # Block metadata endpoints
+        if ip == "169.254.169.254"
+          fail Validation::ValidationFailed.new({connection_string: "Connection to metadata endpoints is not allowed"})
+        end
+      end
+    rescue Resolv::ResolvError
+      fail Validation::ValidationFailed.new({connection_string: "Unable to resolve hostname"})
+    end
+  rescue URI::InvalidURIError
+    fail Validation::ValidationFailed.new({connection_string: "Invalid connection string format"})
+  end
 end

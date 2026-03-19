@@ -1,0 +1,63 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+# Reads JSON config from stdin
+config = JSON.parse($stdin.read)
+
+source_conn = config["source_conn"]
+target_conn = config["target_conn"]
+database_name = config["database_name"]
+
+# Build per-database connection strings
+source_db_conn = source_conn.sub(%r{/[^/?]*(\?|$)}, "/#{database_name}\\1")
+target_db_conn = target_conn.sub(%r{/[^/?]*(\?|$)}, "/#{database_name}\\1")
+
+# Create target database if it doesn't exist
+begin
+  existing = r("psql", target_conn, "-t", "-A", "-c",
+    "SELECT 1 FROM pg_database WHERE datname = '#{database_name.gsub("'", "''")}'",
+    env: {"PGCONNECT_TIMEOUT" => "30"}).strip
+  if existing != "1"
+    r("psql", target_conn, "-c", "CREATE DATABASE \"#{database_name.gsub('"', '""')}\";",
+      env: {"PGCONNECT_TIMEOUT" => "30"})
+  end
+rescue CommandFail => e
+  $stderr.puts "Warning creating database: #{e.message}"
+end
+
+# Run pg_dump | pg_restore pipeline
+log_file = "/tmp/migrate_#{database_name.gsub(/[^a-zA-Z0-9_-]/, "_")}.log"
+
+# Use shell pipeline for streaming
+pipeline_cmd = [
+  "PGCONNECT_TIMEOUT=60 pg_dump -Fc --no-privileges --verbose -d '#{source_db_conn}' 2>>#{log_file}",
+  "|",
+  "PGCONNECT_TIMEOUT=60 pg_restore --no-privileges --verbose -d '#{target_db_conn}' 2>>#{log_file}"
+].join(" ")
+
+begin
+  r("bash", "-c", "set -euo pipefail; #{pipeline_cmd}")
+rescue CommandFail => e
+  $stderr.puts "Migration of #{database_name} failed: #{e.message}"
+  # Read last 20 lines of log for error context
+  begin
+    log_tail = r("tail", "-20", log_file)
+    $stderr.puts "Last log entries:\n#{log_tail}"
+  rescue CommandFail
+    # ignore
+  end
+  exit 1
+end
+
+# Run ANALYZE on the migrated database
+begin
+  r("psql", target_db_conn, "-c", "ANALYZE;",
+    env: {"PGCONNECT_TIMEOUT" => "30"})
+rescue CommandFail => e
+  $stderr.puts "Warning: ANALYZE failed: #{e.message}"
+end
+
+puts "Migration of #{database_name} completed successfully"

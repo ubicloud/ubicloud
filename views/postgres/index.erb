@@ -19,6 +19,13 @@
             </div>
             ITEM
           end.join}
+          <div class="border-t border-gray-100"></div>
+          <div class="py-1 hover:bg-gray-50" role="none">
+            <a href="#{@project.path}/postgres/migrate" class="block px-4 py-3 focus:outline-none">
+              <h3 class="text-base font-semibold leading-6 text-gray-900">Migrate to Ubicloud</h3>
+              <p class="mt-1 text-sm text-gray-500">Import an existing PostgreSQL database from another provider</p>
+            </a>
+          </div>
         </div>
       </div>
     DROPDOWN
@@ -74,6 +81,28 @@
           </span>
         </div>
     <% end %>
+      <!-- Migrate to Ubicloud card -->
+      <div class="rounded-lg shadow group relative bg-white p-6">
+        <div>
+          <span class="inline-flex rounded-lg overflow-hidden w-12 h-12 items-center justify-center bg-orange-50">
+            <svg class="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7.5L7.5 3m0 0L12 7.5M7.5 3v13.5m13.5-3L16.5 18m0 0L12 13.5m4.5 4.5V6" />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-4">
+          <h3 class="text-base font-semibold leading-6 text-gray-900">
+            <a href="<%= @project.path %>/postgres/migrate" class="focus:outline-none">
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              Migrate to Ubicloud
+            </a>
+          </h3>
+          <p class="mt-2 text-sm text-gray-500">Import an existing PostgreSQL database from another provider</p>
+        </div>
+        <span class="pointer-events-none absolute right-6 top-6 text-gray-300 group-hover:text-gray-400">
+          <%== part("components/icon", name: "hero-arrow-up-right") %>
+        </span>
+      </div>
     </div>
   </div>
 <% end %>

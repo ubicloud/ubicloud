@@ -1,0 +1,133 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+# Reads source connection string from stdin
+conn_str = $stdin.read.strip
+
+result = {
+  "server" => {"version" => "", "version_major" => 0},
+  "can_dump_roles" => false,
+  "databases" => [],
+  "roles" => [],
+  "warnings" => []
+}
+
+# Test connectivity and get version
+begin
+  version_output = r("psql", conn_str, "-t", "-A", "-c", "SELECT version();",
+    env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+  version_num = r("psql", conn_str, "-t", "-A", "-c", "SHOW server_version_num;",
+    env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+  major = version_num[0..1].to_i
+  result["server"] = {"version" => version_output, "version_major" => major}
+rescue CommandFail => e
+  $stderr.puts JSON.generate({"error" => "Cannot connect to source database", "details" => e.message})
+  exit 1
+end
+
+# Test role dump access (requires superuser)
+begin
+  r("psql", conn_str, "-t", "-A", "-c", "SELECT 1 FROM pg_authid LIMIT 1;",
+    env: {"PGCONNECT_TIMEOUT" => "10"})
+  result["can_dump_roles"] = true
+rescue CommandFail
+  result["can_dump_roles"] = false
+  result["warnings"] << "No superuser access - role passwords will not transfer during migration"
+end
+
+# Get database list with sizes
+begin
+  db_output = r("psql", conn_str, "-t", "-A", "-F", "|", "-c", <<~SQL,
+    SELECT datname, pg_database_size(datname), pg_encoding_to_char(encoding)
+    FROM pg_database
+    WHERE datistemplate = false AND datname != 'postgres'
+    ORDER BY pg_database_size(datname) DESC;
+  SQL
+    env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+
+  db_output.split("\n").each do |line|
+    parts = line.split("|")
+    next if parts.length < 3
+    result["databases"] << {
+      "name" => parts[0],
+      "size_bytes" => parts[1].to_i,
+      "encoding" => parts[2],
+      "table_count" => 0,
+      "extensions" => [],
+      "access" => "unknown"
+    }
+  end
+rescue CommandFail => e
+  result["warnings"] << "Could not list databases: #{e.message}"
+end
+
+# Get roles
+begin
+  role_output = r("psql", conn_str, "-t", "-A", "-F", "|", "-c", <<~SQL,
+    SELECT rolname, rolsuper, rolcreatedb, rolcreaterole, rolcanlogin
+    FROM pg_roles
+    WHERE rolname NOT LIKE 'pg_%' AND rolname != 'postgres'
+    ORDER BY rolname;
+  SQL
+    env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+
+  role_output.split("\n").each do |line|
+    parts = line.split("|")
+    next if parts.length < 5
+    result["roles"] << {
+      "name" => parts[0],
+      "superuser" => parts[1] == "t",
+      "createdb" => parts[2] == "t",
+      "createrole" => parts[3] == "t",
+      "login" => parts[4] == "t"
+    }
+  end
+rescue CommandFail => e
+  result["warnings"] << "Could not list roles: #{e.message}"
+end
+
+# Per-database details (table count, extensions)
+result["databases"].each do |db|
+  # Build per-database connection string
+  db_conn = conn_str.sub(%r{/[^/?]*(\?|$)}, "/#{db["name"]}\\1")
+
+  begin
+    count = r("psql", db_conn, "-t", "-A", "-c", <<~SQL,
+      SELECT count(*) FROM information_schema.tables
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema');
+    SQL
+      env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+    db["table_count"] = count.to_i
+  rescue CommandFail
+    db["table_count"] = -1
+  end
+
+  begin
+    ext_output = r("psql", db_conn, "-t", "-A", "-F", "|", "-c", <<~SQL,
+      SELECT extname, extversion FROM pg_extension WHERE extname != 'plpgsql';
+    SQL
+      env: {"PGCONNECT_TIMEOUT" => "10"}).strip
+    db["extensions"] = ext_output.split("\n").map do |line|
+      parts = line.split("|")
+      {"name" => parts[0], "version" => parts[1]} if parts.length >= 2
+    end.compact
+  rescue CommandFail
+    db["extensions"] = []
+  end
+
+  # Test basic table access
+  begin
+    r("psql", db_conn, "-t", "-A", "-c", <<~SQL,
+      SELECT 1 FROM pg_tables WHERE schemaname NOT IN ('pg_catalog', 'information_schema') LIMIT 1;
+    SQL
+      env: {"PGCONNECT_TIMEOUT" => "10"})
+    db["access"] = "full"
+  rescue CommandFail
+    db["access"] = "partial"
+  end
+end
+
+puts JSON.generate(result)

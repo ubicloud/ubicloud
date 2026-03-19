@@ -654,6 +654,88 @@ class Clover
         end
       end
 
+      r.on "migration" do
+        r.get web?, "create" do
+          authorize("Postgres:edit", @pg)
+          @page_title = "Migrate PostgreSQL Database"
+          view "postgres/migration/create"
+        end
+
+        r.post true do
+          authorize("Postgres:edit", @pg)
+          handle_validation_failure("postgres/migration/create")
+          migration = migration_post(@pg)
+          if api?
+            Serializers::PostgresMigration.serialize(migration, {detailed: true})
+          else
+            flash["notice"] = "Migration analysis started. This may take a few minutes."
+            r.redirect "#{@pg.path}/migration/#{migration.ubid}"
+          end
+        end
+
+        r.on String do |migration_ubid|
+          @migration = PostgresMigration.from_ubid(migration_ubid)
+          check_found_object(@migration)
+
+          r.get true do
+            authorize("Postgres:view", @pg)
+            if api?
+              Serializers::PostgresMigration.serialize(@migration, {detailed: true})
+            else
+              @page_title = "Migration - #{@pg.name}"
+              view "postgres/migration/show"
+            end
+          end
+
+          r.post "start" do
+            authorize("Postgres:edit", @pg)
+
+            selected_dbs = typecast_params.array(:str, "databases") || []
+            @migration.migration_databases.each do |db|
+              db.update(selected: selected_dbs.include?(db.name))
+            end
+
+            location_name = typecast_params.nonempty_str!("location")
+            location = Location.where(display_name: location_name).first || Location.where(name: location_name).first
+            fail Validation::ValidationFailed.new({location: "Invalid region"}) unless location
+
+            @migration.update(
+              location_id: location.id,
+              selected_region: location_name,
+              selected_vm_size: typecast_params.nonempty_str!("size"),
+              selected_storage_size_gib: typecast_params.pos_int!("storage_size"),
+              selected_pg_version: typecast_params.nonempty_str!("version")
+            )
+
+            @migration.incr_start_migration
+
+            if api?
+              Serializers::PostgresMigration.serialize(@migration, {detailed: true})
+            else
+              flash["notice"] = "Migration started!"
+              r.redirect "#{@pg.path}/migration/#{@migration.ubid}"
+            end
+          end
+
+          r.post "cancel" do
+            authorize("Postgres:edit", @pg)
+            @migration.incr_cancel
+
+            if api?
+              {message: "Migration cancellation initiated"}
+            else
+              flash["notice"] = "Migration cancellation initiated."
+              r.redirect "#{@pg.path}/migration/#{@migration.ubid}"
+            end
+          end
+
+          r.get "status" do
+            authorize("Postgres:view", @pg)
+            Serializers::PostgresMigration.serialize(@migration, {detailed: true})
+          end
+        end
+      end
+
       r.is "upgrade" do
         r.get api? do
           # api-only route, web GET upgrade route handled by r.show_object call earlier in route

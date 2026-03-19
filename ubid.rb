@@ -107,6 +107,8 @@ class UBID
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
   TYPE_LOCATION_AWS_AZ = "1a"
   TYPE_AWS_SUBNET = "as"
+  TYPE_POSTGRES_MIGRATION = "p8"
+  TYPE_POSTGRES_MIGRATION_DATABASE = "p9"
   # TYPE_AUDIT_LOG = "a1"
 
   # Common entropy-based type for everything else
