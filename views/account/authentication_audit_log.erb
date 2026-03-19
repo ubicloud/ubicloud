@@ -1,89 +1,83 @@
 <% @page_title = "Authentication Audit Log" %>
 
-<%== part("components/page_header", title: "My Account") %>
+<%== part("components/page_header", title: "Authentication Audit Log") %>
 
-<main>
-  <div class="max-w-screen-xl pb-6 lg:pb-16">
-    <div class="overflow-hidden rounded-lg bg-white shadow">
-      <div class="divide-y divide-gray-200 lg:grid lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-        <%== render("account/submenu") %>
-        <div class="divide-y divide-gray-200 lg:col-span-8 xl:col-span-9 2xl:col-span-10">
-          <div class="px-4 py-5 sm:p-6">
-            <% form(action: "/account/authentication-audit-log", method: :get) do %>
-              <div class="grid grid-cols-12 gap-3">
-                <div class="col-span-12 sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "message",
-                    label: "Message",
-                    value: typecast_params.nonempty_str("message"),
-                    attributes: { placeholder: "Filter by message" }
-                  ) %>
-                </div>
-                <div class="col-span-12 sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "metadata",
-                    label: "Metadata",
-                    value: typecast_params.nonempty_str("metadata"),
-                    attributes: { placeholder: 'Filter by metadata, e.g. {"ip":"1.2.3.4"}' }
-                  ) %>
-                </div>
-                <div class="col-span-12 sm:col-span-4">
-                  <%== part(
-                    "components/form/text",
-                    name: "end",
-                    type: "date",
-                    label: "#{@month_limit} Months Prior To",
-                    value: @end_date,
-                    attributes: {required: true}
-                  ) %>
-                </div>
-                <div class="col-span-12 sm:col-span-2 flex items-end">
-                  <%== part("components/form/submit_button", text: "Search") %>
-                </div>
-              </div>
-            <% end %>
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:p-6">
+      <% form(action: "/account/authentication-audit-log", method: :get) do %>
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "message",
+              label: "Message",
+              value: typecast_params.nonempty_str("message"),
+              attributes: { placeholder: "Filter by message" }
+            ) %>
           </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "metadata",
+              label: "Metadata",
+              value: typecast_params.nonempty_str("metadata"),
+              attributes: { placeholder: 'Filter by metadata, e.g. {"ip":"1.2.3.4"}' }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "end",
+              type: "date",
+              label: "#{@month_limit} Months Prior To",
+              value: @end_date,
+              attributes: {required: true}
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2 flex items-end">
+            <%== part("components/form/submit_button", text: "Search") %>
+          </div>
+        </div>
+      <% end %>
+    </div>
 
-          <% rows =
+    <% rows =
    @audit_logs.map do |entry|
-     [
-       [
-         entry[:at].getutc.strftime("%F %T"),
-         h(entry[:message]),
-         entry[:metadata] ? entry[:metadata].map { |k, v| "#{h k}: #{h v.to_s}" }.join(", ") : ""
-       ],
-       { id: UBID.to_ubid(entry[:id]) }
-     ]
+   [
+    [
+      entry[:at].getutc.strftime("%F %T"),
+      h(entry[:message]),
+      entry[:metadata] ? entry[:metadata].map { |k, v| "#{h k}: #{h v.to_s}" }.join(", ") : ""
+    ],
+    { id: UBID.to_ubid(entry[:id]) }
+   ]
    end
 
-            if @pagination_key
-              link_text = "Next Page"
-              @next_page_params["pagination_key"] = @pagination_key
-            elsif @next_end_date
-              link_text = "Prior 3 Months"
-              @next_page_params["end"] = @next_end_date
-            end
+      if @pagination_key
+        link_text = "Next Page"
+        @next_page_params["pagination_key"] = @pagination_key
+      elsif @next_end_date
+        link_text = "Prior 3 Months"
+        @next_page_params["end"] = @next_end_date
+      end
 
-            if link_text
-              rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
-            end %>
+      if link_text
+        rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
+      end %>
 
-          <%== part(
-            "components/table_card",
-            id: "authentication-audit-log-table",
-            headers: ["Time (in UTC)", "Message", "Metadata"],
-            empty_state: {
-              icon: "hero-document-text",
-              title: "No matching authentication audit log entries in date range",
-              description: "No matching authentication audit log entries found for your account (access limited to prior 6 months)."
-            },
-            consistent_styling: true,
-            rows:
-          ) %>
-        </div>
-      </div>
-    </div>
+    <%== part(
+      "components/table_card",
+      id: "authentication-audit-log-table",
+      headers: ["Time (in UTC)", "Message", "Metadata"],
+      empty_state: {
+        icon: "hero-document-text",
+        title: "No matching authentication audit log entries in date range",
+        description: "No matching authentication audit log entries found for your account (access limited to prior 6 months)."
+      },
+      consistent_styling: true,
+      allow_wrap: true,
+      rows:
+    ) %>
   </div>
-</main>
+</div>
