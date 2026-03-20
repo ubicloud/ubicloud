@@ -1184,6 +1184,24 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "server" do
+      it "returns servers successfully" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/servers"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["count"]).to be >= 1
+        expect(response_body["items"].length).to eq(response_body["count"])
+
+        server = response_body["items"].first
+        expect(server).to have_key("id")
+        expect(server).to have_key("role")
+        expect(server).to have_key("state")
+        expect(server).to have_key("synchronization_status")
+        expect(server).to have_key("vm")
+      end
+    end
+
     describe "backup" do
       it "returns backups successfully" do
         backup = Struct.new(:key, :last_modified)

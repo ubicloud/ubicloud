@@ -164,6 +164,18 @@ class PostgresServer < Sequel::Model
     true
   end
 
+  def display_state
+    label = strand.label
+    return "running" if label == "wait"
+    return "unavailable" if label == "unavailable"
+    return "restarting" if label == "restart"
+    return "failing_over" if FAILOVER_LABELS.include?(label)
+    return "synchronizing" if ["wait_catch_up", "wait_synchronization"].include?(label)
+    return "deleting" if ["destroy", "wait_children_destroy", "destroy_vm_and_pg"].include?(label)
+    return "creating" if initial_provisioning_set?
+    "updating"
+  end
+
   def primary?
     timeline_access == "push"
   end

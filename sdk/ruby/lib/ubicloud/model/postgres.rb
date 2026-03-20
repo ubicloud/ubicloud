@@ -170,6 +170,11 @@ module Ubicloud
       adapter.get(_path("/backup"))[:items]
     end
 
+    # Return an array of server hashes for this database.
+    def servers
+      adapter.get(_path("/servers"))[:items]
+    end
+
     # Create a client certificate keypair with the given common name, expiring after duration seconds.
     # Returns a PEM string containing the certificate and key.
     def create_client_cert_keypair(common_name:, duration:)
