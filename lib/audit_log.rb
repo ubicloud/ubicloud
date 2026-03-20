@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
 module AuditLog
-  def audit_log_search(ds, accounts_dataset:, resolve:, month_limit:, min_end_date: Date.today << month_limit)
+  def audit_log_search(ds, accounts_dataset:, resolve:, month_limit:, min_end_date: Date.today << month_limit, next_page_params: {})
     ds = ds.order(Sequel.desc(:at), :id, :ubid_type, :action)
     skip_query = false
-    next_page_params = @next_page_params = {}
+    @next_page_params = next_page_params
 
     if (action = typecast_params.nonempty_str("action"))
       next_page_params["action"] = action

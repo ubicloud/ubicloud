@@ -1569,6 +1569,15 @@ RSpec.describe CloverAdmin do
 
       click_link "View Audit Log"
       expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
+
+      click_link "Older Results"
+      expect(audit_log_content).to eq []
+
+      at = Date.today << 7
+      insert_audit_log(at:)
+      insert_audit_log(project_id: project2.id, action: "destroy", at:)
+      page.refresh
+      expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
     end
 
     it "can filter by action" do
