@@ -52,7 +52,9 @@ class Prog::InstallRhizome < Prog::Base
   end
 
   label def install_gems
-    sshable.cmd("bundle config set --local path vendor/bundle && bundle install")
+    if frame["target_folder"] == "host"
+      sshable.cmd("bundle config set --local path vendor/bundle && bundle install")
+    end
 
     hop_validate
   end

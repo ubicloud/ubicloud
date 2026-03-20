@@ -33,9 +33,15 @@ RSpec.describe Prog::InstallRhizome do
   end
 
   describe "#install_gems" do
-    it "runs some commands and exits" do
+    it "runs some commands and hops" do
       expect(ir.sshable).to receive(:_cmd).with("bundle config set --local path vendor/bundle && bundle install")
-      expect { ir.install_gems }.to hop
+      expect { ir.install_gems }.to hop("validate")
+    end
+
+    it "hops without running commands if target folder is not host" do
+      refresh_frame(ir, new_values: {"target_folder" => "postgres"})
+      expect(ir.sshable).not_to receive(:_cmd)
+      expect { ir.install_gems }.to hop("validate")
     end
   end
 
