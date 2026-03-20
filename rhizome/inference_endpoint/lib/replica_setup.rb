@@ -2,12 +2,7 @@
 
 require_relative "../../common/lib/util"
 
-require "fileutils"
-require "netaddr"
 require "json"
-require "openssl"
-require "base64"
-require "uri"
 
 class ReplicaSetup
   def prep(engine_start_cmd:, replica_ubid:, ssl_crt_path:, ssl_key_path:, gateway_port:, max_requests:)
