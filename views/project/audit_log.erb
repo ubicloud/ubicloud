@@ -70,17 +70,7 @@
       ]
     end
 
-    if @pagination_key
-      link_text = "Next Page"
-      @next_page_params["pagination_key"] = @pagination_key
-    elsif @next_end_date
-      link_text = "Prior 3 Months"
-      @next_page_params["end"] = @next_end_date
-    end
-
-    if link_text
-      rows << [[["<a class=\"text-orange-600\" href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
-    end %>
+    audit_log_paginate(rows) %>
 
   <%== part(
     "components/table_card",
