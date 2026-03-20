@@ -1,0 +1,40 @@
+<% @page_title = "Authentication Audit Log" %>
+
+<% form({id: "audit-log-search"}, wrapper: :div) do |f| %>
+  <%== f.input(:text, key: "action", label: "Action", value: typecast_params.nonempty_str("action")) %>
+  <%== f.input(:text, key: "account", label: "Account", value: typecast_params.nonempty_str("account")) %>
+  <%== f.input(:text, key: "metadata", label: "Metadata", value: typecast_params.nonempty_str("metadata")) %>
+  <%== f.input(:date, key: "end", label: "End Date", value: @end_date) %>
+  <%== f.button("Search") %>
+<% end %>
+
+<table id="audit-log-search-results" class="authentication">
+  <thead>
+    <tr>
+      <th>At (UTC)</th>
+      <th>Action</th>
+      <th>Account</th>
+      <th>Metadata</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% end_date = @end_date %>
+    <% @audit_logs.each do %>
+      <tr>
+        <td><%= it[:at].getutc.strftime("%F %T") %></td>
+        <td><a href="?<%= to_query_string("end" => end_date, "action" => it[:message]) %>"><%= it[:message] %></a></td>
+        <td><%== linkify_ubids(UBID.to_ubid(it[:account_id])) %></td>
+        <td>
+          <% it[:metadata].map do |k, v| %>
+            <a href="?<%= to_query_string("end" => end_date, "metadata" => "#{k}=#{v}") %>"><%= k %>:
+              <%= v %></a>
+          <% end %>
+        </td>
+      </tr>
+    <% end %>
+    <% if link_text = audit_log_paginate %>
+      <% link_params_html = @next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;") %>
+      <tr><td colspan="5"><a href="?<%== link_params_html %>"><%= link_text %></a></td></tr>
+    <% end %>
+  </tbody>
+</table>
