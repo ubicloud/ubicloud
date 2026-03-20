@@ -9,14 +9,6 @@
   <%== f.button("Search") %>
 <% end %>
 
-<% if @pagination_key
-  link_text = "Next Page"
-  @next_page_params["pagination_key"] = @pagination_key
-elsif @next_end_date
-  link_text = "Older Results"
-  @next_page_params["end"] = @next_end_date
-end %>
-
 <table id="audit-log-search-results">
   <thead>
     <tr>
@@ -37,7 +29,7 @@ end %>
         <td><%== linkify_ubids(it[:object_ids].map { |id| UBID.to_ubid(id) }.join(", ")) %></td>
       </tr>
     <% end %>
-    <% if link_text %>
+    <% if link_text = audit_log_paginate %>
       <tr><td colspan="5"><a href="?<%= to_query_string(@next_page_params) %>"><%= link_text %></a></td></tr>
     <% end %>
   </tbody>

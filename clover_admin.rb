@@ -727,6 +727,16 @@ class CloverAdmin < Roda
     end
   end
 
+  def audit_log_paginate
+    if @pagination_key
+      @next_page_params["pagination_key"] = @pagination_key
+      "Next Page"
+    elsif @next_end_date
+      @next_page_params["end"] = @next_end_date
+      "Older Results"
+    end
+  end
+
   route do |r|
     r.public
     check_csrf!
