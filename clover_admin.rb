@@ -887,12 +887,14 @@ class CloverAdmin < Roda
 
     r.get "audit-log" do
       ds = DB[:audit_log]
+      next_page_params = {}
 
       if (project_id = typecast_params.ubid_uuid("project"))
         ds = ds.where(project_id:)
+        next_page_params["project"] = UBID.to_ubid(project_id)
       end
 
-      audit_log_search(ds, resolve: nil, accounts_dataset: Account.dataset, month_limit: 6, min_end_date: MIN_AUDIT_LOG_END_DATE)
+      audit_log_search(ds, resolve: nil, accounts_dataset: Account.dataset, month_limit: 6, min_end_date: MIN_AUDIT_LOG_END_DATE, next_page_params:)
       view("audit_log")
     end
 
