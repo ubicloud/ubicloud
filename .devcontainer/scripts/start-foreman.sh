@@ -8,7 +8,7 @@
 
 set -e
 
-WORKDIR="/workspaces/ubicloud"
+WORKDIR="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
 LOG_DIR="/var/log/foreman"
 LOG_FILE="$LOG_DIR/foreman.log"
 
@@ -54,7 +54,7 @@ sudo mkdir -p "$LOG_DIR"
 sudo chown vscode:vscode "$LOG_DIR"
 cd "$WORKDIR"
 echo "=== Starting foreman (log: $LOG_FILE) ==="
-RACK_ENV=development bundle exec foreman start >> "$LOG_FILE" 2>&1 &
+RACK_ENV=development PORT="${PORT:-3100}" bundle exec foreman start >> "$LOG_FILE" 2>&1 &
 echo "Foreman started (PID: $!)"
 echo "  tail -f $LOG_FILE"
 

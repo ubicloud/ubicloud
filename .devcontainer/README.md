@@ -52,6 +52,30 @@ use skill /ubicloud-onebox to interact with onebox
     .devcontainer/scripts/ssh-pg.sh <server-name> <instance-index>
 ```
 
+## Running Multiple Devcontainers Simultaneously (Test Mode)
+
+1. Install devcontainer cli 
+    ```bash
+        brew install devcontainer
+    ``` 
+
+1. Each devcontainer instance needs a unique host port. By default port `3100` is used. To run a second instance on a different port.
+
+   Start the container manually with a unique port and project name before opening VS Code:
+    ```bash
+    HOST_PORT=3101 COMPOSE_PROJECT_NAME=clickgres2 devcontainer up --workspace-folder .
+    ```
+    `COMPOSE_PROJECT_NAME` scopes all named volumes to the project, so each instance gets fully isolated data (`clickgres2_postgres-data`, etc.).
+
+1. Open the VS Code and select "Attach to Running Container"
+
+1. Navigate to the specific code folder under /workspaces/
+
+1. To stop a specific instance:
+    ```bash
+    HOST_PORT=3101 COMPOSE_PROJECT_NAME=clickgres2 docker compose -f .devcontainer/docker-compose.yml down
+    ```
+
 ## Teardown
 
 ### Stop containers

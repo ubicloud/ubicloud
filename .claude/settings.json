@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ruby .claude/skills/**/*.rb*)",
+      "Bash(.claude/skills/**/*.sh*)",
+      "Bash(bundle exec rake*)",
+      "Bash(rake*)",
+      "Bash(curl*)",
+      "Bash(.devcontainer/scripts/invoke_ubicloud_api_curl.sh*)",
+      "Bash(.devcontainer/scripts/wait_for_postgres_state.sh*)",
+      "Bash(bundle exec rspec*)"
+    ]
+  }
+}

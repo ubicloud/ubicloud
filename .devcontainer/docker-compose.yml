@@ -1,18 +1,20 @@
-name: clickgres_devcontainer
-
 services:
   app:
     build:
       context: ..
       dockerfile: .devcontainer/Dockerfile
+      args:
+        WORKSPACE_FOLDER_NAME: ${WORKSPACE_FOLDER_NAME:-ubicloud}
     volumes:
       - ../..:/workspaces:cached
       - postgres-run:/var/run/postgresql
       - ~/.aws/sso:/home/vscode/.aws/sso
+      - ~/.gitconfig:/tmp/.host-gitconfig:ro
     environment:
       - AWS_ASSUME_ROLE=arn:aws:iam::248825820370:role/clickgres-pg-test-local-access-via-pg-dev-admin
+      - PORT=3100
     ports:
-      - "3000:3000"
+      - "${HOST_PORT:-3100}:3100"
     # command: sleep infinity  # Default CMD from Dockerfile; override for interactive use: bash
     depends_on:
       db:

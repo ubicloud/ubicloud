@@ -6,18 +6,22 @@
 
 set -e
 
-echo "=== Creating default project ==="
+echo "=== Creating default project and account ==="
 
 RACK_ENV=development bundle exec ruby -r ./loader -e '
-  project = Project.first(name: "default")
-  if project
-    puts "Project \"default\" already exists (id: #{project.id})"
-  else
-    project = Project.create(name: "default", feature_flags: {"private_locations" => true})
-    puts "Created project \"default\" (id: #{project.id})"
+  email = "dev@ubicloud.local"
+  account = Account.first(email: email)
+  unless account
+    account = Account.create(email: email, status_id: 2)
+  end
+  puts "Account \"#{account.email}\" (id: #{account.id}, ubid: #{account.ubid})"
+
+  project = account.projects_dataset.first(name: "default")
+  unless project
+    project = account.create_project_with_default_policy("default")
   end
   project.set_ff_private_locations(true)
-  puts "Feature flag private_locations: #{project.get_ff_private_locations}"
+  puts "Project \"#{project.name}\" (id: #{project.id}, ubid: #{project.ubid})"
 
   # Add POSTGRES_SERVICE_PROJECT_ID to .env.rb
   env_rb = ".env.rb"
@@ -26,9 +30,24 @@ RACK_ENV=development bundle exec ruby -r ./loader -e '
   if content.include?("POSTGRES_SERVICE_PROJECT_ID")
     content.gsub!(/^ENV\["POSTGRES_SERVICE_PROJECT_ID"\].*$/, env_line)
     File.write(env_rb, content)
-    puts "Updated POSTGRES_SERVICE_PROJECT_ID in .env.rb"
   else
     File.open(env_rb, "a") { |f| f.puts env_line }
-    puts "Added POSTGRES_SERVICE_PROJECT_ID to .env.rb"
   end
+
+  pat = ApiKey.first(owner_table: "accounts", owner_id: account.id, project_id: project.id, used_for: "api")
+  unless pat
+    pat = ApiKey.create_personal_access_token(account, project: project)
+    pat.unrestrict_token_for_project(project.id)
+  end
+
+  puts "PAT token: pat-#{pat.ubid}-#{pat.key}"
+
+  # Remove shared (non-project-specific) locations — this devcontainer is for
+  # the Clickhouse environment which only uses the project-owned AWS location.
+  shared = Location.where(project_id: nil).all
+  if shared.any?
+    shared.each(&:destroy)
+    puts "Removed #{shared.count} shared location(s): #{shared.map(&:display_name).join(", ")}"
+  end
+
 '

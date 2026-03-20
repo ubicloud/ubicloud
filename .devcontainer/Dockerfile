@@ -1,8 +1,9 @@
 FROM ubuntu:24.04
 
-ARG RUBY_VERSION=3.4.8
+ARG RUBY_VERSION=3.4.9
 ARG NODE_VERSION=24.12.0
 ARG DEBIAN_FRONTEND=noninteractive
+ARG WORKSPACE_FOLDER_NAME=ubicloud
 
 # Install system dependencies
 RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
@@ -34,6 +35,17 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     neovim \
     logrotate \
     cron \
+    python3 \
+    python3-pip \
+    iproute2 \
+    iputils-ping \
+    net-tools \
+    dnsutils \
+    traceroute \
+    nmap \
+    tcpdump \
+    netcat-openbsd \
+    lsof \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI (arch-aware)
@@ -61,9 +73,9 @@ ENV PATH="/home/vscode/.local/bin:/home/vscode/.local/share/mise/installs/ruby/$
 # Install bundler and foreman
 RUN gem install bundler foreman
 
-WORKDIR /workspaces/ubicloud
+WORKDIR /workspaces/${WORKSPACE_FOLDER_NAME}
 
-# Copy dependency files and install dependencies
+# Copy dependency files and install dependencies (cached unless Gemfile/package.json change)
 COPY --chown=vscode:vscode Gemfile Gemfile.lock ./
 RUN bundle install
 

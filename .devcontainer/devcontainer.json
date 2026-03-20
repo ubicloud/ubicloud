@@ -1,18 +1,24 @@
 {
   "name": "Clickgres",
   "dockerComposeFile": "docker-compose.yml",
+  "build": {
+    "args": {
+      "WORKSPACE_FOLDER_NAME": "${localWorkspaceFolderBasename}"
+    }
+  },
   "service": "app",
-  "workspaceFolder": "/workspaces/ubicloud",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "features": {},
   "forwardPorts": [
-    3000
+    3100
   ],
   "portsAttributes": {
-    "3000": {
+    "3100": {
       "label": "Ubicloud Web",
       "onAutoForward": "notify"
     }
   },
+  "initializeCommand": "echo WORKSPACE_FOLDER_NAME=${localWorkspaceFolderBasename} > .devcontainer/.env",
   "postCreateCommand": "",
   "postStartCommand": "",
   "customizations": {

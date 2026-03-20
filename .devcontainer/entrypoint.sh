@@ -3,11 +3,20 @@ set -e
 
 MARKER_FILE="/tmp/.container_initialized"
 
+# Copy host .gitconfig if it was mounted as a file (Docker creates a directory if the host file doesn't exist)
+if [ -f /tmp/.host-gitconfig ]; then
+  cp /tmp/.host-gitconfig /home/vscode/.gitconfig
+  chown vscode:vscode /home/vscode/.gitconfig
+fi
+
+
 # Run once on first start (equivalent to postCreateCommand)
 if [ ! -f "$MARKER_FILE" ]; then
   echo "=== First start: initializing sql users and databases ==="
   psql -U postgres -d postgres -f ch-internal/scripts/create-users.sql || true
   psql -U postgres -d postgres -f ch-internal/scripts/create-db.sql || true
+  bundle exec rake 'setup_database[development,false]'
+  bundle exec rake 'setup_database[test,true]'
   touch "$MARKER_FILE"
 fi
 
@@ -21,14 +30,13 @@ fi
 
 # Run on every start (equivalent to postStartCommand)
 echo "=== Setting up databases ==="
-bundle exec rake 'setup_database[development,false]'
 bundle exec rake dev_up
 npm ci
 npm run prod
 
 # Start foreman in background (idempotent — skips if already running)
 echo "=== Starting foreman in background ==="
-/workspaces/ubicloud/.devcontainer/scripts/start-foreman.sh || true
+.devcontainer/scripts/start-foreman.sh || true
 
 echo ""
 echo "========================================"

@@ -2,138 +2,107 @@
 name: ubicloud-onebox
 description: Operate the local Ubicloud onebox (development environment). Use when the user wants to create, inspect, or manage Ubicloud resources like PostgreSQL servers, VMs, or other infrastructure locally.
 user-invocable: true
-allowed-tools: Bash, Read, Grep, Glob
 ---
 
 # Ubicloud Onebox Skill
 
-You are operating a local Ubicloud development onebox. All resource management is done by running Ruby code with:
+You are operating a local Ubicloud development onebox. Always run commands from the current project root.
+
+**Prefer the API approach** for creating, inspecting, deleting resources and querying billing. Fall back to Ruby code execution only when the API doesn't support the operation (e.g., direct DB queries, HA changes, or internal state inspection). See [ruby-approach.md](ruby-approach.md) for Ruby patterns.
+
+## API wrapper
+
+Use `.devcontainer/scripts/invoke_ubicloud_api_curl.sh` for all API calls — it handles token acquisition automatically and is allowlisted so no approval prompts are needed.
 
 ```
-RACK_ENV=development bundle exec ruby -r ./loader -e '<ruby code>'
+invoke_ubicloud_api_curl.sh <METHOD> <path> [extra curl args...]
 ```
 
-Always run commands from `/workspaces/ubicloud`.
+If it errors with a token/decryption failure, direct the user to run `.devcontainer/scripts/register-pg-project.sh` first.
 
-## Common patterns
+## Common API patterns
 
-### Lookup helpers
+### List projects
 
-```ruby
-project = Project.first(name: "default")
-location = Location.first(project_id: project.id, name: "us-west-2")
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh GET /project
 ```
 
 ### Create a PostgreSQL server
 
-```ruby
-project = Project.first(name: "default")
-location = Location.first(project_id: project.id, name: "us-west-2")
-
-st = Prog::Postgres::PostgresResourceNexus.assemble(
-  project_id: project.id,
-  location_id: location.id,
-  name: "<name>",
-  target_vm_size: "m8gd.large",
-  target_storage_size_gib: 64
-)
-
-pg = st.subject
-puts "ID: #{pg.id}"
-puts "UBID: #{pg.ubid}"
-
-loop do
-  state = pg.reload.display_state
-  label = pg.strand.reload.label
-  puts "state: #{state}, label: #{label}"
-  break if state == "running"
-  sleep 5
-end
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh POST \
+  /project/default/location/aws-us-west-2/postgres/<name> \
+  -d '{"size": "m8gd.large", "storage_size": 118}'
 ```
 
-### Inspect a PostgreSQL server
+Optional fields: `ha_type` ("none"/"async"/"sync"), `version`, `flavor`, `tags` (array of `{key, value}` objects).
 
-```ruby
-pg = PostgresResource.first(name: "<name>")
-puts "state: #{pg.display_state}"
-puts "label: #{pg.strand.label}"
-puts "connection_string: #{pg.connection_string}"
+After creation, wait until state is `running` using the polling helper:
+
+```bash
+.devcontainer/scripts/wait_for_postgres_state.sh <name> running [timeout_seconds]
+```
+
+The script polls every 15 seconds (default timeout: 600s) and exits 0 when the target state is reached, or 1 on timeout. Use `deleted` as the target state to wait for deletion (detects HTTP 404).
+
+### Get PostgreSQL server details
+
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh GET \
+  /project/default/location/aws-us-west-2/postgres/<name>
 ```
 
 ### List all PostgreSQL servers
 
-```ruby
-PostgresResource.all.each do |pg|
-  puts "#{pg.name} | #{pg.display_state} | #{pg.ubid}"
-end
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh GET \
+  /project/default/location/aws-us-west-2/postgres
+```
+
+### Modify a PostgreSQL server (HA, size, etc.)
+
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh PATCH \
+  /project/default/location/aws-us-west-2/postgres/<name> \
+  -d '{"ha_type": "sync"}'
 ```
 
 ### Delete a PostgreSQL server
 
-```ruby
-pg = PostgresResource.first(name: "<name>")
-if pg.nil?
-  puts "No PostgreSQL server found with name '<name>'"
-else
-  puts "Requesting destroy for #{pg.name} (#{pg.ubid})..."
-  pg.incr_destroy
-
-  loop do
-    r = PostgresResource.first(id: pg.id)
-    break if r.nil?
-    state = r.display_state
-    label = r.strand.reload.label
-    puts "state: #{state}, label: #{label}"
-    sleep 5
-  end
-
-  puts "Deleted."
-end
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh DELETE \
+  /project/default/location/aws-us-west-2/postgres/<name>
 ```
 
-### Create a PostgreSQL server with HA (standbys)
+Returns 204 on success. Wait for deletion to complete:
 
-HA options: `NONE` (0 standbys), `ASYNC` (1 standby), `SYNC` (2 standbys).
-
-```ruby
-project = Project.first(name: "default")
-location = Location.first(project_id: project.id, name: "us-west-2")
-
-st = Prog::Postgres::PostgresResourceNexus.assemble(
-  project_id: project.id,
-  location_id: location.id,
-  name: "<name>",
-  target_vm_size: "m8gd.large",
-  target_storage_size_gib: 64,
-  ha_type: PostgresResource::HaType::SYNC  # NONE / ASYNC (1 standby) / SYNC (2 standbys)
-)
-
-pg = st.subject
-puts "ID:      #{pg.id}"
-puts "UBID:    #{pg.ubid}"
-puts "HA type: #{pg.ha_type} (#{pg.target_standby_count} standbys)"
-
-loop do
-  state = pg.reload.display_state
-  label = pg.strand.reload.label
-  puts "state: #{state}, label: #{label}"
-  break if state == "running"
-  sleep 5
-end
-
-puts "connection_string: #{pg.connection_string}"
+```bash
+.devcontainer/scripts/wait_for_postgres_state.sh <name> deleted
 ```
 
-### List available locations
+### Get billing resources
 
-```ruby
-Location.all.each { |l| puts "#{l.name} | #{l.id}" }
+```bash
+.devcontainer/scripts/invoke_ubicloud_api_curl.sh GET \
+  "/billing/resources?start_time=<ISO8601>&end_time=<ISO8601>"
+```
+
+Optional filters:
+- `&project_id=<ubid>` — scope to a specific project
+- `&resource_type=PostgresVCpu&resource_type=PostgresStorage` — filter by resource type(s)
+
+Returns a deduplicated list of resources with billing activity in the time range:
+```json
+{"items": [{"project_id": "...", "resource_id": "...", "resource_name": "...", "resource_type": "PostgresVCpu", "tags": {...}}]}
 ```
 
 ## Behavior guidelines
 
-- Always poll with `loop { ... sleep 5 }` when waiting for resources to become ready; break when `display_state == "running"`.
-- Print the `id` and `ubid` immediately after assembling a resource so the user can track it.
+- Always prefer AWS instance type sizes (e.g. `m8gd.large`, `m8gd.xlarge`). The default size is `m8gd.large`. Non-AWS sizes like `standard-2` should not be used.
 - Use the `default` project and `us-west-2` location unless the user specifies otherwise.
+- Use `default` as the project ID in all paths — the script resolves it automatically. Never call `GET /project` just to get the ID.
+- Use `wait_for_postgres_state.sh <name> <state>` to wait for resources to reach a target state (e.g. `running`, `deleted`). Never write manual polling loops.
 - If a resource with the requested name already exists, report its current state instead of creating a duplicate.
-- Pass the user's `$ARGUMENTS` (e.g. name, size) as Ruby variables — do not hard-code names unless the user didn't provide one.
+- Pass the user's `$ARGUMENTS` (e.g. name, size) into the commands — do not hard-code names unless the user didn't provide one.
+- For operations not available via API (direct DB access, HA toggling via semaphores, internal state), see [ruby-approach.md](ruby-approach.md).

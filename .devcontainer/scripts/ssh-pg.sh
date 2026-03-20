@@ -22,6 +22,5 @@ SSH_INFO=$(RACK_ENV=development bundle exec ruby -r ./loader -e '
   puts "#{s.unix_user}@#{s.host}"
 ' -- "$RESOURCE_NAME" "$SERVER_INDEX" "$KEY_FILE")
 
-cat "$KEY_FILE" > "/tmp/pg_ssh.key"
 echo "Connecting to ${SSH_INFO}..."
 ssh -i "$KEY_FILE" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "$SSH_INFO"
