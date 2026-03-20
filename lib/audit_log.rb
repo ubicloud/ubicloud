@@ -77,7 +77,7 @@ module AuditLog
   end
 
   def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, min_end_date: Date.today << month_limit)
-    ds = ds.order(Sequel.desc(:at), :id)
+    ds = ds.order(Sequel.desc(:at), :message, :id)
     skip_query = false
     next_page_params = @next_page_params = {}
 

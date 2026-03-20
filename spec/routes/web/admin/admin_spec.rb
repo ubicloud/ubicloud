@@ -1788,4 +1788,101 @@ RSpec.describe CloverAdmin do
       expect(app.format_seconds(999999)).to eq "277:46:39"
     end
   end
+
+  describe "authentication audit log" do
+    let(:user) { create_account }
+
+    def insert_account_audit_log(account_id:, message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
+      DB[:account_authentication_audit_log].returning(:id).insert(
+        account_id:,
+        message:,
+        metadata: Sequel.pg_jsonb(metadata),
+        at:
+      ).first[:id]
+    end
+
+    def audit_log_content
+      page.all("#audit-log-search-results td:not(:first-child):not(:only-child)").map(&:text)
+    end
+
+    it "can view authentication audit log entries" do
+      insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+
+      click_link "View Authentication Audit Logs"
+
+      expect(page.title).to eq("Ubicloud Admin - Authentication Audit Log")
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 1.2.3.4"]
+    end
+
+    it "can filter by action" do
+      insert_account_audit_log(account_id: user.id, message: "login")
+      insert_account_audit_log(account_id: user.id, message: "login_failure")
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 127.0.0.1",
+        "login_failure", user.ubid, "ip: 127.0.0.1"
+      ]
+
+      click_link "login_failure"
+      expect(audit_log_content).to eq ["login_failure", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Action", with: "login"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+    end
+
+    it "can filter by metadata" do
+      insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+      insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 1.2.3.4",
+        "login_failure", user.ubid, "ip: 9.9.9.9"
+      ]
+
+      click_link "ip: 1.2.3.4"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 1.2.3.4"]
+
+      fill_in "Metadata", with: "ip=9.9.9.9"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", user.ubid, "ip: 9.9.9.9"]
+    end
+
+    it "can filter by account name, email, and ubid" do
+      user.update(name: "Test-Name")
+      other = create_account("other@example.com", with_project: false)
+      other.update(name: "Other-Name")
+      insert_account_audit_log(account_id: user.id, message: "login")
+      insert_account_audit_log(account_id: other.id, message: "login_failure")
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 127.0.0.1",
+        "login_failure", other.ubid, "ip: 127.0.0.1"
+      ]
+
+      click_link user.ubid
+      expect(page.title).to eq("Ubicloud Admin - Account #{user.ubid}")
+      click_link "View Authentication Audit Log"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "Other-Name"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", other.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: user.email
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: other.ubid
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", other.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "not-a-ubid-or-name"
+      click_button "Search"
+      expect(audit_log_content).to be_empty
+    end
+  end
 end

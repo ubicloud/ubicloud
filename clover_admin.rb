@@ -898,6 +898,17 @@ class CloverAdmin < Roda
       view("audit_log")
     end
 
+    r.get "authentication-audit-log" do
+      authentication_audit_log_search(
+        DB[:account_authentication_audit_logs],
+        accounts_dataset: Account.dataset,
+        resolve: nil,
+        month_limit: 6,
+        min_end_date: MIN_AUDIT_LOG_END_DATE
+      )
+      view("authentication_audit_log")
+    end
+
     r.get "admin-list" do
       @admins = DB[:admin_account].select_order_map(:login)
       view("admin_list")
