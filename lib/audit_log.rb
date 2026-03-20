@@ -76,7 +76,7 @@ module AuditLog
     end.join("&")
   end
 
-  def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, resolve: nil, min_end_date: Date.today << month_limit)
+  def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, min_end_date: Date.today << month_limit)
     ds = ds.order(Sequel.desc(:at), :id)
     skip_query = false
     next_page_params = @next_page_params = {}
@@ -105,17 +105,6 @@ module AuditLog
     end
 
     fetch_audit_log_entries(ds, next_page_params:, default_limit: 100, skip_query:, month_limit:, min_end_date:)
-
-    ubids = {}
-
-    if resolve == :accounts && accounts_dataset
-      @audit_logs.each { ubids[it[:account_id]] = nil }
-      UBID.resolve_map(ubids) do |ds|
-        ds.where(id: accounts_dataset.select(Sequel[:accounts][:id]))
-      end
-    end
-
-    @ubids = ubids
 
     nil
   end

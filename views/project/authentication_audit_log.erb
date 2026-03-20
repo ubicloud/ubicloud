@@ -82,7 +82,13 @@
         ],
         { id: UBID.to_ubid(entry[:id]) }
       ]
-      row[0].insert(2, [entry[:account], {escape: false}]) if @project
+
+      if @project
+        account_ubid = UBID.to_ubid(entry[:account_id])
+        account_name = entry[:account_name] || account_ubid
+        row[0].insert(2, ["<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "account" => account_ubid)}\">#{h account_name}</a>", {escape: false}])
+      end
+
       row
     end
 
