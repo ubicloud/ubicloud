@@ -55,19 +55,10 @@ class Clover
     r.get web?, @project.get_ff_authentication_audit_log, "authentication" do
       accounts_dataset = @project.accounts_dataset
       authentication_audit_log_search(
-        DB[:account_authentication_audit_log].where(account_id: accounts_dataset.select(:id)),
+        DB[:account_authentication_audit_log].join(accounts_dataset.select(Sequel[:id].as(:account_id), Sequel[:name].as(:account_name)).as(:accounts), [:account_id]),
         accounts_dataset:,
-        resolve: :accounts,
         month_limit: 3
       )
-      ubids = @ubids
-      end_date = @end_date
-      @audit_logs.each do |log|
-        account_id = log[:account_id]
-        account_ubid = UBID.to_ubid(account_id)
-        account_name = ubids[account_id]&.name || account_ubid
-        log[:account] = "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "account" => account_ubid)}\">#{h account_name}</a>"
-      end
       view "project/authentication_audit_log"
     end
   end
