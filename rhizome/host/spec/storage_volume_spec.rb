@@ -578,7 +578,7 @@ RSpec.describe StorageVolume do
 
     it "can create vhost backend service file for unencrypted vhost" do
       service_file = "/etc/systemd/system/test-2-storage.service"
-      expect(File).to receive(:write).with(service_file, /vhost-backend\.conf \nRestart=always/)
+      expect(File).to receive(:write).with(service_file, /vhost-backend\.conf \nRestart=no/)
       unencrypted_vhost_sv.vhost_backend_create_service_file
     end
 
