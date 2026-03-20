@@ -1684,6 +1684,21 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/servers':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: listPostgresDatabaseServers
+      summary: List servers for a specific PostgreSQL database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresServers'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/set-maintenance-window':
     post:
       operationId: setMaintenanceWindow
@@ -3163,6 +3178,45 @@ components:
       additionalProperties: false
       required:
         - metrics
+    PostgresServer:
+      type: object
+      properties:
+        id:
+          description: ID of the server
+          type: string
+        role:
+          description: Role of the server (primary or standby)
+          type: string
+          enum:
+            - primary
+            - standby
+        state:
+          description: Current state of the server
+          type: string
+          enum:
+            - running
+            - creating
+            - updating
+            - unavailable
+            - failover
+            - restarting
+            - synchronizing
+            - deleting
+        synchronization_status:
+          description: Synchronization status of the server
+          type: string
+          enum:
+            - ready
+            - catching_up
+        vm:
+          $ref: '#/components/schemas/Vm'
+      additionalProperties: false
+      required:
+        - id
+        - role
+        - state
+        - synchronization_status
+        - vm
     PostgresBackup:
       type: object
       properties:
@@ -3820,6 +3874,23 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresServers:
+      description: A list of Postgres Database Servers
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresServer'
             additionalProperties: false
             required:
               - count

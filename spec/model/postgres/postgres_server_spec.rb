@@ -1090,4 +1090,60 @@ RSpec.describe PostgresServer do
       expect { postgres_server.run_query("interpolated #{string}") }.to raise_error(NetSsh::PotentialInsecurity)
     end
   end
+
+  describe "#display_state" do
+    before do
+      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "wait")
+    end
+
+    it "returns running for wait label" do
+      expect(postgres_server.display_state).to eq("running")
+    end
+
+    it "returns unavailable for unavailable label" do
+      postgres_server.strand.update(label: "unavailable")
+      expect(postgres_server.display_state).to eq("unavailable")
+    end
+
+    it "returns failing_over for failover labels" do
+      postgres_server.strand.update(label: "taking_over")
+      expect(postgres_server.display_state).to eq("failing_over")
+    end
+
+    it "returns restarting for restart label" do
+      postgres_server.strand.update(label: "restart")
+      expect(postgres_server.display_state).to eq("restarting")
+    end
+
+    it "returns synchronizing for wait_catch_up label" do
+      postgres_server.strand.update(label: "wait_catch_up")
+      expect(postgres_server.display_state).to eq("synchronizing")
+    end
+
+    it "returns synchronizing for wait_synchronization label" do
+      postgres_server.strand.update(label: "wait_synchronization")
+      expect(postgres_server.display_state).to eq("synchronizing")
+    end
+
+    it "returns deleting for destroy label" do
+      postgres_server.strand.update(label: "destroy")
+      expect(postgres_server.display_state).to eq("deleting")
+    end
+
+    it "returns creating when initial_provisioning semaphore is set" do
+      postgres_server.strand.update(label: "mount_data_disk")
+      postgres_server.incr_initial_provisioning
+      expect(postgres_server.display_state).to eq("creating")
+    end
+
+    it "returns updating for configure label" do
+      postgres_server.strand.update(label: "configure")
+      expect(postgres_server.display_state).to eq("updating")
+    end
+
+    it "returns updating for refresh_certificates label" do
+      postgres_server.strand.update(label: "refresh_certificates")
+      expect(postgres_server.display_state).to eq("updating")
+    end
+  end
 end

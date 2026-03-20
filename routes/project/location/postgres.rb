@@ -557,6 +557,15 @@ class Clover
         end
       end
 
+      r.get api?, "servers" do
+        authorize("Postgres:view", pg)
+
+        {
+          items: Serializers::PostgresServer.serialize(pg.servers(eager: [:strand, :semaphores])),
+          count: pg.servers.count
+        }
+      end
+
       r.get api?, "backup" do
         authorize("Postgres:view", pg)
 
