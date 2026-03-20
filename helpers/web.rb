@@ -246,6 +246,20 @@ class Clover < Roda
     hash.map { |name, value| "<input #{html_attrs(type: "hidden", name:, value:)} />" }.join("\n")
   end
 
+  def audit_log_paginate(rows)
+    if @pagination_key
+      link_text = "Next Page"
+      @next_page_params["pagination_key"] = @pagination_key
+    elsif @next_end_date
+      link_text = "Prior 3 Months"
+      @next_page_params["end"] = @next_end_date
+    end
+
+    if link_text
+      rows << [[["<a class=\"text-orange-600\" href=\"?#{h to_query_string(@next_page_params)}\">#{link_text}</a>", {escape: false}]]]
+    end
+  end
+
   # Returns object. This is a separate method so the XSS scanning lint task
   # will not flag the usage inside <%== tags.
   def allow_unescaped(html)
