@@ -182,7 +182,7 @@ class StorageVolume
         Environment=RUST_LOG=info
         Environment=RUST_BACKTRACE=1
         ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
-        Restart=always
+        Restart=no
         User=#{@vm_name}
         Group=#{@vm_name}
         #{systemd_io_rate_limits}
