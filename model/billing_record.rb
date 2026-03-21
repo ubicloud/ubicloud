@@ -63,8 +63,10 @@ end
 #  span            | tstzrange | NOT NULL DEFAULT tstzrange(now(), NULL::timestamp with time zone, '[)'::text)
 #  amount          | numeric   | NOT NULL
 #  billing_rate_id | uuid      | NOT NULL
+#  resource_tags   | jsonb     | NOT NULL DEFAULT '[]'::jsonb
 # Indexes:
-#  billing_record_pkey              | PRIMARY KEY btree (id)
-#  billing_record_project_id_index  | btree (project_id)
-#  billing_record_resource_id_index | btree (resource_id)
-#  billing_record_span_index        | gist (span)
+#  billing_record_pkey                | PRIMARY KEY btree (id)
+#  billing_record_project_id_index    | btree (project_id)
+#  billing_record_resource_id_index   | btree (resource_id)
+#  billing_record_resource_tags_index | gin (resource_tags)
+#  billing_record_span_index          | gist (span)
