@@ -45,7 +45,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
     previous_total_lsn = strand.stack.first["total_lsn"] || 0
     if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
       update_stack({"total_disk_usage" => [total_disk_usage, previous_total_disk_usage].max, "total_lsn" => [total_lsn, previous_total_lsn].max})
-      register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: true)
+      register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
     end
 
     nap 60
