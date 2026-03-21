@@ -272,6 +272,27 @@ RSpec.describe Prog::Base do
       }.to change { st.stack.first["deadline_at"] }
     end
 
+    it "limits deadline_at when allow_extension is an integer" do
+      st = Strand.create(prog: "Test", label: :extend_deadline_with_limit)
+      st.unsynchronized_run
+
+      deadline_start = Time.parse(st.stack.first["deadline_start"].to_s)
+      deadline_at = Time.parse(st.stack.first["deadline_at"].to_s)
+      expect(deadline_start).to be_within(1).of(Time.now)
+      expect(deadline_at).to be_within(1).of(deadline_start + 10 * 60)
+
+      # move back start to test limit
+      st.label = :extend_deadline_with_limit
+      deadline_start -= 25 * 60
+      st.stack.first["deadline_start"] = deadline_start.to_s
+      st.unsynchronized_run
+
+      new_deadline_start = Time.parse(st.stack.first["deadline_start"].to_s)
+      new_deadline_at = Time.parse(st.stack.first["deadline_at"].to_s)
+      expect(new_deadline_start).to eq(deadline_start)
+      expect(new_deadline_at).to be_within(1).of(deadline_start + 30 * 60)
+    end
+
     it "triggers a page exactly once when deadline is expired" do
       st = Strand.create(prog: "Test", label: :set_expired_deadline)
       st.unsynchronized_run
@@ -357,6 +378,7 @@ RSpec.describe Prog::Base do
 
       expect(st.stack.first).to receive(:delete).with("deadline_target")
       expect(st.stack.first).to receive(:delete).with("deadline_at")
+      expect(st.stack.first).to receive(:delete).with("deadline_start")
 
       st.unsynchronized_run
     end
