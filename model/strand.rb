@@ -184,6 +184,7 @@ SQL
 
       top_frame.delete("deadline_target")
       top_frame.delete("deadline_at")
+      top_frame.delete("deadline_start")
 
       modified!(:stack)
     end

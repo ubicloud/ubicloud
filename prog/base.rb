@@ -367,7 +367,14 @@ end
       end
 
       current_frame["deadline_target"] = deadline_target
-      current_frame["deadline_at"] = Time.now + deadline_in
+
+      if allow_extension.is_a?(Integer)
+        current_frame["deadline_start"] ||= Time.now
+        cap = Time.parse(current_frame["deadline_start"].to_s) + allow_extension
+        current_frame["deadline_at"] = [Time.now + deadline_in, cap].min
+      else
+        current_frame["deadline_at"] = Time.now + deadline_in
+      end
 
       strand.modified!(:stack)
     end
