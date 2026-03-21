@@ -468,7 +468,7 @@ SQL
       previous_lsn = strand.stack.first["current_lsn"]
       if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
         update_stack({"current_lsn" => current_lsn})
-        register_deadline("wait", 10 * 60, allow_extension: true)
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
       nap 30
     end

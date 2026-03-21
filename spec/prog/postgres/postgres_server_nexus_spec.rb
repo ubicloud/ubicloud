@@ -831,7 +831,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "naps if the lag is too high and extends deadline when lsn progresses" do
       expect(server).to receive(:lsn_caught_up).and_return(false)
       expect(server).to receive(:current_lsn).and_return("0/1000000")
-      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: true)
+      expect(nx).to receive(:register_deadline).with("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       expect { nx.wait_catch_up }.to nap(30)
       expect(nx.strand.stack.first["current_lsn"]).to eq("0/1000000")
     end
