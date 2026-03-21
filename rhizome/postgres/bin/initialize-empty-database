@@ -4,15 +4,16 @@
 require_relative "../../common/lib/util"
 require_relative "../lib/postgres_setup"
 
-if ARGV.count != 1
-  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+if ARGV.count != 2
+  fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
 end
 
 v = ARGV[0]
+strict_overcommit = ARGV[1] == "true"
 
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
-pg_setup.configure_memory_overcommit
+pg_setup.configure_memory_overcommit(strict: strict_overcommit)
 pg_setup.setup_data_directory
 pg_setup.create_cluster
 
