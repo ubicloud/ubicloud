@@ -186,7 +186,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version)
+      strict_overcommit = resource.skip_strict_memory_overcommit_set? ? "false" : "true"
+      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version, strict_overcommit)
     end
 
     nap 5
@@ -202,7 +203,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       else
         postgres_server.timeline.latest_backup_label_before_target(target: resource.restore_target)
       end
-      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label)
+      strict_overcommit = resource.skip_strict_memory_overcommit_set? ? "false" : "true"
+      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label, strict_overcommit)
     end
 
     nap 5
