@@ -21,4 +21,13 @@ RSpec.describe CloverAdmin, "PostgresServer" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - PostgresServer #{@instance.ubid}"
   end
+
+  it "can recycle a PostgresServer" do
+    visit "/model/PostgresServer/#{@instance.ubid}"
+    click_link "Recycle"
+    click_button "Recycle"
+
+    expect(page).to have_content("Recycle scheduled for PostgresServer")
+    expect(Semaphore.where(strand_id: @instance.id, name: "recycle").count).to eq 1
+  end
 end
