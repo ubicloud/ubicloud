@@ -941,13 +941,25 @@ class CloverAdmin < Roda
       view("audit_log")
     end
 
-    r.get "authentication-audit-log" do
+    r.get "authentication-audit-log", ["admin", true].freeze do |admin|
+      if admin
+        @page_title = "Admin Authentication Audit Log"
+        @account_name_map = DB[:admin_account].select_hash(:id, :login)
+        table = :admin_account_authentication_audit_log
+        accounts_dataset = DB[:admin_account]
+        args = {account_columns: [:login].freeze}
+      else
+        @page_title = "Authentication Audit Log"
+        table = :account_authentication_audit_log
+        accounts_dataset = Account.dataset
+      end
+
       authentication_audit_log_search(
-        DB[:account_authentication_audit_log],
-        accounts_dataset: Account.dataset,
-        resolve: nil,
+        DB[table],
+        accounts_dataset:,
         month_limit: 6,
-        min_end_date: MIN_AUDIT_LOG_END_DATE
+        min_end_date: MIN_AUDIT_LOG_END_DATE,
+        **args
       )
       view("authentication_audit_log")
     end
