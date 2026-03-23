@@ -14,7 +14,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
+    :configure_logs, :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -61,7 +61,10 @@ class PostgresServer < Sequel::Model
       "ssl_key_file" => "'/etc/ssl/certs/server.key'",
       "log_timezone" => "'UTC'",
       "log_directory" => "'pg_log'",
-      "log_filename" => "'postgresql.log'",
+      "log_destination" => "'stderr,jsonlog'",
+      "log_filename" => "'postgresql-%Y-%m-%d_%H%M%S'",
+      "log_rotation_age" => "60",
+      "log_rotation_size" => "102400",
       "log_truncate_on_rotation" => "true",
       "logging_collector" => "on",
       "timezone" => "'UTC'",
@@ -365,6 +368,23 @@ class PostgresServer < Sequel::Model
       additional_labels:,
       metrics_dir: "/home/ubi/postgres/metrics",
       project_id: Config.postgres_service_project_id
+    }
+  end
+
+  def logs_config
+    return nil unless Config.parseable_service_project_id
+
+    pr = ParseableResource.first(project_id: Config.parseable_service_project_id)
+    ps = pr&.servers&.first
+    return nil unless ps&.strand&.label == "wait"
+
+    {
+      resource_id: resource.ubid,
+      version:,
+      parseable_endpoint: ps.endpoint,
+      parseable_username: pr.admin_user,
+      parseable_password: pr.admin_password,
+      parseable_ca_bundle: pr.root_certs
     }
   end
 
