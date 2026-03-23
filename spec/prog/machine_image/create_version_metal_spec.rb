@@ -239,7 +239,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
 
       machine_image.reload
-      expect(machine_image.latest_version_id).to eq(mi_version_metal.id)
+      expect(machine_image.latest_version.id).to eq(mi_version_metal.id)
     end
   end
 

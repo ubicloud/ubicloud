@@ -4,11 +4,7 @@ require_relative "../../model"
 
 class MachineImageVersion < Sequel::Model
   one_to_one :strand, key: :id
-  one_to_one :metal, class: :MachineImageVersionMetal, key: :id, read_only: true
-
-  many_to_one :machine_image
-  one_to_many :vm_storage_volumes, read_only: true
-  one_to_many :active_billing_records, class: :BillingRecord, key: :resource_id, read_only: true, &:active
+  many_to_one :machine_image, read_only: true
 
   plugin ResourceMethods
 end
