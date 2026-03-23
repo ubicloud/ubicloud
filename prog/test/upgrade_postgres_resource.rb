@@ -25,6 +25,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
     )
 
     update_stack({"postgres_resource_id" => st.id})
+    update_stack({"pre_upgrade_postgres_timeline_id" => PostgresResource[st.id].timeline.id})
     hop_wait_postgres_resource
   end
 
@@ -209,13 +210,15 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
+    pre_upgrade_timeline.incr_destroy
+    postgres_resource.timeline.incr_destroy
     read_replica.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 5 if read_replica || postgres_resource
+    nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
     hop_finish
   end
 
@@ -245,6 +248,10 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   def representative_server
     @representative_server ||= postgres_resource.representative_server
+  end
+
+  def pre_upgrade_timeline
+    PostgresTimeline[frame["pre_upgrade_postgres_timeline_id"]]
   end
 
   def test_queries_sql
