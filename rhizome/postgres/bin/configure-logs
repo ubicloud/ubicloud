@@ -24,7 +24,7 @@ tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") pe
 
 stream = "pg-#{resource_id}"
 
-http_destination = lambda { |label, template_name, batch_lines|
+http_destination = lambda { |label, body, batch_lines|
   <<~DEST
     destination d_parseable_#{label} {
       http(
@@ -32,11 +32,8 @@ http_destination = lambda { |label, template_name, batch_lines|
         method("POST")
         user("#{parseable_username}")
         password("#{parseable_password}")
-        headers("Content-Type: application/json")
-        body-prefix('[')
-        body-suffix(']')
-        delimiter(',')
-        template(#{template_name})
+        headers("Content-Type: application/x-ndjson")
+        body(#{body})
         batch-lines(#{batch_lines})
         batch-bytes(1048576)
         batch-timeout(10000)
@@ -73,18 +70,8 @@ syslog_ng_conf = <<~CONF
     match("ubicloud-postgres-upgrade" value(".journald._SYSTEMD_UNIT"));
   };
 
-  template t_pglog {
-    template("${MESSAGE}");
-    template-escape(no);
-  };
-
-  template t_journal {
-    template('$(format-json stream=literal(journal) ts="${ISODATE}" unit="${PROGRAM}" priority=${LEVEL_NUM} message="${MESSAGE}")');
-    template-escape(no);
-  };
-
-  #{http_destination.call("pglog", "t_pglog", 200)}
-  #{http_destination.call("journal", "t_journal", 50)}
+  #{http_destination.call("pglog", '"${MESSAGE}\\n"', 200)}
+  #{http_destination.call("journal", %('$(format-json stream=literal(journal) ts="${ISODATE}" unit="${PROGRAM}" priority=${LEVEL_NUM} message="${MESSAGE}")\\n'), 50)}
 
   log { source(s_pglog); destination(d_parseable_pglog); };
   log { source(s_journal); filter(f_postgres_units); destination(d_parseable_journal); };
