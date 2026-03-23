@@ -12,8 +12,8 @@ ca_bundle = config_json["ca_bundle"]
 user = config_json["admin_user"]
 password = config_json["admin_password"]
 
-r "mkdir -p /dat/parseable"
-r "chown parseable:parseable /dat/parseable"
+r "mkdir -p /dat/parseable/data /dat/parseable/staging"
+r "chown -R parseable:parseable /dat/parseable"
 
 r "mkdir -p /etc/parseable/certs/CAs"
 r "chown -R parseable:parseable /etc/parseable/"
@@ -39,7 +39,8 @@ parseable_service = <<~PARSEABLE_SERVICE
   Environment=P_USERNAME=#{user}
   Environment=P_PASSWORD=#{password}
   Environment=P_ADDR=0.0.0.0:8000
-  Environment=P_LOCAL_STORAGE_PATH=/dat/parseable
+  Environment=P_FS_DIR=/dat/parseable/data
+  Environment=P_STAGING_DIR=/dat/parseable/staging
   Environment=P_TLS_CERT_PATH=/etc/parseable/certs/public.crt
   Environment=P_TLS_KEY_PATH=/etc/parseable/certs/private.key
   ExecStart=/usr/local/bin/parseable local-store
