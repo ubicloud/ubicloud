@@ -34,6 +34,7 @@ http_destination = lambda { |label, body, batch_lines|
         password("#{parseable_password}")
         headers("Content-Type: application/x-ndjson")
         body(#{body})
+        persist-name("parseable_#{label}")
         batch-lines(#{batch_lines})
         batch-bytes(1048576)
         batch-timeout(10000)
