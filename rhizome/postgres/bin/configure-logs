@@ -7,12 +7,18 @@ require_relative "../../common/lib/util"
 config = JSON.parse($stdin.read)
 version = config["version"]
 resource_id = config["resource_id"]
+log_dir = config["log_dir"]
 parseable_endpoint = config["parseable_endpoint"]
 parseable_username = config["parseable_username"]
 parseable_password = config["parseable_password"]
 parseable_ca_bundle = config["parseable_ca_bundle"]
 
 r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
+
+# Create log dir outside the data directory so syslog-ng can traverse it
+# (data dir is 700; syslog-ng drops CAP_DAC_OVERRIDE after startup)
+r "install -d -o postgres -g postgres -m 750 #{log_dir}"
+r "usermod -aG postgres ubi_monitoring"
 
 if parseable_ca_bundle
   r "mkdir -p /etc/syslog-ng/certs"
@@ -54,7 +60,7 @@ syslog_ng_conf = <<~CONF
 
   source s_pglog {
     wildcard-file(
-      base-dir("/dat/#{version}/data/pg_log")
+      base-dir("#{log_dir}")
       filename-pattern("postgresql-*.json")
       flags(no-parse)
       follow-freq(5)

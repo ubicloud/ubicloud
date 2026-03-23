@@ -60,7 +60,8 @@ class PostgresServer < Sequel::Model
       "ssl_cert_file" => "'/etc/ssl/certs/server.crt'",
       "ssl_key_file" => "'/etc/ssl/certs/server.key'",
       "log_timezone" => "'UTC'",
-      "log_directory" => "'pg_log'",
+      "log_directory" => "'/dat/#{version}/pg_log'",
+      "log_file_mode" => "0640",
       "log_destination" => "'stderr,jsonlog'",
       "log_filename" => "'postgresql-%Y-%m-%d_%H%M%S'",
       "log_rotation_age" => "60",
@@ -392,6 +393,7 @@ class PostgresServer < Sequel::Model
     {
       resource_id: resource.ubid,
       version:,
+      log_dir: "/dat/#{version}/pg_log",
       parseable_endpoint: ps.endpoint,
       parseable_username: pr.admin_user,
       parseable_password: pr.admin_password,
