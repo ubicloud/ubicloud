@@ -20,7 +20,7 @@ if parseable_ca_bundle
 end
 
 use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
-tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") peer-verify(required-trusted))) : ""
+tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") peer-verify(yes))) : ""
 
 stream = "pg-#{resource_id}"
 
