@@ -146,7 +146,7 @@ module Config
   # Parseable
   optional :parseable_service_project_id, uuid
   override :parseable_host_name, "logs.ubicloud.com", string
-  override :parseable_version, "v1.6.4", string
+  override :parseable_version, "v2.6.3", string
   optional :parseable_endpoint_override, string
   optional :parseable_admin_user, string
   optional :parseable_admin_password, string
