@@ -79,7 +79,7 @@ syslog_ng_conf = <<~CONF
   };
 
   template t_journal {
-    template('{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"message":"$(escape-string json ${MESSAGE})"}');
+    template('$(format-json stream=literal(journal) ts="${ISODATE}" unit="${PROGRAM}" priority=${LEVEL_NUM} message="${MESSAGE}")');
     template-escape(no);
   };
 
