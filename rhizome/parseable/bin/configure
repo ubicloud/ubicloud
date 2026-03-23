@@ -1,0 +1,56 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+config_json = JSON.parse($stdin.read)
+
+cert = config_json["cert"]
+cert_key = config_json["cert_key"]
+ca_bundle = config_json["ca_bundle"]
+user = config_json["admin_user"]
+password = config_json["admin_password"]
+
+r "mkdir -p /dat/parseable"
+r "chown parseable:parseable /dat/parseable"
+
+r "mkdir -p /etc/parseable/certs/CAs"
+r "chown -R parseable:parseable /etc/parseable/"
+
+safe_write_to_file("/etc/parseable/certs/public.crt", cert)
+safe_write_to_file("/etc/parseable/certs/private.key", cert_key)
+safe_write_to_file("/etc/parseable/certs/CAs/public.crt", ca_bundle)
+r "chown -R parseable:parseable /etc/parseable/certs"
+
+parseable_service = <<~PARSEABLE_SERVICE
+  [Unit]
+  Description=Parseable Log Analytics Server
+  After=network.target
+
+  [Service]
+  Type=simple
+  User=parseable
+  Group=parseable
+  StartLimitBurst=5
+  StartLimitInterval=0
+  Restart=on-failure
+  RestartSec=1
+  Environment=P_USERNAME=#{user}
+  Environment=P_PASSWORD=#{password}
+  Environment=P_ADDR=0.0.0.0:8000
+  Environment=P_LOCAL_STORAGE_PATH=/dat/parseable
+  Environment=P_TLS_CERT_PATH=/etc/parseable/certs/public.crt
+  Environment=P_TLS_KEY_PATH=/etc/parseable/certs/private.key
+  ExecStart=/usr/local/bin/parseable local-store
+  ExecStop=/bin/kill -s SIGTERM $MAINPID
+  LimitNOFILE=65536
+  LimitNPROC=32000
+
+  [Install]
+  WantedBy=multi-user.target
+PARSEABLE_SERVICE
+
+safe_write_to_file("/etc/systemd/system/parseable.service", parseable_service)
+r "systemctl daemon-reload"
+r "systemctl enable parseable --now"
