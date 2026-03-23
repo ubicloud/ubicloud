@@ -15,9 +15,8 @@ RSpec.describe Clover, "authentication audit log" do
     ).first[:id]
   end
 
-  # Returns rows that correspond to audit log entries (rows with non-empty id attribute)
-  def data_rows(table_id = "authentication-audit-log-table")
-    page.all("##{table_id} tbody tr[id!='']")
+  def audit_log_content
+    page.all("#authentication-audit-log-table td:not(:first-child):not(:only-child)").map(&:text)
   end
 
   describe "account authentication audit log" do
@@ -41,9 +40,7 @@ RSpec.describe Clover, "authentication audit log" do
         visit "/account/authentication-audit-log"
 
         expect(page.title).to eq("Ubicloud - Authentication Audit Log")
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_content("ip: 1.2.3.4")
+        expect(audit_log_content).to eq(["login", "ip: 1.2.3.4, via: password"])
       end
 
       it "does not show entries from other accounts" do
@@ -51,8 +48,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: other.id, message: "login_from_other")
 
         visit "/account/authentication-audit-log"
-
-        expect(data_rows).to be_empty
+        expect(audit_log_content).to eq([])
       end
 
       it "can filter by action" do
@@ -60,16 +56,14 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
         visit "/account/authentication-audit-log"
-        expect(data_rows.length).to eq(2)
+        expect(audit_log_content).to eq(["login", "ip: 127.0.0.1", "login_failure", "ip: 127.0.0.1"])
 
         click_link "login_failure"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_failure")
+        expect(audit_log_content).to eq(["login_failure", "ip: 127.0.0.1"])
 
         fill_in "Action", with: "login"
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
+        expect(audit_log_content).to eq(["login", "ip: 127.0.0.1"])
       end
 
       it "can filter by metadata" do
@@ -77,26 +71,21 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
         visit "/account/authentication-audit-log"
-        expect(data_rows.length).to eq(2)
+        expect(audit_log_content).to eq(["login", "ip: 1.2.3.4", "login_failure", "ip: 9.9.9.9"])
 
         click_link "ip: 1.2.3.4"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_content("ip: 1.2.3.4")
+        expect(audit_log_content).to eq(["login", "ip: 1.2.3.4"])
 
         fill_in "Metadata", with: "ip=9.9.9.9"
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_failure")
-        expect(data_rows.first).to have_content("ip: 9.9.9.9")
+        expect(audit_log_content).to eq(["login_failure", "ip: 9.9.9.9"])
       end
 
       it "shows no data rows for invalid metadata JSON" do
         insert_account_audit_log(account_id: user.id, message: "login")
 
         visit "/account/authentication-audit-log?metadata=not-json"
-
-        expect(data_rows).to be_empty
+        expect(audit_log_content).to eq([])
       end
     end
   end
@@ -134,9 +123,7 @@ RSpec.describe Clover, "authentication audit log" do
         click_link "View Authentication Audit Logs"
 
         expect(page.title).to eq("Ubicloud - project-1 - Authentication Audit Log")
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_content("ip: 1.2.3.4")
+        expect(audit_log_content).to eq(["login", user.ubid, "ip: 1.2.3.4"])
       end
 
       it "does not show entries from accounts not in project" do
@@ -144,8 +131,7 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: other.id, message: "login_from_other")
 
         visit "#{project.path}/audit-log/authentication"
-
-        expect(data_rows).to be_empty
+        expect(audit_log_content).to eq([])
       end
 
       it "can filter by action" do
@@ -153,35 +139,35 @@ RSpec.describe Clover, "authentication audit log" do
         insert_account_audit_log(account_id: user.id, message: "login_failure")
 
         visit "#{project.path}/audit-log/authentication"
-        expect(data_rows.length).to eq(2)
+        expect(audit_log_content).to eq([
+          "login", user.ubid, "ip: 127.0.0.1",
+          "login_failure", user.ubid, "ip: 127.0.0.1"
+        ])
 
         click_link "login_failure"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_failure")
+        expect(audit_log_content).to eq(["login_failure", user.ubid, "ip: 127.0.0.1"])
 
         fill_in "Action", with: "login"
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
+        expect(audit_log_content).to eq(["login", user.ubid, "ip: 127.0.0.1"])
       end
 
       it "can filter by metadata" do
         insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
         insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
 
-        visit "/account/authentication-audit-log"
-        expect(data_rows.length).to eq(2)
+        visit "#{project.path}/audit-log/authentication"
+        expect(audit_log_content).to eq([
+          "login", user.ubid, "ip: 1.2.3.4",
+          "login_failure", user.ubid, "ip: 9.9.9.9"
+        ])
 
         click_link "ip: 1.2.3.4"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login")
-        expect(data_rows.first).to have_content("ip: 1.2.3.4")
+        expect(audit_log_content).to eq(["login", user.ubid, "ip: 1.2.3.4"])
 
         fill_in "Metadata", with: "ip=9.9.9.9"
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_failure")
-        expect(data_rows.first).to have_content("ip: 9.9.9.9")
+        expect(audit_log_content).to eq(["login_failure", user.ubid, "ip: 9.9.9.9"])
       end
 
       it "can filter by account name, email, and ubid" do
@@ -189,38 +175,33 @@ RSpec.describe Clover, "authentication audit log" do
         other = create_account("other@example.com", with_project: false)
         other.update(name: "Other-Name")
         project.add_account(other)
-        insert_account_audit_log(account_id: user.id, message: "login_success")
+        insert_account_audit_log(account_id: user.id, message: "login")
         insert_account_audit_log(account_id: other.id, message: "login_failure")
 
         visit "#{project.path}/audit-log/authentication"
-        expect(data_rows.length).to eq(2)
+        expect(audit_log_content).to eq([
+          "login", "Test-Name", "ip: 127.0.0.1",
+          "login_failure", "Other-Name", "ip: 127.0.0.1"
+        ])
 
         click_link "Test-Name"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_success")
-        expect(data_rows.first).to have_no_content("login_failure")
+        expect(audit_log_content).to eq(["login", "Test-Name", "ip: 127.0.0.1"])
 
         fill_in "Account", with: "Other-Name"
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_no_content("login_success")
-        expect(data_rows.first).to have_content("login_failure")
+        expect(audit_log_content).to eq(["login_failure", "Other-Name", "ip: 127.0.0.1"])
 
         fill_in "Account", with: user.email
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_content("login_success")
-        expect(data_rows.first).to have_no_content("login_failure")
+        expect(audit_log_content).to eq(["login", "Test-Name", "ip: 127.0.0.1"])
 
         fill_in "Account", with: other.ubid
         click_button "Search"
-        expect(data_rows.length).to eq(1)
-        expect(data_rows.first).to have_no_content("login_success")
-        expect(data_rows.first).to have_content("login_failure")
+        expect(audit_log_content).to eq(["login_failure", "Other-Name", "ip: 127.0.0.1"])
 
         fill_in "Account", with: "not-a-ubid-or-name"
         click_button "Search"
-        expect(data_rows).to be_empty
+        expect(audit_log_content).to eq([])
       end
 
       it "returns 403 when user lacks Project:auditlog permission" do
