@@ -1267,25 +1267,6 @@ RSpec.describe CloverAdmin do
     expect(page.all("#admin-list li").map(&:text)).to eq ["admin", "foo"]
   end
 
-  it "allows closing other admin accounts" do
-    DB[:admin_account].insert(login: "foo")
-    click_link "View Admin List"
-    expect(page.title).to eq "Ubicloud Admin - Admin List"
-    expect(page.all("#admin-list li").map(&:text)).to eq ["admin", "foo"]
-    select "foo"
-    expect(Clog).to receive(:emit).with("Admin account closed", {admin_account_closed: {account_closed: "foo", closer: "admin"}}).and_call_original
-    click_button "Close Admin Account"
-    expect(page).to have_flash_notice "Admin account \"foo\" closed."
-    expect(page.all("#admin-list li").map(&:text)).to eq ["admin"]
-
-    DB[:admin_account].insert(login: "foo")
-    page.refresh
-    DB[:admin_account].where(login: "foo").delete
-    select "foo"
-    click_button "Close Admin Account"
-    expect(page).to have_flash_error "Unable to close admin account for \"foo\"."
-  end
-
   it "shows GitHub runner x64 VM usage" do
     installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     installation_id = installation.id

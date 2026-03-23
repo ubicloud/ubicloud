@@ -136,11 +136,7 @@ class CloverAdmin < Roda
     end
 
     password = SecureRandom.urlsafe_base64(16)
-    password_hash = rodauth.new(nil).password_hash(password)
-    DB.transaction do
-      id = DB[:admin_account].insert(login:)
-      DB[:admin_password_hash].insert(id:, password_hash:)
-    end
+    rodauth.create_account(login:, password:)
     Clog.emit("Created admin account", {admin_account_created: login})
     password
   end
@@ -187,12 +183,24 @@ class CloverAdmin < Roda
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
 
   plugin :rodauth, route_csrf: true do
-    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account, :internal_request
+    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account, :internal_request,
+      :audit_logging
+
+    internal_request_configuration do
+      enable :create_account
+      require_email_address_logins? false
+      password_meets_requirements? do |password|
+        # uses a randomly generated password
+        true
+      end
+    end
+
     accounts_table :admin_account
     password_hash_table :admin_password_hash
     webauthn_keys_table :admin_webauthn_key
     webauthn_user_ids_table :admin_webauthn_user_id
     login_column :login
+    audit_logging_table :admin_account_authentication_audit_log
 
     # :nocov:
     unless skip_webauthn_requirement
@@ -200,6 +208,41 @@ class CloverAdmin < Roda
       login_redirect do
         uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
       end
+
+      remove_webauthn_key do |webauthn_id|
+        @_webauthn_credential_id = webauthn_id
+        super(webauthn_id)
+      end
+
+      add_webauthn_credential do |webauthn_credential|
+        @_webauthn_credential_id = webauthn_credential.id
+        super(webauthn_credential)
+      end
+    end
+
+    audit_log_metadata do |action|
+      hash = {}
+
+      if (ip = request.ip || session[:ip])
+        hash["ip"] = ip
+      end
+
+      case action
+      when :two_factor_authentication
+        webauthn_credential_id = authenticated_webauthn_id
+      when :webauthn_setup, :webauthn_remove
+        webauthn_credential_id = @_webauthn_credential_id
+      when :close_account
+        if (closer = session[:closer])
+          hash["closer"] = closer
+        end
+      end
+
+      if webauthn_credential_id
+        hash["token"] = webauthn_credential_id[0...8]
+      end
+
+      hash
     end
 
     check_csrf? false
@@ -900,7 +943,7 @@ class CloverAdmin < Roda
 
     r.get "authentication-audit-log" do
       authentication_audit_log_search(
-        DB[:account_authentication_audit_logs],
+        DB[:account_authentication_audit_log],
         accounts_dataset: Account.dataset,
         resolve: nil,
         month_limit: 6,
@@ -965,7 +1008,7 @@ class CloverAdmin < Roda
       login = typecast_params.nonempty_str!("login")
 
       begin
-        CloverAdmin.rodauth.close_account(account_login: login, session: {closer: rodauth.account_from_session[:login]})
+        CloverAdmin.rodauth.close_account(account_login: login, session: {closer: rodauth.account_from_session[:login], ip: request.ip})
       rescue Rodauth::InternalRequestError
         flash["error"] = "Unable to close admin account for #{login.inspect}."
       else
