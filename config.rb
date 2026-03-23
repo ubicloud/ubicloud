@@ -143,6 +143,12 @@ module Config
   optional :minio_service_project_id, uuid
   override :minio_version, "minio_20250723155402.0.0_amd64", string
 
+  # Parseable
+  optional :parseable_service_project_id, uuid
+  override :parseable_host_name, "logs.ubicloud.com", string
+  override :parseable_version, "v1.6.4", string
+  optional :parseable_endpoint_override, string
+
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, uuid
   override :victoria_metrics_host_name, "metrics.ubicloud.com", string
