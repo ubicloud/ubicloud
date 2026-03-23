@@ -49,7 +49,7 @@ http_destination = lambda { |label, template_name, batch_lines|
 }
 
 syslog_ng_conf = <<~CONF
-  @version: 4.8
+  @version: 4.6
   @include "scl.conf"
 
   options {
@@ -81,8 +81,8 @@ syslog_ng_conf = <<~CONF
   };
 
   template t_journal {
-    template('{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"message":"${MESSAGE}"}');
-    template-escape(yes);
+    template('{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"message":"$(escape-string json ${MESSAGE})"}');
+    template-escape(no);
   };
 
   #{http_destination.call("pglog", "t_pglog", 200)}
