@@ -148,6 +148,8 @@ module Config
   override :parseable_host_name, "logs.ubicloud.com", string
   override :parseable_version, "v1.6.4", string
   optional :parseable_endpoint_override, string
+  optional :parseable_admin_user, string
+  optional :parseable_admin_password, string
 
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, uuid

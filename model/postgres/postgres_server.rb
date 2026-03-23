@@ -372,6 +372,17 @@ class PostgresServer < Sequel::Model
   end
 
   def logs_config
+    if Config.parseable_endpoint_override
+      return {
+        resource_id: resource.ubid,
+        version:,
+        parseable_endpoint: Config.parseable_endpoint_override,
+        parseable_username: Config.parseable_admin_user || "admin",
+        parseable_password: Config.parseable_admin_password || "password",
+        parseable_ca_bundle: nil
+      }
+    end
+
     return nil unless Config.parseable_service_project_id
 
     pr = ParseableResource.first(project_id: Config.parseable_service_project_id)
