@@ -60,10 +60,6 @@ syslog_ng_conf = <<~CONF
     );
   };
 
-  source s_journal {
-    systemd-journal();
-  };
-
   filter f_postgres_units {
     match("postgresql@" value(".journald._SYSTEMD_UNIT")) or
     match("pgbouncer@" value(".journald._SYSTEMD_UNIT")) or
@@ -74,7 +70,7 @@ syslog_ng_conf = <<~CONF
   #{http_destination.call("journal", %('$(format-json stream=literal(journal) ts="${ISODATE}" unit="${PROGRAM}" priority=${LEVEL_NUM} message="${MESSAGE}")\\n'), 50)}
 
   log { source(s_pglog); destination(d_parseable_pglog); };
-  log { source(s_journal); filter(f_postgres_units); destination(d_parseable_journal); };
+  log { source(s_src); filter(f_postgres_units); destination(d_parseable_journal); };
 CONF
 
 safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
