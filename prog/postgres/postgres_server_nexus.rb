@@ -326,8 +326,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
       vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
 
-      hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
-      hop_setup_hugepages
+      hop_configure_logs
     end
 
     vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
@@ -368,6 +367,31 @@ CONFIG
     vm.sshable.write_file("#{filepath}/#{filename}", config)
     vm.sshable.cmd("sudo /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file::filepath/:filename -s", filepath:, filename:)
     hop_setup_hugepages
+  end
+
+  label def configure_logs
+    logs_config = postgres_server.logs_config
+
+    unless logs_config
+      when_initial_provisioning_set? do
+        hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
+        hop_setup_hugepages
+      end
+      hop_wait
+    end
+
+    case vm.sshable.d_check("configure_logs")
+    when "Succeeded"
+      vm.sshable.d_clean("configure_logs")
+      when_initial_provisioning_set? do
+        hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
+        hop_setup_hugepages
+      end
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: logs_config.to_json)
+    end
+    nap 5
   end
 
   label def setup_hugepages
@@ -556,6 +580,11 @@ SQL
     when_configure_metrics_set? do
       decr_configure_metrics
       hop_configure_metrics
+    end
+
+    when_configure_logs_set? do
+      decr_configure_logs
+      hop_configure_logs
     end
 
     when_configure_set? do
