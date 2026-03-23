@@ -1,0 +1,98 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+
+config = JSON.parse($stdin.read)
+version = config["version"]
+resource_id = config["resource_id"]
+parseable_endpoint = config["parseable_endpoint"]
+parseable_username = config["parseable_username"]
+parseable_password = config["parseable_password"]
+parseable_ca_bundle = config["parseable_ca_bundle"]
+
+r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
+
+if parseable_ca_bundle
+  r "mkdir -p /etc/syslog-ng/certs"
+  safe_write_to_file("/etc/syslog-ng/certs/parseable-ca.crt", parseable_ca_bundle)
+end
+
+use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
+tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") peer-verify(required-trusted))) : ""
+
+stream = "pg-#{resource_id}"
+
+http_destination = lambda { |label, template_name, batch_lines|
+  <<~DEST
+    destination d_parseable_#{label} {
+      http(
+        url("#{parseable_endpoint}/api/v1/logstream/#{stream}")
+        method("POST")
+        user("#{parseable_username}")
+        password("#{parseable_password}")
+        headers("Content-Type: application/json")
+        body-prefix('[')
+        body-suffix(']')
+        delimiter(',')
+        template(#{template_name})
+        batch-lines(#{batch_lines})
+        batch-bytes(1048576)
+        batch-timeout(10000)
+        timeout(30)
+        retries(3)
+        #{tls_block}
+      );
+    };
+  DEST
+}
+
+syslog_ng_conf = <<~CONF
+  @version: 4.8
+  @include "scl.conf"
+
+  options {
+    keep-hostname(yes);
+    use-fqdn(no);
+  };
+
+  source s_pglog {
+    file("/dat/#{version}/data/pg_log/postgresql-*.json"
+      flags(no-parse)
+      follow-freq(5)
+      multi-line-mode(no-multi-line)
+    );
+  };
+
+  source s_journal {
+    systemd-journal();
+  };
+
+  filter f_postgres_units {
+    match("postgresql@" template("${PROGRAM}")) or
+    match("pgbouncer@" template("${PROGRAM}")) or
+    match("ubicloud-postgres-upgrade" template("${PROGRAM}"));
+  };
+
+  template t_pglog {
+    template("${MESSAGE}");
+    template-escape(no);
+  };
+
+  template t_journal {
+    template('{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"message":"${MESSAGE}"}');
+    template-escape(yes);
+  };
+
+  #{http_destination.call("pglog", "t_pglog", 200)}
+  #{http_destination.call("journal", "t_journal", 50)}
+
+  log { source(s_pglog); destination(d_parseable_pglog); };
+  log { source(s_journal); filter(f_postgres_units); destination(d_parseable_journal); };
+CONF
+
+safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
+
+r "systemctl enable syslog-ng --now"
+r "systemctl restart syslog-ng"
