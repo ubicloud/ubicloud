@@ -55,10 +55,11 @@ syslog_ng_conf = <<~CONF
   };
 
   source s_pglog {
-    file("/dat/#{version}/data/pg_log/postgresql-*.json"
+    wildcard-file(
+      base-dir("/dat/#{version}/data/pg_log")
+      filename-pattern("postgresql-*.json")
       flags(no-parse)
       follow-freq(5)
-      multi-line-mode(no-multi-line)
     );
   };
 
