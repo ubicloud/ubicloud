@@ -1866,4 +1866,95 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to be_empty
     end
   end
+
+  describe "admin authentication audit log" do
+    def insert_account_audit_log(account_id: DB[:admin_account].get(:id), message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
+      DB[:admin_account_authentication_audit_log].returning(:id).insert(
+        account_id:,
+        message:,
+        metadata: Sequel.pg_jsonb(metadata),
+        at:
+      ).first[:id]
+    end
+
+    def audit_log_content
+      page.all("#audit-log-search-results td:not(:first-child):not(:only-child)").map(&:text)
+    end
+
+    before do
+      DB[:admin_account_authentication_audit_log].delete
+    end
+
+    it "can view authentication audit log entries" do
+      insert_account_audit_log
+
+      click_link "View Admin Authentication Audit Logs"
+
+      expect(page.title).to eq("Ubicloud Admin - Admin Authentication Audit Log")
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+    end
+
+    it "can filter by action" do
+      insert_account_audit_log
+      insert_account_audit_log(message: "login_failure")
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", "admin", "ip: 127.0.0.1",
+        "login_failure", "admin", "ip: 127.0.0.1"
+      ]
+
+      click_link "login_failure"
+      expect(audit_log_content).to eq ["login_failure", "admin", "ip: 127.0.0.1"]
+
+      fill_in "Action", with: "login"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+    end
+
+    it "can filter by metadata" do
+      insert_account_audit_log(metadata: {"ip" => "1.2.3.4"})
+      insert_account_audit_log(message: "login_failure", metadata: {"ip" => "9.9.9.9"})
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", "admin", "ip: 1.2.3.4",
+        "login_failure", "admin", "ip: 9.9.9.9"
+      ]
+
+      click_link "ip: 1.2.3.4"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 1.2.3.4"]
+
+      fill_in "Metadata", with: "ip=9.9.9.9"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", "admin", "ip: 9.9.9.9"]
+    end
+
+    it "can filter by account login and ubid" do
+      described_class.create_admin_account("other-admin")
+      insert_account_audit_log
+      insert_account_audit_log(account_id: DB[:admin_account].where(login: "other-admin").get(:id), message: "login_failure")
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "create_account", "other-admin", "",
+        "login", "admin", "ip: 127.0.0.1",
+        "login_failure", "other-admin", "ip: 127.0.0.1"
+      ]
+
+      click_link "admin"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "other-admin"
+      click_button "Search"
+      expect(audit_log_content).to eq [
+        "create_account", "other-admin", "",
+        "login_failure", "other-admin", "ip: 127.0.0.1"
+      ]
+
+      fill_in "Account", with: "not-a-ubid-or-name"
+      click_button "Search"
+      expect(audit_log_content).to be_empty
+    end
+  end
 end

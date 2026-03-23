@@ -76,7 +76,7 @@ module AuditLog
     end.join("&")
   end
 
-  def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, min_end_date: Date.today << month_limit)
+  def authentication_audit_log_search(ds, month_limit:, accounts_dataset: nil, account_columns: %i[name email].freeze, min_end_date: Date.today << month_limit)
     ds = ds.order(Sequel.desc(:at), :message, :id)
     skip_query = false
     next_page_params = @next_page_params = {}
@@ -97,7 +97,7 @@ module AuditLog
       next_page_params["account"] = account
       if (account_id = UBID.to_uuid(account))
         ds = ds.where(account_id:)
-      elsif (account_id = accounts_dataset.where(Sequel[{name: account}] | {email: account}).get(:id))
+      elsif (account_id = accounts_dataset.where(Sequel.or(account_columns.map { [it, account] })).get(:id))
         ds = ds.where(account_id:)
       else
         skip_query = true
