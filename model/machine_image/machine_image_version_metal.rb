@@ -4,8 +4,8 @@ require_relative "../../model"
 
 class MachineImageVersionMetal < Sequel::Model
   many_to_one :machine_image_version, key: :id, read_only: true, is_used: true
-  many_to_one :store, class: :MachineImageStore
-  many_to_one :archive_kek, class: :StorageKeyEncryptionKey
+  many_to_one :store, class: :MachineImageStore, read_only: true
+  many_to_one :archive_kek, class: :StorageKeyEncryptionKey, read_only: true
 
   plugin ResourceMethods, etc_type: true
 end
