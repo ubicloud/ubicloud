@@ -70,9 +70,9 @@ syslog_ng_conf = <<~CONF
   };
 
   filter f_postgres_units {
-    match("postgresql@" template("${PROGRAM}")) or
-    match("pgbouncer@" template("${PROGRAM}")) or
-    match("ubicloud-postgres-upgrade" template("${PROGRAM}"));
+    match("postgresql@" value(".journald._SYSTEMD_UNIT")) or
+    match("pgbouncer@" value(".journald._SYSTEMD_UNIT")) or
+    match("ubicloud-postgres-upgrade" value(".journald._SYSTEMD_UNIT"));
   };
 
   template t_pglog {
