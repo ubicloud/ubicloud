@@ -49,9 +49,6 @@ http_destination = lambda { |label, template_name, batch_lines|
 }
 
 syslog_ng_conf = <<~CONF
-  @version: 4.6
-  @include "scl.conf"
-
   options {
     keep-hostname(yes);
     use-fqdn(no);
