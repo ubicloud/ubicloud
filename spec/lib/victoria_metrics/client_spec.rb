@@ -117,6 +117,12 @@ RSpec.describe VictoriaMetrics::Client do
           .to_return(status: 500, body: "Internal Server Error")
         expect { client.send(:send_request, "GET", "/test") }.to raise_error(VictoriaMetrics::ClientError, "VictoriaMetrics Client error, method: GET, path: /test, status code: 500")
       end
+
+      it "raises error for Excon error status code" do
+        stub_request(:get, "#{endpoint}/test")
+          .to_raise(Excon::Error::Timeout.new("bad"))
+        expect { client.send(:send_request, "GET", "/test") }.to raise_error(VictoriaMetrics::ClientError, "VictoriaMetrics Client error (Excon::Error::Timeout: bad), method: GET, path: /test")
+      end
     end
   end
 

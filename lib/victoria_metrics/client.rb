@@ -82,14 +82,17 @@ class VictoriaMetrics::Client
   private
 
   def send_request(method, path, body = nil, headers = {})
-    full_path = path
-
     if @username && @password
       auth = Base64.strict_encode64("#{@username}:#{@password}")
       headers["Authorization"] = "Basic #{auth}"
     end
 
-    response = @client.request(method:, path: full_path, body:, headers:)
+    begin
+      response = @client.request(method:, path:, body:, headers:, timeout: 5)
+    rescue Excon::Error::Timeout, Excon::Error::Socket => e
+      raise VictoriaMetrics::ClientError, "VictoriaMetrics Client error (#{e.class}: #{e.message}), method: #{method}, path: #{path}"
+    end
+
     if [200, 204, 206, 404].include?(response.status)
       response
     else
