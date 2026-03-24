@@ -367,7 +367,7 @@ end
     if (deadline_at = current_frame["deadline_at"]).nil? ||
         (old_deadline_target = current_frame["deadline_target"]) != deadline_target ||
         allow_extension ||
-        Time.parse(deadline_at.to_s) > new_deadline
+        Time.parse(deadline_at) > new_deadline
 
       if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
         pg.incr_resolve
@@ -377,7 +377,7 @@ end
 
       if allow_extension.is_a?(Integer)
         current_frame["deadline_start"] ||= time_string(time)
-        cap = Time.parse(current_frame["deadline_start"].to_s) + allow_extension
+        cap = Time.parse(current_frame["deadline_start"]) + allow_extension
         current_frame["deadline_at"] = time_string([new_deadline, cap].min)
       else
         current_frame["deadline_at"] = time_string(new_deadline)
