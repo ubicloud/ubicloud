@@ -357,10 +357,13 @@ end
 
   def register_deadline(deadline_target, deadline_in, allow_extension: false)
     current_frame = strand.stack.first
+    time = Time.now
+    new_deadline = time + deadline_in
+
     if (deadline_at = current_frame["deadline_at"]).nil? ||
         (old_deadline_target = current_frame["deadline_target"]) != deadline_target ||
         allow_extension ||
-        Time.parse(deadline_at.to_s) > Time.now + deadline_in
+        Time.parse(deadline_at.to_s) > new_deadline
 
       if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
         pg.incr_resolve
@@ -369,11 +372,11 @@ end
       current_frame["deadline_target"] = deadline_target
 
       if allow_extension.is_a?(Integer)
-        current_frame["deadline_start"] ||= Time.now
+        current_frame["deadline_start"] ||= time
         cap = Time.parse(current_frame["deadline_start"].to_s) + allow_extension
-        current_frame["deadline_at"] = [Time.now + deadline_in, cap].min
+        current_frame["deadline_at"] = [new_deadline, cap].min
       else
-        current_frame["deadline_at"] = Time.now + deadline_in
+        current_frame["deadline_at"] = new_deadline
       end
 
       strand.modified!(:stack)
