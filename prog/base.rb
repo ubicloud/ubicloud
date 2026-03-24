@@ -355,6 +355,10 @@ end
     fail Hop.new(@strand.prog, @strand.label, {label:, retval: nil})
   end
 
+  private def time_string(time)
+    strand.time_string(time)
+  end
+
   def register_deadline(deadline_target, deadline_in, allow_extension: false)
     current_frame = strand.stack.first
     time = Time.now
@@ -372,11 +376,11 @@ end
       current_frame["deadline_target"] = deadline_target
 
       if allow_extension.is_a?(Integer)
-        current_frame["deadline_start"] ||= time
+        current_frame["deadline_start"] ||= time_string(time)
         cap = Time.parse(current_frame["deadline_start"].to_s) + allow_extension
-        current_frame["deadline_at"] = [new_deadline, cap].min
+        current_frame["deadline_at"] = time_string([new_deadline, cap].min)
       else
-        current_frame["deadline_at"] = new_deadline
+        current_frame["deadline_at"] = time_string(new_deadline)
       end
 
       strand.modified!(:stack)

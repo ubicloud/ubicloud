@@ -908,7 +908,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to hop("restart")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "stops the vm and hops to stopped_by_admin with admin_stop semaphore" do
@@ -974,7 +974,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to hop("start_after_stop")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "does not stop if already stopped" do
@@ -1007,7 +1007,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.unavailable }.to hop("start_after_stop")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "hops to stopped when needed" do

@@ -284,7 +284,7 @@ RSpec.describe Prog::Base do
       # move back start to test limit
       st.label = :extend_deadline_with_limit
       deadline_start -= 25 * 60
-      st.stack.first["deadline_start"] = deadline_start.to_s
+      st.stack.first["deadline_start"] = st.time_string(deadline_start)
       st.unsynchronized_run
 
       new_deadline_start = Time.parse(st.stack.first["deadline_start"].to_s)

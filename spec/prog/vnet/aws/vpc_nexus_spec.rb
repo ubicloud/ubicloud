@@ -278,7 +278,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vm.incr_prevent_destroy
 
       expect { nx.destroy }.to nap(5)
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 10 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 10 * 60)
       expect(nx.strand.stack.first.fetch("deadline_target")).to be_nil
     end
 
