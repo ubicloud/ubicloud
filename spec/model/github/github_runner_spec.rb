@@ -62,6 +62,37 @@ RSpec.describe GithubRunner do
     })
   end
 
+  it "can log duration with vhost block backend version" do
+    vm = github_runner.vm
+    vhost_block_backend = VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+    boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)
+    VmStorageVolume.create(
+      vm_id: vm.id,
+      boot: true,
+      size_gib: 75,
+      disk_index: 0,
+      boot_image_id: boot_image.id,
+      vhost_block_backend_id: vhost_block_backend.id,
+      vring_workers: 4
+    )
+
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      boot_image: boot_image.version,
+      vhost_block_backend_version: vhost_block_backend.version,
+      cores: vm.cores,
+      vcpus: vm.vcpus,
+      vm_host_ubid: vm.vm_host.ubid,
+      data_center: vm.vm_host.data_center
+    })
+  end
+
   it "can log duration when vm does not have vm_host" do
     github_runner.vm.update(vm_host_id: nil)
     vm = github_runner.vm
