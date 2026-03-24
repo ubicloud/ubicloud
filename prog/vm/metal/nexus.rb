@@ -628,6 +628,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
   end
 
   def log_vm_stats
+    return unless host
     stats = host.sshable.cmd_json("sudo host/bin/vm-stats :vm_name", vm_name:, timeout: 10, log: false)
   rescue Sshable::SshError, JSON::ParserError => e
     # Collecting VM stats is best effort during destroy, so we catch and log any
