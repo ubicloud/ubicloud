@@ -24,6 +24,14 @@ RSpec.describe Prog::InstallRhizome do
       expect { ir.start }.to hop("install_gems")
     end
 
+    it "handles non-ascii content in tar" do
+      expect(ir.sshable).to receive(:_cmd) do |*args, **kwargs|
+        expect(args).to eq ["tar xf -"]
+        expect(kwargs[:stdin].encoding).to eq(Encoding::BINARY)
+      end
+      expect { ir.start }.to hop("install_gems")
+    end
+
     it "writes tar including specs" do
       sshable2 = Sshable.create
       ir_spec = described_class.new(Strand.create_with_id(sshable2, prog: "InstallRhizome", label: "start", stack: [{"target_folder" => "host", "install_specs" => true}]))
