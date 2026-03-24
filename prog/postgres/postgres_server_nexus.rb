@@ -789,7 +789,9 @@ SQL
 
   label def destroy_vm_and_pg
     vm.incr_destroy
+    representative_server = resource.representative_server
     postgres_server.destroy
+    representative_server.incr_configure
 
     pop "postgres server is deleted"
   end

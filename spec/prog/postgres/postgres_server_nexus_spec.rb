@@ -1417,6 +1417,20 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: vm.id, name: "destroy").count).to eq(1)
       expect(postgres_server.exists?).to be false
     end
+
+    it "increments configure on the representative server when it is a different server" do
+      postgres_server.update(is_representative: false)
+      representative_server = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: true)
+
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+
+      expect(Semaphore.where(strand_id: representative_server.id, name: "configure").count).to eq(1)
+    end
+
+    it "does not crash when this server is the representative server" do
+      # postgres_server is the representative server (is_representative: true by default)
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+    end
   end
 
   describe "#available?" do
