@@ -192,7 +192,7 @@ SQL
     effective_prog = prog
     stack.each do |frame|
       if (deadline_at = frame["deadline_at"])
-        if Time.now > Time.parse(deadline_at.to_s)
+        if Time.now > Time.parse(deadline_at)
           sbj = subject
           extra_data = case sbj
           when Vm
