@@ -222,7 +222,7 @@ SQL
     end
 
     unless top_frame["last_label_changed_at"]
-      top_frame["last_label_changed_at"] = Time.now.to_s
+      top_frame["last_label_changed_at"] = time_string(Time.now)
       modified!(:stack)
     end
 
@@ -304,6 +304,10 @@ SQL
         end
       end
     end
+  end
+
+  def time_string(time)
+    time.strftime("%F %T.%6N %z")
   end
 end
 

@@ -746,7 +746,7 @@ usermod -L ubuntu
       expect(Time).to receive(:now).at_least(:once).and_return(now)
       expect { nx.prevent_destroy }.to nap(30)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
-      expect(nx.strand.stack.first["deadline_at"]).to eq(now + 24 * 60 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(0.00001).of(now + 24 * 60 * 60)
     end
   end
 

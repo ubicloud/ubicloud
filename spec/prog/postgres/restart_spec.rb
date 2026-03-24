@@ -33,7 +33,7 @@ RSpec.describe Prog::Postgres::Restart do
     it "sets deadline and hops to restart" do
       expect { nx.start }.to hop("restart")
       expect(nx.strand.stack.first["deadline_target"]).to be_nil
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 5 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 5 * 60)
     end
   end
 
