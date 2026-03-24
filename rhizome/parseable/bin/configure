@@ -38,7 +38,7 @@ parseable_service = <<~PARSEABLE_SERVICE
   RestartSec=1
   Environment=P_USERNAME=#{user}
   Environment=P_PASSWORD=#{password}
-  Environment=P_ADDR=0.0.0.0:8000
+  Environment=P_ADDR=[::]:8000
   Environment=P_FS_DIR=/dat/parseable/data
   Environment=P_STAGING_DIR=/dat/parseable/staging
   Environment=P_TLS_CERT_PATH=/etc/parseable/certs/public.crt
