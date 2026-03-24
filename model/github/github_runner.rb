@@ -49,6 +49,9 @@ class GithubRunner < Sequel::Model
     values = {ubid:, label:, repository_name:, duration: duration.round(3), conclusion: workflow_job&.dig("conclusion")}
     if vm
       values.merge!(vm_ubid: vm.ubid, arch: vm.arch, cores: vm.cores, vcpus: vm.vcpus, boot_image: vm.vm_storage_volumes.first&.boot_image&.version || vm.boot_image)
+      if (vhost_block_backend_version = vm.vm_storage_volumes.first&.vhost_block_backend&.version)
+        values[:vhost_block_backend_version] = vhost_block_backend_version
+      end
       if vm.vm_host
         values[:vm_host_ubid] = vm.vm_host.ubid
         values[:data_center] = vm.vm_host.data_center
