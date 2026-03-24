@@ -462,6 +462,8 @@ class PostgresServer < Sequel::Model
   end
 
   def observe_metrics_backlog(session)
+    return unless metrics_done_dir_exists?(session)
+
     metrics_done_dir = "#{metrics_config[:metrics_dir]}/done"
     result = session[:ssh_session].exec!(
       "find :metrics_done_dir -name '*.txt' | wc -l",
