@@ -20,7 +20,6 @@ rescue CommandFail
   r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
 end
 
-# Create log dir outside the data directory (data dir is 700, inaccessible to syslog-ng)
 r "usermod -aG postgres ubi_monitoring"
 
 if parseable_ca_bundle
@@ -38,7 +37,7 @@ http_destination = lambda { |label, body|
   <<~DEST
     destination d_parseable_#{label} {
       http(
-        url("#{parseable_endpoint}/api/v1/logstream/#{stream}")
+        url("#{parseable_endpoint}/api/v1/logstream/#{resource_id}")
         method("POST")
         user("#{parseable_username}")
         password("#{parseable_password}")
@@ -86,8 +85,6 @@ CONF
 
 safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
 
-# Enable --no-caps so syslog-ng (running as root) can traverse the 750 log dir
-# without CAP_DAC_OVERRIDE. The log dir is owned by postgres:postgres mode 750.
 r "sed -i 's/^#SYSLOGNG_OPTS=.*/SYSLOGNG_OPTS=\"--no-caps\"/' /etc/default/syslog-ng"
 
 r "systemctl enable syslog-ng --now"
