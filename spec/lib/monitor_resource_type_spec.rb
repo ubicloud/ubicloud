@@ -133,7 +133,9 @@ RSpec.describe MonitorResourceType do
 
   describe "thread pool checkup semaphore" do
     it "does not call incr_checkup if checkup is already set" do
+      raised = false
       @mrt = described_class.create(Object, :foo, 2, [[]]) do
+        raised = true
         raise StandardError
       end
 
@@ -144,8 +146,9 @@ RSpec.describe MonitorResourceType do
       mr = MonitorableResource.new(vm_host)
       @mrt.submit_queue.push(mr)
 
-      result = @mrt.finish_queue.pop(timeout: 1)
-      expect(result).to eq(mr)
+      result = @mrt.finish_queue.pop(timeout: 5)
+      expect(raised).to be true
+      expect(result).to be mr
       expect(Semaphore.where(strand_id: vm_host.id, name: "checkup").count).to eq(1)
     end
   end
