@@ -17,9 +17,15 @@ class VmStats
         with_memory: false # VM uses hugepages, so memory usage is not reflected in the process RSS
       )
     }
-    ubiblk_disks.each do |disk_index|
-      result["disk_#{disk_index}"] =
-        unit_stats("#{@vm_name}-#{disk_index}-storage", with_io: true, with_memory: true)
+    result["vm"]["vcpus"] = vm_params.fetch("max_vcpus")
+
+    ubiblk_disks.each do |disk|
+      disk_index = disk["disk_index"]
+      result["disk_#{disk_index}"] = disk.except("disk_index").merge!(unit_stats(
+        "#{@vm_name}-#{disk_index}-storage",
+        with_io: true,
+        with_memory: true
+      ))
     end
 
     result
@@ -64,7 +70,8 @@ class VmStats
     main_pid = unit_property(unit_name, "MainPID")
     h = {
       "main_pid" => main_pid,
-      "cpu_stats" => cpu_stats(main_pid)
+      "cpu_stats" => cpu_stats(main_pid),
+      "active_age_ms" => unit_active_age_ms(unit_name)
     }
     if with_memory
       h["memory_peak_bytes"] = Integer(unit_property(unit_name, "MemoryPeak"), 10)
@@ -75,18 +82,33 @@ class VmStats
     h
   end
 
+  def unit_active_age_ms(unit)
+    enter_ts_monotonic = unit_property(unit, "ActiveEnterTimestampMonotonic")
+    # It will return "0" if the unit is not active, in which case we want to
+    # return nil rather than a large age
+    return nil if enter_ts_monotonic.empty? || enter_ts_monotonic == "0"
+
+    start_ms = Integer(enter_ts_monotonic, 10) / 1000
+    uptime_ms = (Process.clock_gettime(Process::CLOCK_MONOTONIC) * 1000).to_i
+
+    uptime_ms - start_ms
+  end
+
   def clk_tick
     @clk_tick ||= Integer(r("getconf", "CLK_TCK"), 10)
   end
 
-  def ubiblk_disks
-    @ubiblk_disks ||= begin
+  def vm_params
+    @vm_params ||= begin
       vm_path = VmPath.new(@vm_name)
-      params = JSON.parse(File.read(vm_path.prep_json))
+      JSON.parse(File.read(vm_path.prep_json))
+    end
+  end
 
-      params.fetch("storage_volumes").filter_map do |sv|
-        sv["disk_index"] if sv["vhost_block_backend_version"]
-      end
+  def ubiblk_disks
+    @ubiblk_disks ||= vm_params.fetch("storage_volumes").filter_map do |sv|
+      next unless sv["vhost_block_backend_version"]
+      sv.slice("disk_index", "vhost_block_backend_version", "num_queues", "queue_size", "size_gib")
     end
   end
 end
