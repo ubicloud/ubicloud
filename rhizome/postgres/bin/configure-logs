@@ -15,8 +15,7 @@ parseable_ca_bundle = config["parseable_ca_bundle"]
 
 r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
 
-# Create log dir outside the data directory so syslog-ng can traverse it
-# (data dir is 700; syslog-ng drops CAP_DAC_OVERRIDE after startup)
+# Create log dir outside the data directory (data dir is 700, inaccessible to syslog-ng)
 r "install -d -o postgres -g postgres -m 750 #{log_dir}"
 r "usermod -aG postgres ubi_monitoring"
 
@@ -30,7 +29,10 @@ tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") pe
 
 stream = "pg-#{resource_id}"
 
-http_destination = lambda { |label, body, batch_lines|
+tls_curl_flag = use_tls ? "--cacert /etc/syslog-ng/certs/parseable-ca.crt" : "-k"
+r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{stream}' || true"
+
+http_destination = lambda { |label, body|
   <<~DEST
     destination d_parseable_#{label} {
       http(
@@ -38,11 +40,11 @@ http_destination = lambda { |label, body, batch_lines|
         method("POST")
         user("#{parseable_username}")
         password("#{parseable_password}")
-        headers("Content-Type: application/x-ndjson")
+        headers("Content-Type: application/json")
         body(#{body})
         persist-name("parseable_#{label}")
-        batch-lines(#{batch_lines})
-        batch-bytes(1048576)
+        workers(1)
+        batch-lines(1)
         batch-timeout(10000)
         timeout(30)
         retries(3)
@@ -73,14 +75,18 @@ syslog_ng_conf = <<~CONF
     match("ubicloud-postgres-upgrade" value(".journald._SYSTEMD_UNIT"));
   };
 
-  #{http_destination.call("pglog", '"${MESSAGE}\\n"', 200)}
-  #{http_destination.call("journal", %('$(format-json stream=literal(journal) ts="${ISODATE}" unit="${PROGRAM}" priority=${LEVEL_NUM} message="${MESSAGE}")\\n'), 50)}
+  #{http_destination.call("pglog", '"[${MESSAGE}]"')}
+  #{http_destination.call("journal", %('[{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"msg":"${MSG}"}]'))}
 
   log { source(s_pglog); destination(d_parseable_pglog); };
   log { source(s_src); filter(f_postgres_units); destination(d_parseable_journal); };
 CONF
 
 safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
+
+# Enable --no-caps so syslog-ng (running as root) can traverse the 750 log dir
+# without CAP_DAC_OVERRIDE. The log dir is owned by postgres:postgres mode 750.
+r "sed -i 's/^#SYSLOGNG_OPTS=.*/SYSLOGNG_OPTS=\"--no-caps\"/' /etc/default/syslog-ng"
 
 r "systemctl enable syslog-ng --now"
 r "systemctl restart syslog-ng"
