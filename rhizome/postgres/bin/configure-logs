@@ -13,10 +13,14 @@ parseable_username = config["parseable_username"]
 parseable_password = config["parseable_password"]
 parseable_ca_bundle = config["parseable_ca_bundle"]
 
-r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
+begin
+  r "dpkg -s syslog-ng syslog-ng-mod-http"
+rescue CommandFail
+  r "apt-get update -qq"
+  r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
+end
 
 # Create log dir outside the data directory (data dir is 700, inaccessible to syslog-ng)
-r "install -d -o postgres -g postgres -m 750 #{log_dir}"
 r "usermod -aG postgres ubi_monitoring"
 
 if parseable_ca_bundle
@@ -27,10 +31,8 @@ end
 use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
 tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") peer-verify(yes))) : ""
 
-stream = "pg-#{resource_id}"
-
 tls_curl_flag = use_tls ? "--cacert /etc/syslog-ng/certs/parseable-ca.crt" : "-k"
-r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{stream}' || true"
+r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{resource_id}' || true"
 
 http_destination = lambda { |label, body|
   <<~DEST
@@ -72,7 +74,7 @@ syslog_ng_conf = <<~CONF
   filter f_postgres_units {
     match("postgresql@" value(".journald._SYSTEMD_UNIT")) or
     match("pgbouncer@" value(".journald._SYSTEMD_UNIT")) or
-    match("ubicloud-postgres-upgrade" value(".journald._SYSTEMD_UNIT"));
+    match("upgrade_postgres" value(".journald._SYSTEMD_UNIT"));
   };
 
   #{http_destination.call("pglog", '"[${MESSAGE}]"')}
@@ -89,4 +91,4 @@ safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
 r "sed -i 's/^#SYSLOGNG_OPTS=.*/SYSLOGNG_OPTS=\"--no-caps\"/' /etc/default/syslog-ng"
 
 r "systemctl enable syslog-ng --now"
-r "systemctl restart syslog-ng"
+r("systemctl restart syslog-ng", expect: [0, 1])
