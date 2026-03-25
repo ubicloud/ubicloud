@@ -57,6 +57,8 @@ class StorageArchive
 
       # archive
       StorageArchive.new(config_path, nil, nil, target_conf, vhost_block_backend_version).archive
+
+      image_size_mib.to_i
     end
   end
 
