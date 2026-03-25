@@ -22,6 +22,7 @@ jobs:
         service:
           - api
           - workers
+          - o11y-bot
     runs-on: k8s-nano
     steps:
       - name: Generate Token
