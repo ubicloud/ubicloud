@@ -1431,6 +1431,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       # postgres_server is the representative server (is_representative: true by default)
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
+
+    it "does not crash when the resource is already deleted" do
+      allow(nx).to receive(:resource).and_return(nil)
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+    end
   end
 
   describe "#available?" do
