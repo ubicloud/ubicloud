@@ -3,6 +3,7 @@
 
 require "json"
 require_relative "../../common/lib/util"
+require_relative "../lib/vector_log_config"
 
 config = JSON.parse($stdin.read)
 resource_id = config["resource_id"]
@@ -26,83 +27,29 @@ unless vector_current.start_with?("vector #{vector_version}")
   r "rm /tmp/vector.tar.gz"
 end
 
+r "usermod -aG systemd-journal ubi_monitoring"
 r "usermod -aG postgres ubi_monitoring"
 
-use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
+log_config = VectorLogConfig.new(
+  resource_id: resource_id,
+  log_dir: log_dir,
+  parseable_endpoint: parseable_endpoint,
+  parseable_username: parseable_username,
+  parseable_password: parseable_password,
+  parseable_ca_bundle: parseable_ca_bundle,
+  parseable_server_name: parseable_server_name
+)
 
-if use_tls
+if log_config.use_tls?
   r "mkdir -p /etc/vector/certs"
-  safe_write_to_file("/etc/vector/certs/parseable-ca.crt", parseable_ca_bundle)
+  safe_write_to_file(log_config.ca_cert_path, parseable_ca_bundle)
 end
 
-tls_curl_flag = use_tls ? "--cacert /etc/vector/certs/parseable-ca.crt" : "-k"
+tls_curl_flag = log_config.use_tls? ? "--cacert #{log_config.ca_cert_path}" : "-k"
 r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{resource_id}' || true"
 
-tls_section = if use_tls
-  server_name_config = parseable_server_name ? "server_name = \"#{parseable_server_name}\"\nverify_hostname = false\n" : nil
-  <<~TLS
-    [sinks.parseable.tls]
-    ca_file = "/etc/vector/certs/parseable-ca.crt"
-    #{server_name_config}
-  TLS
-else
-  ""
-end
-
-vector_conf = <<~CONF
-  data_dir = "/var/lib/vector"
-
-  [sources.pglog]
-  type = "file"
-  include = ["#{log_dir}/postgresql-*.json"]
-
-  [transforms.parse_pglog]
-  type = "remap"
-  inputs = ["pglog"]
-  source = '. = parse_json!(.message)'
-
-  [sources.journal]
-  type = "journald"
-
-  [transforms.filter_journal]
-  type = "filter"
-  inputs = ["journal"]
-  condition = '''
-  unit = string(._SYSTEMD_UNIT) ?? ""
-  starts_with(unit, "postgresql@") || starts_with(unit, "pgbouncer@") || starts_with(unit, "upgrade_postgres")
-  '''
-
-  [transforms.format_journal]
-  type = "remap"
-  inputs = ["filter_journal"]
-  source = '''
-  .stream = "journal"
-  .ts = .timestamp
-  .unit = del(._SYSTEMD_UNIT)
-  .msg = del(.message)
-  '''
-
-  [sinks.parseable]
-  type = "http"
-  inputs = ["parse_pglog", "format_journal"]
-  uri = "#{parseable_endpoint}/api/v1/logstream/#{resource_id}"
-  method = "post"
-  encoding.codec = "json"
-
-  [sinks.parseable.batch]
-  max_events = 200
-  timeout_secs = 10
-
-  [sinks.parseable.auth]
-  strategy = "basic"
-  user = "#{parseable_username}"
-  password = "#{parseable_password}"
-
-  #{tls_section}
-CONF
-
 r "mkdir -p /etc/vector /var/lib/vector"
-safe_write_to_file("/etc/vector/postgres.toml", vector_conf)
+safe_write_to_file("/etc/vector/postgres.toml", log_config.to_toml)
 
 vector_service = <<~SERVICE
   [Unit]
