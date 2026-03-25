@@ -7,7 +7,7 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
   end
 
-  it "adds a metric desintation to the database" do
+  it "adds a basic auth metric destination with 3 positional args" do
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     pg = PostgresResource.first
     expect(pg.metric_destinations_dataset).to be_empty
@@ -17,10 +17,36 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     expect(body).to eq <<~END
       Metric destination added to PostgreSQL database.
       Current metric destinations:
-        1: #{md.ubid}  foo  https://baz.example.com
+        1: #{md.ubid}  basic  foo  https://baz.example.com
     END
+    expect(md.auth_type).to eq "basic"
     expect(md.username).to eq "foo"
     expect(md.password).to eq "bar"
     expect(md.url).to eq "https://baz.example.com"
+    expect(md.mtls).to be false
+  end
+
+  it "adds a bearer auth metric destination with 2 positional args" do
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first
+    body = cli(%w[pg eu-central-h1/test-pg add-metric-destination -a bearer https://baz.example.com my_token])
+    md = pg.metric_destinations.first
+    expect(body).to eq <<~END
+      Metric destination added to PostgreSQL database.
+      Current metric destinations:
+        1: #{md.ubid}  bearer  https://baz.example.com
+    END
+    expect(md.auth_type).to eq "bearer"
+    expect(md.username).to be_nil
+    expect(md.password).to eq "my_token"
+  end
+
+  it "adds a metric destination with mtls enabled" do
+    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
+    pg = PostgresResource.first
+    cli(%w[pg eu-central-h1/test-pg add-metric-destination -m foo bar https://baz.example.com])
+    md = pg.metric_destinations.first
+    expect(md.mtls).to be true
+    expect(md.auth_type).to eq "basic"
   end
 end

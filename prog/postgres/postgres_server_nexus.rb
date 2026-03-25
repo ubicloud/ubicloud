@@ -252,12 +252,14 @@ CONFIG
     vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
     metric_destinations = resource.metric_destinations.map {
-      <<METRIC_DESTINATION
-- url: '#{it.url}'
-  basic_auth:
-    username: '#{it.username}'
-    password: '#{it.password}'
-METRIC_DESTINATION
+      config = "- url: '#{it.url}'\n"
+      config << if it.auth_type == "bearer"
+        "  authorization:\n    credentials: '#{it.password}'\n"
+      else
+        "  basic_auth:\n    username: '#{it.username}'\n    password: '#{it.password}'\n"
+      end
+      config << "  tls_config:\n    cert_file: /etc/ssl/certs/client.crt\n    key_file: /etc/ssl/certs/client.key\n" if it.mtls
+      config
     }.prepend("remote_write:").join("\n")
 
     prometheus_config = <<CONFIG

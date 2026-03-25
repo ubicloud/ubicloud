@@ -1400,20 +1400,31 @@ paths:
             schema:
               type: object
               properties:
+                auth_type:
+                  description: Authentication type
+                  type: string
+                  default: basic
+                  enum:
+                    - basic
+                    - bearer
+                mtls:
+                  description: Require mTLS
+                  type: boolean
+                  default: false
                 password:
-                  description: Password for the Metric Destination
+                  description: 'Password for basic auth, token for bearer auth'
                   type: string
                 url:
                   description: URL for the Metric Destination
                   type: string
                 username:
-                  description: Username for the Metric Destination
+                  description: 'Username, required for basic auth'
                   type: string
+                  nullable: true
               additionalProperties: false
               required:
                 - password
                 - url
-                - username
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'

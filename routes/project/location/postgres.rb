@@ -252,12 +252,24 @@ class Clover
           handle_validation_failure("postgres/show") { @page = "charts" }
 
           password_param = (api? ? "password" : "metric-destination-password")
-          url, username, password = typecast_params.nonempty_str!(["url", "username", password_param])
+          auth_type = typecast_params.str("auth_type") || "basic"
+          mtls = typecast_params.bool("mtls") || false
+
+          unless %w[basic bearer].include?(auth_type)
+            raise Validation::ValidationFailed.new(auth_type: "must be 'basic' or 'bearer'")
+          end
+
+          url, password = typecast_params.nonempty_str!(["url", password_param])
+          username = typecast_params.nonempty_str("username") if auth_type == "basic"
+
+          if auth_type == "basic" && !username
+            raise Validation::ValidationFailed.new(username: "is required for basic auth")
+          end
 
           Validation.validate_url(url)
 
           DB.transaction do
-            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:)
+            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, auth_type:, mtls:)
             pg.servers.each(&:incr_configure_metrics)
             audit_log(md, "create", pg)
           end
