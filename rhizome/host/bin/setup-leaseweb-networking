@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "yaml"
+require "json"
+require "fileutils"
+
+NETPLAN_PATH = "/etc/netplan/01-netcfg.yaml"
+
+unless (subnets_json = ARGV.shift)
+  fail "No subnets JSON provided"
+end
+
+subnets = JSON.parse(subnets_json)
+
+# Read existing netplan config
+netplan = YAML.safe_load_file(NETPLAN_PATH)
+
+# Find the primary ethernet interface
+ethernets = netplan.dig("network", "ethernets")
+fail "No ethernets found in netplan config" unless ethernets&.any?
+
+iface_name = ethernets.keys.first
+iface = ethernets[iface_name]
+
+existing_addresses = iface["addresses"] || []
+existing_routes = iface["routes"] || []
+
+subnets.each do |subnet|
+  cidr = subnet["cidr"]
+  gateway = subnet["gateway"]
+
+  next if existing_addresses.include?(cidr)
+
+  existing_addresses << cidr
+
+  if gateway && !gateway.empty?
+    route = {
+      "to" => "default",
+      "via" => gateway,
+      "metric" => 100,
+      "on-link" => true
+    }
+
+    # Only add if no duplicate route exists
+    unless existing_routes.any? { |r| r["via"] == gateway && r["to"] == "default" }
+      existing_routes << route
+    end
+  end
+end
+
+iface["addresses"] = existing_addresses
+iface["routes"] = existing_routes unless existing_routes.empty?
+
+safe_write_to_file(NETPLAN_PATH, YAML.dump(netplan))
+
+# Validate the config
+r("netplan generate --debug")
+
+# Apply with automatic rollback on failure
+r("netplan try --timeout 120")

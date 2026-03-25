@@ -6,6 +6,42 @@ class Prog::LearnNetwork < Prog::Base
   subject_is :sshable, :vm_host
 
   label def start
+    if vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      hop_setup_leaseweb_networking
+    end
+
+    learn_network_from_host
+  end
+
+  label def setup_leaseweb_networking
+    subnets = vm_host.assigned_subnets.map { |a|
+      {cidr: a.cidr.to_s, gateway: a.gateway}
+    }
+    sshable.cmd("sudo host/bin/setup-leaseweb-networking :json", json: subnets.to_json)
+
+    hop_leaseweb_verify_networking
+  end
+
+  label def leaseweb_verify_networking
+    sshable.cmd("ping -c 3 -w 10 8.8.8.8")
+
+    hop_leaseweb_learn_ipv6
+  end
+
+  label def leaseweb_learn_ipv6
+    adr = vm_host.assigned_subnets.find { |a| a.cidr.version == 6 }
+
+    if adr
+      vm_host.update(
+        ip6: adr.cidr.nth(1).to_s,
+        net6: adr.cidr.to_s
+      )
+    end
+
+    pop "learned network information"
+  end
+
+  def learn_network_from_host
     ip6 = parse_ip_addr_j(sshable.cmd_json("/usr/sbin/ip -j -6 addr show scope global"))
 
     # While it would be ideal for NetAddr's IPv6 support to convey
