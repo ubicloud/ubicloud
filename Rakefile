@@ -210,8 +210,13 @@ task "csi_spec" do
 end
 
 desc "Update cli spec golden files"
-task "update_golden_files" do
+task "update_cli_golden_files" do
   sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/spec-output-files/.txt spec/routes/api/cli/golden-files/"
+end
+
+desc "Update svg spec golden files"
+task "update_svg_golden_files" do
+  sh "mv spec/lib/svg_chart-spec-output-files/*.svg spec/lib/svg_chart-golden-files/"
 end
 
 # Other
@@ -449,7 +454,8 @@ namespace :linter do
       "render(",
       "rodauth.add_recovery_codes_heading",
       "rodauth.otp_qr_code",
-      "yield"
+      "yield",
+      "SvgChart.render("
     ]
     safe_regexp = /\A\s*(?:#{Regexp.union(safe_patterns)})/m
 
