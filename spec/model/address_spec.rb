@@ -34,6 +34,10 @@ RSpec.describe Address do
   end
 
   it "populates ipv4_address table with addresses in cidr without first and last, when using leaseweb" do
+    leaseweb_ips = [
+      Hosting::LeasewebApis::IpInfo.new(ip_address: "1.2.3.4/32", source_host_ip: "1.2.3.4", is_failover: false, gateway: "1.2.3.1", mask: 32)
+    ]
+    expect(Hosting::Apis).to receive(:pull_ips).and_return(leaseweb_ips)
     vm_host = Prog::Vm::HostNexus.assemble("1.2.3.4", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "1").subject
     described_class.create(cidr: "0.0.0.0/30", vm_host:)
     expect(DB[:ipv4_address].select_order_map(:ip).map(&:to_s)).to eq %w[0.0.0.1 0.0.0.2]

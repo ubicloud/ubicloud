@@ -30,6 +30,8 @@ class Prog::Vm::HostNexus < Prog::Base
         vmh.set_data_center
         # Avoid overriding custom server names for development hosts.
         vmh.set_server_name unless Config.development?
+      elsif provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+        vmh.create_addresses
       else
         Address.create_with_id(id, cidr: sshable_hostname, routed_to_host_id: id)
         AssignedHostAddress.create(ip: sshable_hostname, address_id: id, host_id: id)
