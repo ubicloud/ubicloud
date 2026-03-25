@@ -105,7 +105,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, extra_data: {queue_size: queued_vms.count, utilization:})
       end
 
-      nap 30
+      nap (30.0 / (1 + waiting_seconds / 120.0)).clamp(5, 30)
     end
 
     vm.nics.each(&:incr_vm_allocated)
