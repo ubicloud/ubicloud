@@ -376,6 +376,8 @@ class PostgresServer < Sequel::Model
     if Config.parseable_endpoint_override
       return {
         resource_id: resource.ubid,
+        instance: ubid,
+        server_role: primary? ? "primary" : "standby",
         version:,
         log_dir: "/dat/#{version}/data/pg_log",
         vector_version: Config.vector_version,
@@ -394,6 +396,8 @@ class PostgresServer < Sequel::Model
 
     {
       resource_id: resource.ubid,
+      instance: ubid,
+      server_role: primary? ? "primary" : "standby",
       version:,
       log_dir: "/dat/#{version}/data/pg_log",
       vector_version: Config.vector_version,

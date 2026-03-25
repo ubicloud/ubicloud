@@ -7,6 +7,8 @@ require_relative "../lib/vector_log_config"
 
 config = JSON.parse($stdin.read)
 resource_id = config["resource_id"]
+instance = config["instance"]
+server_role = config["server_role"]
 log_dir = config["log_dir"]
 vector_version = config["vector_version"]
 parseable_endpoint = config["parseable_endpoint"]
@@ -32,6 +34,8 @@ r "usermod -aG postgres ubi_monitoring"
 
 log_config = VectorLogConfig.new(
   resource_id: resource_id,
+  instance: instance,
+  server_role: server_role,
   log_dir: log_dir,
   parseable_endpoint: parseable_endpoint,
   parseable_username: parseable_username,
