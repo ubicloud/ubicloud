@@ -254,12 +254,20 @@ CONFIG
     vm.sshable.write_file("/home/prometheus/web-config.yml", web_config, user: "prometheus")
 
     metric_destinations = resource.metric_destinations.map {
-      <<METRIC_DESTINATION
+      if it.username == "__use_bearer_auth"
+        <<METRIC_DESTINATION
+- url: '#{it.url}'
+  authorization:
+    credentials: '#{it.password}'
+METRIC_DESTINATION
+      else
+        <<METRIC_DESTINATION
 - url: '#{it.url}'
   basic_auth:
     username: '#{it.username}'
     password: '#{it.password}'
 METRIC_DESTINATION
+      end
     }.prepend("remote_write:").join("\n")
 
     prometheus_config = <<CONFIG

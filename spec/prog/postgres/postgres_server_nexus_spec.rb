@@ -733,6 +733,46 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect { standby_nx.configure_metrics }.to hop("wait")
     end
+
+    it "uses bearer token auth when username is __use_bearer_auth" do
+      server
+      PostgresMetricDestination.create(
+        postgres_resource:,
+        url: "https://metrics.example.com/write",
+        username: "__use_bearer_auth",
+        password: "my_bearer_token"
+      )
+
+      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
+      standby_nx = described_class.new(standby.strand)
+      standby_server = standby_nx.postgres_server
+      standby_sshable = standby_server.vm.sshable
+      allow(Config).to receive(:postgres_otel_otlp_export_enabled).and_return(true)
+      expect(standby_nx).to receive(:setup_otel)
+
+      # Prometheus expectations - should contain authorization block, not basic_auth
+      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/web-config.yml > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo -u prometheus tee /home/prometheus/prometheus.yml > /dev/null", stdin: /remote_write:.*authorization:.*credentials:.*my_bearer_token/m)
+
+      # Configure metrics expectations
+      expect(standby_server).to receive(:metrics_config).and_return(metrics_config)
+      expect(standby_sshable).to receive(:_cmd).with("mkdir -p /home/ubi/postgres/metrics")
+      expect(standby_sshable).to receive(:_cmd).with("tee /home/ubi/postgres/metrics/config.json > /dev/null", stdin: metrics_config.to_json)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.service > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/postgres-metrics.timer > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo mkdir -p /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo chown ubi:ubi /var/lib/node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.service > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo tee /etc/systemd/system/pg-collect-metrics.timer > /dev/null", stdin: anything)
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl daemon-reload")
+
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload node_exporter || sudo systemctl restart node_exporter")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
+      expect(standby_sshable).to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
+
+      expect { standby_nx.configure_metrics }.to hop("wait")
+    end
   end
 
   describe "#setup_cloudwatch" do
