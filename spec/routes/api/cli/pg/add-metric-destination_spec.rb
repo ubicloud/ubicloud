@@ -23,7 +23,6 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     expect(md.username).to eq "foo"
     expect(md.password).to eq "bar"
     expect(md.url).to eq "https://baz.example.com"
-    expect(md.mtls).to be false
   end
 
   it "adds a bearer auth metric destination with 2 positional args" do
@@ -39,14 +38,5 @@ RSpec.describe Clover, "cli pg add-metric-destination" do
     expect(md.auth_type).to eq "bearer"
     expect(md.username).to be_nil
     expect(md.password).to eq "my_token"
-  end
-
-  it "adds a metric destination with mtls enabled" do
-    cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
-    pg = PostgresResource.first
-    cli(%w[pg eu-central-h1/test-pg add-metric-destination -m foo bar https://baz.example.com])
-    md = pg.metric_destinations.first
-    expect(md.mtls).to be true
-    expect(md.auth_type).to eq "basic"
   end
 end

@@ -31,7 +31,7 @@ class Serializers::Postgres < Serializers::Base
         hostname: pg.hostname,
         primary: pg.representative_server.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
-        metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_type: it.auth_type, mtls: it.mtls, username: it.username, url: it.url} },
+        metric_destinations: pg.metric_destinations.map { {id: it.ubid, auth_type: it.auth_type, username: it.username, url: it.url} },
         read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
       )
 

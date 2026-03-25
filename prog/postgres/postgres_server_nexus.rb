@@ -258,7 +258,6 @@ CONFIG
       else
         "  basic_auth:\n    username: '#{it.username}'\n    password: '#{it.password}'\n"
       end
-      config << "  tls_config:\n    cert_file: /etc/ssl/certs/client.crt\n    key_file: /etc/ssl/certs/client.key\n" if it.mtls
       config
     }.prepend("remote_write:").join("\n")
 

@@ -62,8 +62,8 @@ module Ubicloud
     end
 
     # Add a metric destination for this database. Returns a hash for the metric destination.
-    def add_metric_destination(url:, password:, auth_type: "basic", username: nil, mtls: false)
-      md = adapter.post(_path("/metric-destination"), url:, password:, auth_type:, username:, mtls:)
+    def add_metric_destination(url:, password:, auth_type: "basic", username: nil)
+      md = adapter.post(_path("/metric-destination"), url:, password:, auth_type:, username:)
 
       self[:metric_destinations]&.<<(md)
 

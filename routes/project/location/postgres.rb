@@ -253,7 +253,6 @@ class Clover
 
           password_param = (api? ? "password" : "metric-destination-password")
           auth_type = typecast_params.str("auth_type") || "basic"
-          mtls = typecast_params.bool("mtls") || false
 
           unless %w[basic bearer].include?(auth_type)
             raise Validation::ValidationFailed.new(auth_type: "must be 'basic' or 'bearer'")
@@ -269,7 +268,7 @@ class Clover
           Validation.validate_url(url)
 
           DB.transaction do
-            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, auth_type:, mtls:)
+            md = PostgresMetricDestination.create(postgres_resource_id: pg.id, url:, username:, password:, auth_type:)
             pg.servers.each(&:incr_configure_metrics)
             audit_log(md, "create", pg)
           end

@@ -1407,10 +1407,6 @@ paths:
                   enum:
                     - basic
                     - bearer
-                mtls:
-                  description: Require mTLS
-                  type: boolean
-                  default: false
                 password:
                   description: 'Password for basic auth, token for bearer auth'
                   type: string

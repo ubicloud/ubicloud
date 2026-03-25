@@ -623,7 +623,6 @@ Usage:
 
 Options:
     -a, --auth-type=type             authentication type (default: basic)
-    -m, --mtls                       enable mTLS using client certificates
 
 
 Add pgbouncer configuration entries to a PostgreSQL database

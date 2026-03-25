@@ -5,7 +5,6 @@ UbiCli.on("pg").run_on("add-metric-destination") do
 
   options("ubi pg (location/pg-name | pg-id) add-metric-destination [options] username password url", key: :md_opts) do
     on("-a", "--auth-type=type", %w[basic bearer], "authentication type (default: basic)")
-    on("-m", "--mtls", "enable mTLS using client certificates")
   end
 
   args(2..3)
@@ -24,7 +23,6 @@ UbiCli.on("pg").run_on("add-metric-destination") do
     body << "Current metric destinations:\n"
     data[:metric_destinations].each_with_index do |md, i|
       body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:auth_type]
-      body << "+mtls" if md[:mtls]
       body << "  " << md[:username] if md[:auth_type] == "basic"
       body << "  " << md[:url] << "\n"
     end
