@@ -153,6 +153,24 @@ class CloverAdmin < Roda
     end
   end
 
+  def format_bytes(bytes)
+    if bytes < 1024
+      "#{bytes.round}B"
+    elsif bytes < 1024**2
+      "#{(bytes / 1024.0).round(1)}KiB"
+    elsif bytes < 1024**3
+      "#{(bytes / 1024.0**2).round(1)}MiB"
+    else
+      "#{(bytes / 1024.0**3).round(1)}GiB"
+    end
+  end
+
+  def format_seconds(s)
+    m, s = s.divmod(60)
+    h, m = m.divmod(60)
+    "%02d:%02d:%02d" % [h, m, s]
+  end
+
   def available_classes
     classes = []
     Sequel::Model.subclasses.each do |c|

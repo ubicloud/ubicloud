@@ -1,0 +1,38 @@
+<%# locals: (obj:) %>
+
+<% query_metric = lambda do |tsdb_client, metric, resource_ubid|
+  next [] unless tsdb_client
+  query = metric.series[0].query.gsub("$ubicloud_resource_id", resource_ubid)
+  end_ts = Time.now.to_i
+  start_ts = end_ts - 6 * 3600
+  result = tsdb_client.query_range(query:, start_ts:, end_ts:)
+  next [] if result.empty?
+  result[0]["values"].map { |v| [v[0].to_f, v[1].to_f] }
+ rescue VictoriaMetrics::ClientError
+  []
+end
+
+tsdb_client = PostgresServer.victoria_metrics_client
+backlog_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:archival_backlog], obj.resource.ubid)
+lag_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:wal_lag], obj.resource.ubid)
+replay_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:replay_lag], obj.resource.ubid) if obj.standby? || obj.read_replica?
+
+nonce = SecureRandom.hex(32)
+content_security_policy.add_img_src [:nonce, nonce] %>
+
+<div class="chart-grid">
+  <div class="chart-cell">
+    <h3>Archival Backlog</h3>
+    <%== part("components/svg_chart", points: backlog_points, nonce:) %>
+  </div>
+  <div class="chart-cell">
+    <h3>WAL Lag</h3>
+    <%== part("components/svg_chart", points: lag_points, nonce:) { format_bytes(it) } %>
+  </div>
+  <% if replay_points %>
+    <div class="chart-cell">
+      <h3>Replay Lag</h3>
+      <%== part("components/svg_chart", points: replay_points, nonce:) { format_seconds(it) } %>
+    </div>
+  <% end %>
+</div>

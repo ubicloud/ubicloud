@@ -1729,4 +1729,54 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to eq []
     end
   end
+
+  describe "format_bytes" do
+    let(:app) { described_class.allocate }
+
+    it "formats bytes" do
+      expect(app.format_bytes(0)).to eq "0B"
+      expect(app.format_bytes(1023)).to eq "1023B"
+    end
+
+    it "formats kibibytes" do
+      expect(app.format_bytes(1024)).to eq "1.0KiB"
+      expect(app.format_bytes(1600)).to eq "1.6KiB"
+      expect(app.format_bytes(1024**2 - 1)).to eq "1024.0KiB"
+    end
+
+    it "formats mebibytes" do
+      expect(app.format_bytes(1024**2)).to eq "1.0MiB"
+      expect(app.format_bytes(1024**2 * 5.55)).to eq "5.6MiB"
+      expect(app.format_bytes(1024**3 - 1)).to eq "1024.0MiB"
+    end
+
+    it "formats gibibytes" do
+      expect(app.format_bytes(1024**3)).to eq "1.0GiB"
+      expect(app.format_bytes(1024**3 * 2.25)).to eq "2.3GiB"
+    end
+  end
+
+  describe "format_seconds" do
+    let(:app) { described_class.allocate }
+
+    it "formats zero" do
+      expect(app.format_seconds(0)).to eq "00:00:00"
+    end
+
+    it "formats seconds only" do
+      expect(app.format_seconds(45)).to eq "00:00:45"
+    end
+
+    it "formats minutes and seconds" do
+      expect(app.format_seconds(125)).to eq "00:02:05"
+    end
+
+    it "formats hours, minutes, and seconds" do
+      expect(app.format_seconds(3661)).to eq "01:01:01"
+    end
+
+    it "format allows for more than 2 digits in hour" do
+      expect(app.format_seconds(999999)).to eq "277:46:39"
+    end
+  end
 end
