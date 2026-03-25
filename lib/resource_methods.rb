@@ -137,12 +137,8 @@ module ResourceMethods
       if arg.is_a?(UBID)
         super(arg.to_uuid)
       elsif arg.is_a?(String) && arg.bytesize == 26
-        begin
-          ubid = UBID.parse(arg)
-        rescue UBIDParseError
-          nil
-        else
-          super(ubid.to_uuid)
+        if (uuid = UBID.to_uuid(arg))
+          super(uuid)
         end
       else
         super
