@@ -1305,5 +1305,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "JSON::ParserError")})
       nx.log_vm_stats
     end
+
+    it "skips if the vm doesn't allocated yet" do
+      vm.update(vm_host_id: nil)
+      expect(nx).to receive(:host).and_return(nil).at_least(:once)
+      expect(sshable).not_to receive(:_cmd)
+      nx.log_vm_stats
+    end
   end
 end

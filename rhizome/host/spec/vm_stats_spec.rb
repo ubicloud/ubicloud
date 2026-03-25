@@ -18,9 +18,12 @@ RSpec.describe VmStats do
   describe "#collect" do
     it "collects stats for the VM and its disks" do
       stub_unit_property("vmh6b1sz", "MainPID", "3373")
+      stub_unit_property("vmh6b1sz", "ActiveEnterTimestampMonotonic", "31554196")
       stub_unit_property("vmh6b1sz-0-storage", "MainPID", "3350")
       stub_unit_property("vmh6b1sz-0-storage", "MemoryPeak", "51892224")
       stub_unit_property("vmh6b1sz-0-storage", "MemorySwapPeak", "123879")
+      stub_unit_property("vmh6b1sz-0-storage", "ActiveEnterTimestampMonotonic", "31534196")
+      allow(Process).to receive(:clock_gettime).with(Process::CLOCK_MONOTONIC).and_return(1616.0)
       expect(File).to receive(:read).with("/proc/3373/stat").and_return("3373 (cloud-hyperviso) S 1 3373 3373 0 -1 4194560 1163 0 0 0 95143 16431 0 0 20 0 13 0 3364 8618754048 960 18446744073709551615 135770696667136 135770699811150 140729095742720 0 0 0 134234114 69632 1073759298 0 0 0 17 7 0 0 0 89566 0 135770700348320 135770700898816 93826017284096 140729095744653 140729095745099 140729095745099 140729095745483 0")
       expect(File).to receive(:read).with("/proc/3350/stat").and_return("3350 (vhost-backend) S 1 3350 3350 0 -1 4194560 15183 45 31 0 16602 733 0 0 20 0 7 0 3351 17248038912 10371 18446744073709551615 140535920156672 140535933113610 140725366025408 0 0 0 0 4096 1088 0 0 0 17 7 0 0 0 0 0 140535936046520 140535939797664 93825003057152 140725366033855 140725366033953 140725366033953 140725366034378 0")
       expect(File).to receive(:foreach).with("/proc/3350/io")
@@ -34,6 +37,7 @@ RSpec.describe VmStats do
 
       expect(File).to receive(:read).with("/vm/vmh6b1sz/prep.json").and_return(JSON.generate(
         {
+          "max_vcpus" => 8,
           "storage_volumes" => [
             {
               "boot" => true,
@@ -41,7 +45,10 @@ RSpec.describe VmStats do
               "image_version" => "20250502.1",
               "encrypted" => true,
               "disk_index" => 0,
-              "vhost_block_backend_version" => "v0.4.0"
+              "vhost_block_backend_version" => "v0.4.0",
+              "num_queues" => 4,
+              "queue_size" => 64,
+              "size_gib" => 20
             },
             {
               "disk_index" => 1,
@@ -55,6 +62,8 @@ RSpec.describe VmStats do
         {
           "vm" => {
             "main_pid" => "3373",
+            "vcpus" => 8,
+            "active_age_ms" => 1584446,
             "cpu_stats" => {
               "user_time_ms" => 951430,
               "system_time_ms" => 164310,
@@ -65,6 +74,11 @@ RSpec.describe VmStats do
             "main_pid" => "3350",
             "memory_peak_bytes" => 51892224,
             "memory_swap_peak_bytes" => 123879,
+            "vhost_block_backend_version" => "v0.4.0",
+            "num_queues" => 4,
+            "queue_size" => 64,
+            "size_gib" => 20,
+            "active_age_ms" => 1584466,
             "cpu_stats" => {
               "user_time_ms" => 166020,
               "system_time_ms" => 7330,
@@ -114,17 +128,20 @@ RSpec.describe VmStats do
   end
 
   describe "#ubiblk_disks" do
-    it "returns the list of disk indices for ubiblk disks" do
+    it "returns the list of disk hashes for ubiblk disks" do
       expect(File).to receive(:read).with("/vm/vmh6b1sz/prep.json").and_return(
         JSON.generate({
           "storage_volumes" => [
-            {"disk_index" => 0, "vhost_block_backend_version" => "v0.1"},
+            {"disk_index" => 0, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 20},
             {"disk_index" => 1},
-            {"disk_index" => 2, "vhost_block_backend_version" => "v0.1"}
+            {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40}
           ]
         })
       )
-      expect(vm_stats.ubiblk_disks).to eq([0, 2])
+      expect(vm_stats.ubiblk_disks).to eq([
+        {"disk_index" => 0, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 20},
+        {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40}
+      ])
     end
   end
 end

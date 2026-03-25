@@ -7,6 +7,19 @@ class BillingRecord < Sequel::Model
 
   dataset_module do
     where(:active, Sequel.function(:upper, :span) => nil)
+
+    def overlapping(start_time, end_time)
+      where(Sequel.pg_range(:span).overlaps(start_time...end_time))
+    end
+
+    def with_tag(key, value)
+      where(Sequel.pg_jsonb_op(:resource_tags).contains({key => value}))
+    end
+
+    def distinct_by_resource
+      distinct(:resource_id)
+        .order(:resource_id, Sequel.desc(Sequel.function(:lower, :span)))
+    end
   end
 
   plugin ResourceMethods

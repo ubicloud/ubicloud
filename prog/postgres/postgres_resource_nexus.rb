@@ -252,19 +252,23 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         postgres_resource.active_billing_records.each(&:finalize)
 
         new_billing_records.each do |br|
-          BillingRecord.create(
-            project_id: postgres_resource.project_id,
-            resource_id: postgres_resource.id,
-            resource_name: postgres_resource.name,
-            billing_rate_id: br[:billing_rate_id],
-            amount: br[:amount]
-          )
+          create_billing_record(billing_rate_id: br[:billing_rate_id], amount: br[:amount])
         end
       end
     end
 
     decr_initial_provisioning
     hop_wait
+  end
+
+  def create_billing_record(billing_rate_id:, amount:)
+    BillingRecord.create(
+      project_id: postgres_resource.project_id,
+      resource_id: postgres_resource.id,
+      resource_name: postgres_resource.name,
+      billing_rate_id:,
+      amount:
+    )
   end
 
   label def wait

@@ -12,6 +12,7 @@ class Prog::InstallRhizome < Prog::Base
 
   label def start
     tar = StringIO.new
+    tar.binmode
     file_hash_map = {} # pun intended
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"

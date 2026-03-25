@@ -157,6 +157,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
+      expect(@pg_strand.subject.timeline.strand.semaphores.map(&:name)).to include("destroy")
     end
   end
 

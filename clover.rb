@@ -357,7 +357,8 @@ class Clover < Roda
 
     # :nocov:
     unless Config.development?
-      enable :disallow_common_passwords, :verify_account
+      enable :disallow_common_passwords, :verify_account,
+        :reset_password_verifies_account
 
       email_from Config.mail_from
 
