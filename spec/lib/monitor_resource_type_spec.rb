@@ -220,6 +220,37 @@ RSpec.describe MonitorResourceType do
   describe "#scan with host attached types" do
     entire_range = "00000000-0000-0000-0000-000000000000".."ffffffff-ffff-ffff-ffff-ffffffffffff"
 
+    it "handles error when creating metrics target resource" do
+      mrt = @mrt = described_class.create(MetricsTargetResource, [5, "stuck", :stuck], 2, [VmHost])
+      create_vm_host
+      expect(VictoriaMetricsResource).to receive(:client_for_project).and_raise(RuntimeError)
+      expect(Clog).to receive(:emit).with("Monitor object initialization has failed.", instance_of(Hash)).and_call_original
+      expect(mrt.resources).to eq({})
+      mrt.scan(entire_range)
+      expect(mrt.resources.keys).to eq []
+      expect(mrt.resources.values.map(&:resource)).to eq []
+    end
+
+    it "handles error when creating attached resource" do
+      c = Class.new(MonitorableResource) do
+        n = 0
+        define_method(:initialize) do |resource|
+          n += 1
+          raise if n > 1
+          super(resource)
+        end
+      end
+      mrt = @mrt = described_class.create(c, [5, "stuck", :stuck], 2, [VmHost], host_attached_types: [Vm])
+      vm_host = create_vm_host
+      create_vm(vm_host_id: vm_host.id)
+      expect(Clog).to receive(:emit).with("Monitor object initialization has failed.", instance_of(Hash)).and_call_original
+      expect(mrt.resources).to eq({})
+      mrt.scan(entire_range)
+      attached_resources = mrt.resources[vm_host.id].attached_resources
+      expect(attached_resources.keys).to eq []
+      expect(attached_resources.values.map(&:resource)).to eq []
+    end
+
     it "works as expected" do
       vm_host = create_vm_host
       vm_host2 = create_vm_host
