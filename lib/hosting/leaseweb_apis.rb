@@ -28,7 +28,7 @@ class Hosting::LeasewebApis
     )
 
     data = JSON.parse(response.body)
-    data.dig("networkInterfaces", "public", "ip")
+    strip_cidr(data.dig("networkInterfaces", "public", "ip"))
   end
 
   def create_connection
@@ -68,13 +68,13 @@ class Hosting::LeasewebApis
     public_ips = ips.select { |ip| ip["networkType"] == "PUBLIC" && ip["type"] == "NORMAL_IP" }
 
     main_ip_entry = public_ips.find { |ip| ip["mainIp"] }
-    main_ip4 = main_ip_entry&.dig("ip")
+    main_ip4 = strip_cidr(main_ip_entry&.dig("ip"))
 
     result = []
     subnet_groups = {}
 
     public_ips.each do |ip_entry|
-      ip = ip_entry["ip"]
+      ip = strip_cidr(ip_entry["ip"])
       prefix = ip_entry["prefixLength"]
       gateway = ip_entry["gateway"]
       is_main = ip_entry["mainIp"]
@@ -121,6 +121,11 @@ class Hosting::LeasewebApis
     end
 
     result
+  end
+
+  def strip_cidr(ip)
+    return nil if ip.nil?
+    ip.split("/").first
   end
 
   def gateway_present?(gateway)

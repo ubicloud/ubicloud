@@ -34,10 +34,19 @@ RSpec.describe Hosting::LeasewebApis do
     it "returns the main IPv4 address" do
       stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/91478")
         .to_return(status: 200, body: JSON.dump({
-          "networkInterfaces" => {"public" => {"ip" => "23.105.171.112"}}
+          "networkInterfaces" => {"public" => {"ip" => "23.105.171.112/26"}}
         }))
 
       expect(leaseweb_apis.get_main_ip4).to eq("23.105.171.112")
+    end
+
+    it "strips the CIDR suffix from the IP" do
+      stub_request(:get, "https://api.leaseweb.com/bareMetals/v2/servers/91478")
+        .to_return(status: 200, body: JSON.dump({
+          "networkInterfaces" => {"public" => {"ip" => "192.168.1.1/24"}}
+        }))
+
+      expect(leaseweb_apis.get_main_ip4).to eq("192.168.1.1")
     end
 
     it "raises an error on failure" do
@@ -56,7 +65,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 1}
         }))
@@ -75,7 +84,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
@@ -84,7 +93,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 50})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.176.1", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.176.1/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
@@ -98,8 +107,8 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "10.0.0.1", "prefixLength" => 24, "gateway" => "10.0.0.254", "mainIp" => false, "networkType" => "REMOTE_MANAGEMENT", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "10.0.0.1/24", "prefixLength" => 24, "gateway" => "10.0.0.254", "mainIp" => false, "networkType" => "REMOTE_MANAGEMENT", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
@@ -114,12 +123,12 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.0", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NETWORK"},
-            {"ip" => "23.105.176.6", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "GATEWAY"},
-            {"ip" => "23.105.176.7", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "BROADCAST"},
-            {"ip" => "23.105.176.4", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "ROUTER1"},
-            {"ip" => "23.105.176.5", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "ROUTER2"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.0/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NETWORK"},
+            {"ip" => "23.105.176.6/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "GATEWAY"},
+            {"ip" => "23.105.176.7/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "BROADCAST"},
+            {"ip" => "23.105.176.4/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "ROUTER1"},
+            {"ip" => "23.105.176.5/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "ROUTER2"}
           ],
           "_metadata" => {"totalCount" => 6}
         }))
@@ -134,8 +143,8 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "2607:f5b7:1:30:9::_112", "prefixLength" => 64, "gateway" => "2607:f5b7:1:30::1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "2607:f5b7:1:30:9::_112/64", "prefixLength" => 64, "gateway" => "2607:f5b7:1:30::1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
@@ -154,7 +163,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 1}
         }))
@@ -170,8 +179,8 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "5.6.7.8", "prefixLength" => 24, "gateway" => "5.6.7.1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "5.6.7.8/24", "prefixLength" => 24, "gateway" => "5.6.7.1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
@@ -188,10 +197,10 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.1", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.2", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.3", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.1/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.2/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.3/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 4}
         }))
@@ -210,7 +219,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 1}
         }))
@@ -224,7 +233,7 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => nil, "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => nil, "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 1}
         }))
@@ -238,10 +247,10 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "2607:f5b7:1:30:9::_112", "prefixLength" => 64, "gateway" => "2607:f5b7:1:30::1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.1", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "23.105.176.2", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "2607:f5b7:1:30:9::_112/64", "prefixLength" => 64, "gateway" => "2607:f5b7:1:30::1", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.1/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "23.105.176.2/29", "prefixLength" => 29, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 4}
         }))
@@ -279,8 +288,8 @@ RSpec.describe Hosting::LeasewebApis do
         .with(query: {limit: 50, offset: 0})
         .to_return(status: 200, body: JSON.dump({
           "ips" => [
-            {"ip" => "23.105.171.112", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
-            {"ip" => "2607:f5b7:1:30:9::_112", "prefixLength" => 64, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
+            {"ip" => "23.105.171.112/26", "prefixLength" => 26, "gateway" => "23.105.171.126", "mainIp" => true, "networkType" => "PUBLIC", "type" => "NORMAL_IP"},
+            {"ip" => "2607:f5b7:1:30:9::_112/64", "prefixLength" => 64, "gateway" => "", "mainIp" => false, "networkType" => "PUBLIC", "type" => "NORMAL_IP"}
           ],
           "_metadata" => {"totalCount" => 2}
         }))
