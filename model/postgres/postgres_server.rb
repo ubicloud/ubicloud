@@ -378,6 +378,7 @@ class PostgresServer < Sequel::Model
         resource_id: resource.ubid,
         version:,
         log_dir: "/dat/#{version}/data/pg_log",
+        vector_version: Config.vector_version,
         parseable_endpoint: Config.parseable_endpoint_override,
         parseable_username: Config.parseable_admin_user || "admin",
         parseable_password: Config.parseable_admin_password || "password",
@@ -395,7 +396,9 @@ class PostgresServer < Sequel::Model
       resource_id: resource.ubid,
       version:,
       log_dir: "/dat/#{version}/data/pg_log",
+      vector_version: Config.vector_version,
       parseable_endpoint: ps.endpoint,
+      parseable_server_name: pr.hostname,
       parseable_username: pr.admin_user,
       parseable_password: pr.admin_password,
       parseable_ca_bundle: pr.root_certs

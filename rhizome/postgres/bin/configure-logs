@@ -5,87 +5,122 @@ require "json"
 require_relative "../../common/lib/util"
 
 config = JSON.parse($stdin.read)
-version = config["version"]
 resource_id = config["resource_id"]
 log_dir = config["log_dir"]
+vector_version = config["vector_version"]
 parseable_endpoint = config["parseable_endpoint"]
 parseable_username = config["parseable_username"]
 parseable_password = config["parseable_password"]
 parseable_ca_bundle = config["parseable_ca_bundle"]
+parseable_server_name = config["parseable_server_name"]
 
-begin
-  r "dpkg -s syslog-ng syslog-ng-mod-http"
-rescue CommandFail
-  r "apt-get update -qq"
-  r "apt-get install -y -q syslog-ng syslog-ng-mod-http"
+vector_current = begin
+  r("vector --version")
+rescue
+  ""
+end
+unless vector_current.start_with?("vector #{vector_version}")
+  r "wget -q https://github.com/vectordotdev/vector/releases/download/v#{vector_version}/vector-#{vector_version}-x86_64-unknown-linux-gnu.tar.gz -O /tmp/vector.tar.gz"
+  r "tar -xzf /tmp/vector.tar.gz --strip-components=3 -C /usr/local/bin ./vector-x86_64-unknown-linux-gnu/bin/vector"
+  r "chmod +x /usr/local/bin/vector"
+  r "rm /tmp/vector.tar.gz"
 end
 
 r "usermod -aG postgres ubi_monitoring"
 
-if parseable_ca_bundle
-  r "mkdir -p /etc/syslog-ng/certs"
-  safe_write_to_file("/etc/syslog-ng/certs/parseable-ca.crt", parseable_ca_bundle)
+use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
+
+if use_tls
+  r "mkdir -p /etc/vector/certs"
+  safe_write_to_file("/etc/vector/certs/parseable-ca.crt", parseable_ca_bundle)
 end
 
-use_tls = parseable_ca_bundle && parseable_endpoint.start_with?("https://")
-tls_block = use_tls ? %( tls(ca-file("/etc/syslog-ng/certs/parseable-ca.crt") peer-verify(yes))) : ""
-
-tls_curl_flag = use_tls ? "--cacert /etc/syslog-ng/certs/parseable-ca.crt" : "-k"
+tls_curl_flag = use_tls ? "--cacert /etc/vector/certs/parseable-ca.crt" : "-k"
 r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{resource_id}' || true"
 
-http_destination = lambda { |label, body|
-  <<~DEST
-    destination d_parseable_#{label} {
-      http(
-        url("#{parseable_endpoint}/api/v1/logstream/#{resource_id}")
-        method("POST")
-        user("#{parseable_username}")
-        password("#{parseable_password}")
-        headers("Content-Type: application/json")
-        body(#{body})
-        persist-name("parseable_#{label}")
-        workers(1)
-        batch-lines(1)
-        batch-timeout(10000)
-        timeout(30)
-        retries(3)
-        #{tls_block}
-      );
-    };
-  DEST
-}
+tls_section = if use_tls
+  server_name_config = parseable_server_name ? "server_name = \"#{parseable_server_name}\"\nverify_hostname = false\n" : nil
+  <<~TLS
+    [sinks.parseable.tls]
+    ca_file = "/etc/vector/certs/parseable-ca.crt"
+    #{server_name_config}
+  TLS
+else
+  ""
+end
 
-syslog_ng_conf = <<~CONF
-  options {
-    keep-hostname(yes);
-    use-fqdn(no);
-  };
+vector_conf = <<~CONF
+  data_dir = "/var/lib/vector"
 
-  source s_pglog {
-    wildcard-file(
-      base-dir("#{log_dir}")
-      filename-pattern("postgresql-*.json")
-      flags(no-parse)
-      follow-freq(5)
-    );
-  };
+  [sources.pglog]
+  type = "file"
+  include = ["#{log_dir}/postgresql-*.json"]
 
-  filter f_postgres_units {
-    match("postgresql@" value(".journald._SYSTEMD_UNIT")) or
-    match("pgbouncer@" value(".journald._SYSTEMD_UNIT")) or
-    match("upgrade_postgres" value(".journald._SYSTEMD_UNIT"));
-  };
+  [transforms.parse_pglog]
+  type = "remap"
+  inputs = ["pglog"]
+  source = '. = parse_json!(.message)'
 
-  #{http_destination.call("pglog", '"[${MESSAGE}]"')}
-  #{http_destination.call("journal", %('[{"stream":"journal","ts":"${ISODATE}","unit":"${PROGRAM}","priority":${LEVEL_NUM},"msg":"${MSG}"}]'))}
+  [sources.journal]
+  type = "journald"
 
-  log { source(s_pglog); destination(d_parseable_pglog); };
-  log { source(s_src); filter(f_postgres_units); destination(d_parseable_journal); };
+  [transforms.filter_journal]
+  type = "filter"
+  inputs = ["journal"]
+  condition = '''
+  unit = string(._SYSTEMD_UNIT) ?? ""
+  starts_with(unit, "postgresql@") || starts_with(unit, "pgbouncer@") || starts_with(unit, "upgrade_postgres")
+  '''
+
+  [transforms.format_journal]
+  type = "remap"
+  inputs = ["filter_journal"]
+  source = '''
+  .stream = "journal"
+  .ts = .timestamp
+  .unit = del(._SYSTEMD_UNIT)
+  .msg = del(.message)
+  '''
+
+  [sinks.parseable]
+  type = "http"
+  inputs = ["parse_pglog", "format_journal"]
+  uri = "#{parseable_endpoint}/api/v1/logstream/#{resource_id}"
+  method = "post"
+  encoding.codec = "json"
+
+  [sinks.parseable.batch]
+  max_events = 200
+  timeout_secs = 10
+
+  [sinks.parseable.auth]
+  strategy = "basic"
+  user = "#{parseable_username}"
+  password = "#{parseable_password}"
+
+  #{tls_section}
 CONF
 
-safe_write_to_file("/etc/syslog-ng/conf.d/postgres.conf", syslog_ng_conf)
+r "mkdir -p /etc/vector /var/lib/vector"
+safe_write_to_file("/etc/vector/postgres.toml", vector_conf)
 
-r "sed -i 's/^#SYSLOGNG_OPTS=.*/SYSLOGNG_OPTS=\"--no-caps\"/' /etc/default/syslog-ng"
+vector_service = <<~SERVICE
+  [Unit]
+  Description=Vector log shipper for PostgreSQL
+  After=network.target
 
-r "systemctl enable syslog-ng --now"
-r("systemctl restart syslog-ng", expect: [0, 1])
+  [Service]
+  Type=simple
+  User=root
+  ExecStart=/usr/local/bin/vector --config /etc/vector/postgres.toml
+  Restart=on-failure
+  RestartSec=5
+
+  [Install]
+  WantedBy=multi-user.target
+SERVICE
+
+safe_write_to_file("/etc/systemd/system/vector-postgres.service", vector_service)
+r "systemctl daemon-reload"
+r "systemctl enable vector-postgres --now"
+r "systemctl restart vector-postgres"
