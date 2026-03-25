@@ -110,7 +110,7 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
 
       type.where_each(id: id_range) do
         unless (v = resources[it.id])
-          v = wrapper_class.new(it)
+          next unless (v = new_wrapped_object(it))
           new_resources << v
         end
         scanned_resources[it.id] = v
@@ -131,7 +131,9 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
           old_attached_resources = host.attached_resources
           host.attached_resources_sync do
             vms.each do
-              new_attached_resources[it.id] = old_attached_resources[it.id] || wrapper_class.new(it)
+              if (wrapped_object = old_attached_resources[it.id] || new_wrapped_object(it))
+                new_attached_resources[it.id] = wrapped_object
+              end
             end
             host.attached_resources.replace(new_attached_resources)
           end
@@ -187,5 +189,14 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
       end
       run_queue[0]&.monitor_job_finished_at
     end
+  end
+
+  private
+
+  def new_wrapped_object(obj)
+    wrapper_class.new(obj)
+  rescue => ex
+    Clog.emit("Monitor object initialization has failed.", {monitor_object_initialization_failure: Util.exception_to_hash(ex, into: {ubid: obj.ubid})})
+    nil
   end
 end
