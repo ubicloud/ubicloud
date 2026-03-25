@@ -7,7 +7,7 @@ class OidcProvider < Sequel::Model
   one_to_many :locked_domains, remover: nil, clearer: nil
 
   def self.name_for_ubid(ubid)
-    OidcProvider[UBID.to_uuid(ubid)]&.display_name
+    self[ubid]&.display_name
   end
 
   # Register a new OIDC Provider using their OIDC discovery information.
