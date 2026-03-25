@@ -300,6 +300,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "creates a page if no capacity left and naps" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+      vm.created_at = Time.now - 11 * 60
       expect(vm.waiting_for_capacity_set?).to be(false)
       expect { nx.start }.to nap(30)
       expect(vm.reload.waiting_for_capacity_set?).to be(true)
@@ -307,22 +308,50 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
+      vm.created_at = Time.now - 11 * 60
       expect(nx).not_to receive(:incr_waiting_for_capacity)
       expect { nx.start }.to nap(30)
       expect(Page.count).to eq(1)
     end
 
-    it "waits for a while before creating a page for github-runners" do
+    it "does not create a page if VM has been waiting less than 10 minutes" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
 
-      vm.created_at = Time.now - 10 * 60
-      vm.location_id = Location[name: "github-runners"].id
+      vm.created_at = Time.now + 10
       expect { nx.start }.to nap(30)
       expect(Page.count).to eq(0)
     end
 
+    it "waits 1 hour before creating a page for github-runners" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+
+      vm.created_at = Time.now - 11 * 60
+      vm.location_id = Location[name: "github-runners"].id
+      expect { nx.start }.to nap(30)
+      expect(Page.count).to eq(0)
+
+      vm.created_at = Time.now - 61 * 60
+      expect { nx.start }.to nap(30)
+      expect(Page.count).to eq(1)
+    end
+
+    it "waits 6 hours before creating a page for standard-60 github-runners" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+
+      vm.vcpus = 60
+      vm.created_at = Time.now - 2 * 60 * 60
+      vm.location_id = Location[name: "github-runners"].id
+      expect { nx.start }.to nap(30)
+      expect(Page.count).to eq(0)
+
+      vm.created_at = Time.now - 7 * 60 * 60
+      expect { nx.start }.to nap(30)
+      expect(Page.count).to eq(1)
+    end
+
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
+      vm.created_at = Time.now - 11 * 60
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
       expect { nx.start }.to nap(30)
       expect(Page.count).to eq(1)

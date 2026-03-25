@@ -94,7 +94,13 @@ class Prog::Vm::Metal::Nexus < Prog::Base
 
       Clog.emit("No capacity left", {lack_of_capacity: {location: Location[vm.location_id].name, arch: vm.arch, family: vm.family, queue_size: queued_vms.count}})
 
-      unless Location[vm.location_id].name == "github-runners" && vm.created_at > Time.now - 60 * 60
+      waiting_seconds = Time.now - vm.created_at
+      page_after_minutes = if vm.location_id == Location::GITHUB_RUNNERS_ID
+        (vm.vcpus == 60) ? (6 * 60) : 60
+      else
+        10
+      end
+      if waiting_seconds >= page_after_minutes * 60
         utilization = VmHost.where(allocation_state: "accepting", arch: vm.arch).select_map { sum(:used_cores) * 100.0 / sum(:total_cores) }.first.to_f
         Prog::PageNexus.assemble("No capacity left at #{Location[vm.location_id].display_name} for #{vm.family} family of #{vm.arch}", ["NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family], queued_vms.limit(25).select_map(Sequel[:vm][:id]).map { UBID.to_ubid(it) }, extra_data: {queue_size: queued_vms.count, utilization:})
       end
