@@ -29,7 +29,7 @@ class Prog::LearnNetwork < Prog::Base
   end
 
   label def leaseweb_learn_ipv6
-    adr = vm_host.assigned_subnets.find { |a| a.cidr.version == 6 }
+    adr = vm_host.assigned_subnets.select { |a| a.cidr.version == 6 }.min_by { |a| a.cidr.netmask.prefix_len }
 
     if adr
       vm_host.update(
@@ -71,16 +71,11 @@ class Prog::LearnNetwork < Prog::Base
   def parse_ip_addr_j(s)
     case s
     in [iface]
-      case iface.fetch("addr_info").filter_map { |info|
-             if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 112
-               Ip6.new(local, prefixlen)
-             end
-           }
-      in [net6]
-        net6
-      else
-        fail "only one global unique address prefix supported on interface"
-      end
+      iface.fetch("addr_info").filter_map { |info|
+        if (local = info["local"]) && (prefixlen = info["prefixlen"]) && prefixlen <= 112
+          Ip6.new(local, prefixlen)
+        end
+      }.min_by(&:prefixlen)
     in []
       nil
     else

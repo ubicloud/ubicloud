@@ -143,6 +143,22 @@ JSON
       expect(leaseweb_vm_host.net6.to_s).to eq("2607:f5b7:1:30:9::/112")
     end
 
+    it "picks the largest ipv6 subnet when multiple are assigned" do
+      leaseweb_ips_multi_v6 = [
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "23.105.171.112/32", source_host_ip: "23.105.171.112", is_failover: false, gateway: "23.105.171.126", mask: 26),
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "2607:f5b7:1:30:9::/112", source_host_ip: "23.105.171.112", is_failover: false, gateway: "2607:f5b7:1:30::1", mask: 112),
+        Hosting::LeasewebApis::IpInfo.new(ip_address: "2607:f5b7:1:30:9::/64", source_host_ip: "23.105.171.112", is_failover: false, gateway: "2607:f5b7:1:30::1", mask: 64)
+      ]
+      expect(Hosting::Apis).to receive(:pull_ips).and_return(leaseweb_ips_multi_v6)
+      vmh = Prog::Vm::HostNexus.assemble("23.105.171.112", provider_name: HostProvider::LEASEWEB_PROVIDER_NAME, server_identifier: "91480").subject
+      ln = described_class.new(Strand.new(stack: [{"subject_id" => vmh.id}]))
+
+      expect { ln.leaseweb_learn_ipv6 }.to exit({"msg" => "learned network information"})
+      vmh.reload
+      expect(vmh.ip6.to_s).to eq("2607:f5b7:1:30::1")
+      expect(vmh.net6.to_s).to eq("2607:f5b7:1:30::/64")
+    end
+
     it "pops without setting ipv6 when no ipv6 subnet assigned" do
       leaseweb_ips_no_v6 = [
         Hosting::LeasewebApis::IpInfo.new(ip_address: "23.105.171.112/32", source_host_ip: "23.105.171.112", is_failover: false, gateway: "23.105.171.126", mask: 26)
@@ -174,7 +190,7 @@ JSON
       }.to raise_error RuntimeError, "only one interface supported"
     end
 
-    it "crashes if more than one global unique address prefix is provided" do
+    it "picks the largest prefix when multiple global unique address prefixes are provided" do
       json = JSON.parse(<<~JSON)
         [
           {
@@ -182,18 +198,19 @@ JSON
             "addr_info": [
               {
                 "local": "2a01:4f8:173:1ed3::2",
-                "prefixlen": 64
+                "prefixlen": 112
               },
               {
-                "local": "2a01:4f8:173:1ed3::3",
+                "local": "2a01:4f8:173:1ed3::",
                 "prefixlen": 64
               }
             ]
           }
         ]
       JSON
-      expect { lm.parse_ip_addr_j(json) }
-        .to raise_error RuntimeError, "only one global unique address prefix supported on interface"
+      result = lm.parse_ip_addr_j(json)
+      expect(result.addr).to eq("2a01:4f8:173:1ed3::")
+      expect(result.prefixlen).to eq(64)
     end
   end
 end
