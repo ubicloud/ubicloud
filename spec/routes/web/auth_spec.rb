@@ -674,8 +674,7 @@ RSpec.describe Clover, "auth" do
 
       create_account
 
-      visit "/login"
-      click_link "Forgot your password?"
+      visit "/reset-password-request"
       fill_in "Email Address", with: TEST_USER_EMAIL
       click_button "Request Password Reset"
 
