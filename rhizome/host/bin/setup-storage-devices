@@ -1,0 +1,104 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+require "json"
+require "fileutils"
+
+# Identifies non-OS, non-RAID storage devices, creates GPT partition tables,
+# formats with ext4, mounts at /var/storage/devices/disk{N}, and updates fstab.
+# Idempotent: safe to re-run — skips already-partitioned/mounted devices.
+
+STORAGE_BASE = "/var/storage/devices"
+
+def root_device
+  # Find the device backing the root filesystem
+  output = r("findmnt -n -o SOURCE /")
+  source = output.strip
+  # Strip partition suffix to get the base device: /dev/sda1 -> /dev/sda, /dev/nvme0n1p1 -> /dev/nvme0n1
+  source.sub(/p?\d+$/, "")
+end
+
+def raid_devices
+  # Find devices that are part of RAID arrays
+  return [] unless File.exist?("/proc/mdstat")
+  mdstat = File.read("/proc/mdstat")
+  mdstat.scan(/\b(sd[a-z]+|nvme\d+n\d+)\b/).flatten.uniq.map { |d| "/dev/#{d}" }
+end
+
+def all_block_devices
+  # List all non-loopback, non-dm, non-md block devices (whole disks only)
+  output = r("lsblk -d -n -o NAME,TYPE -J")
+  devices = JSON.parse(output)["blockdevices"]
+  devices
+    .select { |d| d["type"] == "disk" }
+    .map { |d| "/dev/#{d["name"]}" }
+end
+
+def already_mounted?(device)
+  output = r("lsblk -n -o MOUNTPOINT #{device}")
+  output.strip.split("\n").any? { |line| !line.strip.empty? }
+end
+
+def setup_device(device, disk_number)
+  partition = partition_path(device)
+  mount_point = "#{STORAGE_BASE}/disk#{disk_number}"
+
+  # Create GPT partition table with a single partition
+  r("parted -s #{device} mklabel gpt")
+  r("parted -s #{device} mkpart primary ext4 0% 100%")
+
+  # Wait for partition device to appear
+  r("udevadm settle --timeout=10")
+
+  # Format with ext4
+  r("mkfs.ext4 -F #{partition}")
+
+  # Create mount point and mount
+  FileUtils.mkdir_p(mount_point)
+  r("mount #{partition} #{mount_point}")
+
+  # Add fstab entry using UUID for persistence
+  uuid = r("blkid -s UUID -o value #{partition}").strip
+  fstab_entry = "UUID=#{uuid} #{mount_point} ext4 defaults,nofail 0 2"
+
+  fstab = File.read("/etc/fstab")
+  unless fstab.include?(uuid)
+    File.open("/etc/fstab", "a") { |f| f.puts(fstab_entry) }
+  end
+end
+
+def partition_path(device)
+  # /dev/sda -> /dev/sda1, /dev/nvme0n1 -> /dev/nvme0n1p1
+  if device.include?("nvme")
+    "#{device}p1"
+  else
+    "#{device}1"
+  end
+end
+
+root_dev = root_device
+raid_devs = raid_devices
+
+candidates = all_block_devices.reject { |d|
+  d == root_dev || raid_devs.include?(d) || already_mounted?(d)
+}
+
+if candidates.empty?
+  puts "No unpartitioned storage devices found"
+  exit 0
+end
+
+FileUtils.mkdir_p(STORAGE_BASE)
+
+# Find the next available disk number (to be idempotent across re-runs)
+existing = Dir.glob("#{STORAGE_BASE}/disk*").map { |p| p[/disk(\d+)$/, 1].to_i }
+next_disk = existing.empty? ? 0 : existing.max + 1
+
+candidates.each_with_index do |device, i|
+  disk_number = next_disk + i
+  puts "Setting up #{device} as disk#{disk_number}"
+  setup_device(device, disk_number)
+end
+
+puts "Storage device setup complete: #{candidates.length} device(s) configured"

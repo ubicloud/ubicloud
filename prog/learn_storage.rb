@@ -42,6 +42,10 @@ class Prog::LearnStorage < Prog::Base
   end
 
   label def start
+    if vm_host.provider_name == HostProvider::LEASEWEB_PROVIDER_NAME
+      sshable.cmd("sudo host/bin/setup-storage-devices")
+    end
+
     make_model_instances.each do |sd|
       sd.skip_auto_validations(:unique) do
         sd.insert_conflict(target: [:vm_host_id, :name],
