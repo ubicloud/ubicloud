@@ -52,6 +52,8 @@ end
 #  cidr              | cidr    | NOT NULL
 #  is_failover_ip    | boolean | NOT NULL DEFAULT false
 #  routed_to_host_id | uuid    | NOT NULL
+#  gateway           | text    |
+#  mask              | integer |
 # Indexes:
 #  address_pkey     | PRIMARY KEY btree (id)
 #  address_cidr_key | UNIQUE btree (cidr)

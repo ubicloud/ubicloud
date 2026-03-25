@@ -205,7 +205,9 @@ class VmHost < Sequel::Model
             fail "BUG: source host #{source_host_ip} isn't added to the database"
           end
 
-          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:)
+          gateway = ip_record.respond_to?(:gateway) ? ip_record.gateway : nil
+          mask = ip_record.respond_to?(:mask) ? ip_record.mask : nil
+          adr = Address.create(cidr: ip_addr, routed_to_host_id: id, is_failover_ip:, gateway:, mask:)
         end
 
         unless is_failover_ip
