@@ -416,7 +416,7 @@ class Clover
         authorize("Postgres:edit", pg)
 
         DB.transaction do
-          pg.representative_server.incr_recycle
+          pg.representative_server.incr_recycle_by_user_request
           audit_log(pg, "recycle")
         end
 

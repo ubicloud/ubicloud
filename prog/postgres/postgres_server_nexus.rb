@@ -594,12 +594,12 @@ SQL
         update_stack_lsn(lsn)
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
-        decr_recycle
+        decr_recycle_lagging_read_replica
         nap 15 * 60
       else
         # It has not applied any new wal files while has been napping for the
         # last 15 minutes, so, there should be something wrong, we are recycling
-        postgres_server.incr_recycle unless postgres_server.recycle_set?
+        postgres_server.incr_recycle_lagging_read_replica unless postgres_server.recycle_lagging_read_replica_set?
       end
       nap 60
     end
@@ -624,13 +624,11 @@ SQL
 
     if available?
       decr_checkup
-      decr_recycle
+      decr_recycle_unavailable_server
       hop_wait
     end
 
-    unless postgres_server.recycle_set?
-      postgres_server.incr_recycle
-    end
+    postgres_server.incr_recycle_unavailable_server unless postgres_server.recycle_unavailable_server_set?
 
     bud Prog::Postgres::Restart
     nap 5
