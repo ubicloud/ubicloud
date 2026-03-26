@@ -540,6 +540,31 @@ RSpec.describe Clover, "postgres" do
         expect(last_response.status).to eq(200)
       end
 
+      it "metric-destination with bearer auth" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
+          url: "https://example.com",
+          password: "my_token",
+          auth_type: "bearer"
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+        md = pg.metric_destinations.first
+        expect(md.auth_type).to eq("bearer")
+        expect(md.username).to be_nil
+        expect(md.password).to eq("my_token")
+      end
+
+      it "metric-destination basic auth without username" do
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
+          url: "https://example.com",
+          password: "password",
+          auth_type: "basic"
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["details"]["username"]).to eq("is required for basic auth")
+      end
+
       it "metric-destination invalid url" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
           url: "-",
