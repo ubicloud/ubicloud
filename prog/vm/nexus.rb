@@ -12,7 +12,7 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [], request_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -78,11 +78,11 @@ class Prog::Vm::Nexus < Prog::Base
 
           raise "Given subnet is not available in the given project" unless subnet
         elsif new_private_subnet_name
-          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:).subject
+          subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: new_private_subnet_name, location_id:, request_id:).subject
         else
           subnet = project.default_private_subnet(location)
         end
-        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:).subject
+        nic = Prog::Vnet::NicNexus.assemble(subnet.id, name: "#{name}-nic", exclude_availability_zones:, availability_zone:, request_id:).subject
       end
 
       vm = Vm.create(
@@ -169,6 +169,9 @@ class Prog::Vm::Nexus < Prog::Base
           "private_subnet_id" => subnet.id
         }]
       ) { it.id = vm.id }
+
+      vm.incr_initial_provisioning(request_id)
+      vm.strand
     end
   end
 

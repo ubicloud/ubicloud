@@ -20,7 +20,7 @@ class PostgresServer < Sequel::Model
       # nothing
     end
 
-    def metal_increment_s3_new_timeline
+    def metal_increment_s3_new_timeline(request_id: nil)
     end
   end
 end

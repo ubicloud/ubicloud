@@ -131,19 +131,19 @@ class Clover
             DB.transaction do
               DB.ignore_duplicate_queries do
                 cidrs.map! do |cidr|
-                  firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:)
+                  firewall_rule = firewall.insert_firewall_rule(cidr, pg_range, description:, request_id: request.get_header("HTTP_X_REQUEST_ID"))
                   audit_log(firewall_rule, "create", firewall)
                   firewall_rule
                 end
               end
-            end
 
-            if api?
-              cidrs = cidrs[0] if cidrs.length == 1
-              Serializers::FirewallRule.serialize(cidrs)
-            else
-              flash["notice"] = "Firewall rule is created"
-              r.redirect firewall, "/networking"
+              if api?
+                cidrs = cidrs[0] if cidrs.length == 1
+                Serializers::FirewallRule.serialize(cidrs)
+              else
+                flash["notice"] = "Firewall rule is created"
+                r.redirect firewall, "/networking"
+              end
             end
           end
         end
@@ -196,7 +196,7 @@ class Clover
           r.delete true do
             authorize("Firewall:edit", firewall)
             DB.transaction do
-              firewall.remove_firewall_rule(firewall_rule)
+              firewall.remove_firewall_rule(firewall_rule, request_id: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule, "destroy", firewall)
             end
 

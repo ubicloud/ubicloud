@@ -11,7 +11,7 @@ class PostgresTimeline < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :secret_key
   plugin ProviderDispatcher, __FILE__
-  plugin SemaphoreMethods, :destroy
+  plugin SemaphoreMethods, :destroy, :initial_provisioning
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
 

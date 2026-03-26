@@ -242,7 +242,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   label def wait_sshable
     unless vm.update_firewall_rules_set?
-      vm.incr_update_firewall_rules
+      convert_semaphore(:initial_provisioning, :update_firewall_rules)
       # This is the first time we get into this state and we know that
       # wait_sshable will take definitely more than 6 seconds. So, we nap here
       # to reduce the amount of load on the control plane unnecessarily.

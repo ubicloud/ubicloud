@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm, :resource
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [])
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [], request_id: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -59,7 +59,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
+        request_id:
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -73,10 +74,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id,
         version: server_version
       )
-
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      st = Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      postgres_server.incr_initial_provisioning(request_id) if request_id
+      st
     end
   end
 
@@ -519,6 +521,7 @@ SQL
 
   label def wait
     decr_initial_provisioning
+    decr_reach_wait
 
     when_fence_set? do
       hop_fence
@@ -556,12 +559,12 @@ SQL
     end
 
     when_configure_metrics_set? do
-      decr_configure_metrics
+      convert_semaphore(:configure_metrics, :reach_wait)
       hop_configure_metrics
     end
 
     when_configure_set? do
-      decr_configure
+      convert_semaphore(:configure, :reach_wait)
       hop_configure
     end
 

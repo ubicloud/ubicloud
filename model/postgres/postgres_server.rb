@@ -14,7 +14,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
+    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot, :reach_wait
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -372,7 +372,7 @@ class PostgresServer < Sequel::Model
     unplanned_take_over_set? || planned_take_over_set? || FAILOVER_LABELS.include?(strand.label)
   end
 
-  def switch_to_new_timeline(parent_id: timeline.id)
+  def switch_to_new_timeline(parent_id: timeline.id, request_id: nil)
     # We have to stop wal-g before updating the timeline to avoid WAL files
     # being pushed to the old bucket.
     vm.sshable.cmd("sudo systemctl stop wal-g") if timeline.blob_storage && !resource.use_old_walg_command_set?
@@ -382,7 +382,7 @@ class PostgresServer < Sequel::Model
       synchronization_status: "ready"
     )
 
-    increment_s3_new_timeline
+    increment_s3_new_timeline(request_id:)
     refresh_walg_credentials
   end
 
