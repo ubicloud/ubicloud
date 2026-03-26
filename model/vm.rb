@@ -336,7 +336,8 @@ class Vm < Sequel::Model
         "slice_name" => vm_host_slice&.inhost_name || "system.slice",
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
-        "copy_on_read" => false
+        "copy_on_read" => false,
+        "track_written" => s.track_written
       }.tap { |v| v["cpus"] = cpus if add_cpus }
     }
   end

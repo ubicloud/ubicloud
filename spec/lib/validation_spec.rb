@@ -123,6 +123,10 @@ RSpec.describe Validation do
         expect { described_class.validate_storage_volumes([{encrypted: true, max_read_mbytes_per_sec: 10, max_write_mbytes_per_sec: 10}], 0) }.not_to raise_error
       end
 
+      it "succeeds if track_written is set" do
+        expect { described_class.validate_storage_volumes([{encrypted: true, track_written: true}], 0) }.not_to raise_error
+      end
+
       it "fails if no volumes" do
         expect { described_class.validate_storage_volumes([], 0) }.to raise_error described_class::ValidationFailed
       end

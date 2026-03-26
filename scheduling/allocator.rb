@@ -704,7 +704,8 @@ module Scheduling::Allocator
           storage_device_id: @volume_to_device_map[disk_index],
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
           max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"],
-          vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil
+          vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil,
+          track_written: volume.fetch("track_written", false)
         )
       end
     end

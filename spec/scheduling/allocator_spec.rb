@@ -900,6 +900,26 @@ RSpec.describe Al do
       expect(vm.vm_storage_volumes.first.max_write_mbytes_per_sec).to eq(300)
     end
 
+    it "creates volume with track_written set to true" do
+      vm = create_vm
+      vol = [{
+        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
+        "boot" => false, "track_written" => true
+      }]
+      described_class.allocate(vm, vol)
+      expect(vm.vm_storage_volumes.first.track_written).to be(true)
+    end
+
+    it "creates volume with track_written defaulting to false" do
+      vm = create_vm
+      vol = [{
+        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
+        "boot" => false
+      }]
+      described_class.allocate(vm, vol)
+      expect(vm.vm_storage_volumes.first.track_written).to be(false)
+    end
+
     it "creates volume with no rate limits" do
       vm = create_vm
       described_class.allocate(vm, vol)
