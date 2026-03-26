@@ -485,15 +485,23 @@ CMD
   end
 
   label def run_post_installation_script
-    if postgres_server.paradedb_and_primary?
-      postgres_server.run_query(<<SQL)
+    case vm.sshable.d_check("post_installation_script")
+    when "Succeeded"
+      if postgres_server.paradedb_and_primary?
+        postgres_server.run_query(<<SQL)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS pg_analytics;
 CREATE EXTENSION IF NOT EXISTS vector;
 SQL
+      end
+
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("post_installation_script", "sudo", "postgres/bin/post-installation-script")
     end
-    hop_wait
+
+    nap 1
   end
 
   label def wait_catch_up
