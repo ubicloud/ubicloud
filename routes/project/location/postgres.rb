@@ -253,11 +253,6 @@ class Clover
 
           password_param = (api? ? "password" : "metric-destination-password")
           auth_type = typecast_params.str("auth_type") || "basic"
-
-          unless %w[basic bearer].include?(auth_type)
-            raise Validation::ValidationFailed.new(auth_type: "must be 'basic' or 'bearer'")
-          end
-
           url, password = typecast_params.nonempty_str!(["url", password_param])
           username = typecast_params.nonempty_str("username") if auth_type == "basic"
 
