@@ -73,6 +73,7 @@ end
 #  vhost_block_backend_id   | uuid    |
 #  vring_workers            | integer |
 #  machine_image_version_id | uuid    |
+#  track_written            | boolean | NOT NULL DEFAULT false
 # Indexes:
 #  vm_storage_volume_pkey                 | PRIMARY KEY btree (id)
 #  vm_storage_volume_vm_id_disk_index_key | UNIQUE btree (vm_id, disk_index)
