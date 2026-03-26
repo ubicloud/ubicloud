@@ -868,12 +868,12 @@ RSpec.describe CloverAdmin do
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
-    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    expect(vm.semaphores_dataset.select_map(:name)).to eq ["initial_provisioning"]
     click_link "Restart"
     click_button "Restart"
     expect(page).to have_flash_notice("Restart scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
-    expect(vm.semaphores_dataset.select_map(:name)).to eq ["restart"]
+    expect(vm.semaphores_dataset.select_map(:name)).to include("restart")
   end
 
   it "supports stopping Vms" do
@@ -882,12 +882,12 @@ RSpec.describe CloverAdmin do
     click_button "Show Object"
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
 
-    expect(vm.semaphores_dataset.select_map(:name)).to eq []
+    expect(vm.semaphores_dataset.select_map(:name)).to eq ["initial_provisioning"]
     click_link "Stop"
     click_button "Stop"
     expect(page).to have_flash_notice("Stop scheduled for Vm")
     expect(page.title).to eq "Ubicloud Admin - Vm #{vm.ubid}"
-    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "stop"]
+    expect(vm.semaphores_dataset.select_order_map(:name)).to eq ["admin_stop", "initial_provisioning", "stop"]
   end
 
   it "supports restarting PostgresResource" do

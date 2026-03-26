@@ -14,7 +14,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
   def self.assemble(project_id:, location_id:, name:, target_vm_size:, target_storage_size_gib:,
     target_version: PostgresResource::DEFAULT_VERSION, flavor: PostgresResource::Flavor::STANDARD,
     ha_type: PostgresResource::HaType::NONE, parent_id: nil, tags: [], restore_target: nil, with_firewall_rules: true,
-    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, request_ids: nil)
+    user_config: {}, pgbouncer_user_config: {}, private_subnet_name: nil, init_script: nil, request_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
 
     DB.transaction do
       superuser_password, timeline_id, timeline_access, target_version = if parent_id.nil?
-        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id, request_ids:).id, "push", target_version]
+        [SecureRandom.urlsafe_base64(15), Prog::Postgres::PostgresTimelineNexus.assemble(location_id: location.id, request_id:).id, "push", target_version]
       else
         unless (parent = PostgresResource[parent_id])
           fail "No existing parent"
@@ -54,14 +54,12 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         target_vm_size:, target_storage_size_gib:,
         superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
       )
-      postgres_resource.incr_initial_provisioning(request_ids) if request_ids
-
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
 
       # Customer firewall, will be attached to created customer subnet
       firewall = Firewall.create(name: "#{postgres_resource.ubid}-firewall", location_id: location.id, description: "Firewall for PostgreSQL database #{postgres_resource.name}", project_id:)
       subnet_name = private_subnet_name || "#{postgres_resource.ubid}-subnet"
-      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id, request_ids:).subject
+      private_subnet = Prog::Vnet::SubnetNexus.assemble(project_id, name: subnet_name, location_id: location.id, firewall_id: firewall.id, request_id:).subject
       private_subnet_id = private_subnet.id
       postgres_resource.update(private_subnet_id:)
 
@@ -73,7 +71,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
           {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
           {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
-        ], request_ids:
+        ], request_id:
       )
 
       if with_firewall_rules
@@ -82,12 +80,13 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
           {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
           {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
-        ], request_ids:)
+        ], request_id:)
       end
 
-      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true, request_ids:)
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: postgres_resource.id, timeline_id:, timeline_access:, is_representative: true, request_id:)
 
       strand = Strand.create_with_id(postgres_resource, prog: "Postgres::PostgresResourceNexus", label: "start")
+      postgres_resource.incr_initial_provisioning(request_id) if request_id
 
       if project.get_ff_postgres_aws_use_different_azs_for_standbys && location.aws?
         postgres_resource.incr_use_different_az
@@ -196,19 +195,27 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       refresh = true
     end
 
+    if OpenSSL::X509::Certificate.new(postgres_resource.client_root_cert_1).not_after < Time.now + 60 * 60 * 24 * 30 * 5
+      postgres_resource.client_root_cert_1, postgres_resource.client_root_cert_key_1 = postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2
+      postgres_resource.client_root_cert_2, postgres_resource.client_root_cert_key_2 = Util.create_root_certificate(common_name: "#{postgres_resource.ubid} Client Certificate Authority", duration: 60 * 60 * 24 * 365 * 10)
+      refresh = true
+    end
+
     if OpenSSL::X509::Certificate.new(postgres_resource.server_cert).not_after < Time.now + 60 * 60 * 24 * 30
       refresh = true
     end
 
-    request_ids = nil
     when_refresh_certificates_set? do
-      request_ids = get_request_ids(:refresh_certificates)
       refresh = true
     end
     if refresh
       postgres_resource.server_cert, postgres_resource.server_cert_key = create_certificate
       postgres_resource.client_cert, postgres_resource.client_cert_key = create_client_certificate
-      servers.each { it.incr_refresh_certificates(request_ids) }
+      if @snap.set?(:refresh_certificates)
+        relay_semaphore(:refresh_certificates, servers, :refresh_certificates)
+      else
+        servers.each { it.incr_refresh_certificates }
+      end
     end
 
     postgres_resource.certificate_last_checked_at = Time.now
