@@ -61,7 +61,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
   end
 
   label def verify_vms
-    frame["vms"].each { bud(Prog::Test::Vm, {subject_id: it, first_boot: frame["first_boot"]}) }
+    frame["vms"].each { bud(Prog::Test::Vm, {"subject_id" => it, "first_boot" => frame["first_boot"]}) }
     hop_wait_verify_vms
   end
 
