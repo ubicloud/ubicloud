@@ -51,13 +51,13 @@ end
 
 # Table: semaphore
 # Columns:
-#  id          | uuid   | PRIMARY KEY
-#  strand_id   | uuid   | NOT NULL
-#  name        | text   | NOT NULL
-#  request_ids | text[] |
+#  id         | uuid | PRIMARY KEY
+#  strand_id  | uuid | NOT NULL
+#  name       | text | NOT NULL
+#  request_id | text |
 # Indexes:
-#  semaphore_pkey              | PRIMARY KEY btree (id)
-#  semaphore_request_ids_index | btree (request_ids)
-#  semaphore_strand_id_index   | btree (strand_id)
+#  semaphore_pkey             | PRIMARY KEY btree (id)
+#  semaphore_request_id_index | btree (request_id)
+#  semaphore_strand_id_index  | btree (strand_id)
 # Foreign key constraints:
 #  semaphore_strand_id_fkey | (strand_id) REFERENCES strand(id)
