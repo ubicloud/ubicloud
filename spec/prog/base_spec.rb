@@ -493,6 +493,37 @@ RSpec.describe Prog::Base do
       expect(page.details["location"]).to eq(resource.location.display_name)
       expect(page.details).to have_key("needs_recycling")
     end
+
+    it "unregister_deadline resolves existing page for the deadline" do
+      st = Strand.create(prog: "Test", label: :napper)
+      nx = Prog::Test.new(st)
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, "napper"], st.ubid).id
+
+      st.stack.first["deadline_target"] = "napper"
+      st.stack.first["deadline_at"] = (Time.now - 1).to_s
+      st.modified!(:stack)
+
+      nx.unregister_deadline("napper")
+
+      expect(st.stack.first).not_to have_key("deadline_at")
+      Strand[page_id].unsynchronized_run
+      Strand[page_id].unsynchronized_run
+      expect(Page.where(id: Page.where(id: page_id).get(:id)).count).to eq(0)
+    end
+
+    it "unregister_deadline clears fields even when no page exists" do
+      st = Strand.create(prog: "Test", label: :napper)
+      nx = Prog::Test.new(st)
+      st.stack.first["deadline_target"] = "napper"
+      st.stack.first["deadline_at"] = (Time.now + 60).to_s
+      st.modified!(:stack)
+
+      nx.unregister_deadline("napper")
+
+      expect(st.stack.first).not_to have_key("deadline_at")
+      expect(st.stack.first).not_to have_key("deadline_target")
+      expect(st.stack.first).not_to have_key("deadline_start")
+    end
   end
 
   describe "#before_run" do
