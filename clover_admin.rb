@@ -10,6 +10,12 @@ require "openssl"
 class CloverAdmin < Roda
   include AuditLog
 
+  TableLink = Data.define(:value, :link)
+
+  def table_link(...)
+    TableLink.new(...)
+  end
+
   Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
 
   MIN_AUDIT_LOG_END_DATE = Date.new(2025, 6)

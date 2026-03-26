@@ -3,7 +3,7 @@
 <% total = Hash.new(0)
 types = %w[runner vm]
 @data.each do |row|
-    row[:name] = [row[:name], {link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}"}]
+    row[:name] = table_link(value: row[:name], link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}")
     row.each { |k, v| total[k] += v if v.is_a?(Numeric) }
     types.each do |type|
       row[:"#{type}_vcpus"] = "#{row.delete(:"allocated_#{type}_vcpus")} / #{row[:"#{type}_vcpus"]}"
