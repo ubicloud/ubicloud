@@ -850,8 +850,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#run_post_installation_script" do
-    it "creates extensions for non-standard flavor and hops wait" do
+    it "creates extensions for non-standard flavor and hops wait when succeeded" do
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
+      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/),
@@ -859,9 +860,26 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.run_post_installation_script }.to hop("wait")
     end
 
-    it "skips extension creation for standard flavor and hops wait" do
-      expect(sshable).not_to receive(:_cmd)
+    it "skips extension creation for standard flavor and hops wait when succeeded" do
+      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("Succeeded")
       expect { nx.run_post_installation_script }.to hop("wait")
+    end
+
+    it "starts the post installation script when not started" do
+      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("post_installation_script", "sudo", "postgres/bin/post-installation-script")
+      expect { nx.run_post_installation_script }.to nap(1)
+    end
+
+    it "starts the post installation script when failed" do
+      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("Failed")
+      expect(sshable).to receive(:d_run).with("post_installation_script", "sudo", "postgres/bin/post-installation-script")
+      expect { nx.run_post_installation_script }.to nap(1)
+    end
+
+    it "naps when the post installation script is still running" do
+      expect(sshable).to receive(:d_check).with("post_installation_script").and_return("InProgress")
+      expect { nx.run_post_installation_script }.to nap(1)
     end
   end
 
