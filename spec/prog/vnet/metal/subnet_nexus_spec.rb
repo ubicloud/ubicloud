@@ -217,9 +217,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
     }
 
-    it "naps if state creation is ongoing" do
+    it "hibernates if state creation is ongoing" do
       nic
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to hibernate
     end
 
     it "consumes nic_phase_done semaphore when barrier not yet met" do
@@ -227,15 +227,15 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id)
       PrivateSubnet.incr_nic_phase_done(ps.id)
       fresh_nx = described_class.new(strand)
-      expect { fresh_nx.wait_inbound_setup }.to nap(5)
+      expect { fresh_nx.wait_inbound_setup }.to hibernate
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq(0)
     end
 
-    it "naps when some NICs haven't reached target phase (barrier)" do
+    it "hibernates when some NICs haven't reached target phase (barrier)" do
       nic  # at idle
       nic2 = Prog::Vnet::NicNexus.assemble(ps.id, name: "b").subject
       nic2.update(rekey_payload: {}, rekey_coordinator_id: ps.id, rekey_phase: "inbound")
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to hibernate
     end
 
     it "hops to wait_outbound_setup if state creation is done" do
@@ -296,9 +296,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_outbound_setup", id: ps.id))
     }
 
-    it "naps if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to hibernate
     end
 
     it "hops to wait_old_state_drop if policy update is done" do
@@ -315,7 +315,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       PrivateSubnet.incr_nic_phase_done(ps.id)
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq(1)
       fresh_nx = described_class.new(strand)
-      expect { fresh_nx.wait_outbound_setup }.to nap(5)
+      expect { fresh_nx.wait_outbound_setup }.to hibernate
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq(0)
     end
 
@@ -340,9 +340,9 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id))
     }
 
-    it "naps if policy update is ongoing" do
+    it "hibernates if policy update is ongoing" do
       nic
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to hibernate
     end
 
     it "consumes nic_phase_done semaphore when barrier not yet met" do
@@ -350,7 +350,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       strand = Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_old_state_drop", id: ps.id)
       PrivateSubnet.incr_nic_phase_done(ps.id)
       fresh_nx = described_class.new(strand)
-      expect { fresh_nx.wait_old_state_drop }.to nap(5)
+      expect { fresh_nx.wait_old_state_drop }.to hibernate
       expect(Semaphore.where(strand_id: ps.id, name: "nic_phase_done").count).to eq(0)
     end
 
@@ -421,7 +421,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       nx = described_class.new(Strand.create(prog: "Vnet::Metal::SubnetNexus", label: "wait_inbound_setup", id: ps.id))
 
       # Phase inbound: NIC still idle → nap (barrier)
-      expect { nx.wait_inbound_setup }.to nap(5)
+      expect { nx.wait_inbound_setup }.to hibernate
 
       # NIC advances to inbound → coordinator advances
       nic.update(rekey_phase: "inbound")
@@ -430,7 +430,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
       # Phase outbound: NIC still inbound → nap (barrier)
       nic.refresh
-      expect { nx.wait_outbound_setup }.to nap(5)
+      expect { nx.wait_outbound_setup }.to hibernate
 
       # NIC advances to outbound → coordinator advances
       nic.update(rekey_phase: "outbound")
@@ -439,7 +439,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
       # Phase old_drop: NIC still outbound → nap (barrier)
       nic.refresh
-      expect { nx.wait_old_state_drop }.to nap(5)
+      expect { nx.wait_old_state_drop }.to hibernate
 
       # NIC advances to old_drop → coordinator finishes
       nic.update(rekey_phase: "old_drop")

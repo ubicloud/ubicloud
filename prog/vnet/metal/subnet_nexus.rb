@@ -206,7 +206,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   # TLA \* AdvanceOutbound: all locked NICs at "outbound" → advance to old_drop.
@@ -231,7 +231,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   # TLA \* FinishRekey: phase_old_drop → idle.  Barrier + release all held locks.
@@ -263,7 +263,7 @@ class Prog::Vnet::Metal::SubnetNexus < Prog::Base
     when_nic_phase_done_set? do
       decr_nic_phase_done
     end
-    nap 5
+    hibernate
   end
 
   # TLA \* Destroy: remove all edges of s, signal neighbors (must be idle with no locks).

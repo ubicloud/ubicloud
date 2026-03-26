@@ -17,7 +17,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
 
   describe "#start" do
     it "naps if nothing to do" do
-      expect { nx.start }.to nap(5)
+      expect { nx.start }.to hibernate
     end
 
     it "hops to wait_setup if allocated" do
@@ -29,7 +29,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
   describe "#wait_setup" do
     it "naps if nothing to do" do
       expect(nx).to receive(:decr_vm_allocated)
-      expect { nx.wait_setup }.to nap(5)
+      expect { nx.wait_setup }.to hibernate
     end
 
     it "incrs refresh_keys when setup_nic is set" do
@@ -42,7 +42,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nx).to receive(:decr_vm_allocated)
       expect(nx).to receive(:when_setup_nic_set?).and_yield
       expect(nx).to receive(:decr_setup_nic)
-      expect { nx.wait_setup }.to nap(5)
+      expect { nx.wait_setup }.to hibernate
       expect(nic.reload.state).to eq("creating")
       expect(Semaphore.where(strand_id: ps.id, name: "refresh_keys").count).to eq(1)
     end
@@ -66,7 +66,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
     end
 
     it "naps if nothing to do" do
-      expect { nx.wait }.to nap(5)
+      expect { nx.wait }.to hibernate
     end
 
     it "hops to start rekey if needed" do
@@ -130,10 +130,10 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect { nx.start_rekey }.to raise_error RuntimeError, /phase should be idle before advancing to inbound/
     end
 
-    it "if outbound setup is not triggered, just naps" do
+    it "if outbound setup is not triggered, hibernates" do
       nic.update(rekey_phase: "inbound")
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_return(false)
-      expect { nx.wait_rekey_outbound_trigger }.to nap(5)
+      expect { nx.wait_rekey_outbound_trigger }.to hibernate
     end
 
     it "if outbound setup is triggered, pushes setup_outbound and naps" do
@@ -141,7 +141,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nx).to receive(:when_trigger_outbound_update_set?).and_yield
       expect(nx).to receive(:decr_trigger_outbound_update)
       expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :setup_outbound)
-      expect { nx.wait_rekey_outbound_trigger }.to nap(5)
+      expect { nx.wait_rekey_outbound_trigger }.to hibernate
     end
 
     it "fails if NIC phase is wrong when trigger_outbound_update fires" do
@@ -168,11 +168,11 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nic.reload.rekey_phase).to eq("outbound")
     end
 
-    it "wait_rekey_old_state_drop_trigger naps if trigger is not set" do
+    it "wait_rekey_old_state_drop_trigger hibernates if trigger is not set" do
       nic.update(rekey_phase: "outbound")
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_return(false)
 
-      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to hibernate
     end
 
     it "wait_rekey_old_state_drop_trigger pushes drop_old_state and naps if trigger is set" do
@@ -180,7 +180,7 @@ RSpec.describe Prog::Vnet::Metal::NicNexus do
       expect(nx).to receive(:when_old_state_drop_trigger_set?).and_yield
       expect(nx).to receive(:decr_old_state_drop_trigger)
       expect(nx).to receive(:push).with(Prog::Vnet::RekeyNicTunnel, {}, :drop_old_state)
-      expect { nx.wait_rekey_old_state_drop_trigger }.to nap(5)
+      expect { nx.wait_rekey_old_state_drop_trigger }.to hibernate
     end
 
     it "fails if NIC phase is wrong when old_state_drop_trigger fires" do
