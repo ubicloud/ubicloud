@@ -72,7 +72,7 @@
       row = [
         [
           entry[:at].getutc.strftime("%F %T"),
-          ["<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "action" => entry[:message])}\">#{h entry[:message]}</a>", {escape: false}],
+          [entry[:message], {link: "?#{to_query_string("end" => end_date, "action" => entry[:message])}"}],
           [
             entry[:metadata].map do |k, v|
               "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "metadata" => "#{k}=#{v}")}\">#{h k}: #{h v}</a>"
@@ -86,7 +86,7 @@
       if @project
         account_ubid = UBID.to_ubid(entry[:account_id])
         account_name = entry[:account_name] || account_ubid
-        row[0].insert(2, ["<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "account" => account_ubid)}\">#{h account_name}</a>", {escape: false}])
+        row[0].insert(2, [account_name, {link: "?#{to_query_string("end" => end_date, "account" => account_ubid)}"}])
       end
 
       row
