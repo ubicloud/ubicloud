@@ -25,7 +25,7 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
-    :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable
+    :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
