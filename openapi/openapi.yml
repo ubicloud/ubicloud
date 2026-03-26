@@ -124,6 +124,8 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Audit Log
+  '/project/{project_id}/clickgres-billing/postgres-resources':
+    $ref: './openapi-clickgres.yml#/paths/~1project~1{project_id}~1clickgres-billing~1postgres-resources'
   '/project/{project_id}/firewall':
     parameters:
       - $ref: '#/components/parameters/project_id'
@@ -4240,6 +4242,8 @@ components:
       scheme: bearer
       type: http
 tags:
+  - description: Clickgres Billing Operations
+    name: Clickgres Billing
   - description: Firewall Operations
     name: Firewall
   - description: Firewall Rule Operations

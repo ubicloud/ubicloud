@@ -2,3 +2,4 @@ output: openapi/openapi.yml
 sort: true
 sortSet:
   sortPathsBy: path
+bundle: false

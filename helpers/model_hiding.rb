@@ -16,6 +16,7 @@ class Clover < Roda
       ALLOWED_CALLS = {
         ::ActionTag => [:options_for_project],
         ::ApiKey => [:create_inference_api_key, :create_personal_access_token, :project_id_for_personal_access_token],
+        ::BillingRecord => [:where],
         ::DiscountCode => [:first],
         ::FirewallRule => [:cidr_for_source_type, :range_for_port_type, :port_options, :source_options],
         ::GithubInstallation => [:with_github_installation_id],

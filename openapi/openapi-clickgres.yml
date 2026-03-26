@@ -1,0 +1,125 @@
+openapi: 3.0.3
+info:
+  description: Clickgres API extensions not available in upstream Ubicloud
+  title: Clickgres API
+  version: 0.1.0
+  contact:
+    url: 'https://www.clickhouse.com/'
+    email: support@clickhouse.com
+servers:
+  - url: 'https://api.ubicloud.com'
+paths:
+  '/project/{project_id}/clickgres-billing/postgres-resources':
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: UBID of the project
+    get:
+      operationId: listClickgresBillingPostgresResources
+      summary: List Clickgres billing resources for PostgreSQL databases
+      parameters:
+        - name: start_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: Start of the time range (ISO 8601)
+        - name: end_time
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date-time
+          description: End of the time range (ISO 8601)
+        - name: chc_org_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by chc_org_id tag value
+      responses:
+        '200':
+          $ref: '#/components/responses/ClickgresBillingPostgresResources'
+        default:
+          description: An error response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      code:
+                        type: integer
+                        example: 401
+                      message:
+                        type: string
+                        example: 'There was an error logging in'
+                      type:
+                        type: string
+                        example: InvalidCredentials
+                      details:
+                        type: object
+                        nullable: true
+                    required:
+                      - code
+                      - message
+                      - type
+                additionalProperties: false
+                required:
+                  - error
+      tags:
+        - Clickgres Billing
+components:
+  responses:
+    ClickgresBillingPostgresResources:
+      description: List of Clickgres billing resources
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              items:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    project_id:
+                      type: string
+                      description: UBID of the project
+                      example: pjkkmx0f2vke4h36nk9cm8v8q0
+                    resource_id:
+                      type: string
+                      description: UBID of the resource
+                    resource_name:
+                      type: string
+                      description: Name of the resource
+                    resource_tags:
+                      description: Tags associated with the resource
+                      type: object
+                      additionalProperties: true
+                  required:
+                    - project_id
+                    - resource_id
+                    - resource_name
+                    - resource_tags
+            required:
+              - items
+  securitySchemes:
+    BearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http
+tags:
+  - description: Clickgres Billing Operations
+    name: Clickgres Billing
+security:
+  - BearerAuth: []

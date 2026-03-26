@@ -8,7 +8,8 @@
       "Bash(curl*)",
       "Bash(.devcontainer/scripts/invoke_ubicloud_api_curl.sh*)",
       "Bash(.devcontainer/scripts/wait_for_postgres_state.sh*)",
-      "Bash(bundle exec rspec*)"
+      "Bash(bundle exec rspec*)",
+      "Bash(sed*./*)"
     ]
   }
 }

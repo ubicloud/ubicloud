@@ -85,16 +85,15 @@ Returns 204 on success. Wait for deletion to complete:
 
 ```bash
 .devcontainer/scripts/invoke_ubicloud_api_curl.sh GET \
-  "/billing/resources?start_time=<ISO8601>&end_time=<ISO8601>"
+  "/project/default/clickgres-billing/postgres-resources?start_time=<ISO8601>&end_time=<ISO8601>"
 ```
 
 Optional filters:
-- `&project_id=<ubid>` — scope to a specific project
-- `&resource_type=PostgresVCpu&resource_type=PostgresStorage` — filter by resource type(s)
+- `&chc_org_id=<string>` — filter by `chc_org_id` tag value
 
 Returns a deduplicated list of resources with billing activity in the time range:
 ```json
-{"items": [{"project_id": "...", "resource_id": "...", "resource_name": "...", "resource_type": "PostgresVCpu", "tags": {...}}]}
+{"items": [{"project_id": "...", "resource_id": "...", "resource_name": "...", "resource_tags": {...}}]}
 ```
 
 ## Behavior guidelines

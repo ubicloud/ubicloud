@@ -14,8 +14,11 @@ module Overrider
 
       return unless File.exist?(load_file)
       load(load_file)
+
+      # :nocov: -- ClickHouse always sets OVERRIDE_DIR, so the upstream test path
       klass.prepend(klass::PrependMethods) if defined?(klass::PrependMethods)
       klass.singleton_class.prepend(klass::PrependClassMethods) if defined?(klass::PrependClassMethods)
+      # :nocov:
     end
   end
 
