@@ -137,6 +137,8 @@ class Clover < Roda
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage
   end
+
+  plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
   # :nocov:
 
   plugin :host_routing, scope_predicates: true do |hosts|
