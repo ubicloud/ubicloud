@@ -475,10 +475,7 @@ sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-search.deb
 CMD
       end
 
-      if retval&.dig("msg") == "postgres server is restarted"
-        hop_run_post_installation_script
-      end
-      push Prog::Postgres::Restart
+      hop_run_post_installation_script
     end
 
     hop_wait
