@@ -806,27 +806,16 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       }
     end
 
-    it "updates password and buds restart during the initial provisioning" do
+    it "updates password and hops to run_post_installation_script during initial provisioning" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
-      expect(nx).to receive(:push).with(Prog::Postgres::Restart)
-      expect { nx.update_superuser_password }.to hop("wait")
-    end
-
-    it "updates password and hops to run_post_installation_script during initial provisioning if restart is already executed" do
-      nx.incr_initial_provisioning
-      expect(sshable).to receive(:_cmd).with(
-        "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher),
-      ).and_return("")
-      nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
 
-    it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
+    it "updates password, installs paradedb packages, and hops to run_post_installation_script during initial provisioning for non-standard flavors" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         /sudo apt-get install.*pg-analytics.*pg-search/m,
@@ -835,7 +824,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
-      nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
     end
