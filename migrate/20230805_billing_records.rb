@@ -4,7 +4,7 @@ Sequel.migration do
   change do
     create_table(:billing_record) do
       column :id, :uuid, primary_key: true, default: nil
-      column :project_id, :project, type: :uuid, null: false
+      column :project_id, :uuid, null: false
       column :resource_id, :uuid, null: false
       column :resource_name, :text, collate: '"C"', null: false
       column :span, :tstzrange, null: false, default: Sequel.lit("tstzrange(now(), NULL, '[)')")
