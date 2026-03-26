@@ -3,6 +3,8 @@
 class Prog::Vnet::Metal::NicNexus < Prog::Base
   subject_is :nic
 
+  # TLA:module SubnetRekey
+
   label def start
     when_vm_allocated_set? do
       hop_wait_setup
@@ -10,15 +12,25 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     nap 5
   end
 
+  # TLA \* CreateNic: activate an inactive NIC.  Sets refreshNeeded on owner.
+  # TLA \* Models wait_setup: decr_setup_nic + incr_refresh_keys + state "creating".
+  # TLA CreateNic(n) ==
+  # TLA   ∧ n ∈ AllNics \ activeNics
+  # TLA   ∧ ops < MaxOps
   label def wait_setup
     decr_vm_allocated
     when_setup_nic_set? do
       DB.transaction do
         decr_setup_nic
+        # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![NicOwner[n]] = @ + 1]
         nic.private_subnet.incr_refresh_keys
+        # TLA   ∧ activeNics' = activeNics ∪ {n}
         nic.update(state: "creating")
       end
     end
+    # TLA   ∧ ops' = ops + 1
+    # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, nicPhase⟩
+    # TLA
     when_start_rekey_set? do
       hop_start_rekey
     end
@@ -41,11 +53,19 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   label def start_rekey
     decr_start_rekey
 
+    # TLA \* NicAdvanceInbound: idle → inbound (after setup_inbound).
+    # TLA NicAdvanceInbound(n) ==
+    # TLA   ∧ n ∈ activeNics
+    # TLA   ∧ nicPhase[n] = "idle"
+    # TLA   ∧ ∃ s ∈ Subnets : n ∈ heldLocks[s] ∧ pc[s] = "phase_inbound"
     if retval&.dig("msg") == "inbound_setup is complete"
       fail "BUG: NIC not locked for rekey" unless nic.rekey_coordinator_id
       fail "BUG: NIC phase should be idle before advancing to inbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "idle"
+      # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "inbound"]
       nic.update(rekey_phase: "inbound")
       PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait_rekey_outbound_trigger
     end
 
@@ -61,10 +81,18 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   label def wait_rekey_outbound_trigger
     fail "BUG: NIC not locked in wait_rekey_outbound_trigger" unless nic.rekey_coordinator_id
 
+    # TLA \* NicAdvanceOutbound: inbound → outbound (after setup_outbound).
+    # TLA NicAdvanceOutbound(n) ==
+    # TLA   ∧ n ∈ activeNics
+    # TLA   ∧ nicPhase[n] = "inbound"
+    # TLA   ∧ ∃ s ∈ Subnets : n ∈ heldLocks[s] ∧ pc[s] = "phase_outbound"
     if retval&.dig("msg") == "outbound_setup is complete"
       fail "BUG: NIC phase should be inbound before advancing to outbound, got #{nic.rekey_phase}" unless nic.rekey_phase == "inbound"
+      # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "outbound"]
       nic.update(rekey_phase: "outbound")
       PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait_rekey_old_state_drop_trigger
     end
 
@@ -82,10 +110,18 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
   label def wait_rekey_old_state_drop_trigger
     fail "BUG: NIC not locked in wait_rekey_old_state_drop_trigger" unless nic.rekey_coordinator_id
 
+    # TLA \* NicAdvanceOldDrop: outbound → old_drop (after drop_old_state).
+    # TLA NicAdvanceOldDrop(n) ==
+    # TLA   ∧ n ∈ activeNics
+    # TLA   ∧ nicPhase[n] = "outbound"
+    # TLA   ∧ ∃ s ∈ Subnets : n ∈ heldLocks[s] ∧ pc[s] = "phase_old_drop"
     if retval&.dig("msg")&.start_with?("drop_old_state is complete")
       fail "BUG: NIC phase should be outbound before advancing to old_drop, got #{nic.rekey_phase}" unless nic.rekey_phase == "outbound"
+      # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "old_drop"]
       nic.update(state: "active", rekey_phase: "old_drop")
       PrivateSubnet.incr_nic_phase_done(nic.rekey_coordinator_id)
+      # TLA   ∧ UNCHANGED ⟨edges, pc, heldLocks, ops, activeNics, refreshNeeded⟩
+      # TLA
       hop_wait
     end
 
@@ -100,6 +136,11 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
     nap 5
   end
 
+  # TLA \* DestroyNic: deactivate an active NIC.  Removes from heldLocks (FK cascade).
+  # TLA \* Models destroy: nic.destroy + incr_refresh_keys.
+  # TLA DestroyNic(n) ==
+  # TLA   ∧ n ∈ activeNics
+  # TLA   ∧ ops < MaxOps
   label def destroy
     if nic.vm
       Clog.emit("Cannot destroy nic with active vm, first clean up the attached resources", nic)
@@ -108,10 +149,17 @@ class Prog::Vnet::Metal::NicNexus < Prog::Base
 
     decr_destroy
 
+    # TLA   ∧ activeNics' = activeNics \ {n}
+    # TLA   ∧ heldLocks' = [s ∈ Subnets ↦ heldLocks[s] \ {n}]
+    # TLA   ∧ nicPhase' = [nicPhase EXCEPT ![n] = "idle"]
     # Hard-delete is load-bearing: FK cascade clears rekey_coordinator_id
     # and rekey_phase, ensuring destroyed NICs release coordinator locks.
+    # TLA   ∧ refreshNeeded' = [refreshNeeded EXCEPT ![NicOwner[n]] = @ + 1]
     nic.private_subnet.incr_refresh_keys
     nic.destroy
+    # TLA   ∧ ops' = ops + 1
+    # TLA   ∧ UNCHANGED ⟨edges, pc⟩
+    # TLA
 
     pop "nic deleted"
   end
