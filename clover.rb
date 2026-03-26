@@ -1007,6 +1007,12 @@ class Clover < Roda
         r.hash_branches(:webhook_prefix)
       end
 
+      r.post "operation" do
+        before_main_hash_branches
+        id = typecast_params.str!("id")
+        Semaphore.where(request_id: id).distinct.select_map(:name).to_json
+      end
+
       r.get "auth", :ubid_uuid do |id|
         next unless (@oidc_provider = OidcProvider[id])
 

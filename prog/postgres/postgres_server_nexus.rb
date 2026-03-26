@@ -11,7 +11,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
 
   def_delegators :postgres_server, :vm, :resource
 
-  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [], request_ids: nil)
+  def self.assemble(resource_id:, timeline_id:, timeline_access:, is_representative: false, exclude_host_ids: [], exclude_availability_zones: [], availability_zone: nil, exclude_data_centers: [], request_id: nil)
     DB.transaction do
       ubid = PostgresServer.generate_ubid
 
@@ -59,8 +59,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
-        request_ids:
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
+        request_id:
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -74,11 +74,11 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         vm_id: vm_st.id,
         version: server_version
       )
-      postgres_server.incr_initial_provisioning(request_ids) if request_ids
-
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
 
-      Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      st = Strand.create_with_id(postgres_server, prog: "Postgres::PostgresServerNexus", label: "start")
+      postgres_server.incr_initial_provisioning(request_id) if request_id
+      st
     end
   end
 

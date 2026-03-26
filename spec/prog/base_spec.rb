@@ -543,4 +543,34 @@ RSpec.describe Prog::Base do
         .to change { st.reload.retval }.from(nil).to({"msg" => "operation is cancelled due to explicitly requested destruction"})
     end
   end
+
+  describe "#convert_semaphore" do
+    it "updates semaphore name in place" do
+      st = Strand.create(prog: "Test", label: "start")
+      req = SecureRandom.uuid
+      Semaphore.incr(st.id, "foo", req)
+
+      prog = described_class.new(st)
+      prog.convert_semaphore(:foo, :bar)
+
+      expect(Semaphore.where(strand_id: st.id, name: "foo").count).to eq 0
+      sem = Semaphore.where(strand_id: st.id, name: "bar").first
+      expect(sem.request_id).to eq req
+    end
+  end
+
+  describe "#relay_semaphore" do
+    it "relays semaphore rows to target strands" do
+      st = Strand.create(prog: "Test", label: "start")
+      st2 = Strand.create(prog: "Test", label: "start")
+      req = SecureRandom.uuid
+      Semaphore.incr(st.id, "foo", req)
+
+      prog = described_class.new(st)
+      prog.relay_semaphore(:foo, [st2.id.to_s], :bar)
+
+      expect(Semaphore.where(strand_id: st.id, name: "foo").count).to eq 0
+      expect(Semaphore.where(strand_id: st2.id, name: "bar").first.request_id).to eq req
+    end
+  end
 end

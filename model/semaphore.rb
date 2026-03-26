@@ -5,7 +5,7 @@ require_relative "../model"
 class Semaphore < Sequel::Model
   plugin ResourceMethods
 
-  def self.incr(id, name, request_ids = nil)
+  def self.incr(id, name, request_id = nil)
     case name
     when Symbol
       name = name.to_s
@@ -15,19 +15,26 @@ class Semaphore < Sequel::Model
       raise "invalid name given to Semaphore.incr: #{name.inspect}"
     end
 
-    if request_ids.is_a? String
-      request_ids = Sequel.pg_array([request_ids])
-    elsif request_ids.is_a? Array
-      request_ids = Sequel.pg_array(request_ids)
-    end
-
     with(:updated_strand,
       Strand
         .where(id:)
         .returning(:id)
         .with_sql(:update_sql, schedule: Sequel::CURRENT_TIMESTAMP))
-      .insert([:id, :strand_id, :name, :request_ids],
-        DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name, request_ids))
+      .insert([:id, :strand_id, :name, :request_id],
+        DB[:updated_strand].select(Sequel[:gen_timestamp_ubid_uuid].function(820), :id, name, request_id))
+  end
+
+  def self.relay(from_strand_id, name, to_strand_ids, to_name = nil)
+    to_name = (to_name || name).to_s
+    name = name.to_s
+    source = where(strand_id: from_strand_id, name:)
+    to_strand_ids.each do |target_id|
+      DB[:semaphore].insert(
+        [:id, :strand_id, :name, :request_id],
+        source.select(Sequel[:gen_timestamp_ubid_uuid].function(820), target_id, to_name, :request_id)
+      )
+    end
+    source.destroy
   end
 
   def self.set_at(id)
@@ -42,10 +49,6 @@ class Semaphore < Sequel::Model
     hash = super
     hash[:set_at] = set_at.strftime("%F %T")
     hash
-  end
-
-  def self.get_request_ids(id, name)
-    DB.from { Sequel.lit("semaphore, unnest(request_ids)") }.get { array_agg(:unnest).distinct }
   end
 end
 

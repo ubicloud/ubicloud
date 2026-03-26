@@ -10,7 +10,7 @@ class Clover
       if pg_name
         r.post api? do
           check_visible_location
-          postgres_post(pg_name, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
+          postgres_post(pg_name, request_id: request.get_header("HTTP_X_REQUEST_ID"))
         end
 
         filter = {Sequel[:postgres_resource][:name] => pg_name}
@@ -200,10 +200,10 @@ class Clover
 
             firewall_rule = nil
             DB.transaction do
-              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
+              firewall_rule = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(5432..5432), description:, request_id: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule, "create", [fw, pg])
 
-              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:, request_ids: request.get_header("HTTP_X_REQUEST_ID"))
+              firewall_rule2 = fw.insert_firewall_rule(parsed_cidr, Sequel.pg_range(6432..6432), description:, request_id: request.get_header("HTTP_X_REQUEST_ID"))
               audit_log(firewall_rule2, "create", [fw, pg])
             end
 
@@ -328,7 +328,7 @@ class Clover
             tags:,
             restore_target: nil,
             init_script: pg.init_script&.init_script,
-            request_ids: request.get_header("HTTP_X_REQUEST_ID")
+            request_id: request.get_header("HTTP_X_REQUEST_ID")
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -401,7 +401,7 @@ class Clover
             tags:,
             restore_target:,
             init_script: pg.init_script&.init_script,
-            request_ids: request.get_header("HTTP_X_REQUEST_ID")
+            request_id: request.get_header("HTTP_X_REQUEST_ID")
           ).subject
           audit_log(pg, "restore", restored)
         end

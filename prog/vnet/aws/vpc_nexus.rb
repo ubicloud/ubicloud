@@ -151,8 +151,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
   label def wait
     when_update_firewall_rules_set? do
-      request_ids = get_request_ids(:update_firewall_rulses)
-      private_subnet.vms.each { it.incr_update_firewall_rules(request_ids) }
+      relay_semaphore(:update_firewall_rules, private_subnet.vms, :update_firewall_rules)
       decr_update_firewall_rules
     end
 

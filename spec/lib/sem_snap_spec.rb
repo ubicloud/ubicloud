@@ -52,6 +52,22 @@ RSpec.describe SemSnap do
     expect(described_class.new(st.id).set_at(:test)).to be_nil
   end
 
+  it ".convert moves semaphore ids between names in snapshot" do
+    snap = described_class.new(st.id)
+    snap.incr(:foo)
+    expect(snap.set?(:foo)).to be true
+
+    snap.convert(:foo, :bar)
+    expect(snap.set?(:foo)).to be false
+    expect(snap.set?(:bar)).to be true
+  end
+
+  it ".convert does nothing when source name does not exist" do
+    snap = described_class.new(st.id)
+    expect { snap.convert(:nonexistent, :bar) }.not_to raise_error
+    expect(snap.set?(:bar)).to be false
+  end
+
   it ".sem_at returns time earliest semaphore was created" do
     snap = described_class.new(st.id)
     snap.incr(:test)

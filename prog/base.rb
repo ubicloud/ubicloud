@@ -38,22 +38,24 @@ end
     end
   end
 
-  def get_request_ids(name)
-    Semaphore.get_request_ids(@strand.id, name.to_s)
+  def convert_semaphore(name_from, name_into)
+    Semaphore.where(strand_id: @strand.id, name: name_from.to_s)
+      .update(name: name_into.to_s)
+    @snap.convert(name_from, name_into)
   end
 
-  def convert_semaphore(name_from, name_into)
-    request_ids = Semaphore.get_request_ids(@strand.id, name_from.to_s)
-    @snap.incr(name_into, request_ids)
-    @snap.decr(name_from)
+  def relay_semaphore(name, targets, to_name = name)
+    target_ids = targets.map { it.is_a?(String) ? it : it.id }
+    Semaphore.relay(@strand.id, name, target_ids, to_name)
+    @snap.decr(name)
   end
 
   def self.semaphore(*names)
     names.map!(&:intern)
     names << :destroying if names.include?(:destroy) && !names.include?(:destroying)
     names.each do |name|
-      define_method :"incr_#{name}" do |request_ids = nil|
-        @snap.incr(name, request_ids)
+      define_method :"incr_#{name}" do |request_id = nil|
+        @snap.incr(name, request_id)
       end
 
       define_method :"decr_#{name}" do

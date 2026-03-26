@@ -152,6 +152,15 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
 
       expect(pg.use_different_az_set?).to be false
     end
+
+    it "sets initial_provisioning semaphore with request_id when provided" do
+      req = SecureRandom.uuid
+      st = described_class.assemble(project_id: customer_project.id, location_id:, name: "pg-name", target_vm_size: "standard-2", target_storage_size_gib: 128, request_id: req)
+      pg = st.subject
+      sem = Semaphore.where(strand_id: pg.id, name: "initial_provisioning").first
+      expect(sem).to exist
+      expect(sem.request_id).to eq req
+    end
   end
 
   describe "#before_run" do
