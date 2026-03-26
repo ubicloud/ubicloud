@@ -36,7 +36,7 @@ class Clover
           subject_id = log[:subject_id]
           subject_ubid = UBID.to_ubid(subject_id)
           subject_name = ubids[subject_id]&.name || subject_ubid
-          log[:subject] = "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "subject" => subject_ubid)}\">#{h subject_name}</a>"
+          log[:subject] = [subject_name, {link: "?#{to_query_string("end" => end_date, "subject" => subject_ubid)}"}]
 
           log[:objects] = log[:object_ids].filter_map do |object_id|
             object_ubid = UBID.to_ubid(object_id)
