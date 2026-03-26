@@ -5,8 +5,16 @@ require_relative "../model"
 class VhostBlockBackend < Sequel::Model
   plugin ResourceMethods, etc_type: true
 
+  def self.parse_version(version_str)
+    Gem::Version.new(version_str.delete_prefix("v"))
+  end
+
+  def parsed_version
+    @parsed_version ||= self.class.parse_version(version)
+  end
+
   def supports_archive?
-    Gem::Version.new(version.delete_prefix("v")) >= Gem::Version.new("0.4.0")
+    parsed_version >= Gem::Version.new("0.4.0")
   end
 end
 

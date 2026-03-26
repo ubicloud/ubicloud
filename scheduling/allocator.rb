@@ -26,7 +26,9 @@ module Scheduling::Allocator
       true, # use slices
       Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
-      family_filter
+      family_filter,
+      os_filter,
+      (storage_volumes.any? { it["track_written"] }) ? "v0.4.0" : nil
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -60,7 +62,8 @@ module Scheduling::Allocator
     :require_shared_slice,
     :diagnostics,
     :family_filter,
-    :os_filter
+    :os_filter,
+    :minimum_vhost_block_backend_version
   ) do
     def initialize(*args)
       super
@@ -238,6 +241,22 @@ module Scheduling::Allocator
 
       # Temporary while testing CloudHypervisor 46 rollout
       ds = ds.where(Sequel[:vm_host][:os_version] => request.os_filter) if request.os_filter
+
+      if request.minimum_vhost_block_backend_version
+        vbb = Sequel[:vhost_block_backend]
+
+        version = Sequel.cast(Sequel.function(:string_to_array, Sequel.function(:ltrim, vbb[:version], "v"), "."), "integer[]")
+        min_version = VhostBlockBackend.parse_version(request.minimum_vhost_block_backend_version).segments
+
+        subquery = DB[:vhost_block_backend]
+          .where(vbb[:vm_host_id] => Sequel[:vm_host][:id])
+          .exclude(Sequel[vbb][:allocation_weight] => 0)
+          .where { vbb[:version] =~ /^v\d+\.\d+\.\d+$/ }
+          .where(version >= Sequel.pg_array(min_version, :integer))
+          .select(1)
+
+        ds = ds.where(subquery.exists)
+      end
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
       # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
