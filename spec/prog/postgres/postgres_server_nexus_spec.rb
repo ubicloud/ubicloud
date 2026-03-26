@@ -1038,18 +1038,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/A"})
         expect(replica_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
         expect { replica_nx.wait }.to nap(60)
-        expect(Semaphore.where(strand_id: replica_server.id, name: "recycle").count).to eq(1)
+        expect(Semaphore.where(strand_id: replica_server.id, name: "recycle_lagging_read_replica").count).to eq(1)
       end
 
       it "does not increment recycle if it is incremented already" do
-        replica_nx.incr_recycle
+        replica_nx.incr_recycle_lagging_read_replica
         expect(replica_server).to receive(:lsn_caught_up).and_return(false)
         expect(replica_server).to receive(:current_lsn).and_return("1/A")
 
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/A"})
         expect(replica_server).to receive(:lsn_diff).with("1/A", "1/A").and_return(0)
         expect { replica_nx.wait }.to nap(60)
-        expect(Semaphore.where(strand_id: replica_server.id, name: "recycle").count).to eq(1)
+        expect(Semaphore.where(strand_id: replica_server.id, name: "recycle_lagging_read_replica").count).to eq(1)
       end
 
       it "checks if it wasn't already lagging but the lag exists, if so, update the stack and nap" do
@@ -1072,7 +1072,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
         refresh_frame(replica_nx, new_frame: {"lsn" => "1/9"})
         expect(replica_server).to receive(:lsn_diff).with("1/A", "1/9").and_return(1)
-        expect(replica_nx).to receive(:decr_recycle)
+        expect(replica_nx).to receive(:decr_recycle_lagging_read_replica)
         expect(replica_nx).to receive(:update_stack_lsn).with("1/A")
         expect { replica_nx.wait }.to nap(900)
       end
@@ -1092,7 +1092,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "hops to wait if the server is available" do
       expect(nx).to receive(:available?).and_return(true)
-      expect(nx).to receive(:decr_recycle)
+      expect(nx).to receive(:decr_recycle_unavailable_server)
       expect { nx.unavailable }.to hop("wait")
     end
 
@@ -1100,11 +1100,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
-      expect(postgres_server.reload.recycle_set?).to be true
+      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
     end
 
     it "buds restart without incrementing recycle when recycle is already set" do
-      postgres_server.incr_recycle
+      postgres_server.incr_recycle_unavailable_server
       expect(nx).to receive(:available?).and_return(false)
       expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
@@ -1117,7 +1117,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
-      expect(postgres_server.reload.recycle_set?).to be true
+      expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
     end
 
     it "does not bud restart if there is already one restart going on" do

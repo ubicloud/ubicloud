@@ -14,7 +14,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
+    :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -189,7 +189,11 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    recycle_set? || vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
+    recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
+    instance_size_mismatch = vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    version_mismatch = version != resource.target_version
+
+    recycle_requested || instance_size_mismatch || version_mismatch
   end
 
   def lsn_caught_up

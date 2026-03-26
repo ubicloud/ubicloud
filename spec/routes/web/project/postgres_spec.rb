@@ -792,7 +792,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_flash_notice "'#{pg.name}' will be recycled soon"
         expect(page.status_code).to eq(200)
-        expect(pg.representative_server.recycle_set?).to be true
+        expect(pg.representative_server.recycle_by_user_request_set?).to be true
       end
 
       it "doesn't show reset button when does not have permissions" do
