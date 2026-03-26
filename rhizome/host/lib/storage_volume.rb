@@ -41,6 +41,7 @@ class StorageVolume
     @num_queues = params.fetch("num_queues", 1)
     @queue_size = params.fetch("queue_size", 256)
     @copy_on_read = params.fetch("copy_on_read", false)
+    @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
   end
@@ -335,7 +336,8 @@ class StorageVolume
       "data_path" => disk_file,
       "vhost_socket" => vhost_sock,
       "rpc_socket" => sp.rpc_socket_path,
-      "device_id" => @device_id
+      "device_id" => @device_id,
+      "track_written" => @track_written
     }
     hash["metadata_path"] = sp.vhost_backend_metadata if @image_path
     toml_section("device", hash)
