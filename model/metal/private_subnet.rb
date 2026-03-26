@@ -8,6 +8,7 @@ class PrivateSubnet < Sequel::Model
         create_tunnels(subnet.nics, nic)
       end
       subnet.incr_refresh_keys
+      incr_refresh_keys
     end
 
     def disconnect_subnet(subnet)

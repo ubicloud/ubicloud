@@ -81,7 +81,8 @@ class PrivateSubnet < Sequel::Model
     (state == "waiting") ? "available" : state
   end
 
-  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate
+  plugin SemaphoreMethods, :destroy, :refresh_keys, :add_new_nic, :update_firewall_rules, :migrate,
+    :nic_phase_done
 
   def self.random_subnet(cidr_size)
     subnets = PRIVATE_SUBNET_RANGES.select { |_, (prefix, _)|
