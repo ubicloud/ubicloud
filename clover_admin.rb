@@ -51,6 +51,8 @@ class CloverAdmin < Roda
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage, dir: "coverage/views/admin"
   end
+
+  plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
   # :nocov:
 
   plugin :part

@@ -112,6 +112,7 @@ module Config
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
   optional :git_commit_hash, string
+  optional :ip_from_header, string
 
   # GitHub Runner App
   optional :github_app_name, string
