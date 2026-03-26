@@ -6,7 +6,7 @@ Sequel.migration do
       column :id, :uuid, primary_key: true, default: nil
       column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
       column :updated_at, :timestamptz, null: false, default: Sequel.lit("now()")
-      column :resource_id, :postgres_resource, type: :uuid, null: false
+      column :resource_id, :uuid, null: false
       foreign_key :vm_id, :vm, type: :uuid
     end
 
