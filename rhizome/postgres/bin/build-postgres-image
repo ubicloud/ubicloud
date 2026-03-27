@@ -1,0 +1,811 @@
+#!/bin/bash
+# build-postgres-image -- install the full production PostgreSQL stack on a booted VM
+#
+# Mirrors the postgres-vm-images chroot pipeline (setup_base, setup_packages,
+# setup_monitoring, setup_cleanup) but runs over SSH on a live VM.
+#
+# Usage:  ssh root@<vm> 'bash -s' < build-postgres-image
+#    or:  scp build-postgres-image root@<vm>:/tmp/ && ssh root@<vm> bash /tmp/build-postgres-image
+#
+# Environment variables (optional):
+#   PROVIDER  -- "metal", "aws", or "gcp" (default: "metal")
+#               Controls provider-specific steps (CloudWatch, IMDS, etc.)
+#   SKIP_WALG -- set to "1" to skip WAL-G compilation (saves ~5min)
+#   SKIP_CLAMAV -- set to "1" to skip ClamAV scan
+#   DEPS_DIR  -- directory with pre-downloaded deps (default: /tmp)
+#               If deps are pre-staged here, the script uses them instead of downloading.
+#               Expected files: walg-src.tar.gz, pguint-src.tar.gz,
+#               prometheus-*.tar.gz, node_exporter-*.tar.gz, postgres_exporter-*.tar.gz
+
+set -uexo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# Ensure HOME and Go paths are set (GCP startup scripts run without HOME)
+export HOME="${HOME:-/root}"
+export GOPATH="${GOPATH:-$HOME/go}"
+export GOMODCACHE="${GOMODCACHE:-$GOPATH/pkg/mod}"
+
+PROVIDER="${PROVIDER:-metal}"
+SKIP_WALG="${SKIP_WALG:-0}"
+SKIP_CLAMAV="${SKIP_CLAMAV:-0}"
+DEPS_DIR="${DEPS_DIR:-/tmp}"
+
+# Detect architecture
+ARCH=$(uname -m)
+case $ARCH in
+  x86_64)  UBUNTU_ARCH="amd64" ;;
+  aarch64) UBUNTU_ARCH="arm64" ;;
+  *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+esac
+echo "=== Architecture: $ARCH ($UBUNTU_ARCH), Provider: $PROVIDER ==="
+
+# Detect OS
+if [ -f /etc/os-release ]; then
+  . /etc/os-release
+  OS_ID="$ID"
+  OS_CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo unknown)}"
+else
+  OS_ID="ubuntu"
+  OS_CODENAME="jammy"
+fi
+echo "=== OS: $OS_ID $OS_CODENAME ==="
+
+###############################################################################
+# PHASE 1: Base system setup (mirrors setup_base.sh)
+###############################################################################
+echo "=== [1/6] Base system setup ==="
+
+apt-get update -qq
+
+# OpenSSH security update (Ubuntu 22.04 specific)
+if [ "$OS_ID" = "ubuntu" ] && [ "$OS_CODENAME" = "jammy" ]; then
+  apt-get -qq -y satisfy 'openssh-server (>= 1:8.9p1-3ubuntu0.10)' || true
+fi
+
+# Kernel update (Ubuntu 22.04 HWE kernel -- matches upstream postgres-vm-images)
+if [ "$OS_ID" = "ubuntu" ] && [ "$OS_CODENAME" = "jammy" ]; then
+  echo "Installing kernel 6.8.0-90-generic..."
+  apt-get install -y linux-image-6.8.0-90-generic linux-headers-6.8.0-90-generic linux-tools-6.8.0-90-generic || true
+fi
+
+# Ruby bundler (needed by rhizome)
+apt-get install -y ruby-bundler
+
+echo "=== [1/6] Configuring PostgreSQL repositories ==="
+
+# Add PostgreSQL PGDG repository
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --batch --yes --dearmor -o /usr/share/keyrings/pgdg.gpg
+echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] http://apt.postgresql.org/pub/repos/apt ${OS_CODENAME}-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+
+# Add golang PPA for WAL-G (Ubuntu only -- Debian uses PGDG or default golang)
+if [ "$OS_ID" = "ubuntu" ]; then
+  add-apt-repository -y --no-update ppa:longsleep/golang-backports
+fi
+
+apt-get update
+
+echo "=== [1/6] Installing postgresql-common and configuring ==="
+
+apt-get install -y postgresql-common
+
+# Data checksums, no auto cluster creation, conf.d inclusion
+# Written as a complete file to survive postgresql-common package upgrades
+cat > /etc/postgresql-common/createcluster.conf <<'PGCONF'
+initdb_options = '--data-checksums'
+create_main_cluster = 'off'
+add_include_dir = 'conf.d'
+include_dir = '/etc/postgresql-common/createcluster.d'
+PGCONF
+mkdir -p /etc/postgresql-common/createcluster.d
+
+echo "=== [1/6] Installing extension dependencies ==="
+
+# These shared libraries are needed by the cached .deb extensions at runtime.
+# Install unconditionally -- apt is a no-op if already present.
+apt-get install -y \
+    libc-ares2 \
+    libevent-2.1-7 \
+    libgdal30 libgdal-dev \
+    libgeos-c1v5 \
+    libproj22 \
+    libprotobuf-c1 \
+    libsfcgal1 \
+    libsybdb5 \
+    liburing2 \
+    default-libmysqlclient-dev \
+    python3-psycopg2 \
+    nftables || {
+  # Debian 13 may have different package names for some libs
+  echo "WARN: some extension deps failed, trying Debian alternatives..."
+  apt-get install -y \
+      libc-ares2 \
+      libevent-2.1-7 \
+      libgdal-dev \
+      libgeos-dev \
+      libproj-dev \
+      libprotobuf-c1 \
+      libsfcgal1 \
+      libsybdb5 \
+      default-libmysqlclient-dev \
+      python3-psycopg2 \
+      nftables || true
+}
+
+# libh3 -- may not be available on all distros
+apt-get install -y libh3-1 2>/dev/null || apt-get install -y libh3-dev 2>/dev/null || echo "WARN: libh3 not available, h3 extension may not work"
+
+###############################################################################
+# PHASE 2: Package lists and caching (mirrors setup_base.sh package caching)
+###############################################################################
+echo "=== [2/6] Creating package lists and caching .debs ==="
+
+mkdir -p /usr/local/share/postgresql/packages
+
+# Write package lists inline (from postgres-vm-images/common/assets/packages/)
+cat > /usr/local/share/postgresql/packages/common.txt <<'EOF'
+pgbouncer
+pgbouncer-dbgsym
+EOF
+
+for ver in 16 17 18; do
+cat > /usr/local/share/postgresql/packages/${ver}.txt <<EOF
+postgresql-${ver}
+postgresql-${ver}-cron
+postgresql-${ver}-cron-dbgsym
+postgresql-${ver}-dbgsym
+postgresql-${ver}-h3
+postgresql-${ver}-h3-dbgsym
+postgresql-${ver}-hll
+postgresql-${ver}-hll-dbgsym
+postgresql-${ver}-hypopg
+postgresql-${ver}-hypopg-dbgsym
+postgresql-${ver}-mysql-fdw
+postgresql-${ver}-mysql-fdw-dbgsym
+postgresql-${ver}-orafce
+postgresql-${ver}-orafce-dbgsym
+postgresql-${ver}-partman
+postgresql-${ver}-partman-dbgsym
+postgresql-${ver}-pgaudit
+postgresql-${ver}-pgaudit-dbgsym
+postgresql-${ver}-pglogical
+postgresql-${ver}-pglogical-dbgsym
+postgresql-${ver}-pgrouting
+postgresql-${ver}-pgrouting-dbgsym
+postgresql-${ver}-pgrouting-scripts
+postgresql-${ver}-pgtap
+postgresql-${ver}-pgvector
+postgresql-${ver}-pgvector-dbgsym
+postgresql-${ver}-postgis-3
+postgresql-${ver}-postgis-3-dbgsym
+postgresql-${ver}-postgis-3-scripts
+postgresql-${ver}-repack
+postgresql-${ver}-repack-dbgsym
+postgresql-${ver}-similarity
+postgresql-${ver}-similarity-dbgsym
+postgresql-${ver}-tds-fdw
+postgresql-${ver}-tds-fdw-dbgsym
+postgresql-plperl-${ver}
+postgresql-plperl-${ver}-dbgsym
+postgresql-plpython3-${ver}
+postgresql-plpython3-${ver}-dbgsym
+EOF
+done
+
+chown -R root:root /usr/local/share/postgresql/packages
+chmod 755 /usr/local/share/postgresql/packages
+chmod 644 /usr/local/share/postgresql/packages/*.txt
+
+# Install helper script for runtime package installation
+cat > /usr/local/bin/install-postgresql-packages <<'HELPER'
+#!/bin/bash
+set -euo pipefail
+PACKAGE_CACHE="/var/cache/postgresql-packages"
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 <postgresql-version>"
+  echo "  postgresql-version: 16, 17, or 18"
+  exit 1
+fi
+VERSION="$1"
+if [[ ! "$VERSION" =~ ^(16|17|18)$ ]]; then
+  echo "Error: Invalid PostgreSQL version '$VERSION'. Must be 16, 17, or 18."
+  exit 1
+fi
+if [[ ! -d "$PACKAGE_CACHE/$VERSION" ]]; then
+  echo "Error: Package cache directory not found: $PACKAGE_CACHE/$VERSION"
+  exit 1
+fi
+if [[ ! -d "$PACKAGE_CACHE/common" ]]; then
+  echo "Error: Common package cache directory not found: $PACKAGE_CACHE/common"
+  exit 1
+fi
+echo "Installing PostgreSQL $VERSION packages..."
+dpkg -i "$PACKAGE_CACHE/common"/*.deb "$PACKAGE_CACHE/$VERSION"/*.deb
+echo "PostgreSQL $VERSION packages installed successfully."
+HELPER
+chmod 755 /usr/local/bin/install-postgresql-packages
+
+# Download .deb packages to cache
+PACKAGE_CACHE="/var/cache/postgresql-packages"
+for version in 16 17 18; do
+  echo "Downloading packages for PostgreSQL $version..."
+  mkdir -p "$PACKAGE_CACHE/$version"
+  pushd "$PACKAGE_CACHE/$version" > /dev/null
+  xargs -a /usr/local/share/postgresql/packages/$version.txt apt-get download 2>&1 || {
+    echo "WARN: some packages for PG $version failed to download, continuing..."
+  }
+  popd > /dev/null
+done
+
+echo "Downloading common packages..."
+mkdir -p "$PACKAGE_CACHE/common"
+pushd "$PACKAGE_CACHE/common" > /dev/null
+xargs -a /usr/local/share/postgresql/packages/common.txt apt-get download 2>&1 || {
+  echo "WARN: some common packages failed to download, continuing..."
+}
+popd > /dev/null
+
+echo "Package cache contents:"
+du -sh "$PACKAGE_CACHE"/* || true
+
+###############################################################################
+# PHASE 3: Users, groups, IMDS protection (mirrors setup_base.sh)
+###############################################################################
+echo "=== [3/6] Users, groups, IMDS protection ==="
+
+# Create users (idempotent)
+id prometheus &>/dev/null || adduser --disabled-password --gecos '' prometheus
+id ubi_monitoring &>/dev/null || adduser --disabled-password --gecos '' ubi_monitoring
+
+# Create cert_readers group and memberships
+getent group cert_readers &>/dev/null || groupadd cert_readers
+usermod --append --groups cert_readers postgres
+usermod --append --groups cert_readers prometheus
+
+# Restrict su to sudo group
+if ! grep -q 'pam_wheel.so group=sudo' /etc/pam.d/su; then
+  echo -e '\nauth required pam_wheel.so group=sudo\n' | tee -a /etc/pam.d/su
+fi
+
+# IMDS protection (nftables config + systemd service)
+cat > /etc/nftables.conf <<'NFTCONF'
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+table inet imds_protection {
+    chain output {
+        type filter hook output priority 0; policy accept;
+
+        # Allow root to access IMDS
+        meta skuid 0 ip daddr 169.254.169.254 accept
+        meta skuid 0 ip6 daddr fd00:ec2::254 accept
+
+        # Block all other users from accessing IMDS
+        ip daddr 169.254.169.254 drop
+        ip6 daddr fd00:ec2::254 drop
+    }
+}
+NFTCONF
+
+cat > /etc/systemd/system/imds-protection.service <<'IMDSSVC'
+[Unit]
+Description=Block non-root access to EC2 instance metadata
+DefaultDependencies=no
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'grep -qi amazon /sys/devices/virtual/dmi/id/sys_vendor 2>/dev/null && nft -f /etc/nftables.conf || true'
+
+[Install]
+WantedBy=multi-user.target
+IMDSSVC
+
+systemctl enable imds-protection.service
+
+###############################################################################
+# PHASE 4: Build from source -- WAL-G and pguint (mirrors setup_packages.sh)
+###############################################################################
+echo "=== [4/6] Building WAL-G and extensions from source ==="
+
+# Install build dependencies
+apt-get install -y cmake python3 python3-pip git make gcc
+
+# Install golang -- use PPA on Ubuntu, apt on Debian
+if [ "$OS_ID" = "ubuntu" ]; then
+  apt-get install -y golang-go
+else
+  apt-get install -y golang-go || {
+    echo "WARN: golang-go not in repos, trying snap..."
+    snap install go --classic
+  }
+fi
+
+# Install PG server dev packages for all versions
+apt-get install -y postgresql-server-dev-16 postgresql-server-dev-17 postgresql-server-dev-18
+
+ln -sf /usr/bin/python3 /usr/bin/python 2>/dev/null || true
+
+# --- WAL-G ---
+if [ "$SKIP_WALG" != "1" ]; then
+  echo "Building WAL-G from source..."
+  WALG_DIR=$(mktemp -d)
+  if [ -f "$DEPS_DIR/walg-src.tar.gz" ]; then
+    echo "Using pre-downloaded WAL-G source..."
+    tar xzf "$DEPS_DIR/walg-src.tar.gz" -C "$WALG_DIR" --strip-components=1
+  else
+    cd "$WALG_DIR"
+    git init
+    git remote add origin https://github.com/wal-g/wal-g.git
+    git fetch origin --depth 1 6ea13b90a3198bd5c8f8ac2ae323f28e33cf9f06
+    git reset --hard FETCH_HEAD
+  fi
+  cd "$WALG_DIR"
+
+  make deps
+  make pg_build
+  GOBIN=/usr/bin make pg_install
+  echo "WAL-G installed: $(wal-g --version 2>&1 || echo 'version check failed')"
+
+  # Build WAL-G daemon client
+  make build_client
+  cp bin/walg-daemon-client /usr/bin/walg-daemon-client
+  chmod +x /usr/bin/walg-daemon-client
+
+  cd /tmp
+  rm -rf "$WALG_DIR"
+else
+  echo "Skipping WAL-G build (SKIP_WALG=1)"
+fi
+
+# --- pguint extension ---
+echo "Building pguint extension for PG 16, 17, 18..."
+PGUINT_DIR=$(mktemp -d)
+if [ -f "$DEPS_DIR/pguint-src.tar.gz" ]; then
+  echo "Using pre-downloaded pguint source..."
+  tar xzf "$DEPS_DIR/pguint-src.tar.gz" -C "$PGUINT_DIR" --strip-components=1
+else
+  cd "$PGUINT_DIR"
+  git clone --depth 1 https://github.com/petere/pguint.git .
+fi
+cd "$PGUINT_DIR"
+
+for pgver in 16 17 18; do
+  PG_CONFIG="/usr/lib/postgresql/${pgver}/bin/pg_config"
+  if [ -x "$PG_CONFIG" ]; then
+    echo "Building pguint for PostgreSQL $pgver..."
+    make PG_CONFIG="$PG_CONFIG"
+    make PG_CONFIG="$PG_CONFIG" install
+    make clean
+  else
+    echo "WARN: pg_config not found for PG $pgver, skipping pguint"
+  fi
+done
+
+cd /tmp
+rm -rf "$PGUINT_DIR"
+
+# --- ParadeDB extensions (amd64 only, download only) ---
+if [ "$UBUNTU_ARCH" = "amd64" ] && [ "$OS_CODENAME" = "jammy" ]; then
+  echo "Downloading ParadeDB extensions (x64/jammy only)..."
+  PG_ANALYTICS_VERSION="0.3.7"
+  PG_SEARCH_VERSION="0.21.2"
+  PARADEDB_PKG_DIR="/var/cache/paradedb"
+  mkdir -p "$PARADEDB_PKG_DIR"
+
+  # Use pre-staged packages if available, else download
+  for pgver in 16 17; do
+    if [ -f "$DEPS_DIR/paradedb/postgresql-${pgver}-pg-analytics.deb" ]; then
+      cp "$DEPS_DIR/paradedb/postgresql-${pgver}-pg-analytics.deb" "$PARADEDB_PKG_DIR/"
+    else
+      curl -fSL --max-time 120 -o "$PARADEDB_PKG_DIR/postgresql-${pgver}-pg-analytics.deb" \
+        "https://github.com/paradedb/pg_analytics/releases/download/v${PG_ANALYTICS_VERSION}/postgresql-${pgver}-pg-analytics_${PG_ANALYTICS_VERSION}-1PARADEDB-jammy_amd64.deb" || echo "WARN: pg_analytics PG${pgver} download failed"
+    fi
+  done
+
+  for pgver in 16 17 18; do
+    if [ -f "$DEPS_DIR/paradedb/postgresql-${pgver}-pg-search.deb" ]; then
+      cp "$DEPS_DIR/paradedb/postgresql-${pgver}-pg-search.deb" "$PARADEDB_PKG_DIR/"
+    else
+      curl -fSL --max-time 120 -o "$PARADEDB_PKG_DIR/postgresql-${pgver}-pg-search.deb" \
+        "https://github.com/paradedb/paradedb/releases/download/v${PG_SEARCH_VERSION}/postgresql-${pgver}-pg-search_${PG_SEARCH_VERSION}-1PARADEDB-jammy_amd64.deb" || echo "WARN: pg_search PG${pgver} download failed"
+    fi
+  done
+
+  echo "ParadeDB packages:"
+  ls -la "$PARADEDB_PKG_DIR"/
+else
+  echo "Skipping ParadeDB extensions (arch=$UBUNTU_ARCH, codename=$OS_CODENAME)"
+fi
+
+###############################################################################
+# PHASE 5: Monitoring (mirrors setup_monitoring.sh)
+###############################################################################
+echo "=== [5/6] Installing monitoring tools ==="
+
+PROM_ARCH="$UBUNTU_ARCH"
+
+# Prometheus
+echo "Installing Prometheus v2.53.0..."
+if [ -f "$DEPS_DIR/prometheus-2.53.0.linux-${PROM_ARCH}.tar.gz" ]; then
+  cp "$DEPS_DIR/prometheus-2.53.0.linux-${PROM_ARCH}.tar.gz" /tmp/prometheus.tar.gz
+else
+  wget -q "https://github.com/prometheus/prometheus/releases/download/v2.53.0/prometheus-2.53.0.linux-${PROM_ARCH}.tar.gz" -O /tmp/prometheus.tar.gz
+fi
+tar -xzf /tmp/prometheus.tar.gz -C /tmp
+cp "/tmp/prometheus-2.53.0.linux-${PROM_ARCH}/prometheus" /usr/bin/prometheus
+chown prometheus:prometheus /usr/bin/prometheus
+chmod 100 /usr/bin/prometheus
+rm -rf /tmp/prometheus*
+
+# node_exporter
+echo "Installing node_exporter v1.8.1..."
+if [ -f "$DEPS_DIR/node_exporter-1.8.1.linux-${PROM_ARCH}.tar.gz" ]; then
+  cp "$DEPS_DIR/node_exporter-1.8.1.linux-${PROM_ARCH}.tar.gz" /tmp/node_exporter.tar.gz
+else
+  wget -q "https://github.com/prometheus/node_exporter/releases/download/v1.8.1/node_exporter-1.8.1.linux-${PROM_ARCH}.tar.gz" -O /tmp/node_exporter.tar.gz
+fi
+tar -xzf /tmp/node_exporter.tar.gz -C /tmp
+cp "/tmp/node_exporter-1.8.1.linux-${PROM_ARCH}/node_exporter" /usr/bin/node_exporter
+chown prometheus:prometheus /usr/bin/node_exporter
+chmod 100 /usr/bin/node_exporter
+rm -rf /tmp/node_exporter*
+
+# postgres_exporter
+echo "Installing postgres_exporter v0.15.0..."
+if [ -f "$DEPS_DIR/postgres_exporter-0.15.0.linux-${PROM_ARCH}.tar.gz" ]; then
+  cp "$DEPS_DIR/postgres_exporter-0.15.0.linux-${PROM_ARCH}.tar.gz" /tmp/postgres_exporter.tar.gz
+else
+  wget -q "https://github.com/prometheus-community/postgres_exporter/releases/download/v0.15.0/postgres_exporter-0.15.0.linux-${PROM_ARCH}.tar.gz" -O /tmp/postgres_exporter.tar.gz
+fi
+tar -xzf /tmp/postgres_exporter.tar.gz -C /tmp
+cp "/tmp/postgres_exporter-0.15.0.linux-${PROM_ARCH}/postgres_exporter" /usr/bin/postgres_exporter
+chown ubi_monitoring:ubi_monitoring /usr/bin/postgres_exporter
+chmod 100 /usr/bin/postgres_exporter
+rm -rf /tmp/postgres_exporter*
+
+# --- Systemd service files ---
+
+cat > /etc/systemd/system/prometheus.service <<'SVC'
+[Unit]
+Description=Prometheus Monitoring System
+Documentation=https://prometheus.io/docs/introduction/overview/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/bin/prometheus \
+    --config.file=/home/prometheus/prometheus.yml \
+    --web.config.file=/home/prometheus/web-config.yml \
+    --storage.tsdb.path=/home/prometheus/data \
+    --web.console.templates=/home/prometheus/consoles \
+    --web.console.libraries=/home/prometheus/console_libraries \
+    --storage.tsdb.retention.size=1GB
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+
+cat > /etc/systemd/system/node_exporter.service <<'SVC'
+[Unit]
+Description=Prometheus Node Exporter
+Documentation=https://prometheus.io/docs/guides/node-exporter/
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=prometheus
+Group=prometheus
+Type=simple
+ExecStart=/usr/bin/node_exporter \
+    --collector.disable-defaults \
+    --collector.cpu \
+    --collector.diskstats \
+    --collector.filesystem \
+    --collector.loadavg \
+    --collector.meminfo \
+    --collector.netdev \
+    --collector.uname \
+    --web.disable-exporter-metrics \
+    --collector.diskstats.device-exclude="^(z?ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\\d+n\\d+p)\\d+$|vda|vdc" \
+    --collector.filesystem.mount-points-exclude="^/(dev|proc|run|sys|var|boot|)($|/)"
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+
+cat > /etc/systemd/system/postgres_exporter.service <<'SVC'
+[Unit]
+Description=Prometheus PostgreSQL Exporter
+Documentation=https://github.com/prometheus-community/postgres_exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=ubi_monitoring
+Group=ubi_monitoring
+Type=simple
+Environment=DATA_SOURCE_NAME="host=/var/run/postgresql dbname=postgres"
+ExecStart=/usr/bin/postgres_exporter \
+    --disable-default-metrics \
+    --no-collector.stat_bgwriter \
+    --no-collector.stat_database \
+    --no-collector.locks \
+    --no-collector.database \
+    --extend.query-path=/usr/local/share/postgresql/postgres_exporter_queries.yaml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+
+cat > /etc/systemd/system/wal-g.service <<'SVC'
+[Unit]
+Description=WAL-G Daemon
+Documentation=https://github.com/wal-g/wal-g
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=postgres
+Group=postgres
+Type=simple
+EnvironmentFile=/etc/postgresql/wal-g.env
+ExecStart=/usr/bin/wal-g daemon /tmp/wal-g
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+SVC
+
+# postgres_exporter custom queries
+mkdir -p /usr/local/share/postgresql
+cat > /usr/local/share/postgresql/postgres_exporter_queries.yaml <<'QUERIES'
+pg_stat_activity:
+  query: |
+    SELECT
+      state,
+      COUNT(*) as count,
+      MAX(EXTRACT(EPOCH FROM now() - xact_start))::float AS max_tx_duration
+    FROM pg_stat_activity
+    WHERE pid <> pg_backend_pid()
+      AND datname IS NOT NULL
+      AND state IS NOT NULL
+    GROUP BY state
+  metrics:
+    - state:
+        usage: "LABEL"
+        description: "Connection state (active, idle, etc.)"
+    - count:
+        usage: "GAUGE"
+        description: "Number of connections in this state across all databases"
+    - max_tx_duration:
+        usage: "GAUGE"
+        description: "Maximum transaction duration in seconds across all databases"
+
+pg_stat_database:
+  query: |
+    SELECT
+      SUM(numbackends)::float as numbackends,
+      SUM(xact_commit)::float as xact_commit,
+      SUM(xact_rollback)::float as xact_rollback,
+      SUM(blks_read)::float as blks_read,
+      SUM(blks_hit)::float as blks_hit,
+      SUM(tup_returned)::float as tup_returned,
+      SUM(tup_fetched)::float as tup_fetched,
+      SUM(tup_inserted)::float as tup_inserted,
+      SUM(tup_updated)::float as tup_updated,
+      SUM(tup_deleted)::float as tup_deleted,
+      SUM(conflicts)::float as conflicts,
+      SUM(temp_files)::float as temp_files,
+      SUM(temp_bytes)::float as temp_bytes,
+      SUM(deadlocks)::float as deadlocks,
+      SUM(blk_read_time)::float as blk_read_time,
+      SUM(blk_write_time)::float as blk_write_time
+    FROM pg_stat_database
+    WHERE datname IS NOT NULL
+      AND datname NOT IN ('template0', 'template1')
+  metrics:
+    - numbackends:
+        usage: "GAUGE"
+        description: "Total number of backends across all databases"
+    - xact_commit:
+        usage: "COUNTER"
+        description: "Total committed transactions across all databases"
+    - xact_rollback:
+        usage: "COUNTER"
+        description: "Total rolled back transactions across all databases"
+    - blks_read:
+        usage: "COUNTER"
+        description: "Total disk blocks read across all databases"
+    - blks_hit:
+        usage: "COUNTER"
+        description: "Total buffer cache hits across all databases"
+    - tup_returned:
+        usage: "COUNTER"
+        description: "Total rows returned across all databases"
+    - tup_fetched:
+        usage: "COUNTER"
+        description: "Total rows fetched across all databases"
+    - tup_inserted:
+        usage: "COUNTER"
+        description: "Total rows inserted across all databases"
+    - tup_updated:
+        usage: "COUNTER"
+        description: "Total rows updated across all databases"
+    - tup_deleted:
+        usage: "COUNTER"
+        description: "Total rows deleted across all databases"
+    - conflicts:
+        usage: "COUNTER"
+        description: "Total query conflicts across all databases"
+    - temp_files:
+        usage: "COUNTER"
+        description: "Total temporary files created across all databases"
+    - temp_bytes:
+        usage: "COUNTER"
+        description: "Total temporary file bytes across all databases"
+    - deadlocks:
+        usage: "COUNTER"
+        description: "Total deadlocks across all databases"
+    - blk_read_time:
+        usage: "COUNTER"
+        description: "Total time spent reading blocks in milliseconds across all databases"
+    - blk_write_time:
+        usage: "COUNTER"
+        description: "Total time spent writing blocks in milliseconds across all databases"
+
+pg_database:
+  query: |
+    SELECT
+      datname,
+      pg_database_size(datname)::float as size_bytes
+    FROM pg_database
+    WHERE datallowconn = true
+      AND datistemplate = false
+      AND datname NOT IN ('template0', 'template1')
+    ORDER BY pg_database_size(datname) DESC
+    LIMIT 5
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - size_bytes:
+        usage: "GAUGE"
+        description: "Database size in bytes"
+
+pg_locks:
+  query: |
+    SELECT
+      lower(mode) as mode,
+      COUNT(*)::float as count
+    FROM pg_locks
+    WHERE database IS NOT NULL
+    GROUP BY mode
+  metrics:
+    - mode:
+        usage: "LABEL"
+        description: "Lock mode"
+    - count:
+        usage: "GAUGE"
+        description: "Number of locks across all databases by mode"
+
+pg_stat_database_conflicts:
+  query: |
+    SELECT
+      SUM(confl_tablespace)::float as confl_tablespace,
+      SUM(confl_lock)::float as confl_lock,
+      SUM(confl_snapshot)::float as confl_snapshot,
+      SUM(confl_bufferpin)::float as confl_bufferpin,
+      SUM(confl_deadlock)::float as confl_deadlock,
+      SUM(COALESCE(confl_active_logicalslot, 0))::float as confl_active_logicalslot
+    FROM pg_stat_database_conflicts
+    WHERE datname IS NOT NULL
+      AND datname NOT IN ('template0', 'template1')
+  metrics:
+    - confl_tablespace:
+        usage: "COUNTER"
+        description: "Total queries canceled due to dropped tablespaces across all databases"
+    - confl_lock:
+        usage: "COUNTER"
+        description: "Total queries canceled due to lock timeouts across all databases"
+    - confl_snapshot:
+        usage: "COUNTER"
+        description: "Total queries canceled due to old snapshots across all databases"
+    - confl_bufferpin:
+        usage: "COUNTER"
+        description: "Total queries canceled due to pinned buffers across all databases"
+    - confl_deadlock:
+        usage: "COUNTER"
+        description: "Total queries canceled due to deadlocks across all databases"
+    - confl_active_logicalslot:
+        usage: "COUNTER"
+        description: "Total queries canceled due to active logical replication slots across all databases (PG 14+)"
+QUERIES
+
+systemctl daemon-reload
+
+# --- CloudWatch Agent (AWS only) ---
+if [ "$PROVIDER" = "aws" ]; then
+  echo "Installing CloudWatch Agent (AWS)..."
+  CW_ARCH="$UBUNTU_ARCH"
+  curl -fSL -o /tmp/amazon-cloudwatch-agent.deb \
+    "https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/${CW_ARCH}/latest/amazon-cloudwatch-agent.deb"
+  dpkg -i /tmp/amazon-cloudwatch-agent.deb
+  rm -f /tmp/amazon-cloudwatch-agent.deb
+else
+  echo "Skipping CloudWatch Agent (provider=$PROVIDER)"
+fi
+
+# --- ClamAV scan ---
+if [ "$SKIP_CLAMAV" != "1" ]; then
+  echo "Running ClamAV security scan..."
+  apt-get install -y clamav clamav-freshclam
+  systemctl stop clamav-freshclam.service 2>/dev/null || true
+  freshclam || echo "WARN: freshclam update failed, continuing..."
+  mkdir -p /tmp/clamav
+  clamscan --quiet -r /usr/bin /usr/sbin /lib /lib64 /usr/lib /etc --log=/tmp/clamav/scan.log -i 2>/dev/null || true
+  echo "ClamAV scan results:"
+  cat /tmp/clamav/scan.log 2>/dev/null || echo "(no findings)"
+else
+  echo "Skipping ClamAV scan (SKIP_CLAMAV=1)"
+fi
+
+###############################################################################
+# PHASE 6: Cleanup (mirrors setup_cleanup.sh)
+###############################################################################
+echo "=== [6/6] Cleanup ==="
+
+# Cloud-init cleanup for re-initialization on next boot
+cloud-init clean --logs --seed 2>/dev/null || true
+
+# Configure cloud-init datasource list for multi-cloud compatibility
+mkdir -p /etc/cloud/cloud.cfg.d
+cat > /etc/cloud/cloud.cfg.d/90_dpkg.cfg <<'EOF'
+# to update this file, run dpkg-reconfigure cloud-init
+datasource_list: [ NoCloud, ConfigDrive, OpenNebula, DigitalOcean, Azure, AltCloud, OVF, MAAS, GCE, OpenStack, CloudSigma, SmartOS, Bigstep, Scaleway, AliYun, Ec2, CloudStack, Hetzner, IBMCloud, Oracle, Exoscale, RbxCloud, UpCloud, VMware, Vultr, LXD, NWCS, None ]
+EOF
+
+# Configure grub for cloud deployment (serial console access)
+mkdir -p /etc/default/grub.d
+cat > /etc/default/grub.d/50-cloudimg-settings.cfg <<'EOF'
+GRUB_RECORDFAIL_TIMEOUT=0
+GRUB_TIMEOUT=0
+GRUB_CMDLINE_LINUX_DEFAULT="console=tty1 console=ttyS0"
+GRUB_TERMINAL=console
+EOF
+update-grub 2>/dev/null || true
+
+# Ensure createcluster.conf survived all package operations
+# (postgresql-common upgrades from PGDG can replace the conffile)
+cat > /etc/postgresql-common/createcluster.conf <<'PGCONF'
+initdb_options = '--data-checksums'
+create_main_cluster = 'off'
+add_include_dir = 'conf.d'
+include_dir = '/etc/postgresql-common/createcluster.d'
+PGCONF
+
+# Clean up build artifacts
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+rm -rf /tmp/clamav /tmp/*.tar.gz /tmp/*.deb
+
+echo "=== Build complete ==="
+echo "Installed components:"
+echo "  - PostgreSQL packages cached: $(ls /var/cache/postgresql-packages/ 2>/dev/null | tr '\n' ' ')"
+echo "  - WAL-G: $(which wal-g 2>/dev/null && wal-g --version 2>&1 || echo 'not installed')"
+echo "  - Prometheus: $(test -f /usr/bin/prometheus && echo 'installed' || echo 'not installed')"
+echo "  - node_exporter: $(test -f /usr/bin/node_exporter && echo 'installed' || echo 'not installed')"
+echo "  - postgres_exporter: $(test -f /usr/bin/postgres_exporter && echo 'installed' || echo 'not installed')"
+echo "  - pgbouncer cache: $(ls /var/cache/postgresql-packages/common/*.deb 2>/dev/null | wc -l) debs"
+echo "  - pguint: $(find /usr/lib/postgresql -name 'uint.so' 2>/dev/null | head -1 || echo 'not found')"
+echo "  - install-postgresql-packages: $(which install-postgresql-packages 2>/dev/null || echo 'not found')"
