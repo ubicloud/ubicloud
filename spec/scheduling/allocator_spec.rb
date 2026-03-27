@@ -1642,5 +1642,17 @@ RSpec.describe Al do
       vbb_2 = VhostBlockBackend.new(allocation_weight: 100) { it.id = VhostBlockBackend.generate_uuid }
       expect(Al::StorageAllocation.allocate_vhost_block_backend([vbb_1, vbb_2])).to eq(vbb_2.id)
     end
+
+    it "filters backends by min_version" do
+      vbb_1 = VhostBlockBackend.new_with_id(allocation_weight: 100, version: "v0.3.0")
+      vbb_2 = VhostBlockBackend.new_with_id(allocation_weight: 1, version: "v0.4.0")
+      vbb_3 = VhostBlockBackend.new_with_id(allocation_weight: 100, version: "v0.1-7")
+      expect(Al::StorageAllocation.allocate_vhost_block_backend([vbb_1, vbb_2, vbb_3], min_version: "v0.4.0")).to eq(vbb_2.id)
+    end
+
+    it "fails if no backends meet min_version" do
+      vbb_1 = VhostBlockBackend.new_with_id(allocation_weight: 100, version: "v0.3.0")
+      expect { Al::StorageAllocation.allocate_vhost_block_backend([vbb_1], min_version: "v0.4.0") }.to raise_error "Total weight of all eligible vhost_block_backends shouldn't be zero."
+    end
   end
 end

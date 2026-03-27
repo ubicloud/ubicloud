@@ -650,7 +650,12 @@ module Scheduling::Allocator
       rand_choice.id
     end
 
-    def self.allocate_vhost_block_backend(backends)
+    def self.allocate_vhost_block_backend(backends, min_version: nil)
+      if min_version
+        parsed_min_version = VhostBlockBackend.parse_version(min_version)
+        backends.select! { |b| b.parsed_version >= parsed_min_version }
+      end
+
       total_weight = backends.sum(&:allocation_weight)
       fail "Total weight of all eligible vhost_block_backends shouldn't be zero." if total_weight == 0
 
@@ -696,7 +701,10 @@ module Scheduling::Allocator
           spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
           use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"]
         else
-          vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(vm_host.vhost_block_backends)
+          vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(
+            vm_host.vhost_block_backends,
+            min_version: @request.minimum_vhost_block_backend_version
+          )
           use_bdev_ubi = false
         end
 
