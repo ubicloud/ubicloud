@@ -41,6 +41,8 @@ class SubjectTag < Sequel::Model
       !DB[:access_tag].where(project_id:, hyper_tag_id: subject.id).empty?
     when ApiKey
       subject.owner_table == "accounts" && subject.project_id == project_id
+    when TrustedJwtIssuer
+      subject.project_id == project_id
     end
   end
 end

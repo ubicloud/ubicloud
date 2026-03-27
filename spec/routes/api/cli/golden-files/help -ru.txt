@@ -33,6 +33,12 @@ ubi gh installation-name/repository-name list-cache-entries [options]
 ubi gh installation-name/repository-name remove-all-cache-entries
 ubi gh installation-name/repository-name remove-cache-entry cache-entry-id
 ubi help [options] [command [subcommand]]
+ubi jw command [...]
+ubi jw jw-id post-command [...]
+ubi jw create [options]
+ubi jw list [options]
+ubi jw jw-id destroy [options]
+ubi jw jw-id show
 ubi kc command [...]
 ubi kc (location/kc-name | kc-id) post-command [...]
 ubi kc list [options]

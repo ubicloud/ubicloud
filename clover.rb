@@ -131,6 +131,7 @@ class Clover < Roda
     PrivateSubnet
     SshPublicKey
     SubjectTag
+    TrustedJwtIssuer
     Vm
   ].each { path(it, class_name: true, &under_project_path) }
 
@@ -322,9 +323,10 @@ class Clover < Roda
   end
 
   require_relative "rodauth/features/personal_access_token"
+  require_relative "rodauth/features/jwt_scope_token"
 
   plugin :rodauth, name: :api do
-    enable :json, :personal_access_token
+    enable :json, :personal_access_token, :jwt_scope_token
 
     only_json? true
 
@@ -991,7 +993,7 @@ class Clover < Roda
 
   route do |r|
     if api?
-      unless /\ABearer:?\s+pat-/i.match?(env["HTTP_AUTHORIZATION"].to_s)
+      unless /\ABearer:?\s+/i.match?(env["HTTP_AUTHORIZATION"].to_s)
         if r.path_info == "/cli"
           response.content_type = :text
           response.status = 400

@@ -6,20 +6,30 @@ require "jwt"
 require_relative "../model"
 
 class TrustedJwtIssuer < Sequel::Model
-  many_to_one :project, read_only: true
-  many_to_one :account, read_only: true
-
   plugin ResourceMethods
+  include SubjectTag::Cleanup
 
   JWKS_CACHE_TTL = 300
+  # Min seconds between JWKS fetches per URI. kid misses force invalidation, so
+  # without this an attacker minting tokens with unknown kids could hammer the issuer
+  JWKS_MIN_REFETCH = 30
   JWKS_CACHE = {}
   JWKS_CACHE_MUTEX = Mutex.new
+  JWKS_FETCH_TIMEOUTS = {connect_timeout: 5, read_timeout: 5, write_timeout: 5}.freeze
   # Tolerate small clock skew between issuer and verifier
   CLOCK_LEEWAY = 30
+  # Asymmetric algorithms only; HMAC excluded to prevent key confusion against public JWKS
+  ALLOWED_ALGORITHMS = %w[RS256 RS384 RS512 PS256 PS384 PS512 ES256 ES384 ES512].freeze
+
+  def path
+    "/token/jwt-issuer/#{ubid}/access-control"
+  end
 
   def validate
     super
     validates_presence [:name, :issuer, :jwks_uri]
+
+    validates_format(Validation::ALLOWED_NAME_PATTERN, :name, message: "must only contain lowercase letters, numbers, and hyphens and have max length 63.", allow_nil: true)
 
     if jwks_uri && !jwks_uri.empty?
       errors.add(:jwks_uri, "must be a valid https URL") unless self.class.valid_jwks_uri?(jwks_uri)
@@ -28,7 +38,7 @@ class TrustedJwtIssuer < Sequel::Model
 
   def decode_jwt(token)
     opts = {
-      algorithms: ["RS256"],
+      algorithms: ALLOWED_ALGORITHMS,
       iss: issuer,
       verify_iss: true,
       required_claims: ["exp"],
@@ -57,16 +67,24 @@ class TrustedJwtIssuer < Sequel::Model
   end
 
   def self.fetch_jwks(uri, invalidate:)
-    JWKS_CACHE_MUTEX.synchronize do
+    now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    pending = JWKS_CACHE_MUTEX.synchronize do
       entry = JWKS_CACHE[uri]
-      now = Process.clock_gettime(Process::CLOCK_MONOTONIC)
-      if invalidate || entry.nil? || now - entry[:at] > JWKS_CACHE_TTL
-        entry = {at: now, jwks: JSON.parse(Excon.get(uri, expects: [200]).body)}
-        JWKS_CACHE[uri] = entry
+      if entry && (now - entry[:at] < JWKS_MIN_REFETCH || (!invalidate && now - entry[:at] <= JWKS_CACHE_TTL))
+        entry[:promise]
+      else
+        # cache fetch so concurrent callers for same URI await one request outside mutex
+        promise = Thread.new do
+          Thread.current.report_on_exception = false
+          JSON.parse(Excon.get(uri, expects: [200], **JWKS_FETCH_TIMEOUTS).body)
+        end
+        JWKS_CACHE[uri] = {at: now, promise:}
+        promise
       end
-      entry[:jwks]
     end
+    pending.value
   rescue Excon::Error, JSON::ParserError => e
+    JWKS_CACHE_MUTEX.synchronize { JWKS_CACHE.delete(uri) if JWKS_CACHE[uri]&.[](:promise).equal?(pending) }
     raise JWT::DecodeError, "Failed to fetch JWKS from #{uri}: #{e.message}"
   end
 

@@ -25,6 +25,7 @@ class Project < Sequel::Model
   one_to_many :machine_images, read_only: true
   one_to_many :machine_image_stores, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
+  one_to_many :trusted_jwt_issuers, read_only: true
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
   RESOURCE_ASSOCIATION_DATASET_METHODS = RESOURCE_ASSOCIATIONS.map { :"#{it}_dataset" }
@@ -63,7 +64,8 @@ class Project < Sequel::Model
     object_tags: :destroy,
     quotas: :destroy,
     ssh_public_keys: :destroy,
-    subject_tags: :destroy
+    subject_tags: :destroy,
+    trusted_jwt_issuers: :destroy
 
   plugin ResourceMethods
 
