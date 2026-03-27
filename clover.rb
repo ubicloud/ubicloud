@@ -505,6 +505,9 @@ class Clover < Roda
     end
     # :nocov:
 
+    require_relative "vendor/omniauth_oidc"
+    omniauth_provider :oidc
+
     auth_class_eval do
       def check_locked_domain(email, error_prefix, redirect: nil)
         if (locked_domain = locked_domain_for(email))
@@ -516,17 +519,12 @@ class Clover < Roda
       # If the route isn't already handled and matches a known provider,
       # get the app specific to that provider, and then run it.
       def route_omniauth!
-        super
         if (match = %r{\A/auth/(0p[a-tv-z0-9]{24})(?:/callback)?\z}.match(request.path_info)) &&
             (provider = OidcProvider[match[1]])
-          omniauth_run omniauth_app_for_provider(provider)
-
-          # :nocov:
-          # Not reached in testing due to omniauth_setup throw above.
-          handle_omniauth_callback
-          # :nocov:
+          request.env["clover.oidc_provider"] = provider
         end
-        nil
+
+        super
       end
 
       def domain_for_email(email)
@@ -535,62 +533,6 @@ class Clover < Roda
 
       def locked_domain_for(email)
         LockedDomain.with_pk(domain_for_email(email))
-      end
-
-      omniauth_apps = {}
-      omniauth_app_mutex = Mutex.new
-      builder_app = ->(env) { [404, {}, []] }
-
-      # Return OIDC-provider specific omniauth app.  If there isn't an existing
-      # app for the provider in this process, build one.
-      define_method(:omniauth_app_for_provider) do |provider|
-        name = provider.ubid
-        if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
-          return app
-        end
-
-        # Delay loading of omniauth_oidc until it is needed. Generally, this type of
-        # runtime require doesn't work with a frozen environment, but it does in this
-        # as the file does not modify any frozen constants. This is helpful so that
-        # users do not have to pay the cost of loading the file if they do not have
-        # any OidcProviders.
-        require_relative "vendor/omniauth_oidc"
-
-        # This part is copied from rodauth-omniauth's omniauth_app method in order
-        # to integrate with rodauth-omniauth.
-        builder = OmniAuth::Builder.new
-        builder.options(
-          path_prefix: omniauth_prefix,
-          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
-        )
-        builder.configure do |config|
-          [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
-            config.send(:"#{hook}=", ->(env) { env["rodauth.omniauth.instance"].send(:"omniauth_#{hook}") })
-          end
-        end
-
-        # Only use the provider passed to the method. rodauth-omniauth uses all
-        # statically configured providers in omniauth_app
-        uri = URI(provider.url)
-        builder.provider :oidc,
-          name: name.to_sym,
-          issuer: provider.url,
-          client_options: {
-            port: uri.port,
-            scheme: uri.scheme,
-            host: uri.host,
-            identifier: provider.client_id,
-            secret: provider.client_secret,
-            redirect_uri: provider.callback_url,
-            authorization_endpoint: provider.authorization_endpoint,
-            token_endpoint: provider.token_endpoint,
-            userinfo_endpoint: provider.userinfo_endpoint,
-            need_groups: provider.group_prefix
-          }
-
-        builder.run builder_app
-        app = builder.to_app
-        omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
       end
     end
 
