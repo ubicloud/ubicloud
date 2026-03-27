@@ -46,6 +46,7 @@ RUN apt-get update --fix-missing && apt-get install -y --no-install-recommends \
     tcpdump \
     netcat-openbsd \
     lsof \
+    tmux \
     && rm -rf /var/lib/apt/lists/*
 
 # Install AWS CLI (arch-aware)

@@ -18,7 +18,7 @@ Use `.devcontainer/scripts/invoke_ubicloud_api_curl.sh` for all API calls — it
 invoke_ubicloud_api_curl.sh <METHOD> <path> [extra curl args...]
 ```
 
-If it errors with a token/decryption failure, direct the user to run `.devcontainer/scripts/register-pg-project.sh` first.
+If it errors with a token/decryption failure (e.g. `Unable to decrypt encrypted column`), run `.devcontainer/scripts/rotate-pat-token.sh` to regenerate the PAT without touching the project setup. Only fall back to `register-pg-project.sh` if the account or project itself is missing.
 
 ## Common API patterns
 

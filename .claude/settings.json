@@ -1,15 +1,41 @@
 {
   "permissions": {
     "allow": [
+      "Read",
+      "Edit",
+      "MultiEdit",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(cut:*)",
+      "Bash(wc:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(ls:*)",
+      "Bash(git:*)",
+      "Bash(python3:*)",
+      "Bash(bundle exec *)",
+      "Bash(rake*)",
+      "Bash(ruby*)",
       "Bash(ruby .claude/skills/**/*.rb*)",
       "Bash(.claude/skills/**/*.sh*)",
-      "Bash(bundle exec rake*)",
-      "Bash(rake*)",
+      "Bash(.devcontainer/scripts/*.sh*)",
       "Bash(curl*)",
-      "Bash(.devcontainer/scripts/invoke_ubicloud_api_curl.sh*)",
-      "Bash(.devcontainer/scripts/wait_for_postgres_state.sh*)",
-      "Bash(bundle exec rspec*)",
-      "Bash(sed*./*)"
+      "Bash(ssh -i /tmp/pg_ssh_key_* -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null *)",
+      "Bash(aws ec2 describe-instances *)",
+      "Bash(PGPASSWORD=* psql *)",
+      "Bash(chmod 600 /tmp/pg_ssh_key_test)"
+    ],
+    "deny": [
+      "Bash(sed:*)",
+      "Bash(perl:*)",
+      "Bash(ed:*)",
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)"
     ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "RACK_ENV": "development"
   }
 }

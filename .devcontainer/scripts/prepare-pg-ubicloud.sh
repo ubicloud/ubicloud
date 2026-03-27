@@ -10,7 +10,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REGIONS=()
 
-AWS_PROFILE="${AWS_LOGIN_PROFILE:-pg-dev-postgresqladmindev}"
 : "${AWS_ASSUME_ROLE:?AWS_ASSUME_ROLE is not set. Ensure it is defined in docker-compose.yml or exported in your shell.}"
 
 # Parse arguments
@@ -58,13 +57,7 @@ for REGION in "${REGIONS[@]}"; do
   "$SCRIPT_DIR/register-pg-region.sh" "$REGION" "$AWS_ASSUME_ROLE"
 done
 
-echo "=== AWS SSO login ==="
-if aws sts get-caller-identity --profile="$AWS_PROFILE" >/dev/null 2>&1; then
-  echo "AWS SSO session already active"
-else
-  echo "Logging in to AWS SSO..."
-  aws sso login --profile="$AWS_PROFILE"    
-fi
+"$SCRIPT_DIR/aws-sso-login.sh"
 
 echo ""
 echo "=== Done ==="
