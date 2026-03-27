@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = "ubi-csi"
-  spec.version = "0.8.0"
+  spec.version = "0.9.0"
   spec.authors = ["Ubicloud"]
   spec.email = ["support@ubicloud.com"]
 
