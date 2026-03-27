@@ -308,6 +308,7 @@ end
 #  resource_discount         | resource_discount_project_id_fkey         | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
+#  trusted_jwt_issuer        | trusted_jwt_issuer_project_id_fkey        | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
 #  victoria_metrics_resource | victoria_metrics_resource_project_id_fkey | (project_id) REFERENCES project(id)
 #  vm                        | vm_project_id_fkey                        | (project_id) REFERENCES project(id)
