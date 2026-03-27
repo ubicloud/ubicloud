@@ -1738,6 +1738,41 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/privatelink':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    post:
+      operationId: createPostgresDatabasePrivateLink
+      summary: Create an AWS PrivateLink endpoint for a PostgreSQL database
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivatelinkAws'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+    get:
+      operationId: getPostgresDatabasePrivateLink
+      summary: Get the AWS PrivateLink endpoint for a PostgreSQL database
+      responses:
+        '200':
+          $ref: '#/components/responses/PrivatelinkAws'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+    delete:
+      operationId: deletePostgresDatabasePrivateLink
+      summary: Delete the AWS PrivateLink endpoint for a PostgreSQL database
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
   '/project/{project_id}/location/{location}/private-subnet':
     get:
       operationId: listLocationPrivateSubnets
@@ -3177,6 +3212,67 @@ components:
       required:
         - key
         - last_modified
+    PrivatelinkAws:
+      type: object
+      properties:
+        id:
+          description: ID of the PrivateLink endpoint
+          type: string
+        state:
+          description: Current state of the PrivateLink endpoint
+          type: string
+        subnet_id:
+          description: ID of the private subnet associated with this PrivateLink
+          type: string
+        service_name:
+          description: AWS VPC endpoint service name (available once provisioned)
+          type: string
+          nullable: true
+        service_id:
+          description: AWS VPC endpoint service ID
+          type: string
+          nullable: true
+        ports:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              src_port:
+                type: integer
+              dst_port:
+                type: integer
+            additionalProperties: false
+            required:
+              - id
+              - src_port
+              - dst_port
+        vms:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              name:
+                type: string
+              state:
+                type: string
+            additionalProperties: false
+            required:
+              - id
+              - name
+              - state
+      additionalProperties: false
+      required:
+        - id
+        - state
+        - subnet_id
+        - service_name
+        - service_id
+        - ports
+        - vms
     PostgresFirewallRule:
       type: object
       properties:
@@ -3795,6 +3891,12 @@ components:
               - current_version
               - target_version
               - upgrade_status
+    PrivatelinkAws:
+      description: An AWS PrivateLink endpoint for a PostgreSQL database
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PrivatelinkAws'
     PostgresFirewallRule:
       description: A Postgres Firewall Rule
       content:
