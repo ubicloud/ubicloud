@@ -723,6 +723,54 @@ class Clover
         end
       end
 
+      r.on "privatelink" do
+        r.post true do
+          authorize("Postgres:edit", pg)
+
+          unless pg.location.aws?
+            raise CloverError.new(400, "InvalidRequest", "PrivateLink is only supported on AWS locations")
+          end
+
+          unless (rep_vm = pg.representative_server&.vm)
+            raise CloverError.new(400, "InvalidRequest", "PostgreSQL database is not ready")
+          end
+
+          pl = DB.transaction do
+            strand = Prog::Vnet::PrivatelinkAwsNexus.assemble(
+              private_subnet_id: rep_vm.nics.first.private_subnet_id,
+              vm_ids: [rep_vm.id],
+              description: "PrivateLink for PostgreSQL database #{pg.name}"
+            )
+            audit_log(strand.subject, "create", pg)
+            strand.subject
+          end
+
+          Serializers::PrivatelinkAws.serialize(pl, {detailed: true})
+        end
+
+        pl = @pl = pg.representative_server&.vm&.nics&.first&.private_subnet&.privatelink_aws_resource
+
+        r.get true do
+          authorize("Postgres:view", pg)
+          unless pl
+            raise CloverError.new(404, "PrivatelinkNotConfigured", "No PrivateLink endpoint is configured for this PostgreSQL database")
+          end
+          Serializers::PrivatelinkAws.serialize(pl, {detailed: true})
+        end
+
+        r.delete true do
+          authorize("Postgres:edit", pg)
+          unless pl
+            next 204
+          end
+          DB.transaction do
+            pl.incr_destroy
+            audit_log(pl, "destroy", pg)
+          end
+          204
+        end
+      end
+
       r.is "upgrade" do
         r.get api? do
           # api-only route, web GET upgrade route handled by r.show_object call earlier in route
