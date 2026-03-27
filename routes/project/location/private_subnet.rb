@@ -30,6 +30,63 @@ class Clover
         private_subnet_connection_action("disconnect", id)
       end
 
+      r.on "privatelink" do
+        r.post true do
+          authorize("PrivateSubnet:edit", ps)
+
+          vm_ids = []
+          if (vm = authorized_vm(location_id: ps.location_id))
+            vm_ids = [vm.id]
+          end
+
+          pl = DB.transaction do
+            strand = Prog::Vnet::PrivatelinkAwsNexus.assemble(
+              private_subnet_id: ps.id,
+              vm_ids: vm_ids
+            )
+            audit_log(strand.subject, "create")
+            strand.subject
+          end
+
+          Serializers::PrivatelinkAws.serialize(pl, {detailed: true})
+        end
+
+        pl = @pl = ps.privatelink_aws_resource
+        check_found_object(pl)
+
+        r.post %w[add-vm remove-vm] do |action|
+          authorize("PrivateSubnet:edit", ps)
+
+          unless (vm = authorized_vm(location_id: ps.location_id))
+            fail Validation::ValidationFailed.new("vm_id" => "No matching VM found in #{ps.display_location}")
+          end
+
+          if action == "add-vm"
+            pl.add_vm(vm)
+            audit_log(pl, "add_vm", vm)
+          else
+            pl.remove_vm(vm)
+            audit_log(pl, "remove_vm", vm)
+          end
+
+          Serializers::PrivatelinkAws.serialize(pl.reload, {detailed: true})
+        end
+
+        r.get true do
+          authorize("PrivateSubnet:view", ps)
+          Serializers::PrivatelinkAws.serialize(pl, {detailed: true})
+        end
+
+        r.delete true do
+          authorize("PrivateSubnet:edit", ps)
+          DB.transaction do
+            pl.incr_destroy
+            audit_log(pl, "destroy")
+          end
+          204
+        end
+      end
+
       r.get true do
         authorize("PrivateSubnet:view", ps)
         if api?
