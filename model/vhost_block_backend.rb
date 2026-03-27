@@ -17,9 +17,11 @@ end
 #  version           | text                     | NOT NULL
 #  allocation_weight | integer                  | NOT NULL
 #  vm_host_id        | uuid                     | NOT NULL
+#  version_code      | integer                  | NOT NULL
 # Indexes:
-#  vhost_block_backend_pkey                   | PRIMARY KEY btree (id)
-#  vhost_block_backend_vm_host_id_version_key | UNIQUE btree (vm_host_id, version)
+#  vhost_block_backend_pkey                        | PRIMARY KEY btree (id)
+#  vhost_block_backend_vm_host_id_version_code_key | UNIQUE btree (vm_host_id, version_code)
+#  vhost_block_backend_vm_host_id_version_key      | UNIQUE btree (vm_host_id, version)
 # Check constraints:
 #  vhost_block_backend_allocation_weight_check | (allocation_weight >= 0)
 # Foreign key constraints:
