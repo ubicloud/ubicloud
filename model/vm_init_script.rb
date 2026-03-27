@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class VmInitScript < Sequel::Model
-  plugin ResourceMethods, etc_type: true, encrypted_columns: :init_script
+  plugin ResourceMethods, referencing: UBID::TYPE_VM, encrypted_columns: :init_script
 
   def validate
     super

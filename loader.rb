@@ -258,7 +258,7 @@ def clover_freeze
     ResourceMethods::ClassMethods,
     ResourceMethods::DatasetMethods,
     ResourceMethods::InstanceMethods,
-    ResourceMethods::UbidTypeEtcMethods,
+    ResourceMethods::NoSetUuid,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,
