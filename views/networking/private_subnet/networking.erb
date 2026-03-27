@@ -119,4 +119,22 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
       </tbody>
     </table>
   </div>
+  <% if (pl = @ps.privatelink_aws_resource) %>
+    <div class="mt-6">
+    <%== part(
+      "components/table_card",
+      title: "AWS PrivateLink",
+      headers: ["Name", "Service Name", "Description"],
+      rows: [
+        [
+          [
+            [pl.ubid, {link: path(pl)}],
+            pl.service_name || (pl.display_state == "available" ? "—" : "Creating..."),
+            pl.description || "—"
+          ]
+        ]
+      ]
+    ) %>
+    </div>
+  <% end %>
 </div>

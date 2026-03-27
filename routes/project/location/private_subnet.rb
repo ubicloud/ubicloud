@@ -54,6 +54,10 @@ class Clover
         pl = @pl = ps.privatelink_aws_resource
         check_found_object(pl)
 
+        r.get web? do
+          r.redirect pl
+        end
+
         r.post %w[add-vm remove-vm] do |action|
           authorize("PrivateSubnet:edit", ps)
 
