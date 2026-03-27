@@ -7,7 +7,7 @@ class MachineImageVersionMetal < Sequel::Model
   many_to_one :store, class: :MachineImageStore, read_only: true
   many_to_one :archive_kek, class: :StorageKeyEncryptionKey, read_only: true
 
-  plugin ResourceMethods, etc_type: true
+  plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
 end
 
 # Table: machine_image_version_metal

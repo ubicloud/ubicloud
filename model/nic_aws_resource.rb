@@ -4,7 +4,7 @@ require_relative "../model"
 
 class NicAwsResource < Sequel::Model
   many_to_one :nic, key: :id, read_only: true, is_used: true
-  plugin ResourceMethods
+  plugin ResourceMethods, referencing: UBID::TYPE_NIC
 end
 
 # Table: nic_aws_resource
