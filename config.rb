@@ -195,7 +195,7 @@ module Config
   override :ubuntu_noble_version, "20250502.1", string
   override :ubuntu_jammy_version, "20250508", string
   override :debian_12_version, "20250428-2096", string
-  override :almalinux_9_version, "9.6-20250522", string
+  override :almalinux_9_version, "9.7-20251118", string
   override :github_ubuntu_2404_version, "20260312.1.0", string
   override :github_ubuntu_2204_version, "20260312.1.0", string
   override :github_ubuntu_2204_x64_aws_ami_version, "ami-09fa327aee19e9267", string
