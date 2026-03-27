@@ -276,7 +276,9 @@ RSpec.configure do |config|
     end
 
     def create_vhost_block_backend(version: "v0.4.1", **)
-      args = {version:, allocation_weight: 100, **}
+      v = Gem::Version.new(version.delete_prefix("v")).segments
+      version_code = v[0] * 10000 + v[1] * 100 + v[2]
+      args = {version:, version_code:, allocation_weight: 100, **}
       args[:vm_host_id] ||= create_vm_host.id
       VhostBlockBackend.create(**args)
     end

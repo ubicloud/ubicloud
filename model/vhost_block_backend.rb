@@ -3,10 +3,19 @@
 require_relative "../model"
 
 class VhostBlockBackend < Sequel::Model
+  MIN_ARCHIVE_SUPPORT_VERSION = 400
+
   plugin ResourceMethods, etc_type: true
 
   def supports_archive?
-    Gem::Version.new(version.delete_prefix("v")) >= Gem::Version.new("0.4.0")
+    version_code >= MIN_ARCHIVE_SUPPORT_VERSION
+  end
+
+  def version
+    major = version_code / 10000
+    minor = (version_code % 10000) / 100
+    patch = version_code % 100
+    "v#{major}.#{minor}.#{patch}"
   end
 end
 
