@@ -36,9 +36,9 @@ module OmniAuth
 
       class MissingCodeError < RuntimeError; end
 
-      option :name
-      option :client_options
-      option :issuer
+      #option :name
+      #option :client_options
+      #option :issuer
       # option :prompt, nil # [:none, :login, :consent, :select_account]
       # option :hd, nil
       # option :uid_field, 'sub'
@@ -50,6 +50,13 @@ module OmniAuth
 
       def params
         request.params
+      end
+
+      # Need to give strategy a name when there is no provider.
+      # Pick something that is impossible to guess and varies per run.
+      NO_NAME = SecureRandom.hex(32)
+      def name
+        provider&.ubid || NO_NAME
       end
 
       attr_reader :access_token, :user_info
@@ -75,14 +82,14 @@ module OmniAuth
           redirect_uri:,
           response_type: "code",
           scope: "openid email",
-          client_id: opts[:identifier],
+          client_id: opts.identifier,
           # prompt: options.prompt,
           # hd: options.hd,
           nonce:,
           state:
         }
 
-        redirect "#{base_url_for(:authorization_endpoint)}?#{query_string_for(params)}"
+        redirect "#{base_url_for(opts.authorization_endpoint)}?#{query_string_for(params)}"
       end
 
       def callback_phase
@@ -101,9 +108,9 @@ module OmniAuth
 
         opts = client_options
         response = Excon.post(
-          base_url_for(:token_endpoint),
+          base_url_for(opts.token_endpoint),
           headers: {
-            'Authorization' => "Basic #{Base64.strict_encode64([CGI.escape(opts[:identifier]), CGI.escape(opts[:secret])].join(':'))}",
+            'Authorization' => "Basic #{Base64.strict_encode64([CGI.escape(opts.identifier), CGI.escape(opts.secret)].join(':'))}",
             "Content-Type" => "application/x-www-form-urlencoded",
             "Accept" => "application/json",
           },
@@ -133,7 +140,7 @@ module OmniAuth
             nonce = session.delete('omniauth.nonce')
             aud = token["aud"]
             aud = [aud] if aud.is_a?(String)
-            if token["iss"] != options.issuer || !aud.include?(client_options.identifier) || token["nonce"] != nonce
+            if token["iss"] != opts.issuer || !aud.include?(opts.identifier) || token["nonce"] != nonce
               fail!(:unable_to_verify_id_token, RuntimeError.new("Unable to verify id token"))
               return
             end
@@ -149,7 +156,7 @@ module OmniAuth
               need_user_info = false
             end
 
-            if opts[:need_groups]
+            if opts.need_groups
               if (groups = token["groups"])
                 Clog.emit("OIDC groups found in token", oidc_groups_found: {groups:, user_info:})
                 user_info["groups"] = groups
@@ -163,7 +170,7 @@ module OmniAuth
 
         unless need_user_info
           response = Excon.get(
-            base_url_for(:userinfo_endpoint),
+            base_url_for(opts.userinfo_endpoint),
             headers: {'Authorization' => "Bearer #{@access_token}", "Accept" => "application/json"},
             expects: 200
           )
@@ -191,9 +198,9 @@ module OmniAuth
 
       private
 
-      def base_url_for(endpoint_key)
+      def base_url_for(endpoint)
         opts = client_options
-        "#{opts[:scheme]}://#{opts[:host]}:#{opts[:port]}#{opts[endpoint_key]}"
+        "#{opts.scheme}://#{opts.host}:#{opts.port}#{endpoint}"
       end
 
       def query_string_for(params)
@@ -202,8 +209,41 @@ module OmniAuth
         end.join("&")
       end
 
+      ClientOptions = Data.define(
+        :issuer,
+        :port,
+        :scheme,
+        :host,
+        :identifier,
+        :secret,
+        :redirect_uri,
+        :authorization_endpoint,
+        :token_endpoint,
+        :userinfo_endpoint,
+        :need_groups
+      )
+
+      def provider
+        @provider ||= request.env["clover.oidc_provider"]
+      end
+
       def client_options
-        options.client_options
+        return @client_options if @client_options
+
+        uri = URI(provider.url)
+        @client_options = ClientOptions.new(
+          issuer: provider.url,
+          port: uri.port,
+          scheme: uri.scheme,
+          host: uri.host,
+          identifier: provider.client_id,
+          secret: provider.client_secret,
+          redirect_uri: provider.callback_url,
+          authorization_endpoint: provider.authorization_endpoint,
+          token_endpoint: provider.token_endpoint,
+          userinfo_endpoint: provider.userinfo_endpoint,
+          need_groups: provider.group_prefix
+        )
       end
 
       def redirect_uri
