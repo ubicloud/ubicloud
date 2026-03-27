@@ -28,10 +28,10 @@ RSpec.describe VmStorageVolume do
   end
 
   it "returns correct vhost_block_backend version if exists associated installation" do
-    vbb = VhostBlockBackend.new(version: "some-vhost-version")
+    vbb = VhostBlockBackend.new(version_code: 10402)
     v = described_class.new(disk_index: 7)
     allow(v).to receive(:vhost_block_backend).and_return(vbb)
-    expect(v.vhost_block_backend_version).to eq("some-vhost-version")
+    expect(v.vhost_block_backend_version).to eq("v1.4.2")
   end
 
   it "returns nil vhost_block_backend version if no associated installation" do

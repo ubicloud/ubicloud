@@ -29,8 +29,12 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     arch = vm_host.arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
+    parsed_version = Gem::Version.new(version.delete_prefix("v")).segments
+    version_code = parsed_version[0] * 10000 + parsed_version[1] * 100 + parsed_version[2]
+
     VhostBlockBackend.create(
       version: frame["version"],
+      version_code:,
       allocation_weight: 0,
       vm_host_id: vm_host.id
     )
