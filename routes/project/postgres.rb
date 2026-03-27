@@ -2,6 +2,20 @@
 
 class Clover
   hash_branch(:project_prefix, "postgres") do |r|
+    r.on "capabilities" do
+      r.get true do
+        authorize("Postgres:view", @project)
+        option_tree, = PostgresResource.generate_postgres_options(@project)
+        locations = Location.postgres_locations + @project.locations
+        serialized = serialize_option_tree(option_tree)
+        filter_option_tree_by_availability(serialized, locations)
+        {
+          option_tree: serialized,
+          metadata: postgres_option_metadata(locations),
+        }
+      end
+    end
+
     r.get true do
       tags_param = typecast_params.nonempty_str("tags")
       postgres_list(tags_param:)
