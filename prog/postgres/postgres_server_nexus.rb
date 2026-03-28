@@ -48,7 +48,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
         storage_volumes: [
           {encrypted: true, size_gib: 16, vring_workers: 1},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
+          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1},
         ],
         boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
@@ -59,7 +59,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -71,7 +71,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         is_representative:,
         synchronization_status:,
         vm_id: vm_st.id,
-        version: server_version
+        version: server_version,
       )
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)

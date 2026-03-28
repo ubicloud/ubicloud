@@ -28,7 +28,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
       subnet_st = Prog::Vnet::SubnetNexus.assemble(
         Config.minio_service_project_id,
         name: "#{cluster_name}-subnet",
-        location_id: location.id
+        location_id: location.id,
       )
       minio_cluster = MinioCluster.create(
         name: cluster_name,
@@ -40,7 +40,7 @@ class Prog::Minio::MinioClusterNexus < Prog::Base
         root_cert_key_1:,
         root_cert_2:,
         root_cert_key_2:,
-        project_id:
+        project_id:,
       ) { it.id = ubid.to_uuid }
 
       pool_count.times do |i|

@@ -14,7 +14,7 @@ RSpec.describe Clover, "cli pg restore" do
       name: "walg-minio",
       admin_user: "admin",
       admin_password: "password",
-      root_cert_1: "dummy-certs"
+      root_cert_1: "dummy-certs",
     )
 
     backup = Struct.new(:key, :last_modified)

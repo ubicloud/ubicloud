@@ -71,7 +71,7 @@ class Minio::Client
     query = URI.encode_www_form({
       "userOrGroup" => user_name,
       "isGroup" => "false",
-      "policyName" => policy_name
+      "policyName" => policy_name,
     })
     response = send_request("PUT", admin_uri("set-user-or-group-policy?#{query}"))
     response.data
@@ -110,7 +110,7 @@ class Minio::Client
       "encoding-type" => "url",
       "list-type" => 2,
       "prefix" => folder_path,
-      "max-keys" => max_keys
+      "max-keys" => max_keys,
     })
     response = send_request("GET", s3_uri("#{bucket_name}?#{query}"))
     if response.status == 404
@@ -130,7 +130,7 @@ class Minio::Client
         "list-type" => 2,
         "prefix" => folder_path,
         "max-keys" => max_keys,
-        "start-after" => continuation_token
+        "start-after" => continuation_token,
       })
       response = send_request("GET", s3_uri("#{bucket_name}?#{query}"))
       parsed_objects = parse_list_objects(response.data[:body])

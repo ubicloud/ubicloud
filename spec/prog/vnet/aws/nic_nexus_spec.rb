@@ -83,8 +83,8 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
           {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
-          {name: "status", values: ["available"]}
-        ]
+          {name: "status", values: ["available"]},
+        ],
       }).and_call_original
       expect { nx.create_network_interface }.to hop("assign_ipv6_address")
       expect(nic.nic_aws_resource.reload.network_interface_id).to eq("eni-existing123")

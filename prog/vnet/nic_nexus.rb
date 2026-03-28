@@ -56,7 +56,7 @@ class Prog::Vnet::NicNexus < Prog::Base
       if location_az
         aws_subnet = AwsSubnet.first(
           private_subnet_aws_resource_id: ps_aws_resource.id,
-          location_aws_az_id: location_az.id
+          location_aws_az_id: location_az.id,
         )
         return aws_subnet if aws_subnet
       end

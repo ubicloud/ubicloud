@@ -16,7 +16,7 @@ module Ubicloud
         "authorization" => "Bearer: #{token}",
         "content-type" => "application/json",
         "accept" => "text/plain",
-        "connection" => "close"
+        "connection" => "close",
       }.freeze
       @get_headers = @headers.dup
       @get_headers.delete("content-type")
@@ -27,7 +27,7 @@ module Ubicloud
       "GET" => :get,
       "POST" => :post,
       "DELETE" => :delete,
-      "PATCH" => :patch
+      "PATCH" => :patch,
     }.freeze
 
     private_constant :METHOD_MAP

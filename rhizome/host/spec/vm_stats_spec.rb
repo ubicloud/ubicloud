@@ -48,14 +48,14 @@ RSpec.describe VmStats do
               "vhost_block_backend_version" => "v0.4.0",
               "num_queues" => 4,
               "queue_size" => 64,
-              "size_gib" => 20
+              "size_gib" => 20,
             },
             {
               "disk_index" => 1,
-              "encrypted" => true
-            }
-          ]
-        }
+              "encrypted" => true,
+            },
+          ],
+        },
       ))
 
       expect(vm_stats.collect).to eq(
@@ -67,8 +67,8 @@ RSpec.describe VmStats do
             "cpu_stats" => {
               "user_time_ms" => 951430,
               "system_time_ms" => 164310,
-              "total_time_ms" => 1115740
-            }
+              "total_time_ms" => 1115740,
+            },
           },
           "disk_0" => {
             "main_pid" => "3350",
@@ -82,14 +82,14 @@ RSpec.describe VmStats do
             "cpu_stats" => {
               "user_time_ms" => 166020,
               "system_time_ms" => 7330,
-              "total_time_ms" => 173350
+              "total_time_ms" => 173350,
             },
             "io_stats" => {
               "read_bytes" => 1185382400,
-              "write_bytes" => 5457008640
-            }
-          }
-        }
+              "write_bytes" => 5457008640,
+            },
+          },
+        },
       )
     end
   end
@@ -134,13 +134,13 @@ RSpec.describe VmStats do
           "storage_volumes" => [
             {"disk_index" => 0, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 20},
             {"disk_index" => 1},
-            {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40}
-          ]
-        })
+            {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40},
+          ],
+        }),
       )
       expect(vm_stats.ubiblk_disks).to eq([
         {"disk_index" => 0, "vhost_block_backend_version" => "v0.1", "queue_size" => 64, "num_queues" => 4, "size_gib" => 20},
-        {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40}
+        {"disk_index" => 2, "vhost_block_backend_version" => "v0.1", "queue_size" => 128, "num_queues" => 2, "size_gib" => 40},
       ])
     end
   end

@@ -8,7 +8,7 @@ RSpec.describe Prog::RotateSshKey do
   let(:sshable) {
     Sshable.create(
       host: "test.localhost",
-      raw_private_key_1: SshKey.generate.keypair
+      raw_private_key_1: SshKey.generate.keypair,
     )
   }
 
@@ -63,21 +63,21 @@ RSpec.describe Prog::RotateSshKey do
 
     it "can connect with new key" do
       expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
-        Net::SSH::Connection::Session::StringWithExitstatus.new("key rotated successfully\n", 0)
+        Net::SSH::Connection::Session::StringWithExitstatus.new("key rotated successfully\n", 0),
       )
       expect { rsk.test_rotation }.to exit({"msg" => "key rotated successfully"})
     end
 
     it "fails if exit status not zero" do
       expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
-        Net::SSH::Connection::Session::StringWithExitstatus.new("unknown error", 1)
+        Net::SSH::Connection::Session::StringWithExitstatus.new("unknown error", 1),
       )
       expect { rsk.test_rotation }.to raise_error RuntimeError, "Unexpected exit status: 1"
     end
 
     it "fails if output not expected" do
       expect(sess).to receive(:_exec!).with("echo key rotated successfully").and_return(
-        Net::SSH::Connection::Session::StringWithExitstatus.new("wrong output", 0)
+        Net::SSH::Connection::Session::StringWithExitstatus.new("wrong output", 0),
       )
       expect { rsk.test_rotation }.to raise_error RuntimeError, "Unexpected output message: wrong output"
     end

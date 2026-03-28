@@ -13,7 +13,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -27,7 +27,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     Strand.create(
       prog: "Postgres::ConvergePostgresResource", label: "start",
       parent_id: pg.strand.id,
-      stack: [{"subject_id" => pg.id}]
+      stack: [{"subject_id" => pg.id}],
     )
   }
 
@@ -443,7 +443,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(candidate.reload).to have_attributes(
         version: "17",
         configure_set?: true,
-        restart_set?: true
+        restart_set?: true,
       )
     end
   end

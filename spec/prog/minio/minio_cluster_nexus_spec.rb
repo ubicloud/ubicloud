@@ -7,8 +7,8 @@ RSpec.describe Prog::Minio::MinioClusterNexus do
     expect(Config).to receive(:minio_service_project_id).and_return(minio_project.id).at_least(:once)
     described_class.new(
       described_class.assemble(
-        minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2"
-      )
+        minio_project.id, "minio", Location::HETZNER_FSN1_ID, "minio-admin", 100, 1, 1, 1, "standard-2",
+      ),
     )
   }
 

@@ -27,7 +27,7 @@ RSpec.describe Serializers::LoadBalancer do
         health_check_protocol: "tcp",
         src_port: 1,
         dst_port: 5,
-        cert_enabled: false
+        cert_enabled: false,
       }
 
       expect(described_class.serialize_internal(lb)).to eq(expected_result)
@@ -55,7 +55,7 @@ RSpec.describe Serializers::LoadBalancer do
         health_check_protocol: "tcp",
         src_port: nil,
         dst_port: nil,
-        cert_enabled: nil
+        cert_enabled: nil,
       }
 
       expect(described_class.serialize_internal(lb)).to eq(expected_result)

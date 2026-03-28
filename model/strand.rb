@@ -98,7 +98,7 @@ class Strand < Sequel::Model
     .returning
     .where(
       Sequel[id: DB[:strand].select(:id).where(id: :$id).for_no_key_update.skip_locked, exitval: nil] &
-        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP),
     )
     .prepare_sql_type(:update)
     .prepare(:first, :strand_take_lease_and_reload,

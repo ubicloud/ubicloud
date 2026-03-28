@@ -71,7 +71,7 @@ class PostgresServer < Sequel::Model
       "lc_numeric" => "'C.UTF-8'",
       "lc_time" => "'C.UTF-8'",
       "shared_preload_libraries" => "'pg_cron,pg_stat_statements'",
-      "cron.use_background_workers" => "on"
+      "cron.use_background_workers" => "on",
     }
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
@@ -134,7 +134,7 @@ class PostgresServer < Sequel::Model
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
-          net6: it.net6.to_s
+          net6: it.net6.to_s,
         }
       },
       cert_auth_users: resource.cert_auth_users,
@@ -142,7 +142,7 @@ class PostgresServer < Sequel::Model
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
       metrics_config:,
-      disk_throughput_baseline_mbps:
+      disk_throughput_baseline_mbps:,
     }
   end
 
@@ -262,14 +262,14 @@ class PostgresServer < Sequel::Model
     ssh_session.forward.local_socket(File.join(health_monitor_socket_path, ".s.PGSQL.5432"), "/var/run/postgresql/.s.PGSQL.5432")
     {
       ssh_session:,
-      db_connection: nil
+      db_connection: nil,
     }
   end
 
   def init_metrics_export_session
     ssh_session = vm.sshable.start_fresh_session
     {
-      ssh_session:
+      ssh_session:,
     }
   end
 
@@ -358,11 +358,11 @@ class PostgresServer < Sequel::Model
   def metrics_config
     ignored_timeseries_patterns = [
       "pg_stat_user_tables_.*",
-      "pg_statio_user_tables_.*"
+      "pg_statio_user_tables_.*",
     ]
     exclude_pattern = ignored_timeseries_patterns.join("|")
     query_params = {
-      "match[]": "{__name__!~'#{exclude_pattern}'}"
+      "match[]": "{__name__!~'#{exclude_pattern}'}",
     }
     query_str = URI.encode_www_form(query_params)
     additional_labels = resource.tags.to_h { |tag| ["pg_tags_label_#{tag["key"]}", tag["value"]] }
@@ -370,18 +370,18 @@ class PostgresServer < Sequel::Model
       location_id: UBID.to_ubid(resource.location_id),
       location_name: resource.location.name,
       location_provider: resource.location.provider,
-      location_display_name: resource.location.display_name
+      location_display_name: resource.location.display_name,
     })
 
     {
       endpoints: [
-        "https://localhost:9090/federate?#{query_str}"
+        "https://localhost:9090/federate?#{query_str}",
       ],
       max_file_retention: 120,
       interval: "15s",
       additional_labels:,
       metrics_dir: "/home/ubi/postgres/metrics",
-      project_id: Config.postgres_service_project_id
+      project_id: Config.postgres_service_project_id,
     }
   end
 
@@ -396,7 +396,7 @@ class PostgresServer < Sequel::Model
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push",
-      synchronization_status: "ready"
+      synchronization_status: "ready",
     )
 
     increment_s3_new_timeline
@@ -415,13 +415,13 @@ class PostgresServer < Sequel::Model
   def observe_archival_backlog(session)
     oldest_pending = session[:ssh_session].exec!(
       "sudo -u postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
-      version:
+      version:,
     ).strip
     oldest_pending = nil if oldest_pending.empty?
 
     result = session[:ssh_session].exec!(
       "sudo find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
-      version:
+      version:,
     )
     archival_backlog = Integer(result.strip, 10)
 
@@ -482,7 +482,7 @@ class PostgresServer < Sequel::Model
     metrics_done_dir = "#{metrics_config[:metrics_dir]}/done"
     result = session[:ssh_session].exec!(
       "find :metrics_done_dir -name '*.txt' | wc -l",
-      metrics_done_dir:
+      metrics_done_dir:,
     )
     metrics_backlog = Integer(result.strip, 10)
     metrics_interval = metrics_config[:interval].to_i
@@ -540,7 +540,7 @@ class PostgresServer < Sequel::Model
   DISK_THROUGHPUT_BASELINE_MBPS = {
     "hetzner" => 128,
     "aws" => 448,
-    "leaseweb" => 100
+    "leaseweb" => 100,
   }.freeze
 end
 

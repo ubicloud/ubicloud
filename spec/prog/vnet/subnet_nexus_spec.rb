@@ -60,7 +60,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         prj.id,
         name: "default-ps",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
+        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64",
       )
 
       expect(ps.subject.net6.to_s).to eq("fd10:9b0b:6b4b:8fbb::/64")
@@ -72,7 +72,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         prj.id,
         name: "default-ps",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv4_range: "10.0.0.0/26"
+        ipv4_range: "10.0.0.0/26",
       )
 
       expect(ps.subject.net4.to_s).to eq("10.0.0.0/26")

@@ -49,7 +49,7 @@ class Prog::DownloadBootImage < Prog::Base
           "debian" => "raw",
           "ai" => "raw",
           "kubernetes" => "raw",
-          "gpu" => "raw"
+          "gpu" => "raw",
         }
         image_family = image_name.split("-").first
         suffix = suffixes.fetch(image_family, nil)
@@ -132,7 +132,7 @@ class Prog::DownloadBootImage < Prog::Base
     ["kubernetes-v1_32", "x64", "20250320.1.0"] => "369c7c869bba690771a1dcbbae52159defaa3fd3540f008ba6feea291e7a220a",
     ["kubernetes-v1_33", "x64", "20250506.1.0"] => "35ca03c19385227117fa6579f58c73a362970359fa9486024ca393b134a698d4",
     ["kubernetes-v1_34", "x64", "20250828.1.0"] => "3a29122a3836109df78778df24899f864bc8beff7d92d86dc4ab8b99314f520c",
-    ["gpu-ubuntu-noble", "x64", "20251017.1.0"] => "b87829c6bc71718ff0dffe2948d2586ca7ff95a02dbb03f68d18ec8c223b312c"
+    ["gpu-ubuntu-noble", "x64", "20251017.1.0"] => "b87829c6bc71718ff0dffe2948d2586ca7ff95a02dbb03f68d18ec8c223b312c",
   }.freeze
   BOOT_IMAGE_SHA256.each_key(&:freeze)
 
@@ -149,7 +149,7 @@ class Prog::DownloadBootImage < Prog::Base
       secret_access_key: Config.ubicloud_images_r2_secret_key,
       region: "auto",
       request_checksum_calculation: "when_required",
-      response_checksum_validation: "when_required"
+      response_checksum_validation: "when_required",
     )
     Aws::S3::Presigner.new(client:).presigned_url(:get_object, bucket: Config.ubicloud_images_r2_bucket_name, key:, expires_in: 60 * 60)
   end
@@ -159,7 +159,7 @@ class Prog::DownloadBootImage < Prog::Base
       endpoint: Config.ubicloud_images_blob_storage_endpoint,
       access_key: Config.ubicloud_images_blob_storage_access_key,
       secret_key: Config.ubicloud_images_blob_storage_secret_key,
-      ssl_ca_data: Config.ubicloud_images_blob_storage_certs
+      ssl_ca_data: Config.ubicloud_images_blob_storage_certs,
     )
     client.get_presigned_url("GET", Config.ubicloud_images_bucket_name, key, 60 * 60).to_s
   end
@@ -179,7 +179,7 @@ class Prog::DownloadBootImage < Prog::Base
       name: image_name,
       version:,
       activated_at: nil,
-      size_gib: 0
+      size_gib: 0,
     )
     hop_download
   end
@@ -221,7 +221,7 @@ class Prog::DownloadBootImage < Prog::Base
     image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
-      available_storage_gib: Sequel[:available_storage_gib] - image_size_gib
+      available_storage_gib: Sequel[:available_storage_gib] - image_size_gib,
     )
     image.update(size_gib: image_size_gib)
     hop_activate_boot_image
@@ -241,8 +241,8 @@ class Prog::DownloadBootImage < Prog::Base
         restarts: frame["restarted"] || 0,
         vm_host_ubid: vm_host.ubid,
         arch: vm_host.arch,
-        location: vm_host.location.display_name
-      }
+        location: vm_host.location.display_name,
+      },
     ])
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end

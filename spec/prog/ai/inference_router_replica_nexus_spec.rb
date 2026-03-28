@@ -20,7 +20,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       replica_count: 2,
       project_id: project.id,
       load_balancer_id: load_balancer.id,
-      private_subnet_id: private_subnet.id
+      private_subnet_id: private_subnet.id,
     )
   }
   let!(:inference_router_model) {
@@ -30,7 +30,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       completion_billing_resource: "test-model-output",
       project_inflight_limit: 100,
       project_prompt_tps_limit: 10000,
-      project_completion_tps_limit: 10000
+      project_completion_tps_limit: 10000,
     )
   }
 
@@ -44,7 +44,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
   let(:replica) {
     InferenceRouterReplica.create(
       inference_router_id: inference_router.id,
-      vm_id: vm.id
+      vm_id: vm.id,
     )
   }
 
@@ -68,7 +68,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       st_ir = Prog::Ai::InferenceRouterNexus.assemble(
         project_id: user_project.id,
         location_id: Location::HETZNER_FSN1_ID,
-        name: "ir1"
+        name: "ir1",
       )
       ir = st_ir.subject
       st = described_class.assemble(ir.id)
@@ -119,20 +119,20 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(Config).to receive(:inference_router_access_token).and_return("dummy_access_token")
       expect(Config).to receive(:inference_router_release_tag).and_return("v0.1.0")
       expect(sshable).to receive(:_cmd).with(
-        "id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router"
+        "id -u inference-router >/dev/null 2>&1 || sudo useradd --system --no-create-home --shell /usr/sbin/nologin inference-router",
       )
       expect(sshable).to receive(:_cmd).with(
-        "sudo wget -O /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64"
+        "sudo wget -O /ir/workdir/fetch_linux_amd64 https://github.com/gruntwork-io/fetch/releases/download/v0.4.6/fetch_linux_amd64",
       )
       expect(sshable).to receive(:_cmd).with("sudo chmod +x /ir/workdir/fetch_linux_amd64")
       expect(sshable).to receive(:_cmd).with(
-        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=dummy_access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=v0.1.0 --release-asset=\"inference-router-*\" /ir/workdir/"
+        "sudo /ir/workdir/fetch_linux_amd64 --github-oauth-token=dummy_access_token --repo=\"https://github.com/ubicloud/inference-router\" --tag=v0.1.0 --release-asset=\"inference-router-*\" /ir/workdir/",
       )
       expect(sshable).to receive(:_cmd).with(
-        "sudo tar -xzf /ir/workdir/inference-router-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /ir/workdir"
+        "sudo tar -xzf /ir/workdir/inference-router-v0.1.0-x86_64-unknown-linux-gnu.tar.gz -C /ir/workdir",
       )
       expect(sshable).to receive(:_cmd).with(
-        "sudo chown -R inference-router:inference-router /ir/workdir"
+        "sudo chown -R inference-router:inference-router /ir/workdir",
       )
       expect(sshable).to receive(:_cmd)
         .with("sudo tee /etc/systemd/system/inference-router.service > /dev/null", stdin: /\A\[Unit\].*WantedBy=multi-user.target\n\z/m)
@@ -242,7 +242,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         priority: 1,
         inference_router_model_id: inference_router_model.id,
         inference_router_id: inference_router.id,
-        enabled: true
+        enabled: true,
       )
       InferenceRouterTarget.create(
         name: "test-target-b",
@@ -253,7 +253,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         extra_configs: {"tag1" => "value1", "tag2" => "value2"},
         inference_router_model_id: inference_router_model.id,
         inference_router_id: inference_router.id,
-        enabled: true
+        enabled: true,
       )
       InferenceRouterTarget.create(
         name: "test-target-c",
@@ -263,7 +263,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         priority: 2,
         inference_router_model_id: inference_router_model.id,
         inference_router_id: inference_router.id,
-        enabled: true
+        enabled: true,
       )
       InferenceRouterTarget.create(
         name: "test-target-d",
@@ -273,7 +273,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
         priority: 2,
         inference_router_model_id: inference_router_model.id,
         inference_router_id: inference_router.id,
-        enabled: false
+        enabled: false,
       )
       expect(inference_router).to receive(:ubid).and_return("irubid")
 
@@ -282,70 +282,70 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expected_projects = projects.map do |p|
         {
           "ubid" => p.ubid,
-          "api_keys" => [Digest::SHA2.hexdigest(p.api_keys.first.key)]
+          "api_keys" => [Digest::SHA2.hexdigest(p.api_keys.first.key)],
         }
       end.sort_by { |p| p["ubid"] }
       expect(sshable).to receive(:_cmd).with(
-        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'",
       ).and_return("dummy_md5sum")
       expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
-        hash_including(stdin: a_string_matching(/"projects":/))
+        hash_including(stdin: a_string_matching(/"projects":/)),
       ) do |command, options|
         json_sent = JSON.parse(options[:stdin])
         expect(json_sent["basic"]).to eq({})
         expect(json_sent["certificate"].transform_keys(&:to_sym)).to eq({
           cert: cert.cert,
-          key: OpenSSL::PKey.read(cert.csr_key).to_pem
+          key: OpenSSL::PKey.read(cert.csr_key).to_pem,
         })
         expect(json_sent["health_check"].transform_keys(&:to_sym)).to eq({
           check_frequency: "10s",
           consecutive_success: 2,
-          consecutive_failure: 2
+          consecutive_failure: 2,
         })
         expect(json_sent["servers"].map { |h| h.transform_keys(&:to_sym) }).to eq([{
           name: "main-server",
           addr: "[::]:8443",
           locations: ["inference", "up"],
           threads: 0,
-          metrics_path: "/metrics"
+          metrics_path: "/metrics",
         }, {
           name: "admin-server",
           addr: "127.0.0.1:8080,::1:8080",
           locations: ["usage", "stats"],
-          threads: 1
+          threads: 1,
         }])
         expect(json_sent["locations"].map { |h| h.transform_keys(&:to_sym) }).to eq([
           {name: "up", path: "^/up$", app: "up"},
           {name: "inference", path: "^/v1/(chat/completions|completions|embeddings)$", app: "inference"},
           {name: "usage", path: "^/usage$", app: "usage"},
-          {name: "stats", path: "^/stats$", app: "stats"}
+          {name: "stats", path: "^/stats$", app: "stats"},
         ])
         expect(json_sent["routes"].map { |h| h.transform_keys(&:to_sym).except(:endpoints) }).to eq([{
           model_name: "test-model",
           project_inflight_limit: 100,
           project_prompt_tps_limit: 10000,
-          project_completion_tps_limit: 10000
+          project_completion_tps_limit: 10000,
         }])
         expect(json_sent["routes"][0]["endpoints"].size).to eq(2)
         expect(json_sent["routes"][0]["endpoints"][0].sort_by { it["id"] }.map { |h| h.transform_keys(&:to_sym) }).to eq([{
           id: "test-target-a",
           host: "test-host-a",
           api_key: "test-key-a",
-          inflight_limit: 10
+          inflight_limit: 10,
         }, {
           id: "test-target-b",
           host: "test-host-b",
           api_key: "test-key-b",
           inflight_limit: 10,
           tag1: "value1",
-          tag2: "value2"
+          tag2: "value2",
         }])
         expect(json_sent["routes"][0]["endpoints"][1].map { |h| h.transform_keys(&:to_sym) }).to eq([{
           id: "test-target-c",
           host: "test-host-c",
           api_key: "test-key-c",
-          inflight_limit: 10
+          inflight_limit: 10,
         }])
         projects_sent = json_sent["projects"].sort_by { |p| p["ubid"] }
         expect(projects_sent).to eq(expected_projects)
@@ -358,27 +358,27 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
             "ubid" => replica.ubid,
             "request_count" => 1,
             "prompt_token_count" => 10,
-            "completion_token_count" => 20
+            "completion_token_count" => 20,
           }, {
             "ubid" => "anotherubid",
             "request_count" => 0,
             "prompt_token_count" => 0,
-            "completion_token_count" => 0
-          }
+            "completion_token_count" => 0,
+          },
         ],
         "health" => [
           {"id" => "model1", "healthy" => true},
-          {"id" => "model2", "healthy" => true}
-        ]
+          {"id" => "model2", "healthy" => true},
+        ],
       }
       expect(sshable).to receive(:_cmd).with("curl -k -m 10 --no-progress-meter https://localhost:8080/stats").and_return(stats.to_json)
 
       usage = stats["usage"]
       expect(nx).to receive(:update_billing_records).with(
-        usage, "prompt_billing_resource", "prompt_token_count"
+        usage, "prompt_billing_resource", "prompt_token_count",
       )
       expect(nx).to receive(:update_billing_records).with(
-        usage, "completion_billing_resource", "completion_token_count"
+        usage, "completion_billing_resource", "completion_token_count",
       )
 
       nx.ping_inference_router
@@ -395,12 +395,12 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       p_allowed.set_ff_visible_locations ["tr-ist-u1-tom"]
 
       expect(sshable).to receive(:_cmd).with(
-        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'",
       ).and_return("dummy_md5sum")
 
       expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
-        hash_including(stdin: a_string_matching(/"projects":/))
+        hash_including(stdin: a_string_matching(/"projects":/)),
       ) do |_, options|
         json_sent = JSON.parse(options[:stdin])
 
@@ -410,7 +410,7 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
 
         expect(sent_projects.first["ubid"]).to eq(p_allowed.ubid)
         expect(sent_projects.first["api_keys"]).to eq(
-          [Digest::SHA2.hexdigest(p_allowed.api_keys.first.key)]
+          [Digest::SHA2.hexdigest(p_allowed.api_keys.first.key)],
         )
 
         ubids = sent_projects.map { |pr| pr["ubid"] }
@@ -429,12 +429,12 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     it "creates a page for unhealthy endpoints and resolves it when all become healthy" do
       # First call: unhealthy endpoints, should create a page
       expect(sshable).to receive(:_cmd).with(
-        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'",
       ).and_return("dummy_md5sum").twice
 
       expect(sshable).to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
-        hash_including(stdin: a_string_matching(/"projects":/))
+        hash_including(stdin: a_string_matching(/"projects":/)),
       ).twice
 
       expect(sshable).to receive(:_cmd).with("sudo pkill -f -HUP inference-router").twice
@@ -465,15 +465,15 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
     it "skips config update when unchanged" do
       expect(inference_router).to receive(:ubid).and_return("irubid")
       expect(sshable).to receive(:_cmd).with(
-        "md5sum /ir/workdir/config.json | awk '{ print $1 }'"
+        "md5sum /ir/workdir/config.json | awk '{ print $1 }'",
       ).and_return("8ffb16694fe5e619b27326450e52124f") # md5sum of the test config.
       expect(sshable).not_to receive(:_cmd).with(
         "sudo mkdir -p /ir/workdir && sudo tee /ir/workdir/config.json > /dev/null",
-        hash_including(stdin: a_string_matching(/"projects":/))
+        hash_including(stdin: a_string_matching(/"projects":/)),
       )
       expect(sshable).not_to receive(:_cmd).with("sudo pkill -f -HUP inference-router")
       expect(sshable).to receive(:_cmd).with(
-        "curl -k -m 10 --no-progress-meter https://localhost:8080/stats"
+        "curl -k -m 10 --no-progress-meter https://localhost:8080/stats",
       ).and_return("{\"usage\": [], \"health\": []}")
       nx.ping_inference_router
     end
@@ -486,11 +486,11 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
-        "prompt_billing_resource", "prompt_token_count"
+        "prompt_billing_resource", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
-        "completion_billing_resource", "completion_token_count"
+        "completion_billing_resource", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(2)
       brs = BillingRecord.order(:billing_rate_id).all
@@ -504,11 +504,11 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(brs[1].amount).to eq(20)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
-        "prompt_billing_resource", "prompt_token_count"
+        "prompt_billing_resource", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
-        "completion_billing_resource", "completion_token_count"
+        "completion_billing_resource", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(2)
       expect(Integer(brs[0].reload.amount)).to eq(11)
@@ -519,11 +519,11 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
-        "prompt_billing_resource", "prompt_token_count"
+        "prompt_billing_resource", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
-        "completion_billing_resource", "completion_token_count"
+        "completion_billing_resource", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(0)
     end
@@ -536,9 +536,9 @@ RSpec.describe Prog::Ai::InferenceRouterReplicaNexus do
       nx.update_billing_records(
         [
           {"ubid" => p1.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3},
-          {"ubid" => p2.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}
+          {"ubid" => p2.ubid, "model_name" => "test-model", "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3},
         ],
-        "prompt_billing_resource", "prompt_token_count"
+        "prompt_billing_resource", "prompt_token_count",
       )
       expect(BillingRecord.count).to eq(1)
       br = BillingRecord.first

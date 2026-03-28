@@ -22,7 +22,7 @@ RSpec.describe Prog::Test::Kubernetes do
       project_id: kubernetes_test_project.id,
       private_subnet_id: private_subnet.id,
       cp_node_count: 1,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
     KubernetesNodepool.create(name: "test-cluster-np", node_count: 1, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
     allow(kc).to receive(:client).and_return(Kubernetes::Client.new(kc, session))
@@ -654,8 +654,8 @@ RSpec.describe Prog::Test::Kubernetes do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
         "spec" => {
           "persistentVolumeReclaimPolicy" => "Retain",
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}},
+        },
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
@@ -674,8 +674,8 @@ RSpec.describe Prog::Test::Kubernetes do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "data"}},
         "spec" => {
           "persistentVolumeReclaimPolicy" => "Retain",
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["w1-node"]}]}]}},
+        },
       }]}
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate(pv_list), 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(response)
@@ -767,7 +767,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({
         "reboot_node_id" => node.id,
         "nat_rules_before_reboot" => "table ip nat { ... }",
-        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }"
+        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }",
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_raise("not ready")
@@ -778,7 +778,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({
         "reboot_node_id" => node.id,
         "nat_rules_before_reboot" => "table ip nat { ... }",
-        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }"
+        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }",
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
@@ -791,7 +791,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({
         "reboot_node_id" => node.id,
         "nat_rules_before_reboot" => "table ip nat { ... }",
-        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }"
+        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }",
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
@@ -805,7 +805,7 @@ RSpec.describe Prog::Test::Kubernetes do
       kubernetes_test.update_stack({
         "reboot_node_id" => node.id,
         "nat_rules_before_reboot" => "table ip nat { ... }",
-        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }"
+        "pod_access_rules_before_reboot" => "table ip6 pod_access { ... }",
       })
       kubernetes_test.instance_variable_set(:@frame, nil)
       expect(sshable).to receive(:_cmd).with("uptime").and_return("up")
@@ -922,8 +922,8 @@ RSpec.describe Prog::Test::Kubernetes do
     it "returns false when node entries are not set" do
       st = instance_double(Strand, stack: [
         {
-          "kubernetes_service_project_id" => "uuid"
-        }
+          "kubernetes_service_project_id" => "uuid",
+        },
       ])
       expect(kubernetes_test).to receive(:strand).and_return(st)
       expect(kubernetes_test.node_host_entries_set?("non-existing-node")).to be false
@@ -934,9 +934,9 @@ RSpec.describe Prog::Test::Kubernetes do
         {
           "kubernetes_service_project_id" => "uuid",
           "nodes_status" => {
-            "existing-node" => true
-          }
-        }
+            "existing-node" => true,
+          },
+        },
       ])
       expect(kubernetes_test).to receive(:strand).and_return(st)
       expect(kubernetes_test.node_host_entries_set?("existing-node")).to be true
@@ -950,8 +950,8 @@ RSpec.describe Prog::Test::Kubernetes do
       expect(kubernetes_test).to receive(:update_stack).with({
         "kubernetes_service_project_id" => "uuid",
         "nodes_status" => {
-          "somenode" => true
-        }
+          "somenode" => true,
+        },
       })
       kubernetes_test.set_node_entries_status("somenode")
     end

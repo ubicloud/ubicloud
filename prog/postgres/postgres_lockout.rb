@@ -19,7 +19,7 @@ class Prog::Postgres::PostgresLockout < Prog::Base
     postgres_server.vm.sshable.cmd(
       "timeout 10 sudo pg_ctlcluster :version main stop -m immediate",
       version: postgres_server.version,
-      timeout: 15
+      timeout: 15,
     )
   end
 
@@ -27,14 +27,14 @@ class Prog::Postgres::PostgresLockout < Prog::Base
     postgres_server.vm.sshable.cmd(
       "timeout 10 sudo postgres/bin/lockout-hba :version",
       version: postgres_server.version,
-      timeout: 15
+      timeout: 15,
     )
   end
 
   def lockout_with_host_routing
     postgres_server.vm.vm_host.sshable.cmd(
       "timeout 10 sudo ip link set :interface down", interface: "vetho#{postgres_server.vm.inhost_name}",
-      timeout: 15
+      timeout: 15,
     )
   end
 end

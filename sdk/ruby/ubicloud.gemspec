@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.metadata = {
     "bug_tracker_uri" => "https://github.com/ubicloud/ubicloud/issues",
     "mailing_list_uri" => "https://github.com/ubicloud/ubicloud/discussions/new?category=q-a",
-    "source_code_uri" => "https://github.com/ubicloud/ubicloud/tree/main/sdk/ruby"
+    "source_code_uri" => "https://github.com/ubicloud/ubicloud/tree/main/sdk/ruby",
   }
 
   s.files = %w[MIT-LICENSE] + Dir["lib/**/*.rb"]

@@ -75,7 +75,7 @@ def wrap_key(key, kek_data)
   cipher.auth_data = kek_data["auth_data"]
   [
     cipher.update(key) + cipher.final,
-    cipher.auth_tag
+    cipher.auth_tag,
   ]
 end
 
@@ -97,7 +97,7 @@ def generate_vhost_conf(plain_keys, kek_data, vm_name, device)
     "copy_on_read" => false,
     "poll_queue_timeout_us" => 1000,
     "device_id" => "#{vm_name}_0",
-    "write_through" => write_through
+    "write_through" => write_through,
   }
   key1 = [plain_keys["key"]].pack("H*")
   key2 = [plain_keys["key2"]].pack("H*")

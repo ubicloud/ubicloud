@@ -8,8 +8,8 @@ Octokit.configure do |c|
   c.connection_options = {
     request: {
       open_timeout: 5,
-      timeout: 5
-    }
+      timeout: 5,
+    },
   }
 end
 
@@ -26,7 +26,7 @@ module Github
     key = {
       iat: current,
       exp: current + (8 * 60),
-      iss: Config.github_app_id
+      iss: Config.github_app_id,
     }
     bearer_token = JWT.encode(key, private_key, "RS256")
 

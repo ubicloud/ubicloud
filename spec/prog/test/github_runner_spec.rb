@@ -42,7 +42,7 @@ RSpec.describe Prog::Test::GithubRunner do
       strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}], provider: "aws")
       expect(strand.stack.first["labels"]).to eq([
         "ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404",
-        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404"
+        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404",
       ])
     end
   end
@@ -91,7 +91,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
       expect(client).to receive(:post).with(
         "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
-        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true},
       ).and_return({workflow_run_id: 123456789})
       expect { gr_test.trigger_test_run }.to hop("check_test_run")
     end
@@ -101,7 +101,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
       expect(client).to receive(:post).with(
         "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
-        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true},
       ).and_return(false)
       expect { gr_test.trigger_test_run }.to hop("clean_resources")
     end

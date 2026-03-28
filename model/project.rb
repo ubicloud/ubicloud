@@ -99,7 +99,7 @@ class Project < Sequel::Model
     hash = ProjectDiscountCode.dataset.returning.insert(
       id: ProjectDiscountCode.generate_uuid,
       project_id: id,
-      discount_code_id: discount.id
+      discount_code_id: discount.id,
     ).first
     ProjectDiscountCode.call(hash)
   end
@@ -141,7 +141,7 @@ class Project < Sequel::Model
       "subtotal" => 0.0,
       "credit" => 0.0,
       "discount" => 0.0,
-      "cost" => 0.0
+      "cost" => 0.0,
     }
 
     Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: Time.now, status: "current")
@@ -233,7 +233,7 @@ class Project < Sequel::Model
     :visible_locations,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
-    :cache_proxy_download_url
+    :cache_proxy_download_url,
   )
 end
 

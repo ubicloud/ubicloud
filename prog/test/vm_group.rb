@@ -13,8 +13,8 @@ class Prog::Test::VmGroup < Prog::Test::Base
         "test_slices" => test_slices,
         "vms" => [],
         "boot_images" => boot_images,
-        "verify_host_capacity" => verify_host_capacity
-      }]
+        "verify_host_capacity" => verify_host_capacity,
+      }],
     )
   end
 
@@ -33,7 +33,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     storage_options = [
       [{encrypted:}, {encrypted:, size_gib: 5}],
       [{encrypted:, max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150}],
-      [{encrypted:}]
+      [{encrypted:}],
     ]
     vm_count = [boot_images.size, storage_options.size, size_options.size].max
     vms = Array.new(vm_count) do |index|
@@ -49,7 +49,7 @@ class Prog::Test::VmGroup < Prog::Test::Base
     update_stack({
       "vms" => vms.map(&:id),
       "subnets" => subnets.map(&:id),
-      "project_id" => project.id
+      "project_id" => project.id,
     })
 
     hop_wait_vms

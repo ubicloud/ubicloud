@@ -25,5 +25,5 @@ replica_setup.prep(
   ssl_crt_path: ssl_crt_path,
   ssl_key_path: ssl_key_path,
   gateway_port: gateway_port,
-  max_requests: max_requests
+  max_requests: max_requests,
 )

@@ -22,7 +22,7 @@ RSpec.describe Serializers::KubernetesCluster do
         display_state: "creating",
         cp_node_count: 3,
         node_size: "standard-2",
-        version: Option.kubernetes_versions.first
+        version: Option.kubernetes_versions.first,
       }
 
       expect(described_class.serialize_internal(kc)).to eq(expected_result)
@@ -46,7 +46,7 @@ RSpec.describe Serializers::KubernetesCluster do
         node_size: "standard-2",
         version: Option.kubernetes_versions.first,
         cp_vms: Serializers::Vm.serialize([cp_vm]),
-        nodepools: Serializers::KubernetesNodepool.serialize([kn], {detailed: true})
+        nodepools: Serializers::KubernetesNodepool.serialize([kn], {detailed: true}),
       }
 
       expect(described_class.serialize_internal(kc, {detailed: true})).to eq(expected_result)

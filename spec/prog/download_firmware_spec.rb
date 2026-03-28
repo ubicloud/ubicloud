@@ -12,7 +12,7 @@ RSpec.describe Prog::DownloadFirmware do
       vm_host,
       prog: "DownloadFirmware",
       label: "start",
-      stack: [{"version" => "202405", "sha256" => "thesha"}]
+      stack: [{"version" => "202405", "sha256" => "thesha"}],
     )
   }
 

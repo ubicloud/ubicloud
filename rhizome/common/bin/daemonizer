@@ -13,7 +13,7 @@ STATE_MAP = {
   "dead" => "NotStarted",
   "running" => "InProgress",
   "exited" => "Succeeded",
-  "failed" => "Failed"
+  "failed" => "Failed",
 }
 
 def get_state(name)

@@ -116,7 +116,7 @@ class KubernetesCluster < Sequel::Model
     nodepools.flat_map(&:nodes).map do |kd|
       pod_name = client.kubectl(
         "get pods -n ubicsi --field-selector spec.nodeName=:nodename -o jsonpath='{.items[*].metadata.name}'",
-        nodename: kd.name
+        nodename: kd.name,
       ).split.find { it.start_with?("ubicsi-nodeplugin-") }
 
       next {node: kd.ubid, healthy: false} unless pod_name
@@ -131,7 +131,7 @@ class KubernetesCluster < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 

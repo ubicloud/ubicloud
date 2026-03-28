@@ -49,7 +49,7 @@ class HugepagesSetup
   end
 
   def update_postgres_hugepages_conf(shared_buffers_kib)
-    safe_write_to_file("/etc/postgresql/#{@version}/#{@cluster}/conf.d/002-hugepages.conf", <<CONF
+    safe_write_to_file("/etc/postgresql/#{@version}/#{@cluster}/conf.d/002-hugepages.conf", <<CONF,
 huge_pages = 'on'
 huge_page_size = 0
 shared_buffers = #{shared_buffers_kib}kB

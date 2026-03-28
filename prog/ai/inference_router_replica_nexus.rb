@@ -16,12 +16,12 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
   PAGE_TYPES = {
     unhealthy_replica: {
       message: "Replica %s of inference router %s is unavailable",
-      tag: "InferenceRouterReplicaUnavailable"
+      tag: "InferenceRouterReplicaUnavailable",
     },
     unhealthy_endpoints: {
       message: "Replica %s of inference router %s has unhealthy endpoints",
-      tag: "InferenceRouterReplicaUnhealthyEndpoints"
-    }
+      tag: "InferenceRouterReplicaUnhealthyEndpoints",
+    },
   }.freeze
 
   def self.assemble(inference_router_id)
@@ -36,14 +36,14 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         size: inference_router.vm_size,
         boot_image: "ubuntu-noble",
         private_subnet_id: inference_router.load_balancer.private_subnet.id,
-        enable_ip4: true
+        enable_ip4: true,
       )
 
       inference_router.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceRouterReplica.create(
         inference_router_id:,
-        vm_id: vm_st.id
+        vm_id: vm_st.id,
       ) { it.id = ubid.to_uuid }
 
       Strand.create_with_id(replica, prog: "Ai::InferenceRouterReplicaNexus", label: "start")
@@ -216,7 +216,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       vm_ip: vm.sshable.host,
       vm_host_ubid: vm.vm_host.ubid,
       vm_host_ip: vm.vm_host.sshable.host,
-      **details
+      **details,
     }
 
     page_details = PAGE_TYPES.fetch(type)
@@ -224,7 +224,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
     Prog::PageNexus.assemble(
       format(page_details[:message], inference_router_replica.ubid.to_s[0..7], inference_router.name),
       [page_details[:tag], inference_router_replica.ubid],
-      inference_router_replica.ubid, extra_data:
+      inference_router_replica.ubid, extra_data:,
     )
   end
 
@@ -237,7 +237,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
       owner_table: "project",
       used_for: "inference_endpoint",
       is_valid: true,
-      owner_id: Sequel[:project][:id]
+      owner_id: Sequel[:project][:id],
     ).exists
 
     free_quota_exhausted_projects_ds = FreeQuota.get_exhausted_projects("inference-tokens")
@@ -255,7 +255,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
         else
           ds.where(
             Sequel.pg_jsonb_op(:feature_flags)["visible_locations"]
-                  .contains([inference_router.location.name])
+                  .contains([inference_router.location.name]),
           )
         end
       end.order(:id)
@@ -268,7 +268,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
           api_keys: it.api_keys
             .select { |k| k.used_for == "inference_endpoint" && k.is_valid }
             .sort_by { |k| k.id }
-            .map { |k| Digest::SHA2.hexdigest(k.key) }
+            .map { |k| Digest::SHA2.hexdigest(k.key) },
         }
     end
 
@@ -290,16 +290,16 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
                   .merge(id: target.name, api_key: target.api_key)
                   .merge(target.extra_configs)
             end
-          end
+          end,
       }
     end
     new_config = {
       certificate: {
         cert: inference_router.load_balancer.active_cert.cert,
-        key: OpenSSL::PKey.read(inference_router.load_balancer.active_cert.csr_key).to_pem
+        key: OpenSSL::PKey.read(inference_router.load_balancer.active_cert.csr_key).to_pem,
       },
       projects: eligible_projects,
-      routes:
+      routes:,
     }
     new_config = new_config.merge(JSON.parse(File.read("config/inference_router_config.json")))
     new_config_json = JSON.generate(new_config)
@@ -364,7 +364,7 @@ class Prog::Ai::InferenceRouterReplicaNexus < Prog::Base
             resource_name: "#{resource_family} #{begin_time.strftime("%Y-%m-%d")}",
             billing_rate_id: rate_id,
             span: Sequel.pg_range(begin_time...end_time),
-            amount: tokens
+            amount: tokens,
           )
         end
       rescue Sequel::Error => ex

@@ -13,14 +13,14 @@ RSpec.describe VictoriaMetricsServer do
       root_cert_2: "dummy-root-cert-2",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      project_id: project.id
+      project_id: project.id,
     )
 
     server = described_class.create(
       victoria_metrics_resource_id: vmr.id,
       vm_id: vm.id,
       cert: "cert",
-      cert_key: "cert-key"
+      cert_key: "cert-key",
     )
     Strand.create_with_id(server, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "wait")
     server
@@ -30,13 +30,13 @@ RSpec.describe VictoriaMetricsServer do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID,
-      net4: "10.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "10.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
   let(:vm) {
     Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "test-vm", private_subnet_id: private_subnet.id,
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     ).subject.update(ephemeral_net6: "fdfa:b5aa:14a3:4a3d::/64")
   }
 
@@ -73,13 +73,13 @@ RSpec.describe VictoriaMetricsServer do
         ssl_ca_data: vms.resource.root_certs,
         socket: File.join("unix://", socket_path, "health_monitor_socket"),
         username: vms.resource.admin_user,
-        password: vms.resource.admin_password
+        password: vms.resource.admin_password,
       ).and_return(client)
 
       result = vms.init_health_monitor_session
       expect(result).to eq({
         ssh_session: session,
-        victoria_metrics_client: client
+        victoria_metrics_client: client,
       })
     end
   end
@@ -94,7 +94,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(client).to receive(:health).and_return(true)
       expect(vms).to receive(:aggregate_readings).with(
         previous_pulse: {reading: "down", reading_rpt: 3, reading_chg: fixed_time - 60},
-        reading: "up"
+        reading: "up",
       ).and_return({reading: "up", reading_rpt: 1, reading_chg: fixed_time})
 
       result = vms.check_pulse(session:, previous_pulse: {reading: "down", reading_rpt: 3, reading_chg: fixed_time - 60})
@@ -108,7 +108,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(client).to receive(:health).and_return(false)
       expect(vms).to receive(:aggregate_readings).with(
         previous_pulse: {reading: "up", reading_rpt: 2, reading_chg: fixed_time - 30},
-        reading: "down"
+        reading: "down",
       ).and_return({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
 
       result = vms.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 2, reading_chg: fixed_time - 30})
@@ -122,7 +122,7 @@ RSpec.describe VictoriaMetricsServer do
       expect(client).to receive(:health).and_raise(RuntimeError)
       expect(vms).to receive(:aggregate_readings).with(
         previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: fixed_time - 10},
-        reading: "down"
+        reading: "down",
       ).and_return({reading: "down", reading_rpt: 1, reading_chg: fixed_time})
 
       result = vms.check_pulse(session:, previous_pulse: {reading: "up", reading_rpt: 1, reading_chg: fixed_time - 10})
@@ -160,7 +160,7 @@ RSpec.describe VictoriaMetricsServer do
         ssl_ca_data: vms.resource.root_certs,
         socket: nil,
         username: vms.resource.admin_user,
-        password: vms.resource.admin_password
+        password: vms.resource.admin_password,
       )
 
       vms.client
@@ -173,7 +173,7 @@ RSpec.describe VictoriaMetricsServer do
         ssl_ca_data: vms.resource.root_certs,
         socket:,
         username: vms.resource.admin_user,
-        password: vms.resource.admin_password
+        password: vms.resource.admin_password,
       )
 
       vms.client(socket:)

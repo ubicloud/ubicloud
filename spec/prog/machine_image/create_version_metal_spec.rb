@@ -16,7 +16,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
       storage_device_id: sd.id, vhost_block_backend_id: vhost_block_backend.id,
       key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "test-source-kek").id,
-      vring_workers: 1
+      vring_workers: 1,
     )
     vm
   }
@@ -32,14 +32,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       endpoint: "https://minio.example.com/",
       bucket: "test-bucket",
       access_key: "test-access-key",
-      secret_key: "test-secret-key"
+      secret_key: "test-secret-key",
     )
   }
   let(:mi_version) {
     MachineImageVersion.create(
       machine_image_id: machine_image.id,
       version: "1.0",
-      actual_size_mib: 5120
+      actual_size_mib: 5120,
     )
   }
   let(:archive_kek) { StorageKeyEncryptionKey.create_random(auth_data: "target-kek") }
@@ -49,7 +49,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       enabled: false,
       archive_kek_id: archive_kek.id,
       store_id: store.id,
-      store_prefix: "#{project.ubid}/#{machine_image.ubid}/1.0"
+      store_prefix: "#{project.ubid}/#{machine_image.ubid}/1.0",
     )
   }
   let(:strand) {
@@ -60,8 +60,8 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       stack: [{
         "subject_id" => mi_version_metal.id,
         "source_vm_id" => source_vm.id,
-        "destroy_source_after" => false
-      }]
+        "destroy_source_after" => false,
+      }],
     )
   }
 
@@ -79,7 +79,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
         vm_id: source_vm.id, boot: false, size_gib: 10, disk_index: 1,
         storage_device_id: source_vol.storage_device_id, vhost_block_backend_id: source_vol.vhost_block_backend_id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "extra").id,
-        vring_workers: 1
+        vring_workers: 1,
       )
 
       expect {
@@ -93,7 +93,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
         vm_id: running_vm.id, boot: true, size_gib: 5, disk_index: 0,
         storage_device_id: source_vol.storage_device_id, vhost_block_backend_id: source_vol.vhost_block_backend_id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "x").id,
-        vring_workers: 1
+        vring_workers: 1,
       )
 
       expect {
@@ -109,7 +109,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
         vm_id: old_vm.id, boot: true, size_gib: 5, disk_index: 0,
         storage_device_id: source_vol.storage_device_id, vhost_block_backend_id: old_backend.id,
         key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "y").id,
-        vring_workers: 1
+        vring_workers: 1,
       )
 
       expect {
@@ -123,7 +123,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       VmStorageVolume.create(
         vm_id: unencrypted_vm.id, boot: true, size_gib: 5, disk_index: 0,
         storage_device_id: source_vol.storage_device_id, vhost_block_backend_id: source_vol.vhost_block_backend_id,
-        vring_workers: 1
+        vring_workers: 1,
       )
 
       expect {
@@ -137,7 +137,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       VmStorageVolume.create(
         vm_id: no_backend_vm.id, boot: true, size_gib: 5, disk_index: 0,
         storage_device_id: source_vol.storage_device_id,
-        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "z").id
+        key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "z").id,
       )
 
       expect {
@@ -149,7 +149,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       new_mi_version = MachineImageVersion.create(
         machine_image_id: machine_image.id,
         version: "2.0",
-        actual_size_mib: 5120
+        actual_size_mib: 5120,
       )
 
       strand = described_class.assemble(new_mi_version, source_vm, store, destroy_source_after: true)
@@ -257,7 +257,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
         "prefix" => mi_version_metal.store_prefix,
         "access_key_id" => store.access_key,
         "secret_access_key" => store.secret_key,
-        "archive_kek" => archive_kek.secret_key_material_hash
+        "archive_kek" => archive_kek.secret_key_material_hash,
       )
       expect(result).not_to have_key("vm_name")
       expect(result).not_to have_key("device")
@@ -272,14 +272,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       s3.stub_responses(
         :list_objects_v2,
         {contents: [{size: 10}, {size: 20}], is_truncated: true, next_continuation_token: "token"},
-        {contents: [{size: 5}], is_truncated: false}
+        {contents: [{size: 5}], is_truncated: false},
       )
 
       allow(Aws::S3::Client).to receive(:new).with(
         region: store.region,
         endpoint: store.endpoint,
         access_key_id: store.access_key,
-        secret_access_key: store.secret_key
+        secret_access_key: store.secret_key,
       ).and_return(s3)
 
       expect(prog.archive_size_bytes).to eq(35)

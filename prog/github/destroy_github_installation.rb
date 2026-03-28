@@ -9,7 +9,7 @@ class Prog::Github::DestroyGithubInstallation < Prog::Base
     Strand.create(
       prog: "Github::DestroyGithubInstallation",
       label: "start",
-      stack: [{"subject_id" => installation.id}]
+      stack: [{"subject_id" => installation.id}],
     )
   end
 

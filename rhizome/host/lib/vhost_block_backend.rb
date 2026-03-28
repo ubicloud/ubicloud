@@ -11,7 +11,7 @@ class VhostBlockBackend
     ["v0.3.1", :x64] => "3b4a6d3387a8da7c914d85203955c0a879168518aed76679a334070403630262",
     ["v0.3.1", :arm64] => "d7cd297468569a0fa197d48eb7d21b64aea9598895d1b5b97da8bec5e307d57b",
     ["v0.2.2", :x64] => "f5b7b2b88fa18e5070ff319b15363aed671e496d9f6cccec3bbcc48a6f38a44a",
-    ["v0.2.2", :arm64] => "7f4a5818fdab4e7524855096352d9ceaa038ff254de2b52c88d491f76a05686f"
+    ["v0.2.2", :arm64] => "7f4a5818fdab4e7524855096352d9ceaa038ff254de2b52c88d491f76a05686f",
   }.freeze
 
   SHA256_BY_VERSION_AND_ARCH.each_key(&:freeze)

@@ -68,7 +68,7 @@ class GithubRunner < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: vm.sshable.start_fresh_session
+      ssh_session: vm.sshable.start_fresh_session,
     }
   end
 

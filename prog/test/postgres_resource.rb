@@ -11,13 +11,13 @@ class Prog::Test::PostgresResource < Prog::Test::Base
     frame = {
       "provider" => provider,
       "postgres_service_project_id" => postgres_service_project.id,
-      "postgres_test_project_id" => postgres_test_project.id
+      "postgres_test_project_id" => postgres_test_project.id,
     }
 
     Strand.create(
       prog: "Test::PostgresResource",
       label: "start",
-      stack: [frame]
+      stack: [frame],
     )
   end
 
@@ -37,7 +37,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
       location_id:,
       name: "postgres-test-standard",
       target_vm_size:,
-      target_storage_size_gib:
+      target_storage_size_gib:,
     )
 
     update_stack({"postgres_resource_id" => st.id})

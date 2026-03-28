@@ -31,7 +31,7 @@ module Scheduling::Allocator
       vm.project.get_ff_allocator_diagnostics || false,
       family_filter,
       os_filter,
-      minimum_vhost_block_backend_version
+      minimum_vhost_block_backend_version,
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -66,7 +66,7 @@ module Scheduling::Allocator
     :diagnostics,
     :family_filter,
     :os_filter,
-    :minimum_vhost_block_backend_version
+    :minimum_vhost_block_backend_version,
   ) do
     def initialize(*args)
       super
@@ -153,7 +153,7 @@ module Scheduling::Allocator
           :available_iommu_groups,
           Sequel.function(:coalesce, :vm_provisioning_count, 0).as(:vm_provisioning_count),
           :accepts_slices,
-          :family
+          :family,
         )
         .where(arch: request.arch_filter)
         .with(:available_ipv4, DB[:ipv4_address]
@@ -252,7 +252,7 @@ module Scheduling::Allocator
             .exclude(allocation_weight: 0)
             .where { version_code >= request.minimum_vhost_block_backend_version }
             .select(1)
-            .exists
+            .exists,
         )
       end
 
@@ -283,7 +283,7 @@ module Scheduling::Allocator
         vm_host_id: vm_host.id,
         ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
         local_vetho_ip: vm_host.veth_pair_random_ip4_addr,
-        allocated_at: Time.now
+        allocated_at: Time.now,
       }
       update_args[:family] = vm_host.family if vm.family != "burstable"
       vm.set(**update_args)
@@ -457,7 +457,7 @@ module Scheduling::Allocator
             .where(id: @existing_slice.id, enabled: true)
             .update(
               used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
-              used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib
+              used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib,
             )
 
           fail "failed to update slice" unless updated == 1
@@ -478,7 +478,7 @@ module Scheduling::Allocator
             family: vm.family,
             allowed_cpus: cpus,
             memory_gib: @request.memory_gib_for_vcpus(cpus.count),
-            is_shared: @request.require_shared_slice
+            is_shared: @request.require_shared_slice,
           )
 
           # update the VM
@@ -489,7 +489,7 @@ module Scheduling::Allocator
           VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
             used_cpu_percent: Sequel[:used_cpu_percent] + vm.cpu_percent_limit,
             used_memory_gib: Sequel[:used_memory_gib] + vm.memory_gib,
-            enabled: true
+            enabled: true,
           )
 
           # Update the host utilization
@@ -498,7 +498,7 @@ module Scheduling::Allocator
           # Slice destruction will return those to the host
           VmHost.dataset.where(id: vm_host.id).update(
             used_cores: Sequel[:used_cores] + st.subject.cores,
-            used_hugepages_1g: Sequel[:used_hugepages_1g] + st.subject.total_memory_gib
+            used_hugepages_1g: Sequel[:used_hugepages_1g] + st.subject.total_memory_gib,
           )
         end
       end
@@ -586,7 +586,7 @@ module Scheduling::Allocator
             gpu_partition_id: GpuPartition
               .where(vm_host_id:)
               .exclude(vm_id: nil)
-              .select(:id)
+              .select(:id),
           )
           .select(:pci_device_id)
 
@@ -602,7 +602,7 @@ module Scheduling::Allocator
           vm_host_id:,
           enabled: true,
           vm_id: nil,
-          gpu_count:
+          gpu_count:,
         )
         .exclude(partition_id: blocked_partitions)
         .order(:partition_id)
@@ -670,7 +670,7 @@ module Scheduling::Allocator
     def allocate_boot_image(vm_host, boot_image_name)
       boot_image = BootImage.where(
         vm_host_id: vm_host.id,
-        name: boot_image_name
+        name: boot_image_name,
       ).exclude(activated_at: nil).order_by(Sequel.desc(:version, nulls: :last)).first
 
       boot_image.id
@@ -700,7 +700,7 @@ module Scheduling::Allocator
         else
           vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(
             vm_host.vhost_block_backends,
-            min_version: @request.minimum_vhost_block_backend_version
+            min_version: @request.minimum_vhost_block_backend_version,
           )
           use_bdev_ubi = false
         end
@@ -729,7 +729,7 @@ module Scheduling::Allocator
           max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
           max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"],
           vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil,
-          track_written: volume.fetch("track_written", false)
+          track_written: volume.fetch("track_written", false),
         )
       end
     end

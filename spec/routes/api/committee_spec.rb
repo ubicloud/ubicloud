@@ -59,7 +59,7 @@ RSpec.describe Clover, "committee infrastructure" do
         unix_user: "ubi",
         size: "standard-2",
         boot_image: "ubuntu-jammy",
-        storage_size: "40"
+        storage_size: "40",
       }.to_json
     }.to raise_error Committee::InvalidResponse, %r{#/components/schemas/Vm missing required parameters: .*}
   end
@@ -71,7 +71,7 @@ RSpec.describe Clover, "committee infrastructure" do
         unix_user: "ubi",
         size: "standard-2",
         boot_image: "ubuntu-jammy",
-        storage_size: "40"
+        storage_size: "40",
       }.to_json
     }.to raise_error Committee::InvalidRequest, '#/components/schemas/Reference pattern ^[a-z0-9](?:[a-z0-9\-]{0,61}[a-z0-9])?$ does not match value: "INVALID"'
   end
@@ -99,7 +99,7 @@ RSpec.describe Clover, "committee infrastructure" do
         unix_user: "ubi",
         size: "standard-2",
         boot_image: "ubuntu-jammy",
-        storage_size: "40"
+        storage_size: "40",
       }.to_json
     }.to raise_error Committee::InvalidResponse, "Response body wasn't valid JSON."
   end

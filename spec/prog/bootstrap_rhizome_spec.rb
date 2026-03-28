@@ -9,7 +9,7 @@ RSpec.describe Prog::BootstrapRhizome do
   let(:sshable) {
     Sshable.create(
       host: "192.168.1.100",
-      raw_private_key_1: ssh_key.keypair
+      raw_private_key_1: ssh_key.keypair,
     )
   }
   let(:st) {

@@ -30,7 +30,7 @@ class VmHostSlice < Sequel::Model
     allocated_cpus = vm_host.cpus_dataset.where(
       vm_host_cpu[:spdk] => false,
       vm_host_cpu[:vm_host_slice_id] => nil,
-      vm_host_cpu[:cpu_number] => allowed_cpus
+      vm_host_cpu[:cpu_number] => allowed_cpus,
     ).update(vm_host_slice_id: id)
 
     # A concurrent xact might take some of the CPUs, so check if we got them all

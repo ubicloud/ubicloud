@@ -11,7 +11,7 @@ RSpec.describe Serializers::BillingResource do
       project_id:,
       resource_id:,
       resource_name: "pg-test",
-      resource_tags:
+      resource_tags:,
     )
   }
 
@@ -21,7 +21,7 @@ RSpec.describe Serializers::BillingResource do
       project_id: UBID.to_ubid(project_id),
       resource_id: UBID.to_ubid(resource_id),
       resource_name: "pg-test",
-      resource_tags:
+      resource_tags:,
     )
   end
 end

@@ -44,7 +44,7 @@ class FirewallRule < Sequel::Model
     (443...444) => "HTTPS",
     (5432...5433) => "PostgreSQL",
     (6432...6433) => "pgBouncer",
-    (0...65536) => "All"
+    (0...65536) => "All",
   }.freeze
 
   # This is used for mapping port ranges to select option values in the UI.
@@ -74,7 +74,7 @@ class FirewallRule < Sequel::Model
   # Note that named private subnets are not handled by this.
   DISPLAY_SOURCE_TYPE = {
     "0.0.0.0/0" => "All IPv4",
-    "::/0" => "All IPv6"
+    "::/0" => "All IPv6",
   }.freeze
 
   # This is used for mapping IP address ranges to select option values in the UI.
@@ -97,7 +97,7 @@ class FirewallRule < Sequel::Model
   SOURCE_OPTIONS.push(
     ["subnet4", "Private Subnet IPv4"],
     ["subnet6", "Private Subnet IPv6"],
-    ["custom", "Custom"]
+    ["custom", "Custom"],
   )
   SOURCE_OPTIONS.freeze.each(&:freeze)
   def self.source_options

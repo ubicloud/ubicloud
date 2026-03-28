@@ -361,20 +361,20 @@ RSpec.describe Vm do
         vm_id: vm.id, disk_index: 0, size_gib: 1, boot: true,
         boot_image_id: boot_image.id, key_encryption_key_1_id: kek.id,
         spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
-        storage_device_id: storage_device.id
+        storage_device_id: storage_device.id,
       )
       VmStorageVolume.create(
         vm_id: vm.id, disk_index: 1, size_gib: 100, boot: false,
         spdk_installation_id: spdk_installation.id, use_bdev_ubi: true,
         storage_device_id: storage_device.id, max_read_mbytes_per_sec: 200,
-        max_write_mbytes_per_sec: 300, vhost_block_backend_id: vbb.id, vring_workers: 4
+        max_write_mbytes_per_sec: 300, vhost_block_backend_id: vbb.id, vring_workers: 4,
       )
 
       (0..total_cpus - 1).each do |cpu|
         VmHostCpu.create(
           vm_host_id: vm_host.id,
           cpu_number: cpu,
-          spdk: cpu < vm_host.spdk_cpu_count
+          spdk: cpu < vm_host.spdk_cpu_count,
         )
       end
     end
@@ -398,7 +398,7 @@ RSpec.describe Vm do
          "max_read_mbytes_per_sec" => 200,
          "max_write_mbytes_per_sec" => 300,
          "vhost_block_backend_version" => vbb.version, "num_queues" => 4, "queue_size" => 64,
-         "copy_on_read" => false, "slice_name" => "system.slice", "track_written" => false}
+         "copy_on_read" => false, "slice_name" => "system.slice", "track_written" => false},
       ])
     end
 

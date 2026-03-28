@@ -17,7 +17,7 @@ class Prog::LogVmHostUtilizations < Prog::Base
         sum(floor((Sequel[:total_cores] - Sequel[:used_cores]) / Sequel.case({"x64" => 4, "arm64" => 8}, 0, :arch))).cast(:integer).as(:available_standard_8_count),
         sum(floor((Sequel[:total_cores] - Sequel[:used_cores]) / Sequel.case({"x64" => 8, "arm64" => 16}, 0, :arch))).cast(:integer).as(:available_standard_16_count),
         sum(floor((Sequel[:total_cores] - Sequel[:used_cores]) / Sequel.case({"x64" => 15, "arm64" => 30}, 0, :arch))).cast(:integer).as(:available_standard_30_count),
-        sum(floor((Sequel[:total_cores] - Sequel[:used_cores]) / Sequel.case({"x64" => 30, "arm64" => 60}, 0, :arch))).cast(:integer).as(:available_standard_60_count)
+        sum(floor((Sequel[:total_cores] - Sequel[:used_cores]) / Sequel.case({"x64" => 30, "arm64" => 60}, 0, :arch))).cast(:integer).as(:available_standard_60_count),
       ]
     }.group(:allocation_state, :location_id, :arch, :family).all
 

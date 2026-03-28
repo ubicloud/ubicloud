@@ -220,7 +220,7 @@ RSpec.describe Invoice do
       expect(url_presigner).to receive(:presigned_url).with(:get_object, {
         bucket: Config.invoices_bucket_name,
         expires_in: 3600,
-        key: invoice.blob_key
+        key: invoice.blob_key,
       }).and_return(url)
 
       expect(invoice.generate_download_link).to eq(url)

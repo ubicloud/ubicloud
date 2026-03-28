@@ -154,7 +154,7 @@ class StorageVolume
       "sudo", "-u", @vm_name,
       vhost_backend.init_metadata_path,
       "-s", @stripe_sector_count_shift.to_s,
-      "--config", sp.vhost_backend_config
+      "--config", sp.vhost_backend_config,
     ]
     cmd.push("--kek", sp.kek_pipe) unless use_config_v2?
 
@@ -285,7 +285,7 @@ class StorageVolume
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
       "write_through" => write_through_device?,
-      "rpc_socket_path" => sp.rpc_socket_path
+      "rpc_socket_path" => sp.rpc_socket_path,
     }
 
     if @image_path
@@ -337,7 +337,7 @@ class StorageVolume
       "vhost_socket" => vhost_sock,
       "rpc_socket" => sp.rpc_socket_path,
       "device_id" => @device_id,
-      "track_written" => @track_written
+      "track_written" => @track_written,
     }
     hash["metadata_path"] = sp.vhost_backend_metadata if @image_path
     toml_section("device", hash)
@@ -351,14 +351,14 @@ class StorageVolume
       "seg_count_max" => 4,
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
-      "cpus" => @cpus
+      "cpus" => @cpus,
     }
     toml_section("tuning", hash.compact)
   end
 
   def v2_encryption_section
     hash = {
-      "xts_key.ref" => "xts-key"
+      "xts_key.ref" => "xts-key",
     }
     toml_section("encryption", hash)
   end
@@ -366,7 +366,7 @@ class StorageVolume
   def v2_danger_zone_section
     hash = {
       "enabled" => true,
-      "allow_unencrypted_disk" => true
+      "allow_unencrypted_disk" => true,
     }
     toml_section("danger_zone", hash)
   end
@@ -376,18 +376,18 @@ class StorageVolume
     xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
     xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
     wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
+      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
     )
 
     secrets_xts_key_section = toml_section("secrets.#{xts_key_name}", {
       "source.inline" => wrapped_xts_b64,
       "encoding" => "base64",
-      "encrypted_by.ref" => "kek"
+      "encrypted_by.ref" => "kek",
     })
 
     secrets_kek_section = toml_section("secrets.kek", {
       "source.file" => sp.kek_pipe,
-      "encoding" => "base64"
+      "encoding" => "base64",
     })
 
     secrets_xts_key_section + "\n" + secrets_kek_section
@@ -397,7 +397,7 @@ class StorageVolume
     hash = {
       "type" => "raw",
       "image_path" => @image_path,
-      "copy_on_read" => @copy_on_read
+      "copy_on_read" => @copy_on_read,
     }
     toml_section("stripe_source", hash)
   end
@@ -413,7 +413,7 @@ class StorageVolume
         "method" => "aes256-gcm",
         "key" => key_wrapping_secrets["key"].strip,
         "init_vector" => key_wrapping_secrets["init_vector"].strip,
-        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip,
       }.to_yaml
     end
   end
@@ -512,7 +512,7 @@ class StorageVolume
     result = {
       cipher: "AES_XTS",
       key: data_encryption_key[..63],
-      key2: data_encryption_key[64..]
+      key2: data_encryption_key[64..],
     }
 
     key_file = data_encryption_key_path
@@ -563,16 +563,16 @@ class StorageVolume
         name: "aio0",
         block_size: 512,
         filename: disk_file,
-        readonly: false
-      }
+        readonly: false,
+      },
     },
       {
         method: "bdev_crypto_create",
         params: {
           base_bdev_name: "aio0",
           name: "crypt0",
-          key_name: "super_key"
-        }
+          key_name: "super_key",
+        },
       }]
 
     accel_conf = [
@@ -582,22 +582,22 @@ class StorageVolume
           name: "super_key",
           cipher: encryption_key[:cipher],
           key: encryption_key[:key],
-          key2: encryption_key[:key2]
-        }
-      }
+          key2: encryption_key[:key2],
+        },
+      },
     ]
 
     spdk_config_json = {
       subsystems: [
         {
           subsystem: "accel",
-          config: accel_conf
+          config: accel_conf,
         },
         {
           subsystem: "bdev",
-          config: bdev_conf
-        }
-      ]
+          config: bdev_conf,
+        },
+      ],
     }.to_json
 
     # spdk_dd uses the same spdk app infra, so it will bind to an rpc socket,
@@ -650,7 +650,7 @@ class StorageVolume
         key_name,
         encryption_key[:cipher],
         encryption_key[:key],
-        encryption_key[:key2]
+        encryption_key[:key2],
       )
       rpc_client.bdev_aio_create(aio_bdev, disk_file, 512)
       rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
@@ -669,7 +669,7 @@ class StorageVolume
     rpc_client.bdev_set_qos_limit(
       @device_id,
       r_mbytes_per_sec: @max_read_mbytes_per_sec,
-      w_mbytes_per_sec: @max_write_mbytes_per_sec
+      w_mbytes_per_sec: @max_write_mbytes_per_sec,
     )
   end
 

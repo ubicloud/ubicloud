@@ -26,7 +26,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
         config:,
         type:,
         extra_configs:,
-        enabled:
+        enabled:,
       )
 
       Strand.create_with_id(target, prog: "Ai::InferenceRouterTargetNexus", label: "start")
@@ -82,7 +82,7 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
       "containerDiskInGb" => 50,
       "dockerEntrypoint" => ["bash", "-c"],
       "dockerStartCmd" => [
-        <<~CMD.gsub(/\s+/, " ").strip
+        <<~CMD.gsub(/\s+/, " ").strip,
           apt update;
           DEBIAN_FRONTEND=noninteractive apt-get install openssh-server -y;
           mkdir -p ~/.ssh; cd $_; chmod 700 ~/.ssh;
@@ -96,12 +96,12 @@ class Prog::Ai::InferenceRouterTargetNexus < Prog::Base
       "env" => {
         "HF_TOKEN" => "{{ RUNPOD_SECRET_HF_TOKEN }}",
         "HF_MODEL" => inference_router_model.model_name,
-        "VLLM_API_KEY" => inference_router_target.api_key
+        "VLLM_API_KEY" => inference_router_target.api_key,
       },
       "imageName" => "vllm/vllm-openai:latest",
       "ports" => ["8080/http", "22/tcp"],
       "volumeMountPath" => "/model",
-      "volumeInGb" => 50
+      "volumeInGb" => 50,
     }
   end
 

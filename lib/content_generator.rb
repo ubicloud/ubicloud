@@ -24,7 +24,7 @@ module ContentGenerator
       vm_family = Option::VmFamilies.find { it.name == family }
       [
         vm_family.display_name,
-        vm_family.ui_descriptor
+        vm_family.ui_descriptor,
       ]
     end
 
@@ -36,7 +36,7 @@ module ContentGenerator
         size.display_name,
         "#{size.vcpus} vCPUs / #{size.memory_gib} GB RAM",
         "$#{"%.2f" % (size.vcpus * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour"
+        "$#{"%.3f" % (size.vcpus * unit_price * 60)}/hour",
       ]
     end
 
@@ -48,7 +48,7 @@ module ContentGenerator
         "#{storage_size}GB",
         nil,
         "$#{"%.2f" % (storage_size * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size * unit_price * 60)}/hour"
+        "$#{"%.3f" % (storage_size * unit_price * 60)}/hour",
       ]
     end
 
@@ -62,7 +62,7 @@ module ContentGenerator
         (gpu_count == 0) ? "No GPU" : "#{gpu_count}x #{PciDevice.device_name(gpu[1])}",
         nil,
         "$#{"%.2f" % (gpu_count * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour"
+        "$#{"%.3f" % (gpu_count * unit_price * 60)}/hour",
       ]
     end
 
@@ -81,7 +81,7 @@ module ContentGenerator
 
       [
         pg_family.name,
-        pg_family.description
+        pg_family.description,
       ]
     end
 
@@ -93,7 +93,7 @@ module ContentGenerator
         size.name,
         "#{size.vcpu_count} vCPUs / #{size.memory_gib} GB RAM",
         "$#{"%.2f" % (size.vcpu_count * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour"
+        "$#{"%.3f" % (size.vcpu_count * unit_price * 60)}/hour",
       ]
     end
 
@@ -104,7 +104,7 @@ module ContentGenerator
         "#{storage_size}GB",
         nil,
         "$#{"%.2f" % (storage_size.to_i * unit_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour"
+        "$#{"%.3f" % (storage_size.to_i * unit_price * 60)}/hour",
       ]
     end
 
@@ -123,7 +123,7 @@ module ContentGenerator
         ha_type.description,
         "",
         "$#{"%.2f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60 * 672)}/mo",
-        "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour"
+        "$#{"%.3f" % (standby_count * ((vcpu_count * compute_unit_price) + (storage_size.to_i * storage_unit_price)) * 60)}/hour",
       ]
     end
 
@@ -132,15 +132,15 @@ module ContentGenerator
         PostgresResource::Flavor::PARADEDB => [[
           "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads.",
           "You can get ParadeDB specific support via email at <a href='mailto:support@paradedb.com' class='text-orange-600 font-semibold'>support@paradedb.com</a> or via Slack at <a href='https://join.slack.com/t/paradedbcommunity/shared_invite/zt-2lkzdsetw-OiIgbyFeiibd1DG~6wFgTQ' target='_blank' class='text-orange-600 font-semibold'>ParadeDB Community Slack</a>",
-          "By creating a ParadeDB PostgreSQL database on Ubicloud you consent to your contact information being shared with ParadeDB team."
+          "By creating a ParadeDB PostgreSQL database on Ubicloud you consent to your contact information being shared with ParadeDB team.",
         ],
           "Accept <a href='https://paradedb.notion.site/Terms-of-Use-d17c9916a5b746fab86c274feb35da75' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://paradedb.notion.site/Privacy-Policy-a7ce333c45c8478fb03250dff7e573b7?pvs=4' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"],
         PostgresResource::Flavor::LANTERN => [[
           "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads.",
           "You can reach to Lantern team for support at <a href='mailto:support@lantern.dev' class='text-orange-600 font-semibold'>support@lantern.dev</a>",
-          "By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern team."
+          "By creating a Lantern PostgreSQL database on Ubicloud you consent to your contact information being shared with Lantern team.",
         ],
-          "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"]
+          "Accept <a href='https://lantern.dev/legal/terms' target='_blank' class='text-orange-600 font-semibold'>Terms of Service</a> and <a href='https://lantern.dev/legal/privacy' target='_blank' class='text-orange-600 font-semibold'> Privacy Policy</a>"],
       }
 
       notice[flavor]
@@ -169,7 +169,7 @@ module ContentGenerator
         data.title,
         data.explanation,
         "$#{"%.2f" % (cp_nodes * cp_node_price * 60 * 672)}/mo",
-        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour"
+        "$#{"%.3f" % (cp_nodes * cp_node_price * 60)}/hour",
       ]
     end
 
@@ -180,7 +180,7 @@ module ContentGenerator
         worker_size.display_name,
         "#{worker_size.vcpus} vCPUs / #{worker_size.memory_gib} GB RAM / #{worker_size.storage_size_options.first} GB NVMe Storage",
         "$#{"%.2f" % monthly_price(location, worker_size)}/mo",
-        "$#{"%.3f" % hourly_price(location, worker_size)}/hour"
+        "$#{"%.3f" % hourly_price(location, worker_size)}/hour",
       ]
     end
 

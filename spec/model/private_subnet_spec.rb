@@ -10,7 +10,7 @@ RSpec.describe PrivateSubnet do
       location_id: Location::HETZNER_FSN1_ID,
       state: "waiting",
       name: "ps",
-      project_id: Project.create(name: "test").id
+      project_id: Project.create(name: "test").id,
     )
   }
 
@@ -48,7 +48,7 @@ RSpec.describe PrivateSubnet do
           private_ipv6: "fd1b:9793:dcef:cd0a:c::/79",
           mac: "00:00:00:00:00:01",
           name: "existing-nic",
-          state: "active"
+          state: "active",
         )
       end
 
@@ -146,7 +146,7 @@ RSpec.describe PrivateSubnet do
         net6: "fd10:9b0b:6b4b:8fbb::/64",
         net4: "10.0.0.0/26",
         state: "waiting",
-        project_id: Project.create(name: "tunnel-test-project").id
+        project_id: Project.create(name: "tunnel-test-project").id,
       )
     }
     let(:src_nic) {
@@ -156,7 +156,7 @@ RSpec.describe PrivateSubnet do
         private_ipv4: "10.0.0.1",
         mac: "00:00:00:00:00:01",
         name: "src-nic",
-        state: "active"
+        state: "active",
       )
     }
     let(:dst_nic) {
@@ -166,7 +166,7 @@ RSpec.describe PrivateSubnet do
         private_ipv4: "10.0.0.2",
         mac: "00:00:00:00:00:02",
         name: "dst-nic",
-        state: "active"
+        state: "active",
       )
     }
 
@@ -208,7 +208,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.firewalls_dataset.all).to be_empty
     end
@@ -216,7 +216,7 @@ RSpec.describe PrivateSubnet do
     it "does not destroy associated firewalls if name does match" do
       ps.incr_destroy_if_only_used_internally(
         ubid: described_class.generate_ubid,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.firewalls_dataset.count).to eq 1
     end
@@ -230,7 +230,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.firewalls_dataset.count).to eq 1
     end
@@ -243,7 +243,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
@@ -257,7 +257,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: [vm.id]
+        vm_ids: [vm.id],
       )
       expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
@@ -270,7 +270,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
@@ -281,7 +281,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq []
     end
@@ -295,7 +295,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules"]
     end
@@ -310,7 +310,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_map(:name)).to eq ["update_firewall_rules", "destroy"]
     end
@@ -325,7 +325,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end
@@ -340,7 +340,7 @@ RSpec.describe PrivateSubnet do
 
       ps.incr_destroy_if_only_used_internally(
         ubid:,
-        vm_ids: []
+        vm_ids: [],
       )
       expect(ps.semaphores_dataset.select_order_map(:name)).to eq ["destroy", "update_firewall_rules"]
     end

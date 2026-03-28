@@ -12,7 +12,7 @@ RSpec.describe StorageKeyEncryption do
       "algorithm" => algorithm,
       "key" => Base64.encode64(cipher.random_key),
       "init_vector" => Base64.encode64(cipher.random_iv),
-      "auth_data" => "Ubicloud-Test-Auth"
+      "auth_data" => "Ubicloud-Test-Auth",
     })
   }
 
@@ -35,7 +35,7 @@ RSpec.describe StorageKeyEncryption do
     sek2 = described_class.new({
       "algorithm" => "aes256-wrap",
       :key => "123",
-      :init_vector => "456"
+      :init_vector => "456",
     })
 
     expect {
@@ -66,7 +66,7 @@ RSpec.describe StorageKeyEncryption do
     let(:wrapped_dek) {
       {
         key: sek.wrap_key(dek[:key]),
-        key2: sek.wrap_key(dek[:key2])
+        key2: sek.wrap_key(dek[:key2]),
       }
     }
 
@@ -76,13 +76,13 @@ RSpec.describe StorageKeyEncryption do
           cipher: "AES_XTS",
           key: [
             Base64.strict_encode64(wrapped_dek[:key][0]),
-            Base64.strict_encode64(wrapped_dek[:key][1])
+            Base64.strict_encode64(wrapped_dek[:key][1]),
           ],
           key2: [
             Base64.strict_encode64(wrapped_dek[:key2][0]),
-            Base64.strict_encode64(wrapped_dek[:key2][1])
-          ]
-        })
+            Base64.strict_encode64(wrapped_dek[:key2][1]),
+          ],
+        }),
       )
 
       read_key = sek.read_encrypted_dek("key-file")
@@ -96,13 +96,13 @@ RSpec.describe StorageKeyEncryption do
           cipher: "AES_XTS",
           key: [
             Base64.encode64(wrapped_dek[:key][0]),
-            Base64.encode64(wrapped_dek[:key][1])
+            Base64.encode64(wrapped_dek[:key][1]),
           ],
           key2: [
             Base64.encode64(wrapped_dek[:key2][0]),
-            Base64.encode64(wrapped_dek[:key2][1])
-          ]
-        })
+            Base64.encode64(wrapped_dek[:key2][1]),
+          ],
+        }),
       )
 
       read_key = sek.read_encrypted_dek("key-file")

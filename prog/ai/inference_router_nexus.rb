@@ -31,18 +31,18 @@ class Prog::Ai::InferenceRouterNexus < Prog::Base
 
       custom_dns_zone = DnsZone.where(
         project_id: Config.inference_endpoint_service_project_id,
-        name: Config.inference_dns_zone
+        name: Config.inference_dns_zone,
       ).first
       custom_hostname_prefix = name if custom_dns_zone
       lb_s = Prog::Vnet::LoadBalancerNexus.assemble(
         subnet_s.id, name: ubid.to_s, src_port: 443, dst_port: 8443, health_check_endpoint: "/up",
         health_check_protocol: "https", health_check_down_threshold: 3,
         health_check_up_threshold: 1, custom_hostname_prefix:,
-        custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: LoadBalancer::Stack::DUAL
+        custom_hostname_dns_zone_id: custom_dns_zone&.id, stack: LoadBalancer::Stack::DUAL,
       )
 
       inference_router = InferenceRouter.create(
-        project_id:, location_id:, name:, vm_size:, replica_count:, load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id
+        project_id:, location_id:, name:, vm_size:, replica_count:, load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id,
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceRouterReplicaNexus.assemble(inference_router.id)
       Strand.create_with_id(inference_router, prog: "Ai::InferenceRouterNexus", label: "start")

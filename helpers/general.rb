@@ -86,7 +86,7 @@ class Clover < Roda
     WEB_DEFAULT_HEADERS = DEFAULT_HEADERS.merge(
       "content-type" => "text/html",
       "x-frame-options" => "deny",
-      "x-content-type-options" => "nosniff"
+      "x-content-type-options" => "nosniff",
     )
     # :nocov:
     if Config.production?
@@ -313,7 +313,7 @@ class Clover < Roda
         code: 404,
         type: "InvalidLocation",
         message: "Validation failed for following path components: location",
-        details: {location: "Given location is not a valid location. Available locations: #{valid_locations.join(", ")}"}
+        details: {location: "Given location is not a valid location. Available locations: #{valid_locations.join(", ")}"},
       }}.to_json)
     end
 
@@ -334,7 +334,7 @@ class Clover < Roda
       .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
         hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
           hourly: br["unit_price"].to_f * 60,
-          monthly: br["unit_price"].to_f * 60 * 672
+          monthly: br["unit_price"].to_f * 60 * 672,
         }
     end
   end

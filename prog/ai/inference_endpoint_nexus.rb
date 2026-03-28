@@ -39,7 +39,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
       tags: model["tags"],
       max_requests: model["max_requests"],
       max_project_rps: model["max_project_rps"],
-      max_project_tps: model["max_project_tps"]
+      max_project_tps: model["max_project_tps"],
     )
   end
 
@@ -76,7 +76,7 @@ class Prog::Ai::InferenceEndpointNexus < Prog::Base
         project_id:, location_id:, boot_image:, name:, vm_size:, storage_volumes:,
         model_name:, engine:, engine_params:, replica_count:, is_public:,
         load_balancer_id: lb_s.id, private_subnet_id: subnet_s.id, gpu_count:, tags:,
-        max_requests:, max_project_rps:, max_project_tps:, external_config:
+        max_requests:, max_project_rps:, max_project_tps:, external_config:,
       ) { it.id = ubid.to_uuid }
       Prog::Ai::InferenceEndpointReplicaNexus.assemble(inference_endpoint.id)
       Strand.create_with_id(inference_endpoint, prog: "Ai::InferenceEndpointNexus", label: "start")

@@ -24,7 +24,7 @@ RSpec.describe Prog::CheckUsageAlerts do
           resource_name: "test",
           span: Sequel::Postgres::PGRange.new(Time.now, Time.now + 1),
           billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-hel1")["id"],
-          amount:
+          amount:,
         )
       end
 
@@ -51,7 +51,7 @@ RSpec.describe Prog::CheckUsageAlerts do
         invoice_number: "test-invoice-01",
         content: {cost: 0},
         begin_time: (begin_of_previous_month.to_date << 1).to_time,
-        end_time: begin_of_previous_month
+        end_time: begin_of_previous_month,
       )
 
       # Previous month: high usage that would push total over the limit
@@ -61,7 +61,7 @@ RSpec.describe Prog::CheckUsageAlerts do
         resource_name: "test-prev",
         span: Sequel::Postgres::PGRange.new(begin_of_previous_month, begin_of_current_month),
         billing_rate_id: billing_rate["id"],
-        amount: 1_000_000
+        amount: 1_000_000,
       )
 
       # Current month: low usage that is below the limit
@@ -71,7 +71,7 @@ RSpec.describe Prog::CheckUsageAlerts do
         resource_name: "test-curr",
         span: Sequel::Postgres::PGRange.new(begin_of_current_month, Time.now + 1),
         billing_rate_id: billing_rate["id"],
-        amount: 100
+        amount: 100,
       )
 
       # Set limit between current month cost and combined (prev + current) cost

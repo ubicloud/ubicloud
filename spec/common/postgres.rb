@@ -29,7 +29,7 @@ module PostgresTestHelpers
       client_root_cert_1: "client_root_cert_1",
       client_root_cert_2: "client_root_cert_2",
       client_cert: "client_cert",
-      client_cert_key: "client_cert_key"
+      client_cert_key: "client_cert_key",
     )
     Strand.create_with_id(pg, prog: "Postgres::PostgresResourceNexus", label: "start")
     pg
@@ -51,7 +51,7 @@ module PostgresTestHelpers
     s = PostgresServer.create(
       timeline:, resource:, vm_id: vm.id,
       is_representative:, synchronization_status: "ready",
-      timeline_access:, version: PostgresResource::DEFAULT_VERSION
+      timeline_access:, version: PostgresResource::DEFAULT_VERSION,
     )
     Strand.create_with_id(s, prog: "Postgres::PostgresServerNexus", label: "start")
     s

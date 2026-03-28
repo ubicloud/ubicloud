@@ -11,7 +11,7 @@ RSpec.describe OidcProvider do
       authorization_endpoint: "https://host/auth",
       token_endpoint: "https://host/tok",
       userinfo_endpoint: "https://host/ui",
-      jwks_uri: "https://host/jw"
+      jwks_uri: "https://host/jw",
     }.to_json
   end
 
@@ -25,7 +25,7 @@ RSpec.describe OidcProvider do
       authorization_endpoint: "/auth",
       token_endpoint: "/tok",
       userinfo_endpoint: "/ui",
-      jwks_uri: "https://host/jw"
+      jwks_uri: "https://host/jw",
     )
     expect(described_class.name_for_ubid(provider.ubid)).to eq "TestOIDC"
   end
@@ -36,13 +36,13 @@ RSpec.describe OidcProvider do
     request_body = {
       client_name: "Ubicloud",
       redirect_uris: ["#{Config.base_url}/auth/0pk8pg19vxe24gbdms7hmw780h/callback"],
-      scopes: "openid email"
+      scopes: "openid email",
     }.to_json
     response_body = {
       client_id: "123",
       client_secret: "456",
       registration_client_uri: "https://host/rc",
-      registration_access_token: "789"
+      registration_access_token: "789",
     }.to_json
     Excon.stub({path: "/register", method: :post, body: request_body}, {status: 201, body: response_body})
 
@@ -82,7 +82,7 @@ RSpec.describe OidcProvider do
     body = {
       client_name: "Ubicloud",
       redirect_uris: ["#{Config.base_url}/auth/0pk8pg19vxe24gbdms7hmw780h/callback"],
-      scopes: "openid email"
+      scopes: "openid email",
     }.to_json
     Excon.stub({path: "/register", method: :post, body:}, {status: 403, body: {error: "bad"}.to_json})
 

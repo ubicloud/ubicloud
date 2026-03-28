@@ -922,7 +922,7 @@ RSpec.describe Clover, "project" do
           action:,
           project_id:,
           subject_id:,
-          object_ids: Sequel.pg_array(object_ids, :uuid)
+          object_ids: Sequel.pg_array(object_ids, :uuid),
         ).first[:id]
       end
 
@@ -949,21 +949,21 @@ RSpec.describe Clover, "project" do
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
           "vm/destroy", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
 
         fill_in "Action", with: "vm"
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/destroy", user.ubid, ""
+          "vm/destroy", user.ubid, "",
         ]
 
         fill_in "Action", with: "create"
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
 
         click_link "vm/create"
@@ -973,7 +973,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log?limit=2"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/destroy", user.ubid, ""
+          "vm/destroy", user.ubid, "",
         ]
 
         click_link "Next Page"
@@ -998,7 +998,7 @@ RSpec.describe Clover, "project" do
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
           "vm/destroy", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
       end
 
@@ -1071,7 +1071,7 @@ RSpec.describe Clover, "project" do
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/create", other_account_ubid.to_s, ""
+          "vm/create", other_account_ubid.to_s, "",
         ]
 
         visit(page.current_url + "&limit=1")
@@ -1083,18 +1083,18 @@ RSpec.describe Clover, "project" do
         url = page.current_url
         visit(url.sub(/pagination_key=\d+/, "pagination_key=1746082800"))
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         url = page.current_url
         visit(url.sub(/pagination_key=\d+/, "pagination_key=a"))
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         visit(url[0...-1])
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         fill_in "3 Months Prior To", with: date.strftime("%F")
@@ -1104,7 +1104,7 @@ RSpec.describe Clover, "project" do
         click_link "Prior 3 Months"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/create", other_account_ubid.to_s, ""
+          "vm/create", other_account_ubid.to_s, "",
         ]
 
         fill_in "3 Months Prior To", with: "2026-03-aa"

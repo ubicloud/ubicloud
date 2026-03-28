@@ -14,7 +14,7 @@ RSpec.describe StorageKeyTool do
       algorithm: key_wrapping_algorithm,
       key: cipher.random_key,
       init_vector: cipher.random_iv,
-      auth_data: "Ubicloud-Storage-Auth"
+      auth_data: "Ubicloud-Storage-Auth",
     }
   end
 
@@ -31,7 +31,7 @@ RSpec.describe StorageKeyTool do
     expect(ske).to receive(:read_encrypted_dek).with(key_file).and_return({
       cipher: cipher,
       key: key,
-      key2: key2
+      key2: key2,
     })
     expect(StorageKeyEncryption).to receive(:new).with(kek).and_return(ske)
   end
@@ -41,7 +41,7 @@ RSpec.describe StorageKeyTool do
     expect(ske).to receive(:write_encrypted_dek).with(key_file, {
       cipher: cipher,
       key: key,
-      key2: key2
+      key2: key2,
     })
     expect(StorageKeyEncryption).to receive(:new).with(kek).and_return(ske)
   end

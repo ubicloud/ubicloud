@@ -101,7 +101,7 @@ class Prog::Vm::Nexus < Prog::Base
         ip4_enabled: enable_ip4,
         pool_id:,
         arch:,
-        project_id:
+        project_id:,
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
@@ -139,7 +139,7 @@ class Prog::Vm::Nexus < Prog::Base
               size_gib: volume[:size_gib] / disk_count,
               boot: volume[:boot],
               use_bdev_ubi: false,
-              disk_index:
+              disk_index:,
             )
 
             disk_index += 1
@@ -167,8 +167,8 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
-          "private_subnet_id" => subnet.id
-        }]
+          "private_subnet_id" => subnet.id,
+        }],
       ) { it.id = vm.id }
     end
   end

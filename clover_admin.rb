@@ -50,7 +50,7 @@ class CloverAdmin < Roda
     skip_compiled_encoding_detection: true,
     scope_class: self,
     default_fixed_locals:,
-    extract_fixed_locals: true
+    extract_fixed_locals: true,
   }
 
   # :nocov:
@@ -259,7 +259,7 @@ class CloverAdmin < Roda
     hmac_secret OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-rodauth-hmac-secret")
     function_name(&{
       rodauth_get_salt: :rodauth_admin_get_salt,
-      rodauth_valid_password_hash: :rodauth_admin_valid_password_hash
+      rodauth_valid_password_hash: :rodauth_admin_valid_password_hash,
     }.to_proc)
 
     close_account_redirect "/login"
@@ -297,18 +297,18 @@ class CloverAdmin < Roda
   OBJECT_ACTIONS = {
     "Account" => {
       "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
-      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend)
+      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend),
     },
     "Invoice" => {
       "download_pdf" => object_action("Download PDF", type: :direct) do |obj|
         obj.generate_download_link
-      end
+      end,
     },
     "GithubInstallation" => {
-      "github_page" => github_page_action
+      "github_page" => github_page_action,
     },
     "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
+      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner),
     },
     "GithubRepository" => {
       "github_page" => github_page_action,
@@ -317,16 +317,16 @@ class CloverAdmin < Roda
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       rescue Octokit::NotFound
         "Job not found"
-      end
+      end,
     },
     "Page" => {
-      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve)
+      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
     },
     "PostgresResource" => {
-      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart)
+      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart),
     },
     "PostgresServer" => {
-      "recycle" => object_action("Recycle", flash: "Recycle scheduled for PostgresServer", &:incr_recycle)
+      "recycle" => object_action("Recycle", flash: "Recycle scheduled for PostgresServer", &:incr_recycle),
     },
     "Project" => {
       "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: {typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}}}) do |obj, credit|
@@ -337,13 +337,13 @@ class CloverAdmin < Roda
           typecast: :str!,
           type: "select",
           add_blank: true,
-          options: Project.instance_methods.grep(/\Aset_ff_/).map! { it[7...] }.sort!
+          options: Project.instance_methods.grep(/\Aset_ff_/).map! { it[7...] }.sort!,
         },
         value: {
           typecast: :nonempty_str,
           placeholder: "JSON",
-          required: nil
-        }
+          required: nil,
+        },
       }) do |obj, name, value|
         begin
           value = JSON.parse(value) if value
@@ -357,14 +357,14 @@ class CloverAdmin < Roda
           typecast: :str!,
           type: "select",
           add_blank: true,
-          options: ProjectQuota.default_quotas.keys
+          options: ProjectQuota.default_quotas.keys,
         },
         value: {
           typecast: :int,
           type: "number",
           placeholder: "blank to reset to default",
-          required: nil
-        }
+          required: nil,
+        },
       }) do |obj, resource_type, value|
         quota_id = ProjectQuota.default_quotas[resource_type]["id"]
         if (existing_quota = obj.quotas_dataset.first(quota_id:))
@@ -376,7 +376,7 @@ class CloverAdmin < Roda
         elsif value
           obj.add_quota(quota_id:, value:)
         end
-      end
+      end,
     },
     "Strand" => {
       "subject" => object_action("Subject", type: :direct) do |obj|
@@ -393,7 +393,7 @@ class CloverAdmin < Roda
         options = subject_class.respond_to?(:semaphore_names) ? subject_class.semaphore_names.map(&:name).sort! : [].freeze
         {
           name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:}
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
         }
       }) do |obj, name, name_confirmation|
         fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
@@ -403,12 +403,12 @@ class CloverAdmin < Roda
         options = obj.semaphores_dataset.distinct.select_order_map(:name)
         {
           name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
-          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:}
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
         }
       }) do |obj, name, name_confirmation|
         fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
         Semaphore.where(strand_id: obj.id, name:).destroy
-      end
+      end,
     },
     "Vm" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for Vm", &:incr_restart),
@@ -417,7 +417,7 @@ class CloverAdmin < Roda
           obj.incr_admin_stop
           obj.incr_stop
         end
-      end
+      end,
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
@@ -438,12 +438,12 @@ class CloverAdmin < Roda
             .where(project_id: nil, provider: %w[hetzner leaseweb])
             .or(id: Location::GITHUB_RUNNERS_ID)
             .select_order_map([:display_name, :id])
-            .each { it[1] = UBID.to_ubid(it[1]) }
-        }
+            .each { it[1] = UBID.to_ubid(it[1]) },
+        },
       }) do |obj, target_location_id|
         obj.move_to_location(target_location_id)
-      end
-    }
+      end,
+    },
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
 
@@ -455,14 +455,14 @@ class CloverAdmin < Roda
     "Invoice" => [:invoice_number],
     "KubernetesCluster" => [:name],
     "PostgresResource" => [:name],
-    "Vm" => [:name]
+    "Vm" => [:name],
   }.freeze
   SEARCH_QUERIES.each_value(&:freeze)
   SEARCH_PREFIXES = SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ").freeze
 
   OBJECTS_WITH_UI = {
     "Vm" => lambda { |vm| "project/#{vm.project.ubid}/location/#{vm.location.display_name}/vm/#{vm.ubid}/overview" },
-    "PostgresResource" => lambda { |pg| "project/#{pg.project.ubid}/location/#{pg.location.display_name}/postgres/#{pg.name}/overview" }
+    "PostgresResource" => lambda { |pg| "project/#{pg.project.ubid}/location/#{pg.location.display_name}/postgres/#{pg.name}/overview" },
   }.freeze
 
   OBJECTS_WITH_EXTRAS = Dir["views/admin/extras/*.erb"]
@@ -477,7 +477,7 @@ class CloverAdmin < Roda
     ["Project", :vms] => "project",
     ["Project", :postgres_resources] => "project",
     ["Project", :invoices] => "project",
-    ["PostgresResource", :servers] => "resource"
+    ["PostgresResource", :servers] => "resource",
   }.freeze
 
   plugin :autoforme do
@@ -950,7 +950,7 @@ class CloverAdmin < Roda
             vm_id: it.ubid,
             vm_name: it.name,
             boot_image: it.boot_image,
-            project_id: it.project.ubid
+            project_id: it.project.ubid,
           }
         }
         archived_vms = ArchivedRecord.vms_by_ips(ips, days: @days).map {
@@ -961,7 +961,7 @@ class CloverAdmin < Roda
             vm_id: UBID.to_ubid(it[:vm_id]),
             vm_name: it[:vm_name],
             boot_image: it[:boot_image],
-            project_id: UBID.to_ubid(it[:project_id])
+            project_id: UBID.to_ubid(it[:project_id]),
           }
         }
         @vms = (active_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }
@@ -1001,7 +1001,7 @@ class CloverAdmin < Roda
         accounts_dataset:,
         month_limit: 6,
         min_end_date: MIN_AUDIT_LOG_END_DATE,
-        **args
+        **args,
       )
       view("authentication_audit_log")
     end
@@ -1016,7 +1016,7 @@ class CloverAdmin < Roda
 
       vcpus_expr = Sequel.case(
         [[{label: "ubicloud"}, 2], [{label: "ubicloud-arm"}, 2]],
-        Sequel.cast(Sequel.function(:regexp_replace, :label, '^.*(?:standard|premium)-(\d+).*$', '\1'), Integer)
+        Sequel.cast(Sequel.function(:regexp_replace, :label, '^.*(?:standard|premium)-(\d+).*$', '\1'), Integer),
       )
 
       runners = DB[:github_runner]
@@ -1037,19 +1037,19 @@ class CloverAdmin < Roda
         .select(
           Sequel[:i][:id],
           Sequel[:i][:name],
-          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium)
+          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium),
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
           *{r: :runner, v: :vm}.flat_map { |k, prefix|
             [
               Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]).filter(~Sequel.expr(Sequel[k][:allocated_at] => nil)), 0).as(:"allocated_#{prefix}_vcpus"),
-              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0).as(:"#{prefix}_vcpus")
+              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0).as(:"#{prefix}_vcpus"),
             ]
           },
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
-          *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") }
+          *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
         .group(Sequel[:i][:id], Sequel[:i][:name], :premium)
         .reverse(:runner_vcpus, :vm_vcpus)

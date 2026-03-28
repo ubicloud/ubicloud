@@ -11,7 +11,7 @@ RSpec.describe StorageVolume do
       "device_id" => "xyz01",
       "encrypted" => false,
       "size_gib" => 12,
-      "image" => "kubuntu"
+      "image" => "kubuntu",
     }
     described_class.new("test", params)
   }
@@ -22,7 +22,7 @@ RSpec.describe StorageVolume do
       "device_id" => "xyz01",
       "encrypted" => true,
       "size_gib" => 12,
-      "image" => "kubuntu"
+      "image" => "kubuntu",
     }
     described_class.new("test", params)
   }
@@ -36,7 +36,7 @@ RSpec.describe StorageVolume do
       "image" => "kubuntu",
       "vhost_block_backend_version" => "v0.1-5",
       "num_queues" => 4,
-      "queue_size" => 128
+      "queue_size" => 128,
     }
     described_class.new("test", params)
   }
@@ -50,7 +50,7 @@ RSpec.describe StorageVolume do
       "image" => "kubuntu",
       "vhost_block_backend_version" => "v0.1-5",
       "num_queues" => 4,
-      "queue_size" => 128
+      "queue_size" => 128,
     }
     described_class.new("test", params)
   }
@@ -64,7 +64,7 @@ RSpec.describe StorageVolume do
       "image" => "kubuntu",
       "vhost_block_backend_version" => "v0.4.0",
       "num_queues" => 4,
-      "queue_size" => 128
+      "queue_size" => 128,
     }
     described_class.new("test", params)
   }
@@ -78,7 +78,7 @@ RSpec.describe StorageVolume do
       "image" => "kubuntu",
       "vhost_block_backend_version" => "v0.4.0",
       "num_queues" => 4,
-      "queue_size" => 128
+      "queue_size" => 128,
     }
     described_class.new("test", params)
   }
@@ -93,7 +93,7 @@ RSpec.describe StorageVolume do
       "vhost_block_backend_version" => "v0.4.0",
       "num_queues" => 2,
       "queue_size" => 128,
-      "cpus" => [0, 1]
+      "cpus" => [0, 1],
     }
     described_class.new("test", params)
   }
@@ -199,7 +199,7 @@ RSpec.describe StorageVolume do
       expect(unencrypted_sv).to receive(:set_qos_limits).with(no_args).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
-        -> {}
+        -> {},
       )
       expect(unencrypted_sv).to receive(:purge_spdk_artifacts)
       unencrypted_sv.start(nil)
@@ -210,7 +210,7 @@ RSpec.describe StorageVolume do
       expect(unencrypted_sv).to receive(:set_qos_limits).with(no_args).and_return(nil, nil)
       expect(unencrypted_sv).to receive(:setup_spdk_vhost).with(no_args).and_invoke(
         -> { raise SpdkExists.new("Device Exists", -17) },
-        -> { raise SpdkExists.new("Device Exists", -17) }
+        -> { raise SpdkExists.new("Device Exists", -17) },
       )
       expect(unencrypted_sv).to receive(:purge_spdk_artifacts)
       expect { unencrypted_sv.start(nil) }.to raise_error SpdkExists
@@ -335,12 +335,12 @@ RSpec.describe StorageVolume do
         "disk_index" => 1,
         "device_id" => "xyz01",
         "max_read_mbytes_per_sec" => 200,
-        "max_write_mbytes_per_sec" => 300
+        "max_write_mbytes_per_sec" => 300,
       })
       rpc_client = instance_double(SpdkRpc)
       allow(sv).to receive(:rpc_client).and_return(rpc_client)
       expect(rpc_client).to receive(:bdev_set_qos_limit).with(
-        "xyz01", r_mbytes_per_sec: 200, w_mbytes_per_sec: 300
+        "xyz01", r_mbytes_per_sec: 200, w_mbytes_per_sec: 300,
       )
       sv.set_qos_limits
     end
@@ -348,7 +348,7 @@ RSpec.describe StorageVolume do
     it "doesn't set qos limits if none are provided" do
       sv = described_class.new("test", {
         "disk_index" => 1,
-        "device_id" => "xyz01"
+        "device_id" => "xyz01",
       })
       expect(sv).not_to receive(:rpc_client)
       sv.set_qos_limits
@@ -418,7 +418,7 @@ RSpec.describe StorageVolume do
     it "can create vhost backend config" do
       encryption_key = {
         key: "abcdefgh01234567abcdefgh01234567",
-        key2: "abcdefgh01234567abcdefgh01234567"
+        key2: "abcdefgh01234567abcdefgh01234567",
       }
       algorithm = "aes-256-gcm"
       cipher = OpenSSL::Cipher.new(algorithm)
@@ -426,7 +426,7 @@ RSpec.describe StorageVolume do
         "algorithm" => algorithm,
         "key" => Base64.encode64(cipher.random_key),
         "init_vector" => Base64.encode64(cipher.random_iv),
-        "auth_data" => "Ubicloud-Test-Auth"
+        "auth_data" => "Ubicloud-Test-Auth",
       }
       config_path = "/var/storage/test/2/vhost-backend.conf"
       f = instance_double(File)
@@ -444,7 +444,7 @@ RSpec.describe StorageVolume do
     it "creates v2 config files for v0.4.0" do
       encryption_key = {
         key: "abcdefgh01234567abcdefgh01234567",
-        key2: "abcdefgh01234567abcdefgh01234567"
+        key2: "abcdefgh01234567abcdefgh01234567",
       }
       algorithm = "aes-256-gcm"
       cipher = OpenSSL::Cipher.new(algorithm)
@@ -452,7 +452,7 @@ RSpec.describe StorageVolume do
         "algorithm" => algorithm,
         "key" => Base64.encode64(cipher.random_key),
         "init_vector" => Base64.encode64(cipher.random_iv),
-        "auth_data" => "Ubicloud-Test-Auth"
+        "auth_data" => "Ubicloud-Test-Auth",
       }
 
       expect(encrypted_vhost_v2_sv).to receive(:write_through_device?).and_return(true)
@@ -538,7 +538,7 @@ RSpec.describe StorageVolume do
         "algorithm" => algorithm,
         "key" => Base64.encode64(cipher.random_key),
         "init_vector" => Base64.encode64(cipher.random_iv),
-        "auth_data" => "Ubicloud-Test-Auth"
+        "auth_data" => "Ubicloud-Test-Auth",
       }
       metadata_path = "/var/storage/test/2/metadata"
       f = instance_double(File)
@@ -563,7 +563,7 @@ RSpec.describe StorageVolume do
         "sudo", "-u", "test",
         "/opt/vhost-block-backend/v0.1-5/init-metadata",
         "-s", "11", "--config",
-        "/var/storage/test/2/vhost-backend.conf"
+        "/var/storage/test/2/vhost-backend.conf",
       )
       unencrypted_vhost_sv.vhost_backend_create_metadata(nil)
     end
@@ -598,7 +598,7 @@ RSpec.describe StorageVolume do
         "algorithm" => algorithm,
         "key" => Base64.encode64(cipher.random_key),
         "init_vector" => Base64.encode64(cipher.random_iv),
-        "auth_data" => "Ubicloud-Test-Auth"
+        "auth_data" => "Ubicloud-Test-Auth",
       }
       kek_pipe = "/var/storage/test/2/kek.pipe"
       vhost_sock = "/var/storage/test/2/vhost.sock"
@@ -629,7 +629,7 @@ RSpec.describe StorageVolume do
         "disk_index" => 1,
         "device_id" => "xyz01",
         "max_read_mbytes_per_sec" => 2000,
-        "max_write_mbytes_per_sec" => 3000
+        "max_write_mbytes_per_sec" => 3000,
       })
       expect(sv).to receive(:persistent_device_id).with("/var/storage/test/1").and_return("/dev/disk/by-id/dev1")
       expect(sv.systemd_io_rate_limits).to eq(<<~RESULT
@@ -642,7 +642,7 @@ RSpec.describe StorageVolume do
     it "returns empty string if no rate limits are set" do
       sv = described_class.new("test", {
         "disk_index" => 1,
-        "device_id" => "xyz01"
+        "device_id" => "xyz01",
       })
       expect(sv.systemd_io_rate_limits).to eq("")
     end

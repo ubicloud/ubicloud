@@ -63,7 +63,7 @@ class Clover
         installation_id:,
         name: installation_response[:account][:login] || installation_response[:account][:name],
         type: installation_response[:account][:type],
-        project_id: project.id
+        project_id: project.id,
       )
 
       flash["notice"] = "GitHub runner integration is enabled for #{project.name} project."

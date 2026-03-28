@@ -85,8 +85,8 @@ class MonitorRunner
         monitor_submit_queue_length: @monitor_resources.submit_queue.length,
         metric_export_submit_queue_length: @metric_export_resources.submit_queue.length,
         monitor_idle_worker_threads: @monitor_resources.submit_queue.num_waiting,
-        metric_export_idle_worker_threads: @metric_export_resources.submit_queue.num_waiting
-      }
+        metric_export_idle_worker_threads: @metric_export_resources.submit_queue.num_waiting,
+      },
     })
   end
 

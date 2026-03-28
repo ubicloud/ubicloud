@@ -13,7 +13,7 @@ RSpec.describe LocationCredential do
       display_name: "display-name",
       ui_name: "ui-name",
       visible: true,
-      provider: "aws"
+      provider: "aws",
     )
   }
 

@@ -87,14 +87,14 @@ class UbiCNI
       ips: [
         {address: "#{ipv4_container_ip}/#{ipv4_container_ip.prefix}", gateway: ipv4_gateway_ip.to_s, interface: 0},
         {address: "#{container_ula_ipv6}/#{container_ula_ipv6.prefix}", gateway: outer_link_local, interface: 0},
-        {address: "#{container_ipv6}/#{container_ipv6.prefix}", gateway: outer_link_local, interface: 0}
+        {address: "#{container_ipv6}/#{container_ipv6.prefix}", gateway: outer_link_local, interface: 0},
       ],
       routes: [{dst: "0.0.0.0/0"}],
       dns: {
         nameservers: ["10.96.0.10"],
         search: ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
-        options: ["ndots:5"]
-      }
+        options: ["ndots:5"],
+      },
     }
   end
 
@@ -131,7 +131,7 @@ options ndots:5
         ipv4_container_ip.to_s,
         ipv4_gateway_ip.to_s,
         container_ula_ipv6.to_s,
-        container_ipv6.to_s
+        container_ipv6.to_s,
       ]
       file.write(JSON.pretty_generate(ipam_store))
       file.flush

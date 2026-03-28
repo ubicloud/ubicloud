@@ -79,7 +79,7 @@ class Minio::HeaderSigner
       canonical_headers,
       "",
       signed_headers,
-      headers["x-amz-content-sha256"]
+      headers["x-amz-content-sha256"],
     ].join("\n")
 
     [sha256_hash(canonical_request), signed_headers]
@@ -93,7 +93,7 @@ class Minio::HeaderSigner
       "X-Amz-Credential" => access_key + "/" + scope,
       "X-Amz-Date" => time_to_amz_date(date),
       "X-Amz-Expires" => expires,
-      "X-Amz-SignedHeaders" => signed_headers
+      "X-Amz-SignedHeaders" => signed_headers,
     })
     canonical_query_string = get_canonical_query_string(uri.query)
 
@@ -104,7 +104,7 @@ class Minio::HeaderSigner
       canonical_headers,
       "",
       signed_headers,
-      "UNSIGNED-PAYLOAD"
+      "UNSIGNED-PAYLOAD",
     ].join("\n")
 
     [sha256_hash(canonical_request), uri]

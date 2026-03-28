@@ -12,7 +12,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   let(:private_subnet) {
     ps = PrivateSubnet.create(
       name: "test-subnet", project_id: project.id, location_id:,
-      net4: "1.0.0.0/8", net6: "fd10:9b0b:6b4b:8fbb::/64"
+      net4: "1.0.0.0/8", net6: "fd10:9b0b:6b4b:8fbb::/64",
     )
     Strand.create_with_id(ps, prog: "Vnet::SubnetNexus", label: "wait")
     ps
@@ -22,14 +22,14 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
     create_vm_host(
       location_id:,
       total_cpus: 48, total_cores: 48, total_dies: 1, total_sockets: 1,
-      net6: NetAddr::IPv6Net.parse("2001:db8::/48")
+      net6: NetAddr::IPv6Net.parse("2001:db8::/48"),
     )
   }
 
   let(:vm_strand) {
     Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "test", private_subnet_id: private_subnet.id,
-      location_id:, force_host_id: vm_host.id
+      location_id:, force_host_id: vm_host.id,
     )
   }
 
@@ -47,15 +47,15 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
         {"subject_id" => vm.id, "gpu_count" => 0, "hugepages" => true, "ch_version" => nil,
          "gpu_device" => nil, "hypervisor" => nil, "force_host_id" => nil, "swap_size_bytes" => nil,
          "exclude_host_ids" => [], "firmware_version" => nil, "alternative_families" => [],
-         "last_label_changed_at" => Time.now.to_s, "distinct_storage_devices" => true}
-      ]
+         "last_label_changed_at" => Time.now.to_s, "distinct_storage_devices" => true},
+      ],
     )
   }
 
   def create_load_balancer(cert_enabled:)
     lb = LoadBalancer.create(
       name: "test-lb", private_subnet_id: private_subnet.id, project_id: project.id,
-      health_check_endpoint: "/health", cert_enabled:
+      health_check_endpoint: "/health", cert_enabled:,
     )
     LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)
     lb

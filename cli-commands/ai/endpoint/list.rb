@@ -28,7 +28,7 @@ UbiCli.on("ai", "endpoint", "list") do
         context_length: tags[:context_length],
         url: ie[:url],
         input_price: price[:per_million_prompt_tokens],
-        output_price: price[:per_million_completion_tokens]
+        output_price: price[:per_million_completion_tokens],
       }
     end
     given = opts[:fields]

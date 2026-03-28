@@ -10,7 +10,7 @@ UbiCli.on("sk").run_on("show") do
     response([
       "id: ", ssh_public_key.id, "\n",
       "name: ", ssh_public_key.name, "\n",
-      "public key:\n", ssh_public_key.public_key
+      "public key:\n", ssh_public_key.public_key,
     ])
   end
 end

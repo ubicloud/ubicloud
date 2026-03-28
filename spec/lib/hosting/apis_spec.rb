@@ -6,7 +6,7 @@ RSpec.describe Hosting::Apis do
       VmHost,
       ubid: "vhgkz40v22ny2qkf4maddr8xv1",
       provider: hetzner_host,
-      provider_name: HostProvider::HETZNER_PROVIDER_NAME
+      provider_name: HostProvider::HETZNER_PROVIDER_NAME,
     )
   }
   let(:hetzner_apis) { instance_double(Hosting::HetznerApis, pull_ips: []) }
@@ -17,7 +17,7 @@ RSpec.describe Hosting::Apis do
       user: "user1", password: "pass",
       api: hetzner_apis,
       server_identifier: 123,
-      provider_name: HostProvider::HETZNER_PROVIDER_NAME
+      provider_name: HostProvider::HETZNER_PROVIDER_NAME,
     )
   }
 

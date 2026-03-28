@@ -14,7 +14,7 @@ RSpec.describe StorageArchive do
       "endpoint" => "https://s3.example.com",
       "access_key_id" => "abc",
       "secret_access_key" => "def",
-      "archive_kek" => {"algorithm" => "aes-256-gcm", "key" => "Zm9v"}
+      "archive_kek" => {"algorithm" => "aes-256-gcm", "key" => "Zm9v"},
     }
   }
 
@@ -123,12 +123,12 @@ allow_inline_plaintext_secrets = true
           "--config", disk_config_path,
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
-          "--zstd-level", "3"
+          "--zstd-level", "3",
         ],
         kek_pipe: disk_kek_path,
         kek_content: "Zm9v",
         env: {"RUST_LOG" => "info"},
-        stdin: built_config
+        stdin: built_config,
       )
 
       archive.archive
@@ -146,7 +146,7 @@ allow_inline_plaintext_secrets = true
         "--target-config", "/dev/stdin",
         "--compression", "zstd",
         "--zstd-level", "3",
-        stdin: built_config
+        stdin: built_config,
       )
 
       archive.archive
@@ -166,7 +166,7 @@ allow_inline_plaintext_secrets = true
 
       expect(boot_image).to receive(:download).with(url: "https://example.com/image.raw", sha256sum: "abc123")
       expect(described_class).to receive(:r).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw")
-      expect(described_class).to receive(:safe_write_to_file).with("#{tmpdir}/vhost-backend.conf", <<~CONFIG
+      expect(described_class).to receive(:safe_write_to_file).with("#{tmpdir}/vhost-backend.conf", <<~CONFIG,
 [device]
 data_path = "/tmp/test-archive-url/disk.raw"
 metadata_path = "/tmp/test-archive-url/metadata"

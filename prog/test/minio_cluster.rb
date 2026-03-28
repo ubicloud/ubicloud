@@ -10,7 +10,7 @@ class Prog::Test::MinioCluster < Prog::Test::Base
     Strand.create(
       prog: "Test::MinioCluster",
       label: "start",
-      stack: [{"project_id" => project_id}]
+      stack: [{"project_id" => project_id}],
     )
   end
 
@@ -18,7 +18,7 @@ class Prog::Test::MinioCluster < Prog::Test::Base
     minio_cluster = Prog::Minio::MinioClusterNexus.assemble(
       frame["project_id"],
       "postgres-minio-e2e",
-      Location::HETZNER_FSN1_ID, "minio-admin", 32, 1, 1, 1, "standard-2"
+      Location::HETZNER_FSN1_ID, "minio-admin", 32, 1, 1, 1, "standard-2",
     ).subject
     update_stack({"minio_cluster_id" => minio_cluster.id})
     hop_wait

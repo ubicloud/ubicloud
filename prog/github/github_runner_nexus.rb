@@ -15,7 +15,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2204_x64_aws_ami_version,
     Config.github_ubuntu_2404_x64_aws_ami_version,
     Config.github_ubuntu_2204_arm64_aws_ami_version,
-    Config.github_ubuntu_2404_arm64_aws_ami_version
+    Config.github_ubuntu_2404_arm64_aws_ami_version,
   ].freeze
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
@@ -30,7 +30,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         repository_name:,
         repository_id:,
         label:,
-        actual_label: actual_label || label
+        actual_label: actual_label || label,
       )
 
       Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
@@ -52,7 +52,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         location_id: Location::GITHUB_RUNNERS_ID,
         storage_size_gib: label_data["storage_size_gib"],
         storage_encrypted: true,
-        arch:
+        arch:,
       ).first
     end
 
@@ -85,7 +85,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       location_id:,
       allow_only_ssh: true,
       ipv4_range_size: 28,
-      preferred_azs:
+      preferred_azs:,
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -101,7 +101,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       arch:,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
-      alternative_families:
+      alternative_families:,
     )
 
     vm_st.subject
@@ -146,7 +146,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
-          amount: used_amount
+          amount: used_amount,
         )
       end
     rescue Sequel::Postgres::ExclusionConstraintViolation
@@ -184,8 +184,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       extra_data: {
         remaining: rate_limit.remaining,
         limit: rate_limit.limit,
-        resets_at: rate_limit.resets_at
-      }
+        resets_at: rate_limit.resets_at,
+      },
     )
     nap [rate_limit.resets_at - Time.now, 30].max
   rescue Octokit::Error => e
@@ -357,8 +357,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         "Location" => vmh&.location&.name,
         "Datacenter" => vmh&.data_center,
         "Project" => project.ubid,
-        "Console URL" => "#{Config.base_url}#{project.path}/github"
-      }.map { "#{_1}: #{_2}" }.join("\n")
+        "Console URL" => "#{Config.base_url}#{project.path}/github",
+      }.map { "#{_1}: #{_2}" }.join("\n"),
     }
   end
 
@@ -527,7 +527,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         limit_window: match[2].to_i,
         remaining: match[3].to_i,
         remaining_window: match[4].to_i,
-        source: match[5]
+        source: match[5],
       }
       Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
     end

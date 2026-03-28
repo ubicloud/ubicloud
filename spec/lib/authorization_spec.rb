@@ -6,7 +6,7 @@ RSpec.describe Authorization do
   let(:users) {
     [
       Account.create(email: "auth1@example.com"),
-      Account.create(email: "auth2@example.com")
+      Account.create(email: "auth2@example.com"),
     ]
   }
   let(:projects) { (0..1).map { users[it].create_project_with_default_policy("project-#{it}") } }
@@ -107,7 +107,7 @@ RSpec.describe Authorization do
         [{subjects: users[0].id, actions: [nil], objects: vms[0].id}, users[0].id, "Vm:view", 1],
         [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:edit", 0],
         [{subjects: users[0].id, actions: "Postgres:edit", objects: pg.id}, users[0].id, "Postgres:view", 0],
-        [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:view", 1]
+        [{subjects: users[0].id, actions: "Postgres:view", objects: pg.id}, users[0].id, "Postgres:view", 1],
       ].each do |policies, subject_id, actions, matched_count|
         DB.transaction(rollback: :always) do
           add_separate_aces(policies)
@@ -163,7 +163,7 @@ RSpec.describe Authorization do
         [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
         [{subjects: users[0].id, actions: ["Vm:view", "Vm:delete"], objects: vms[1].id}, users[0].id, ["Vm:view", "Vm:create"], vms[0].id, 0],
         [{subjects: users[0].id, actions: "Vm:delete", objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
-        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0]
+        [{subjects: [users[0].id], actions: ["Vm:view"], objects: vms[1].id}, users[0].id, "Vm:view", vms[0].id, 0],
       ].each do |policies, subject_id, actions, object_id, matched_count|
         DB.transaction(rollback: :always) do
           add_separate_aces(policies)
@@ -284,7 +284,7 @@ RSpec.describe Authorization do
     {
       add_separate_aces: "direct permissions",
       add_single_ace: "indirect permissions via tag",
-      add_single_ace_with_nested_tags: "indirect permissions via nested tag"
+      add_single_ace_with_nested_tags: "indirect permissions via nested tag",
     }.each do |method, desc|
       it "returns authorized resources for user and project and action when user has #{desc}" do
         vms

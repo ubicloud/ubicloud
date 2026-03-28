@@ -58,7 +58,7 @@ class Clover
         cacheKey: entry.key,
         cacheVersion: entry.version,
         creationTime: entry.created_at,
-        archiveLocation: signed_url
+        archiveLocation: signed_url,
       }
     end
 
@@ -83,9 +83,9 @@ class Clover
                 scope: it.scope,
                 cacheKey: it.key,
                 cacheVersion: it.version,
-                creationTime: it.created_at
+                creationTime: it.created_at,
               }
-            end
+            end,
           }
         end
 
@@ -160,7 +160,7 @@ class Clover
           {
             uploadId: upload_id,
             presignedUrls: presigned_urls,
-            chunkSize: max_chunk_size
+            chunkSize: max_chunk_size,
           }
         end
       end
@@ -181,7 +181,7 @@ class Clover
             bucket: repository.bucket_name,
             key: entry.blob_key,
             upload_id:,
-            multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }}
+            multipart_upload: {parts: etags.map.with_index { {part_number: _2 + 1, etag: _1} }},
           })
         rescue Aws::S3::Errors::InvalidPart, Aws::S3::Errors::NoSuchUpload, Aws::S3::Errors::EntityTooSmall => ex
           Clog.emit("could not complete multipart upload", {failed_multipart_upload: Util.exception_to_hash(ex, into: {ubid: runner.ubid, repository_ubid: repository.ubid})})

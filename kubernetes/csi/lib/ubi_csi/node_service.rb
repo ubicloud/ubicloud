@@ -39,10 +39,10 @@ module Csi
             capabilities: [
               NodeServiceCapability.new(
                 rpc: NodeServiceCapability::RPC.new(
-                  type: NodeServiceCapability::RPC::Type::STAGE_UNSTAGE_VOLUME
-                )
-              )
-            ]
+                  type: NodeServiceCapability::RPC::Type::STAGE_UNSTAGE_VOLUME,
+                ),
+              ),
+            ],
           )
         end
       end
@@ -51,13 +51,13 @@ module Csi
         log_request_response(req, "node_get_info") do |req_id|
           topology = Topology.new(
             segments: {
-              "kubernetes.io/hostname" => @node_id
-            }
+              "kubernetes.io/hostname" => @node_id,
+            },
           )
           NodeGetInfoResponse.new(
             node_id: @node_id,
             max_volumes_per_node: MAX_VOLUMES_PER_NODE,
-            accessible_topology: topology
+            accessible_topology: topology,
           )
         end
       end

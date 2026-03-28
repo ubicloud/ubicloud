@@ -32,7 +32,7 @@ RSpec.describe Prog::Test::VmGroup do
       expect(vg_test).to receive(:update_stack).and_call_original
       refresh_frame(vg_test, new_values: {
         "test_slices" => true,
-        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
+        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"],
       })
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
@@ -45,7 +45,7 @@ RSpec.describe Prog::Test::VmGroup do
         "test_reboot" => true,
         "test_slices" => true,
         "vms" => [],
-        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"]
+        "boot_images" => ["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"],
       })
       expect { vg_test.setup_vms }.to hop("wait_vms")
     end

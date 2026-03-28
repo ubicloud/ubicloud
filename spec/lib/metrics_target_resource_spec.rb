@@ -10,7 +10,7 @@ RSpec.describe MetricsTargetResource do
   let(:postgres_server) {
     PostgresServer.create(
       timeline:, resource: postgres_resource, vm_id: vm.id, is_representative: true,
-      synchronization_status: "ready", timeline_access: "push", version: "16"
+      synchronization_status: "ready", timeline_access: "push", version: "16",
     )
   }
 
@@ -25,7 +25,7 @@ RSpec.describe MetricsTargetResource do
     PrivateSubnet.create(
       name: "postgres-subnet", project:, location:,
       net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
-      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64"),
     )
   }
 
@@ -38,7 +38,7 @@ RSpec.describe MetricsTargetResource do
       display_name: "us-west-2",
       ui_name: "us-west-2",
       provider: "ubicloud",
-      visible: true
+      visible: true,
     )
   }
 

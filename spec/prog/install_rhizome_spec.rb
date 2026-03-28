@@ -65,7 +65,7 @@ RSpec.describe Prog::InstallRhizome do
         folder: "old_folder",
         commit: "old_commit",
         digest: "old_digest",
-        installed_at: Time.now - 3600
+        installed_at: Time.now - 3600,
       )
       expect(ir).to receive(:frame).and_return({"target_folder" => "host", "rhizome_digest" => "abc"}).at_least(:once)
       expect(ir.sshable).to receive(:_cmd).with("common/bin/validate")

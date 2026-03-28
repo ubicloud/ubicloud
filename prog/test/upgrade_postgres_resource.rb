@@ -9,7 +9,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
     Strand.create(
       prog: "Test::UpgradePostgresResource",
       label: "start",
-      stack: [{"postgres_test_project_id" => postgres_test_project.id}]
+      stack: [{"postgres_test_project_id" => postgres_test_project.id}],
     )
   end
 
@@ -21,7 +21,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
       ha_type: "async",
-      target_version: "17"
+      target_version: "17",
     )
 
     update_stack({"postgres_resource_id" => st.id})
@@ -57,7 +57,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
       user_config: {},
-      pgbouncer_user_config: {}
+      pgbouncer_user_config: {},
     )
 
     update_stack({"read_replica_id" => st.id})

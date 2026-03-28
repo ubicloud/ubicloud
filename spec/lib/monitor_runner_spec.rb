@@ -16,7 +16,7 @@ RSpec.describe MonitorRunner do
       scan_every: 0.01,
       report_every: 0.01,
       enqueue_every: 0.01,
-      check_stuck_pulses_every: 0.01
+      check_stuck_pulses_every: 0.01,
     }
   end
 
@@ -33,7 +33,7 @@ RSpec.describe MonitorRunner do
     let(:monitor_runner_args) do
       {
         scan_every: 6,
-        enqueue_every: 2
+        enqueue_every: 2,
       }
     end
 
@@ -113,7 +113,7 @@ RSpec.describe MonitorRunner do
         total_monitor_attached_resources: 0,
         total_metric_export_resources: 0,
         monitor_submit_queue_length: 0,
-        metric_export_submit_queue_length: 0
+        metric_export_submit_queue_length: 0,
       })
 
       vmh = VmHost.new_with_id
@@ -146,7 +146,7 @@ RSpec.describe MonitorRunner do
         monitor_submit_queue_length: 1,
         metric_export_submit_queue_length: 0,
         monitor_idle_worker_threads: 0,
-        metric_export_idle_worker_threads: 1
+        metric_export_idle_worker_threads: 1,
       })
       2.times { q2.push nil }
     end

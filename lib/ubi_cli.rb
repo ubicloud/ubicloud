@@ -13,7 +13,7 @@ class UbiCli
     "lb" => "load_balancer",
     "pg" => "postgres",
     "ps" => "private_subnet",
-    "vm" => "vm"
+    "vm" => "vm",
   }.freeze
 
   CAPITALIZED_LABELS = {
@@ -23,7 +23,7 @@ class UbiCli
     "lb" => "Load balancer",
     "pg" => "PostgreSQL database",
     "ps" => "Private subnet",
-    "vm" => "Virtual machine"
+    "vm" => "Virtual machine",
   }.freeze
 
   LOWERCASE_LABELS = CAPITALIZED_LABELS.transform_values(&:downcase)

@@ -69,7 +69,7 @@ class Clover
           "size" => size,
           "storage_size" => target_storage_size_gib,
           "ha_type" => ha_type,
-          "version" => pg.version
+          "version" => pg.version,
         }
 
         validate_postgres_input(pg.name, postgres_params)
@@ -187,7 +187,7 @@ class Clover
 
             {
               items: Serializers::PostgresFirewallRule.serialize(rules),
-              count: rules.count
+              count: rules.count,
             }
           end
 
@@ -225,7 +225,7 @@ class Clover
             DB.transaction do
               fwr.update(
                 cidr: new_cidr,
-                description:
+                description:,
               )
               firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
               audit_log(fwr, "update")
@@ -327,7 +327,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target: nil,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -398,7 +398,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "restore", restored)
         end
@@ -516,7 +516,7 @@ class Clover
             extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
             duration:,
             issuer_cert:,
-            issuer_key:
+            issuer_key:,
           ).map(&:to_pem)
 
           audit_log(pg, "create_cert")
@@ -568,7 +568,7 @@ class Clover
 
         {
           items: Serializers::PostgresServer.serialize(pg.servers(eager: [:strand, :semaphores])),
-          count: pg.servers.count
+          count: pg.servers.count,
         }
       end
 
@@ -578,13 +578,13 @@ class Clover
         backups = pg.timeline.backups.map do |backup|
           {
             key: backup.key,
-            last_modified: backup.last_modified.utc.iso8601
+            last_modified: backup.last_modified.utc.iso8601,
           }
         end
 
         {
           items: backups,
-          count: backups.count
+          count: backups.count,
         }
       end
 
@@ -635,7 +635,7 @@ class Clover
               series_query_result = tsdb_client.query_range(
                 query:,
                 start_ts:,
-                end_ts:
+                end_ts:,
               )
 
               # This can be a two cases:
@@ -663,12 +663,12 @@ class Clover
             name: metric_definition.name,
             unit: metric_definition.unit,
             description: metric_definition.description,
-            series: series_results.flatten
+            series: series_results.flatten,
           }
         end
 
         {
-          metrics: results
+          metrics: results,
         }
       end
 
@@ -679,7 +679,7 @@ class Clover
           {
             pg_config: pg.user_config,
             pgbouncer_config: pg.pgbouncer_user_config,
-            default_pg_config: pg.representative_server.configure_hash[:configs]
+            default_pg_config: pg.representative_server.configure_hash[:configs],
           }
         end
 
@@ -722,7 +722,7 @@ class Clover
           if api?
             response = {
               pg_config: pg.user_config,
-              pgbouncer_config: pg.pgbouncer_user_config
+              pgbouncer_config: pg.pgbouncer_user_config,
             }
             response[:message] = "The changes in the following parameters require a database restart to take effect: #{restart_requiring_changed_params.join(", ")}. You can restart the database by using the restart endpoint." unless restart_requiring_changed_params.empty?
             response

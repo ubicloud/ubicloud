@@ -28,7 +28,7 @@ class BillingInfo < Sequel::Model
           "postal_code" => address["postal_code"],
           "tax_id" => metadata["tax_id"],
           "company_name" => metadata["company_name"],
-          "note" => metadata["note"]
+          "note" => metadata["note"],
         }
       end
     end

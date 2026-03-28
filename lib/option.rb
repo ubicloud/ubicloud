@@ -58,7 +58,7 @@ module Option
     "i7ie" => {2 => [1250], 4 => [2500], 8 => [5000], 12 => [7500], 24 => [15000], 48 => [30000], 72 => [45000], 96 => [60000]},
     "r8gd" => non_storage_optimized_vm_storage_size_options,
     "r6gd" => non_storage_optimized_vm_storage_size_options,
-    "r6id" => non_storage_optimized_vm_storage_size_options
+    "r6id" => non_storage_optimized_vm_storage_size_options,
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -67,7 +67,7 @@ module Option
     ["ubuntu-noble", "Ubuntu Noble 24.04 LTS"],
     ["ubuntu-jammy", "Ubuntu Jammy 22.04 LTS"],
     ["debian-12", "Debian 12"],
-    ["almalinux-9", "AlmaLinux 9"]
+    ["almalinux-9", "AlmaLinux 9"],
   ].map { |args| BootImage.new(*args) }.freeze
 
   VmFamily = Data.define(:name, :ui_descriptor, :visible, :require_shared_slice) do
@@ -80,7 +80,7 @@ module Option
     ["standard", "Dedicated CPU", true, false],
     ["standard-gpu", "Dedicated GPU", false, false],
     ["premium", "Dedicated Premium CPU", false, false],
-    ["burstable", "Shared CPU", true, true]
+    ["burstable", "Shared CPU", true, true],
   ].map { |args| VmFamily.new(*args) }
 
   IoLimits = Data.define(:max_read_mbytes_per_sec, :max_write_mbytes_per_sec)
@@ -131,7 +131,7 @@ module Option
   POSTGRES_FLAVOR_OPTIONS = [
     [PostgresResource::Flavor::STANDARD, "ubicloud", "PostgreSQL Database", "Get started by creating a new PostgreSQL database which is managed by Ubicloud team. It's a good choice for general purpose databases."],
     [PostgresResource::Flavor::PARADEDB, "paradedb", "ParadeDB PostgreSQL Database", "ParadeDB is an Elasticsearch alternative built on Postgres. ParadeDB instances are managed by the ParadeDB team and are optimal for search and analytics workloads."],
-    [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."]
+    [PostgresResource::Flavor::LANTERN, "lantern", "Lantern PostgreSQL Database", "Lantern is a PostgreSQL-based vector database designed specifically for building AI applications. Lantern instances are managed by the Lantern team and are optimal for AI workloads."],
   ].to_h { |args| [args[0], PostgresFlavorOption.new(*args)] }.freeze
 
   PostgresFamilyOption = Data.define(:name, :description)
@@ -148,7 +148,7 @@ module Option
     ["r6id", "Memory Optimized, Intel Xeon"],
     ["c6gd", "Compute Optimized, Graviton2"],
     ["m6id", "General Purpose, Intel Xeon"],
-    ["m6gd", "General Purpose, Graviton2"]
+    ["m6gd", "General Purpose, Graviton2"],
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -242,7 +242,7 @@ module Option
     ["r6id", 48, 384],
     ["r6id", 64, 512],
     ["r6id", 96, 768],
-    ["r6id", 128, 1024]
+    ["r6id", 128, 1024],
   ].to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])
@@ -255,7 +255,7 @@ module Option
 
   POSTGRES_LEGACY_SIZE_OPTIONS = POSTGRES_SIZE_OPTIONS.merge([
     ["burstable-1", POSTGRES_SIZE_OPTIONS["hobby-1"]],
-    ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]]
+    ["burstable-2", POSTGRES_SIZE_OPTIONS["hobby-2"]],
   ].to_h).freeze
 
   POSTGRES_STORAGE_SIZE_OPTIONS = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096].freeze
@@ -263,14 +263,14 @@ module Option
   POSTGRES_VERSION_OPTIONS = {
     PostgresResource::Flavor::STANDARD => ["18", "17", "16"],
     PostgresResource::Flavor::PARADEDB => ["17", "16"],
-    PostgresResource::Flavor::LANTERN => ["17", "16"]
+    PostgresResource::Flavor::LANTERN => ["17", "16"],
   }
 
   PostgresHaOption = Data.define(:name, :standby_count, :description)
   POSTGRES_HA_OPTIONS = [
     [PostgresResource::HaType::NONE, 0, "No Standbys"],
     [PostgresResource::HaType::ASYNC, 1, "1 Standby"],
-    [PostgresResource::HaType::SYNC, 2, "2 Standbys"]
+    [PostgresResource::HaType::SYNC, 2, "2 Standbys"],
   ].to_h { |args| [args[0], PostgresHaOption.new(*args)] }.freeze
 
   AWS_LOCATIONS = ["us-west-2", "us-east-1", "us-east-2", "ap-southeast-2", "eu-west-1", "eu-central-1"].freeze

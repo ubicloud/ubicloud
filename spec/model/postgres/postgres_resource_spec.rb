@@ -14,7 +14,7 @@ RSpec.describe PostgresResource do
       user_config: {},
       pgbouncer_user_config: {},
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     )
     fw = Firewall.create(name: pr.ubid + "-internal-firewall", project_id: project.id, location_id:)
     fw.associate_with_private_subnet(private_subnet)
@@ -30,7 +30,7 @@ RSpec.describe PostgresResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -257,7 +257,7 @@ RSpec.describe PostgresResource do
     let(:storage_device) {
       StorageDevice.create(
         name: "nvme0", vm_host_id: vm_host.id,
-        total_storage_gib: 100, available_storage_gib: 80
+        total_storage_gib: 100, available_storage_gib: 80,
       )
     }
 
@@ -265,17 +265,17 @@ RSpec.describe PostgresResource do
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
       boot_image = BootImage.create(
         name: "postgres-ubuntu-#{SecureRandom.hex(4)}", version: boot_image_version,
-        vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 10
+        vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 10,
       )
       VmStorageVolume.create(
         vm_id: vm.id, boot: true, size_gib: 64, disk_index: 0,
-        storage_device_id: storage_device.id, boot_image_id: boot_image.id
+        storage_device_id: storage_device.id, boot_image_id: boot_image.id,
       )
       PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
         is_representative:,
         created_at: Time.now + created_offset,
-        synchronization_status: "ready", timeline_access: "push", version: "17"
+        synchronization_status: "ready", timeline_access: "push", version: "17",
       )
     end
 
@@ -304,34 +304,34 @@ RSpec.describe PostgresResource do
       # Create AWS location
       aws_location = Location.create(
         name: "us-west-2", provider: "aws", display_name: "aws-us-west-2",
-        ui_name: "AWS US West 2", visible: true
+        ui_name: "AWS US West 2", visible: true,
       )
       aws_subnet = PrivateSubnet.create(
         name: "aws-subnet", project_id: project.id, location_id: aws_location.id,
-        net4: "172.0.1.0/26", net6: "fdfa:b5aa:14a3:4a3e::/64"
+        net4: "172.0.1.0/26", net6: "fdfa:b5aa:14a3:4a3e::/64",
       )
       aws_timeline = create_postgres_timeline(location_id: aws_location.id)
       aws_resource = described_class.create(
         name: "pg-aws", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id: aws_location.id, project_id: project.id,
         user_config: {}, pgbouncer_user_config: {}, target_vm_size: "standard-2",
-        target_storage_size_gib: 64
+        target_storage_size_gib: 64,
       )
 
       # Create VMs with AWS boot images
       vm1 = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name: "aws-vm-1", private_subnet_id: aws_subnet.id,
-        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-12345678"
+        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-12345678",
       ).subject
 
       vm2 = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name: "aws-vm-2", private_subnet_id: aws_subnet.id,
-        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-87654321"
+        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-87654321",
       ).subject
 
       vm3 = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name: "aws-vm-3", private_subnet_id: aws_subnet.id,
-        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-primary"
+        location_id: aws_location.id, unix_user: "ubi", boot_image: "ami-primary",
       ).subject
 
       # Create PgAwsAmi for the first AMI only
@@ -341,19 +341,19 @@ RSpec.describe PostgresResource do
       PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm3.id,
         is_representative: true, synchronization_status: "ready",
-        timeline_access: "push", version: "17"
+        timeline_access: "push", version: "17",
       )
       # Standby with valid AMI (older)
       standby1 = PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm1.id,
         is_representative: false, created_at: Time.now - 3600,
-        synchronization_status: "ready", timeline_access: "push", version: "17"
+        synchronization_status: "ready", timeline_access: "push", version: "17",
       )
       # Standby with invalid AMI (newer)
       PostgresServer.create(
         timeline: aws_timeline, resource_id: aws_resource.id, vm_id: vm2.id,
         is_representative: false, created_at: Time.now,
-        synchronization_status: "ready", timeline_access: "push", version: "17"
+        synchronization_status: "ready", timeline_access: "push", version: "17",
       )
 
       expect(aws_resource.upgrade_candidate_server).to eq(standby1)
@@ -483,7 +483,7 @@ RSpec.describe PostgresResource do
       server = PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
         is_representative: true, synchronization_status: "ready",
-        timeline_access: "push", version: "17"
+        timeline_access: "push", version: "17",
       )
       Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: strand_label)
       server
@@ -577,7 +577,7 @@ RSpec.describe PostgresResource do
       vm = create_hosted_vm(project, private_subnet, "pg-vm-#{SecureRandom.hex(4)}")
       server = PostgresServer.create(
         timeline:, resource_id: postgres_resource.id, vm_id: vm.id,
-        synchronization_status: "ready", timeline_access: "push", version: "17"
+        synchronization_status: "ready", timeline_access: "push", version: "17",
       )
       Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label:)
       server
@@ -615,7 +615,7 @@ RSpec.describe PostgresResource do
       Strand.create(
         prog: "Postgres::ConvergePostgresResource",
         label: "upgrade_standby",
-        parent_id: postgres_resource.strand.id
+        parent_id: postgres_resource.strand.id,
       )
       expect(postgres_resource.upgrade_stage).to eq("upgrade_standby")
     end
@@ -804,7 +804,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
-        hash_including(body: array_including(/When disk usage reaches 90%, storage will be automatically increased/))
+        hash_including(body: array_including(/When disk usage reaches 90%, storage will be automatically increased/)),
       )
     end
 
@@ -819,7 +819,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
-        hash_including(body: array_including(/However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed./))
+        hash_including(body: array_including(/However, your database has already reached the maximum available storage size, so auto-scaling cannot proceed./)),
       )
     end
 
@@ -835,7 +835,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
-        hash_including(body: array_including(/However, your project does not have sufficient quota, so auto-scaling cannot proceed./))
+        hash_including(body: array_including(/However, your project does not have sufficient quota, so auto-scaling cannot proceed./)),
       )
     end
 
@@ -849,7 +849,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Auto-Scaling: pg-name",
-        hash_including(body: array_including(/We are currently preparing a new server with increased storage./))
+        hash_including(body: array_including(/We are currently preparing a new server with increased storage./)),
       )
     end
 
@@ -866,7 +866,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Auto-Scaling: pg-name",
-        hash_including(body: array_including(/instance is being upgraded from hobby-2 to standard-2/))
+        hash_including(body: array_including(/instance is being upgraded from hobby-2 to standard-2/)),
       )
     end
 
@@ -880,7 +880,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Auto-Scaling: pg-name",
-        hash_including(body: array_including(/However, your database has already reached the maximum available storage size./))
+        hash_including(body: array_including(/However, your database has already reached the maximum available storage size./)),
       )
     end
 
@@ -893,7 +893,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Storage Warning: pg-name at 85% capacity",
-        hash_including(body: array_including(/you previously canceled auto-scaling/))
+        hash_including(body: array_including(/you previously canceled auto-scaling/)),
       )
     end
 
@@ -907,7 +907,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["test@example.com"],
         "PostgreSQL Auto-Scaling: pg-name",
-        hash_including(body: array_including(/you previously canceled auto-scaling/))
+        hash_including(body: array_including(/you previously canceled auto-scaling/)),
       )
     end
 
@@ -916,7 +916,7 @@ RSpec.describe PostgresResource do
         name: "pg-replica", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id:, project_id: project.id, user_config: {},
         pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
-        parent_id: postgres_resource.id
+        parent_id: postgres_resource.id,
       )
 
       expect(server.vm.sshable).to receive(:_cmd).with("df --output=pcent /dat | tail -n 1").and_return("  92%\n")
@@ -955,7 +955,7 @@ RSpec.describe PostgresResource do
         name: "pg-rr", superuser_password: "dummy-password", ha_type: "none",
         target_version: "17", location_id:, project_id: project.id, user_config: {},
         pgbouncer_user_config: {}, target_vm_size: "standard-2", target_storage_size_gib: 64,
-        parent_id: postgres_resource.id
+        parent_id: postgres_resource.id,
       )
 
       next_option = {"size" => "standard-2", "storage_size" => 128}
@@ -1023,8 +1023,8 @@ RSpec.describe PostgresResource do
         "PostgreSQL Auto-Scaling Canceled: pg-name",
         hash_including(
           greeting: "Hello,",
-          body: array_including(/has been canceled as requested/)
-        )
+          body: array_including(/has been canceled as requested/),
+        ),
       )
     end
   end
@@ -1050,7 +1050,7 @@ RSpec.describe PostgresResource do
       Strand.create(
         prog: "Postgres::ConvergePostgresResource",
         label: "recycle_representative_server",
-        parent_id: postgres_resource.strand.id
+        parent_id: postgres_resource.strand.id,
       )
       expect(postgres_resource.can_cancel_storage_auto_scale?).to be false
     end
@@ -1062,7 +1062,7 @@ RSpec.describe PostgresResource do
         Strand.create(
           prog: "Postgres::ConvergePostgresResource",
           label:,
-          parent_id: postgres_resource.strand.id
+          parent_id: postgres_resource.strand.id,
         )
         expect(postgres_resource.can_cancel_storage_auto_scale?).to be(true), "expected true for label #{label}"
       end
@@ -1116,7 +1116,7 @@ RSpec.describe PostgresResource do
       expect(Util).to have_received(:send_email).with(
         ["user@example.com"],
         "PostgreSQL Auto-Scaling Canceled: pg-name",
-        hash_including(greeting: "Hello,")
+        hash_including(greeting: "Hello,"),
       )
     end
 
@@ -1125,7 +1125,7 @@ RSpec.describe PostgresResource do
         name: "pg-rr-cancel", superuser_password: "dummy", ha_type: "none",
         target_version: "17", location_id:, project_id: project.id, user_config: {},
         pgbouncer_user_config: {}, target_vm_size: "standard-4", target_storage_size_gib: 256,
-        parent_id: postgres_resource.id
+        parent_id: postgres_resource.id,
       )
       postgres_resource.update(target_vm_size: "standard-4", target_storage_size_gib: 256)
       postgres_resource.incr_storage_auto_scale_action_performed_90

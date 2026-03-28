@@ -8,7 +8,7 @@ RSpec.describe Prog::Minio::SetupMinio do
   let(:minio_server) {
     prj = Project.create(name: "default")
     ps = Prog::Vnet::SubnetNexus.assemble(
-      prj.id, name: "minio-cluster-name"
+      prj.id, name: "minio-cluster-name",
     )
 
     mc = MinioCluster.create(
@@ -21,7 +21,7 @@ RSpec.describe Prog::Minio::SetupMinio do
       root_cert_key_1: "root_cert_key_1",
       root_cert_2: "root_cert_2",
       root_cert_key_2: "root_cert_key_2",
-      project_id: prj.id
+      project_id: prj.id,
     )
 
     mp = MinioPool.create(
@@ -29,7 +29,7 @@ RSpec.describe Prog::Minio::SetupMinio do
       cluster_id: mc.id,
       vm_size: "standard-2",
       server_count: 1,
-      drive_count: 1
+      drive_count: 1,
     )
 
     vm = create_vm
@@ -40,7 +40,7 @@ RSpec.describe Prog::Minio::SetupMinio do
       vm:,
       index: 0,
       cert: "cert",
-      cert_key: "key"
+      cert_key: "key",
     )
     Strand.create_with_id(minio_server, prog: "Minio::SetupMinio", label: "install_minio")
     minio_server
@@ -96,7 +96,7 @@ ECHO
         hosts: minio_hosts,
         cert: "cert",
         cert_key: "key",
-        ca_bundle: "root_cert_1" + "root_cert_2"
+        ca_bundle: "root_cert_1" + "root_cert_2",
       }).chomp
     }
 

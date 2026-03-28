@@ -86,18 +86,18 @@ RSpec.describe AccessControlEntry do
       net6: "fd1b:9793:dcef:cd0a:c::/79",
       net4: "10.9.39.5/32",
       project_id: project2.id,
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     ).id
     load_balancer_id = LoadBalancer.create(
       name: "",
       private_subnet_id:,
       project_id: project2.id,
-      health_check_endpoint: ""
+      health_check_endpoint: "",
     ).id
     LoadBalancerPort.create(
       load_balancer_id:,
       src_port: 1024,
-      dst_port: 1025
+      dst_port: 1025,
     )
     inference_endpoint = InferenceEndpoint.create(
       location_id: Location::HETZNER_FSN1_ID,
@@ -111,7 +111,7 @@ RSpec.describe AccessControlEntry do
       replica_count: 1,
       project_id: project2.id,
       load_balancer_id:,
-      private_subnet_id:
+      private_subnet_id:,
     )
     ace.object_id = inference_endpoint.id
     expect(ace.valid?).to be false
@@ -129,7 +129,7 @@ RSpec.describe AccessControlEntry do
     expect(ace.errors).to eq(
       subject_id: ["is not related to this project"],
       action_id: ["is not related to this project"],
-      object_id: ["is not related to this project"]
+      object_id: ["is not related to this project"],
     )
   end
 end

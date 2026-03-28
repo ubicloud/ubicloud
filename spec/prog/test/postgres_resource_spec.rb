@@ -12,7 +12,7 @@ RSpec.describe Prog::Test::PostgresResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: test_project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 

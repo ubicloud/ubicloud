@@ -171,7 +171,7 @@ RSpec.describe Prog::Test::Vm do
         "main_pid" => "1234",
         "vcpus" => 8,
         "active_age_ms" => 60000,
-        "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690}
+        "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690},
       }
     }
 
@@ -186,7 +186,7 @@ RSpec.describe Prog::Test::Vm do
         "size_gib" => 100,
         "vhost_block_backend_version" => "1.0",
         "cpu_stats" => {"user_time_ms" => 104430, "system_time_ms" => 4900, "total_time_ms" => 109330},
-        "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222}
+        "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222},
       }
     }
 
@@ -194,7 +194,7 @@ RSpec.describe Prog::Test::Vm do
       vm_stats_output = {
         "disk_0" => valid_disk_stats_output,
         "disk_1" => valid_disk_stats_output,
-        "vm" => valid_vm_stats_output
+        "vm" => valid_vm_stats_output,
       }
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
       expect { vm_test.verify_vm_stats }.to hop("stop_semaphore")
@@ -209,7 +209,7 @@ RSpec.describe Prog::Test::Vm do
     it "fails if disk_1 key is missing in vm-stats output" do
       vm_stats_output = {
         "disk_0" => valid_disk_stats_output,
-        "vm" => valid_vm_stats_output
+        "vm" => valid_vm_stats_output,
       }
 
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
@@ -221,8 +221,8 @@ RSpec.describe Prog::Test::Vm do
       vm_stats_output = {
         "disk_0" => valid_disk_stats_output,
         "vm" => {
-          "unexpected_key" => "value"
-        }
+          "unexpected_key" => "value",
+        },
       }
 
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
@@ -233,9 +233,9 @@ RSpec.describe Prog::Test::Vm do
     it "fails if expected keys are missing in disk_0 stats" do
       vm_stats_output = {
         "disk_0" => {
-          "unexpected_key" => "value"
+          "unexpected_key" => "value",
         },
-        "vm" => valid_vm_stats_output
+        "vm" => valid_vm_stats_output,
       }
       expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
       expect { vm_test.verify_vm_stats }.to hop("failed")
@@ -255,9 +255,9 @@ RSpec.describe Prog::Test::Vm do
       output = {
         "jobs" => [
           {
-            "read" => {"bw_bytes" => 1048576}
-          }
-        ]
+            "read" => {"bw_bytes" => 1048576},
+          },
+        ],
       }
       expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_read_bw_bytes).to eq 1048576
@@ -269,9 +269,9 @@ RSpec.describe Prog::Test::Vm do
       output = {
         "jobs" => [
           {
-            "write" => {"bw_bytes" => 1048576}
-          }
-        ]
+            "write" => {"bw_bytes" => 1048576},
+          },
+        ],
       }
       expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_write_bw_bytes).to eq 1048576

@@ -118,7 +118,7 @@ class Hosting::HetznerApis
         IpInfo.new(
           ip_address: "#{ip["ip"]}/32",
           source_host_ip: ip["server_ip"],
-          is_failover: ip["failover_ip"]
+          is_failover: ip["failover_ip"],
         )
       end +
 
@@ -132,7 +132,7 @@ class Hosting::HetznerApis
         IpInfo.new(
           ip_address: "#{subnet["ip"]}/#{mask}",
           source_host_ip: subnet["server_ip"],
-          is_failover: subnet["failover_ip"]
+          is_failover: subnet["failover_ip"],
         )
       end
     )

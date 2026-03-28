@@ -36,7 +36,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
         max_requests: 500,
         max_project_rps: 100,
         max_project_tps: 10000,
-        tags: {}
+        tags: {},
       )
 
       described_class.assemble_with_model(project_id: 1, location_id: Location::HETZNER_FSN1_ID, name: "test-endpoint", model_id: "model_id")

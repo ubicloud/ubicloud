@@ -24,14 +24,14 @@ RSpec.describe Clover, "inference endpoint" do
       location_id: Location::HETZNER_FSN1_ID, vm_size: "size",
       replica_count: 1, boot_image: "image", storage_volumes: [],
       engine_params: "", engine: "vllm", private_subnet_id: ps.id,
-      tags: {"capability" => "Text Generation", "display_name" => "Test Model", "hf_model" => "test-org/test-model"}
+      tags: {"capability" => "Text Generation", "display_name" => "Test Model", "hf_model" => "test-org/test-model"},
     )
   end
 
   let(:ir) do
     InferenceRouter.create(
       name: "ir-name", location_id: Location::HETZNER_FSN1_ID, vm_size: "standard-2",
-      replica_count: 1, project_id: project.id, load_balancer_id: lb.id, private_subnet_id: ps.id
+      replica_count: 1, project_id: project.id, load_balancer_id: lb.id, private_subnet_id: ps.id,
     )
   end
 
@@ -42,7 +42,7 @@ RSpec.describe Clover, "inference endpoint" do
       completion_billing_resource: "test-model2-output",
       project_inflight_limit: 100, project_prompt_tps_limit: 10_000,
       project_completion_tps_limit: 10_000, visible: true,
-      tags: {"capability" => "Text Generation", "hf_model" => "test-org/test-model2", "multimodal" => true, "context_length" => "128k"}
+      tags: {"capability" => "Text Generation", "hf_model" => "test-org/test-model2", "multimodal" => true, "context_length" => "128k"},
     )
   end
 
@@ -50,7 +50,7 @@ RSpec.describe Clover, "inference endpoint" do
     InferenceRouterTarget.create(
       name: "test-target", host: "test-host", api_key: "test-key",
       inflight_limit: 10, priority: 1,
-      inference_router_model_id: irm.id, inference_router_id: ir.id, enabled: true
+      inference_router_model_id: irm.id, inference_router_id: ir.id, enabled: true,
     )
   end
 
@@ -92,12 +92,12 @@ RSpec.describe Clover, "inference endpoint" do
           "model_name" => "test-model",
           "tags" => {
             "capability" => "Text Generation",
-            "hf_model" => "test-org/test-model"
+            "hf_model" => "test-org/test-model",
           },
           "price" => {
             "per_million_prompt_tokens" => 0.05,
-            "per_million_completion_tokens" => 0.05
-          }
+            "per_million_completion_tokens" => 0.05,
+          },
         },
         {
           "id" => irm.ubid,
@@ -109,13 +109,13 @@ RSpec.describe Clover, "inference endpoint" do
             "capability" => "Text Generation",
             "hf_model" => "test-org/test-model2",
             "multimodal" => true,
-            "context_length" => "128k"
+            "context_length" => "128k",
           },
           "price" => {
             "per_million_prompt_tokens" => 0.2,
-            "per_million_completion_tokens" => 0.7
-          }
-        }
+            "per_million_completion_tokens" => 0.7,
+          },
+        },
       ])
     end
 
@@ -129,7 +129,7 @@ RSpec.describe Clover, "inference endpoint" do
       item = body["items"].first
       expect(item["price"]).to eq({
         "per_million_prompt_tokens" => nil,
-        "per_million_completion_tokens" => nil
+        "per_million_completion_tokens" => nil,
       })
     end
 

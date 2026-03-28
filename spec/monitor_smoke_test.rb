@@ -15,7 +15,7 @@ monitor_pids = [
   Process.spawn({"DYNO" => "monitor.2"}, "bin/monitor", **fd_map.call(0)),
   Process.spawn({"PS" => "monitor.3"}, "bin/monitor", **fd_map.call(1)),
   Process.spawn("bin/monitor", "4", **fd_map.call(2)),
-  Process.spawn("bin/monitor", **fd_map.call(3))
+  Process.spawn("bin/monitor", **fd_map.call(3)),
 ]
 
 print("monitor smoke test: ")
@@ -44,7 +44,7 @@ required_ranges = [
   ["00000000-0000-0000-0000-000000000000", "40000000-0000-0000-0000-000000000000"], # 1/4
   ["40000000-0000-0000-0000-000000000000", "80000000-0000-0000-0000-000000000000"], # 2/4
   ["80000000-0000-0000-0000-000000000000", "c0000000-0000-0000-0000-000000000000"], # 3/4
-  ["c0000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"]  # 4/4
+  ["c0000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"],  # 4/4
 ]
 possible_ranges = required_ranges + [
   ["00000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"], # 1/1
@@ -52,7 +52,7 @@ possible_ranges = required_ranges + [
   ["00000000-0000-0000-0000-000000000000", "80000000-0000-0000-0000-000000000000"], # 1/2
   ["55555555-0000-0000-0000-000000000000", "aaaaaaaa-0000-0000-0000-000000000000"], # 2/3
   ["80000000-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"], # 2/2
-  ["aaaaaaaa-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"]  # 3/3
+  ["aaaaaaaa-0000-0000-0000-000000000000", "ffffffff-ffff-ffff-ffff-ffffffffffff"],  # 3/3
 ]
 
 output_filenames = Array.new(4) { |i| "#{output_filename}#{i}" }
@@ -100,7 +100,7 @@ lines.each_value(&:uniq!).each_value { it.sort_by!(&:inspect) }
   up => ["up", 1],
   evloop => ["up", 1],
   mc2 => ["up", 2],
-  down => ["down", 1]
+  down => ["down", 1],
 }.each do |r, (reading, count)|
   expected_lines = Array.new(lines[r].size - 1) do
     {"got_pulse" => {"ubid" => r, "pulse" => {"reading" => reading, "reading_rpt" => it + 1}}, "message" => "Got new pulse."}

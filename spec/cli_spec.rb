@@ -34,7 +34,7 @@ RSpec.describe "bin/ubi" do
       "UBI_TOKEN" => "a",
       "UBI_SSH" => "/bin/echo",
       "UBI_PG_DUMPALL" => "/bin/echo",
-      "UBI_PSQL" => RbConfig.ruby
+      "UBI_PSQL" => RbConfig.ruby,
     }.freeze
     @debug_env = @env.merge("UBI_DEBUG" => "1")
     @skip_leaked_thread_check = true

@@ -63,7 +63,7 @@ RSpec.describe Clover, "firewall" do
 
     it "success post" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/foo-name", {
-        description: "Firewall description"
+        description: "Firewall description",
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -80,7 +80,7 @@ RSpec.describe Clover, "firewall" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
-        private_subnet_id: ps.ubid
+        private_subnet_id: ps.ubid,
       }.to_json
 
       AccessControlEntry.dataset.destroy
@@ -104,7 +104,7 @@ RSpec.describe Clover, "firewall" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
-        private_subnet_id: ps.ubid
+        private_subnet_id: ps.ubid,
       }.to_json
 
       expect(firewall.private_subnets.count).to eq(1)
@@ -115,7 +115,7 @@ RSpec.describe Clover, "firewall" do
 
     it "attach to subnet not exist" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
-        private_subnet_id: "fooubid"
+        private_subnet_id: "fooubid",
       }.to_json
 
       expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
@@ -125,7 +125,7 @@ RSpec.describe Clover, "firewall" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
-        private_subnet_id: ps.ubid
+        private_subnet_id: ps.ubid,
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -134,7 +134,7 @@ RSpec.describe Clover, "firewall" do
 
     it "detach from subnet not exist" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
-        private_subnet_id: "fooubid"
+        private_subnet_id: "fooubid",
       }.to_json
 
       expect(last_response).to have_api_error(400, "Validation failed for following fields: private_subnet_id")
@@ -144,7 +144,7 @@ RSpec.describe Clover, "firewall" do
       ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: Location::HETZNER_FSN1_ID).subject
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/attach-subnet", {
-        private_subnet_id: ps.ubid
+        private_subnet_id: ps.ubid,
       }.to_json
 
       expect(firewall.private_subnets.count).to eq(1)
@@ -152,7 +152,7 @@ RSpec.describe Clover, "firewall" do
       Semaphore.where(strand_id: ps.id, name: "update_firewall_rules").destroy
 
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/detach-subnet", {
-        private_subnet_id: ps.ubid
+        private_subnet_id: ps.ubid,
       }.to_json
 
       expect(firewall.reload.private_subnets.count).to eq(0)
@@ -161,7 +161,7 @@ RSpec.describe Clover, "firewall" do
 
     it "location not exist" do
       post "/project/#{project.ubid}/location/not-exist-location/firewall/test-firewall", {
-        description: "Firewall description"
+        description: "Firewall description",
       }.to_json
 
       expect(last_response).to have_api_error(404, "Validation failed for following path components: location")

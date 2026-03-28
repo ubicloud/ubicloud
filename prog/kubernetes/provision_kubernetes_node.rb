@@ -67,7 +67,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
       private_subnet_id: kubernetes_cluster.private_subnet_id,
       enable_ip4: true,
       kubernetes_cluster_id: kubernetes_cluster.id,
-      kubernetes_nodepool_id: kubernetes_nodepool&.id
+      kubernetes_nodepool_id: kubernetes_nodepool&.id,
     ).subject
     vm = node.vm
 
@@ -146,7 +146,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         private_subnet_cidr6: kubernetes_cluster.private_subnet.net6,
         node_ipv4: vm.private_ipv4,
         node_ipv6: vm.ip6,
-        service_subnet_cidr6: random_ula_cidr
+        service_subnet_cidr6: random_ula_cidr,
       }
       vm.sshable.d_run("init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster", stdin: JSON.generate(params), log: false)
       nap 30
@@ -175,7 +175,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         certificate_key: cp_sshable.cmd("sudo kubeadm init phase upload-certs --upload-certs", log: false)[/certificate key:\n(.*)/, 1],
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ip6
+        node_ipv6: vm.ip6,
       }
       vm.sshable.d_run("join_control_plane", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15
@@ -203,7 +203,7 @@ class Prog::Kubernetes::ProvisionKubernetesNode < Prog::Base
         join_token: cp_sshable.cmd("sudo kubeadm token create --ttl 24h --usages signing,authentication", log: false).tr("\n", ""),
         discovery_token_ca_cert_hash: cp_sshable.cmd("sudo kubeadm token create --print-join-command", log: false)[/discovery-token-ca-cert-hash (\S+)/, 1],
         node_ipv4: vm.private_ipv4,
-        node_ipv6: vm.ip6
+        node_ipv6: vm.ip6,
       }
       vm.sshable.d_run("join_worker", "kubernetes/bin/join-node", stdin: JSON.generate(params), log: false)
       nap 15

@@ -17,7 +17,7 @@ RSpec.describe InferenceEndpoint do
       engine_params: "",
       replica_count: 1,
       load_balancer_id: load_balancer.id,
-      private_subnet_id: private_subnet.id
+      private_subnet_id: private_subnet.id,
     )
   end
 
@@ -33,7 +33,7 @@ RSpec.describe InferenceEndpoint do
       health_check_protocol: "https",
       health_check_endpoint: "/health",
       project_id: project.id,
-      private_subnet_id: private_subnet.id
+      private_subnet_id: private_subnet.id,
     )
   end
 

@@ -456,7 +456,7 @@ RSpec.describe Clover, "auth" do
           "login" => ip_hash("via" => "password"),
           "logout" => ip_hash,
           "verify_login_change" => ip_hash("new_login" => "new@example.com", "previous_login" => "user@example.com"),
-          "verify_login_change_email" => ip_hash
+          "verify_login_change_email" => ip_hash,
         })
       end
     end
@@ -485,7 +485,7 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({
         "login" => ip_hash("via" => "password"),
         "logout" => ip_hash,
-        "change_password" => ip_hash
+        "change_password" => ip_hash,
       })
     end
 
@@ -494,7 +494,7 @@ RSpec.describe Clover, "auth" do
       password_hash = Argon2::Password.new({
         t_cost: 1,
         m_cost: 5,
-        secret: Config.clover_session_secret
+        secret: Config.clover_session_secret,
       }).create(TEST_USER_PASSWORD)
       DB[:account_previous_password_hashes].insert(account_id: Account.get(:id), password_hash:)
 
@@ -558,7 +558,7 @@ RSpec.describe Clover, "auth" do
         expect(audit_log_hash).to eq({
           "login" => ip_hash("via" => "password"),
           "logout" => ip_hash,
-          "change_password" => ip_hash
+          "change_password" => ip_hash,
         })
       end
 
@@ -691,7 +691,7 @@ RSpec.describe Clover, "auth" do
             "otp_disable" => ip_hash,
             "otp_setup" => ip_hash,
             "otp_unlock_auth_success" => ip_hash,
-            "two_factor_authentication" => ip_hash("via" => "totp")
+            "two_factor_authentication" => ip_hash("via" => "totp"),
           })
         else
           expect(audit_log_hash).to eq({"otp_setup" => ip_hash, "otp_disable" => ip_hash})
@@ -756,7 +756,7 @@ RSpec.describe Clover, "auth" do
             "logout" => ip_hash,
             "webauthn_setup" => ip_hash("key_name" => "My Key 1"),
             "webauthn_remove" => ip_hash("key_name" => "My Key 1"),
-            "two_factor_authentication" => ip_hash("via" => "webauthn", "key_name" => "My Key 0")
+            "two_factor_authentication" => ip_hash("via" => "webauthn", "key_name" => "My Key 0"),
           })
         else
           expect(audit_log_hash).to eq({"webauthn_setup" => ip_hash("key_name" => "My Key 1"), "webauthn_remove" => ip_hash("key_name" => "My Key 1")})
@@ -814,7 +814,7 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({
         "otp_setup" => ip_hash,
         "webauthn_setup" => ip_hash("key_name" => "My Key"),
-        "two_factor_disable" => ip_hash
+        "two_factor_disable" => ip_hash,
       })
     end
   end
@@ -827,8 +827,8 @@ RSpec.describe Clover, "auth" do
         uid: "123456790",
         info: {
           name:,
-          email:
-        }
+          email:,
+        },
       })
     end
 
@@ -841,7 +841,7 @@ RSpec.describe Clover, "auth" do
         authorization_endpoint: "/auth",
         token_endpoint: "/tok",
         userinfo_endpoint: "/ui",
-        jwks_uri: "https://host/jw"
+        jwks_uri: "https://host/jw",
       )
     end
 
@@ -919,7 +919,7 @@ RSpec.describe Clover, "auth" do
       expect(audit_log_hash).to eq({
         "close_account" => ip_hash,
         "create_account" => ip_hash,
-        "verify_account_failure" => ip_hash("reason" => "locked domain")
+        "verify_account_failure" => ip_hash("reason" => "locked domain"),
       })
     end
 
@@ -963,7 +963,7 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
       expect(audit_log_hash).to eq({
         "reset_password_request" => ip_hash,
-        "reset_password_failure" => ip_hash("reason" => "locked domain")
+        "reset_password_failure" => ip_hash("reason" => "locked domain"),
       })
     end
 
@@ -1003,7 +1003,7 @@ RSpec.describe Clover, "auth" do
       expect(page).to have_current_path "/auth/#{oidc_provider.ubid}"
       expect(audit_log_hash).to eq({
         "unlock_account_request" => ip_hash,
-        "unlock_account_failure" => ip_hash("reason" => "locked domain")
+        "unlock_account_failure" => ip_hash("reason" => "locked domain"),
       })
     end
 
@@ -1033,7 +1033,7 @@ RSpec.describe Clover, "auth" do
         authorization_endpoint: "/auth",
         token_endpoint: "/tok",
         userinfo_endpoint: "/ui",
-        jwks_uri: "https://host/jw"
+        jwks_uri: "https://host/jw",
       )
 
       visit "/auth/#{provider.ubid}"
@@ -1056,7 +1056,7 @@ RSpec.describe Clover, "auth" do
         "create_account" => ip_hash("provider" => "TestOIDC2"),
         "logout" => ip_hash,
         "login" => ip_hash("via" => "TestOIDC2"),
-        "login_failure" => ip_hash("reason" => "locked domain", "provider" => "TestOIDC2")
+        "login_failure" => ip_hash("reason" => "locked domain", "provider" => "TestOIDC2"),
       })
     end
 
@@ -1070,7 +1070,7 @@ RSpec.describe Clover, "auth" do
         authorization_endpoint: "/auth",
         token_endpoint: "/tok",
         userinfo_endpoint: "/ui",
-        jwks_uri: "https://host/jw"
+        jwks_uri: "https://host/jw",
       )
 
       visit "/auth/#{provider.ubid}"
@@ -1233,7 +1233,7 @@ RSpec.describe Clover, "auth" do
         expect(page).to have_flash_notice("Your account has been disconnected from TestOIDC")
         expect(audit_log_hash).to eq({
           "connect_provider" => ip_hash("provider" => "TestOIDC"),
-          "disconnect_provider" => ip_hash("provider" => "TestOIDC")
+          "disconnect_provider" => ip_hash("provider" => "TestOIDC"),
         })
       ensure
         OmniAuth.config.mock_auth[omniauth_key] = nil
@@ -1258,7 +1258,7 @@ RSpec.describe Clover, "auth" do
           expect(page).to have_flash_notice("You have been logged in")
           expect(audit_log_hash).to eq({
             "login" => ip_hash("via" => "TestOIDC"),
-            "logout" => ip_hash
+            "logout" => ip_hash,
           })
         end
 
@@ -1285,7 +1285,7 @@ RSpec.describe Clover, "auth" do
           expect(page).to have_flash_notice("You have been logged in")
           expect(audit_log_hash).to eq({
             "login" => ip_hash("via" => "TestOIDC"),
-            "logout" => ip_hash
+            "logout" => ip_hash,
           })
         end
       end
@@ -1446,7 +1446,7 @@ RSpec.describe Clover, "auth" do
         expect(audit_log_hash).to eq({
           "change_login" => ip_hash,
           "verify_login_change_email" => ip_hash,
-          "verify_login_change_failure" => ip_hash("reason" => "locked domain")
+          "verify_login_change_failure" => ip_hash("reason" => "locked domain"),
         })
       end
 
@@ -1482,7 +1482,7 @@ RSpec.describe Clover, "auth" do
         expect(audit_log_hash).to eq({
           "change_login" => ip_hash,
           "verify_login_change_email" => ip_hash,
-          "verify_login_change_failure" => ip_hash("reason" => "locked domain")
+          "verify_login_change_failure" => ip_hash("reason" => "locked domain"),
         })
       end
 

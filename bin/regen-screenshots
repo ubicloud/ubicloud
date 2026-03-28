@@ -152,7 +152,7 @@ class RegenScreenshots
       superuser_password: "1",
       project_id: project.id,
       private_subnet_id: pg_private_subnet.id,
-      target_version: "16"
+      target_version: "16",
     ) do |pg|
       pg.id = UBID.parse("pgmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
@@ -174,10 +174,10 @@ class RegenScreenshots
       unix_user: "postgres",
       public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7b8ZxEjGHV54sF4z/7H5z9hGJtYI5RvV2kz8KjQhYJvQG8W1vZK8dG9vLWJyZWFrZXItdGVzdEBleGFtcGxlLmNvbYIxP634e6Y0p2FQI+CvLVgNxYqaQZxjx84+SN/XY4FOR4",
       boot_image: "ubuntu-jammy",
-      family: "standard"
+      family: "standard",
     )
     pg_timeline = PostgresTimeline.create(
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     ) do |timeline|
       timeline.id = UBID.parse("ptmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
@@ -185,7 +185,7 @@ class RegenScreenshots
       resource_id: pg_resource.id,
       vm_id: pg_vm.id,
       timeline_id: pg_timeline.id,
-      version: "16"
+      version: "16",
     ) do |server|
       server.id = UBID.parse("pvmjy3v4ef1y7gdpzv6b3fchef").to_uuid
     end
@@ -217,7 +217,7 @@ class RegenScreenshots
       target_vm_size: "standard-2",
       target_storage_size_gib: 100,
       project_id: project.id,
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     )
 
     vm_metrics = Vm.create(
@@ -230,14 +230,14 @@ class RegenScreenshots
       unix_user: "ubi",
       public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7b8ZxEjGHV54sF4z/7H5z9hGJtYI5RvV2kz8KjQhYJvQG8W1vZK8dG9vLWJyZWFrZXItdGVzdEBleGFtcGxlLmNvbYIxP634e6Y0p2FQI+CvLVgNxYqaQZxjx84+SN/XY4FOR4",
       boot_image: "ubuntu-jammy",
-      family: "standard"
+      family: "standard",
     )
 
     VictoriaMetricsServer.create(
       victoria_metrics_resource_id: vmr.id,
       vm_id: vm_metrics.id,
       cert: "cert-data",
-      cert_key: "cert-key-data"
+      cert_key: "cert-key-data",
     )
 
     # Mock the VictoriaMetrics client to return sample data
@@ -255,27 +255,27 @@ class RegenScreenshots
         values = timestamps.map { |ts| [ts, metrics_rng.rand(40..49).to_s] }
         [{
           "labels" => {},
-          "values" => values
+          "values" => values,
         }]
       when /node_cpu_seconds_total/
         [{
           "labels" => {"mode" => "user"},
-          "values" => timestamps.map { |ts| [ts, metrics_rng.rand(15..64).to_s] }
+          "values" => timestamps.map { |ts| [ts, metrics_rng.rand(15..64).to_s] },
         },
           {
             "labels" => {"mode" => "system"},
-            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(8..12).to_s] }
+            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(8..12).to_s] },
           },
           {
             "labels" => {"mode" => "iowait"},
-            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(2..4).to_s] }
+            "values" => timestamps.map { |ts| [ts, metrics_rng.rand(2..4).to_s] },
           }]
       else
         # Default sample data
         values = timestamps.map { |ts| [ts, metrics_rng.rand(20..39).to_s] }
         [{
           "labels" => {},
-          "values" => values
+          "values" => values,
         }]
       end
     end
@@ -347,9 +347,9 @@ class RegenScreenshots
         project.id,
         name: "#{kc_ubid}-subnet",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv4_range_size: 18
+        ipv4_range_size: 18,
       ).subject.id,
-      project_id: project.id
+      project_id: project.id,
     ) do |kc|
       kc.id = UBID.parse(kc_ubid).to_uuid
     end
@@ -358,7 +358,7 @@ class RegenScreenshots
       name: "kubernetes-demo-np",
       node_count: 5,
       kubernetes_cluster_id: k8s_cluster.id,
-      target_node_size: "standard-8"
+      target_node_size: "standard-8",
     ) do |kn|
       kn.id = UBID.parse(kn_ubid).to_uuid
     end
@@ -371,7 +371,7 @@ class RegenScreenshots
       dst_port: 6443,
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
-      stack: LoadBalancer::Stack::IPV4
+      stack: LoadBalancer::Stack::IPV4,
     ).subject
 
     # Associate the load balancer with the Kubernetes cluster
@@ -398,7 +398,7 @@ class RegenScreenshots
         boot_image: "kubernetes-v1_34",
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
-        kubernetes_cluster_id: k8s_cluster.id
+        kubernetes_cluster_id: k8s_cluster.id,
       )
     end
 
@@ -414,7 +414,7 @@ class RegenScreenshots
         private_subnet_id: k8s_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: k8s_cluster.id,
-        kubernetes_nodepool_id: k8s_nodepool.id
+        kubernetes_nodepool_id: k8s_nodepool.id,
       )
     end
 

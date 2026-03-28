@@ -46,7 +46,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued"},
-        {id: 2, run_attempt: 1, status: "queued"}
+        {id: 2, run_attempt: 1, status: "queued"},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).and_return({jobs: [
@@ -57,10 +57,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         {status: "queued", labels: ["ubicloud-standard-8"]},
         {status: "queued", labels: ["custom-label-1"]},
         {status: "queued", labels: ["custom-label-2"]},
-        {status: "failed", labels: ["ubicloud"]}
+        {status: "failed", labels: ["ubicloud"]},
       ]})
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 2, 1).and_return({jobs: [
-        {status: "queued", labels: ["ubicloud"]}
+        {status: "queued", labels: ["ubicloud"]},
       ]})
 
       # Create existing runners (idle, no workflow_job) - these reduce the number of new runners needed
@@ -79,7 +79,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "raises if runtime is too long" do
       expect(nx).to receive(:clock_time).and_return(0, 81)
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
-        {id: 1, run_attempt: 2, status: "queued"}
+        {id: 1, run_attempt: 2, status: "queued"},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect { nx.check_queued_jobs }.to raise_error(RuntimeError)

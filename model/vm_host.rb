@@ -111,7 +111,7 @@ class VmHost < Sequel::Model
 
     # Combine it with the higher bits for the host.
     proposal = NetAddr::IPv6Net.new(
-      NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix)
+      NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix),
     )
 
     # :nocov:
@@ -370,13 +370,13 @@ class VmHost < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 
   def init_metrics_export_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 
@@ -442,13 +442,13 @@ class VmHost < Sequel::Model
   def metrics_config
     {
       endpoints: [
-        "http://localhost:9100/metrics"
+        "http://localhost:9100/metrics",
       ],
       max_file_retention: 120,
       interval: "15s",
       additional_labels: {ubicloud_resource_id: ubid},
       metrics_dir: "/home/rhizome/host/metrics",
-      project_id: Config.monitoring_service_project_id
+      project_id: Config.monitoring_service_project_id,
     }
   end
 

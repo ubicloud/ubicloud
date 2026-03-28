@@ -42,7 +42,7 @@ safe_write_to_file("/etc/postgresql/#{v}/main/conf.d/099-user.conf", user_config
 private_subnets = configure_hash["private_subnets"].flat_map {
   [
     "host    all             all             #{_1["net4"]}                     scram-sha-256",
-    "host    all             all             #{_1["net6"]}                     scram-sha-256"
+    "host    all             all             #{_1["net6"]}                     scram-sha-256",
   ]
 }.join("\n")
 

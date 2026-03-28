@@ -15,7 +15,7 @@ RSpec.configure do |config|
       server
       standby_record = create_postgres_server(
         resource: postgres_resource, timeline: postgres_timeline,
-        is_representative: false
+        is_representative: false,
       )
       standby_nx = described_class.new(standby_record.strand)
       ps = standby_nx.postgres_server

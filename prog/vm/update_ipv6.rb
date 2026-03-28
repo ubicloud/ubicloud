@@ -23,7 +23,7 @@ class Prog::Vm::UpdateIpv6 < Prog::Base
 
   label def rewrite_persisted
     vm.update(
-      ephemeral_net6: vm_host.ip6_random_vm_network.to_s
+      ephemeral_net6: vm_host.ip6_random_vm_network.to_s,
     )
 
     write_params_json

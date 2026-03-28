@@ -30,18 +30,18 @@ config = {
     "bootstrapToken" => {
       "token" => join_token,
       "apiServerEndpoint" => endpoint,
-      "caCertHashes" => [discovery_token_ca_cert_hash]
-    }
+      "caCertHashes" => [discovery_token_ca_cert_hash],
+    },
   },
   "nodeRegistration" => {
     "name" => node_name,
     "kubeletExtraArgs" => [
       {
         "name" => "node-ip",
-        "value" => "#{node_ipv4},#{node_ipv6}"
-      }
-    ]
-  }
+        "value" => "#{node_ipv4},#{node_ipv6}",
+      },
+    ],
+  },
 }
 
 if is_control_plane
@@ -49,20 +49,20 @@ if is_control_plane
     "certificateKey" => certificate_key,
     "localAPIEndpoint" => {
       "advertiseAddress" => node_ipv4,
-      "bindPort" => 6443
+      "bindPort" => 6443,
     },
     "apiServer" => {
       "extraArgs" => [
         {
           "name" => "bind-address",
-          "value" => "::"
+          "value" => "::",
         },
         {
           "name" => "advertise-address",
-          "value" => node_ipv4
-        }
-      ]
-    }
+          "value" => node_ipv4,
+        },
+      ],
+    },
   }
 end
 

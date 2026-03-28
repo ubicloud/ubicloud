@@ -89,8 +89,8 @@ MonitorResourceType = Struct.new(:wrapper_class, :resources, :types, :host_attac
           key => {
             ubid: r.resource.ubid,
             job_started_at: r.monitor_job_started_at,
-            time_elapsed: t - r.monitor_job_started_at
-          }
+            time_elapsed: t - r.monitor_job_started_at,
+          },
         })
       end
     end

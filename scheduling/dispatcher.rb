@@ -396,7 +396,7 @@ class Scheduling::Dispatcher
       start_queue:,
       finish_queue:,
       apoptosis_thread: Thread.new { apoptosis_thread(start_queue, finish_queue) },
-      strand_thread: Thread.new { handle_disconnects("unexpected respirate strand thread error") { strand_thread(strand_queue, start_queue, finish_queue) } }
+      strand_thread: Thread.new { handle_disconnects("unexpected respirate strand thread error") { strand_thread(strand_queue, start_queue, finish_queue) } },
     }
   end
 

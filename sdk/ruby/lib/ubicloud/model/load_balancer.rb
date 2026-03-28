@@ -11,7 +11,7 @@ module Ubicloud
     set_associations do
       {
         subnet: PrivateSubnet,
-        vms: Vm
+        vms: Vm,
       }
     end
 

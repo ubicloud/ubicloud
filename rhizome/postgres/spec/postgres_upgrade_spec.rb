@@ -11,8 +11,8 @@ RSpec.describe PostgresUpgrade do
     allow(postgres_upgrade).to receive(:r)
     stub_const("EXTENSION_UPGRADE_SCRIPTS", {
       17 => {
-        "postgis" => "SELECT postgis_extensions_upgrade();"
-      }
+        "postgis" => "SELECT postgis_extensions_upgrade();",
+      },
     })
   end
 
@@ -164,8 +164,8 @@ RSpec.describe PostgresUpgrade do
     it "escapes dangerous database and extension names correctly" do
       stub_const("EXTENSION_UPGRADE_SCRIPTS", {
         17 => {
-          "ext'sname" => "ALTER EXTENSION \"ext'sname\" UPDATE;"
-        }
+          "ext'sname" => "ALTER EXTENSION \"ext'sname\" UPDATE;",
+        },
       })
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("mydb$(pwd)\n")
       expect(logger).to receive(:info).with("Running post upgrade extension update for ext'sname")

@@ -19,7 +19,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -37,7 +37,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
       refresh_frame(nx, new_frame: {"mechanism" => "pg_stop"})
       expect(sshable).to receive(:_cmd).with(
         "timeout 10 sudo pg_ctlcluster 17 main stop -m immediate",
-        timeout: 15
+        timeout: 15,
       ).and_raise(Sshable::SshError.new("", "", "", "", ""))
       expect { nx.start }.to exit({"msg" => "lockout_failed"})
     end
@@ -47,7 +47,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
     it "stops postgres and returns true on success" do
       expect(sshable).to receive(:_cmd).with(
         "timeout 10 sudo pg_ctlcluster 17 main stop -m immediate",
-        timeout: 15
+        timeout: 15,
       ).and_return(true)
       expect { nx.lockout_with_pg_stop }.not_to raise_error
     end
@@ -57,7 +57,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
     it "applies lockout pg_hba.conf and returns true on success" do
       expect(sshable).to receive(:_cmd).with(
         "timeout 10 sudo postgres/bin/lockout-hba 17",
-        timeout: 15
+        timeout: 15,
       ).and_return(true)
       expect { nx.lockout_with_hba }.not_to raise_error
     end
@@ -75,7 +75,7 @@ RSpec.describe Prog::Postgres::PostgresLockout do
     it "applies lockout host routing and returns true on success" do
       expect(vm_host_sshable).to receive(:_cmd).with(
         "timeout 10 sudo ip link set vetho#{server.vm.inhost_name} down",
-        timeout: 15
+        timeout: 15,
       ).and_return(true)
       expect { nx.lockout_with_host_routing }.not_to raise_error
     end

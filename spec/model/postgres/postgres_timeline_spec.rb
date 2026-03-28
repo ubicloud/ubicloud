@@ -54,7 +54,7 @@ PGDATA=/dat/17/data
       instance_double(
         PostgresServer,
         strand: instance_double(Strand, label: "wait"),
-        vm: instance_double(Vm, sshable:)
+        vm: instance_double(Vm, sshable:),
       )
     }
 
@@ -116,8 +116,8 @@ PGDATA=/dat/17/data
         [
           instance_double(Minio::Client::Blob, key: "basebackups_005/0001_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 200),
           instance_double(Minio::Client::Blob, key: "basebackups_005/0002_backup_stop_sentinel.json", last_modified: most_recent_backup_time - 100),
-          instance_double(Minio::Client::Blob, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time)
-        ]
+          instance_double(Minio::Client::Blob, key: "basebackups_005/0003_backup_stop_sentinel.json", last_modified: most_recent_backup_time),
+        ],
       )
 
       expect(postgres_timeline.latest_backup_label_before_target(target: most_recent_backup_time - 50)).to eq("0002")

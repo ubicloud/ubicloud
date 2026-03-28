@@ -10,7 +10,7 @@ RSpec.describe MonitorableResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "test-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -21,7 +21,7 @@ RSpec.describe MonitorableResource do
   let(:postgres_server) {
     vm = Prog::Vm::Nexus.assemble_with_sshable(
       project.id, name: "pg-vm", private_subnet_id: private_subnet.id,
-      location_id:, unix_user: "ubi"
+      location_id:, unix_user: "ubi",
     ).subject
     PostgresServer.create(
       timeline: postgres_timeline,
@@ -30,7 +30,7 @@ RSpec.describe MonitorableResource do
       is_representative: true,
       synchronization_status: "ready",
       timeline_access: "push",
-      version: "16"
+      version: "16",
     )
   }
 
@@ -133,7 +133,7 @@ RSpec.describe MonitorableResource do
       expect(msgs).to eq [
         "Pulse checking has failed.",
         "Got new pulse.",
-        "monitor VmHost worker SSH connection lost"
+        "monitor VmHost worker SSH connection lost",
       ]
       expect(r_without_event_loop.deleted).to be false
       expect(attached_resource.deleted).to be false

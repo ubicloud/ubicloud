@@ -29,7 +29,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
     Strand.create(
       prog: "Vnet::Aws::BackfillAwsSubnets",
       label: "start",
-      stack: [{"subject_id" => private_subnet_id}]
+      stack: [{"subject_id" => private_subnet_id}],
     )
   end
 
@@ -43,7 +43,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
 
   label def backfill_old_subnet
     subnets = client.describe_subnets({
-      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]
+      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}],
     }).subnets
 
     fail "No subnets found in VPC #{private_subnet_aws_resource.vpc_id}" if subnets.empty?
@@ -61,7 +61,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
       location_aws_az_id: location_az.id,
       ipv4_cidr: subnet.cidr_block,
       ipv6_cidr: subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block,
-      subnet_id: subnet.subnet_id
+      subnet_id: subnet.subnet_id,
     )
 
     hop_link_nics
@@ -69,7 +69,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
 
   label def fetch_existing_subnets
     subnets = client.describe_subnets({
-      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]
+      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}],
     }).subnets
 
     # Ensure AZ records exist
@@ -86,7 +86,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
       az_subnet_map[az_suffix] ||= {
         "subnet_id" => subnet.subnet_id,
         "cidr_block" => subnet.cidr_block,
-        "ipv6_cidr" => subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block
+        "ipv6_cidr" => subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block,
       }
     end
 
@@ -109,7 +109,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
         location_aws_az_id: az.id,
         ipv4_cidr:,
         ipv6_cidr: existing&.dig("ipv6_cidr"),
-        subnet_id: existing&.dig("subnet_id")
+        subnet_id: existing&.dig("subnet_id"),
       )
     end
 
@@ -145,7 +145,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
 
   label def create_missing_az_subnets
     vpc = client.describe_vpcs({
-      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}]
+      filters: [{name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]}],
     }).vpcs[0]
 
     vpc_ipv6 = NetAddr::IPv6Net.parse(vpc.ipv_6_cidr_block_association_set[0].ipv_6_cidr_block)
@@ -161,12 +161,12 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
         cidr_block: aws_subnet.ipv4_cidr.to_s,
         ipv_6_cidr_block: ipv6_cidr.to_s,
         availability_zone: full_az,
-        tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}")
+        tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}"),
       }).subnet
 
       client.modify_subnet_attribute({
         subnet_id: subnet.subnet_id,
-        assign_ipv_6_address_on_creation: {value: true}
+        assign_ipv_6_address_on_creation: {value: true},
       })
 
       # Persist immediately so we skip on retry if associate_route_table fails
@@ -180,7 +180,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
     private_subnet_aws_resource.reload.aws_subnets.each do |aws_subnet|
       client.associate_route_table({
         route_table_id: private_subnet_aws_resource.route_table_id,
-        subnet_id: aws_subnet.subnet_id
+        subnet_id: aws_subnet.subnet_id,
       })
     rescue Aws::EC2::Errors::ResourceAlreadyAssociated
     end

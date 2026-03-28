@@ -4,7 +4,7 @@ class Clover
   tag_perm_map = {
     "subject" => "Project:subjtag",
     "action" => "Project:acttag",
-    "object" => "Project:objtag"
+    "object" => "Project:objtag",
   }.freeze
 
   hash_branch(:project_prefix, "user") do |r|

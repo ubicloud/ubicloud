@@ -42,7 +42,7 @@ RSpec.describe Al do
       diagnostics,
       family_filter,
       os_filter,
-      minimum_vhost_block_backend_version
+      minimum_vhost_block_backend_version,
     )
   end
 
@@ -51,11 +51,11 @@ RSpec.describe Al do
       [{
         "use_bdev_ubi" => false,
         "size_gib" => 11,
-        "boot" => true
+        "boot" => true,
       }, {
         "use_bdev_ubi" => true,
         "size_gib" => 22,
-        "boot" => false
+        "boot" => false,
       }]
     }
 
@@ -66,7 +66,7 @@ RSpec.describe Al do
         cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64",
         location_id: Location::HETZNER_FSN1_ID, ip4_enabled: true, created_at: Time.now,
         unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINYf51IA6bHApuggkz/VksM1cZ0elj2gNQQfPBFdlpRW",
-        boot_image: "ubuntu-jammy"
+        boot_image: "ubuntu-jammy",
       )
     }
 
@@ -111,7 +111,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
-        "standard", 400, true, false, false, []
+        "standard", 400, true, false, false, [],
       )
     }
 
@@ -432,7 +432,7 @@ RSpec.describe Al do
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
       expect(cand.first[:available_iommu_groups].map(&:to_h)).to contain_exactly(
         a_hash_including("iommu_group" => 3, "numa_node" => 0),
-        a_hash_including("iommu_group" => 9, "numa_node" => 0)
+        a_hash_including("iommu_group" => 9, "numa_node" => 0),
       )
     end
 
@@ -455,7 +455,7 @@ RSpec.describe Al do
       expect(cand.first[:vm_host_id]).to eq(vmh2.id)
       expect(cand.first[:available_iommu_groups].map(&:to_h)).to contain_exactly(
         a_hash_including("iommu_group" => 3, "numa_node" => 0),
-        a_hash_including("iommu_group" => 9, "numa_node" => 0)
+        a_hash_including("iommu_group" => 9, "numa_node" => 0),
       )
     end
   end
@@ -467,7 +467,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0, nil, true, 0.65, "x64", ["accepting"], [], [], [], [], [],
-        "standard", 400
+        "standard", 400,
       )
     }
     let(:vmhds) {
@@ -633,7 +633,7 @@ RSpec.describe Al do
         [[1, {"use_bdev_ubi" => true, "size_gib" => 22, "boot" => false}],
           [0, {"use_bdev_ubi" => false, "size_gib" => 11, "boot" => true}]],
         "ubuntu-jammy", false, 0.65, "x64", ["accepting"], [], [], [], [],
-        "standard", 200
+        "standard", 200,
       )
     }
     let(:vmhds) {
@@ -801,7 +801,7 @@ RSpec.describe Al do
           vendor: "vd",
           device: "27b0",
           numa_node: i - 1,
-          iommu_group: i
+          iommu_group: i,
         )
       end
 
@@ -828,7 +828,7 @@ RSpec.describe Al do
           vendor: "vd",
           device: "27b0",
           numa_node: i - 1,
-          iommu_group: i
+          iommu_group: i,
         )
       end
 
@@ -938,7 +938,7 @@ RSpec.describe Al do
       vol = [{
         "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
         "boot" => false, "max_read_mbytes_per_sec" => 200,
-        "max_write_mbytes_per_sec" => 300, "rate_limit_bytes_write" => 400
+        "max_write_mbytes_per_sec" => 300, "rate_limit_bytes_write" => 400,
       }]
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.max_read_mbytes_per_sec).to eq(200)
@@ -950,7 +950,7 @@ RSpec.describe Al do
       vm = create_vm
       vol = [{
         "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false, "track_written" => true, "vring_workers" => 1
+        "boot" => false, "track_written" => true, "vring_workers" => 1,
       }]
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.track_written).to be(true)
@@ -960,7 +960,7 @@ RSpec.describe Al do
       vm = create_vm
       vol = [{
         "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false
+        "boot" => false,
       }]
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.track_written).to be(false)

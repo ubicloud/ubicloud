@@ -107,7 +107,7 @@ class Invoice < Sequel::Model
           confirm: true,
           off_session: true,
           customer: billing_info.stripe_id,
-          payment_method: pm.stripe_id
+          payment_method: pm.stripe_id,
         })
       rescue Stripe::CardError => e
         Clog.emit("Invoice couldn't charged.", {invoice_not_charged: {ubid:, payment_method: pm.ubid, error: e.message}})
@@ -125,9 +125,9 @@ class Invoice < Sequel::Model
       content.merge!({
         "payment_method" => {
           "id" => pm.id,
-          "stripe_id" => pm.stripe_id
+          "stripe_id" => pm.stripe_id,
         },
-        "payment_intent" => payment_intent.id
+        "payment_intent" => payment_intent.id,
       })
       save(columns: [:status, :content])
       project.update(reputation: "verified") if amount > 5
@@ -195,14 +195,14 @@ class Invoice < Sequel::Model
     pdf = Prawn::Document.new(
       page_size: "A4",
       page_layout: :portrait,
-      info: {Title: filename, Creator: "Ubicloud", CreationDate: created_at}
+      info: {Title: filename, Creator: "Ubicloud", CreationDate: created_at},
     )
     # We use external fonts to support all UTF-8 characters
     pdf.font_families.update(
       "BeVietnamPro" => {
         normal: "assets/font/BeVietnamPro/Regular.ttf",
-        semibold: "assets/font/BeVietnamPro/SemiBold.ttf"
-      }
+        semibold: "assets/font/BeVietnamPro/SemiBold.ttf",
+      },
     )
     pdf.font "BeVietnamPro"
 
@@ -289,7 +289,7 @@ class Invoice < Sequel::Model
         ["VAT (#{data.vat_rate}%):", "(#{data.vat_amount_eur}) #{data.vat_amount}"]
       end,
       (data.total != "$0.00" && data.vat_reversed) ? [{content: "VAT subject to reverse charge", colspan: 2}] : nil,
-      ["Total:", data.total]
+      ["Total:", data.total],
     ].compact
     pdf.table(totals, position: :right, cell_style: {padding: [2, 5, 2, 5], borders: []}) do
       style(column(0), align: :right, font_style: :semibold, text_color: dark_gray)
@@ -300,7 +300,7 @@ class Invoice < Sequel::Model
       pdf.move_down 60
       bank_transfer_info = [
         [{content: "We kindly request you to remit the amount to:", colspan: 2, font_style: :semibold}],
-        *data.bank_transfer_info.to_a
+        *data.bank_transfer_info.to_a,
       ]
       pdf.table(bank_transfer_info, position: :left) do
         style(row(0..-1).columns(0..1), padding: [2, 5, 2, 5], borders: [])
@@ -319,7 +319,7 @@ class Invoice < Sequel::Model
       key: blob_key,
       body: pdf,
       content_type: "application/pdf",
-      if_none_match: "*"
+      if_none_match: "*",
     )
   end
 
@@ -339,7 +339,7 @@ class Invoice < Sequel::Model
       secret_access_key: Config.invoices_blob_storage_secret_key,
       region: "auto",
       request_checksum_calculation: "when_required",
-      response_checksum_validation: "when_required"
+      response_checksum_validation: "when_required",
     )
   end
 end

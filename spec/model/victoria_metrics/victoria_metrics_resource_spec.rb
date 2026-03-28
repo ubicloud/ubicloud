@@ -13,7 +13,7 @@ RSpec.describe VictoriaMetricsResource do
       root_cert_1: "dummy-root-cert-1",
       root_cert_2: "dummy-root-cert-2",
       project_id: project.id,
-      location_id: location.id
+      location_id: location.id,
     )
   }
 
@@ -26,7 +26,7 @@ RSpec.describe VictoriaMetricsResource do
       ui_name: "aws-us-west-2",
       visible: true,
       provider: "aws",
-      project_id: victoria_metrics_project.id
+      project_id: victoria_metrics_project.id,
     )
   }
 

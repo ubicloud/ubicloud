@@ -14,7 +14,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
       net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "10.0.0.0/26",
       state: "waiting",
-      project:
+      project:,
     )
   }
   let(:firewall) {
@@ -29,7 +29,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
       private_ipv4: NetAddr::IPv4Net.parse("10.0.0.1/32"),
       mac: "00:00:00:00:00:01",
       name: "nic0",
-      state: "active"
+      state: "active",
     )
   }
   let(:vm) {
@@ -51,7 +51,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
       ip4_enabled: false,
       unix_user: "ubi",
       public_key: "ssh-ed25519 test",
-      ephemeral_net6: NetAddr::IPv6Net.parse("fd00::1/79")
+      ephemeral_net6: NetAddr::IPv6Net.parse("fd00::1/79"),
     ).tap do |v|
       nic.update(vm_id: v.id)
     end
@@ -84,7 +84,7 @@ RSpec.describe Prog::Vnet::Metal::UpdateFirewallRules do
         {cidr: "::/0", port_range: nil},
         {cidr: "fd00::1/128", port_range: Sequel.pg_range(8080..65535)},
         {cidr: "fd00::1/64", port_range: Sequel.pg_range(0..8080)},
-        {cidr: "fd00::2/64", port_range: Sequel.pg_range(80..9999)}
+        {cidr: "fd00::2/64", port_range: Sequel.pg_range(80..9999)},
       ])
     end
 
@@ -226,7 +226,7 @@ ADD_RULES
         health_check_protocol: "http",
         health_check_endpoint: "/health",
         project_id: project.id,
-        private_subnet_id: ps.id
+        private_subnet_id: ps.id,
       )
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
 
@@ -236,7 +236,7 @@ ADD_RULES
         private_ipv4: NetAddr::IPv4Net.parse("10.0.0.2/32"),
         mac: "00:00:00:00:00:02",
         name: "nic2",
-        state: "active"
+        state: "active",
       )
       vm2 = Vm.create(
         vm_host: vmh,
@@ -255,7 +255,7 @@ ADD_RULES
         ip4_enabled: false,
         unix_user: "ubi",
         public_key: "ssh-ed25519 test",
-        ephemeral_net6: NetAddr::IPv6Net.parse("fd01::/79")
+        ephemeral_net6: NetAddr::IPv6Net.parse("fd01::/79"),
       )
       nic2.update(vm_id: vm2.id)
 
@@ -404,7 +404,7 @@ ADD_RULES
         health_check_protocol: "http",
         health_check_endpoint: "/health",
         project_id: project.id,
-        private_subnet_id: ps.id
+        private_subnet_id: ps.id,
       )
       LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 443, dst_port: 8443)
       LoadBalancerVm.create(load_balancer_id: lb.id, vm_id: vm.id)

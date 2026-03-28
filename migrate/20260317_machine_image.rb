@@ -83,7 +83,7 @@ Sequel.migration do
 
       add_constraint(
         :vm_storage_volume_single_source,
-        "boot_image_id IS NULL OR machine_image_version_id IS NULL"
+        "boot_image_id IS NULL OR machine_image_version_id IS NULL",
       )
     end
   end

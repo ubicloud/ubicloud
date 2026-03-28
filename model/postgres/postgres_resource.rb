@@ -105,7 +105,7 @@ class PostgresResource < Sequel::Model
       host: hostname,
       port: 5432,
       path: "/postgres",
-      query: "channel_binding=require"
+      query: "channel_binding=require",
     ).to_s
   end
 
@@ -116,7 +116,7 @@ class PostgresResource < Sequel::Model
       sslkey: "/etc/ssl/certs/client.key",
       sslmode: dns_zone ? "verify-full" : "require",
       dbname: "postgres",
-      application_name:
+      application_name:,
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
@@ -128,7 +128,7 @@ class PostgresResource < Sequel::Model
       resource_id: id,
       timeline_id:,
       timeline_access: "fetch",
-      **new_server_exclusion_filters.to_h
+      **new_server_exclusion_filters.to_h,
     )
   end
 
@@ -382,7 +382,7 @@ class PostgresResource < Sequel::Model
   def send_storage_auto_scale_warning_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
-      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
     if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
@@ -412,14 +412,14 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
   def send_storage_auto_scale_started_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
-      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
     if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
@@ -452,7 +452,7 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
@@ -464,7 +464,7 @@ class PostgresResource < Sequel::Model
       "Storage: #{representative_server.storage_size_gib} GB",
       "Instance size: #{vm_size}",
       "Please note that if disk usage reaches to 100%, database would become unavailable.",
-      "We recommend freeing up disk space or contacting support to discuss other options."
+      "We recommend freeing up disk space or contacting support to discuss other options.",
     ]
 
     Util.send_email(
@@ -474,7 +474,7 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
@@ -585,7 +585,7 @@ class PostgresResource < Sequel::Model
 
   UPGRADE_IMAGE_MIN_VERSIONS = {
     "17" => "20240801",
-    "18" => "20251021"
+    "18" => "20251021",
   }
 end
 

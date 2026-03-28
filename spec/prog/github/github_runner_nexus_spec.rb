@@ -335,7 +335,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         [Location::HETZNER_FSN1_ID, "x64", "standard"],
         [Location::GITHUB_RUNNERS_ID, "x64", "standard"],
         [Location::GITHUB_RUNNERS_ID, "x64", "premium"],
-        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"]
+        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"],
       ].each do |location_id, arch, family|
         create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
       end
@@ -717,7 +717,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Page.first).to have_attributes(
         summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
         tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
-        severity: "warning"
+        severity: "warning",
       )
     end
 
@@ -948,7 +948,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       [
         {"time" => "2026-02-16T16:20:55.146469774Z", "level" => "ERROR", "msg" => "Request failed with unexpected status code", "version" => "0.7.0", "error_type" => "backend", "function_name" => "GetCacheEntry", "status_code" => 500},
         {"time" => "2026-02-16T16:20:55.730648373Z", "level" => "WARN", "msg" => "Retrying request", "version" => "0.7.0", "error_type" => "r2", "retry_count" => 1, "max_retries" => 3, "error" => "write tcp: connection reset by peer", "status_code" => 0},
-        "invalid json line"
+        "invalid json line",
       ].each do |message|
         expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message:, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
       end

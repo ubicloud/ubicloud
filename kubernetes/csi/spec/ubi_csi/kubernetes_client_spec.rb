@@ -178,7 +178,7 @@ RSpec.describe Csi::KubernetesClient do
     let(:pv_list) do
       {"items" => [
         {"metadata" => {"name" => "pv1"}, "spec" => {"csi" => {"volumeHandle" => "vol-123"}}},
-        {"metadata" => {"name" => "pv2"}, "spec" => {"csi" => {"volumeHandle" => "vol-456"}}}
+        {"metadata" => {"name" => "pv2"}, "spec" => {"csi" => {"volumeHandle" => "vol-456"}}},
       ]}
     end
 
@@ -198,12 +198,12 @@ RSpec.describe Csi::KubernetesClient do
       {
         "metadata" => {
           "name" => "old-pv-123",
-          "annotations" => {"csi.ubicloud.com/old-pvc-object" => "base64data"}
+          "annotations" => {"csi.ubicloud.com/old-pvc-object" => "base64data"},
         },
         "spec" => {
           "persistentVolumeReclaimPolicy" => "Retain",
-          "claimRef" => {"namespace" => "default", "name" => "test-pvc"}
-        }
+          "claimRef" => {"namespace" => "default", "name" => "test-pvc"},
+        },
       }
     end
 
@@ -217,7 +217,7 @@ RSpec.describe Csi::KubernetesClient do
 
     it "returns nil when no PV has the old-pvc-object annotation" do
       pv_list = {"items" => [
-        {"metadata" => {"name" => "pv1", "annotations" => {}}, "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+        {"metadata" => {"name" => "pv1", "annotations" => {}}, "spec" => {"persistentVolumeReclaimPolicy" => "Retain", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}},
       ]}
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
 
@@ -249,18 +249,18 @@ RSpec.describe Csi::KubernetesClient do
         {
           "metadata" => {"name" => "ubicsi-nodeplugin-abc"},
           "spec" => {"nodeName" => "worker-1"},
-          "status" => {"phase" => "Running", "podIP" => "10.0.0.1"}
+          "status" => {"phase" => "Running", "podIP" => "10.0.0.1"},
         },
         {
           "metadata" => {"name" => "ubicsi-nodeplugin-xyz"},
           "spec" => {"nodeName" => "worker-2"},
-          "status" => {"phase" => "Running", "podIP" => "10.0.0.2"}
+          "status" => {"phase" => "Running", "podIP" => "10.0.0.2"},
         },
         {
           "metadata" => {"name" => "ubicsi-nodeplugin-pending"},
           "spec" => {"nodeName" => "worker-3"},
-          "status" => {"phase" => "Pending", "podIP" => nil}
-        }
+          "status" => {"phase" => "Pending", "podIP" => nil},
+        },
       ]}
     end
 
@@ -280,8 +280,8 @@ RSpec.describe Csi::KubernetesClient do
         {
           "metadata" => {},
           "spec" => {},
-          "status" => {"phase" => "Running"}
-        }
+          "status" => {"phase" => "Running"},
+        },
       ]}
       expect(client).to receive(:run_kubectl).with("-n", "ubicsi", "get", "pods", "-l", "app=ubicsi,component=nodeplugin", "-oyaml").and_return(YAML.dump(pods_with_missing_fields))
 
@@ -299,16 +299,16 @@ RSpec.describe Csi::KubernetesClient do
       {"items" => [
         {
           "metadata" => {"name" => "coredns-abc123"},
-          "status" => {"phase" => "Running", "podIP" => "10.96.0.5"}
+          "status" => {"phase" => "Running", "podIP" => "10.96.0.5"},
         },
         {
           "metadata" => {"name" => "coredns-xyz789"},
-          "status" => {"phase" => "Running", "podIP" => "10.96.0.6"}
+          "status" => {"phase" => "Running", "podIP" => "10.96.0.6"},
         },
         {
           "metadata" => {"name" => "coredns-pending"},
-          "status" => {"phase" => "Pending", "podIP" => nil}
-        }
+          "status" => {"phase" => "Pending", "podIP" => nil},
+        },
       ]}
     end
 
