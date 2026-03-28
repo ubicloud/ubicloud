@@ -52,7 +52,7 @@ class LoadBalancer < Sequel::Model
     # Use subquery instead of joins as this is the basis for a dataset that will be used in an UPDATE query
     LoadBalancerVmPort.where(
       load_balancer_port_id: ports_dataset.select(:id),
-      load_balancer_vm_id: vms_dataset.where(vm_id: vm.id).select(Sequel[:load_balancers_vms][:id])
+      load_balancer_vm_id: vms_dataset.where(vm_id: vm.id).select(Sequel[:load_balancers_vms][:id]),
     )
   end
 

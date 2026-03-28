@@ -103,14 +103,14 @@ class Prog::Vm::HostNexus < Prog::Base
           total_sockets: st.exitval.fetch("total_sockets"),
           total_dies: st.exitval.fetch("total_dies"),
           total_cores:,
-          total_cpus:
+          total_cpus:,
         }
         vm_host.update(**kwargs)
         (0..total_cpus - 1).each do |cpu|
           VmHostCpu.create(
             vm_host_id: vm_host.id,
             cpu_number: cpu,
-            spdk: cpu < vm_host.spdk_cpu_count
+            spdk: cpu < vm_host.spdk_cpu_count,
           )
         end
       end
@@ -130,7 +130,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     push Prog::Storage::SetupVhostBlockBackend, {
       "version" => frame["vhost_block_backend_version"],
-      "allocation_weight" => 100
+      "allocation_weight" => 100,
     }
   end
 
@@ -138,7 +138,7 @@ class Prog::Vm::HostNexus < Prog::Base
     register_deadline("prep_reboot", 4 * 60 * 60)
     frame["default_boot_images"].each { |image_name|
       bud Prog::DownloadBootImage, {
-        "image_name" => image_name
+        "image_name" => image_name,
       }
     }
 
@@ -247,7 +247,7 @@ class Prog::Vm::HostNexus < Prog::Base
 
     vm_host.update(
       total_hugepages_1g: total_hugepages,
-      used_hugepages_1g: spdk_hugepages + total_vm_mem_gib
+      used_hugepages_1g: spdk_hugepages + total_vm_mem_gib,
     )
 
     hop_start_slices

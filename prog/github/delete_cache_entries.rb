@@ -9,8 +9,8 @@ class Prog::Github::DeleteCacheEntries < Prog::Base
       label: "delete_entries",
       stack: [{
         "subject_id" => repository_id,
-        "initiated_at" => initiated_at.to_s
-      }]
+        "initiated_at" => initiated_at.to_s,
+      }],
     )
   end
 

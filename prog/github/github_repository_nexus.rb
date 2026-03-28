@@ -82,7 +82,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
           github_repository.installation,
           repository_name: github_repository.name,
           label:,
-          actual_label:
+          actual_label:,
         )
       end
     end

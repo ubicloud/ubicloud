@@ -24,7 +24,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
     it "buds redelivery children and hops" do
       expect(Time).to receive(:now).and_return(time + 60 * 60).at_least(:once)
       expect(prog).to receive(:failed_deliveries).with(time).and_return(
-        Array.new(26).map.with_index(1) { |_, i| {guid: i, id: i, status: "Fail", delivered_at: time + 5} }
+        Array.new(26).map.with_index(1) { |_, i| {guid: i, id: i, status: "Fail", delivered_at: time + 5} },
       )
       expect { prog.wait }.to hop("wait_redelivers")
         .and change { prog.strand.stack.first["last_check_at"] }.from("2023-10-19 22:27:47 UTC").to("2023-10-19 23:27:47 UTC")
@@ -56,7 +56,7 @@ RSpec.describe Prog::RedeliverGithubFailures do
       expect(app_client).to receive(:list_app_hook_deliveries).and_return([
         {guid: "1", id: "11", status: "Fail", delivered_at: time + 5},
         {guid: "2", id: "21", status: "Fail", delivered_at: time + 4},
-        {guid: "3", id: "31", status: "OK", delivered_at: time + 3}
+        {guid: "3", id: "31", status: "OK", delivered_at: time + 3},
       ])
       # page 2
       next_url = "/app/hook/deliveries?cursor=next_page"
@@ -66,21 +66,21 @@ RSpec.describe Prog::RedeliverGithubFailures do
         {guid: "4", id: "41", status: "Fail", delivered_at: time + 2},
         {guid: "4", id: "42", status: "Fail", delivered_at: time + 1},
         {guid: "5", id: "51", status: "Fail", delivered_at: time - 2},
-        {guid: "6", id: "61", status: "OK", delivered_at: time - 3}
+        {guid: "6", id: "61", status: "OK", delivered_at: time - 3},
       ])
       # page 3
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: nil}))
 
       expect(prog.failed_deliveries(time)).to eq([
         {guid: "1", id: "11", status: "Fail", delivered_at: time + 5},
-        {guid: "4", id: "41", status: "Fail", delivered_at: time + 2}
+        {guid: "4", id: "41", status: "Fail", delivered_at: time + 2},
       ])
     end
 
     it "fetches failed deliveries with max page" do
       expect(app_client).to receive(:list_app_hook_deliveries).and_return([
         {guid: "2", id: "21", status: "OK", delivered_at: time + 3},
-        {guid: "3", id: "31", status: "Fail", delivered_at: time + 3}
+        {guid: "3", id: "31", status: "Fail", delivered_at: time + 3},
       ])
       expect(app_client).to receive(:last_response).and_return(instance_double(Sawyer::Response, rels: {next: instance_double(Sawyer::Relation, href: "next_url")}))
       expect(Clog).to receive(:emit).with("fetched github deliveries", {fetched_github_deliveries: {total: 2, failed: 1, status: {"Fail" => 1}, page: 1, since: time}}).and_call_original

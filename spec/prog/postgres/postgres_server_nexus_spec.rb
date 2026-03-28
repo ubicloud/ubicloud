@@ -18,7 +18,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project:, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -39,11 +39,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project: user_project
+        project: user_project,
       )
       LocationCredential.create(
         access_key: "access-key-id",
-        secret_key: "secret-access-key"
+        secret_key: "secret-access-key",
       ) { it.id = loc.id }
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
@@ -135,7 +135,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         ui_name: "aws-eu-central-1",
         visible: true,
         provider: "aws",
-        project_id: user_project.id
+        project_id: user_project.id,
       )
       aws_resource = create_postgres_resource(project: user_project, location_id: new_aws_location.id)
       aws_resource.update(target_version: "16")
@@ -329,7 +329,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project:,
         target_vm_size: "standard-2",
         target_storage_size_gib: 64,
-        restore_target: Time.now
+        restore_target: Time.now,
       )
       PostgresInitScript.create_with_id(pitr_resource, init_script: "sudo whoami")
       pitr_server = create_postgres_server(resource: pitr_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
@@ -520,7 +520,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         display_name: "aws-us-west-2",
         ui_name: "aws-us-west-2",
         visible: true,
-        provider: "aws"
+        provider: "aws",
       )
       aws_timeline = create_postgres_timeline(location_id: aws_location.id)
       server.update(timeline: aws_timeline)
@@ -619,7 +619,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         postgres_resource:,
         url: "https://metrics.example.com/write",
         username: "metrics_user",
-        password: "metrics_pass"
+        password: "metrics_pass",
       )
 
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
@@ -810,7 +810,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher)
+        hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
       expect(nx).to receive(:push).with(Prog::Postgres::Restart)
       expect { nx.update_superuser_password }.to hop("wait")
@@ -820,7 +820,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher)
+        hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
       nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
       expect { nx.update_superuser_password }.to hop("run_post_installation_script")
@@ -829,11 +829,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates password and hops to run_post_installation_script during initial provisioning for non-standard flavors if restart is already executed" do
       nx.incr_initial_provisioning
       expect(sshable).to receive(:_cmd).with(
-        /sudo apt-get install.*pg-analytics.*pg-search/m
+        /sudo apt-get install.*pg-analytics.*pg-search/m,
       ).and_return("")
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher)
+        hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
       nx.strand.update(retval: Sequel.pg_jsonb_wrap({"msg" => "postgres server is restarted"}))
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
@@ -843,7 +843,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "updates password and hops to wait at times other than the initial provisioning" do
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: password_update_sql_matcher)
+        hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
       expect { nx.update_superuser_password }.to hop("wait")
     end
@@ -854,7 +854,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       postgres_server.resource.update(flavor: PostgresResource::Flavor::PARADEDB)
       expect(sshable).to receive(:_cmd).with(
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
-        hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/)
+        hash_including(stdin: /CREATE EXTENSION IF NOT EXISTS pg_cron/),
       ).and_return("")
       expect { nx.run_post_installation_script }.to hop("wait")
     end
@@ -1241,7 +1241,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project_id: project.id
+        project_id: project.id,
       )
       LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "az1")
       aws_resource = create_postgres_resource(project:, location_id: aws_location.id)
@@ -1377,7 +1377,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       page = Prog::PageNexus.assemble(
         "#{standby.ubid} promotion failed",
         ["PGPromotionFailed", standby.id],
-        standby.ubid
+        standby.ubid,
       ).subject
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
 

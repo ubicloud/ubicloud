@@ -8,13 +8,13 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
 
     frame = {
       "postgres_test_project_id" => postgres_test_project.id,
-      "failover_wait_started" => false
+      "failover_wait_started" => false,
     }
 
     Strand.create(
       prog: "Test::HaPostgresResource",
       label: "start",
-      stack: [frame]
+      stack: [frame],
     )
   end
 
@@ -25,7 +25,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       name: "postgres-test-ha",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      ha_type: "async"
+      ha_type: "async",
     )
 
     update_stack({"postgres_resource_id" => st.id})

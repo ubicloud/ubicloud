@@ -7,7 +7,7 @@ class Clover
     "1b" => [:load_balancers_dataset, "LoadBalancer:view"],
     "pg" => [:postgres_resources_dataset, "Postgres:view"],
     "ps" => [:private_subnets_dataset, "PrivateSubnet:view"],
-    "vm" => [:vms_dataset, "Vm:view"]
+    "vm" => [:vms_dataset, "Vm:view"],
   }.freeze
   type_ds_perm_map.each_value(&:freeze)
 
@@ -19,7 +19,7 @@ class Clover
         {
           "type" => object.class.table_name.to_s.tr("_", " "),
           "location" => object.display_location,
-          "name" => object.name
+          "name" => object.name,
         }
       end
     end

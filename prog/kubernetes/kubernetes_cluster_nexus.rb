@@ -23,7 +23,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           name: "#{ubid}-subnet",
           location_id:,
           firewall_name: "#{ubid}-firewall",
-          ipv4_range_size: 16
+          ipv4_range_size: 16,
         ).subject
       end
 
@@ -34,8 +34,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443..443)},
           {cidr: "::/0", port_range: Sequel.pg_range(443..443)},
           {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-        ]
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)},
+        ],
       )
 
       # Internal worker node firewall, will be directly attached to kubernetes worker VMs
@@ -43,8 +43,8 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       internal_worker_vm_firewall.replace_firewall_rules(
         Config.control_plane_outbound_cidrs.map { {cidr: it, port_range: Sequel.pg_range(22..22)} } + [
           {cidr: subnet.net4.to_s, port_range: Sequel.pg_range(10250..10250)},
-          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)}
-        ]
+          {cidr: subnet.net6.to_s, port_range: Sequel.pg_range(10250..10250)},
+        ],
       )
 
       # TODO: Validate location
@@ -113,7 +113,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       health_check_endpoint: "/healthz",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix: custom_apiserver_hostname_prefix
+      custom_hostname_prefix: custom_apiserver_hostname_prefix,
     ).subject
 
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble_with_multiple_ports(
@@ -124,7 +124,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id:,
-      custom_hostname_prefix: custom_services_hostname_prefix
+      custom_hostname_prefix: custom_services_hostname_prefix,
     ).subject
 
     kubernetes_cluster.update(api_server_lb_id: api_server_lb.id, services_lb_id: services_lb.id)
@@ -169,7 +169,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
       {
         type: record.billing_rate["resource_type"],
         family: record.billing_rate["resource_family"],
-        amount: record.amount
+        amount: record.amount,
       }
     end.tally
 
@@ -181,7 +181,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
           resource_id: kubernetes_cluster.id,
           resource_name: kubernetes_cluster.name,
           billing_rate_id: billing_rate_for(record[:type], record[:family])["id"],
-          amount: record[:amount]
+          amount: record[:amount],
         )
       end
     end
@@ -382,7 +382,7 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
 
       kubernetes_cluster.private_subnet.incr_destroy_if_only_used_internally(
         ubid: kubernetes_cluster.ubid,
-        vm_ids: []
+        vm_ids: [],
       )
 
       if (services_lb = kubernetes_cluster.services_lb)

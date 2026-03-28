@@ -59,7 +59,7 @@ module Authorization
   RECURSIVE_TAG_QUERY_MAP = {
     subject: [:applied_subject_tag, :subject_id],
     action: [:applied_action_tag, :action_id],
-    object: [:applied_object_tag, :object_id]
+    object: [:applied_object_tag, :object_id],
   }.freeze
   RECURSIVE_TAG_QUERY_MAP.each_value(&:freeze)
   private def recursive_tag_query(type, values, project_id: nil)
@@ -178,7 +178,7 @@ module Authorization
           Sequel.join([
             substr(:object_id, 0, 18),
             Sequel.case({"2" => "0"}, "3", substr(:object_id, 18, 1)),
-            substr(:object_id, 19, 18)
+            substr(:object_id, 19, 18),
           ]).cast(:uuid).as(:object_id)
       }
     end
@@ -189,7 +189,7 @@ module Authorization
       # or where the action is allowed for all objects in the project,
       ds.where(object_id: nil).exists &
         # and the object is related to the project
-        {project_id => Sequel[from][:project_id]}
+        {project_id => Sequel[from][:project_id]},
     ))
   end
 end

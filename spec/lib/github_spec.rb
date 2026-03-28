@@ -43,7 +43,7 @@ RSpec.describe Github do
 
     expect(Octokit::Client).to receive(:new).with(
       bearer_token: "eyJhbGciOiJSUzI1NiJ9.eyJpYXQiOjE3NjI4MTkyMDAsImV4cCI6MTc2MjgxOTY4MCwiaXNzIjoiMTIzNDU2In0.iMTR9OO7pZbG9WR5_brak0frQ8XmRPMPQIbE0_spLOL19PX7dxXSQNg-lHxmJP3tghiW7TIgx6-8mY4--ZNKPgTpnwgi_qsgg5IkzM6r2t6XfNV-pFcBsoGas2pHXfitnCWpwHlWj17SZ-AoVkp4VsURJwuBwlNOBVDO4R4bzHZbgA_Xw7lu8OQGnfOm1AzCM4jD6AR22hGdVCkpORXiI4mSi1xdHoP6ARnB6GV6jeRSG41gJLteV6zBZjoVCe7MYSOcmw4RZ4coLR2frRYLyoAAPLqFGDAmJdtxame9fKiXbwflBUTVHaSNl0a-YyseifUysM5Z9GOY1ky7vnzmwg",
-      per_page: 100
+      per_page: 100,
     )
     described_class.app_client
   end

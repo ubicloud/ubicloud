@@ -10,7 +10,7 @@ RSpec.describe Serializers::Postgres do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
   let(:time) {
@@ -32,7 +32,7 @@ RSpec.describe Serializers::Postgres do
       is_representative: true,
       synchronization_status: "ready",
       timeline_access: primary ? "push" : "fetch",
-      version: "17"
+      version: "17",
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: "wait")
     server

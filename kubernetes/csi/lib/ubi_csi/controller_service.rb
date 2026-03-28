@@ -43,10 +43,10 @@ module Csi
             capabilities: [
               ControllerServiceCapability.new(
                 rpc: ControllerServiceCapability::RPC.new(
-                  type: ControllerServiceCapability::RPC::Type::CREATE_DELETE_VOLUME
-                )
-              )
-            ]
+                  type: ControllerServiceCapability::RPC::Type::CREATE_DELETE_VOLUME,
+                ),
+              ),
+            ],
           )
         end
       end
@@ -91,7 +91,7 @@ module Csi
           maximum = format("%g", max_volume_size.to_f / OneGB)
           raise GRPC::OutOfRange.new(
             "Requested volume size #{requested}GB exceeds " \
-            "maximum allowed size of #{maximum}GB"
+            "maximum allowed size of #{maximum}GB",
           )
         end
 
@@ -122,7 +122,7 @@ module Csi
                 accessible_topology: selected_topology.freeze,
                 capacity_bytes: req.capacity_range.required_bytes,
                 parameters: req.parameters.to_h.transform_values(&:freeze).freeze,
-                capabilities: req.volume_capabilities.map(&:to_h).freeze
+                capabilities: req.volume_capabilities.map(&:to_h).freeze,
               }.freeze
             end
           end
@@ -152,8 +152,8 @@ module Csi
               volume_id:,
               capacity_bytes: req.capacity_range.required_bytes,
               volume_context: req.parameters.to_h.merge("size_bytes" => req.capacity_range.required_bytes.to_s),
-              accessible_topology: [topology]
-            )
+              accessible_topology: [topology],
+            ),
           )
         end
       end

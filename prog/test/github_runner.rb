@@ -31,7 +31,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       type: "User",
       project_id: customer_project.id,
       allocator_preferences: {},
-      created_at: Time.now - 8 * 24 * 60 * 60
+      created_at: Time.now - 8 * 24 * 60 * 60,
     )
 
     labels = []
@@ -49,8 +49,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       stack: [{
         "provider" => provider,
         "customer_project_id" => customer_project.id,
-        "labels" => labels
-      }]
+        "labels" => labels,
+      }],
     )
   end
 
@@ -68,7 +68,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
-      storage_encrypted: true
+      storage_encrypted: true,
     ).subject
     update_stack({"vm_pool_id" => pool.id})
 

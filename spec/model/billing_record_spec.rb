@@ -9,7 +9,7 @@ RSpec.describe BillingRecord do
       resource_id: PostgresResource.generate_uuid,
       resource_name: "whatever",
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
-      amount: 1
+      amount: 1,
     }
   }
 
@@ -19,7 +19,7 @@ RSpec.describe BillingRecord do
       resource_id: "2464de61-7501-8374-9ab0-416caebe31da",
       resource_name: "whatever",
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", "standard", "hetzner-fsn1")["id"],
-      amount: 1
+      amount: 1,
     )
     expect(described_class.active.all).to eq([expected])
   end

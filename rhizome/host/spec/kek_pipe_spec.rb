@@ -22,7 +22,7 @@ RSpec.describe KekPipe do
           kek_pipe: kek_pipe,
           kek_content: "kek-content-with-stdin",
           stdin: "stdin-payload",
-          env: {"TEST_KEK_ENV" => "env-with-stdin"}
+          env: {"TEST_KEK_ENV" => "env-with-stdin"},
         )
 
         expect(File.read(output_file)).to eq("env-with-stdin|kek-content-with-stdin|stdin-payload")
@@ -42,7 +42,7 @@ RSpec.describe KekPipe do
           ["ruby", "-e", script, kek_pipe, output_file],
           kek_pipe: kek_pipe,
           kek_content: "kek-content-without-stdin",
-          env: {"TEST_KEK_ENV" => "env-without-stdin"}
+          env: {"TEST_KEK_ENV" => "env-without-stdin"},
         )
 
         expect(File.read(output_file)).to eq("env-without-stdin|kek-content-without-stdin")
@@ -61,7 +61,7 @@ RSpec.describe KekPipe do
             ["ruby", "-e", script],
             kek_pipe: kek_pipe,
             kek_content: "kek-content",
-            kek_write_timeout_sec: 0.1
+            kek_write_timeout_sec: 0.1,
           )
         }.to raise_error RuntimeError, "error writing KEK to pipe: execution expired"
       end
@@ -88,7 +88,7 @@ RSpec.describe KekPipe do
           kek_pipe: kek_pipe,
           kek_content: "kek-content-early-exit",
           stdin: large_stdin,
-          env: {"TEST_KEK_ENV" => "env-early-exit"}
+          env: {"TEST_KEK_ENV" => "env-early-exit"},
         )
 
         expect(File.read(output_file)).to eq("env-early-exit|kek-content-early-exit|line1\n")

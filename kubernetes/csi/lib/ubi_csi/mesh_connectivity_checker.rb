@@ -72,7 +72,7 @@ module Csi
           pods: @pod_status.dup,
           external_endpoints: @external_status.dup,
           mtr_results: @mtr_results.dup,
-          api_error: @api_error
+          api_error: @api_error,
         }
       end
     end
@@ -208,7 +208,7 @@ module Csi
         ip:,
         reachable:,
         error:,
-        last_check: Time.now.utc.iso8601
+        last_check: Time.now.utc.iso8601,
       }
       @mutex.synchronize do
         @pod_status[name] = hash
@@ -240,7 +240,7 @@ module Csi
       hash = {
         reachable:,
         error:,
-        last_check: Time.now.utc.iso8601
+        last_check: Time.now.utc.iso8601,
       }
       @mutex.synchronize do
         @external_status[key] = hash
@@ -295,7 +295,7 @@ module Csi
         ip: target[:ip],
         output: output.strip,
         exit_status: status.exitstatus,
-        last_check: Time.now.utc.iso8601
+        last_check: Time.now.utc.iso8601,
       }
       key = target[:name]
       @mutex.synchronize do

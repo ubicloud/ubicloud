@@ -67,7 +67,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
             prefs["location_filter"] || runner_location_filter,
             prefs["location_preference"] || runner_location_preference,
             [],
-            runner_family_filter
+            runner_family_filter,
           ]
         else
           [["accepting"], [vm.location_id], [], [], [vm.family]]
@@ -85,7 +85,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         data_center_exclusion_filter:,
         gpu_count:,
         gpu_device:,
-        family_filter:
+        family_filter:,
       )
     rescue RuntimeError => ex
       raise unless ex.message.include?("no space left on any eligible host")
@@ -155,7 +155,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       hop_clean_prep
     when "NotStarted", "Failed"
       secrets_json = JSON.generate({
-        storage: vm.storage_secrets
+        storage: vm.storage_secrets,
       })
 
       write_params_json
@@ -209,7 +209,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
 
       vm.storage_volumes.each do |vol|
@@ -218,7 +218,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: "Disk ##{vol["disk_index"]} of #{vm.name}",
           billing_rate_id: BillingRate.from_resource_properties("VmStorage", vm.family, vm.location.name)["id"],
-          amount: vol["size_gib"]
+          amount: vol["size_gib"],
         )
       end
 
@@ -228,7 +228,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: vm.assigned_vm_address.ip,
           billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
-          amount: 1
+          amount: 1,
         )
       end
 
@@ -241,7 +241,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
           resource_id: vm.id,
           resource_name: "GPUs of #{vm.name}",
           billing_rate_id: BillingRate.from_resource_properties("Gpu", gpu.device, vm.location.name)["id"],
-          amount: gpu_count
+          amount: gpu_count,
         )
       end
     end
@@ -427,7 +427,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} unavailable but main process running",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid}
+          extra_data: {vm_host: host.ubid},
         )
         update_stack("reason_determined" => true)
         nap 30
@@ -475,7 +475,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
         Prog::PageNexus.assemble(
           "#{vm.ubid} stopped unexpectedly (#{reason})",
           ["VmExit", vm.ubid], vm.ubid,
-          extra_data: {vm_host: host.ubid, result:, reason:}
+          extra_data: {vm_host: host.ubid, result:, reason:},
         )
         update_stack("reason_determined" => true)
       end
@@ -527,7 +527,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # Instead update the slice utilization
       VmHostSlice.dataset.where(id: vm.vm_host_slice_id).update(
         used_cpu_percent: Sequel[:used_cpu_percent] - vm.cpu_percent_limit,
-        used_memory_gib: Sequel[:used_memory_gib] - vm.memory_gib
+        used_memory_gib: Sequel[:used_memory_gib] - vm.memory_gib,
       )
     elsif host
       fail "BUG: Number of cores cannot be zero when VM is runing without a slice" if vm.cores == 0
@@ -535,7 +535,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
       # If there is no slice, we need to update the host utilization directly
       VmHost.dataset.where(id: vm.vm_host_id).update(
         used_cores: Sequel[:used_cores] - vm.cores,
-        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib
+        used_hugepages_1g: Sequel[:used_hugepages_1g] - vm.memory_gib,
       )
     end
 
@@ -599,7 +599,7 @@ class Prog::Vm::Metal::Nexus < Prog::Base
     vm.update(display_state: "starting")
 
     secrets_json = JSON.generate({
-      storage: vm.storage_secrets
+      storage: vm.storage_secrets,
     })
 
     host.sshable.cmd("sudo host/bin/setup-vm recreate-unpersisted :vm_name", vm_name:, stdin: secrets_json)

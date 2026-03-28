@@ -15,7 +15,7 @@ class StorageKeyEncryptionKey < Sequel::Model
       algorithm:,
       key: Base64.strict_encode64(key),
       init_vector: Base64.strict_encode64(init_vector),
-      auth_data:
+      auth_data:,
     )
   end
 
@@ -27,7 +27,7 @@ class StorageKeyEncryptionKey < Sequel::Model
       "key" => key,
       "init_vector" => init_vector,
       "algorithm" => algorithm,
-      "auth_data" => auth_data
+      "auth_data" => auth_data,
     }
   end
 end

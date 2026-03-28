@@ -29,7 +29,7 @@ class PostgresTimeline < Sequel::Model
         region: location.name,
         credentials: location.location_credential.credentials,
         endpoint: blob_storage_endpoint,
-        force_path_style: true
+        force_path_style: true,
       )
     end
 
@@ -61,12 +61,12 @@ class PostgresTimeline < Sequel::Model
               id: "DeleteOldBackups",
               status: "Enabled",
               expiration: {
-                days: BACKUP_BUCKET_EXPIRATION_DAYS
+                days: BACKUP_BUCKET_EXPIRATION_DAYS,
               },
-              filter: {}
-            }
-          ]
-        }
+              filter: {},
+            },
+          ],
+        },
       })
     end
   end

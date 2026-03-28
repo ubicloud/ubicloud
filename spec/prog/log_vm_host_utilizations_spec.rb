@@ -13,7 +13,7 @@ RSpec.describe Prog::LogVmHostUtilizations do
         ["hetzner-fsn1", "arm64", "standard", "accepting", 10, 80, 30, 200],
         ["hetzner-hel1", "x64", "standard", "accepting", 2, 10, 20, 100],
         ["hetzner-hel1", "x64", "standard", "accepting", 0, nil, 0, 0],
-        ["hetzner-fsn1", "x64", "premium", "accepting", 10, 16, 80, 256]
+        ["hetzner-fsn1", "x64", "premium", "accepting", 10, 16, 80, 256],
       ].each do |location, arch, family, allocation_state, used_cores, total_cores, used_hugepages_1g, total_hugepages_1g|
         create_vm_host(location_id: Location[name: location].id, arch:, family:, allocation_state:, used_cores:, total_cores:, used_hugepages_1g:, total_hugepages_1g:)
       end

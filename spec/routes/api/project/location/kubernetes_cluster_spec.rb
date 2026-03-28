@@ -16,7 +16,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
       project_id: project.id,
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
   }
 
@@ -33,7 +33,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
-        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
       ].each do |method, path|
         send method, path
 
@@ -66,7 +66,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version: "v1.33",
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1
+          cp_nodes: 1,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -80,7 +80,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
           version: "v1.30",
           worker_size: "standard-2",
           worker_nodes: 2,
-          cp_nodes: 1
+          cp_nodes: 1,
         }.to_json
 
         expect(last_response.status).to eq(400)
@@ -134,7 +134,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
           name: "np",
           node_count: 2,
-          kubernetes_cluster_id: kc.id
+          kubernetes_cluster_id: kc.id,
         ).subject
       end
 

@@ -87,7 +87,7 @@ module ResourceMethods
       "cidr" => :to_s.to_proc,
       "inet" => :to_s.to_proc,
       "numeric" => :to_f.to_proc,
-      "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
+      "timestamp with time zone" => lambda { |v| v.strftime("%F %T") },
     }.freeze
     def inspect_values_hash
       inspect_values = {}

@@ -27,7 +27,7 @@ module Toml
       "\f" => '\\f',
       "\r" => '\\r',
       '"' => '\\"',
-      "\\" => "\\\\"
+      "\\" => "\\\\",
     }
     h.default_proc = proc { |_, ch| format('\\u%04X', ch.ord) }
     escaped = value.gsub(/[\x00-\x08\x0A-\x1F\x7F"\\]/, h)

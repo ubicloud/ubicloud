@@ -60,7 +60,7 @@ class Clover
         @project.id,
         name:,
         location_id: @location.id,
-        firewall_id: firewall&.id
+        firewall_id: firewall&.id,
       ).subject
       audit_log(ps, "create")
     end

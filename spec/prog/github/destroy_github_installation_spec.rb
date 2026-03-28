@@ -15,7 +15,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       name: "ubicloud",
       type: "Organization",
       installation_id: 123,
-      project_id: project.id
+      project_id: project.id,
     )
   }
 
@@ -32,7 +32,7 @@ RSpec.describe Prog::Github::DestroyGithubInstallation do
       repository_id: repository.id,
       repository_name: repository.name,
       label: "ubicloud",
-      vm_id: vm.id
+      vm_id: vm.id,
     )
     Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "wait")
     runner

@@ -21,7 +21,7 @@ RSpec.describe Clover, "private_subnet" do
         [:delete, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
         [:delete, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.name}"],
-        [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{ps.display_location}/private-subnet/#{ps.ubid}"],
       ].each do |method, path|
         send method, path
 

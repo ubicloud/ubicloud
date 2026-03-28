@@ -13,7 +13,7 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
         kubernetes_cluster_id: kc.id,
         access_key: SecureRandom.hex(16),
         secret_key: SecureRandom.hex(32),
-        location_id: kc.location.id
+        location_id: kc.location.id,
       )
       Strand.create_with_id(keb, prog: "Kubernetes::EtcdBackupNexus", label: "setup_blob_storage")
     end
@@ -58,7 +58,7 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
       "secret_key" => kubernetes_etcd_backup.secret_key,
       "endpoint" => kubernetes_etcd_backup.blob_storage_endpoint,
       "bucket" => kubernetes_etcd_backup.ubid,
-      "root_certs" => kubernetes_etcd_backup.blob_storage.root_certs
+      "root_certs" => kubernetes_etcd_backup.blob_storage.root_certs,
     }
     sshable.d_run("backup_etcd", "kubernetes/bin/backup-etcd", stdin: JSON.generate(creds), log: false)
 
@@ -84,7 +84,7 @@ class Prog::Kubernetes::EtcdBackupNexus < Prog::Base
       endpoint: kubernetes_etcd_backup.blob_storage_endpoint,
       access_key: kubernetes_etcd_backup.blob_storage.admin_user,
       secret_key: kubernetes_etcd_backup.blob_storage.admin_password,
-      ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs
+      ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs,
     )
   end
 end

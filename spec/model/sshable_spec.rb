@@ -12,7 +12,7 @@ RSpec.describe Sshable do
       id: described_class.generate_uuid,
       host: "test.localhost",
       unix_user: "testuser",
-      raw_private_key_1: key
+      raw_private_key_1: key,
     )
   }
 
@@ -85,7 +85,7 @@ LOCK
             exit_code: 124,
             session_fail_msg: "session lock conflict for testlockname",
             sshable_ubid: "shc97c1mcnv67qenbsk5qdzmrp",
-            prog: nil
+            prog: nil,
           })
         end
         sa.connect

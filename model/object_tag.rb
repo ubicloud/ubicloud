@@ -28,7 +28,7 @@ class ObjectTag < Sequel::Model
       "KubernetesCluster" => project.kubernetes_clusters,
       "SubjectTag" => project.subject_tags,
       "ActionTag" => project.action_tags,
-      {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag)
+      {"label" => "ObjectTag (grants access to tag itself)", "id" => "object-metatag-group"} => project.object_tags.map(&:metatag),
     }
   end
 

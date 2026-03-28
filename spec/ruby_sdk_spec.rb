@@ -457,8 +457,8 @@ RSpec.describe Ubicloud do
             "Accept-Encoding" => "gzip;q=1.0,deflate;q=0.6,identity;q=0.3",
             "Authorization" => "Bearer: foo",
             "Connection" => "close",
-            "User-Agent" => "Ruby"
-          }
+            "User-Agent" => "Ruby",
+          },
         )
         .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.get("headers")).to eq({})
@@ -474,8 +474,8 @@ RSpec.describe Ubicloud do
             "Authorization" => "Bearer: foo",
             "Connection" => "close",
             "Content-Type" => "application/json",
-            "User-Agent" => "Ruby"
-          }
+            "User-Agent" => "Ruby",
+          },
         )
         .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json", "test-array" => ["a", "b"]})
       expect(adapter.post("headers", foo: "bar")).to eq({})
@@ -490,8 +490,8 @@ RSpec.describe Ubicloud do
             "Authorization" => "Bearer: foo",
             "Connection" => "close",
             "Content-Type" => "application/json",
-            "User-Agent" => "Ruby"
-          }
+            "User-Agent" => "Ruby",
+          },
         )
         .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.post("headers")).to eq({})
@@ -506,8 +506,8 @@ RSpec.describe Ubicloud do
             "Authorization" => "Bearer: foo",
             "Connection" => "close",
             "Content-Type" => "application/json",
-            "User-Agent" => "Ruby"
-          }
+            "User-Agent" => "Ruby",
+          },
         )
         .to_return(status: 200, body: "{}", headers: {"content-type" => "application/json"})
       expect(adapter.delete("headers")).to eq({})

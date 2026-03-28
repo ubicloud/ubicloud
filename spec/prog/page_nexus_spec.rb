@@ -68,7 +68,7 @@ RSpec.describe Prog::PageNexus do
         tag_parts,
         ["old_ubid"],
         severity: "error",
-        extra_data: {"old_data" => "old_value"}
+        extra_data: {"old_data" => "old_value"},
       ).subject
 
       expect(existing_page.summary).not_to eq(summary)
@@ -94,7 +94,7 @@ RSpec.describe Prog::PageNexus do
         "Old Summary",
         tag_parts,
         ["old_ubid"],
-        severity: "warning"
+        severity: "warning",
       ).subject
 
       expect(existing_page.semaphores.map(&:name)).not_to include("retrigger")
@@ -110,7 +110,7 @@ RSpec.describe Prog::PageNexus do
         "Old Summary",
         tag_parts,
         ["old_ubid"],
-        severity: "error"
+        severity: "error",
       ).subject
 
       described_class.assemble(summary, tag_parts, related_resources, severity: "warning")
@@ -123,7 +123,7 @@ RSpec.describe Prog::PageNexus do
         "Old Summary",
         tag_parts,
         ["old_ubid"],
-        severity: "error"
+        severity: "error",
       ).subject
 
       described_class.assemble(summary, tag_parts, related_resources, severity: "error")

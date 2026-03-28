@@ -20,14 +20,14 @@ class Clover
         project_id: @project.id,
         location_id: @location.id,
         cp_node_count:,
-        version:
+        version:,
       ).subject
 
       Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
         name: name + "-np",
         node_count:,
         kubernetes_cluster_id: kc.id,
-        target_node_size:
+        target_node_size:,
       )
       audit_log(kc, "create")
 

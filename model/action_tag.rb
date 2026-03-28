@@ -24,7 +24,7 @@ class ActionTag < Sequel::Model
     {
       "Global Tag" => ActionTag.global_by_name.all,
       "Tag" => project.action_tags,
-      "Action" => ActionType
+      "Action" => ActionType,
     }
   end
 

@@ -30,7 +30,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       storage_volumes: [],
       project_id: project.id,
       load_balancer_id: load_balancer.id,
-      private_subnet_id: private_subnet.id
+      private_subnet_id: private_subnet.id,
     )
   }
 
@@ -44,7 +44,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   let(:replica) {
     InferenceEndpointReplica.create(
       inference_endpoint_id: inference_endpoint.id,
-      vm_id: vm.id
+      vm_id: vm.id,
     )
   }
 
@@ -67,7 +67,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
         project_id: user_project.id,
         location_id: Location::HETZNER_FSN1_ID,
         name: "ie1",
-        model_id: "8b0b55b3-fb99-415f-8441-3abef2c2a200"
+        model_id: "8b0b55b3-fb99-415f-8441-3abef2c2a200",
       )
       ie = st_ie.subject
       st = described_class.assemble(ie.id)
@@ -134,8 +134,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {data: {myself: {pods: []}}}.to_json, headers: {})
 
@@ -146,8 +146,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {"podFindAndDeployOnDemand" => {"id" => "thepodid"}}}.to_json, headers: {})
       expect(replica).to receive(:update).with(external_state: {"pod_id" => "thepodid"})
@@ -164,8 +164,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {"myself" => {"pods" => [{"name" => replica.ubid.to_s, "id" => "thepodid"}]}}}.to_json, headers: {})
 
@@ -183,8 +183,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => true, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
 
@@ -202,8 +202,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {"pod" => {"id" => "thepodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
       expect { nx.setup_external }.to nap(10)
@@ -219,8 +219,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {"pod" => {"id" => "anotherpodid", "runtime" => {"ports" => [{"type" => "tcp", "isIpPublic" => false, "publicPort" => 1234, "ip" => "1.2.3.4"}]}}}}.to_json, headers: {})
       expect { nx.setup_external }.to raise_error("BUG: unexpected pod id")
@@ -236,8 +236,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: {"data" => {}}.to_json, headers: {})
       expect { nx.setup_external }.to raise_error("BUG: pod not found")
@@ -375,8 +375,8 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
             "Accept-Encoding" => "deflate, gzip",
             "Authorization" => "Bearer ",
             "Content-Type" => "application/json",
-            "Host" => "api.runpod.io"
-          }
+            "Host" => "api.runpod.io",
+          },
         )
         .to_return(status: 200, body: "", headers: {})
 
@@ -417,11 +417,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(inference_endpoint).to receive(:ubid).and_return("ieubid")
       expect(nx).to receive(:update_billing_records).with(
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       expect(nx).to receive(:update_billing_records).with(
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
       expect(sshable).to receive(:_cmd).with("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", {stdin: "{\"replica_ubid\":\"#{replica.ubid}\",\"public_endpoint\":false,\"projects\":[{\"ubid\":\"#{projects.first.ubid}\",\"api_keys\":[\"#{Digest::SHA2.hexdigest(projects.first.api_keys.first.key)}\"],\"quota_rps\":100,\"quota_tps\":10000}]}"}).and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       nx.ping_gateway
@@ -433,7 +433,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
 
       expected_projects = [
         {"ubid" => projects.first.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.first.api_keys.first.key)], "quota_rps" => 100, "quota_tps" => 10000},
-        {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 100, "quota_tps" => 10000}
+        {"ubid" => projects.last.ubid, "api_keys" => [Digest::SHA2.hexdigest(projects.last.api_keys.first.key)], "quota_rps" => 100, "quota_tps" => 10000},
       ].sort_by { |p| p["ubid"] }
 
       expect(sshable).to receive(:_cmd) do |command, options|
@@ -443,11 +443,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       end.and_return("{\"inference_endpoint\":\"1eqhk4b9gfq27gc5agxkq84bhr\",\"replica\":\"1rvtmbhd8cne6jpz3xxat7rsnr\",\"projects\":[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]}")
       expect(nx).to receive(:update_billing_records).with(
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       expect(nx).to receive(:update_billing_records).with(
         JSON.parse("[{\"ubid\":\"#{replica.ubid}\",\"request_count\":1,\"prompt_token_count\":10,\"completion_token_count\":20},{\"ubid\":\"anotherubid\",\"request_count\":0,\"prompt_token_count\":0,\"completion_token_count\":0}]"),
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
 
       nx.ping_gateway
@@ -461,11 +461,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 10, "completion_token_count" => 20}],
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(2)
       br, br2 = BillingRecord.order(:billing_rate_id).all
@@ -479,11 +479,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(br2.amount).to eq(20)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 1, "completion_token_count" => 2}],
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(2)
       expect(Integer(br.reload.amount)).to eq(11)
@@ -494,11 +494,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 0, "prompt_token_count" => 0, "completion_token_count" => 0}],
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(0)
     end
@@ -509,11 +509,11 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "output", "completion_token_count"
+        "output", "completion_token_count",
       )
       expect(BillingRecord.count).to eq(0)
     end
@@ -525,7 +525,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
       expect(BillingRecord.count).to eq(0)
       nx.update_billing_records(
         [{"ubid" => p1.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}, {"ubid" => p2.ubid, "request_count" => 1, "prompt_token_count" => 2, "completion_token_count" => 3}],
-        "input", "prompt_token_count"
+        "input", "prompt_token_count",
       )
       expect(BillingRecord.count).to eq(1)
       br = BillingRecord.first

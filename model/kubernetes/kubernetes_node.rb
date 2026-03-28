@@ -20,7 +20,7 @@ class KubernetesNode < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 
@@ -87,7 +87,7 @@ class KubernetesNode < Sequel::Model
         unreachable_external: unreachable_external.keys,
         pod_errors: unreachable_pods.map { |name, v| v.merge("name" => name) },
         external_errors: unreachable_external.map { |name, v| v.merge("name" => name) },
-        mtr_results:
+        mtr_results:,
       }
     else
       {available: true}
@@ -98,11 +98,11 @@ class KubernetesNode < Sequel::Model
     if kubernetes_nodepool
       [
         {type: "KubernetesWorkerVCpu", family: vm.family, amount: BigDecimal(vm.vcpus)},
-        {type: "KubernetesWorkerStorage", family: "standard", amount: BigDecimal(vm.storage_size_gib)}
+        {type: "KubernetesWorkerStorage", family: "standard", amount: BigDecimal(vm.storage_size_gib)},
       ]
     else
       [
-        {type: "KubernetesControlPlaneVCpu", family: vm.family, amount: BigDecimal(vm.vcpus)}
+        {type: "KubernetesControlPlaneVCpu", family: vm.family, amount: BigDecimal(vm.vcpus)},
       ]
     end
   end

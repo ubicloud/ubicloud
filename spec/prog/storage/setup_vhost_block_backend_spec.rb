@@ -7,7 +7,7 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
     described_class.new(described_class.assemble(
       "adec2977-74a9-8b71-8473-cf3940a45ac5",
       Config.vhost_block_backend_version,
-      allocation_weight: 50
+      allocation_weight: 50,
     ))
   }
 

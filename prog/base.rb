@@ -119,7 +119,7 @@ end
         arg
       else
         raise Strand::InternalError, "BUG: must pop with string or hash"
-      end
+      end,
     )
 
     if strand.stack.length > 0 && (link = frame["link"])
@@ -228,7 +228,7 @@ end
       id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
       label:,
-      stack: Sequel.pg_jsonb_wrap([new_frame])
+      stack: Sequel.pg_jsonb_wrap([new_frame]),
     )
   end
 

@@ -8,7 +8,7 @@ RSpec.describe KubernetesEtcdBackup do
       kubernetes_cluster_id: kc.id,
       access_key: "access",
       secret_key: "secret",
-      location_id: location.id
+      location_id: location.id,
     )
   end
 
@@ -23,7 +23,7 @@ RSpec.describe KubernetesEtcdBackup do
       project_id: project.id,
       private_subnet_id: private_subnet.id,
       cp_node_count: 1,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
     vm = Prog::Vm::Nexus.assemble("public key", project.id, name: "cp", private_subnet_id: kc.private_subnet.id).subject
     Sshable.create_with_id(vm)
@@ -34,7 +34,7 @@ RSpec.describe KubernetesEtcdBackup do
   before do
     allow(Config).to receive_messages(
       postgres_service_project_id: project.id,
-      kubernetes_service_project_id: project.id
+      kubernetes_service_project_id: project.id,
     )
   end
 

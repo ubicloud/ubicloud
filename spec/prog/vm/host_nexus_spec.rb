@@ -10,7 +10,7 @@ RSpec.describe Prog::Vm::HostNexus do
     [
       ["127.0.0.1", "127.0.0.1", false],
       ["30.30.30.32/29", "127.0.0.1", true],
-      ["2a01:4f8:10a:128b::/64", "127.0.0.1", true]
+      ["2a01:4f8:10a:128b::/64", "127.0.0.1", true],
     ].map {
       Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
     }
@@ -171,7 +171,7 @@ RSpec.describe Prog::Vm::HostNexus do
         "SetupNftables",
         "SetupNodeExporter",
         "SetupSysstat",
-        "Vm::PrepHost"
+        "Vm::PrepHost",
       ])
     end
 

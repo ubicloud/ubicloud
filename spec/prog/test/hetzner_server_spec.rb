@@ -16,7 +16,7 @@ RSpec.describe Prog::Test::HetznerServer do
       "hetzner_ssh_keypair" => "oOtAbOGFVHJjFyeQBgSfghi+YBuyQzBRsKABGZhOmDpmwxqx681mscsGBLaQ\n2iWQsOYBBVLDtQWe/gf3NRNyBw==\n",
       "server_id" => "1234",
       "additional_boot_images" => [],
-      "setup_host" => true
+      "setup_host" => true,
     })
     allow(hs_test).to receive(:hetzner_api).and_return(hetzner_api)
   }
@@ -152,7 +152,7 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo mkdir -p #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo chmod a+rw #{tmp_dir}")
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with(
-        "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e"
+        "sudo RUN_E2E_TESTS=1 bundle exec rspec host/e2e",
       )
       expect(hs_test.vm_host.sshable).to receive(:_cmd).with("sudo rm -rf #{tmp_dir}")
       expect { hs_test.run_integration_specs }.to hop("wait")

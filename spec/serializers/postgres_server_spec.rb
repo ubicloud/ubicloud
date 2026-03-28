@@ -10,7 +10,7 @@ RSpec.describe Serializers::PostgresServer do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
   let(:pg) {
@@ -26,7 +26,7 @@ RSpec.describe Serializers::PostgresServer do
       is_representative:,
       synchronization_status:,
       timeline_access:,
-      version: "17"
+      version: "17",
     )
     Strand.create_with_id(server, prog: "Postgres::PostgresServerNexus", label: strand_label)
     server

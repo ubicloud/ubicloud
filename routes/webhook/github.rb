@@ -78,8 +78,8 @@ class Clover
             labels: job_labels,
             started_in: Time.parse(job["started_at"]) - Time.parse(job["created_at"]),
             completed_in: job["completed_at"] ? (Time.parse(job["completed_at"]) - Time.parse(job["started_at"])) : nil,
-            conclusion: job["conclusion"]
-          }
+            conclusion: job["conclusion"],
+          },
         })
       end
       return error("Unmatched label")
@@ -91,7 +91,7 @@ class Clover
         repository_name:,
         label:,
         actual_label:,
-        default_branch: data["repository"]["default_branch"]
+        default_branch: data["repository"]["default_branch"],
       ).subject
 
       return success("GithubRunner[#{runner.ubid}] created")
@@ -103,7 +103,7 @@ class Clover
 
     runner = installation.runners_dataset.first(
       repository_name:,
-      runner_id:
+      runner_id:,
     )
 
     return error("Unregistered runner") unless runner

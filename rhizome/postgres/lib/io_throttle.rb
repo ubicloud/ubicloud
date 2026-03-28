@@ -8,7 +8,7 @@ class IoThrottle
     "archiver",     # Its progress resolves the archival backlog
     "logger",       # Throttling affects archiver (logs go to stderr)
     "checkpointer", # Checkpoints trigger WAL deletion
-    "writer"        # wal writer + background writer - allow checkpoints to complete
+    "writer",        # wal writer + background writer - allow checkpoints to complete
   ].freeze
 
   # Throttle ratios applied to the provider's disk throughput baseline.
@@ -17,7 +17,7 @@ class IoThrottle
   IO_THROTTLE_RATIOS = [
     [1000, 0.20],  # Critical: 1000+ files -> 20% of baseline
     [500, 0.50],   # Severe: 500-999 files -> 50% of baseline
-    [100, 0.80]    # Moderate: 100-499 files -> 80% of baseline
+    [100, 0.80],    # Moderate: 100-499 files -> 80% of baseline
   ].freeze
 
   def initialize(instance, logger, disk_throughput_baseline_mbps)

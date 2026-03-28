@@ -127,8 +127,8 @@ class Repartitioner
       @repartition_emit_key => {
         partition_number: @partition_number,
         num_partitions: np,
-        range: @strand_id_range
-      }
+        range: @strand_id_range,
+      },
     })
   end
 

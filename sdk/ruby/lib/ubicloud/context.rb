@@ -38,7 +38,7 @@ module Ubicloud
       inference_api_key: InferenceApiKey,
       inference_endpoint: InferenceEndpoint,
       kubernetes_cluster: KubernetesCluster,
-      ssh_public_key: SshPublicKey
+      ssh_public_key: SshPublicKey,
     }.each do |meth, model|
       define_method(meth) { @models[meth] ||= ModelAdapter.new(model, @adapter) }
     end
@@ -54,7 +54,7 @@ module Ubicloud
       "gp" => GithubRepository,
       "ak" => InferenceApiKey,
       "kc" => KubernetesCluster,
-      "sk" => SshPublicKey
+      "sk" => SshPublicKey,
     }.freeze
 
     # Return a new model instance for the given id, assuming the id is properly

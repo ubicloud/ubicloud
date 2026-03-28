@@ -40,7 +40,7 @@ class OidcProvider < Sequel::Model
         body: {
           client_name: "Ubicloud",
           redirect_uris: [oidc_provider.callback_url],
-          scopes: "openid email"
+          scopes: "openid email",
         }.to_json)
 
       registration_info = JSON.parse(response.body)
@@ -61,7 +61,7 @@ class OidcProvider < Sequel::Model
       userinfo_endpoint:,
       jwks_uri:,
       registration_client_uri:,
-      registration_access_token:
+      registration_access_token:,
     )
   end
 

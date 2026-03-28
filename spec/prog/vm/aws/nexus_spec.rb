@@ -90,7 +90,7 @@ usermod -L ubuntu
     it "creates correct number of storage volumes for storage optimized instance types" do
       storage_volumes = [
         {encrypted: true, size_gib: 30},
-        {encrypted: true, size_gib: 7500}
+        {encrypted: true, size_gib: 7500},
       ]
 
       vm = Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, size: "i8g.8xlarge", arch: "arm64", storage_volumes:).subject
@@ -128,7 +128,7 @@ usermod -L ubuntu
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
 
       expect { nx.before_destroy }
@@ -158,10 +158,10 @@ usermod -L ubuntu
             {
               Effect: "Allow",
               Principal: {Service: "ec2.amazonaws.com"},
-              Action: "sts:AssumeRole"
-            }
-          ]
-        }.to_json
+              Action: "sts:AssumeRole",
+            },
+          ],
+        }.to_json,
       }).and_call_original
 
       expect { nx.start }.to hop("create_role_policy")
@@ -175,9 +175,9 @@ usermod -L ubuntu
           {
             Effect: "Allow",
             Principal: {Service: "ec2.amazonaws.com"},
-            Action: "sts:AssumeRole"
-          }
-        ]
+            Action: "sts:AssumeRole",
+          },
+        ],
       }.to_json}).and_raise(Aws::IAM::Errors::EntityAlreadyExists.new(nil, "EntityAlreadyExists"))
       expect { nx.start }.to hop("create_role_policy")
     end
@@ -202,23 +202,23 @@ usermod -L ubuntu
               Action: [
                 "logs:CreateLogStream",
                 "logs:PutLogEvents",
-                "logs:CreateLogGroup"
+                "logs:CreateLogGroup",
               ],
               Resource: [
                 "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:log-stream:*",
-                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:log-stream:*"
-              ]
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:log-stream:*",
+              ],
             },
             {
               Effect: "Allow",
               Action: "logs:DescribeLogStreams",
               Resource: [
                 "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:*",
-                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*"
-              ]
-            }
-          ]
-        }.to_json
+                "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*",
+              ],
+            },
+          ],
+        }.to_json,
       }).and_call_original
 
       expect { nx.create_role_policy }.to hop("attach_role_policy")
@@ -236,7 +236,7 @@ usermod -L ubuntu
       iam_client.stub_responses(:list_policies, policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}])
       expect(iam_client).to receive(:attach_role_policy).with({
         role_name: vm.name,
-        policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"
+        policy_arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy",
       }).and_call_original
 
       expect { nx.attach_role_policy }.to hop("create_instance_profile")
@@ -254,7 +254,7 @@ usermod -L ubuntu
     it "creates an instance profile" do
       iam_client.stub_responses(:create_instance_profile, instance_profile: {instance_profile_name: "#{vm.name}-instance-profile", instance_profile_id: "test-id", path: "/", roles: [], arn: "arn:aws:iam::123456789012:instance-profile/#{vm.name}-instance-profile", create_date: Time.now})
       expect(iam_client).to receive(:create_instance_profile).with({
-        instance_profile_name: "#{vm.name}-instance-profile"
+        instance_profile_name: "#{vm.name}-instance-profile",
       }).and_call_original
 
       expect { nx.create_instance_profile }.to hop("add_role_to_instance_profile")
@@ -271,7 +271,7 @@ usermod -L ubuntu
       iam_client.stub_responses(:add_role_to_instance_profile, {})
       expect(iam_client).to receive(:add_role_to_instance_profile).with({
         instance_profile_name: "#{vm.name}-instance-profile",
-        role_name: vm.name
+        role_name: vm.name,
       }).and_call_original
 
       expect { nx.add_role_to_instance_profile }.to hop("wait_instance_profile_created")
@@ -287,7 +287,7 @@ usermod -L ubuntu
     it "waits for instance profile to be created" do
       iam_client.stub_responses(:get_instance_profile, instance_profile: {instance_profile_name: "#{vm.name}-instance-profile", instance_profile_id: "#{vm.name}-instance-profile-id", path: "/", roles: [], arn: "arn:aws:iam::#{vm.project_id}:instance-profile/#{vm.name}-instance-profile", create_date: Time.now})
       expect(iam_client).to receive(:get_instance_profile).with({
-        instance_profile_name: "#{vm.name}-instance-profile"
+        instance_profile_name: "#{vm.name}-instance-profile",
       }).and_call_original
 
       expect { nx.wait_instance_profile_created }.to hop("create_instance")
@@ -319,20 +319,20 @@ usermod -L ubuntu
               iops: 3000,
               volume_size: 30,
               volume_type: "gp3",
-              throughput: 125
-            }
-          }
+              throughput: 125,
+            },
+          },
         ],
         network_interfaces: [
           {
             network_interface_id: "eni-0123456789abcdefg",
-            device_index: 0
-          }
+            device_index: 0,
+          },
         ],
         private_dns_name_options: {
           hostname_type: "ip-name",
           enable_resource_name_dns_a_record: false,
-          enable_resource_name_dns_aaaa_record: false
+          enable_resource_name_dns_aaaa_record: false,
         },
         metadata_options: {http_tokens: "required"},
         min_count: 1,
@@ -341,7 +341,7 @@ usermod -L ubuntu
         iam_instance_profile: {name: "#{vm.name}-instance-profile"},
         client_token: vm.id,
         instance_market_options: nil,
-        user_data: Base64.encode64(user_data)
+        user_data: Base64.encode64(user_data),
       }).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
@@ -373,7 +373,7 @@ usermod -L ubuntu
       vm.update(unix_user: "runneradmin")
       expected_user_data = user_data + "echo \"#{vm.private_ipv4} ubicloudhostplaceholder.blob.core.windows.net\" >> /etc/hosts"
       expect(client).to receive(:run_instances).with(hash_including(
-        user_data: Base64.encode64(expected_user_data)
+        user_data: Base64.encode64(expected_user_data),
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
@@ -384,7 +384,7 @@ usermod -L ubuntu
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
       expect(client).to receive(:run_instances).with(hash_including(
-        instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}}
+        instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time"}},
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
@@ -396,7 +396,7 @@ usermod -L ubuntu
       client.stub_responses(:run_instances, instances: [{instance_id: "i-0123456789abcdefg", network_interfaces: [{subnet_id: "subnet-12345678"}], public_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com"}])
       vm.update(unix_user: "runneradmin")
       expect(client).to receive(:run_instances).with(hash_including(
-        instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}}
+        instance_market_options: {market_type: "spot", spot_options: {instance_interruption_behavior: "terminate", spot_instance_type: "one-time", max_price: "0.12"}},
       )).and_call_original
       expect { nx.create_instance }.to hop("wait_instance_created")
       expect(vm.aws_instance).to have_attributes(instance_id: "i-0123456789abcdefg", az_id: "use1-az1", iam_role: "testvm", ipv4_dns_name: "ec2-44-224-119-46.us-west-2.compute.amazonaws.com")
@@ -471,7 +471,7 @@ usermod -L ubuntu
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
-          "retry_count" => 3
+          "retry_count" => 3,
         }).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
       end
@@ -496,7 +496,7 @@ usermod -L ubuntu
             vm:,
             error: "Aws::EC2::Errors::InsufficientInstanceCapacity",
             message: "Insufficient capacity",
-            retry_count: 4
+            retry_count: 4,
           })
         end
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
@@ -527,7 +527,7 @@ usermod -L ubuntu
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect(nx).to receive(:update_stack).with({
           "exclude_availability_zones" => ["b", "c", "a"],
-          "retry_count" => 3
+          "retry_count" => 3,
         }).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
       end
@@ -552,7 +552,7 @@ usermod -L ubuntu
             vm:,
             error: "Aws::EC2::Errors::Unsupported",
             message: "Instance type not supported",
-            retry_count: 4
+            retry_count: 4,
           })
         end
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
@@ -590,8 +590,8 @@ usermod -L ubuntu
           operation_name: :describe_instances,
           params: a_hash_including(filters: [
             {name: "instance-id", values: ["i-0123456789abcdefg"]},
-            {name: "tag:Ubicloud", values: ["true"]}
-          ])
+            {name: "tag:Ubicloud", values: ["true"]},
+          ]),
         )))
     end
 
@@ -618,8 +618,8 @@ usermod -L ubuntu
           operation_name: :describe_instances,
           params: a_hash_including(filters: [
             {name: "instance-id", values: ["i-0123456789abcdefg"]},
-            {name: "tag:Ubicloud", values: ["true"]}
-          ])
+            {name: "tag:Ubicloud", values: ["true"]},
+          ]),
         )))
         .and change { vm.reload.cores }.to(1)
     end
@@ -789,13 +789,13 @@ usermod -L ubuntu
       first_response = iam_client.stub_data(:list_policies, {
         policies: [{policy_name: "other-policy-1", arn: "arn:aws:iam::aws:policy/other-policy-1"}],
         is_truncated: true,
-        marker: "next-page-marker"
+        marker: "next-page-marker",
       })
 
       # Second page: has the policy we're looking for
       second_response = iam_client.stub_data(:list_policies, {
         policies: [{policy_name: "#{vm.name}-cw-agent-policy", arn: "arn:aws:iam::aws:policy/#{vm.name}-cw-agent-policy"}],
-        is_truncated: false
+        is_truncated: false,
       })
 
       iam_client.stub_responses(:list_policies, first_response, second_response)
@@ -810,13 +810,13 @@ usermod -L ubuntu
       first_response = iam_client.stub_data(:list_policies, {
         policies: [{policy_name: "other-policy-1", arn: "arn:aws:iam::aws:policy/other-policy-1"}],
         is_truncated: true,
-        marker: "next-page-marker"
+        marker: "next-page-marker",
       })
 
       # Second page: no match, last page
       second_response = iam_client.stub_data(:list_policies, {
         policies: [{policy_name: "other-policy-2", arn: "arn:aws:iam::aws:policy/other-policy-2"}],
-        is_truncated: false
+        is_truncated: false,
       })
 
       iam_client.stub_responses(:list_policies, first_response, second_response)
@@ -825,7 +825,7 @@ usermod -L ubuntu
       expect(policy).to be_nil
       expect(iam_client.api_requests).to include(
         a_hash_including(operation_name: :list_policies, params: a_hash_including(scope: "Local", max_items: 100, marker: nil)),
-        a_hash_including(operation_name: :list_policies, params: a_hash_including(scope: "Local", max_items: 100, marker: "next-page-marker"))
+        a_hash_including(operation_name: :list_policies, params: a_hash_including(scope: "Local", max_items: 100, marker: "next-page-marker")),
       )
     end
   end
@@ -839,7 +839,7 @@ usermod -L ubuntu
       iam_client.stub_responses(:delete_policy, {})
       iam_client.stub_responses(:delete_role, {})
       policies = iam_client.stub_data(:list_attached_role_policies, {attached_policies: [
-        {policy_name: "policy-name", policy_arn: "policy-arn"}
+        {policy_name: "policy-name", policy_arn: "policy-arn"},
       ]})
       iam_client.stub_responses(:list_attached_role_policies, policies)
       iam_client.stub_responses(:detach_role_policy, {})
@@ -853,7 +853,7 @@ usermod -L ubuntu
           a_hash_including(operation_name: :remove_role_from_instance_profile, params: {instance_profile_name: "testvm-instance-profile", role_name: "testvm"}),
           a_hash_including(operation_name: :delete_instance_profile, params: {instance_profile_name: "testvm-instance-profile"}),
           a_hash_including(operation_name: :delete_policy, params: {policy_arn: "arn:aws:iam::aws:policy/testvm-cw-agent-policy"}),
-          a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"})
+          a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"}),
         ))
     end
 
@@ -868,7 +868,7 @@ usermod -L ubuntu
         .to(include(
           a_hash_including(operation_name: :remove_role_from_instance_profile, params: {instance_profile_name: "testvm-instance-profile", role_name: "testvm"}),
           a_hash_including(operation_name: :delete_instance_profile, params: {instance_profile_name: "testvm-instance-profile"}),
-          a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"})
+          a_hash_including(operation_name: :delete_role, params: {role_name: "testvm"}),
         ))
     end
   end

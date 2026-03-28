@@ -12,7 +12,7 @@ Sequel.migration do
     ["us-east-1", "arm64", "ami-0ec032eb86708362d", "ami-0bb80e22adc550c26"],
     ["us-east-2", "arm64", "ami-065754213f20865f4", "ami-04226de158be1d778"],
     ["eu-west-1", "arm64", "ami-0381f44b045b93d25", "ami-0de6479c53ebf2f2a"],
-    ["ap-southeast-2", "arm64", "ami-03380543da666e424", "ami-0235e4fbf92c90b06"]
+    ["ap-southeast-2", "arm64", "ami-03380543da666e424", "ami-0235e4fbf92c90b06"],
   ]
   up do
     ami_ids.each do |location_name, arch, new_ami_id, _|

@@ -33,7 +33,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsResourceNexus < Prog::Base
         root_cert_key_2:,
         target_vm_size: vm_size,
         target_storage_size_gib: storage_size_gib,
-        project_id: project.id
+        project_id: project.id,
       )
 
       firewall = Firewall.create(name: "#{victoria_metrics_resource.ubid}-firewall", location_id: location.id, description: "VictoriaMetrics default firewall", project_id: Config.victoria_metrics_service_project_id)

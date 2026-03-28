@@ -16,7 +16,7 @@ class PrivateSubnet < Sequel::Model
   PRIVATE_SUBNET_RANGES = [
     "10.0.0.0/8",
     "172.16.0.0/12",
-    "192.168.0.0/16"
+    "192.168.0.0/16",
   ].to_h {
     prefix = Integer(it.split("/").last, 10)
     [it, [prefix, PRIVATE_24_BLOCK_COUNT - 2**prefix].freeze]
@@ -25,7 +25,7 @@ class PrivateSubnet < Sequel::Model
   BANNED_IPV4_SUBNETS = [
     NetAddr::IPv4Net.parse("172.16.0.0/16"),
     NetAddr::IPv4Net.parse("172.17.0.0/16"),
-    NetAddr::IPv4Net.parse("172.18.0.0/16")
+    NetAddr::IPv4Net.parse("172.18.0.0/16"),
   ].freeze
 
   DEFAULT_AWS_SUBNET_PREFIX_LEN = 16
@@ -47,7 +47,7 @@ class PrivateSubnet < Sequel::Model
       .exclude(Sequel[:vm][:id] => Semaphore
         .where(
           strand_id: nics_dataset.select(:vm_id),
-          name: "destroy"
+          name: "destroy",
         )
         .select(:strand_id))
   end

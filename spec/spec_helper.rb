@@ -290,7 +290,7 @@ RSpec.configure do |config|
     def create_hosted_vm(project, private_subnet, name)
       Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name:, private_subnet_id: private_subnet.id,
-        location_id: location.id, unix_user: "ubi"
+        location_id: location.id, unix_user: "ubi",
       ).subject
     end
 
@@ -302,7 +302,7 @@ RSpec.configure do |config|
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
-        arch:
+        arch:,
       }
 
       args = args_from_size.merge(args)

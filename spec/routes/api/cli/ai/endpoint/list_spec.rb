@@ -18,7 +18,7 @@ RSpec.describe Clover, "cli ai endpoint list" do
       location_id: Location::HETZNER_FSN1_ID, vm_size: "size",
       replica_count: 1, boot_image: "image", storage_volumes: [],
       engine_params: "", engine: "vllm", private_subnet_id: ps.id,
-      tags: {"capability" => "Text Generation", "display_name" => "Test Model", "hf_model" => "test-org/test-model"}
+      tags: {"capability" => "Text Generation", "display_name" => "Test Model", "hf_model" => "test-org/test-model"},
     )
   end
 

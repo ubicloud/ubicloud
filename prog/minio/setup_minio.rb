@@ -44,7 +44,7 @@ ECHO
         hosts:,
         cert: minio_server.cert,
         cert_key: minio_server.cert_key,
-        ca_bundle: minio_server.cluster.root_certs
+        ca_bundle: minio_server.cluster.root_certs,
       })
 
       minio_server.vm.sshable.cmd("common/bin/daemonizer 'sudo minio/bin/configure-minio' configure_minio", stdin: config_json)

@@ -36,7 +36,7 @@ class VictoriaMetricsServer < Sequel::Model
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 8427)
     {
       ssh_session:,
-      victoria_metrics_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
+      victoria_metrics_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket")),
     }
   end
 
@@ -65,7 +65,7 @@ class VictoriaMetricsServer < Sequel::Model
       ssl_ca_data: resource.root_certs,
       socket:,
       username: resource.admin_user,
-      password: resource.admin_password
+      password: resource.admin_password,
     )
   end
 end

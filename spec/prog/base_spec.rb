@@ -216,7 +216,7 @@ RSpec.describe Prog::Base do
     it "can render hop" do
       expect(
         described_class::Hop.new("OldProg", "old_label",
-          Strand.new(prog: "NewProg", label: "new_label")).to_s
+          Strand.new(prog: "NewProg", label: "new_label")).to_s,
       ).to eq("hop OldProg#old_label -> NewProg#new_label")
     end
 
@@ -226,7 +226,7 @@ RSpec.describe Prog::Base do
 
     it "can render exit" do
       expect(described_class::Exit.new(
-        Strand.new(prog: "TestProg", label: "exiting_label"), {"msg" => "done"}
+        Strand.new(prog: "TestProg", label: "exiting_label"), {"msg" => "done"},
       ).to_s).to eq('Strand exits from TestProg#exiting_label with {"msg" => "done"}')
     end
   end
@@ -398,7 +398,7 @@ RSpec.describe Prog::Base do
 
       expect(Page.all.map(&:summary)).to include(
         "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
-        "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time"
+        "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time",
       )
     end
 

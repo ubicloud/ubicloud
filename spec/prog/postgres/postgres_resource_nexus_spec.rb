@@ -15,7 +15,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project:, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -32,11 +32,11 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project: postgres_project
+        project: postgres_project,
       )
       LocationCredential.create(
         access_key: "access-key-id",
-        secret_key: "secret-access-key"
+        secret_key: "secret-access-key",
       ) { it.id = loc.id }
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
@@ -99,7 +99,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         "0.0.0.0/0:5432...5433",
         "0.0.0.0/0:6432...6433",
         "::/0:5432...5433",
-        "::/0:6432...6433"
+        "::/0:6432...6433",
       ]
 
       internal_firewall = pg.internal_firewall
@@ -110,7 +110,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         "#{private_subnet.net4}:6432...6433",
         "::/0:22...23",
         "#{private_subnet.net6}:5432...5433",
-        "#{private_subnet.net6}:6432...6433"
+        "#{private_subnet.net6}:6432...6433",
       ]
     end
 
@@ -124,7 +124,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         "#{pg.private_subnet.net4}:5432...5433",
         "#{pg.private_subnet.net4}:6432...6433",
         "#{pg.private_subnet.net6}:5432...5433",
-        "#{pg.private_subnet.net6}:6432...6433"
+        "#{pg.private_subnet.net6}:6432...6433",
       ]
     end
 
@@ -166,7 +166,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresVCpu", "standard-standard", "hetzner-fsn1", false)["id"],
         amount: 2,
-        span: past_span
+        span: past_span,
       )
       br2 = BillingRecord.create(
         project_id: project.id,
@@ -174,7 +174,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: BillingRate.from_resource_properties("PostgresStorage", "standard", "hetzner-fsn1", false)["id"],
         amount: 64,
-        span: past_span
+        span: past_span,
       )
       fresh_nx = described_class.new(st)
       fresh_nx.incr_destroy
@@ -267,13 +267,13 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ["AAAA", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv6_string],
         ["A", "private.#{name}.pg.example.com.", postgres_server.vm.private_ipv4_string],
         ["AAAA", "#{name}.pg.example.com.", postgres_server.vm.ip6_string],
-        ["A", "#{name}.pg.example.com.", postgres_server.vm.ip4_string]
+        ["A", "#{name}.pg.example.com.", postgres_server.vm.ip4_string],
       ]
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).where(:tombstoned).select_order_map([:type, :name, :data])).to eq [
         ["A", "#{name}.pg.example.com.", "2.3.4.5"],
         ["A", "private.#{name}.pg.example.com.", "127.0.0.1"],
         ["AAAA", "#{name}.pg.example.com.", "2::1"],
-        ["AAAA", "private.#{name}.pg.example.com.", "::1"]
+        ["AAAA", "private.#{name}.pg.example.com.", "::1"],
       ]
     end
 
@@ -286,7 +286,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
       expect(DnsRecord.where(dns_zone_id: dns_zone.id).select_order_map([:type, :name])).to eq [
         ["A", "#{name}.pg.example.com."],
         ["A", "private.#{name}.pg.example.com."],
-        ["AAAA", "private.#{name}.pg.example.com."]
+        ["AAAA", "private.#{name}.pg.example.com."],
       ]
     end
 
@@ -303,7 +303,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         ["A", "#{name}.pg.example.com."],
         ["A", "private.#{name}.pg.example.com."],
         ["AAAA", "#{name}.pg.example.com."],
-        ["AAAA", "private.#{name}.pg.example.com."]
+        ["AAAA", "private.#{name}.pg.example.com."],
       ]
     end
 
@@ -396,7 +396,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         extensions: ["keyUsage=digitalSignature"],
         duration: 60 * 60 * 24 * 29,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
-        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
       postgres_resource.update(server_cert: short_cert_pem, server_cert_key: short_key_pem)
 
@@ -420,7 +420,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         extensions: ["keyUsage=digitalSignature"],
         duration: 60 * 60 * 24 * 29,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
-        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
       postgres_resource.update(root_cert_1: short_cert_pem, root_cert_key_1: short_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
 
@@ -436,7 +436,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         extensions: ["keyUsage=digitalSignature"],
         duration: 60 * 60 * 24 * 29,
         issuer_cert: OpenSSL::X509::Certificate.new(postgres_resource.root_cert_1),
-        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1)
+        issuer_key: OpenSSL::PKey::EC.new(postgres_resource.root_cert_key_1),
       ).map(&:to_pem)
       postgres_resource.update(client_root_cert_1: short_client_root_pem, client_root_cert_key_1: short_client_root_key_pem, server_cert: short_server_cert_pem, server_cert_key: short_server_key_pem)
 
@@ -498,14 +498,14 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
         billing_rate_id: vcpu_rate_id,
-        amount: 2
+        amount: 2,
       )
       br_storage = BillingRecord.create(
         project_id: project.id,
         resource_id: postgres_resource.id,
         resource_name: postgres_resource.name,
         billing_rate_id: storage_rate_id,
-        amount: 64
+        amount: 64,
       )
 
       expect { nx.update_billing_records }.to hop("wait")
@@ -528,7 +528,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: vcpu_rate_id,
         amount: 4,
-        span: past_span
+        span: past_span,
       )
       br_storage = BillingRecord.create(
         project_id: project.id,
@@ -536,7 +536,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         resource_name: postgres_resource.name,
         billing_rate_id: storage_rate_id,
         amount: 128,
-        span: past_span
+        span: past_span,
       )
 
       expect { nx.update_billing_records }.to hop("wait")

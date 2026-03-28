@@ -186,7 +186,7 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8080",
           "Health Check Protocol", "HTTP",
-          "HTTP Health Check Endpoint", "/up"
+          "HTTP Health Check Endpoint", "/up",
         ]
         expect(page).to have_no_content "How to fetch the SSL certificate?"
       end
@@ -215,7 +215,7 @@ RSpec.describe Clover, "load balancer" do
           "Application Port", "8080",
           "Health Check Protocol", "HTTPS",
           "HTTPS Health Check Endpoint", "/up",
-          "SSL Certificate Status", "Creating"
+          "SSL Certificate Status", "Creating",
         ]
         expect(page).to have_content "How to fetch the SSL certificate?"
       end
@@ -278,7 +278,7 @@ RSpec.describe Clover, "load balancer" do
           "Application Port", "8000",
           "Health Check Protocol", "HTTPS",
           "HTTPS Health Check Endpoint", "/up",
-          "SSL Certificate Status", "Available"
+          "SSL Certificate Status", "Available",
         ]
 
         lb.update(health_check_protocol: "tcp", stack: "ipv4")
@@ -293,13 +293,13 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8000",
           "Health Check Protocol", "TCP",
-          "SSL Certificate Status", "Available"
+          "SSL Certificate Status", "Available",
         ]
 
         visit "#{project.path}#{lb.path}/vms"
         expect(page.all("#lb-vms td").map(&:text)).to eq [
           "dummy-vm-1", "down", "Detach",
-          "Select a VM", "", "Attach"
+          "Select a VM", "", "Attach",
         ]
 
         within("#load-balancer-submenu") { click_link "Overview" }

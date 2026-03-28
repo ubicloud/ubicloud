@@ -11,7 +11,7 @@ RSpec.describe Clover, "authentication audit log" do
       account_id:,
       message:,
       metadata: Sequel.pg_jsonb(metadata),
-      at:
+      at:,
     ).first[:id]
   end
 
@@ -141,7 +141,7 @@ RSpec.describe Clover, "authentication audit log" do
         visit "#{project.path}/audit-log/authentication"
         expect(audit_log_content).to eq([
           "login", user.ubid, "ip: 127.0.0.1",
-          "login_failure", user.ubid, "ip: 127.0.0.1"
+          "login_failure", user.ubid, "ip: 127.0.0.1",
         ])
 
         click_link "login_failure"
@@ -159,7 +159,7 @@ RSpec.describe Clover, "authentication audit log" do
         visit "#{project.path}/audit-log/authentication"
         expect(audit_log_content).to eq([
           "login", user.ubid, "ip: 1.2.3.4",
-          "login_failure", user.ubid, "ip: 9.9.9.9"
+          "login_failure", user.ubid, "ip: 9.9.9.9",
         ])
 
         click_link "ip: 1.2.3.4"
@@ -181,7 +181,7 @@ RSpec.describe Clover, "authentication audit log" do
         visit "#{project.path}/audit-log/authentication"
         expect(audit_log_content).to eq([
           "login", "Test-Name", "ip: 127.0.0.1",
-          "login_failure", "Other-Name", "ip: 127.0.0.1"
+          "login_failure", "Other-Name", "ip: 127.0.0.1",
         ])
 
         click_link "Test-Name"

@@ -326,7 +326,7 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
         name: "ipv4-pending-vm",
         private_ipv4: "10.0.0.7/32",
         private_ipv6: "fd10:9b0b:6b4b:8fb2::/64",
-        public_ipv6: "2001:db8:2::/64"
+        public_ipv6: "2001:db8:2::/64",
       )
       vm.update(ip4_enabled: true)
       expect { nx.rewrite_dns_records }.to nap(5)

@@ -17,7 +17,7 @@ class StorageArchive
       "target_conf",
       %w[bucket prefix region endpoint access_key_id secret_access_key archive_kek],
       %w[session_token],
-      target_conf
+      target_conf,
     )
     @backend = VhostBlockBackend.new(vhost_block_backend_version)
 
@@ -49,7 +49,7 @@ class StorageArchive
       safe_write_to_file(config_path, [
         toml_section("device", {"data_path" => disk_raw_path, "metadata_path" => File.join(dir, "metadata")}),
         toml_section("stripe_source", {"type" => "raw", "image_path" => boot_image.image_path}),
-        toml_section("danger_zone", {"enabled" => true, "allow_unencrypted_disk" => true})
+        toml_section("danger_zone", {"enabled" => true, "allow_unencrypted_disk" => true}),
       ].join("\n"))
 
       vp = VhostBlockBackend.new(vhost_block_backend_version)
@@ -66,7 +66,7 @@ class StorageArchive
       "--config", @disk_config_path,
       "--target-config", "/dev/stdin",
       "--compression", "zstd",
-      "--zstd-level", "3"
+      "--zstd-level", "3",
     ]
     env = {"RUST_LOG" => "info"}
     target_config = build_target_config
@@ -76,7 +76,7 @@ class StorageArchive
         kek_pipe: @disk_kek_path,
         kek_content: @disk_kek["key"],
         env: env,
-        stdin: target_config
+        stdin: target_config,
       )
     else
       r(env, *cmd, stdin: target_config)
@@ -92,26 +92,26 @@ class StorageArchive
       "endpoint" => @target_conf["endpoint"],
       "access_key_id.ref" => "s3-key-id",
       "secret_access_key.ref" => "s3-secret-key",
-      "archive_kek.ref" => "archive-kek"
+      "archive_kek.ref" => "archive-kek",
     }
     target["session_token.ref"] = "s3-session-token" if @target_conf["session_token"]
 
     parts = [toml_section("target", target)]
 
     parts << toml_section("secrets.s3-key-id", {
-      "source.inline" => @target_conf["access_key_id"]
+      "source.inline" => @target_conf["access_key_id"],
     })
     parts << toml_section("secrets.s3-secret-key", {
-      "source.inline" => @target_conf["secret_access_key"]
+      "source.inline" => @target_conf["secret_access_key"],
     })
     parts << toml_section("secrets.archive-kek", {
       "source.inline" => @target_conf["archive_kek"]["key"],
-      "encoding" => "base64"
+      "encoding" => "base64",
     })
 
     if @target_conf["session_token"]
       parts << toml_section("secrets.s3-session-token", {
-        "source.inline" => @target_conf["session_token"]
+        "source.inline" => @target_conf["session_token"],
       })
     end
 
@@ -119,7 +119,7 @@ class StorageArchive
     # acceptable.
     parts << toml_section("danger_zone", {
       "enabled" => true,
-      "allow_inline_plaintext_secrets" => true
+      "allow_inline_plaintext_secrets" => true,
     })
 
     parts.join("\n")

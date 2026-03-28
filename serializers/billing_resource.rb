@@ -6,7 +6,7 @@ class Serializers::BillingResource < Serializers::Base
       project_id: UBID.to_ubid(br.project_id),
       resource_id: UBID.to_ubid(br.resource_id),
       resource_name: br.resource_name,
-      resource_tags: br.resource_tags
+      resource_tags: br.resource_tags,
     }
   end
 end

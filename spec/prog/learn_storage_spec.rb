@@ -27,7 +27,7 @@ EOS
       }.from([]).to([
         ["DEFAULT", ["wwn-some-random-id1"]],
         ["stor1", ["wwn-some-random-id2"]],
-        ["stor2", ["wwn-some-random-id3"]]
+        ["stor2", ["wwn-some-random-id3"]],
       ])
     end
 
@@ -53,17 +53,17 @@ EOS
       expect { ls.start }.to exit({"msg" => "created StorageDevice records"}).and change {
         StorageDevice.map { |sd|
           sd.values.slice(
-            :name, :available_storage_gib, :total_storage_gib
+            :name, :available_storage_gib, :total_storage_gib,
           )
         }.sort_by { it[:name] }
       }.from(
-        [{name: "stor1", total_storage_gib: 100, available_storage_gib: 100}]
+        [{name: "stor1", total_storage_gib: 100, available_storage_gib: 100}],
       ).to(
         [
           {name: "DEFAULT", total_storage_gib: 5, available_storage_gib: 0},
           {name: "stor1", total_storage_gib: 5, available_storage_gib: 2},
-          {name: "stor2", total_storage_gib: 3, available_storage_gib: 1}
-        ]
+          {name: "stor2", total_storage_gib: 3, available_storage_gib: 1},
+        ],
       )
 
       expect(vmh.reload.available_storage_gib).to eq(3)

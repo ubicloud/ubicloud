@@ -25,7 +25,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
         access_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(16),
         secret_key: (location.aws? && Config.aws_postgres_iam_access) ? nil : SecureRandom.hex(32),
         location_id: location.id,
-        backup_period_hours: parent&.backup_period_hours || 24
+        backup_period_hours: parent&.backup_period_hours || 24,
       )
       Strand.create_with_id(postgres_timeline, prog: "Postgres::PostgresTimelineNexus", label: "start")
     end
@@ -160,7 +160,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       endpoint: postgres_timeline.blob_storage_endpoint,
       access_key: postgres_timeline.blob_storage.admin_user,
       secret_key: postgres_timeline.blob_storage.admin_password,
-      ssl_ca_data: postgres_timeline.blob_storage.root_certs
+      ssl_ca_data: postgres_timeline.blob_storage.root_certs,
     )
   end
 end

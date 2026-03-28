@@ -13,8 +13,8 @@ puts JSON.generate(restarter: {
   start_time: iso_start,
   startup: {
     command:,
-    minimum_time_alive:
-  }
+    minimum_time_alive:,
+  },
 })
 
 loop do
@@ -38,8 +38,8 @@ loop do
       command:,
       exitstatus: status.exitstatus,
       pid: status.pid,
-      success: status.success?
-    }
+      success: status.success?,
+    },
   })
   exit status.exitstatus if shutting_down
 
@@ -49,7 +49,7 @@ loop do
     puts JSON.generate(restarter: {start_time: iso_start,
                                    shutdown: {
                                      command:,
-                                     minimum_time_alive:
+                                     minimum_time_alive:,
                                    }})
     exit
   end

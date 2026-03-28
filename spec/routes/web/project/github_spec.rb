@@ -254,20 +254,20 @@ RSpec.describe Clover, "github" do
           "run_id" => 456,
           "workflow_name" => "test-workflow",
           "created_at" => (now - 60).iso8601,
-          "started_at" => (now - 40).iso8601
-        }
+          "started_at" => (now - 40).iso8601,
+        },
       )
       runner_waiting_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
       runner_not_created = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(
         created_at: now - 38,
-        vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm-2", size: "standard-4", arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID).id
+        vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm-2", size: "standard-4", arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID).id,
       )
       runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-2", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
       runner_custom_label_quota = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4", repository_name: "my-repo").update(label: "apply_custom_label_quota").subject.update(created_at: now - 120)
 
       [
         [now, "standard-2", 15],
-        [now - 3 * 24 * 60 * 60, "standard-16-arm", 200_000]
+        [now - 3 * 24 * 60 * 60, "standard-16-arm", 200_000],
       ].each do |time, family, amount|
         BillingRecord.create(
           project_id: project.id,
@@ -275,7 +275,7 @@ RSpec.describe Clover, "github" do
           resource_name: "Daily Usage #{time.strftime("%Y-%m-%d")}",
           span: Sequel::Postgres::PGRange.new(time, time),
           billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global")["id"],
-          amount:
+          amount:,
         )
       end
 
@@ -290,13 +290,13 @@ RSpec.describe Clover, "github" do
         ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
         ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
         ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
-        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""]
+        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
       ]
       expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
         ["Allocated vCPU", "4 vCPU"],
         ["Requested vCPU", "14 vCPU"],
         ["Today", "$0.01"],
-        ["Last 30 Days", "$1280.01"]
+        ["Last 30 Days", "$1280.01"],
       ]
     end
 

@@ -21,7 +21,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       admin_user: "admin",
       admin_password: "secret",
       root_cert_1: "certs",
-      private_subnet_id: private_subnet.id
+      private_subnet_id: private_subnet.id,
     )
     Strand.create_with_id(mc, prog: "Minio::MinioClusterNexus", label: "wait")
     mc
@@ -42,7 +42,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       display_name: "aws-us-west-2",
       ui_name: "AWS US West 2",
       visible: true,
-      provider: "aws"
+      provider: "aws",
     )
     LocationCredential.create_with_id(loc,
       access_key: "access-key-id",
@@ -54,7 +54,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
   def backup_fixture(days_ago:)
     Struct.new(:key, :last_modified).new(
       "basebackups_005/base_backup_stop_sentinel.json",
-      Time.now - days_ago * 24 * 60 * 60
+      Time.now - days_ago * 24 * 60 * 60,
     )
   end
 
@@ -70,7 +70,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       endpoint: minio_cluster.ip4_urls.first,
       access_key: minio_cluster.admin_user,
       secret_key: minio_cluster.admin_password,
-      ssl_ca_data: minio_cluster.root_cert_1
+      ssl_ca_data: minio_cluster.root_cert_1,
     ).and_return(client)
     client
   end
@@ -141,7 +141,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
           name: "aws-pg-subnet",
           location_id: aws_location.id,
           net4: "172.0.1.0/26",
-          net6: "fdfa:b5aa:14a3:4a3e::/64"
+          net6: "fdfa:b5aa:14a3:4a3e::/64",
         )
         resource.update(private_subnet_id: aws_private_subnet.id)
         server = create_postgres_server(resource:, timeline: postgres_timeline)

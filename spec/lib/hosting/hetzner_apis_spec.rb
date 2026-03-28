@@ -146,58 +146,58 @@ RSpec.describe Hosting::HetznerApis do
         {
           "ip" => {
             "ip" => "1.1.1.1",
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "ip" => {
             "ip" => "1.1.2.0",
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "ip" => {
             "ip" => "31.31.31.31",
-            "server_ip" => "1.1.1.1"
-          }
-        }
+            "server_ip" => "1.1.1.1",
+          },
+        },
       ]))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([
         {
           "subnet" => {
             "ip" => "2.2.2.0",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "subnet" => {
             "ip" => "3.3.3.0",
             "mask" => 20,
-            "server_ip" => "1.1.1.0" # assigned to a different server
-          }
+            "server_ip" => "1.1.1.0", # assigned to a different server
+          },
         },
         {
           "subnet" => {
             "ip" => "15.15.15.15",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "subnet" => {
             "ip" => "30.30.30.30",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "subnet" => {
             "ip" => "2a01:4f8:10a:128b::",
             "mask" => 64,
-            "server_ip" => "1.1.1.1"
-          }
-        }
+            "server_ip" => "1.1.1.1",
+          },
+        },
       ]))
 
       stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 200, body: JSON.dump([
@@ -206,24 +206,24 @@ RSpec.describe Hosting::HetznerApis do
             "ip" => "15.15.15.15",
             "mask" => 29,
             "server_ip" => "1.1.1.1",
-            "active_server_ip" => "0.0.0.0" # routed to a different server
-          }
+            "active_server_ip" => "0.0.0.0", # routed to a different server
+          },
         },
         {
           "failover" => {
             "ip" => "30.30.30.30",
             "mask" => 29,
             "server_ip" => "1.1.1.1",
-            "active_server_ip" => "1.1.1.1"
-          }
+            "active_server_ip" => "1.1.1.1",
+          },
         },
         {
           "failover" => {
             "ip" => "31.31.31.31",
             "server_ip" => "1.1.1.1",
-            "active_server_ip" => "1.1.1.0"
-          }
-        }
+            "active_server_ip" => "1.1.1.0",
+          },
+        },
       ]))
 
       expected = [
@@ -231,7 +231,7 @@ RSpec.describe Hosting::HetznerApis do
         ["1.1.2.0/32", "1.1.1.1", false],
         ["2.2.2.0/29", "1.1.1.1", false],
         ["30.30.30.30/29", "1.1.1.1", true],
-        ["2a01:4f8:10a:128b::/64", "1.1.1.1", false]
+        ["2a01:4f8:10a:128b::/64", "1.1.1.1", false],
       ].map {
         Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
       }
@@ -244,45 +244,45 @@ RSpec.describe Hosting::HetznerApis do
         {
           "ip" => {
             "ip" => "1.1.1.1",
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "ip" => {
             "ip" => "1.1.2.0",
-            "server_ip" => "1.1.1.1"
-          }
-        }
+            "server_ip" => "1.1.1.1",
+          },
+        },
       ]))
       stub_request(:get, "https://robot-ws.your-server.de/subnet").to_return(status: 200, body: JSON.dump([
         {
           "subnet" => {
             "ip" => "2.2.2.0",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "subnet" => {
             "ip" => "3.3.3.0",
             "mask" => 20,
-            "server_ip" => "1.1.1.0" # assigned to a different server
-          }
+            "server_ip" => "1.1.1.0", # assigned to a different server
+          },
         },
         {
           "subnet" => {
             "ip" => "15.15.15.15",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
+            "server_ip" => "1.1.1.1",
+          },
         },
         {
           "subnet" => {
             "ip" => "30.30.30.30",
             "mask" => 29,
-            "server_ip" => "1.1.1.1"
-          }
-        }
+            "server_ip" => "1.1.1.1",
+          },
+        },
       ]))
 
       stub_request(:get, "https://robot-ws.your-server.de/failover").to_return(status: 404)
@@ -292,7 +292,7 @@ RSpec.describe Hosting::HetznerApis do
         ["1.1.2.0/32", "1.1.1.1", false],
         ["2.2.2.0/29", "1.1.1.1", false],
         ["15.15.15.15/29", "1.1.1.1", false],
-        ["30.30.30.30/29", "1.1.1.1", false]
+        ["30.30.30.30/29", "1.1.1.1", false],
       ].map {
         Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
       }

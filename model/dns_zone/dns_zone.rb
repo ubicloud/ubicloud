@@ -30,7 +30,7 @@ class DnsZone < Sequel::Model
       [:id, :dns_zone_id, :name, :type, :ttl, :data, :tombstoned],
       records.select_map([:name, :type, :ttl, :data]).map do
         [DnsRecord.generate_uuid, id, *it, true]
-      end
+      end,
     )
 
     incr_refresh_dns_servers
@@ -47,7 +47,7 @@ class DnsZone < Sequel::Model
             .select_group(:dns_zone_id, :name, :type, :data)
             .select_append { max(created_at).as(:latest_created_at) }
             .as(:latest_dns_record),
-          [:dns_zone_id, :name, :type, :data]
+          [:dns_zone_id, :name, :type, :data],
         )
         .where { dns_record[:created_at] < latest_dns_record[:latest_created_at] }.all
 

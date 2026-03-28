@@ -24,7 +24,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       enabled: false,
       archive_kek_id: archive_kek.id,
       store_id: store.id,
-      store_prefix: "#{mi.project.ubid}/#{mi.ubid}/#{version}"
+      store_prefix: "#{mi.project.ubid}/#{mi.ubid}/#{version}",
     )
 
     Strand.create_with_id(
@@ -35,8 +35,8 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
         "subject_id" => mi_version_metal.id,
         "source_vm_id" => source_vm.id,
         "destroy_source_after" => destroy_source_after,
-        "set_as_latest" => set_as_latest
-      }]
+        "set_as_latest" => set_as_latest,
+      }],
     )
   end
 
@@ -73,7 +73,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   label def finish
     machine_image_version_metal.update(
       enabled: true,
-      archive_size_mib: (archive_size_bytes/1048576r).ceil
+      archive_size_mib: (archive_size_bytes/1048576r).ceil,
     )
     if frame["destroy_source_after"]
       source_vm.incr_destroy
@@ -98,8 +98,8 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
         prefix: machine_image_version_metal.store_prefix,
         access_key_id: store.access_key,
         secret_access_key: store.secret_key,
-        archive_kek: machine_image_version_metal.archive_kek.secret_key_material_hash
-      }
+        archive_kek: machine_image_version_metal.archive_kek.secret_key_material_hash,
+      },
     }.to_json
   end
 
@@ -110,7 +110,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       region: store.region,
       endpoint: store.endpoint,
       access_key_id: store.access_key,
-      secret_access_key: store.secret_key
+      secret_access_key: store.secret_key,
     )
 
     total = 0

@@ -90,7 +90,7 @@ RSpec.configure do |config|
       hash = Argon2::Password.new({
         t_cost: 1,
         m_cost: 5,
-        secret: Config.clover_session_secret
+        secret: Config.clover_session_secret,
       }).create(password)
 
       account = Account.create(email:, status_id: 2)
@@ -113,12 +113,12 @@ RSpec.configure do |config|
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project_id: project.id
+        project_id: project.id,
       )
 
       LocationCredential.create(
         access_key: "access-key-id",
-        secret_key: "secret-access-key"
+        secret_key: "secret-access-key",
       ) { it.id = loc.id }
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc

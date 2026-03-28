@@ -178,7 +178,7 @@ when :smtp
       user_name: Config.smtp_user,
       password: Config.smtp_password,
       authentication: :plain,
-      enable_starttls: Config.smtp_tls
+      enable_starttls: Config.smtp_tls,
     }
   end
 when :logger
@@ -278,7 +278,7 @@ def clover_freeze
     Serializers::Base,
     Sshable::SshError,
     Validation,
-    Validation::ValidationFailed
+    Validation::ValidationFailed,
   ].each(&:freeze)
 
   RubyVM::YJIT.enable if defined?(RubyVM::YJIT)

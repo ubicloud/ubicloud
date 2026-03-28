@@ -144,7 +144,7 @@ task "coverage" => [:coverage_spec]
 {
   "sspec" => [" in serial", rspec],
   "pspec" => [" in parallel", turbo_tests],
-  "spec" => ["", spec]
+  "spec" => ["", spec],
 }.each do |task_suffix, (desc_suffix, block)|
   desc "Run specs#{desc_suffix}"
   task task_suffix do
@@ -455,7 +455,7 @@ namespace :linter do
       "rodauth.add_recovery_codes_heading",
       "rodauth.otp_qr_code",
       "yield",
-      "SvgChart.render("
+      "SvgChart.render(",
     ]
     safe_regexp = /\A\s*(?:#{Regexp.union(safe_patterns)})/m
 
@@ -484,7 +484,7 @@ namespace :linter do
           file:,
           line: line_number,
           content: display_content,
-          full_line: lines[line_number - 1].strip
+          full_line: lines[line_number - 1].strip,
         }
       end
     end

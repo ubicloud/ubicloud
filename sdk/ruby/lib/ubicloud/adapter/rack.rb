@@ -26,7 +26,7 @@ module Ubicloud
         "PATH_INFO" => "/project/#{@project_id}/#{path_info}",
         "rack.request.form_input" => nil,
         "rack.request.form_hash" => nil,
-        "rack.request.query_hash" => nil
+        "rack.request.query_hash" => nil,
       )
       env["QUERY_STRING"] = query_string || ""
       params &&= params.to_json.force_encoding(Encoding::BINARY)

@@ -31,7 +31,7 @@ class StorageKeyEncryption
       _1.write(JSON.pretty_generate({
         cipher: data_encryption_key[:cipher],
         key: wrapped_key1_b64,
-        key2: wrapped_key2_b64
+        key2: wrapped_key2_b64,
       }))
       fsync_or_fail(_1)
     }
@@ -46,7 +46,7 @@ class StorageKeyEncryption
     {
       cipher: data_encryption_key["cipher"],
       key: unwrap_key(wrapped_key1),
-      key2: unwrap_key(wrapped_key2)
+      key2: unwrap_key(wrapped_key2),
     }
   end
 
@@ -61,7 +61,7 @@ class StorageKeyEncryption
     cipher.auth_data = @key_encryption_cipher["auth_data"]
     [
       cipher.update(key) + cipher.final,
-      cipher.auth_tag
+      cipher.auth_tag,
     ]
   end
 

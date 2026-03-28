@@ -26,7 +26,7 @@ class EmailRenderer < Roda
 
       html_part(
         part("email/layout", subject:, greeting:, body:, button_title:, button_link:),
-        "Content-Type" => "text/html; charset=UTF-8"
+        "Content-Type" => "text/html; charset=UTF-8",
       )
     end
   end

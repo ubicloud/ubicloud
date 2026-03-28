@@ -95,7 +95,7 @@ RSpec.describe CloverAdmin do
       "login_failure" => ip_hash,
       "logout" => ip_hash,
       "two_factor_authentication" => ip_hash("token" => token),
-      "webauthn_setup" => ip_hash("token" => token)
+      "webauthn_setup" => ip_hash("token" => token),
     })
   end
 
@@ -134,7 +134,7 @@ RSpec.describe CloverAdmin do
       "change_password" => ip_hash,
       "logout" => ip_hash,
       "login" => ip_hash,
-      "two_factor_authentication" => ip_hash("token" => webauthn_token_prefix)
+      "two_factor_authentication" => ip_hash("token" => webauthn_token_prefix),
     })
   end
 
@@ -157,7 +157,7 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin"
     expect(audit_log_hash).to eq({
       "webauthn_remove" => ip_hash("token" => old_token),
-      "webauthn_setup" => ip_hash("token" => webauthn_token_prefix)
+      "webauthn_setup" => ip_hash("token" => webauthn_token_prefix),
     })
   end
 

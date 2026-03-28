@@ -4,24 +4,24 @@ class Clover < Roda
   PG_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
     "running" => "bg-green-100 text-green-800",
     "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800"
+    "deleting" => "bg-red-100 text-red-800",
   ).freeze
 
   PS_STATE_LABEL_COLOR = Hash.new("bg-yellow-100 text-yellow-80").merge!(
     "available" => "bg-green-100 text-green-800",
-    "deleting" => "bg-red-100 text-red-800"
+    "deleting" => "bg-red-100 text-red-800",
   ).freeze
 
   KUBERNETES_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
     "running" => "bg-green-100 text-green-800",
     "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800"
+    "deleting" => "bg-red-100 text-red-800",
   ).freeze
 
   VM_STATE_LABEL_COLOR = Hash.new("bg-slate-100 text-slate-800").merge!(
     "running" => "bg-green-100 text-green-800",
     "creating" => "bg-yellow-100 text-yellow-800",
-    "deleting" => "bg-red-100 text-red-800"
+    "deleting" => "bg-red-100 text-red-800",
   )
   ["rebooting", "starting", "waiting for capacity", "restarting"].each do
     VM_STATE_LABEL_COLOR[it] = VM_STATE_LABEL_COLOR["creating"]
@@ -33,13 +33,13 @@ class Clover < Roda
     "primary" => "bg-orange-600 hover:bg-orange-700 focus-visible:outline-orange-600",
     "safe" => "bg-green-600 hover:bg-green-700 focus-visible:outline-green-600",
     "warning" => "bg-amber-600 hover:bg-amber-700 focus-visible:outline-amber-600",
-    "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600"
+    "danger" => "bg-rose-600 hover:bg-rose-700 focus-visible:outline-rose-600",
   ).freeze
 
   PG_HA_DATA = {
     PostgresResource::HaType::NONE => "Inactive",
     PostgresResource::HaType::ASYNC => "Active (1 standby with asynchronous replication)",
-    PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)"
+    PostgresResource::HaType::SYNC => "Active (2 standbys with synchronous replication)",
   }.freeze
 
   def raise_web_error(message)
@@ -77,8 +77,8 @@ class Clover < Roda
         referrer: env["HTTP_REFERER"],
         error_class: error.class,
         error_message: error.message,
-        backtrace: error.backtrace
-      }
+        backtrace: error.backtrace,
+      },
     })
 
     if Config.test? && !ENV["SHOW_WEB_ERROR_PAGE"]
@@ -110,7 +110,7 @@ class Clover < Roda
     @omniauth_providers ||= [
       # :nocov:
       Config.omniauth_google_id ? [:google, "Google"] : nil,
-      Config.omniauth_github_id ? [:github, "GitHub"] : nil
+      Config.omniauth_github_id ? [:github, "GitHub"] : nil,
       # :nocov:
     ].compact
   end

@@ -40,6 +40,15 @@ Style/HashSyntax:
 Style/HashTransformKeys:
   Enabled: true
 
+Style/TrailingCommaInArguments:
+  EnforcedStyleForMultiline: diff_comma
+
+Style/TrailingCommaInArrayLiteral:
+  EnforcedStyleForMultiline: diff_comma
+
+Style/TrailingCommaInHashLiteral:
+  EnforcedStyleForMultiline: diff_comma
+
 # Seems to be buggy and flags non-redundant line continuations as redundant
 Style/RedundantLineContinuation:
   Enabled: false

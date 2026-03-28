@@ -136,9 +136,9 @@ RSpec.describe Csi::V1::NodeService do
         pvc = {
           "metadata" => {
             "annotations" => {
-              "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-            }
-          }
+              "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+            },
+          },
         }
         expect(service.pvc_needs_migration?(pvc)).to be true
       end
@@ -177,8 +177,8 @@ RSpec.describe Csi::V1::NodeService do
       Csi::V1::NodeStageVolumeRequest.new(
         volume_context: {
           "csi.storage.k8s.io/pvc/namespace" => "default",
-          "csi.storage.k8s.io/pvc/name" => "test-pvc"
-        }
+          "csi.storage.k8s.io/pvc/name" => "test-pvc",
+        },
       )
     end
     let(:success_status) { instance_double(Process::Status, success?: true) }
@@ -196,7 +196,7 @@ RSpec.describe Csi::V1::NodeService do
       pvc_without_migration = {"metadata" => {"annotations" => {}}}
       pv_list = {"items" => [
         {"metadata" => {"name" => "pvc-abc", "annotations" => {}},
-         "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}}
+         "spec" => {"persistentVolumeReclaimPolicy" => "Delete", "claimRef" => {"namespace" => "default", "name" => "test-pvc"}}},
       ]}
       expect(Open3).to receive(:capture2e).with("kubectl", "-n", "default", "get", "pvc", "test-pvc", "-oyaml", stdin_data: nil).and_return([YAML.dump(pvc_without_migration), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump(pv_list), success_status])
@@ -236,8 +236,8 @@ RSpec.describe Csi::V1::NodeService do
         staging_target_path: staging_path,
         volume_context: {"size_bytes" => size_bytes.to_s},
         volume_capability: Csi::V1::VolumeCapability.new(
-          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
-        )
+          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4"),
+        ),
       )
     end
 
@@ -246,7 +246,7 @@ RSpec.describe Csi::V1::NodeService do
       # Keep these as allow since they're not used in every test
       allow(service).to receive_messages(
         is_mounted?: false,
-        find_loop_device: nil
+        find_loop_device: nil,
       )
       allow(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
       allow(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["", true])
@@ -345,7 +345,7 @@ RSpec.describe Csi::V1::NodeService do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
           find_file_system: "ext4",
-          is_mounted?: true
+          is_mounted?: true,
         )
         expect(service).not_to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:)
         service.perform_node_stage_volume(req_id, pvc, req, nil)
@@ -354,7 +354,7 @@ RSpec.describe Csi::V1::NodeService do
       it "raises an error if device filesystem is not in the acceptable list of filesystems" do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
-          find_file_system: "zfs"
+          find_file_system: "zfs",
         )
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Unacceptable file system type for /dev/loop0: zfs")
       end
@@ -362,7 +362,7 @@ RSpec.describe Csi::V1::NodeService do
       it "raises an error if current filesystem differs from the expected file_system" do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
-          find_file_system: "xfs"
+          find_file_system: "xfs",
         )
         expect { service.perform_node_stage_volume(req_id, pvc, req, nil) }.to raise_error("Unexpected filesystem on volume. desired: ext4, current: xfs")
       end
@@ -370,7 +370,7 @@ RSpec.describe Csi::V1::NodeService do
       it "handles mkfs failure" do
         expect(service).to receive_messages(
           find_loop_device: nil,  # New loop device
-          find_file_system: ""
+          find_file_system: "",
         )
         expect(service).to receive(:run_cmd).with("losetup", "--find", "--show", backing_file, req_id:).and_return(["/dev/loop0", true])
         expect(service).to receive(:run_cmd).with("mkfs.ext4", "/dev/loop0", req_id:).and_return(["mkfs error", false])
@@ -382,7 +382,7 @@ RSpec.describe Csi::V1::NodeService do
         expect(service).to receive_messages(
           find_loop_device: "/dev/loop0",
           find_file_system: "",
-          is_mounted?: false
+          is_mounted?: false,
         )
         expect(FileUtils).to receive(:mkdir_p).with(staging_path)
         expect(service).to receive(:run_cmd).with("mount", "/dev/loop0", staging_path, req_id:).and_return(["mount error", false])
@@ -398,9 +398,9 @@ RSpec.describe Csi::V1::NodeService do
         volume_id: "vol-test-123",
         staging_target_path: "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/test-pv/globalmount",
         volume_capability: Csi::V1::VolumeCapability.new(
-          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
+          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4"),
         ),
-        volume_context: {"size_bytes" => "1073741824"}
+        volume_context: {"size_bytes" => "1073741824"},
       )
     end
     let(:pvc) { {"metadata" => {"annotations" => {}}} }
@@ -412,7 +412,7 @@ RSpec.describe Csi::V1::NodeService do
         fetch_and_migrate_pvc: pvc,
         perform_node_stage_volume: response,
         roll_back_reclaim_policy: nil,
-        remove_old_pv_annotation_from_pvc: nil
+        remove_old_pv_annotation_from_pvc: nil,
       )
 
       result = service.node_stage_volume(req, nil)
@@ -434,9 +434,9 @@ RSpec.describe Csi::V1::NodeService do
           "namespace" => namespace,
           "name" => name,
           "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
       }
 
       expect(client).to receive(:remove_pvc_annotation).with(namespace, name, "csi.ubicloud.com/old-pv-name")
@@ -450,8 +450,8 @@ RSpec.describe Csi::V1::NodeService do
     it "returns early when old PV name annotation is not present" do
       pvc = {
         "metadata" => {
-          "annotations" => {}
-        }
+          "annotations" => {},
+        },
       }
 
       expect(client).not_to receive(:get_pv)
@@ -462,14 +462,14 @@ RSpec.describe Csi::V1::NodeService do
       pvc = {
         "metadata" => {
           "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
       }
       pv = {
         "spec" => {
-          "persistentVolumeReclaimPolicy" => "Retain"
-        }
+          "persistentVolumeReclaimPolicy" => "Retain",
+        },
       }
 
       expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
@@ -483,14 +483,14 @@ RSpec.describe Csi::V1::NodeService do
       pvc = {
         "metadata" => {
           "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
       }
       pv = {
         "spec" => {
-          "persistentVolumeReclaimPolicy" => "Delete"
-        }
+          "persistentVolumeReclaimPolicy" => "Delete",
+        },
       }
 
       expect(client).to receive(:get_pv).with("old-pv-123").and_return(pv)
@@ -503,9 +503,9 @@ RSpec.describe Csi::V1::NodeService do
       pvc = {
         "metadata" => {
           "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
       }
 
       expect(client).to receive(:get_pv).with("old-pv-123").and_raise("Kubernetes API error")
@@ -520,21 +520,21 @@ RSpec.describe Csi::V1::NodeService do
       {
         "metadata" => {
           "annotations" => {
-            "csi.ubicloud.com/old-pv-name" => "old-pv-123"
-          }
-        }
+            "csi.ubicloud.com/old-pv-name" => "old-pv-123",
+          },
+        },
       }
     end
     let(:pv) do
       {
         "metadata" => {
-          "annotations" => {}
+          "annotations" => {},
         },
         "spec" => {
           "csi" => {
-            "volumeHandle" => "vol-old-123"
-          }
-        }
+            "volumeHandle" => "vol-old-123",
+          },
+        },
       }
     end
 
@@ -699,8 +699,8 @@ RSpec.describe Csi::V1::NodeService do
     it "updates PV reclaim policy when it's not Retain" do
       pv = {
         "spec" => {
-          "persistentVolumeReclaimPolicy" => "Delete"
-        }
+          "persistentVolumeReclaimPolicy" => "Delete",
+        },
       }
 
       expect(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
@@ -714,8 +714,8 @@ RSpec.describe Csi::V1::NodeService do
     it "does not update PV when reclaim policy is already Retain" do
       pv = {
         "spec" => {
-          "persistentVolumeReclaimPolicy" => "Retain"
-        }
+          "persistentVolumeReclaimPolicy" => "Retain",
+        },
       }
 
       expect(client).to receive(:find_pv_by_volume_id).with(volume_id).and_return(pv)
@@ -731,7 +731,7 @@ RSpec.describe Csi::V1::NodeService do
     let(:req) do
       Csi::V1::NodeUnpublishVolumeRequest.new(
         volume_id: "vol-test-123",
-        target_path:
+        target_path:,
       )
     end
 
@@ -769,8 +769,8 @@ RSpec.describe Csi::V1::NodeService do
         staging_target_path: staging_path,
         target_path:,
         volume_capability: Csi::V1::VolumeCapability.new(
-          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4")
-        )
+          mount: Csi::V1::VolumeCapability::MountVolume.new(fs_type: "ext4"),
+        ),
       )
     end
 
@@ -808,14 +808,14 @@ RSpec.describe Csi::V1::NodeService do
       {
         "metadata" => {
           "name" => pv_name,
-          "annotations" => {}
+          "annotations" => {},
         },
         "spec" => {
           "claimRef" => {
             "namespace" => namespace,
-            "name" => pvc_name
-          }
-        }
+            "name" => pvc_name,
+          },
+        },
       }
     end
     let(:pvc) do
@@ -825,12 +825,12 @@ RSpec.describe Csi::V1::NodeService do
           "namespace" => namespace,
           "resourceVersion" => "12345",
           "uid" => pvc_uid,
-          "creationTimestamp" => "2023-01-01T00:00:00Z"
+          "creationTimestamp" => "2023-01-01T00:00:00Z",
         },
         "spec" => {
-          "volumeName" => pv_name
+          "volumeName" => pv_name,
         },
-        "status" => {}
+        "status" => {},
       }
     end
 
@@ -921,20 +921,20 @@ RSpec.describe Csi::V1::NodeService do
           "annotations" => {
             "existing-annotation" => "value",
             "volume.kubernetes.io/selected-node" => "somenode",
-            "pv.kubernetes.io/bind-completed" => "yes"
+            "pv.kubernetes.io/bind-completed" => "yes",
           },
           "resourceVersion" => "12345",
           "uid" => "uid-123",
           "creationTimestamp" => "2023-01-01T00:00:00Z",
           "deletionTimestamp" => "2023-01-01T00:00:00Z",
-          "deletionGracePeriodSeconds" => 0
+          "deletionGracePeriodSeconds" => 0,
         },
         "spec" => {
-          "volumeName" => "old-pv-name"
+          "volumeName" => "old-pv-name",
         },
         "status" => {
-          "phase" => "Bound"
-        }
+          "phase" => "Bound",
+        },
       }
     end
 

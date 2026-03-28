@@ -16,11 +16,11 @@ RSpec.describe Clover, "private-location" do
       ui_name: "aws-us-west-2",
       visible: true,
       provider: "aws",
-      project_id: project.id
+      project_id: project.id,
     )
     LocationCredential.create(
       access_key: "access-key-id",
-      secret_key: "secret-access-key"
+      secret_key: "secret-access-key",
     ) { it.id = loc.id }
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
@@ -31,7 +31,7 @@ RSpec.describe Clover, "private-location" do
       [
         [:get, "/project/#{project.ubid}/private-location"],
         [:post, "/project/#{project.ubid}/private-location", {name: "region-1"}],
-        [:delete, "/project/#{project.ubid}/private-location/#{private_location.ubid}"]
+        [:delete, "/project/#{project.ubid}/private-location/#{private_location.ubid}"],
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -44,7 +44,7 @@ RSpec.describe Clover, "private-location" do
         name: "region-1",
         private_location_name: "us-west-2",
         aws_access_key: "access-key-id",
-        aws_secret_key: "secret-access-key"
+        aws_secret_key: "secret-access-key",
       }.to_json
 
       expect(last_response).to have_api_error(401, "must include personal access token in Authorization header")
@@ -87,7 +87,7 @@ RSpec.describe Clover, "private-location" do
           name: "hello",
           provider_location_name: "us-west-2",
           access_key: "access-key-id",
-          secret_key: "secret-access-key"
+          secret_key: "secret-access-key",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -122,7 +122,7 @@ RSpec.describe Clover, "private-location" do
           location_id: reg.id,
           target_vm_size: "standard-2",
           target_storage_size_gib: 118,
-          target_version: "16"
+          target_version: "16",
         )
 
         delete "/project/#{project.ubid}/private-location/#{reg.ui_name}"
@@ -176,7 +176,7 @@ RSpec.describe Clover, "private-location" do
     describe "update" do
       it "success" do
         post "/project/#{project.ubid}/private-location/#{private_location.ui_name}", {
-          name: "hello"
+          name: "hello",
         }.to_json
 
         expect(last_response.status).to eq(200)

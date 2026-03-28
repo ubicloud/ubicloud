@@ -24,7 +24,7 @@ RSpec.describe Serializers::Vm do
         storage_size_gib: 100,
         ip6: nil,
         ip4_enabled: true,
-        ip4: "192.168.1.0"
+        ip4: "192.168.1.0",
       }
 
       expect(described_class.serialize_internal(vm)).to eq(expected_result)
@@ -60,7 +60,7 @@ RSpec.describe Serializers::Vm do
         private_ipv4: "10.0.0.1",
         private_ipv6: "fd00::1",
         subnet: "subnet-1",
-        gpu: "1x NVIDIA A100 80GB PCIe"
+        gpu: "1x NVIDIA A100 80GB PCIe",
       }
 
       expect(described_class.serialize_internal(vm, {detailed: true})).to eq(expected_result)

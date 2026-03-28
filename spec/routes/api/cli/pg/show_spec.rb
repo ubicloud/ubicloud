@@ -10,7 +10,7 @@ RSpec.describe Clover, "cli pg show" do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
     @ref = [@pg.display_location, @pg.name].join("/")
   end

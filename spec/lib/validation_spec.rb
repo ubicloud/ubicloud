@@ -10,7 +10,7 @@ RSpec.describe Validation do
         "123abc",
         "abc--123",
         "a-b-c-1-2",
-        "a" * 63
+        "a" * 63,
       ].each do |name|
         expect(described_class.validate_name(name)).to be_nil
       end
@@ -25,7 +25,7 @@ RSpec.describe Validation do
         "ABC",
         "ABC_123",
         "ABC$123",
-        "a" * 64
+        "a" * 64,
       ].each do |name|
         expect { described_class.validate_name(name) }.to raise_error described_class::ValidationFailed
       end
@@ -64,7 +64,7 @@ RSpec.describe Validation do
         [
           ["standard-2", "40"],
           ["standard-2", "80"],
-          ["standard-4", "160"]
+          ["standard-4", "160"],
         ].each do |vm_size, storage_size|
           expect(described_class.validate_vm_storage_size(vm_size, "x64", storage_size)).to eq(storage_size.to_f)
         end
@@ -77,7 +77,7 @@ RSpec.describe Validation do
           ["standard-2", ""],
           ["standard-2", nil],
           ["standard-5", "40"],
-          [nil, "40"]
+          [nil, "40"],
         ].each do |vm_size, storage_size|
           expect { described_class.validate_vm_storage_size(vm_size, "x64", storage_size) }.to raise_error described_class::ValidationFailed
         end
@@ -94,7 +94,7 @@ RSpec.describe Validation do
           "_abc",
           "abc-_-123",
           "a-b-c-1-2",
-          "a" * 32
+          "a" * 32,
         ].each do |name|
           expect(described_class.validate_os_user_name(name)).to be_nil
         end
@@ -107,7 +107,7 @@ RSpec.describe Validation do
           "ABC",
           "123abc",
           "abc$",
-          "a" * 33
+          "a" * 33,
         ].each do |name|
           expect { described_class.validate_os_user_name(name) }.to raise_error described_class::ValidationFailed
         end
@@ -151,7 +151,7 @@ RSpec.describe Validation do
           "_abc",
           "abc-_-123",
           "a-b-c-1-2",
-          "a" * 32
+          "a" * 32,
         ].each do |name|
           expect(described_class.validate_minio_username(name)).to be_nil
         end
@@ -165,7 +165,7 @@ RSpec.describe Validation do
           "ABC",
           "123abc",
           "abc$",
-          "a" * 33
+          "a" * 33,
         ].each do |name|
           expect { described_class.validate_minio_username(name) }.to raise_error described_class::ValidationFailed
         end
@@ -315,7 +315,7 @@ RSpec.describe Validation do
         "John Doe-Smith",
         "Jøhn Döe",
         "John2 Doe",
-        "J" * 63
+        "J" * 63,
       ].each do |name|
         expect(described_class.validate_account_name(name)).to be_nil
       end
@@ -332,7 +332,7 @@ RSpec.describe Validation do
         "Click this link: http://example.com",
         "Click this link example.com",
         "🚀 emojis not allowed",
-        "J" * 64
+        "J" * 64,
       ].each do |name|
         expect { described_class.validate_account_name(name) }.to raise_error described_class::ValidationFailed
       end
@@ -343,7 +343,7 @@ RSpec.describe Validation do
     it "valid account names" do
       [
         "https://example.com",
-        "https://example.com:1234"
+        "https://example.com:1234",
       ].each do |url|
         expect(described_class.validate_url(url)).to be_nil
       end
@@ -356,7 +356,7 @@ RSpec.describe Validation do
         "1.2.3.4",
         "http://example.com",
         "https://",
-        "ftp://example.com"
+        "ftp://example.com",
       ].each do |url|
         expect { described_class.validate_url(url) }.to raise_error described_class::ValidationFailed
       end
@@ -376,7 +376,7 @@ RSpec.describe Validation do
           unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWmPgJE", name:, family: "standard", cores: 1,
           vcpus: 5, cpu_percent_limit: 100, cpu_burst_percent_limit: 100, memory_gib: 4,
           arch: "x64", boot_image: "ubuntu-jammy", display_state: "running", ip4_enabled: true,
-          created_at: Time.now, location_id: Location::HETZNER_FSN1_ID, project_id: project.id
+          created_at: Time.now, location_id: Location::HETZNER_FSN1_ID, project_id: project.id,
         )
       end
       create_five_vcpu["first"]
@@ -421,7 +421,7 @@ RSpec.describe Validation do
         "123abc",
         "abc--123",
         "a-b-c-1-2",
-        "a" * 40
+        "a" * 40,
       ].each do |name|
         expect(described_class.validate_kubernetes_name(name)).to be_nil
       end
@@ -436,7 +436,7 @@ RSpec.describe Validation do
         "ABC",
         "ABC_123",
         "ABC$123",
-        "a" * 42
+        "a" * 42,
       ].each do |name|
         expect { described_class.validate_kubernetes_name(name) }.to raise_error described_class::ValidationFailed
       end
@@ -489,7 +489,7 @@ RSpec.describe Validation do
         "abc--123",
         "a-b-c-1-2",
         "a_b_c_1_2",
-        "a" * 32
+        "a" * 32,
       ].each do |username|
         expect(described_class.validate_victoria_metrics_username(username)).to be_nil
       end
@@ -503,7 +503,7 @@ RSpec.describe Validation do
         "ABC",
         "123abc",
         "abc$",
-        "a" * 33
+        "a" * 33,
       ].each do |username|
         expect { described_class.validate_victoria_metrics_username(username) }.to raise_error described_class::ValidationFailed
       end
@@ -556,8 +556,8 @@ RSpec.describe Validation do
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
-            flavor: PostgresResource::Flavor::STANDARD
-          )
+            flavor: PostgresResource::Flavor::STANDARD,
+          ),
         )
       }.not_to raise_error
     end
@@ -571,8 +571,8 @@ RSpec.describe Validation do
             target_version: "16",
             needs_convergence?: true,
             ongoing_failover?: false,
-            read_replica?: false
-          )
+            read_replica?: false,
+          ),
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -586,8 +586,8 @@ RSpec.describe Validation do
             target_version: "16",
             needs_convergence?: false,
             ongoing_failover?: false,
-            read_replica?: true
-          )
+            read_replica?: true,
+          ),
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -602,8 +602,8 @@ RSpec.describe Validation do
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
-            flavor: PostgresResource::Flavor::LANTERN
-          )
+            flavor: PostgresResource::Flavor::LANTERN,
+          ),
         )
       }.to raise_error described_class::ValidationFailed
     end
@@ -617,8 +617,8 @@ RSpec.describe Validation do
             needs_convergence?: false,
             ongoing_failover?: false,
             read_replica?: false,
-            flavor: PostgresResource::Flavor::STANDARD
-          )
+            flavor: PostgresResource::Flavor::STANDARD,
+          ),
         )
       }.to raise_error described_class::ValidationFailed
     end

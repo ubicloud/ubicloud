@@ -6,7 +6,7 @@ RSpec.describe DnsZone do
   subject(:dns_zone) {
     described_class.create(
       project_id: "00000000-0000-0000-0000-000000000000",
-      name: "example.com"
+      name: "example.com",
     )
   }
 

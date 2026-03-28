@@ -12,7 +12,7 @@ class Clover
         no_authorization_needed
         authentication_audit_log_search(
           DB[:account_authentication_audit_log].where(account_id: current_account_id),
-          month_limit: 3
+          month_limit: 3,
         )
         view "project/authentication_audit_log"
       end

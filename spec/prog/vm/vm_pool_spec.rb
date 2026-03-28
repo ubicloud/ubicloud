@@ -9,7 +9,7 @@ RSpec.describe Prog::Vm::VmPool do
     pool = VmPool.create(
       size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
       storage_size_gib: 86, storage_encrypted: true,
-      arch: "x64"
+      arch: "x64",
     )
     Strand.create_with_id(pool, prog: "Vm::VmPool", label: "start")
   }
@@ -23,7 +23,7 @@ RSpec.describe Prog::Vm::VmPool do
       st = described_class.assemble(
         size: 3, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
         storage_size_gib: 86, storage_encrypted: true,
-        arch: "x64"
+        arch: "x64",
       )
       pool = st.subject
       expect(pool).not_to be_nil

@@ -99,7 +99,7 @@ class Prog::Test::Vm < Prog::Test::Base
       fail_test "missing expected keys in #{disk_key} stats" unless disk_stats.keys.sort == [
         "active_age_ms", "cpu_stats", "io_stats", "main_pid",
         "memory_peak_bytes", "memory_swap_peak_bytes",
-        "num_queues", "queue_size", "size_gib", "vhost_block_backend_version"
+        "num_queues", "queue_size", "size_gib", "vhost_block_backend_version",
       ]
     }
 

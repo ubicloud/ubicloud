@@ -88,7 +88,7 @@ class SshKey
       :string, "ssh-ed25519",
       :string, verify_key_bytes,
       :string, @signer.keypair,
-      :string, "" # empty "comment" field
+      :string, "", # empty "comment" field
     )
 
     # Negative modulus is a handy trick to fill out pads like this.
@@ -108,9 +108,9 @@ class SshKey
         :long, 1, # number of keys N
         :string, Net::SSH::Buffer.from(
           :string, "ssh-ed25519",
-          :string, verify_key_bytes
+          :string, verify_key_bytes,
         ).content, # publickey1
-        :string, nested_private_key.content # privatekey1
+        :string, nested_private_key.content, # privatekey1
       ).content)
       s.puts "-----END OPENSSH PRIVATE KEY-----"
       s.string
@@ -133,7 +133,7 @@ class SshKey
 
       ["ssh-ed25519", Net::SSH::Buffer.from(
         :string, "ssh-ed25519",
-        :string, verify_key.to_bytes
+        :string, verify_key.to_bytes,
       ).content]
     end
 

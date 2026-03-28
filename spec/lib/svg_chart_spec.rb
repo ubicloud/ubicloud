@@ -20,7 +20,7 @@ RSpec.describe SvgChart do
       "zero-values" => {points: [[t0, 0], [t0 + 3600, 0]]},
       "large-values" => {points: [[t0, 1_000_000], [t0 + 3600, 2_000_000]]},
       "identical-timestamps" => {points: [[t0, 10], [t0, 20]]},
-      "many-points" => {points: Array.new(50) { |i| [t0 + i * 60, Math.sin(i / Math::PI) * 100 + 100] }}
+      "many-points" => {points: Array.new(50) { |i| [t0 + i * 60, Math.sin(i / Math::PI) * 100 + 100] }},
     }
 
     scenarios.each do |name, opts|

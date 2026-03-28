@@ -5,7 +5,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
 
   SUPPORTED_SPDK_VERSIONS = [
     ["v23.09-ubi-0.3", "x64"],
-    ["v23.09-ubi-0.3", "arm64"]
+    ["v23.09-ubi-0.3", "arm64"],
   ]
 
   def self.assemble(vm_host_id, version, start_service: false, allocation_weight: 0)
@@ -16,8 +16,8 @@ class Prog::Storage::SetupSpdk < Prog::Base
         "subject_id" => vm_host_id,
         "version" => version,
         "start_service" => start_service,
-        "allocation_weight" => allocation_weight
-      }]
+        "allocation_weight" => allocation_weight,
+      }],
     )
   end
 
@@ -39,7 +39,7 @@ class Prog::Storage::SetupSpdk < Prog::Base
       allocation_weight: 0,
       vm_host_id: vm_host.id,
       cpu_count: vm_host.spdk_cpu_count,
-      hugepages: spdk_hugepages
+      hugepages: spdk_hugepages,
     ) { it.id = SpdkInstallation.generate_uuid }
 
     hop_install_spdk
@@ -68,14 +68,14 @@ class Prog::Storage::SetupSpdk < Prog::Base
   label def update_database
     spdk_installation = SpdkInstallation.where(
       version: frame["version"],
-      vm_host_id: vm_host.id
+      vm_host_id: vm_host.id,
     ).first
 
     spdk_installation.update(allocation_weight: frame["allocation_weight"])
 
     if frame["start_service"]
       VmHost.where(id: vm_host.id).update(
-        used_hugepages_1g: Sequel[:used_hugepages_1g] + spdk_installation.hugepages
+        used_hugepages_1g: Sequel[:used_hugepages_1g] + spdk_installation.hugepages,
       )
     end
 

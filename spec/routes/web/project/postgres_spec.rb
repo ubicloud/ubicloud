@@ -15,7 +15,7 @@ RSpec.describe Clover, "postgres" do
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      target_version: "16"
+      target_version: "16",
     ).subject
   end
 
@@ -26,7 +26,7 @@ RSpec.describe Clover, "postgres" do
       name: "pg-without-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      target_version: "16"
+      target_version: "16",
     ).subject
   end
 
@@ -56,7 +56,7 @@ RSpec.describe Clover, "postgres" do
         name: "walg-minio",
         admin_user: "admin",
         admin_password: "password",
-        root_cert_1: "dummy-certs"
+        root_cert_1: "dummy-certs",
       )
     end
 
@@ -690,7 +690,7 @@ RSpec.describe Clover, "postgres" do
         it "does not show button for AWS instances" do
           aws_location = Location.create(
             name: "us-west-2", provider: "aws", display_name: "aws-us-west-2",
-            ui_name: "AWS US West 2", visible: true
+            ui_name: "AWS US West 2", visible: true,
           )
           LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
           pg_aws = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -699,7 +699,7 @@ RSpec.describe Clover, "postgres" do
             name: "pg-aws",
             target_vm_size: "standard-2",
             target_storage_size_gib: 128,
-            target_version: "16"
+            target_version: "16",
           ).subject
           pg_aws.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
@@ -867,7 +867,7 @@ RSpec.describe Clover, "postgres" do
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         )
         visit "#{project.path}#{pg.path}/charts"
 
@@ -881,7 +881,7 @@ RSpec.describe Clover, "postgres" do
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         )
 
         visit "#{project.path}#{pg.path}/charts"

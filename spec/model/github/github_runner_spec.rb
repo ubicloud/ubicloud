@@ -37,7 +37,7 @@ RSpec.describe GithubRunner do
       cores: vm.cores,
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
-      data_center: vm.vm_host.data_center
+      data_center: vm.vm_host.data_center,
     })
   end
 
@@ -58,7 +58,7 @@ RSpec.describe GithubRunner do
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
       data_center: vm.vm_host.data_center,
-      vm_pool_ubid: pool.ubid
+      vm_pool_ubid: pool.ubid,
     })
   end
 
@@ -73,7 +73,7 @@ RSpec.describe GithubRunner do
       disk_index: 0,
       boot_image_id: boot_image.id,
       vhost_block_backend_id: vhost_block_backend.id,
-      vring_workers: 4
+      vring_workers: 4,
     )
 
     expect(clog_emit_hash).to eq({
@@ -89,7 +89,7 @@ RSpec.describe GithubRunner do
       cores: vm.cores,
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
-      data_center: vm.vm_host.data_center
+      data_center: vm.vm_host.data_center,
     })
   end
 
@@ -108,7 +108,7 @@ RSpec.describe GithubRunner do
       arch: vm.arch,
       boot_image: vm.boot_image,
       cores: vm.cores,
-      vcpus: vm.vcpus
+      vcpus: vm.vcpus,
     })
   end
 
@@ -119,7 +119,7 @@ RSpec.describe GithubRunner do
       ubid: github_runner.ubid,
       label: github_runner.label,
       duration: 10,
-      conclusion: nil
+      conclusion: nil,
     })
   end
 
@@ -139,12 +139,12 @@ RSpec.describe GithubRunner do
 
   it "checks pulse" do
     session = {
-      ssh_session: Net::SSH::Connection::Session.allocate
+      ssh_session: Net::SSH::Connection::Session.allocate,
     }
     pulse = {
       reading: "up",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(session[:ssh_session]).to receive(:_exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")

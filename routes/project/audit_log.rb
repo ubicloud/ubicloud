@@ -20,7 +20,7 @@ class Clover
             at: row[:at].getutc.iso8601,
             action: "#{row[:ubid_type]}/#{row[:action]}",
             subject_id: UBID.to_ubid(subject_id),
-            object_ids: row[:object_ids].map { UBID.to_ubid(it) }
+            object_ids: row[:object_ids].map { UBID.to_ubid(it) },
           }
 
           if (subject_name = ubids[subject_id]&.name)
@@ -57,7 +57,7 @@ class Clover
       authentication_audit_log_search(
         DB[:account_authentication_audit_log].join(accounts_dataset.select(Sequel[:id].as(:account_id), Sequel[:name].as(:account_name)).as(:accounts), [:account_id]),
         accounts_dataset:,
-        month_limit: 3
+        month_limit: 3,
       )
       view "project/authentication_audit_log"
     end

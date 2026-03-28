@@ -24,7 +24,7 @@ RSpec.describe InvoiceGenerator do
       resource_name: name,
       span:,
       billing_rate_id:,
-      amount:
+      amount:,
     )
   end
 
@@ -39,7 +39,7 @@ RSpec.describe InvoiceGenerator do
         "postal_code" => "1186 XK",
         "tax_id" => "NL864651442B01",
         "trade_id" => "88492729",
-        "in_eu_vat" => true
+        "in_eu_vat" => true,
       }
     else
       {
@@ -48,14 +48,14 @@ RSpec.describe InvoiceGenerator do
         "country" => "US",
         "city" => "San Francisco",
         "state" => "CA",
-        "postal_code" => "94127"
+        "postal_code" => "94127",
       }
     end
 
     expected_billing_info = project.billing_info&.stripe_data&.merge({
       "id" => project.billing_info.id,
       "ubid" => project.billing_info.ubid,
-      "in_eu_vat" => !!expected_vat_info
+      "in_eu_vat" => !!expected_vat_info,
     })
 
     br = BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)
@@ -73,9 +73,9 @@ RSpec.describe InvoiceGenerator do
         "duration" => duration_mins,
         "cost" => expected_cost,
         "begin_time" => begin_time.utc.to_s,
-        "unit_price" => br["unit_price"]
+        "unit_price" => br["unit_price"],
       }],
-      "cost" => expected_cost
+      "cost" => expected_cost,
     }]
     actual_content = invoices.first.content
     [
@@ -88,7 +88,7 @@ RSpec.describe InvoiceGenerator do
       ["subtotal", expected_cost],
       ["discount", 0],
       ["credit", 0],
-      ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)]
+      ["cost", (expected_cost + expected_vat_info&.fetch("amount", 0).to_f).round(3)],
     ].each do |key, expected|
       expect(actual_content[key]).to eq(expected)
     end

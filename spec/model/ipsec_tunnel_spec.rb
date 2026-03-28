@@ -14,7 +14,7 @@ RSpec.describe IpsecTunnel do
       net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "10.0.0.0/26",
       state: "waiting",
-      project_id: Project.create(name: "test-project").id
+      project_id: Project.create(name: "test-project").id,
     )
   }
   let(:vm_host) { create_vm_host }
@@ -28,7 +28,7 @@ RSpec.describe IpsecTunnel do
       mac: "00:00:00:00:00:01",
       name: "src-nic",
       vm_id: src_vm.id,
-      state: "active"
+      state: "active",
     )
   }
   let(:dst_nic) {
@@ -39,7 +39,7 @@ RSpec.describe IpsecTunnel do
       mac: "00:00:00:00:00:02",
       name: "dst-nic",
       vm_id: dst_vm.id,
-      state: "active"
+      state: "active",
     )
   }
 

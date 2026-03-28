@@ -143,8 +143,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: "gzipped_data",
             headers: {
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -163,8 +163,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: "gzipped_data",
             headers: {
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -196,8 +196,8 @@ RSpec.describe VictoriaMetrics::Client do
             headers: {
               "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -209,8 +209,8 @@ RSpec.describe VictoriaMetrics::Client do
             headers: {
               "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
       end
     end
@@ -235,19 +235,19 @@ RSpec.describe VictoriaMetrics::Client do
                     "metric" => {"job" => "api", "instance" => "server1"},
                     "values" => [
                       [1600000000, "10.5"],
-                      [1600000015, "12.3"]
-                    ]
+                      [1600000015, "12.3"],
+                    ],
                   },
                   {
                     "metric" => {"job" => "api", "instance" => "server2"},
                     "values" => [
                       [1600000000, "5.2"],
-                      [1600000015, "6.1"]
-                    ]
-                  }
-                ]
-              }
-            }.to_json
+                      [1600000015, "6.1"],
+                    ],
+                  },
+                ],
+              },
+            }.to_json,
           )
       end
 
@@ -269,7 +269,7 @@ RSpec.describe VictoriaMetrics::Client do
           ["query", query],
           ["start", start_ts.to_s],
           ["end", end_ts.to_s],
-          ["step", expected_step.to_s]
+          ["step", expected_step.to_s],
         ]
         encoded_params = URI.encode_www_form(query_params)
 
@@ -286,9 +286,9 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "matrix",
-                "result" => []
-              }
-            }.to_json
+                "result" => [],
+              },
+            }.to_json,
           )
       end
 
@@ -306,8 +306,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: {
               "status" => "error",
               "errorType" => "execution",
-              "error" => "parse error: unexpected end of input"
-            }.to_json
+              "error" => "parse error: unexpected end of input",
+            }.to_json,
           )
       end
 
@@ -326,9 +326,9 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "scalar",
-                "result" => 42
-              }
-            }.to_json
+                "result" => 42,
+              },
+            }.to_json,
           )
       end
 
@@ -354,15 +354,15 @@ RSpec.describe VictoriaMetrics::Client do
                 "result" => [
                   {
                     "metric" => {"job" => "api", "instance" => "server1"},
-                    "value" => [1600000000, "10.5"]
+                    "value" => [1600000000, "10.5"],
                   },
                   {
                     "metric" => {"job" => "api", "instance" => "server2"},
-                    "value" => [1600000000, "5.2"]
-                  }
-                ]
-              }
-            }.to_json
+                    "value" => [1600000000, "5.2"],
+                  },
+                ],
+              },
+            }.to_json,
           )
       end
 
@@ -395,9 +395,9 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "vector",
-                "result" => []
-              }
-            }.to_json
+                "result" => [],
+              },
+            }.to_json,
           )
       end
 
@@ -415,8 +415,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: {
               "status" => "error",
               "errorType" => "execution",
-              "error" => "parse error: unexpected end of input"
-            }.to_json
+              "error" => "parse error: unexpected end of input",
+            }.to_json,
           )
       end
 
@@ -435,9 +435,9 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "scalar",
-                "result" => [1600000000, "42"]
-              }
-            }.to_json
+                "result" => [1600000000, "42"],
+              },
+            }.to_json,
           )
       end
 

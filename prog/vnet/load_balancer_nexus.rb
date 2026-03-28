@@ -37,7 +37,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
         health_check_up_threshold:,
         health_check_down_threshold:,
         health_check_protocol:,
-        cert_enabled:
+        cert_enabled:,
       )
       ports.each { |src_port, dst_port| LoadBalancerPort.create(load_balancer_id: lb.id, src_port:, dst_port:) }
       Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
@@ -190,7 +190,7 @@ class Prog::Vnet::LoadBalancerNexus < Prog::Base
           record_name:,
           type:,
           ttl: 10,
-          data:
+          data:,
         )
       end
     end

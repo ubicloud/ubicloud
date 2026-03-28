@@ -15,8 +15,8 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       stack: [{
         "kubernetes_service_project_id" => kubernetes_service_project.id,
         "kubernetes_test_project_id" => kubernetes_test_project.id,
-        "migration_number" => 0
-      }]
+        "migration_number" => 0,
+      }],
     )
   end
 
@@ -26,13 +26,13 @@ class Prog::Test::Kubernetes < Prog::Test::Base
       project_id: frame["kubernetes_test_project_id"],
       location_id: Location::HETZNER_FSN1_ID,
       version: Option.kubernetes_versions.first,
-      cp_node_count: 1
+      cp_node_count: 1,
     ).subject
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
       name: "kubernetes-test-standard-nodepool",
       node_count: 3,
       kubernetes_cluster_id: kc.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     )
 
     update_stack({"kubernetes_cluster_id" => kc.id})
@@ -141,7 +141,7 @@ STS
       kubernetes_cluster.sshable.d_run(
         unit_name,
         "bash", "-c",
-        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash"
+        "sudo kubectl --kubeconfig /etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- sh -c \"head -c 500M /dev/urandom | tee /etc/data/random-data-#{i} | sha256sum | awk '{print \\$1}'\" > /dev/shm/#{unit_name}.hash",
       )
     end
     hop_wait_data_write
@@ -327,7 +327,7 @@ STS
     update_stack({
       "reboot_node_id" => node.id,
       "nat_rules_before_reboot" => nat_rules,
-      "pod_access_rules_before_reboot" => pod_access_rules
+      "pod_access_rules_before_reboot" => pod_access_rules,
     })
     begin
       node.vm.sshable.cmd("sudo systemctl reboot")
@@ -451,7 +451,7 @@ STS
       Clog.emit("pod not running", {
         pod_status: status,
         events: begin; client.kubectl("get events --field-selector involvedObject.name=ubuntu-statefulset-0 --sort-by=.lastTimestamp"); rescue => e; e.message; end,
-        pv_pvc: begin; client.kubectl("get pv,pvc"); rescue => e; e.message; end
+        pv_pvc: begin; client.kubectl("get pv,pvc"); rescue => e; e.message; end,
       })
     end
     status

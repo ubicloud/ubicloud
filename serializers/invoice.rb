@@ -64,7 +64,7 @@ class Serializers::Invoice < Serializers::Base
                    cost_humanized: humanized_cost(line_item["cost"]),
                    resource_type: line_item["resource_type"],
                    resource_family: line_item["resource_family"],
-                   usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"])
+                   usage: BillingRate.line_item_usage(line_item["resource_type"], line_item["resource_family"], line_item["amount"], line_item["duration"]),
                  )
                end
              end.group_by { it.description }.flat_map do |description, line_items|
@@ -81,12 +81,12 @@ class Serializers::Invoice < Serializers::Base
                    cost_humanized: humanized_cost(cost_sum),
                    resource_type: nil,
                    resource_family: nil,
-                   usage: BillingRate.line_item_usage(line_items.first.resource_type, line_items.first.resource_family, amount_sum, duration_sum)
+                   usage: BillingRate.line_item_usage(line_items.first.resource_type, line_items.first.resource_family, amount_sum, duration_sum),
                  )
                else
                  line_items
                end
-             end.sort_by(&:name)
+             end.sort_by(&:name),
     )
   end
 

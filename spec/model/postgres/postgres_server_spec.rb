@@ -6,7 +6,7 @@ RSpec.describe PostgresServer do
   subject(:postgres_server) {
     described_class.create(
       timeline:, resource:, vm_id: vm.id, is_representative: true,
-      synchronization_status: "ready", timeline_access: "push", version: "16"
+      synchronization_status: "ready", timeline_access: "push", version: "16",
     )
   }
 
@@ -21,7 +21,7 @@ RSpec.describe PostgresServer do
     PrivateSubnet.create(
       name: "postgres-subnet", project:, location:,
       net4: NetAddr::IPv4Net.parse("172.0.0.0/26"),
-      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64")
+      net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a3d::/64"),
     )
   }
 
@@ -34,7 +34,7 @@ RSpec.describe PostgresServer do
       display_name: "us-west-2",
       ui_name: "us-west-2",
       provider: "ubicloud",
-      visible: true
+      visible: true,
     )
   }
 
@@ -46,7 +46,7 @@ RSpec.describe PostgresServer do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
       MinioCluster.create(
-        project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root"
+        project_id: Config.postgres_service_project_id, location:, name: "pgminio", admin_user: "root", admin_password: "root",
       )
     end
 
@@ -83,11 +83,11 @@ RSpec.describe PostgresServer do
 
       described_class.create(
         timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby1").id,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16",
       )
       standby2 = described_class.create(
         timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby2").id,
-        synchronization_status: "ready", timeline_access: "fetch", version: "16"
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
       )
 
       expect(postgres_server.configure_hash[:configs]).to include(synchronous_standby_names: "'ANY 1 (#{standby2.ubid})'")
@@ -98,11 +98,11 @@ RSpec.describe PostgresServer do
 
       described_class.create(
         timeline:, resource: create_standby_resource("1"), vm_id: create_hosted_vm(project, private_subnet, "standby1").id, is_representative: true,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16",
       )
       described_class.create(
         timeline:, resource: create_standby_resource("2"), vm_id: create_hosted_vm(project, private_subnet, "standby2").id, is_representative: true,
-        synchronization_status: "catching_up", timeline_access: "fetch", version: "16"
+        synchronization_status: "catching_up", timeline_access: "fetch", version: "16",
       )
 
       expect(postgres_server.configure_hash[:configs]).not_to include(:synchronous_standby_names)
@@ -169,7 +169,7 @@ RSpec.describe PostgresServer do
     it "returns true only when failover is successfully triggered" do
       standby = described_class.create(
         timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
-        synchronization_status: "ready", timeline_access: "fetch", version: "16"
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
       )
       expect(postgres_server).to receive(:failover_target).and_return(standby)
       expect(standby).to receive(:incr_planned_take_over)
@@ -192,7 +192,7 @@ RSpec.describe PostgresServer do
         postgres_server,
         instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
         instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
       ])
     end
 
@@ -251,7 +251,7 @@ RSpec.describe PostgresServer do
     it "returns standby with physical_slot_ready_id nil as fallback" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready"),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -261,7 +261,7 @@ RSpec.describe PostgresServer do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
         instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready"),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
@@ -277,7 +277,7 @@ RSpec.describe PostgresServer do
         postgres_server,
         instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, strand: instance_double(Strand, label: "wait_catch_up"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
         instance_double(described_class, ubid: "pgubidstandby2", is_representative: false, current_lsn: "1/5", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
-        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby3", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
       ])
     end
 
@@ -303,7 +303,7 @@ RSpec.describe PostgresServer do
     it "returns the replica even if physical_slot_ready_id is nil" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
-        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready")
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: true, physical_slot_ready_id: nil, synchronization_status: "ready"),
       ])
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
     end
@@ -326,7 +326,7 @@ RSpec.describe PostgresServer do
       parent_vm = create_hosted_vm(project, private_subnet, "parent-vm")
       described_class.create(
         timeline:, resource: parent_resource, vm_id: parent_vm.id, is_representative: true,
-        synchronization_status: "ready", timeline_access: "push", version: "16"
+        synchronization_status: "ready", timeline_access: "push", version: "16",
       )
 
       resource.update(parent: parent_resource)
@@ -391,12 +391,12 @@ RSpec.describe PostgresServer do
   it "checks pulse" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: DB
+      db_connection: DB,
     }
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(postgres_server).not_to receive(:incr_checkup)
@@ -409,12 +409,12 @@ RSpec.describe PostgresServer do
   it "increments checkup semaphore if pulse is down for a while and the resource is not upgrading" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
+      db_connection: instance_double(Sequel::Postgres::Database),
     }
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(session[:db_connection]).to receive(:get).and_raise(Sequel::DatabaseConnectionError)
@@ -429,12 +429,12 @@ RSpec.describe PostgresServer do
   it "uses pg_current_wal_lsn to track lsn for primaries" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
+      db_connection: instance_double(Sequel::Postgres::Database),
     }
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_current_wal_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
@@ -448,12 +448,12 @@ RSpec.describe PostgresServer do
   it "uses pg_last_wal_replay_lsn to track lsn for read replicas" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      db_connection: instance_double(Sequel::Postgres::Database)
+      db_connection: instance_double(Sequel::Postgres::Database),
     }
     pulse = {
       reading: "down",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(session[:db_connection]).to receive(:get).with(Sequel.function("pg_last_wal_replay_lsn").as(:lsn)).and_raise(Sequel::DatabaseConnectionError)
@@ -628,7 +628,7 @@ RSpec.describe PostgresServer do
     it "checks archival backlog and does nothing if it is within limits" do
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000005.ready\n",
-        "5\n"
+        "5\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -639,7 +639,7 @@ RSpec.describe PostgresServer do
     it "checks archival backlog and creates a page if it is outside of limits with no previous data" do
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000010.ready\n",
-        "15\n"
+        "15\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -659,7 +659,7 @@ RSpec.describe PostgresServer do
       session[:previous_archival_check_time] = Time.now - 1
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "00000001000000000000000A.ready\n",
-        "15\n"
+        "15\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -674,7 +674,7 @@ RSpec.describe PostgresServer do
       session[:previous_archival_check_time] = Time.now - 2
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000006.ready\n",
-        "15\n"
+        "15\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -688,7 +688,7 @@ RSpec.describe PostgresServer do
       session[:last_archival_check_time] = Time.now - 1
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000020.ready\n",
-        "25\n"
+        "25\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -702,12 +702,12 @@ RSpec.describe PostgresServer do
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {archival_backlog: 30}
+        extra_data: {archival_backlog: 30},
       )
       existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000003.ready\n",
-        "3\n"
+        "3\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -722,12 +722,12 @@ RSpec.describe PostgresServer do
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {archival_backlog: 15}
+        extra_data: {archival_backlog: 15},
       )
       existing_page = Page.from_tag_parts("PGArchivalBacklogHigh", postgres_server.id)
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000009.ready\n",
-        "9\n"
+        "9\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -747,14 +747,14 @@ RSpec.describe PostgresServer do
       # This triggers the "no previous data" path in should_page_for_archival_backlog?
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "\n",
-        "15\n"
+        "15\n",
       )
       expect(Prog::PageNexus).to receive(:assemble).with(
         "#{postgres_server.ubid} archival backlog high",
         ["PGArchivalBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {archival_backlog: 15, disk_usage_percent: 0}
+        extra_data: {archival_backlog: 15, disk_usage_percent: 0},
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -764,7 +764,7 @@ RSpec.describe PostgresServer do
       session[:disk_usage_percent] = 90
       allow(session[:ssh_session]).to receive(:_exec!).and_return(
         "000000010000000000000010.ready\n",
-        "15\n"
+        "15\n",
       )
 
       postgres_server.observe_archival_backlog(session)
@@ -798,33 +798,33 @@ RSpec.describe PostgresServer do
 
     it "returns true when backlog is severe (more than 2x threshold)" do
       expect(postgres_server.should_page_for_archival_backlog?(
-        25, "00000001000000000000000F.ready", "000000010000000000000005.ready", now, previous_time
+        25, "00000001000000000000000F.ready", "000000010000000000000005.ready", now, previous_time,
       )).to be true
     end
 
     it "returns true when there is no previous data" do
       expect(postgres_server.should_page_for_archival_backlog?(
-        15, "00000001000000000000000F.ready", nil, now, nil
+        15, "00000001000000000000000F.ready", nil, now, nil,
       )).to be true
     end
 
     it "returns false when backlog is moderate and upload rate is above threshold" do
       # 5 segments = 80MB in 1 second = 80 MB/s > 50 MB/s
       expect(postgres_server.should_page_for_archival_backlog?(
-        15, "00000001000000000000000A.ready", "000000010000000000000005.ready", now, previous_time
+        15, "00000001000000000000000A.ready", "000000010000000000000005.ready", now, previous_time,
       )).to be false
     end
 
     it "returns true when backlog is moderate but upload rate is below threshold" do
       # 1 segment = 16MB in 2 seconds = 8 MB/s < 10 MB/s
       expect(postgres_server.should_page_for_archival_backlog?(
-        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now - 2
+        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now - 2,
       )).to be true
     end
 
     it "returns true when backlog is moderate but upload rate cannot be calculated due to zero time elapsed" do
       expect(postgres_server.should_page_for_archival_backlog?(
-        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now
+        15, "000000010000000000000006.ready", "000000010000000000000005.ready", now, now,
       )).to be true
     end
   end
@@ -849,13 +849,13 @@ RSpec.describe PostgresServer do
     before do
       allow(postgres_server).to receive(:metrics_config).and_return({
         metrics_dir: "/home/ubi/postgres/metrics",
-        interval: "15s"
+        interval: "15s",
       })
     end
 
     it "checks metrics backlog and does nothing if it is within limits" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
       ).and_return("10\n")
 
       postgres_server.observe_metrics_backlog(session)
@@ -866,7 +866,7 @@ RSpec.describe PostgresServer do
     it "checks metrics backlog and creates a page if it exceeds threshold" do
       # 30 files * 15 seconds = 450 > 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
       ).and_return("30\n")
 
       postgres_server.observe_metrics_backlog(session)
@@ -885,12 +885,12 @@ RSpec.describe PostgresServer do
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {metrics_backlog: 30}
+        extra_data: {metrics_backlog: 30},
       )
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       # 10 files * 15 seconds = 150 < 300 threshold
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
       ).and_return("10\n")
 
       postgres_server.observe_metrics_backlog(session)
@@ -900,7 +900,7 @@ RSpec.describe PostgresServer do
 
     it "logs errors when checking metrics backlog fails" do
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
       ).and_raise(Net::SSH::Exception.new("SSH error"))
       expect(Clog).to receive(:emit).with("Failed to observe metrics backlog", instance_of(Hash)).and_call_original
 
@@ -913,11 +913,11 @@ RSpec.describe PostgresServer do
         ["PGMetricsBacklogHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {metrics_backlog: 30}
+        extra_data: {metrics_backlog: 30},
       )
       existing_page = Page.from_tag_parts("PGMetricsBacklogHigh", postgres_server.id)
       expect(session[:ssh_session]).to receive(:_exec!).with(
-        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l"
+        "find /home/ubi/postgres/metrics/done -name '*.txt' | wc -l",
       ).and_return("19\n")
 
       postgres_server.observe_metrics_backlog(session)
@@ -965,7 +965,7 @@ RSpec.describe PostgresServer do
         ["PGDiskUsageHigh", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {disk_usage_percent: 96}
+        extra_data: {disk_usage_percent: 96},
       )
       postgres_server.observe_disk_usage(session)
     end
@@ -1014,7 +1014,7 @@ RSpec.describe PostgresServer do
         ["PGIOThrottleStale", postgres_server.id],
         postgres_server.ubid,
         severity: "warning",
-        extra_data: {io_max_mtime: Time.at(old_mtime)}
+        extra_data: {io_max_mtime: Time.at(old_mtime)},
       )
       postgres_server.observe_io_throttle(session)
     end

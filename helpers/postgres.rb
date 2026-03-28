@@ -24,7 +24,7 @@ class Clover
       "size" => size,
       "storage_size" => storage_size,
       "ha_type" => ha_type,
-      "version" => version
+      "version" => version,
     }
 
     validate_postgres_input(name, postgres_params)
@@ -52,7 +52,7 @@ class Clover
         user_config:,
         pgbouncer_user_config:,
         tags:,
-        init_script:
+        init_script:,
       ).subject
       audit_log(pg, "create")
     end

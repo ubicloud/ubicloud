@@ -11,7 +11,7 @@ Sequel.migration do
     ["us-east-1", "arm64", "ami-0da22fbdd571c9bac", "ami-03f25039f0bd61216"],
     ["us-east-2", "arm64", "ami-0d42e3872e22a6a73", "ami-0298f1dccfb07c6ec"],
     ["eu-west-1", "arm64", "ami-0cf26a35275aaf530", "ami-06d8da668cf964b22"],
-    ["ap-southeast-2", "arm64", "ami-082aaa8eb267e01b3", "ami-04179a820c1bd4c82"]
+    ["ap-southeast-2", "arm64", "ami-082aaa8eb267e01b3", "ami-04179a820c1bd4c82"],
   ]
 
   up do

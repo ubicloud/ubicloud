@@ -53,7 +53,7 @@ RSpec.describe Clover, "billing" do
         payment_methods: payment_methods_service,
         payment_intents: payment_intents_service,
         setup_intents: setup_intents_service,
-        checkout: instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service)
+        checkout: instance_double(Stripe::CheckoutService, sessions: checkout_sessions_service),
       )
     end
 
@@ -127,7 +127,7 @@ RSpec.describe Clover, "billing" do
 
     it "can update billing info" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}}
+        {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
       visit "#{project.path}/billing"
@@ -147,7 +147,7 @@ RSpec.describe Clover, "billing" do
     it "can update billing info without address" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => nil, "metadata" => {}},
-        {"name" => "New Inc.", "address" => nil, "metadata" => {}}
+        {"name" => "New Inc.", "address" => nil, "metadata" => {}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything)
       visit "#{project.path}/billing"
@@ -167,7 +167,7 @@ RSpec.describe Clover, "billing" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}}
+        {"name" => "New Inc.", "address" => {"country" => "US"}, "metadata" => {"tax_id" => "DE456789"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
       visit "#{project.path}/billing"
@@ -190,7 +190,7 @@ RSpec.describe Clover, "billing" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
         {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
-        {"name" => "Old Inc.", "address" => {"country" => nil}, "metadata" => {"tax_id" => nil}}
+        {"name" => "Old Inc.", "address" => {"country" => nil}, "metadata" => {"tax_id" => nil}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).with(billing_info.stripe_id, anything).at_least(:once)
 
@@ -208,7 +208,7 @@ RSpec.describe Clover, "billing" do
 
     it "shows error if billing info update failed" do
       expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}}
+        {"name" => "Old Inc.", "address" => {"country" => "NL"}, "metadata" => {"tax_id" => "123456"}},
       ).at_least(:once)
       expect(customers_service).to receive(:update).and_raise(Stripe::InvalidRequestError.new("Invalid email address:    test@test.com", "email"))
 
@@ -229,7 +229,7 @@ RSpec.describe Clover, "billing" do
       expect(payment_methods_service).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard"}, "billing_details" => {})).twice
       # rubocop:disable RSpec/VerifiedDoubles
       expect(checkout_sessions_service).to receive(:create).with(
-        hash_including(billing_address_collection: "auto")
+        hash_including(billing_address_collection: "auto"),
       ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
       expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles
@@ -253,13 +253,13 @@ RSpec.describe Clover, "billing" do
         {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
         {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
         {"name" => "ACME Inc.", "address" => nil, "metadata" => {"company_name" => "Foo Company Name"}},
-        {"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Company Name"}}
+        {"name" => "ACME Inc.", "address" => {"country" => "US"}, "metadata" => {"company_name" => "Foo Company Name"}},
       ).exactly(4)
       expect(payment_methods_service).to receive(:retrieve).with(payment_method.stripe_id).and_return(stripe_object("card" => {"brand" => "visa"})).twice
       expect(payment_methods_service).to receive(:retrieve).with("pm_222222222").and_return(stripe_object("card" => {"brand" => "mastercard"}, "billing_details" => {"address" => {"country" => "US"}})).twice
       # rubocop:disable RSpec/VerifiedDoubles
       expect(checkout_sessions_service).to receive(:create).with(
-        hash_including(billing_address_collection: "required")
+        hash_including(billing_address_collection: "required"),
       ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/success?session_id=session_123"))
       expect(payment_intents_service).to receive(:create).and_return(double(Stripe::PaymentIntent, status: "requires_capture", id: "pi_1234567890"))
       # rubocop:enable RSpec/VerifiedDoubles
@@ -363,7 +363,7 @@ RSpec.describe Clover, "billing" do
     describe "discount code with billing info" do
       before do
         expect(customers_service).to receive(:retrieve).with(billing_info.stripe_id).and_return(
-          {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}}
+          {"name" => "New Inc.", "address" => {"country" => "DE"}, "metadata" => {"tax_id" => "DE456789"}},
         ).at_least(:once)
       end
 
@@ -429,7 +429,7 @@ RSpec.describe Clover, "billing" do
           "name" => "ACME Inc.",
           "email" => "test@example.com",
           "address" => nil,
-          "metadata" => {}
+          "metadata" => {},
         }
         expect(customers_service).to receive(:create).and_return(customer).once
         expect(customers_service).to receive(:retrieve).with("test_customer").and_return(customer).once
@@ -478,7 +478,7 @@ RSpec.describe Clover, "billing" do
           resource_name: vm.name,
           span: Sequel::Postgres::PGRange.new(begin_time, end_time),
           billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-          amount: vm.vcpus
+          amount: vm.vcpus,
         )
       end
 
@@ -700,7 +700,7 @@ RSpec.describe Clover, "billing" do
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         # rubocop:disable RSpec/VerifiedDoubles
         expect(checkout_sessions_service).to receive(:create).with(
-          hash_including(billing_address_collection: "auto")
+          hash_including(billing_address_collection: "auto"),
         ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123"))
         # rubocop:enable RSpec/VerifiedDoubles
         expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("customer" => "cs_1234567890", "metadata" => {"invoice" => invoice.ubid}, "payment_status" => "paid"))
@@ -727,7 +727,7 @@ RSpec.describe Clover, "billing" do
         invoice = InvoiceGenerator.new(bi.span.begin, bi.span.end, save_result: true, eur_rate: 1.1).run.first
         # rubocop:disable RSpec/VerifiedDoubles
         expect(checkout_sessions_service).to receive(:create).with(
-          hash_including(billing_address_collection: "auto")
+          hash_including(billing_address_collection: "auto"),
         ).and_return(double(Stripe::Checkout::Session, url: "#{project.path}/billing/invoice/#{invoice.ubid}/success?session_id=session_123")).at_least(:once)
         # rubocop:enable RSpec/VerifiedDoubles
         expect(checkout_sessions_service).to receive(:retrieve).with("session_123").and_return(stripe_object("metadata" => {"invoice" => "1vvc31wac0za4gx65xd6mt2a42"}, "payment_status" => "paid"))

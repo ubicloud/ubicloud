@@ -9,7 +9,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     ["v0.3.1", "x64"],
     ["v0.3.1", "arm64"],
     ["v0.2.2", "x64"],
-    ["v0.2.2", "arm64"]
+    ["v0.2.2", "arm64"],
   ].freeze.each(&:freeze)
 
   def self.assemble(vm_host_id, version, allocation_weight: 0)
@@ -19,8 +19,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
       stack: [{
         "subject_id" => vm_host_id,
         "version" => version,
-        "allocation_weight" => allocation_weight
-      }]
+        "allocation_weight" => allocation_weight,
+      }],
     )
   end
 
@@ -32,7 +32,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     vbb = VhostBlockBackend.create(
       version:,
       allocation_weight: 0,
-      vm_host_id: vm_host.id
+      vm_host_id: vm_host.id,
     )
 
     update_stack(frame.merge("vhost_block_backend_id" => vbb.id))

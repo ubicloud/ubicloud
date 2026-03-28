@@ -33,13 +33,13 @@ class Clover
                 city: tp.nonempty_str("city"),
                 postal_code: tp.nonempty_str("postal_code"),
                 line1: tp.str!("address"),
-                line2: nil
+                line2: nil,
               },
               metadata: {
                 tax_id: new_tax_id,
                 company_name: tp.str("company_name"),
-                note: tp.str("note")
-              }
+                note: tp.str("note"),
+              },
             })
             if new_tax_id != current_tax_id
               DB.transaction do
@@ -66,7 +66,7 @@ class Clover
           customer_creation: "always",
           billing_address_collection: "required",
           success_url: "#{Config.base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
-          cancel_url: "#{Config.base_url}#{@project.path}/billing"
+          cancel_url: "#{Config.base_url}#{@project.path}/billing",
         )
 
         r.redirect checkout.url, 303
@@ -102,7 +102,7 @@ class Clover
             off_session: true,
             capture_method: "manual",
             customer: customer_stripe_id,
-            payment_method: stripe_id
+            payment_method: stripe_id,
           })
 
           if payment_intent.status != "requires_capture"
@@ -125,7 +125,7 @@ class Clover
 
         unless @project.billing_info.has_address?
           StripeClient.customers.update(@project.billing_info.stripe_id, {
-            address: stripe_payment_method["billing_details"]["address"].to_hash
+            address: stripe_payment_method["billing_details"]["address"].to_hash,
           })
         end
 
@@ -143,7 +143,7 @@ class Clover
             customer: billing_info.stripe_id,
             billing_address_collection: billing_info.has_address? ? "auto" : "required",
             success_url: "#{Config.base_url}#{@project.path}/billing/success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url: "#{Config.base_url}#{@project.path}/billing"
+            cancel_url: "#{Config.base_url}#{@project.path}/billing",
           )
 
           r.redirect checkout.url, 303
@@ -198,22 +198,22 @@ class Clover
                 currency: "usd",
                 product_data: {
                   name: "Invoice Payment",
-                  description: invoice.invoice_number
+                  description: invoice.invoice_number,
                 },
-                unit_amount: (invoice.cost.to_f * 100).to_i  # Stripe expects amount in cents
+                unit_amount: (invoice.cost.to_f * 100).to_i,  # Stripe expects amount in cents
               },
-              quantity: 1
+              quantity: 1,
             }],
             payment_intent_data: {
-              capture_method: "automatic"
+              capture_method: "automatic",
             },
             customer: bi.stripe_id,
             metadata: {
-              invoice: invoice.ubid
+              invoice: invoice.ubid,
             },
             billing_address_collection: "auto",
             success_url: "#{Config.base_url}#{path(invoice)}/success?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url: "#{Config.base_url}#{billing_path}"
+            cancel_url: "#{Config.base_url}#{billing_path}",
           )
 
           r.redirect checkout.url, 303

@@ -55,7 +55,7 @@ class VictoriaMetrics::Client
     data["data"]["result"].map do |result|
       {
         "labels" => result["metric"] || {},
-        "value" => result["value"]
+        "value" => result["value"],
       }
     end
   end
@@ -71,7 +71,7 @@ class VictoriaMetrics::Client
     data["data"]["result"].map do |result|
       {
         "labels" => result["metric"] || {},
-        "values" => result["values"]
+        "values" => result["values"],
       }
     end
 

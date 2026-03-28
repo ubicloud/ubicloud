@@ -7,7 +7,7 @@ class Serializers::PrivateLocation < Serializers::Base
       name: location.name,
       ui_name: location.ui_name,
       provider: location.provider,
-      path: location.path
+      path: location.path,
     }
   end
 end

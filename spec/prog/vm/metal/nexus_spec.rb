@@ -31,7 +31,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       location_id: Location::HETZNER_FSN1_ID,
       created_at: Time.now,
       project_id: project.id,
-      vm_host_id: vm_host.id
+      vm_host_id: vm_host.id,
     )
     Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "start")
     vm
@@ -219,7 +219,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     [
       {"swap_size_bytes" => nil},
-      {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"}
+      {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"},
     ].each do |frame_update|
       it "generates and passes a params json if prep command is not started yet (with frame opts: #{frame_update.inspect})" do
         kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
@@ -263,7 +263,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             "slice_name" => "system.slice",
             "cpu_percent_limit" => 200,
             "cpu_burst_percent_limit" => 0,
-            **frame_update
+            **frame_update,
           )
         end
         expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
@@ -290,7 +290,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       [{
         "use_bdev_ubi" => false,
         "size_gib" => 11,
-        "boot" => true
+        "boot" => true,
       }]
     }
 
@@ -406,7 +406,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -424,7 +424,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -442,7 +442,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -463,7 +463,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -471,7 +471,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "considers preferred locations for runners if set for the installation" do
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
-        "location_preference" => [Location::LEASEWEB_WDC02_ID]
+        "location_preference" => [Location::LEASEWEB_WDC02_ID],
       })
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
@@ -487,7 +487,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -508,7 +508,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard", "premium"]
+        family_filter: ["standard", "premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -529,7 +529,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["premium", "standard"]
+        family_filter: ["premium", "standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -551,7 +551,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["premium"]
+        family_filter: ["premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -572,7 +572,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -580,7 +580,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can force allocating a host" do
       st.stack = [{
         "force_host_id" => vm_host.id,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -594,7 +594,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: []
+        family_filter: [],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -602,7 +602,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can exclude hosts" do
       st.stack = [{
         "exclude_host_ids" => [vm_host.id, "another-vm-host-id"],
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -616,7 +616,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -625,7 +625,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       st.stack = [{
         "distinct_storage_devices" => true,
         "storage_volumes" => storage_volumes,
-        "gpu_count" => 0
+        "gpu_count" => 0,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -639,7 +639,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -647,7 +647,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "requests gpus" do
       st.stack = [{
         "gpu_count" => 3,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -661,7 +661,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 3,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -766,7 +766,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
 
       BillingRecord.create(
@@ -774,7 +774,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         resource_id: vm.assigned_vm_address.id,
         resource_name: vm.assigned_vm_address.ip,
         billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
-        amount: 1
+        amount: 1,
       )
 
       vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
@@ -1117,10 +1117,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "absorbs an already deleted errors as a success" do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
-        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
-        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
 
@@ -1305,7 +1305,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
       expect(sshable).to receive(:_cmd).with(
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
-        {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
+        {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/},
       )
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")

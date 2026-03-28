@@ -42,8 +42,8 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       prog: "Storage::MigrateSpdkVmToUbiblk",
       label: "stop_vm",
       stack: [{
-        "subject_id" => vm_id
-      }]
+        "subject_id" => vm_id,
+      }],
     )
   end
 
@@ -150,7 +150,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       use_bdev_ubi: false,
       vhost_block_backend_id: vm_host_vhost_block_backend.id,
       vring_workers: [1, vm.vcpus / 2].max,
-      spdk_installation_id: nil
+      spdk_installation_id: nil,
     )
 
     hop_update_vm_configurations
@@ -186,7 +186,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "vhost_block_backend_version" => Config.vhost_block_backend_version,
       "max_read_mbytes_per_sec" => vm_storage_volume.max_read_mbytes_per_sec,
       "max_write_mbytes_per_sec" => vm_storage_volume.max_write_mbytes_per_sec,
-      "spdk_version" => vm_storage_volume.spdk_installation.version
+      "spdk_version" => vm_storage_volume.spdk_installation.version,
     }.to_json
   end
 
@@ -216,7 +216,7 @@ class Prog::Storage::MigrateSpdkVmToUbiblk < Prog::Base
       "key" => kek.key.strip,
       "init_vector" => kek.init_vector.strip,
       "method" => "aes256-gcm",
-      "auth_data" => Base64.strict_encode64(kek.auth_data)
+      "auth_data" => Base64.strict_encode64(kek.auth_data),
     }
     vm.vm_host.sshable.write_file(kek_file_path, kek_data.to_yaml, log: false)
   end

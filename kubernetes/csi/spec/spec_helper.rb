@@ -9,7 +9,7 @@ unless ENV["COVERAGE"] == "false"
     # Configure formatters for both HTML and console output
     SimpleCov.formatters = [
       SimpleCov::Formatter::HTMLFormatter,
-      SimpleCov::Formatter::Console
+      SimpleCov::Formatter::Console,
     ]
 
     # Add filters to exclude test files and generated protobuf files
@@ -24,7 +24,7 @@ unless ENV["COVERAGE"] == "false"
     # Configure console formatter
     SimpleCov::Formatter::Console.table_options = {
       max_width: 120,
-      sort_by: :covered_percent
+      sort_by: :covered_percent,
     }
 
     # Set minimum coverage threshold

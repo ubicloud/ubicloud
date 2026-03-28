@@ -24,7 +24,7 @@ class Sshable < Sequel::Model
     Errno::EHOSTUNREACH,
     SocketError,
     EOFError,
-    IOError
+    IOError,
   ].freeze
 
   def admin_label

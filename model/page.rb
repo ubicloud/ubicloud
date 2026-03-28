@@ -24,11 +24,11 @@ class Page < Sequel::Model
           status: "firing",
           title: summary,
           source_url: link&.[](:href),
-          metadata:
+          metadata:,
         }.to_json
         Excon.post(incidentio_uri, body:, headers: {
           "Authorization" => "Bearer #{Config.incidentio_key}",
-          "Content-Type" => "application/json"
+          "Content-Type" => "application/json",
         })
       else
         Clog.emit("page triggered", {page_triggered: {tag:, summary:, severity:, details:, links:}})
@@ -42,11 +42,11 @@ class Page < Sequel::Model
         body = {
           deduplication_key: deduplication_key(tag),
           status: "resolved",
-          title: summary
+          title: summary,
         }.to_json
         Excon.post(incidentio_uri, body:, headers: {
           "Authorization" => "Bearer #{Config.incidentio_key}",
-          "Content-Type" => "application/json"
+          "Content-Type" => "application/json",
         })
       else
         Clog.emit("page resolved", {page_resolved: {tag:}})

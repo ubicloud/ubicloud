@@ -97,12 +97,12 @@ RSpec.describe Page do
             status: "firing",
             title: p.summary,
             source_url: "#{Config.admin_url}/model/Page/#{p.ubid}",
-            metadata: {severity: p.severity}
+            metadata: {severity: p.severity},
           }.to_json,
           headers: {
             "Authorization" => "Bearer dummy-key",
-            "Content-Type" => "application/json"
-          }
+            "Content-Type" => "application/json",
+          },
         }, {status: 202})
         expect(p.trigger.status).to eq(202)
       end
@@ -118,13 +118,13 @@ RSpec.describe Page do
             source_url: nil,
             metadata: {
               severity: "low",
-              links: ["https://example.com"]
-            }
+              links: ["https://example.com"],
+            },
           }.to_json,
           headers: {
             "Authorization" => "Bearer dummy-key",
-            "Content-Type" => "application/json"
-          }
+            "Content-Type" => "application/json",
+          },
         }, {status: 202})
         expect(p.client.trigger(p.tag, summary: "title", severity: "low", details: {}, links: [nil, "https://example.com"]).status).to eq(202)
       end
@@ -138,12 +138,12 @@ RSpec.describe Page do
           body: {
             deduplication_key: p.client.send(:deduplication_key, p.tag),
             status: "resolved",
-            title: p.summary
+            title: p.summary,
           }.to_json,
           headers: {
             "Authorization" => "Bearer dummy-key",
-            "Content-Type" => "application/json"
-          }
+            "Content-Type" => "application/json",
+          },
         }, {status: 202})
         expect(p.resolve.status).to eq(202)
       end
@@ -158,7 +158,7 @@ RSpec.describe Page do
           summary: p.summary,
           severity: p.severity,
           details: p.details,
-          links: [{href: "#{Config.admin_url}/model/Page/#{p.ubid}", text: "Admin Page"}]
+          links: [{href: "#{Config.admin_url}/model/Page/#{p.ubid}", text: "Admin Page"}],
         }})
         p.trigger
       end
@@ -167,7 +167,7 @@ RSpec.describe Page do
     describe "#resolve" do
       it "resolves the page if key is present" do
         expect(Clog).to receive(:emit).with("page resolved", {page_resolved: {
-          tag: p.tag
+          tag: p.tag,
         }})
         p.resolve
       end

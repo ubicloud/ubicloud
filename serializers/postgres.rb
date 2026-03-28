@@ -20,7 +20,7 @@ class Serializers::Postgres < Serializers::Base
       read_replica: !!pg.read_replica?,
       parent: pg.parent&.path,
       tags: pg.tags || [],
-      created_at: pg.created_at.iso8601
+      created_at: pg.created_at.iso8601,
     }
 
     if options[:detailed]
@@ -32,7 +32,7 @@ class Serializers::Postgres < Serializers::Base
         primary: pg.representative_server.primary?,
         firewall_rules: Serializers::PostgresFirewallRule.serialize(pg.pg_firewall_rules),
         metric_destinations: pg.metric_destinations.map { {id: it.ubid, username: it.username, url: it.url} },
-        read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true})
+        read_replicas: Serializers::Postgres.serialize(pg.read_replicas, {include_path: true}),
       )
 
       if pg.timeline && pg.representative_server.primary?

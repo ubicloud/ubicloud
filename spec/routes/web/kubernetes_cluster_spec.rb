@@ -15,13 +15,13 @@ RSpec.describe Clover, "Kubernetes" do
       version: Option.kubernetes_versions.first,
       project_id: project.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "mysubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project.id).id,
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     ).subject
 
     Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
       name: "kn",
       node_count: 2,
-      kubernetes_cluster_id: cluster.id
+      kubernetes_cluster_id: cluster.id,
     ).subject
 
     services_lb = Prog::Vnet::LoadBalancerNexus.assemble(
@@ -35,7 +35,7 @@ RSpec.describe Clover, "Kubernetes" do
       dst_port: 6443,
       health_check_endpoint: "/",
       health_check_protocol: "tcp",
-      stack: LoadBalancer::Stack::IPV4
+      stack: LoadBalancer::Stack::IPV4,
     ).subject
 
     cluster.update(services_lb_id: services_lb.id)
@@ -48,7 +48,7 @@ RSpec.describe Clover, "Kubernetes" do
       version: Option.kubernetes_versions.first,
       project_id: project_wo_permissions.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
-      location_id: Location::HETZNER_FSN1_ID
+      location_id: Location::HETZNER_FSN1_ID,
     ).subject
   end
 

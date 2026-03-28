@@ -31,7 +31,7 @@ RSpec.describe Clover, "inference-playground" do
         ["ie3", "llama-guard-3-8b", project_wo_permissions, false, true, lb.id, {capability: "Text Generation"}],
         ["ie4", "mistral-small-3", project, false, true, lb2.id, {capability: "Text Generation"}],
         ["ie5", "llama-3-2-3b-it", project, false, false, lb.id, {capability: "Text Generation"}],
-        ["ie6", "test-model", project_wo_permissions, true, true, lb.id, {capability: "Text Generation"}]
+        ["ie6", "test-model", project_wo_permissions, true, true, lb.id, {capability: "Text Generation"}],
       ].each do |name, model_name, project, is_public, visible, load_balancer_id, tags|
         InferenceEndpoint.create(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id:, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
       end
@@ -42,21 +42,21 @@ RSpec.describe Clover, "inference-playground" do
         replica_count: 1,
         project_id: project.id,
         load_balancer_id: lb.id,
-        private_subnet_id: ps.id
+        private_subnet_id: ps.id,
       )
       [
         ["meta-llama/Llama-3.2-1B-Instruct", "llama-3-2-1b-it-input", "llama-3-2-1b-it-output", true, {capability: "Text Generation", hf_model: "foo/bar"}],
         ["Invisible Model", "test-model-input", "test-model-output", false, {capability: "Text Generation"}],
-        ["Embedding Model", "test-model2-input", "test-model2-output", true, {capability: "Embeddings"}]
+        ["Embedding Model", "test-model2-input", "test-model2-output", true, {capability: "Embeddings"}],
       ].each do |model_name, prompt_billing, completion_billing, visible, tags|
         model = InferenceRouterModel.create(
           model_name:, prompt_billing_resource: prompt_billing, completion_billing_resource: completion_billing,
           project_inflight_limit: 100, project_prompt_tps_limit: 10_000, project_completion_tps_limit: 10_000,
-          visible:, tags:
+          visible:, tags:,
         )
         InferenceRouterTarget.create(
           name: "test-target", host: "test-host", api_key: "test-key", inflight_limit: 10, priority: 1,
-          inference_router_model_id: model.id, inference_router_id: inference_router.id, enabled: true
+          inference_router_model_id: model.id, inference_router_id: inference_router.id, enabled: true,
         )
       end
       visit "#{project.path}/inference-playground"

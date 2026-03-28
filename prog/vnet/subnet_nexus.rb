@@ -87,7 +87,7 @@ class Prog::Vnet::SubnetNexus < Prog::Base
         location_aws_az_id: az.id,
         ipv4_cidr: ipv4_cidr.to_s,
         ipv6_cidr: nil,  # Will be set when VPC is created
-        subnet_id: nil   # Will be set when AWS subnet is created
+        subnet_id: nil,   # Will be set when AWS subnet is created
       )
     end
   end

@@ -32,10 +32,10 @@ init_config = {
     "kubeletExtraArgs" => [
       {
         "name" => "node-ip",
-        "value" => "#{node_ipv4},#{node_ipv6}"
-      }
-    ]
-  }
+        "value" => "#{node_ipv4},#{node_ipv6}",
+      },
+    ],
+  },
 }
 
 cluster_config = {
@@ -48,33 +48,33 @@ cluster_config = {
     "extraArgs" => [
       {
         "name" => "bind-address",
-        "value" => "::"
-      }
-    ]
+        "value" => "::",
+      },
+    ],
   },
   "networking" => {
     "podSubnet" => "#{private_subnet_cidr4},#{private_subnet_cidr6}",
-    "serviceSubnet" => "10.96.0.0/12,#{service_subnet_cidr6}"
+    "serviceSubnet" => "10.96.0.0/12,#{service_subnet_cidr6}",
   },
   "controllerManager" => {
     "extraArgs" => [
       {
         "name" => "allocate-node-cidrs",
-        "value" => "false"
-      }
-    ]
+        "value" => "false",
+      },
+    ],
   },
   "etcd" => {
     "local" => {
-      "dataDir" => "/var/lib/etcd"
-    }
-  }
+      "dataDir" => "/var/lib/etcd",
+    },
+  },
 }
 
 kubelet_config = {
   "apiVersion" => "kubelet.config.k8s.io/v1beta1",
   "kind" => "KubeletConfiguration",
-  "serverTLSBootstrap" => true
+  "serverTLSBootstrap" => true,
 }
 
 config_path = "/tmp/kubeadm-config.yaml"

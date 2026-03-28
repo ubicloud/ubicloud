@@ -11,7 +11,7 @@ RSpec.describe Clover, "cli pg show-upgrade-status" do
       name: "test-pg",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
-      target_version: 16
+      target_version: 16,
     ).subject
     @ref = [@pg.display_location, @pg.name].join("/")
   end

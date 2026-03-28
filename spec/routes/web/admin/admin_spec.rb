@@ -26,7 +26,7 @@ RSpec.describe CloverAdmin do
       vm_size: "standard-2",
       boot_image: "img",
       location_id: Location::HETZNER_FSN1_ID,
-      storage_size_gib: 86
+      storage_size_gib: 86,
     )
     Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { it.id = vp.id }
     vp
@@ -105,7 +105,7 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "unique-pg-search",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     fill_in "UBID, UUID, or prefix:term", with: "pg:unique-pg-search"
@@ -129,7 +129,7 @@ RSpec.describe CloverAdmin do
       content: {billing_info: {country: "NL"}, cost: 1.0, subtotal: 1.0},
       status: "unpaid",
       begin_time: Time.now,
-      end_time: Time.now + 30 * 24 * 60 * 60
+      end_time: Time.now + 30 * 24 * 60 * 60,
     )
 
     fill_in "UBID, UUID, or prefix:term", with: "1v:2512-searchtest-01"
@@ -373,7 +373,7 @@ RSpec.describe CloverAdmin do
       invoice_number: "2512-f859vb27-01",
       content: {billing_info: {country: "NL"}, cost: 1.652, subtotal: 2.6530000000000005},
       begin_time: "2024-11-01 00:00:00",
-      end_time: "2024-12-01 00:00:00"
+      end_time: "2024-12-01 00:00:00",
     )
 
     click_link "Ubicloud Admin"
@@ -423,14 +423,14 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "assoc-table-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     visit "/model/Project/#{project.ubid}"
     within(".association", text: "postgres_resources") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     server = pg.servers.first
@@ -438,7 +438,7 @@ RSpec.describe CloverAdmin do
     within(".association", text: "servers") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
   end
 
@@ -567,13 +567,13 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     click_link "PostgresResource"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     click_link pg.name
@@ -587,7 +587,7 @@ RSpec.describe CloverAdmin do
     fill_in "Created at", with: pg.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     child_pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -596,14 +596,14 @@ RSpec.describe CloverAdmin do
       name: "test-child-pg",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
-      parent_id: pg.id
+      parent_id: pg.id,
     ).subject
 
     click_link "Search"
     fill_in "Parent", with: pg.ubid
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s
+      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s,
     ]
   end
 
@@ -615,14 +615,14 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
     server = pg.servers.first
 
     click_link "PostgresServer"
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
 
     click_link server.ubid, match: :first
@@ -636,7 +636,7 @@ RSpec.describe CloverAdmin do
     select "push", from: "Timeline access"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
 
     click_link "test-pg"
@@ -660,7 +660,7 @@ RSpec.describe CloverAdmin do
       invoice_number: "invoice-number-378",
       content: {foo: "bar", billing_info: {country: "NL"}},
       begin_time: "2024-11-01 00:00:00",
-      end_time: "2024-12-01 00:00:00"
+      end_time: "2024-12-01 00:00:00",
     )
 
     visit "/model/Invoice/#{invoice.ubid}"
@@ -694,7 +694,7 @@ RSpec.describe CloverAdmin do
       ["GithubRunnerVCpu", "400", "0"],
       ["GithubRunnerVCpuArm", "100", "0"],
       ["PostgresVCpu", "128", "0"],
-      ["KubernetesVCpu", "32", "0"]
+      ["KubernetesVCpu", "32", "0"],
     ]
   end
 
@@ -707,7 +707,7 @@ RSpec.describe CloverAdmin do
       resource_name: vm.name,
       span: Sequel::Postgres::PGRange.new(Time.now - 3600, nil),
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
+      amount: vm.vcpus,
     )
 
     visit "/model/Project/#{project.ubid}"
@@ -748,7 +748,7 @@ RSpec.describe CloverAdmin do
     page.refresh
     expect(page).to have_content "Active Pages"
     expect(page_data).to eq [
-      ["", page1.ubid, "some problem", "{}"]
+      ["", page1.ubid, "some problem", "{}"],
     ]
     click_link page1.ubid
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
@@ -757,7 +757,7 @@ RSpec.describe CloverAdmin do
     visit "/"
     expect(page_data).to eq [
       ["", page1.ubid, "some problem", "{}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
     click_link vm_pool.ubid
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
@@ -771,7 +771,7 @@ RSpec.describe CloverAdmin do
     expect(page_data).to eq [
       [vmh.ubid, page3.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
       ["", page1.ubid, "some problem", "{}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
 
     click_link vmh.ubid
@@ -888,7 +888,7 @@ RSpec.describe CloverAdmin do
       vm_size: "standard-2",
       boot_image: "img",
       location_id: Location::HETZNER_FSN1_ID,
-      storage_size_gib: 86
+      storage_size_gib: 86,
     )
     st = Strand.create_with_id(vp, prog: "Vm::VmPool", label: "wait")
     visit "/model/Strand/#{st.ubid}"
@@ -961,7 +961,7 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "a",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
     fill_in "UBID, UUID, or prefix:term", with: pg.ubid
     click_button "Show Object"
@@ -1232,7 +1232,7 @@ RSpec.describe CloverAdmin do
       ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
       ["visible_locations", '["eu-central-h1","eu-central-h2"]', ["eu-central-h1", "eu-central-h2"]],
-      ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}]
+      ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}],
     ].each do |name, value, expected_value|
       visit path
       select name, from: "name"
@@ -1336,7 +1336,7 @@ RSpec.describe CloverAdmin do
       summary: "Test info page with related resources",
       tag: "tag1",
       details: {"related_resources" => [vm.ubid]},
-      severity: "info"
+      severity: "info",
     )
 
     visit "/"
@@ -1392,7 +1392,7 @@ RSpec.describe CloverAdmin do
       "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0"
+      "0", "0", "1", "0",
     ]
 
     click_link "test-installation"
@@ -1423,7 +1423,7 @@ RSpec.describe CloverAdmin do
       "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0"
+      "0", "0", "0", "0",
     ]
   end
 
@@ -1611,7 +1611,7 @@ RSpec.describe CloverAdmin do
         action:,
         project_id:,
         subject_id:,
-        object_ids: Sequel.pg_array(object_ids, :uuid)
+        object_ids: Sequel.pg_array(object_ids, :uuid),
       ).first[:id]
     end
 
@@ -1637,7 +1637,7 @@ RSpec.describe CloverAdmin do
       visit "/audit-log"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project2.ubid, "vm/destroy", user.ubid, ""
+        project2.ubid, "vm/destroy", user.ubid, "",
       ]
 
       fill_in "Project", with: project2.ubid
@@ -1669,21 +1669,21 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
         project.ubid, "vm/destroy", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       fill_in "Action", with: "vm"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "vm/destroy", user.ubid, ""
+        project.ubid, "vm/destroy", user.ubid, "",
       ]
 
       fill_in "Action", with: "create"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       fill_in "Action", with: "vm/create"
@@ -1693,29 +1693,29 @@ RSpec.describe CloverAdmin do
       visit "/audit-log?limit=2"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "vm/destroy", user.ubid, ""
+        project.ubid, "vm/destroy", user.ubid, "",
       ]
 
       click_link "Next Page"
       expect(audit_log_content).to eq [
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       visit "/audit-log?limit=1&action=create"
       expect(audit_log_content).to eq [
-        project.ubid, "vm/create", user.ubid, ""
+        project.ubid, "vm/create", user.ubid, "",
       ]
 
       click_link "Next Page"
       expect(audit_log_content).to eq [
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       visit "/audit-log?limit=a"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
         project.ubid, "vm/destroy", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
     end
 
@@ -1792,14 +1792,14 @@ RSpec.describe CloverAdmin do
       click_link "Older Results"
       expect(audit_log_content).to eq [
         project.ubid, "vm/update", user.ubid, "",
-        project.ubid, "vm/create", other_account_ubid.to_s, ""
+        project.ubid, "vm/create", other_account_ubid.to_s, "",
       ]
 
       fill_in "End Date", with: "2025-09-01"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/update", user.ubid, "",
-        project.ubid, "vm/create", other_account_ubid.to_s, ""
+        project.ubid, "vm/create", other_account_ubid.to_s, "",
       ]
 
       visit(page.current_url + "&limit=1")
@@ -1810,7 +1810,7 @@ RSpec.describe CloverAdmin do
 
       visit(page.current_url[0...-1])
       expect(audit_log_content).to eq [
-        project.ubid, "vm/update", user.ubid, ""
+        project.ubid, "vm/update", user.ubid, "",
       ]
 
       fill_in "End Date", with: "2026-03-aa"
@@ -1877,7 +1877,7 @@ RSpec.describe CloverAdmin do
         account_id:,
         message:,
         metadata: Sequel.pg_jsonb(metadata),
-        at:
+        at:,
       ).first[:id]
     end
 
@@ -1901,7 +1901,7 @@ RSpec.describe CloverAdmin do
       click_link "View Authentication Audit Logs"
       expect(audit_log_content).to eq [
         "login", user.ubid, "ip: 127.0.0.1",
-        "login_failure", user.ubid, "ip: 127.0.0.1"
+        "login_failure", user.ubid, "ip: 127.0.0.1",
       ]
 
       click_link "login_failure"
@@ -1919,7 +1919,7 @@ RSpec.describe CloverAdmin do
       click_link "View Authentication Audit Logs"
       expect(audit_log_content).to eq [
         "login", user.ubid, "ip: 1.2.3.4",
-        "login_failure", user.ubid, "ip: 9.9.9.9"
+        "login_failure", user.ubid, "ip: 9.9.9.9",
       ]
 
       click_link "ip: 1.2.3.4"
@@ -1940,7 +1940,7 @@ RSpec.describe CloverAdmin do
       click_link "View Authentication Audit Logs"
       expect(audit_log_content).to eq [
         "login", user.ubid, "ip: 127.0.0.1",
-        "login_failure", other.ubid, "ip: 127.0.0.1"
+        "login_failure", other.ubid, "ip: 127.0.0.1",
       ]
 
       click_link user.ubid
@@ -1972,7 +1972,7 @@ RSpec.describe CloverAdmin do
         account_id:,
         message:,
         metadata: Sequel.pg_jsonb(metadata),
-        at:
+        at:,
       ).first[:id]
     end
 
@@ -2000,7 +2000,7 @@ RSpec.describe CloverAdmin do
       click_link "View Admin Authentication Audit Logs"
       expect(audit_log_content).to eq [
         "login", "admin", "ip: 127.0.0.1",
-        "login_failure", "admin", "ip: 127.0.0.1"
+        "login_failure", "admin", "ip: 127.0.0.1",
       ]
 
       click_link "login_failure"
@@ -2018,7 +2018,7 @@ RSpec.describe CloverAdmin do
       click_link "View Admin Authentication Audit Logs"
       expect(audit_log_content).to eq [
         "login", "admin", "ip: 1.2.3.4",
-        "login_failure", "admin", "ip: 9.9.9.9"
+        "login_failure", "admin", "ip: 9.9.9.9",
       ]
 
       click_link "ip: 1.2.3.4"
@@ -2038,7 +2038,7 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to eq [
         "create_account", "other-admin", "",
         "login", "admin", "ip: 127.0.0.1",
-        "login_failure", "other-admin", "ip: 127.0.0.1"
+        "login_failure", "other-admin", "ip: 127.0.0.1",
       ]
 
       click_link "admin"
@@ -2048,7 +2048,7 @@ RSpec.describe CloverAdmin do
       click_button "Search"
       expect(audit_log_content).to eq [
         "create_account", "other-admin", "",
-        "login_failure", "other-admin", "ip: 127.0.0.1"
+        "login_failure", "other-admin", "ip: 127.0.0.1",
       ]
 
       fill_in "Account", with: "not-a-ubid-or-name"

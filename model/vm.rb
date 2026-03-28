@@ -28,7 +28,7 @@ class Vm < Sequel::Model
   many_through_many :private_subnet_firewalls,
     [
       [:nic, :vm_id, :private_subnet_id],
-      [:firewalls_private_subnets, :private_subnet_id, :firewall_id]
+      [:firewalls_private_subnets, :private_subnet_id, :firewall_id],
     ],
     class: :Firewall
   many_to_many :vm_firewalls, class: :Firewall, right_key: :firewall_id, remover: nil, clearer: nil
@@ -306,7 +306,7 @@ class Vm < Sequel::Model
       firmware_version:,
       hugepages:,
       init_script: init_script&.init_script || "",
-      ipv6_disabled: project.get_ff_ipv6_disabled || false
+      ipv6_disabled: project.get_ff_ipv6_disabled || false,
     )
   end
 
@@ -337,7 +337,7 @@ class Vm < Sequel::Model
         "num_queues" => s.num_queues,
         "queue_size" => s.queue_size,
         "copy_on_read" => false,
-        "track_written" => s.track_written
+        "track_written" => s.track_written,
       }.tap { |v| v["cpus"] = cpus if add_cpus }
     }
   end

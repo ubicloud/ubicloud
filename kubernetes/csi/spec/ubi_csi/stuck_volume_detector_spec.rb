@@ -58,7 +58,7 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "skips PVCs without bound PV" do
       pvc = {
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {}
+        "spec" => {},
       }
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
@@ -70,13 +70,13 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "skips PVCs bound to PVs on schedulable nodes" do
       pvc = {
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {"volumeName" => "pvc-yyy"}
+        "spec" => {"volumeName" => "pvc-yyy"},
       }
       pv = {
         "metadata" => {"name" => "pvc-yyy"},
         "spec" => {
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}},
+        },
       }
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pv]}), success_status])
@@ -89,13 +89,13 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "detects and recovers PVC on cordoned node" do
       pvc = {
         "metadata" => {"namespace" => "default", "name" => "data-pvc", "annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {"volumeName" => "pvc-yyy"}
+        "spec" => {"volumeName" => "pvc-yyy"},
       }
       pv = {
         "metadata" => {"name" => "pvc-yyy"},
         "spec" => {
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}},
+        },
       }
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pv]}), success_status])
@@ -108,7 +108,7 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "skips PVCs whose bound PV is not found" do
       pvc = {
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {"volumeName" => "pvc-missing"}
+        "spec" => {"volumeName" => "pvc-missing"},
       }
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => []}), success_status])
@@ -120,7 +120,7 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "skips PVCs whose bound PV has no node affinity" do
       pvc = {
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {"volumeName" => "pvc-yyy"}
+        "spec" => {"volumeName" => "pvc-yyy"},
       }
       pv = {"metadata" => {"name" => "pvc-yyy"}, "spec" => {}}
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc]}), success_status])
@@ -139,19 +139,19 @@ RSpec.describe Csi::StuckVolumeDetector do
     it "handles per-PVC errors without stopping iteration" do
       pvc1 = {
         "metadata" => {"namespace" => "ns1", "name" => "pvc1", "annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"}},
-        "spec" => {"volumeName" => "pvc-yyy"}
+        "spec" => {"volumeName" => "pvc-yyy"},
       }
       pvc2 = {
         "metadata" => {"namespace" => "ns2", "name" => "pvc2", "annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-aaa"}},
-        "spec" => {"volumeName" => "pvc-bbb"}
+        "spec" => {"volumeName" => "pvc-bbb"},
       }
       pv1 = {
         "metadata" => {"name" => "pvc-yyy"},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}}}
+        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-1"]}]}]}}},
       }
       pv2 = {
         "metadata" => {"name" => "pvc-bbb"},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-2"]}]}]}}}
+        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["worker-2"]}]}]}}},
       }
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pvc", "--all-namespaces", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pvc1, pvc2]}), success_status])
       expect(Open3).to receive(:capture2e).with("kubectl", "get", "pv", "-oyaml", stdin_data: nil).and_return([YAML.dump({"items" => [pv1, pv2]}), success_status])
@@ -170,7 +170,7 @@ RSpec.describe Csi::StuckVolumeDetector do
     let(:intermediate_pv) do
       {
         "metadata" => {"name" => "pvc-yyy"},
-        "spec" => {"persistentVolumeReclaimPolicy" => "Delete"}
+        "spec" => {"persistentVolumeReclaimPolicy" => "Delete"},
       }
     end
     let(:pvc) do
@@ -180,10 +180,10 @@ RSpec.describe Csi::StuckVolumeDetector do
           "name" => "data-pvc",
           "uid" => "yyy",
           "annotations" => {"csi.ubicloud.com/old-pv-name" => "pvc-xxx"},
-          "resourceVersion" => "12345"
+          "resourceVersion" => "12345",
         },
         "spec" => {"volumeName" => "pvc-yyy", "accessModes" => ["ReadWriteOnce"]},
-        "status" => {"phase" => "Bound"}
+        "status" => {"phase" => "Bound"},
       }
     end
 

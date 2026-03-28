@@ -27,7 +27,7 @@ class Prog::LearnPci < Prog::Base
         vendor: rec.vendor,
         device: rec.device,
         numa_node: rec.numa_node,
-        iommu_group: rec.iommu_group
+        iommu_group: rec.iommu_group,
       )
     end
   end
@@ -41,7 +41,7 @@ class Prog::LearnPci < Prog::Base
             vendor: Sequel[:excluded][:vendor],
             device: Sequel[:excluded][:device],
             numa_node: Sequel[:excluded][:numa_node],
-            iommu_group: Sequel[:excluded][:iommu_group]
+            iommu_group: Sequel[:excluded][:iommu_group],
           }).save_changes
       end
     end

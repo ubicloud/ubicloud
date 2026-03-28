@@ -27,7 +27,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     client.modify_vpc_attribute({
       vpc_id: vpc.vpc_id,
-      enable_dns_hostnames: {value: true}
+      enable_dns_hostnames: {value: true},
     })
 
     security_group_response = begin
@@ -35,7 +35,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         group_name: "aws-#{location.name}-#{private_subnet.ubid}",
         description: "Security group for aws-#{location.name}-#{private_subnet.ubid}",
         vpc_id: private_subnet_aws_resource.vpc_id,
-        tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name)
+        tag_specifications: Util.aws_tag_specifications("security-group", private_subnet.name),
       })
     rescue Aws::EC2::Errors::InvalidGroupDuplicate
       client.describe_security_groups({filters: [{name: "group-name", values: ["aws-#{location.name}-#{private_subnet.ubid}"]}]}).security_groups[0]
@@ -63,7 +63,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     if internet_gateway_response.internet_gateways.empty?
       internet_gateway_id = client.create_internet_gateway({
-        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name)
+        tag_specifications: Util.aws_tag_specifications("internet-gateway", private_subnet.name),
       }).internet_gateway.internet_gateway_id
       private_subnet_aws_resource.update(internet_gateway_id:)
       client.attach_internet_gateway({internet_gateway_id:, vpc_id: private_subnet_aws_resource.vpc_id})
@@ -80,13 +80,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       client.create_route({
         route_table_id:,
         destination_ipv_6_cidr_block: "::/0",
-        gateway_id: internet_gateway_id
+        gateway_id: internet_gateway_id,
       })
 
       client.create_route({
         route_table_id:,
         destination_cidr_block: "0.0.0.0/0",
-        gateway_id: internet_gateway_id
+        gateway_id: internet_gateway_id,
       })
     rescue Aws::EC2::Errors::RouteAlreadyExists
     end
@@ -113,7 +113,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
             cidr_block: aws_subnet.ipv4_cidr.to_s,
             ipv_6_cidr_block: ipv6_cidr.to_s,
             availability_zone: az_name,
-            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}")
+            tag_specifications: Util.aws_tag_specifications("subnet", "#{private_subnet.name}-#{aws_subnet.location_az.az}"),
           }).subnet
         rescue Aws::EC2::Errors::InvalidSubnetConflict
           # Subnet was probably created in a previous attempt but database
@@ -121,7 +121,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
           existing = client.describe_subnets({filters: [
             {name: "vpc-id", values: [private_subnet_aws_resource.vpc_id]},
             {name: "availability-zone", values: [az_name]},
-            {name: "cidr-block", values: [aws_subnet.ipv4_cidr.to_s]}
+            {name: "cidr-block", values: [aws_subnet.ipv4_cidr.to_s]},
           ]}).subnets.first
           existing || fail("Subnet conflict but no matching subnet found for #{az_name}")
         end
@@ -130,7 +130,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       aws_subnet.update(subnet_id: subnet.subnet_id, ipv6_cidr: subnet.ipv_6_cidr_block_association_set.first.ipv_6_cidr_block)
       client.modify_subnet_attribute({
         subnet_id: subnet.subnet_id,
-        assign_ipv_6_address_on_creation: {value: true}
+        assign_ipv_6_address_on_creation: {value: true},
       })
     end
 
@@ -141,7 +141,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
       client.associate_route_table({
         route_table_id: private_subnet_aws_resource.route_table_id,
-        subnet_id: aws_subnet.subnet_id
+        subnet_id: aws_subnet.subnet_id,
       })
     rescue Aws::EC2::Errors::ResourceAlreadyAssociated
     end
@@ -258,8 +258,8 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
         ip_protocol: "tcp",
         from_port:,
         to_port:,
-        ip_ranges: [{cidr_ip: cidr}]
-      }]
+        ip_ranges: [{cidr_ip: cidr}],
+      }],
     })
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate
   end

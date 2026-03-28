@@ -18,7 +18,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       cp_node_count: 3,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: customer_project.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
     KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
@@ -45,7 +45,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       health_check_protocol: "tcp",
       custom_hostname_dns_zone_id: dns_zone.id,
       custom_hostname_prefix: "someprefix",
-      stack: LoadBalancer::Stack::IPV4
+      stack: LoadBalancer::Stack::IPV4,
     ).subject
 
     kc.update(services_lb_id: services_lb.id)
@@ -112,7 +112,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         "#{kc.private_subnet.net4}:10250...10251",
         "::/0:22...23",
         "::/0:443...444",
-        "#{kc.private_subnet.net6}:10250...10251"
+        "#{kc.private_subnet.net6}:10250...10251",
       ]
 
       internal_firewall = kc.internal_worker_vm_firewall
@@ -121,7 +121,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         "0.0.0.0/0:22...23",
         "#{kc.private_subnet.net4}:10250...10251",
         "::/0:22...23",
-        "#{kc.private_subnet.net6}:10250...10251"
+        "#{kc.private_subnet.net6}:10250...10251",
       ]
     end
 
@@ -141,7 +141,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(customer_firewall.project_id).to eq customer_project.id
       expect(customer_firewall.firewall_rules.map { "#{it.cidr}:#{it.port_range.to_range}" }.sort).to eq [
         "0.0.0.0/0:0...65536",
-        "::/0:0...65536"
+        "::/0:0...65536",
       ]
     end
   end
@@ -335,7 +335,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         ["KubernetesWorkerVCpu", "standard", 2], # old worker node
         ["KubernetesWorkerVCpu", "standard", 16], # new worker node
         ["KubernetesWorkerStorage", "standard", 0], # old worker node
-        ["KubernetesWorkerStorage", "standard", 37] # new worker node
+        ["KubernetesWorkerStorage", "standard", 37], # new worker node
       ]
 
       actual_records = kubernetes_cluster.active_billing_records.map {
@@ -625,11 +625,11 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       nodes = kubernetes_cluster.functional_nodes
       expect(nodes.first.vm).to receive_messages(
         ip4: NetAddr.parse_ip("1.2.3.4"),
-        ip6: NetAddr.parse_ip("2001:db8::1234")
+        ip6: NetAddr.parse_ip("2001:db8::1234"),
       )
       expect(nodes.last.vm).to receive_messages(
         ip4: NetAddr.parse_ip("5.6.7.8"),
-        ip6: NetAddr.parse_ip("2001:db8::5678")
+        ip6: NetAddr.parse_ip("2001:db8::5678"),
       )
       get_cm = <<~YAML
     apiVersion: v1
@@ -797,7 +797,7 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
         private_subnet_id: kubernetes_cluster.private_subnet_id,
         enable_ip4: true,
         kubernetes_cluster_id: kubernetes_cluster.id,
-        kubernetes_nodepool_id: kubernetes_nodepool.id
+        kubernetes_nodepool_id: kubernetes_nodepool.id,
       ).subject
       expect(kubernetes_cluster.nodes).to all(receive(:incr_destroy))
       expect(kubernetes_cluster.nodepools).to all(receive(:incr_destroy))

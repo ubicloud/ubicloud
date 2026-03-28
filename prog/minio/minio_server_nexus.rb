@@ -26,12 +26,12 @@ class Prog::Minio::MinioServerNexus < Prog::Base
         name: ubid.to_s,
         size: minio_pool.vm_size,
         storage_volumes: [
-          {encrypted: true, size_gib: 30}
+          {encrypted: true, size_gib: 30},
         ] + Array.new(minio_pool.per_server_drive_count) { {encrypted: true, size_gib: (minio_pool.per_server_storage_size / minio_pool.per_server_drive_count).floor} },
         boot_image: "ubuntu-jammy",
         enable_ip4: true,
         private_subnet_id: minio_pool.cluster.private_subnet.id,
-        distinct_storage_devices: Config.production? && !Config.is_e2e
+        distinct_storage_devices: Config.production? && !Config.is_e2e,
       )
 
       id = ubid.to_uuid
@@ -195,7 +195,7 @@ class Prog::Minio::MinioServerNexus < Prog::Base
       extensions: ["subjectAltName=DNS:#{minio_server.cluster.hostname},DNS:#{minio_server.hostname}#{ip_san}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
-      issuer_key: root_cert_key
+      issuer_key: root_cert_key,
     ).map(&:to_pem)
   end
 end

@@ -16,12 +16,12 @@ RSpec.describe Clover, "location-credential" do
       ui_name: "aws-us-west-2",
       visible: false,
       provider: "aws",
-      project_id: project.id
+      project_id: project.id,
     )
 
     LocationCredential.create(
       access_key: "access_key",
-      secret_key: "secret_key"
+      secret_key: "secret_key",
     ) { it.id = loc.id }
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
@@ -34,12 +34,12 @@ RSpec.describe Clover, "location-credential" do
       ui_name: "aws-us-west-1",
       visible: false,
       provider: "aws",
-      project_id: project_wo_permissions.id
+      project_id: project_wo_permissions.id,
     )
 
     LocationCredential.create(
       access_key: "access_key",
-      secret_key: "secret_key"
+      secret_key: "secret_key",
     ) { it.id = loc.id }
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw1-az1")
     loc
@@ -201,7 +201,7 @@ RSpec.describe Clover, "location-credential" do
           name: "dummy-postgres",
           location_id: private_location.id,
           target_vm_size: "standard-2",
-          target_storage_size_gib: 118
+          target_storage_size_gib: 118,
         )
 
         visit "#{project.path}#{private_location.path}"

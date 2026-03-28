@@ -24,14 +24,14 @@ RSpec.describe Prog::RotateStorageKek do
   let(:current_kek) {
     StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key_1",
-      init_vector: "iv_1", auth_data: "somedata"
+      init_vector: "iv_1", auth_data: "somedata",
     ) { it.id = StorageKeyEncryptionKey.generate_uuid }
   }
 
   let(:new_kek) {
     StorageKeyEncryptionKey.new(
       algorithm: "aes-256-gcm", key: "key_2",
-      init_vector: "iv_2", auth_data: "somedata"
+      init_vector: "iv_2", auth_data: "somedata",
     ) { it.id = StorageKeyEncryptionKey.generate_uuid }
   }
 
@@ -39,7 +39,7 @@ RSpec.describe Prog::RotateStorageKek do
     dev = StorageDevice.create(
       name: "nvme0",
       total_storage_gib: 100,
-      available_storage_gib: 20
+      available_storage_gib: 20,
     ) { it.id = StorageDevice.generate_uuid }
     disk = VmStorageVolume.new(boot: true, size_gib: 20, disk_index: 0, storage_device: dev)
     disk.key_encryption_key_1 = current_kek

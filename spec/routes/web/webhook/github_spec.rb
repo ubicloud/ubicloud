@@ -178,7 +178,7 @@ RSpec.describe Clover, "github" do
       head_branch: "test head branch",
       created_at: "2024-04-24T16:02:42Z",
       started_at: "2024-04-24T16:03:40Z",
-      completed_at:
+      completed_at:,
     }
   end
 
@@ -187,7 +187,7 @@ RSpec.describe Clover, "github" do
       action:,
       installation: {id: installation_id},
       repository: {full_name: repository_name, default_branch: "main"},
-      workflow_job:
+      workflow_job:,
     }
   end
 
@@ -198,7 +198,7 @@ RSpec.describe Clover, "github" do
       {
         "Content-Type" => "application/json",
         "HTTP_X_GITHUB_EVENT" => event,
-        "HTTP_X_HUB_SIGNATURE_256" => "sha256=#{OpenSSL::HMAC.hexdigest("sha256", "secret", data_json)}"
+        "HTTP_X_HUB_SIGNATURE_256" => "sha256=#{OpenSSL::HMAC.hexdigest("sha256", "secret", data_json)}",
       })
   end
 end

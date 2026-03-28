@@ -9,7 +9,7 @@ RSpec.describe Util do
       expect(Net::SSH).to receive(:start).with("hostname", "user", expected_options) do |&blk|
         sess = Net::SSH::Connection::Session.allocate
         expect(sess).to receive(:_exec!).with("test command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0)
+          Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0),
         )
         blk.call sess
       end
@@ -21,7 +21,7 @@ RSpec.describe Util do
       expect(Net::SSH).to receive(:start) do |&blk|
         sess = Net::SSH::Connection::Session.allocate
         expect(sess).to receive(:_exec!).with("failing command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1)
+          Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1),
         )
         blk.call sess
       end

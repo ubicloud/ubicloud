@@ -136,7 +136,7 @@ RSpec.describe Prog::DownloadBootImage do
         "version" => "20230303",
         "sha256sum" => nil,
         "certs" => nil,
-        "use_htcat" => false
+        "use_htcat" => false,
       }.to_json
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
@@ -158,7 +158,7 @@ RSpec.describe Prog::DownloadBootImage do
         "version" => Config.github_ubuntu_2204_version,
         "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
         "certs" => "certs",
-        "use_htcat" => false
+        "use_htcat" => false,
       }.to_json
       refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
@@ -181,7 +181,7 @@ RSpec.describe Prog::DownloadBootImage do
         "version" => Config.github_ubuntu_2204_version,
         "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
         "certs" => nil,
-        "use_htcat" => true
+        "use_htcat" => true,
       }.to_json
       refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil, "download_r2" => true})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
@@ -237,7 +237,7 @@ RSpec.describe Prog::DownloadBootImage do
         name: "DEFAULT",
         total_storage_gib: 50,
         available_storage_gib: 35,
-        enabled: true
+        enabled: true,
       )
       expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
@@ -254,7 +254,7 @@ RSpec.describe Prog::DownloadBootImage do
         name: "DEFAULT",
         total_storage_gib: 50,
         available_storage_gib: 35,
-        enabled: true
+        enabled: true,
       )
       expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/ubuntu-noble-#{version}.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")

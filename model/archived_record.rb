@@ -31,7 +31,7 @@ class ArchivedRecord < Sequel::Model
         ip_values.get_text("dst_vm_id").as(:vm_id),
         vm_values.get_text("name").as(:vm_name),
         vm_values.get_text("boot_image").as(:boot_image),
-        vm_values.get_text("project_id").as(:project_id)
+        vm_values.get_text("project_id").as(:project_id),
       )
       .reverse(Sequel[:ip][:archived_at])
       .all

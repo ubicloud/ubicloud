@@ -15,7 +15,7 @@ RSpec.describe Clover, "audit log" do
       action:,
       project_id:,
       subject_id:,
-      object_ids: Sequel.pg_array(object_ids, :uuid)
+      object_ids: Sequel.pg_array(object_ids, :uuid),
     ).first[:id]
   end
 
@@ -88,7 +88,7 @@ RSpec.describe Clover, "audit log" do
     expect(audit_log_body("/project/#{project.ubid}/audit-log?limit=1"))
       .to eq({
         "items" => [{"action" => "vm/create", "object_ids" => [vm.ubid], "subject_id" => user.ubid}],
-        "pagination_key" => pagination_key
+        "pagination_key" => pagination_key,
       })
     expect(audit_log_body("/project/#{project.ubid}/audit-log?limit=1&pagination_key=#{pagination_key}"))
       .to eq({"items" => [{"action" => "vm/destroy", "object_ids" => [], "subject_id" => user.ubid}]})

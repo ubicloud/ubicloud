@@ -14,8 +14,8 @@ class VmStats
       "vm" => unit_stats(
         @vm_name,
         with_io: false,    # Actual IO is done by the vhost block backend of each disk
-        with_memory: false # VM uses hugepages, so memory usage is not reflected in the process RSS
-      )
+        with_memory: false, # VM uses hugepages, so memory usage is not reflected in the process RSS
+      ),
     }
     result["vm"]["vcpus"] = vm_params.fetch("max_vcpus")
 
@@ -24,7 +24,7 @@ class VmStats
       result["disk_#{disk_index}"] = disk.except("disk_index").merge!(unit_stats(
         "#{@vm_name}-#{disk_index}-storage",
         with_io: true,
-        with_memory: true
+        with_memory: true,
       ))
     end
 
@@ -62,7 +62,7 @@ class VmStats
     {
       "user_time_ms" => user_time_ms,
       "system_time_ms" => system_time_ms,
-      "total_time_ms" => total_time_ms
+      "total_time_ms" => total_time_ms,
     }
   end
 
@@ -71,7 +71,7 @@ class VmStats
     h = {
       "main_pid" => main_pid,
       "cpu_stats" => cpu_stats(main_pid),
-      "active_age_ms" => unit_active_age_ms(unit_name)
+      "active_age_ms" => unit_active_age_ms(unit_name),
     }
     if with_memory
       h["memory_peak_bytes"] = Integer(unit_property(unit_name, "MemoryPeak"), 10)

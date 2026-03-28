@@ -5,7 +5,7 @@ class Serializers::Account < Serializers::Base
     {
       id: a.id,
       ubid: a.ubid,
-      email: a.email
+      email: a.email,
     }
   end
 end

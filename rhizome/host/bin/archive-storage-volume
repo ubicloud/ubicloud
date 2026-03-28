@@ -43,5 +43,5 @@ StorageArchive.new(
   storage_path.kek_pipe,
   kek,
   target_conf,
-  vhost_block_backend_version
+  vhost_block_backend_version,
 ).archive

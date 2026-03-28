@@ -11,7 +11,7 @@ class Prog::CheckDomainBlacklist < Prog::Base
     "MW" => 16,
     "CT" => 32,
     "ABUSE" => 64,
-    "CR" => 128
+    "CR" => 128,
   }.freeze
 
   # Google Public DNS is used because the system default resolver may not

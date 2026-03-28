@@ -15,7 +15,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vpc_id: "vpc-0123456789abcdefg",
       internet_gateway_id: "igw-0123456789abcdefg",
       route_table_id: "rtb-0123456789abcdefg",
-      security_group_id: "sg-0123456789abcdefg"
+      security_group_id: "sg-0123456789abcdefg",
     )
     aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
     aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
@@ -181,7 +181,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       AwsSubnet.create(
         private_subnet_aws_resource_id: aws_resource.id,
         location_aws_az_id: az_b.id,
-        ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s
+        ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s,
       )
       client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}]}])
       client.stub_responses(:create_subnet, ->(context) {
@@ -222,7 +222,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         end
       })
       client.stub_responses(:describe_subnets, subnets: [
-        {subnet_id: "subnet-recovered-a", availability_zone: "us-west-2a", cidr_block: ipv4_cidr_a, ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]}
+        {subnet_id: "subnet-recovered-a", availability_zone: "us-west-2a", cidr_block: ipv4_cidr_a, ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]},
       ])
       expect(client).to receive(:create_subnet).twice.and_call_original
       expect(client).to receive(:describe_subnets).once.and_call_original
@@ -246,7 +246,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
     it "associates route tables for all subnets and hops to wait" do
       expect(client).to receive(:associate_route_table).with({
         route_table_id: "rtb-0123456789abcdefg",
-        subnet_id: "subnet-0123456789abcdefg"
+        subnet_id: "subnet-0123456789abcdefg",
       }).and_call_original
       client.stub_responses(:associate_route_table)
       expect { nx.associate_az_route_tables }.to hop("wait")

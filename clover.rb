@@ -86,7 +86,7 @@ class Clover < Roda
     PostgresResource,
     PrivateSubnet,
     SshPublicKey,
-    Vm
+    Vm,
   ].each do |model, regexp|
     sym = :"#{model.table_name}_ubid_uuid"
     symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
@@ -103,7 +103,7 @@ class Clover < Roda
       json: "application/json",
       pdf: "application/pdf",
       pem: "application/x-pem-file",
-      text: "text/plain"
+      text: "text/plain",
     }
 
   plugin :path
@@ -203,7 +203,7 @@ class Clover < Roda
     @error = {
       code: 404,
       type: "ResourceNotFound",
-      message: "Sorry, we couldn’t find the resource you’re looking for."
+      message: "Sorry, we couldn’t find the resource you’re looking for.",
     }
 
     if api? || request.accepts_json?
@@ -327,8 +327,8 @@ class Clover < Roda
       "error" => {
         "code" => 401,
         "type" => "InvalidCredentials",
-        "message" => "invalid personal access token provided in Authorization header"
-      }
+        "message" => "invalid personal access token provided in Authorization header",
+      },
     }.to_json.freeze
 
     # The only response body that can be generated with this Rodauth configuration
@@ -593,7 +593,7 @@ class Clover < Roda
         builder = OmniAuth::Builder.new
         builder.options(
           path_prefix: omniauth_prefix,
-          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
+          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) },
         )
         builder.configure do |config|
           [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
@@ -616,7 +616,7 @@ class Clover < Roda
             redirect_uri: provider.callback_url,
             authorization_endpoint: provider.authorization_endpoint,
             token_endpoint: provider.token_endpoint,
-            userinfo_endpoint: provider.userinfo_endpoint
+            userinfo_endpoint: provider.userinfo_endpoint,
           }
 
         builder.run builder_app
@@ -647,8 +647,8 @@ class Clover < Roda
           invalid_social_login_account_name: {
             omniauth_name:,
             email: account[:email],
-            name:
-          }
+            name:,
+          },
         })
         name = "Unknown"
       end
