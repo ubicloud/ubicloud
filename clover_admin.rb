@@ -300,6 +300,9 @@ class CloverAdmin < Roda
       "activate_boot_image" => object_action("Activate Boot Image", flash: "Boot image activated") do |obj|
         obj.update(activated_at: Time.now)
       end,
+      "disable_boot_image" => object_action("Disable Boot Image", flash: "Boot image disabled") do |obj|
+        obj.update(activated_at: nil)
+      end,
     },
     "Account" => {
       "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
