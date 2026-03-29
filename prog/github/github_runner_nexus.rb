@@ -421,6 +421,12 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       Prog::PageNexus.assemble("The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], installation_ubid, severity: "warning")
       github_runner.incr_destroy
       nap 0
+    elsif e.message.include?("Resource not accessible by integration")
+      installation_ubid = github_runner.installation.ubid
+      repository_ubid = github_runner.repository.ubid
+      Prog::PageNexus.assemble("Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], installation_ubid, severity: "warning")
+      github_runner.incr_destroy
+      nap 0
     end
     raise
   end
