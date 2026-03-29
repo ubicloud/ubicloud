@@ -487,6 +487,7 @@ class CloverAdmin < Roda
     ["Project", :postgres_resources] => "project",
     ["Project", :invoices] => "project",
     ["PostgresResource", :servers] => "resource",
+    ["VmHost", :boot_images] => "vm_host",
   }.freeze
 
   plugin :autoforme do
@@ -801,8 +802,18 @@ class CloverAdmin < Roda
       order Sequel.desc(:created_at)
       eager [:vm_host]
       columns [:name, :version, :vm_host, :size_gib, :activated_at, :created_at]
-      column_options created_at: {type: "text"},
+      column_options vm_host: ubid_input.call("VmHost"),
+        created_at: {type: "text"},
         activated_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :vm_host
+          ubid_uuid_grep.call(ds, :vm_host_id, value)
+        else
+          framework
+        end
+      end
     end
 
     model VmHost do

@@ -440,6 +440,15 @@ RSpec.describe CloverAdmin do
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
       server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
+
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+    visit "/model/VmHost/#{vm_host.ubid}"
+    within(".association", text: "boot_images") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - BootImage - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
   end
 
   it "handles basic pagination when browsing by class" do
