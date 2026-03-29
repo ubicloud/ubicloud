@@ -843,8 +843,8 @@ DNSMASQ_SERVICE
 
     serial_parts = [
       "-serial file:#{vp.serial_log}",
-      "-display none",
-      "-vga none"
+      "-vnc unix:#{vp.vnc_sock}",
+      "-vga std"
     ]
 
     kernel_parts = [
