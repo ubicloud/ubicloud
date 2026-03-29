@@ -13,7 +13,7 @@ RSpec.describe CloverAdmin, "BootImage" do
   it "displays the BootImage instance page correctly" do
     click_link "BootImage"
     expect(page.status_code).to eq 200
-    expect(page.title).to eq "Ubicloud Admin - BootImage"
+    expect(page.title).to eq "Ubicloud Admin - BootImage - Browse"
 
     click_link @instance.admin_label
     expect(page.status_code).to eq 200
