@@ -315,6 +315,27 @@ class CloverAdmin < Roda
       end,
       "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 1440}}}) do |obj, minutes|
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
+      end,
+      "incr_semaphore" => object_action("Increment Semaphore", flash: "Incremented semaphore", params: ->(obj) {
+        subject_class = obj.subject.class
+        options = subject_class.respond_to?(:semaphore_names) ? subject_class.semaphore_names.map(&:name).sort! : [].freeze
+        {
+          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:}
+        }
+      }) do |obj, name, name_confirmation|
+        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+        Semaphore.incr(obj.id, name)
+      end,
+      "decr_semaphore" => object_action("Decrement Semaphore", flash: "Decremented semaphore", params: ->(obj) {
+        options = obj.semaphores_dataset.distinct.select_order_map(:name)
+        {
+          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:}
+        }
+      }) do |obj, name, name_confirmation|
+        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+        Semaphore.where(strand_id: obj.id, name:).destroy
       end
     },
     "Vm" => {
@@ -755,7 +776,7 @@ class CloverAdmin < Roda
             action = actions[key]
             action_type = action.type
             @label = action.label
-            @params = action.params
+            @params = action.params.is_a?(Proc) ? action.params.call(@obj) : action.params
 
             r.get(action_type != :form) do
               if action_type == :direct
@@ -767,7 +788,7 @@ class CloverAdmin < Roda
 
             r.post(action_type != :direct) do
               begin
-                params = action.params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
+                params = @params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
               rescue Roda::RodaPlugins::TypecastParams::Error => e
                 flash.now["error"] = "Invalid parameter submitted: #{e.param_name}"
                 next view("object_action")
