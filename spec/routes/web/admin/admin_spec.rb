@@ -925,6 +925,36 @@ RSpec.describe CloverAdmin do
     expect(st.reload.semaphores.map(&:name)).not_to include("destroy")
   end
 
+  it "allows browsing and searching BootImage" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    click_link "BootImage"
+    expect(page.title).to eq "Ubicloud Admin - BootImage - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+
+    click_link "ubuntu-jammy"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    click_link "Ubicloud Admin"
+    click_link "BootImage"
+    click_link "Search"
+    fill_in "Vm host", with: vm_host.ubid
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+
+    click_link "Search"
+    fill_in "Created at", with: boot_image.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+  end
+
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid

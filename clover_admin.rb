@@ -788,6 +788,14 @@ class CloverAdmin < Roda
         project: ubid_input.call("Project")
     end
 
+    model BootImage do
+      order Sequel.desc(:created_at)
+      eager [:vm_host]
+      columns [:name, :version, :vm_host, :size_gib, :activated_at, :created_at]
+      column_options created_at: {type: "text"},
+        activated_at: {type: "text"}
+    end
+
     model VmHost do
       order Sequel[:vm_host][:id]
       eager [:location]
