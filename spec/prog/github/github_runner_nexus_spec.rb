@@ -719,6 +719,15 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
+
+    it "destroys the runner if generate request fails due to resource not accessible by integration error" do
+      repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
+      runner.update(repository_id: repo.id)
+      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Resource not accessible by integration"}))
+      expect { nx.register_runner }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
   end
 
   describe "#wait" do
