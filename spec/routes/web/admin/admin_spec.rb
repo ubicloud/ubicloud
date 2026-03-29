@@ -969,6 +969,21 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
   end
 
+  it "supports activating BootImages" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    visit "/model/BootImage/#{boot_image.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    expect(boot_image.activated_at).to be_nil
+    click_link "Activate Boot Image"
+    click_button "Activate Boot Image"
+    expect(page).to have_flash_notice("Boot image activated")
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+    expect(boot_image.reload.activated_at).not_to be_nil
+  end
+
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid
