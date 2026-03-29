@@ -295,6 +295,9 @@ class CloverAdmin < Roda
   end
 
   OBJECT_ACTIONS = {
+    "BootImage" => {
+      "remove_boot_image" => object_action("Remove Boot Image", flash: "Boot image removal scheduled", &:remove_boot_image),
+    },
     "Account" => {
       "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
       "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend),
