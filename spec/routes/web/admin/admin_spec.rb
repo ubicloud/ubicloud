@@ -963,6 +963,20 @@ RSpec.describe CloverAdmin do
     ]
   end
 
+  it "supports removing BootImages" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    visit "/model/BootImage/#{boot_image.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    click_link "Remove Boot Image"
+    click_button "Remove Boot Image"
+    expect(page).to have_flash_notice("Boot image removal scheduled")
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+    expect(Strand.where(prog: "RemoveBootImage", label: "start").count).to eq 1
+  end
+
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid
