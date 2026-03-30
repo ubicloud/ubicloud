@@ -537,7 +537,7 @@ module AdminModelSpecHelper
 
     def create_vhost_block_backend
       host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
-      VhostBlockBackend.create(vm_host_id: host.id, version: "v0.4.1", version_code: 401, allocation_weight: 100)
+      VhostBlockBackend.create(vm_host_id: host.id, version_code: 401, allocation_weight: 100)
     end
 
     def create_victoria_metrics_resource
