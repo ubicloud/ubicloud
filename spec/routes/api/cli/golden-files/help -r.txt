@@ -545,12 +545,15 @@ Post Commands:
     add-config-entries                 Add configuration entries to a PostgreSQL database
     add-firewall-rule                  Add a PostgreSQL firewall rule
     add-metric-destination             Add a PostgreSQL metric destination
+    add-otlp-log-destination           Add an OTLP HTTP log destination to a PostgreSQL database
     add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
+    add-syslog-log-destination         Add a syslog (RFC 5424 over TLS) log destination to a PostgreSQL database
     ca-certificates                    Print CA certificates for a PostgreSQL database
     create                             Create a PostgreSQL database
     create-client-cert-keypair         Create client certificate keypair with given common name, expiring after a duration of seconds
     create-read-replica                Create a read replica for a PostgreSQL database
     delete-firewall-rule               Delete a PostgreSQL firewall rule
+    delete-log-destination             Delete a PostgreSQL log destination
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
     list-backups                       List backups for a PostgreSQL database
@@ -623,10 +626,22 @@ Usage:
     ubi pg (location/pg-name | pg-id) add-metric-destination username password url
 
 
+Add an OTLP HTTP log destination to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-otlp-log-destination name url [header_name=value [...]]
+
+
 Add pgbouncer configuration entries to a PostgreSQL database
 
 Usage:
     ubi pg (location/pg-name | pg-id) add-pgbouncer-config-entries key=value [...]
+
+
+Add a syslog (RFC 5424 over TLS) log destination to a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) add-syslog-log-destination name host [port] [sd-id/key=value [...]]
 
 
 Print CA certificates for a PostgreSQL database
@@ -698,6 +713,12 @@ Delete a PostgreSQL firewall rule
 
 Usage:
     ubi pg (location/pg-name | pg-id) delete-firewall-rule rule-id
+
+
+Delete a PostgreSQL log destination
+
+Usage:
+    ubi pg (location/pg-name | pg-id) delete-log-destination ld-id
 
 
 Delete a PostgreSQL metric destination
@@ -902,7 +923,7 @@ Allowed Option Values:
             target-storage-size-gib version target-version ha-type flavor
             connection-string primary earliest-restore-time
             maintenance-window-start-at read-replica parent tags firewall-rules
-            metric-destinations read-replicas ca-certificates
+            metric-destinations log-destinations read-replicas ca-certificates
 
 
 Schedule a major version upgrade of the PostgreSQL database

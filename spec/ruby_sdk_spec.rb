@@ -433,6 +433,32 @@ RSpec.describe Ubicloud do
     expect(pg.values[:metric_destinations]).to eq([])
   end
 
+  it "Postgres#add_syslog_log_destination and #delete_log_destination work without log destinations loaded" do
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{}"]]
+    end)
+
+    pg = ubi.postgres.new("foo/bar")
+    expect(pg.values[:log_destinations]).to be_nil
+    pg.add_syslog_log_destination(name: "my-dest", host: "logs.example.com")
+    expect(pg.values[:log_destinations]).to be_nil
+    pg.delete_log_destination("p1345678901234567890123456")
+    expect(pg.values[:log_destinations]).to be_nil
+  end
+
+  it "Postgres#add_otlp_log_destination and #delete_log_destination modify log destinations if loaded" do
+    expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
+      [200, {"content-type" => "application/json"}, ["{\"id\": \"p1345678901234567890123456\"}"]]
+    end)
+
+    pg = ubi.postgres.new(location: "foo", name: "bar", log_destinations: [])
+    expect(pg.values[:log_destinations]).to eq([])
+    pg.add_otlp_log_destination(name: "my-dest", url: "https://otlp.nr-data.net")
+    expect(pg.values[:log_destinations]).to eq([{id: "p1345678901234567890123456"}])
+    pg.delete_log_destination("p1345678901234567890123456")
+    expect(pg.values[:log_destinations]).to eq([])
+  end
+
   it "AuditLog.search result is a page supporting pagination" do
     called = 0
     expect(Clover).to receive(:call).twice.and_invoke(proc do |env|
