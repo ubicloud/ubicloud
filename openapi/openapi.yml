@@ -1389,6 +1389,64 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Firewall Rule
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    post:
+      operationId: createLocationPostgresLogDestination
+      summary: Create a new PostgreSQL log destination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  description: Name for the Log Destination
+                  type: string
+                type:
+                  description: 'Destination type. "otlp" sends via OTLP HTTP (https://...); "syslog" sends via RFC 5424 over TLS (tcp://host:port)'
+                  type: string
+                  enum:
+                    - otlp
+                    - syslog
+                url:
+                  description: 'Endpoint URL. For otlp: https://... For syslog: tcp://host:port'
+                  type: string
+                options:
+                  description: 'Authentication options. For otlp: {"headers": {"Header-Name": "value"}}. For syslog: {"structured_data": {"sd-id": {"key": "value"}}}'
+                  type: object
+              additionalProperties: false
+              required:
+                - name
+                - type
+                - url
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresLogDestination'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Log Destination
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/log-destination/{log_destination_id}':
+    parameters:
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/log_destination_id'
+      - $ref: '#/components/parameters/postgres_database_reference'
+      - $ref: '#/components/parameters/project_id'
+    delete:
+      operationId: deleteLocationPostgresLogDestination
+      summary: Delete a specific log destination
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Log Destination
   '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/metric-destination':
     parameters:
       - $ref: '#/components/parameters/location'
@@ -2402,6 +2460,15 @@ components:
       schema:
         type: string
         example: eu-central-h1
+    log_destination_id:
+      description: Postgres Log Destination ID
+      in: path
+      name: log_destination_id
+      required: true
+      schema:
+        type: string
+        example: 1d000000000000000000000000
+        pattern: '^1d[0-9a-hj-km-np-tv-z]{24}$'
     metric_destination_id:
       description: Postgres Metric Destination ID
       in: path
@@ -3275,6 +3342,32 @@ components:
       required:
         - cidr
         - id
+    PostgresLogDestination:
+      type: object
+      properties:
+        id:
+          description: ID of the log destination
+          type: string
+          example: 1d000000000000000000000000
+          pattern: '^1d[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the log destination
+          type: string
+        type:
+          description: 'Destination type: "otlp" or "syslog"'
+          type: string
+          enum:
+            - otlp
+            - syslog
+        url:
+          description: Destination URL
+          type: string
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - type
+        - url
     PrivateSubnet:
       type: object
       properties:
@@ -3886,6 +3979,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/PostgresFirewallRule'
+    PostgresLogDestination:
+      description: A Postgres Log Destination
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PostgresLogDestination'
     PostgresDatabaseMetrics:
       description: Metrics data for a Postgres Database
       content:
@@ -4115,6 +4214,8 @@ tags:
     name: Postgres Firewall Rule
   - description: Postgres Metric Destination
     name: Postgres Metric Destination
+  - description: Postgres Log Destination
+    name: Postgres Log Destination
   - description: Private Subnet Operations
     name: Private Subnet
   - description: Project Operations
