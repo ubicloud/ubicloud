@@ -75,6 +75,13 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       expect { nx.wait_vpc_created }.to hop("create_route_table")
     end
 
+    it "skips explicit SSH ingress when a firewall rule already allows port 22 from 0.0.0.0/0" do
+      client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
+      FirewallRule.create(firewall_id: ps.firewalls.first.id, cidr: "0.0.0.0/0", port_range: 22..22)
+      expect(client).to receive(:authorize_security_group_ingress).with({group_id: "sg-0123456789abcdefg", ip_permissions: [{ip_protocol: "tcp", from_port: 22, to_port: 22, ip_ranges: [{cidr_ip: "0.0.0.0/0"}]}]}).once.and_call_original
+      expect { nx.wait_vpc_created }.to hop("create_route_table")
+    end
+
     it "does not create a security group if it already exists" do
       client.stub_responses(:describe_vpcs, vpcs: [{state: "available", vpc_id: "vpc-0123456789abcdefg"}])
       client.stub_responses(:create_security_group, Aws::EC2::Errors::InvalidGroupDuplicate.new(nil, nil))

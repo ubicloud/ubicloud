@@ -43,14 +43,16 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
 
+    ssh_covered = false
     private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
       next if firewall_rule.ip6?
+      ssh_covered = true if firewall_rule.port_range.first == 22 && firewall_rule.port_range.last - 1 == 22 && firewall_rule.cidr.to_s == "0.0.0.0/0"
       allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
     end
 
     # Allow SSH ingress from the internet so that the controlplane can verify
     # that the VM is running.
-    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0")
+    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0") unless ssh_covered
     hop_create_route_table
 
   end
