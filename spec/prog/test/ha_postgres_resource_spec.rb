@@ -113,7 +113,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
       candidate_server = pgr_test.postgres_resource.servers.find { |s| s.ubid != pgr_test.frame["primary_ubid"] }
       sshable = Sshable.new
       allow(candidate_server.vm).to receive(:sshable).and_return(sshable)
-      allow(sshable).to receive(:_cmd).with("sudo tail -n 20 /dat/17/data/pg_log/postgresql.log").and_return("")
+      allow(sshable).to receive(:_cmd).with(/sudo find.*postgresql-\*\.log.*tail -n 20/).and_return("")
     end
 
     it "fails if the postgres test fails" do
