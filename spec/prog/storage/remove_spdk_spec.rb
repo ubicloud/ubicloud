@@ -32,7 +32,7 @@ RSpec.describe Prog::Storage::RemoveSpdk do
 
     it "does not fail if there are other storage backends" do
       second_spdk.destroy
-      VhostBlockBackend.create(vm_host_id: vm_host.id, version: "v1", allocation_weight: 100)
+      create_vhost_block_backend(vm_host_id: vm_host.id)
       expect { remove_spdk.start }.to hop("wait_volumes")
     end
   end

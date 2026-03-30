@@ -275,6 +275,12 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
+    def create_vhost_block_backend(version: "v0.4.1", **)
+      args = {version:, allocation_weight: 100, **}
+      args[:vm_host_id] ||= create_vm_host.id
+      VhostBlockBackend.create(**args)
+    end
+
     def create_vm_host_slice(**args)
       args = {name: "testslice", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0}.merge!(args)
       args[:vm_host_id] ||= create_vm_host.id

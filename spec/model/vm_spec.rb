@@ -279,7 +279,7 @@ RSpec.describe Vm do
       end
 
       it "checks volume services if present" do
-        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vbb = create_vhost_block_backend(vm_host_id: vmh.id)
         vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
         expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
@@ -297,7 +297,7 @@ RSpec.describe Vm do
 
     context "when vm is sshable" do
       it "checks only volume services if present" do
-        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vbb = create_vhost_block_backend(vm_host_id: vmh.id)
         vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
         expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
@@ -349,7 +349,7 @@ RSpec.describe Vm do
     let(:storage_device) { StorageDevice.create(vm_host_id: vm_host.id, name: "default", available_storage_gib: 200, total_storage_gib: 200) }
     let(:boot_image) { BootImage.create(name: "boot_image", version: "1", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1) }
     let(:kek) { StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth") }
-    let(:vbb) { VhostBlockBackend.create(version: "v0.1-5", allocation_weight: 100, vm_host_id: vm_host.id) }
+    let(:vbb) { create_vhost_block_backend(vm_host_id: vm_host.id) }
     let(:vm) { create_vm(vm_host_id: vm_host.id) }
 
     before do
@@ -397,7 +397,7 @@ RSpec.describe Vm do
          "storage_device" => "default", "read_only" => false,
          "max_read_mbytes_per_sec" => 200,
          "max_write_mbytes_per_sec" => 300,
-         "vhost_block_backend_version" => "v0.1-5", "num_queues" => 4, "queue_size" => 64,
+         "vhost_block_backend_version" => vbb.version, "num_queues" => 4, "queue_size" => 64,
          "copy_on_read" => false, "slice_name" => "system.slice", "track_written" => false}
       ])
     end
