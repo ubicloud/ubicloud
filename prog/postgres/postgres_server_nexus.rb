@@ -349,7 +349,7 @@ TIMER
       "files": {
         "collect_list": [
           {
-            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql.log",
+            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql-*.log",
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
@@ -811,7 +811,7 @@ SQL
     # Do not declare unavailability if Postgres is in crash recovery.
     # Check if log file was modified recently and last 50 lines contain recovery messages.
     begin
-      log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/postgresql.log -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
+      log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
       return true unless log_output.empty?
     rescue
       nil

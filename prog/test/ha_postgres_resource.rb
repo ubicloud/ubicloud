@@ -77,7 +77,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     new_candidate = postgres_resource.servers.filter { |s| s.ubid != frame["primary_ubid"] }.min_by(&:created_at)
     if new_candidate
       # Get last few log lines from the new candidate for debugging.
-      log_lines = new_candidate.vm.sshable.cmd("sudo tail -n 20 /dat/:version/data/pg_log/postgresql.log", version: new_candidate.version)
+      log_lines = new_candidate.vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -exec tail -n 20 {} \\;", version: new_candidate.version)
       Clog.emit("Last log lines from new candidate (#{new_candidate.ubid}):\n#{log_lines}")
     else
       Clog.emit("No new primary found after failover")
