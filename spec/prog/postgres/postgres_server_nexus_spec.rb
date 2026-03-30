@@ -1045,10 +1045,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: postgres_server.id, name: "configure_s3_new_timeline").count).to eq(0)
     end
 
-    it "pushes restart if restart is set" do
+    it "decrements restart and unregisters deadline if daemonized restart succeeds" do
       nx.incr_restart
-      expect(nx).to receive(:push).with(Prog::Postgres::Restart)
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:daemonized_restart).and_return(true)
+      expect(nx).to receive(:unregister_deadline).with("complete_restart")
       expect { nx.wait }.to nap(6 * 60 * 60)
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(0)
+    end
+
+    it "naps without decrementing restart if daemonized restart is not done yet" do
+      nx.incr_restart
+      expect(nx).to receive(:register_deadline).with("complete_restart", 2 * 60)
+      expect(nx).to receive(:daemonized_restart).and_return(false)
+      expect { nx.wait }.to nap(1)
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "restart").count).to eq(1)
     end
 
     describe "read replica" do
@@ -1124,17 +1135,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.unavailable }.to hop("wait")
     end
 
-    it "buds restart if the server is not available" do
+    it "calls daemonized_restart if the server is not available" do
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
+      expect(nx).to receive(:daemonized_restart)
       expect { nx.unavailable }.to nap(5)
       expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
     end
 
-    it "buds restart without incrementing recycle when recycle is already set" do
+    it "calls daemonized_restart without incrementing recycle when recycle is already set" do
       postgres_server.incr_recycle_unavailable_server
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
+      expect(nx).to receive(:daemonized_restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 0
     end
@@ -1142,16 +1153,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "does not create convergence strand if one is already running" do
       Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: postgres_resource.strand.id)
       expect(nx).to receive(:available?).and_return(false)
-      expect(nx).to receive(:bud).with(Prog::Postgres::Restart)
+      expect(nx).to receive(:daemonized_restart)
       expect { nx.unavailable }.to nap(5)
       expect(Strand.where(prog: "Postgres::ConvergePostgresResource", label: "start").count).to eq 1
       expect(postgres_server.reload.recycle_unavailable_server_set?).to be true
-    end
-
-    it "does not bud restart if there is already one restart going on" do
-      Strand.create(parent: st, prog: "Postgres::Restart", label: "start", stack: [{}], lease: Time.now + 10)
-      expect { nx.unavailable }.to nap(5)
-      expect(Strand.where(prog: "Postgres::Restart", label: "start").count).to eq 1
     end
 
     it "trigger_failover succeeds, naps 0" do
@@ -1523,6 +1528,31 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx.strand).to receive(:modified!)
       nx.update_stack_lsn("update")
       expect(frame.first["lsn"]).to eq("update")
+    end
+  end
+
+  describe "#daemonized_restart" do
+    it "cleans up and returns true when restart succeeded" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("Succeeded")
+      expect(sshable).to receive(:d_clean).with("postgres_restart")
+      expect(nx.daemonized_restart).to be true
+    end
+
+    it "starts the restart and returns false when not started" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("NotStarted")
+      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", postgres_server.version)
+      expect(nx.daemonized_restart).to be false
+    end
+
+    it "starts the restart and returns false when failed" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("Failed")
+      expect(sshable).to receive(:d_run).with("postgres_restart", "sudo", "postgres/bin/restart", postgres_server.version)
+      expect(nx.daemonized_restart).to be false
+    end
+
+    it "returns false when restart is in progress" do
+      expect(sshable).to receive(:d_check).with("postgres_restart").and_return("InProgress")
+      expect(nx.daemonized_restart).to be false
     end
   end
 end
