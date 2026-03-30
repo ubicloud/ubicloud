@@ -951,7 +951,7 @@ RSpec.describe Al do
 
     it "uses vhost block backend if available" do
       vmh = VmHost.first
-      vhost_backend = VhostBlockBackend.create(vm_host_id: vmh.id, version: "v0.1-5", allocation_weight: 100)
+      vhost_backend = create_vhost_block_backend(vm_host_id: vmh.id)
       vm = create_vm
       described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
       volume = vm.vm_storage_volumes.first
@@ -962,7 +962,7 @@ RSpec.describe Al do
 
     it "uses SPDK if vhost block backend has allocation_weight 0" do
       vmh = VmHost.first
-      VhostBlockBackend.create(vm_host_id: vmh.id, version: "v0.1-5", allocation_weight: 0)
+      create_vhost_block_backend(vm_host_id: vmh.id, allocation_weight: 0)
       vm = create_vm
       described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
       volume = vm.vm_storage_volumes.first

@@ -7,14 +7,14 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
 
   let(:project) { Project.create(name: "test-mi-project") }
   let(:vm_host) { create_vm_host }
+  let(:vhost_block_backend) { create_vhost_block_backend(allocation_weight: 50, vm_host_id: vm_host.id) }
   let(:source_vm) {
     vm = create_vm(vm_host_id: vm_host.id, project_id: project.id)
     Strand.create_with_id(vm, prog: "Vm::Nexus", label: "stopped")
     sd = StorageDevice.create(name: "vda", total_storage_gib: 100, available_storage_gib: 50, vm_host_id: vm_host.id)
-    be = VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 50, vm_host_id: vm_host.id)
     VmStorageVolume.create(
       vm_id: vm.id, boot: true, size_gib: 5, disk_index: 0,
-      storage_device_id: sd.id, vhost_block_backend_id: be.id,
+      storage_device_id: sd.id, vhost_block_backend_id: vhost_block_backend.id,
       key_encryption_key_1_id: StorageKeyEncryptionKey.create_random(auth_data: "test-source-kek").id,
       vring_workers: 1
     )
@@ -102,7 +102,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     end
 
     it "fails when source VM backend does not support archive" do
-      old_backend = VhostBlockBackend.create(version: "v0.3.0", allocation_weight: 0, vm_host_id: vm_host.id)
+      old_backend = create_vhost_block_backend(version: "v0.3.0", allocation_weight: 0, vm_host_id: vm_host.id)
       old_vm = create_vm(vm_host_id: vm_host.id, project_id: project.id, name: "vm-with-old-ubiblk")
       Strand.create_with_id(old_vm, prog: "Vm::Nexus", label: "stopped")
       VmStorageVolume.create(
@@ -192,7 +192,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     it "starts daemon when status is NotStarted" do
       expect(sshable).to receive(:d_check).with(daemon_name).and_return("NotStarted")
       expect(sshable).to receive(:d_run).with(daemon_name,
-        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, "vda", 0, "v0.4.0",
+        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, "vda", 0, vhost_block_backend.version,
         stdin: "{\"field\":\"value\"}", log: false)
 
       expect { prog.archive }.to nap(30)

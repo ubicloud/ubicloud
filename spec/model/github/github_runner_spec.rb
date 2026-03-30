@@ -64,7 +64,7 @@ RSpec.describe GithubRunner do
 
   it "can log duration with vhost block backend version" do
     vm = github_runner.vm
-    vhost_block_backend = VhostBlockBackend.create(version: "v0.4.0", allocation_weight: 100, vm_host_id: vm.vm_host_id)
+    vhost_block_backend = create_vhost_block_backend(vm_host_id: vm.vm_host_id)
     boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)
     VmStorageVolume.create(
       vm_id: vm.id,

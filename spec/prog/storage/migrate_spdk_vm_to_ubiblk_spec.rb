@@ -8,7 +8,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   let(:st) { Strand.new }
   let(:vm_host) {
     vm_host = create_vm_host
-    vbb = VhostBlockBackend.create(version: Config.vhost_block_backend_version, allocation_weight: 0, vm_host_id: vm_host.id)
+    vbb = create_vhost_block_backend(version: Config.vhost_block_backend_version, allocation_weight: 0, vm_host_id: vm_host.id)
     vm_host.add_vhost_block_backend(vbb)
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
     vm_host.add_spdk_installation(si)
