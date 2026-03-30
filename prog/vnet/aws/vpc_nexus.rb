@@ -43,16 +43,27 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
     private_subnet_aws_resource.update(security_group_id: security_group_response.group_id)
 
-    ssh_covered = false
+    ssh_covered_ip4 = false
+    ssh_covered_ip6 = false
     private_subnet.firewalls(eager: :firewall_rules).flat_map(&:firewall_rules).each do |firewall_rule|
-      next if firewall_rule.ip6?
-      ssh_covered = true if firewall_rule.port_range.first == 22 && firewall_rule.port_range.last - 1 == 22 && firewall_rule.cidr.to_s == "0.0.0.0/0"
-      allow_ingress(security_group_response.group_id, firewall_rule.port_range.first, firewall_rule.port_range.last - 1, firewall_rule.cidr.to_s)
+      first_port = firewall_rule.port_range.first
+      last_port = firewall_rule.port_range.last - 1
+      cidr = firewall_rule.cidr.to_s
+      if 22.between?(first_port, last_port)
+        case cidr
+        when "0.0.0.0/0"
+          ssh_covered_ip4 = true
+        when "::/0"
+          ssh_covered_ip6 = true
+        end
+      end
+      allow_ingress(security_group_response.group_id, first_port, last_port, cidr, firewall_rule.ip6?)
     end
 
     # Allow SSH ingress from the internet so that the controlplane can verify
     # that the VM is running.
-    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0") unless ssh_covered
+    allow_ingress(security_group_response.group_id, 22, 22, "0.0.0.0/0", false) unless ssh_covered_ip4
+    allow_ingress(security_group_response.group_id, 22, 22, "::/0", true) unless ssh_covered_ip6
     hop_create_route_table
 
   end
@@ -253,16 +264,18 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     @client ||= location.location_credential.client
   end
 
-  def allow_ingress(group_id, from_port, to_port, cidr)
-    client.authorize_security_group_ingress({
-      group_id:,
-      ip_permissions: [{
-        ip_protocol: "tcp",
-        from_port:,
-        to_port:,
-        ip_ranges: [{cidr_ip: cidr}],
-      }],
-    })
+  def allow_ingress(group_id, from_port, to_port, cidr, ip6)
+    perm = {
+      ip_protocol: "tcp",
+      from_port:,
+      to_port:,
+    }
+    if ip6
+      perm[:ipv_6_ranges] = [{cidr_ipv_6: cidr}]
+    else
+      perm[:ip_ranges] = [{cidr_ip: cidr}]
+    end
+    client.authorize_security_group_ingress({group_id:, ip_permissions: [perm]})
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate
   end
 
