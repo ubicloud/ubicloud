@@ -36,15 +36,7 @@ module OmniAuth
 
       class MissingCodeError < RuntimeError; end
 
-      #option :name
-      #option :client_options
-      #option :issuer
-      # option :prompt, nil # [:none, :login, :consent, :select_account]
-      # option :hd, nil
-      # option :uid_field, 'sub'
-
       def uid
-        # user_info.raw_attributes[options.uid_field.to_sym] ||
         @user_info["sub"]
       end
 
@@ -83,8 +75,6 @@ module OmniAuth
           response_type: "code",
           scope: "openid email",
           client_id: opts.identifier,
-          # prompt: options.prompt,
-          # hd: options.hd,
           nonce:,
           state:
         }
