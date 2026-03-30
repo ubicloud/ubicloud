@@ -19,6 +19,7 @@ RSpec.describe Clover, "cli pg show" do
     expect(Config).to receive(:postgres_service_hostname).and_return("pg.example.com").at_least(:once)
     DnsZone.create(project_id: @project.id, name: "pg.example.com")
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
+    @pg.add_log_destination(name: "ld-name", type: "syslog", url: "tcp://logs.example.com:6514")
     @pg.update(root_cert_1: "a", root_cert_2: "b")
     rules = @pg.pg_firewall_rules
     rules[0].update(description: "my fwr desc")
@@ -50,6 +51,8 @@ RSpec.describe Clover, "cli pg show" do
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+      log-destinations:
+        1: #{@pg.log_destinations[0].ubid}  ld-name  syslog  tcp://logs.example.com:6514
       read-replicas:
       ca-certificates:
       a
@@ -84,6 +87,8 @@ RSpec.describe Clover, "cli pg show" do
         4: #{rules[3].ubid}  ::/0  6432  
       metric-destinations:
         1: #{@pg.metric_destinations[0].ubid}  md-user  https://md.example.com
+      log-destinations:
+        1: #{@pg.log_destinations[0].ubid}  ld-name  syslog  tcp://logs.example.com:6514
       read-replicas:
         eu-central-h1/test-pg
       ca-certificates:

@@ -13,4 +13,4 @@ Allowed Option Values:
             target-storage-size-gib version target-version ha-type flavor
             connection-string primary earliest-restore-time
             maintenance-window-start-at read-replica parent tags firewall-rules
-            metric-destinations read-replicas ca-certificates
+            metric-destinations log-destinations read-replicas ca-certificates

@@ -8,6 +8,6 @@ UbiCli.on("pg").run_on("add-pgbouncer-config-entries") do
   args(1..)
 
   run do |args, _, cmd|
-    config_entries_response(sdk_object.update_pgbouncer_config(**config_entries_to_hash(args, cmd)), body: ["Updated pgbouncer config:\n"])
+    config_entries_response(sdk_object.update_pgbouncer_config(**kv_entries_to_hash(args, cmd)), body: ["Updated pgbouncer config:\n"])
   end
 end

@@ -6,7 +6,7 @@ module Ubicloud
 
     set_fragment "postgres"
 
-    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
+    set_columns :id, :name, :state, :location, :vm_size, :storage_size_gib, :version, :target_version, :ha_type, :flavor, :ca_certificates, :connection_string, :primary, :firewall_rules, :metric_destinations, :log_destinations, :tags, :maintenance_window_start_at, :read_replica, :parent, :read_replicas
 
     def self._convert_tags_in_params_from_hash_to_array(params)
       if params[:tags]
@@ -69,6 +69,33 @@ module Ubicloud
       self[:metric_destinations]&.<<(md)
 
       md
+    end
+
+    # Add an OTLP HTTP log destination for this database.
+    # Pass an https:// url and optionally options: {"headers" => {...}} for
+    # providers that require header-based authentication (e.g. Grafana, New Relic, Datadog).
+    # Returns a hash for the log destination.
+    def add_otlp_log_destination(name:, url:, headers: {})
+      add_log_destination(name:, type: "otlp", url:, options: {"headers" => headers})
+    end
+
+    # Add a syslog (RFC 5424 over TLS) log destination for this database.
+    # Pass a tcp://host:port url and optionally options: {"structured_data" => {...}} for
+    # providers that require SD-based authentication (e.g. Mezmo, Papertrail).
+    # Returns a hash for the log destination.
+    def add_syslog_log_destination(name:, host:, port: 6514, structured_data: {})
+      url = "tcp://#{host}:#{port}"
+      add_log_destination(name:, type: "syslog", url:, options: {"structured_data" => structured_data})
+    end
+
+    # Delete the log destination with the given id.  Returns nil.
+    def delete_log_destination(ld_id)
+      check_no_slash(ld_id, "invalid log destination id format")
+      adapter.delete(_path("/log-destination/#{ld_id}"))
+
+      self[:log_destinations]&.delete_if { it[:id] == ld_id }
+
+      nil
     end
 
     # Delete the metric destination with the given id.  Returns nil.
@@ -189,6 +216,18 @@ module Ubicloud
     # Remove a user from cert_auth_users. Returns a hash with :items key listing remaining cert auth users.
     def remove_cert_auth_user(name)
       adapter.post(_path("/cert/remove-auth-user"), name:)
+    end
+
+    private
+
+    def add_log_destination(name:, type:, url:, options: nil)
+      params = {name:, type:, url:, options:}
+      params.compact!
+      ld = adapter.post(_path("/log-destination"), **params)
+
+      self[:log_destinations]&.<<(ld)
+
+      ld
     end
   end
 end

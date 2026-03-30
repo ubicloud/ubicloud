@@ -267,7 +267,7 @@ class UbiCli
     params_to_hash(params, :tags, "tag", cmd)
   end
 
-  def config_entries_to_hash(args, cmd)
+  def kv_entries_to_hash(args, cmd)
     args.to_h do
       if it.include?("=")
         it.split("=", 2)
@@ -275,6 +275,22 @@ class UbiCli
         raise Rodish::CommandFailure.new("invalid argument, does not include `=`: #{it.inspect}", cmd)
       end
     end
+  end
+
+  def structured_data_args_to_hash(args, cmd)
+    result = {}
+    args.each do |arg|
+      sd_id, rest = arg.split("/", 2)
+      unless rest
+        raise Rodish::CommandFailure.new("invalid structured_data argument, expected sd-id/key=value format: #{arg.inspect}", cmd)
+      end
+      unless rest.include?("=")
+        raise Rodish::CommandFailure.new("invalid structured_data argument, expected sd-id/key=value format: #{arg.inspect}", cmd)
+      end
+      key, value = rest.split("=", 2)
+      (result[sd_id] ||= {})[key] = value
+    end
+    result.empty? ? nil : result
   end
 
   def handle_ssh(opts)

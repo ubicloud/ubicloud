@@ -3,7 +3,7 @@
 UbiCli.on("pg").run_on("show") do
   desc "Show details for a PostgreSQL database"
 
-  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations read-replicas ca-certificates].freeze.each(&:freeze)
+  fields = %w[id name state location vm-size target-vm-size storage-size-gib target-storage-size-gib version target-version ha-type flavor connection-string primary earliest-restore-time maintenance-window-start-at read-replica parent tags firewall-rules metric-destinations log-destinations read-replicas ca-certificates].freeze.each(&:freeze)
 
   options("ubi pg (location/pg-name | pg-id) show [options]", key: :pg_show) do
     on("-f", "--fields=fields", "show specific fields (comma separated)")
@@ -39,6 +39,11 @@ UbiCli.on("pg").run_on("show") do
         body << "metric-destinations:\n"
         data[key].each_with_index do |md, i|
           body << "  " << (i + 1).to_s << ": " << md[:id] << "  " << md[:username].to_s << "  " << md[:url] << "\n"
+        end
+      when :log_destinations
+        body << "log-destinations:\n"
+        data[key].each_with_index do |ld, i|
+          body << "  " << (i + 1).to_s << ": " << ld[:id] << "  " << ld[:name] << "  " << ld[:type] << "  " << ld[:url] << "\n"
         end
       when :read_replicas
         body << "read-replicas:\n"

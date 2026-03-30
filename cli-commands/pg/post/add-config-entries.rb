@@ -8,6 +8,6 @@ UbiCli.on("pg").run_on("add-config-entries") do
   args(1..)
 
   run do |args, _, cmd|
-    config_entries_response(sdk_object.update_config(**config_entries_to_hash(args, cmd)), body: ["Updated config:\n"])
+    config_entries_response(sdk_object.update_config(**kv_entries_to_hash(args, cmd)), body: ["Updated config:\n"])
   end
 end

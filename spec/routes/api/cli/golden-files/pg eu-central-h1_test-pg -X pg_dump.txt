@@ -14,12 +14,15 @@ Post Commands:
     add-config-entries                 Add configuration entries to a PostgreSQL database
     add-firewall-rule                  Add a PostgreSQL firewall rule
     add-metric-destination             Add a PostgreSQL metric destination
+    add-otlp-log-destination           Add an OTLP HTTP log destination to a PostgreSQL database
     add-pgbouncer-config-entries       Add pgbouncer configuration entries to a PostgreSQL database
+    add-syslog-log-destination         Add a syslog (RFC 5424 over TLS) log destination to a PostgreSQL database
     ca-certificates                    Print CA certificates for a PostgreSQL database
     create                             Create a PostgreSQL database
     create-client-cert-keypair         Create client certificate keypair with given common name, expiring after a duration of seconds
     create-read-replica                Create a read replica for a PostgreSQL database
     delete-firewall-rule               Delete a PostgreSQL firewall rule
+    delete-log-destination             Delete a PostgreSQL log destination
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
     list-backups                       List backups for a PostgreSQL database
