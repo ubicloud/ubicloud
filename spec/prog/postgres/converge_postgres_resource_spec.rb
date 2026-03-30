@@ -113,7 +113,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
 
-    it "provisions a new server but excludes currently used az for aws" do
+    it "does not exclude AZs of recycling servers for aws" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
       LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
       LocationAz.create(location_id: location.id, az: "b", zone_id: "az2")
@@ -123,7 +123,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server1.incr_recycle
       server2.incr_recycle
       pg.incr_use_different_az
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: [])).and_call_original
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
 
