@@ -380,8 +380,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now pg-collect-metrics.timer")
       vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
 
-      hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
-      hop_setup_hugepages
+      hop_configure_logs
     end
 
     vm.sshable.cmd("sudo systemctl reload postgres_exporter || sudo systemctl restart postgres_exporter")
@@ -389,6 +388,21 @@ TIMER
     vm.sshable.cmd("sudo systemctl reload prometheus || sudo systemctl restart prometheus")
 
     hop_wait
+  end
+
+  label def configure_logs
+    case vm.sshable.d_check("configure_logs")
+    when "Succeeded"
+      vm.sshable.d_clean("configure_logs")
+      when_initial_provisioning_set? do
+        hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
+        hop_setup_hugepages
+      end
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("configure_logs", "/home/ubi/postgres/bin/configure-logs", stdin: postgres_server.logs_config.to_json)
+    end
+    nap 5
   end
 
   label def setup_cloudwatch
@@ -631,6 +645,11 @@ SQL
     when_configure_metrics_set? do
       decr_configure_metrics
       hop_configure_metrics
+    end
+
+    when_configure_logs_set? do
+      decr_configure_logs
+      hop_configure_logs
     end
 
     when_promote_read_replica_set? do

@@ -460,6 +460,12 @@ module AdminModelSpecHelper
       PostgresMetricDestination.create_with_id(pg, url: "https://metrics.example.com", username: "test", password: "test-pass", postgres_resource_id: pg.id)
     end
 
+    def create_postgres_log_destination
+      project = Project.create(name: "test-project")
+      pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
+      PostgresLogDestination.create(postgres_resource_id: pg.id, name: "test-dest", type: "syslog", url: "tcp://logs.example.com:6514")
+    end
+
     def create_postgres_init_script
       project = Project.create(name: "test-project")
       pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)

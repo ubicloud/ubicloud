@@ -1303,4 +1303,31 @@ RSpec.describe PostgresServer do
       expect(postgres_server.display_state).to eq("updating")
     end
   end
+
+  describe "#logs_config" do
+    it "returns config with resource_id, instance, server_role, version, and empty destinations" do
+      config = postgres_server.logs_config
+      expect(config[:instance]).to eq(postgres_server.ubid)
+      expect(config[:server_role]).to eq("primary")
+      expect(config[:version]).to eq("16")
+      expect(config[:log_destinations]).to eq([])
+    end
+
+    it "returns standby as server_role for standby servers" do
+      allow(postgres_server).to receive(:primary?).and_return(false)
+      expect(postgres_server.logs_config[:server_role]).to eq("standby")
+    end
+
+    it "includes log destinations" do
+      PostgresLogDestination.create(
+        postgres_resource_id: resource.id,
+        name: "graylog",
+        type: "syslog",
+        url: "tcp://logs.example.com:6514",
+      )
+      destinations = postgres_server.logs_config[:log_destinations]
+      expect(destinations.length).to eq(1)
+      expect(destinations.first).to eq({type: "syslog", url: "tcp://logs.example.com:6514", options: nil})
+    end
+  end
 end
