@@ -23,7 +23,7 @@ RSpec.describe Clover, "cli pg restore" do
 
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64])
     expect(PostgresResource.select_order_map(:name)).to eq %w[test-pg]
-    body = cli(%w[pg eu-central-h1/test-pg restore -c max_connections=99 -u max_client_conn=99 -t foo=bar,baz=quux test-pg-2] << Time.now.utc)
+    body = cli(%w[pg eu-central-h1/test-pg restore -c max_connections=99 -u max_client_conn=99 -t foo=bar,baz=quux test-pg-2] << Time.now.utc.to_datetime.rfc3339)
     expect(PostgresResource.select_order_map(:name)).to eq %w[test-pg test-pg-2]
     pg = PostgresResource.first(name: "test-pg-2")
     expect(pg.user_config).to eq({"max_connections" => "99"})
