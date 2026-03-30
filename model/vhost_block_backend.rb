@@ -17,6 +17,11 @@ class VhostBlockBackend < Sequel::Model
     patch = version_code % 100
     "v#{major}.#{minor}.#{patch}"
   end
+
+  def version=(version_str)
+    v = Gem::Version.new(version_str.delete_prefix("v")).segments
+    self.version_code = v[0] * 10000 + v[1] * 100 + v[2]
+  end
 end
 
 # Table: vhost_block_backend

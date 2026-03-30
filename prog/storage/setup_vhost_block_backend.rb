@@ -29,15 +29,13 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     arch = vm_host.arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
-    parsed_version = Gem::Version.new(version.delete_prefix("v")).segments
-    version_code = parsed_version[0] * 10000 + parsed_version[1] * 100 + parsed_version[2]
-
-    VhostBlockBackend.create(
-      version: frame["version"],
-      version_code:,
+    vbb = VhostBlockBackend.create(
+      version:,
       allocation_weight: 0,
       vm_host_id: vm_host.id
     )
+
+    update_stack(frame.merge("vhost_block_backend_id" => vbb.id))
 
     register_deadline(nil, 5 * 60)
     hop_install_vhost_backend
@@ -49,9 +47,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     case sshable.cmd("common/bin/daemonizer --check :name", name:)
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :name", name:)
-      VhostBlockBackend.first(
-        vm_host_id: vm_host.id, version: frame["version"]
-      ).update(allocation_weight: frame["allocation_weight"])
+      VhostBlockBackend[frame["vhost_block_backend_id"]].update(allocation_weight: frame["allocation_weight"])
       pop "VhostBlockBackend was setup"
     when "Failed", "NotStarted"
       d_command = NetSsh.command("sudo host/bin/setup-vhost-block-backend install :version", version:)
