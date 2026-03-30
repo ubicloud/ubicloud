@@ -568,7 +568,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create a read replica of a PostgreSQL database" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
@@ -584,7 +584,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot create a read replica if there is no backup, yet" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
         pg.timeline.update(cached_earliest_backup_at: nil)
 
@@ -597,7 +597,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can promote a read replica" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
 
@@ -614,7 +614,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "fails to promote if not a read replica" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"

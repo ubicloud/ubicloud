@@ -559,8 +559,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
-          restore_target:
-
+          restore_target: restore_target.to_datetime.rfc3339
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -575,7 +574,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg-with-init-script",
-          restore_target:
+          restore_target: restore_target.to_datetime.rfc3339
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -588,7 +587,7 @@ RSpec.describe Clover, "postgres" do
       it "restore invalid target" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
-          restore_target: Time.now.utc
+          restore_target: Time.now.utc.to_datetime.rfc3339
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: restore_target")
@@ -597,7 +596,7 @@ RSpec.describe Clover, "postgres" do
       it "rejects restoring with invalid config" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg-invalid-config",
-          restore_target: Time.now.utc,
+          restore_target: Time.now.utc.to_datetime.rfc3339,
           pg_config: {"wal_level" => "invalid"}
         }.to_json
 
