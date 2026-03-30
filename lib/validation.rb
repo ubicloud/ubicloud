@@ -265,6 +265,38 @@ module Validation
     fail ValidationFailed.new({url: "Invalid URL"})
   end
 
+  def self.validate_log_destination_options(type, options)
+    return unless options
+
+    allowed_key = (type == "otlp") ? "headers" : "structured_data"
+    extra = options.keys - [allowed_key]
+    fail ValidationFailed.new({options: "options may only contain '#{allowed_key}' for #{type}"}) if extra.any?
+
+    if type == "otlp"
+      headers = options["headers"]
+      if headers
+        fail ValidationFailed.new({options: "options.headers must be a flat object with string values"}) unless
+          headers.is_a?(Hash) && headers.values.all?(String)
+      end
+    else
+      sd = options["structured_data"]
+      if sd
+        fail ValidationFailed.new({options: "options.structured_data must be an object mapping SD-IDs to key/value objects"}) unless
+          sd.is_a?(Hash) && sd.values.all? { it.is_a?(Hash) && it.values.all?(String) }
+      end
+    end
+  end
+
+  def self.validate_syslog_url(url)
+    uri = URI.parse(url)
+    fail ValidationFailed.new({url: "Invalid URL scheme. Only tcp URLs are supported for syslog."}) if uri.scheme != "tcp"
+    fail ValidationFailed.new({url: "Invalid URL"}) if uri.host.nil? || uri.host.empty?
+    fail ValidationFailed.new({url: "Invalid URL"}) if uri.port.nil?
+    fail ValidationFailed.new({url: "port must be between 1 and 65535"}) unless (1..65535).cover?(uri.port)
+  rescue URI::InvalidURIError
+    fail ValidationFailed.new({url: "Invalid URL"})
+  end
+
   def self.validate_vcpu_quota(project, resource_type, requested_vcpu_count, name: :size)
     if !project.quota_available?(resource_type, requested_vcpu_count)
       current_used_vcpu_count = project.current_resource_usage(resource_type)
