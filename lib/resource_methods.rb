@@ -23,13 +23,19 @@ module ResourceMethods
       end
 
       @ubid_format = /\A#{ubid_type}[a-tv-z0-9]{24}\z/
-      @encrypted_columns = Array(encrypted_columns).freeze
+      encrypted_columns_with_opts = case encrypted_columns
+      when nil then {}
+      when Hash then encrypted_columns
+      when Array then encrypted_columns.each_with_object({}) { |col, h| h[col] = {} }
+      else {encrypted_columns => {}}
+      end
+      @encrypted_columns = encrypted_columns_with_opts.keys.freeze
       @redacted_columns = (Array(redacted_columns) + @encrypted_columns).freeze
 
       unless @encrypted_columns.empty?
         plugin :column_encryption do |enc|
-          @encrypted_columns.each do |col|
-            enc.column col
+          encrypted_columns_with_opts.each do |col, opts|
+            enc.column col, **opts
           end
         end
       end

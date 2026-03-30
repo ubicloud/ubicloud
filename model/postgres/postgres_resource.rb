@@ -11,12 +11,13 @@ class PostgresResource < Sequel::Model
   one_to_one :representative_server, class: :PostgresServer, key: :resource_id, conditions: {is_representative: true}, read_only: true
   one_through_one :timeline, class: :PostgresTimeline, join_table: :postgres_server, left_key: :resource_id, read_only: true
   one_to_many :metric_destinations, class: :PostgresMetricDestination, remover: nil, clearer: nil
+  one_to_many :log_destinations, class: :PostgresLogDestination, remover: nil, clearer: nil
   many_to_one :private_subnet, read_only: true
   many_to_one :location, read_only: true
   one_to_many :read_replicas, class: :PostgresResource, key: :parent_id, conditions: {restore_target: nil}, read_only: true
   one_to_one :init_script, class: :PostgresInitScript, key: :id, read_only: true
 
-  plugin :association_dependencies, metric_destinations: :destroy, init_script: :destroy
+  plugin :association_dependencies, metric_destinations: :destroy, log_destinations: :destroy, init_script: :destroy
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs, :client_root_cert_1, :client_root_cert_2, :client_cert],
