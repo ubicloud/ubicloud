@@ -553,7 +553,6 @@ end
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
 #  version                | text                     | NOT NULL
-#  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
 #  physical_slot_ready_id | uuid                     |
 # Indexes:
