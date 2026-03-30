@@ -960,6 +960,42 @@ RSpec.describe CloverAdmin do
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
   end
 
+  it "supports moving VmHost to a non-github location and downloading boot images" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    target_location = Location[Location::HETZNER_HEL1_ID]
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Move to Location"
+    select target_location.display_name, from: "location"
+    click_button "Move to Location"
+    expect(page).to have_flash_notice("Location updated and missing boot image downloads started")
+    expect(vmh.reload.location_id).to eq target_location.id
+
+    download_strands = Strand.where(prog: "DownloadBootImage").all
+    downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+    expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble]
+  end
+
+  it "supports moving VmHost to github-runners location and downloading github images" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    target_location = Location[Location::GITHUB_RUNNERS_ID]
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Move to Location"
+    select target_location.display_name, from: "location"
+    click_button "Move to Location"
+    expect(page).to have_flash_notice("Location updated and missing boot image downloads started")
+    expect(vmh.reload.location_id).to eq target_location.id
+
+    download_strands = Strand.where(prog: "DownloadBootImage").all
+    downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+    expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404]
+  end
+
   it "supports provisioning spare GitHubRunner" do
     ins = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
     ghr = GithubRunner.create(repository_name: "test-repo", label: "ubicloud", installation_id: ins.id)

@@ -337,7 +337,22 @@ class CloverAdmin < Roda
         obj.update(allocation_state: "draining")
       end,
       "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
-      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot)
+      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
+      "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
+        location: {
+          typecast: :ubid_uuid!,
+          type: "select",
+          add_blank: true,
+          required: true,
+          options: Location
+            .where(project_id: nil, provider: %w[hetzner leaseweb])
+            .or(id: Location::GITHUB_RUNNERS_ID)
+            .select_order_map([:display_name, :id])
+            .each { it[1] = UBID.to_ubid(it[1]) }
+        }
+      }) do |obj, target_location_id|
+        obj.move_to_location(target_location_id)
+      end
     }
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
