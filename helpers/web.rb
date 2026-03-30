@@ -101,6 +101,7 @@ class Clover < Roda
   end
 
   def omniauth_provider_name(provider)
+    provider = provider.to_s
     omniauth_providers.each { |sym, name| return name if sym.name == provider }
     OidcProvider.name_for_ubid(provider) || provider
   end
