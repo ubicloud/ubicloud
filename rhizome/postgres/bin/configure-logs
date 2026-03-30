@@ -1,0 +1,46 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../../common/lib/util"
+require_relative "../lib/otel_log_config"
+
+config = JSON.parse($stdin.read)
+instance = config["instance"]
+server_role = config["server_role"]
+version = config["version"]
+resource_name = config["resource_name"]
+log_destinations = config["log_destinations"] || []
+
+log_dir = "/dat/#{version}/data/pg_log"
+
+r "mkdir", "-p", "/etc/otelcol-contrib", "/var/lib/otelcol-contrib/state", "/tmp/otelcol"
+otelcol_user = "otelcol-contrib"
+
+r "chown", "-R", otelcol_user, "/var/lib/otelcol-contrib/state", "/etc/otelcol-contrib", "/tmp/otelcol"
+r "usermod", "-aG", "systemd-journal", otelcol_user
+
+# Ensure the log directory exists (may not yet on initial provisioning)
+unless File.directory?(log_dir)
+  r "mkdir", "-p", log_dir
+  r "chown", "postgres:postgres", log_dir
+end
+
+# Grant traverse on /dat and each intermediate directory down to the log dir
+r "setfacl", "-m", "u:#{otelcol_user}:x", "/dat", "/dat/#{version}", "/dat/#{version}/data"
+
+# Grant recursive read (+rX) and set the default ACL (+r) for new files in one call
+r "setfacl", "-R", "-m", "u:#{otelcol_user}:rX,d:u:#{otelcol_user}:r", log_dir
+
+log_config = OtelLogConfig.new(
+  instance: instance,
+  server_role: server_role,
+  log_dir: log_dir,
+  resource_name: resource_name,
+  log_destinations: log_destinations,
+)
+
+safe_write_to_file("/etc/otelcol-contrib/config.yaml", log_config.to_config)
+
+r "systemctl", "enable", "--now", "otelcol-contrib"
+r "systemctl", "restart", "otelcol-contrib"
