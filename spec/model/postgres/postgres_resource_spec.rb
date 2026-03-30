@@ -124,20 +124,34 @@ RSpec.describe PostgresResource do
       expect(new_server.vm.strand.stack[0]["exclude_data_centers"]).to eq(["dc1"])
     end
 
-    it "provisions a new server but excludes currently used az for aws" do
-      expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
-      ps1
-      ps2
-      NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
+    describe "use_different_az excludes only active server AZs" do
+      before do
+        expect(postgres_resource.location).to receive(:provider).and_return(HostProvider::AWS_PROVIDER_NAME).at_least(:once)
+        ps1
+        ps2
+        NicAwsResource.create_with_id(vm1.nic.id, subnet_az: "a")
+        NicAwsResource.create_with_id(vm2.nic.id, subnet_az: "b")
+        allow(ps1).to receive_messages(needs_recycling?: false, destroy_set?: false)
+        allow(ps2).to receive_messages(needs_recycling?: false, destroy_set?: false)
+        allow(postgres_resource).to receive_messages(servers: [ps1, ps2], use_different_az_set?: true)
+      end
 
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a"])).and_call_original
-      expect(postgres_resource).to receive(:use_different_az_set?).and_return(true)
+      it "excludes both AZs when both servers are active" do
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
+        postgres_resource.provision_new_standby
+      end
 
-      postgres_resource.provision_new_standby
-      expect(PostgresServer.count).to eq(3)
-      new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
-      expect(new_server.resource_id).to eq(postgres_resource.id)
-      expect(new_server.vm.nic.strand.stack[0]["exclude_availability_zones"]).to eq(["a"])
+      it "does not exclude AZ of a server being recycled" do
+        allow(ps2).to receive(:needs_recycling?).and_return(true)
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a"])).and_call_original
+        postgres_resource.provision_new_standby
+      end
+
+      it "does not exclude AZ of a server being destroyed" do
+        allow(ps2).to receive(:destroy_set?).and_return(true)
+        expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: ["a"])).and_call_original
+        postgres_resource.provision_new_standby
+      end
     end
 
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do

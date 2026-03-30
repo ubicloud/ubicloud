@@ -16,9 +16,13 @@ class PostgresResource < Sequel::Model
 
     def aws_new_server_exclusion_filters
       exclude_availability_zones, availability_zone = if use_different_az_set?
+        # Only exclude AZs of servers that will remain after convergence. Servers
+        # that need recycling or are being destroyed will leave their AZ, so it
+        # should be available for the replacement.
+        active_vm_ids = servers.reject { |s| s.needs_recycling? || s.destroy_set? }.map(&:vm_id)
         subnet_azs = NicAwsResource
           .join(:nic, id: :id)
-          .where(vm_id: servers_dataset.select(:vm_id))
+          .where(vm_id: active_vm_ids)
           .distinct
           .select_map(:subnet_az)
 
