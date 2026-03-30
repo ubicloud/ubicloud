@@ -11,7 +11,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def version
-    @version ||= frame.fetch("version") { default_boot_image_version(image_name) }
+    @version ||= frame["version"] || default_boot_image_version(image_name)
   end
 
   def download_from_blob_storage?
@@ -165,7 +165,7 @@ class Prog::DownloadBootImage < Prog::Base
     # YYY: we can remove this once we enforce it in the database layer.
     # Although the default version is used if version is not passed, adding
     # a sanity check here to make sure version is not passed as nil.
-    fail "Version can not be passed as nil" if version.nil?
+    fail "Neither a version nor a default version was provided" if version.nil?
 
     pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
 

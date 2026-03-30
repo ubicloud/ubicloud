@@ -28,9 +28,17 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
     end
 
-    it "fails if version is nil" do
-      refresh_frame(dbi, new_values: {"version" => nil})
-      expect { dbi.start }.to raise_error RuntimeError, "Version can not be passed as nil"
+    it "resolves default version when version is nil" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
+      expect { dbi.start }.to hop("download")
+      bi = BootImage.first(vm_host_id: vm_host.id, name: "ubuntu-noble")
+      expect(bi.version).to eq(Config.ubuntu_noble_version)
+    end
+
+    it "fails if neither version nor default version is provided" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
+      expect(Config).to receive(:ubuntu_noble_version).and_return(nil)
+      expect { dbi.start }.to raise_error RuntimeError, "Neither a version nor a default version was provided"
     end
   end
 
@@ -219,9 +227,10 @@ RSpec.describe Prog::DownloadBootImage do
       expect(bi.reload.size_gib).to eq(3)
     end
 
-    it "checks the correct path if version is nil" do
-      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
-      refresh_frame(dbi, new_values: {"version" => nil})
+    it "checks the correct path when version resolves to default" do
+      version = Config.ubuntu_noble_version
+      BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-noble", version:, size_gib: 0)
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
       sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
@@ -229,7 +238,7 @@ RSpec.describe Prog::DownloadBootImage do
         available_storage_gib: 35,
         enabled: true
       )
-      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/ubuntu-noble-#{version}.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
     end
