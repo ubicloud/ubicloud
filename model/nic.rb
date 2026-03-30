@@ -13,7 +13,7 @@ class Nic < Sequel::Model
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,
-    :old_state_drop_trigger, :setup_nic, :repopulate, :lock, :vm_allocated,
+    :old_state_drop_trigger, :setup_nic, :repopulate, :vm_allocated,
     :migrate_to_separate_prog
 
   def self.ubid_to_name(ubid)
@@ -39,24 +39,28 @@ end
 
 # Table: nic
 # Columns:
-#  id                | uuid                     | PRIMARY KEY
-#  private_subnet_id | uuid                     | NOT NULL
-#  mac               | macaddr                  |
-#  created_at        | timestamp with time zone | NOT NULL DEFAULT now()
-#  private_ipv4      | cidr                     | NOT NULL
-#  private_ipv6      | cidr                     | NOT NULL
-#  vm_id             | uuid                     |
-#  encryption_key    | text                     |
-#  name              | text                     | NOT NULL
-#  rekey_payload     | jsonb                    |
-#  state             | text                     | NOT NULL
+#  id                   | uuid                     | PRIMARY KEY
+#  private_subnet_id    | uuid                     | NOT NULL
+#  mac                  | macaddr                  |
+#  created_at           | timestamp with time zone | NOT NULL DEFAULT now()
+#  private_ipv4         | cidr                     | NOT NULL
+#  private_ipv6         | cidr                     | NOT NULL
+#  vm_id                | uuid                     |
+#  encryption_key       | text                     |
+#  name                 | text                     | NOT NULL
+#  rekey_payload        | jsonb                    |
+#  state                | text                     | NOT NULL
+#  rekey_phase          | text                     | NOT NULL DEFAULT 'idle'::text
+#  rekey_coordinator_id | uuid                     |
 # Indexes:
 #  nic_pkey | PRIMARY KEY btree (id)
 # Check constraints:
-#  state | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
+#  rekey_phase_check | (rekey_phase = ANY (ARRAY['idle'::text, 'inbound'::text, 'outbound'::text, 'old_drop'::text]))
+#  state             | (state = ANY (ARRAY['initializing'::text, 'creating'::text, 'active'::text]))
 # Foreign key constraints:
-#  nic_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
-#  nic_vm_id_fkey             | (vm_id) REFERENCES vm(id)
+#  nic_private_subnet_id_fkey    | (private_subnet_id) REFERENCES private_subnet(id)
+#  nic_rekey_coordinator_id_fkey | (rekey_coordinator_id) REFERENCES private_subnet(id)
+#  nic_vm_id_fkey                | (vm_id) REFERENCES vm(id)
 # Referenced By:
 #  ipsec_tunnel     | ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
 #  ipsec_tunnel     | ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)

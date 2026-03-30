@@ -93,6 +93,36 @@ RSpec.describe Strand do
     }.to change { [st.label, st.exitval] }.from(["hop_entry", nil]).to(["hop_exit", {msg: "hop finished"}])
   end
 
+  it "child exit preserves overdue parent schedule via LEAST" do
+    parent_st = described_class.create(prog: "Test", label: "start")
+    past = Time.now - 3600
+    parent_st.this.update(schedule: past)
+
+    child_st = described_class.create(prog: "Test", label: "hop_exit", parent_id: parent_st.id)
+    child_st.run
+
+    parent_st.refresh
+    expect(parent_st.schedule).to be_within(2).of(past)
+  end
+
+  it "nap handler preserves signal schedule when concurrent incr detected" do
+    st.label = "napper"
+    st.save_changes
+
+    st.take_lease_and_reload do
+      # Simulate concurrent Signal between TAKE_LEASE_PS and nap handler.
+      # LEAST(schedule, NOW()) = NOW() since TAKE_LEASE_PS set schedule > NOW().
+      Semaphore.incr(st.id, "test")
+
+      ret = st.unsynchronized_run
+      expect(ret).to be_a(Prog::Base::Nap)
+
+      # Conditional UPDATE detected interference: schedule preserved at
+      # signal's value (~NOW), NOT set to 123 seconds in the future.
+      expect(st.schedule).to be < Time.now + 60
+    end
+  end
+
   it "logs end of strand if it took long" do
     now = Time.now
     st.label = "napper"
