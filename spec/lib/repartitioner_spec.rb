@@ -114,6 +114,10 @@ RSpec.describe Repartitioner do
       t.join(1)
       expect(t.value).to be true
 
+      # Wait for partition 2 notification to be received by listen loop
+      deadline = Time.now + 1
+      sleep 0.01 until mp.instance_variable_get(:@partition_times)[2] || Time.now > deadline
+
       expect(mp).to receive(:repartition).with(2).and_call_original
       mp.instance_variable_get(:@partition_times)[3] = Time.now - 60
       expect(repartition_2q.pop(timeout: 1)).to be true
