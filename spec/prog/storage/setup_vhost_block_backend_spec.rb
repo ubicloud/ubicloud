@@ -5,7 +5,7 @@ require_relative "../../model/spec_helper"
 RSpec.describe Prog::Storage::SetupVhostBlockBackend do
   subject(:setup_vhost_block_backend) {
     described_class.new(described_class.assemble(
-      "adec2977-74a9-8b71-8473-cf3940a45ac5",
+      vm_host.id,
       Config.vhost_block_backend_version,
       allocation_weight: 50,
     ))
@@ -13,12 +13,8 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
 
   let(:version) { Config.vhost_block_backend_version }
 
-  let(:sshable) { vm_host.sshable }
+  let(:sshable) { setup_vhost_block_backend.sshable }
   let(:vm_host) { create_vm_host(used_hugepages_1g: 0, total_hugepages_1g: 20, total_cpus: 96, os_version: "ubuntu-24.04") }
-
-  before do
-    allow(setup_vhost_block_backend).to receive_messages(sshable:, vm_host:)
-  end
 
   describe "#start" do
     it "hops to install_vhost_backend" do
@@ -26,7 +22,7 @@ RSpec.describe Prog::Storage::SetupVhostBlockBackend do
     end
 
     it "fails if version/arch combination is not supported" do
-      expect(setup_vhost_block_backend).to receive(:frame).and_return({"version" => "v1.0"})
+      refresh_frame(setup_vhost_block_backend, new_values: {"version" => "v1.0"})
       expect { setup_vhost_block_backend.start }.to raise_error RuntimeError, "Unsupported version: v1.0, x64"
     end
   end
