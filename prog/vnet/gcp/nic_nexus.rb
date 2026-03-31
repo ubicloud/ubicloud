@@ -117,7 +117,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   private
 
   def credential
-    @credential ||= nic.private_subnet.location.location_credential
+    @credential ||= nic.private_subnet.location.location_credential_gcp
   end
 
   def addresses_client

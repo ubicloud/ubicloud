@@ -19,7 +19,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   }
 
   let(:location_credential) {
-    LocationCredential.create_with_id(location,
+    LocationCredentialGcp.create_with_id(location,
       project_id: "test-gcp-project",
       service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
       credentials_json: "{}")

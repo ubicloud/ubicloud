@@ -393,7 +393,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   def credential
-    @credential ||= gcp_vpc.location.location_credential
+    @credential ||= gcp_vpc.location.location_credential_gcp
   end
 
   def gcp_project_id
