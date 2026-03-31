@@ -76,6 +76,24 @@ RSpec.describe Prog::Vnet::NicNexus do
       expect(strand.label).to eq("start")
       expect(strand.stack.first["aws_subnet_id"]).not_to be_nil
     end
+
+    it "creates a GCP nic if location is gcp" do
+      expect(ps).to receive(:location).and_return(instance_double(Location, aws?: false, gcp?: true)).at_least(:once)
+      expect(PrivateSubnet).to receive(:[]).with("57afa8a7-2357-4012-9632-07fbe13a3133").and_return(ps).at_least(:once)
+      expect(ps).to receive(:random_private_ipv6).and_return("fd10:9b0b:6b4b:8fbb::/128")
+      expect(ps).to receive(:random_private_ipv4).and_return(NetAddr::IPv4Net.parse("10.0.0.0/26"))
+      id = "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e"
+      expect(Nic).to receive(:generate_ubid).and_return(UBID.from_uuidish(id))
+      nic = instance_double(Nic, private_subnet: ps, id:)
+      expect(Nic).to receive(:create_with_id).with(id,
+        private_ipv6: "fd10:9b0b:6b4b:8fbb::/128",
+        private_ipv4: "10.0.0.0/26",
+        mac: nil,
+        private_subnet_id: "57afa8a7-2357-4012-9632-07fbe13a3133",
+        name: "demonic", state: "active").and_return(nic)
+      expect(Strand).to receive(:create_with_id).with(id, prog: "Vnet::Gcp::NicNexus", label: "start", stack: [{"exclude_availability_zones" => [], "availability_zone" => nil, "ipv4_addr" => "10.0.0.0/26", "aws_subnet_id" => nil}]).and_return(Strand.new)
+      described_class.assemble(ps.id, name: "demonic")
+    end
   end
 
   describe ".select_aws_subnet" do
