@@ -139,6 +139,9 @@ RSpec.describe PostgresResource do
       it "excludes both AZs when both servers are active" do
         expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
         postgres_resource.provision_new_standby
+        new_server = PostgresServer.exclude(id: [ps1.id, ps2.id]).first
+        expect(new_server.vm.strand.stack[0]["unsupported_azs"]).to contain_exactly("a", "b")
+        expect(new_server.vm.strand.stack[0]["exclude_availability_zones"]).to eq([])
       end
 
       it "does not exclude AZ of a server being recycled" do

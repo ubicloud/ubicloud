@@ -22,6 +22,11 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   let(:location_credential_aws) {
     loc = LocationCredentialAws.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationAz.create(location_id: loc.id, az: "b", zone_id: "usw2-az2")
+    LocationAz.create(location_id: loc.id, az: "c", zone_id: "usw2-az3")
+    LocationAz.create(location_id: loc.id, az: "d", zone_id: "usw2-az4")
+    LocationAz.create(location_id: loc.id, az: "e", zone_id: "usw2-az5")
+    LocationAz.create(location_id: loc.id, az: "f", zone_id: "usw2-az6")
     loc
   }
 
@@ -456,114 +461,126 @@ usermod -L ubuntu
 
     describe "when insufficient capacity error for non-runner" do
       let(:nic) { vm.nics.first }
-      let(:nic_nx) { Prog::Vnet::Aws::NicNexus.new(nic.strand) }
 
       before do
         client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
         nic.nic_aws_resource.update(subnet_az: "a")
-        refresh_frame(nic_nx, new_frame: {"exclude_availability_zones" => []})
       end
 
-      it "retries by excluding the failed AZ on first failure" do
+      it "adds failed AZ to exclude_availability_zones on first failure" do
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
           .and change { nic.reload.destroy_set? }.from(false).to(true)
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
-        expect(st.stack.last["retry_count"]).to eq(1)
+        expect(st.stack.last["unsupported_azs"]).to eq([])
       end
 
-      it "increments retry count on subsequent failures" do
-        refresh_frame(nx, new_values: {"retry_count" => 2})
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
-        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
-        expect(nx).to receive(:update_stack).with({
-          "exclude_availability_zones" => ["b", "c", "a"],
-          "retry_count" => 3,
-        }).and_call_original
+      it "preserves unsupported_azs from use_different_az" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b"]})
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["unsupported_azs"]).to eq(["b"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
       end
 
-      it "avoids duplicate AZs in exclusion list" do
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
+      it "resets only exclude_availability_zones when all AZs tried" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
+        expect { nx.create_instance }.to nap(300)
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
+      end
+
+      it "avoids duplicate AZs in exclude_availability_zones" do
+        refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
         expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
-      end
-
-      it "clear exclude_availability_zones after 5 retry attempts" do
-        refresh_frame(nx, new_values: {"retry_count" => 5})
-        expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
-        expect { nx.create_instance }.to nap(300)
-        expect(st.stack.last["exclude_availability_zones"]).to be_nil
-      end
-
-      it "logs retry details in emission" do
-        refresh_frame(nx, new_values: {"retry_count" => 3})
-        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b).to eq(retry_different_az: {
-            vm:,
-            error: "Aws::EC2::Errors::InsufficientInstanceCapacity",
-            message: "Insufficient capacity",
-            retry_count: 4,
-          })
-        end
-        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
       end
     end
 
     describe "when unsupported instance type error" do
       let(:nic) { vm.nics.first }
-      let(:nic_nx) { Prog::Vnet::Aws::NicNexus.new(nic.strand) }
 
       before do
         client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
         nic.nic_aws_resource.update(subnet_az: "a")
-        refresh_frame(nic_nx, new_frame: {"exclude_availability_zones" => []})
       end
 
-      it "retries by excluding the failed AZ on first failure" do
+      it "adds failed AZ to unsupported_azs on first failure" do
         expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
           .and change { nic.reload.destroy_set? }.from(false).to(true)
-        expect(st.stack.last["exclude_availability_zones"]).to eq(["a"])
-        expect(st.stack.last["retry_count"]).to eq(1)
+        expect(st.stack.last["unsupported_azs"]).to eq(["a"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
       end
 
-      it "increments retry count on subsequent failures" do
-        refresh_frame(nx, new_values: {"retry_count" => 2})
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["b", "c"]})
-        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
-        expect(nx).to receive(:update_stack).with({
-          "exclude_availability_zones" => ["b", "c", "a"],
-          "retry_count" => 3,
-        }).and_call_original
-        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+      it "pages and naps 1 hour when all AZs are unsupported" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
+        expect(Clog).to receive(:emit).with("all azs unsupported for instance type", instance_of(Hash))
+        expect(Prog::PageNexus).to receive(:assemble).with("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid, severity: "error")
+        expect { nx.create_instance }.to nap(60 * 60)
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "e", "f", "a"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
       end
 
-      it "avoids duplicate AZs in exclusion list" do
-        refresh_frame(nic_nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
-        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
-        expect(st.stack.last["exclude_availability_zones"]).to eq(["a", "b"])
-      end
-
-      it "clear exclude_availability_zones after 5 retry attempts" do
-        refresh_frame(nx, new_values: {"retry_count" => 5})
-        expect(Clog).not_to receive(:emit).with("retrying in different az", instance_of(Hash))
+      it "preserves unsupported_azs when resetting transient exclusions" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
         expect { nx.create_instance }.to nap(300)
-        expect(st.stack.last["exclude_availability_zones"]).to be_nil
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "a"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
       end
 
-      it "logs retry details in emission" do
-        refresh_frame(nx, new_values: {"retry_count" => 3})
-        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_wrap_original do |m, a, b|
-          expect(b).to eq(retry_different_az: {
-            vm:,
-            error: "Aws::EC2::Errors::Unsupported",
-            message: "Instance type not supported",
-            retry_count: 4,
-          })
-        end
+      it "retries in different az with remaining AZs" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b"]})
+        expect(Clog).to receive(:emit).with("retrying in different az", instance_of(Hash)).and_call_original
         expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "a"])
       end
+
+      it "avoids duplicate AZs in unsupported_azs" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["a", "b"]})
+        expect { nx.create_instance }.to hop("wait_old_nic_deleted")
+        expect(st.stack.last["unsupported_azs"]).to eq(["a", "b"])
+      end
+    end
+
+    describe "mixed error sequences" do
+      let(:nic) { vm.nics.first }
+
+      before do
+        nic.nic_aws_resource.update(subnet_az: "a")
+      end
+
+      it "resets transient but keeps permanent when mixed errors exhaust all AZs" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::InsufficientInstanceCapacity.new(nil, "Insufficient capacity"))
+        expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
+        expect { nx.create_instance }.to nap(300)
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
+      end
+
+      it "pages when unsupported errors accumulate across all AZs" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d", "e", "f"]})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
+        expect(Prog::PageNexus).to receive(:assemble)
+        expect { nx.create_instance }.to nap(60 * 60)
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "e", "f", "a"])
+      end
+
+      it "does not page when unsupported covers some AZs but transient covers the rest" do
+        refresh_frame(nx, new_values: {"unsupported_azs" => ["b", "c", "d"], "exclude_availability_zones" => ["e", "f"]})
+        client.stub_responses(:run_instances, Aws::EC2::Errors::Unsupported.new(nil, "Instance type not supported"))
+        expect(Prog::PageNexus).not_to receive(:assemble)
+        expect(Clog).to receive(:emit).with("resetting transient az exclusions", instance_of(Hash))
+        expect { nx.create_instance }.to nap(300)
+        expect(st.stack.last["unsupported_azs"]).to eq(["b", "c", "d", "a"])
+        expect(st.stack.last["exclude_availability_zones"]).to eq([])
+      end
+    end
+
+    it "raises on invalid az_failure_type" do
+      expect { nx.retry_in_different_az(RuntimeError.new("test"), :bogus) }.to raise_error("unexpected az_failure_type: bogus")
     end
   end
 
@@ -637,7 +654,7 @@ usermod -L ubuntu
     let(:private_subnet_id) { old_nic.private_subnet_id }
 
     before do
-      refresh_frame(nx, new_values: {"private_subnet_id" => private_subnet_id, "exclude_availability_zones" => ["a", "b"]})
+      refresh_frame(nx, new_values: {"private_subnet_id" => private_subnet_id, "unsupported_azs" => ["a"], "exclude_availability_zones" => ["b"]})
     end
 
     it "naps if old NIC still exists" do
@@ -645,7 +662,7 @@ usermod -L ubuntu
       expect { nx.wait_old_nic_deleted }.to nap(1)
     end
 
-    it "creates new NIC and hops to wait_nic_recreated when old NIC is deleted" do
+    it "creates new NIC with combined exclusions and hops to wait_nic_recreated" do
       old_nic.update(vm_id: nil)
       vm.reload
 

@@ -197,9 +197,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         nap 60
       end
 
-      retry_in_different_az(e)
+      retry_in_different_az(e, :transient)
     rescue Aws::EC2::Errors::Unsupported => e
-      retry_in_different_az(e)
+      retry_in_different_az(e, :unsupported)
     end
     instance = instance_response.instances.first
     instance_id = instance.instance_id
@@ -215,7 +215,10 @@ class Prog::Vm::Aws::Nexus < Prog::Base
 
   label def wait_old_nic_deleted
     nap 1 if nic&.reload
-    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: vm.name + "-nic", exclude_availability_zones: frame["exclude_availability_zones"]).subject
+    # Combine permanent (unsupported_azs) and transient (exclude_availability_zones)
+    # exclusions when creating the replacement NIC in a different AZ.
+    all_excluded_azs = ((frame["unsupported_azs"] || []) + (frame["exclude_availability_zones"] || [])).uniq
+    nic = Prog::Vnet::NicNexus.assemble(frame["private_subnet_id"], name: vm.name + "-nic", exclude_availability_zones: all_excluded_azs).subject
     nic.update(vm_id: vm.id)
     hop_wait_nic_recreated
   end
@@ -419,18 +422,41 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     @is_runner = vm.unix_user == "runneradmin"
   end
 
-  def retry_in_different_az(e)
-    if (retry_count = frame["retry_count"] || 0) >= 5
-      Clog.emit("resetting excluding azs to retry", {retry_different_az_failed: {vm:, error: e.class.name, message: e.message, retry_count:}})
-      update_stack({"exclude_availability_zones" => nil, "retry_count" => 0})
-      nap 5 * 60
+  # Two-tier AZ exclusion: unsupported_azs (permanent, from multi-AZ constraints
+  # and Unsupported errors) and exclude_availability_zones (transient, InsufficientCapacity only).
+  # All unsupported: page + 1hr nap. All tried: clear transient, wait 5min.
+  def retry_in_different_az(e, az_failure_type)
+    unsupported_azs = frame["unsupported_azs"] || []
+    exclude_availability_zones = frame["exclude_availability_zones"] || []
+    current_az = nic.nic_aws_resource.subnet_az
+
+    unless [:unsupported, :transient].include?(az_failure_type)
+      fail "unexpected az_failure_type: #{az_failure_type}"
+    end
+    if az_failure_type == :unsupported
+      unsupported_azs = (unsupported_azs + [current_az]).uniq
+    else
+      exclude_availability_zones = (exclude_availability_zones + [current_az]).uniq
     end
 
-    Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, retry_count: retry_count + 1}})
-    azs_excluded = ((nic.strand.stack.first["exclude_availability_zones"] || []) + [nic.nic_aws_resource.subnet_az]).uniq
-    update_stack({"exclude_availability_zones" => azs_excluded, "retry_count" => retry_count + 1})
-    nic.incr_destroy
-    hop_wait_old_nic_deleted
+    total_azs = nic.private_subnet.private_subnet_aws_resource.aws_subnets.count
+    all_tried = (unsupported_azs + exclude_availability_zones).uniq.size >= total_azs
+
+    if all_tried && unsupported_azs.size >= total_azs
+      Clog.emit("all azs unsupported for instance type", {retry_different_az_unsupported: {vm:, error: e.class.name, message: e.message, unsupported_azs:}})
+      Prog::PageNexus.assemble("#{vm.name} instance type unsupported in all AZs", ["InstanceTypeUnsupported", vm.id], vm.ubid, severity: "error")
+      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+      nap 60 * 60
+    elsif all_tried
+      Clog.emit("resetting transient az exclusions", {retry_different_az_reset: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
+      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => []})
+      nap 5 * 60
+    else
+      Clog.emit("retrying in different az", {retry_different_az: {vm:, error: e.class.name, message: e.message, unsupported_azs:, exclude_availability_zones:}})
+      update_stack({"unsupported_azs" => unsupported_azs, "exclude_availability_zones" => exclude_availability_zones})
+      nic.incr_destroy
+      hop_wait_old_nic_deleted
+    end
   end
 
   def ignore_invalid_entity
