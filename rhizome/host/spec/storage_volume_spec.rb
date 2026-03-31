@@ -411,6 +411,58 @@ RSpec.describe StorageVolume do
 
       encrypted_vhost_v2_with_cpus_sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     end
+
+    it "writes v2 config with archive source" do
+      sv = described_class.new("test", {
+        "disk_index" => 2,
+        "device_id" => "xyz01",
+        "encrypted" => true,
+        "size_gib" => 12,
+        "vhost_block_backend_version" => "v0.4.0",
+        "archive_source" => {
+          "bucket" => "ubicloud-images",
+          "prefix" => "pjxdr4fz9wep6h6ep3v4ygywh2/m105t00wekty2n68cvez4spq6t/1.0",
+          "region" => "auto",
+          "endpoint" => "https://accountid.eu.r2.cloudflarestorage.com",
+          "encrypted_access_key_id" => "encrypted_access_key_id_value",
+          "encrypted_secret_access_key" => "encrypted_secret_access_key_value",
+          "encrypted_archive_kek" => "encrypted_archive_kek_value",
+        },
+      })
+
+      expect(sv).to receive(:write_through_device?).and_return(true)
+      expect(sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-stripe-source.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[stripe_source]") &&
+          lines.include?("type = \"archive\"") &&
+          lines.include?("bucket = \"ubicloud-images\"") &&
+          lines.include?("prefix = \"pjxdr4fz9wep6h6ep3v4ygywh2/m105t00wekty2n68cvez4spq6t/1.0\"") &&
+          lines.include?("region = \"auto\"") &&
+          lines.include?("endpoint = \"https://accountid.eu.r2.cloudflarestorage.com\"") &&
+          lines.include?("access_key_id.ref = \"archive-access-key\"") &&
+          lines.include?("secret_access_key.ref = \"archive-secret-key\"") &&
+          lines.include?("archive_kek.ref = \"archive-kek\"")
+        })
+      expect(sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend-secrets.conf", satisfy { |content|
+          lines = content.split("\n")
+          lines.include?("[secrets.archive-access-key]") &&
+          lines.include?("source.inline = \"encrypted_access_key_id_value\"") &&
+          lines.include?("[secrets.archive-secret-key]") &&
+          lines.include?("source.inline = \"encrypted_secret_access_key_value\"") &&
+          lines.include?("[secrets.archive-kek]") &&
+          lines.include?("source.inline = \"encrypted_archive_kek_value\"")
+        })
+      expect(sv).to receive(:write_config_file)
+        .with("/var/storage/test/2/vhost-backend.conf", satisfy { |content|
+          content.split("\n")
+          lines = content.split("\n")
+          lines.include?("[device]") &&
+          lines.include?("[tuning]")
+        })
+      sv.vhost_backend_create_config(encryption_key, key_wrapping_secrets)
+    end
   end
 
   describe "#write_through_device" do

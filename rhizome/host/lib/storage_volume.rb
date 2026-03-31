@@ -44,6 +44,7 @@ class StorageVolume
     @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+    @archive_source = params["archive_source"]
   end
 
   def vp
@@ -98,9 +99,17 @@ class StorageVolume
     end
   end
 
+  def has_source?
+    !!(@image_path || @archive_source)
+  end
+
+  def requires_metadata?
+    has_source? || @track_written
+  end
+
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets) if requires_metadata?
     vhost_backend_create_service_file
   end
 
@@ -118,7 +127,7 @@ class StorageVolume
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
-      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path
+      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if has_source?
       write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets))
       write_config_file(sp.vhost_backend_config, v2_main_toml)
     else
@@ -167,6 +176,15 @@ class StorageVolume
       "--kek #{sp.kek_pipe}"
     end
 
+    if @archive_source
+      restrict_address_families = "AF_UNIX AF_INET AF_INET6"
+      private_network = "no"
+    else
+      restrict_address_families = "AF_UNIX"
+      private_network = "yes"
+      ip_address_deny = "any"
+    end
+
     # systemd-analyze security result:
     # Overall exposure level for #{vhost_user_block_service}: 0.5 SAFE
     service_file_path = "/etc/systemd/system/#{vhost_user_block_service}"
@@ -212,7 +230,7 @@ class StorageVolume
         ProtectKernelLogs=true
         ProtectProc=invisible
         
-        RestrictAddressFamilies=AF_UNIX
+        RestrictAddressFamilies=#{restrict_address_families}
         RestrictNamespaces=true
         SystemCallArchitectures=native
         SystemCallFilter=@system-service
@@ -221,9 +239,9 @@ class StorageVolume
         RestrictSUIDSGID=yes
         RestrictRealtime=yes
         ProcSubset=pid
-        PrivateNetwork=yes
+        PrivateNetwork=#{private_network}
         PrivateUsers=yes
-        IPAddressDeny=any
+        IPAddressDeny=#{ip_address_deny}
 
         [Install]
         WantedBy=multi-user.target
@@ -314,7 +332,7 @@ class StorageVolume
 
   def v2_include_section
     includes = []
-    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path
+    includes << File.basename(sp.vhost_backend_stripe_source_config) if has_source?
     includes << File.basename(sp.vhost_backend_secrets_config)
     items = includes.map { |f| toml_str(f) }.join(", ")
     "include = [#{items}]\n"
@@ -328,7 +346,7 @@ class StorageVolume
       "device_id" => @device_id,
       "track_written" => @track_written,
     }
-    hash["metadata_path"] = sp.vhost_backend_metadata if @image_path
+    hash["metadata_path"] = sp.vhost_backend_metadata if requires_metadata?
     toml_section("device", hash)
   end
 
@@ -360,26 +378,59 @@ class StorageVolume
       StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
     )
 
-    secrets_xts_key_section = toml_section("secrets.#{xts_key_name}", {
+    sections = []
+    sections << toml_section("secrets.#{xts_key_name}", {
       "source.inline" => wrapped_xts_b64,
       "encoding" => "base64",
       "encrypted_by.ref" => "kek",
     })
 
-    secrets_kek_section = toml_section("secrets.kek", {
+    sections << toml_section("secrets.kek", {
       "source.file" => sp.kek_pipe,
       "encoding" => "base64",
     })
 
-    secrets_xts_key_section + "\n" + secrets_kek_section
+    if @archive_source
+      sections << toml_section("secrets.archive-access-key", {
+        "source.inline" => @archive_source["encrypted_access_key_id"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+      sections << toml_section("secrets.archive-secret-key", {
+        "source.inline" => @archive_source["encrypted_secret_access_key"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+      sections << toml_section("secrets.archive-kek", {
+        "source.inline" => @archive_source["encrypted_archive_kek"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+    end
+
+    sections.join("\n")
   end
 
   def v2_stripe_source_toml
-    hash = {
-      "type" => "raw",
-      "image_path" => @image_path,
-      "copy_on_read" => @copy_on_read,
-    }
+    hash = if @archive_source
+      {
+        "type" => "archive",
+        "storage" => "s3",
+        "bucket" => @archive_source["bucket"],
+        "prefix" => @archive_source["prefix"],
+        "region" => @archive_source["region"],
+        "endpoint" => @archive_source["endpoint"],
+        "access_key_id.ref" => "archive-access-key",
+        "secret_access_key.ref" => "archive-secret-key",
+        "archive_kek.ref" => "archive-kek",
+      }
+    else
+      {
+        "type" => "raw",
+        "image_path" => @image_path,
+        "copy_on_read" => @copy_on_read,
+      }
+    end
     toml_section("stripe_source", hash)
   end
 
