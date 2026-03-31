@@ -229,6 +229,16 @@ RSpec.describe LocationCredential do
     end
   end
 
+    it "creates a storage client" do
+      client = instance_double(Google::Cloud::Storage::Project)
+      expect(Google::Cloud::Storage).to receive(:new).with(
+        project_id: "test-project",
+        credentials: {"type" => "service_account", "project_id" => "test-project"}
+      ).and_return(client)
+      expect(location_credential.storage_client).to be(client)
+    end
+
+  end
   context "with AWS access key credentials" do
     subject(:location_credential) {
       described_class.create_with_id(location.id,
