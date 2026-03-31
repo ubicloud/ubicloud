@@ -61,3 +61,4 @@ end
 #  ipsec_tunnel     | ipsec_tunnel_dst_nic_id_fkey | (dst_nic_id) REFERENCES nic(id)
 #  ipsec_tunnel     | ipsec_tunnel_src_nic_id_fkey | (src_nic_id) REFERENCES nic(id)
 #  nic_aws_resource | nic_aws_resource_id_fkey     | (id) REFERENCES nic(id)
+#  nic_gcp_resource | nic_gcp_resource_id_fkey     | (id) REFERENCES nic(id)
