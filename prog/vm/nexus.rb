@@ -185,6 +185,12 @@ class Prog::Vm::Nexus < Prog::Base
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
+          # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
+          # grows with Unsupported errors at runtime. Never cleared during retries.
+          "unsupported_azs" => exclude_availability_zones,
+          # AZs transiently excluded: InsufficientInstanceCapacity errors only.
+          # Cleared when all AZs are exhausted, then retried after a wait.
+          "exclude_availability_zones" => [],
         }],
       ) { it.id = vm.id }
     end
