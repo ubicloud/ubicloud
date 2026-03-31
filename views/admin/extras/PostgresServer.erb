@@ -13,9 +13,10 @@
 end
 
 tsdb_client = PostgresServer.victoria_metrics_client
-backlog_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:archival_backlog], obj.resource.ubid)
-lag_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:wal_lag], obj.resource.ubid)
-replay_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:replay_lag], obj.resource.ubid) if obj.standby? || obj.read_replica?
+resource_ubid = UBID.to_ubid(obj.resource_id)
+backlog_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:archival_backlog], resource_ubid)
+lag_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:wal_lag], resource_ubid)
+replay_points = query_metric.call(tsdb_client, Metrics::ADMIN_POSTGRES_METRICS[:replay_lag], resource_ubid) if obj.resource && (obj.standby? || obj.read_replica?)
 
 nonce = SecureRandom.hex(32)
 content_security_policy.add_img_src [:nonce, nonce] %>

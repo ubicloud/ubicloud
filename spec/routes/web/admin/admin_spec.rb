@@ -643,6 +643,17 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
   end
 
+  it "renders PostgresServer detail page when resource is nil" do
+    project = Project.create(name: "PgTest")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+
+    resource_id = PostgresResource.generate_uuid
+    server = PostgresServer.create(resource_id:, timeline: create_postgres_timeline(location_id: Location::HETZNER_FSN1_ID), version: PostgresResource::DEFAULT_VERSION)
+
+    visit "/model/PostgresServer/#{server.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer #{server.ubid}"
+  end
+
   it "supports downloading invoice PDF" do
     invoice = Invoice.create(
       project: Project.create(name: "stuff"),
