@@ -28,7 +28,7 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
 
   let(:pl) {
     nic  # ensure nic exists before assembling
-    Prog::Vnet::PrivatelinkAwsNexus.assemble(private_subnet_id: ps.id).subject
+    described_class.assemble(private_subnet_id: ps.id).subject
   }
 
   let(:location) { ps.location }
@@ -63,7 +63,7 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       pl = strand.subject
       expect(pl).to be_a(PrivatelinkAwsResource)
       expect(pl.description).to eq("test PL")
-      expect(pl.ports.map { [_1.src_port, _1.dst_port] }).to contain_exactly([5432, 5432], [6432, 5432])
+      expect(pl.ports.map { [it.src_port, it.dst_port] }).to contain_exactly([5432, 5432], [6432, 5432])
       expect(strand.label).to eq("start")
     end
 
@@ -81,10 +81,10 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
         .and change { pl.reload.nlb_arn }.from(nil).to(nlb_arn)
     end
 
-    it "fails if no NIC with AWS resources exists in the subnet" do
+    it "naps if no NIC with AWS resources exists in the subnet" do
       nic.nic_aws_resource.destroy
       nic.reload
-      expect { nx.start }.to raise_error(RuntimeError, /subnet has no NICs with AWS resources/)
+      expect { nx.start }.to nap(10)
     end
   end
 
@@ -109,46 +109,18 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
-    it "creates a target group and listener for each port, then hops to register_initial_targets" do
-      expect { nx.create_target_groups_and_listeners }.to hop("register_initial_targets")
+    it "creates a target group and listener for each port, signals vm strands, then hops to create_endpoint_service" do
+      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
       port = pl.ports.first.reload
       expect(port.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
       expect(port.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
-  end
 
-  describe "#register_initial_targets" do
-    let(:vm) {
-      vm = create_hosted_vm(ps.project, ps, "test-vm")
-      vm_nic = vm.nics.find { _1.private_subnet_id == ps.id }
-      vm_nic.update(private_ipv4: "10.0.0.5/32")
-      vm
-    }
-
-    before {
-      pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
-
-      # Add VM to PL
-      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: vm.id)
-      PrivatelinkAwsVmPort.create(privatelink_aws_vm_id: pl_vm.id, privatelink_aws_port_id: pl.ports.first.id, state: "registering")
-
-      elb_client.stub_responses(:register_targets)
-    }
-
-    it "registers targets and hops to create_endpoint_service" do
-      expect { nx.register_initial_targets }.to hop("create_endpoint_service")
-        .and change { pl.reload.vm_ports_dataset.where(state: "registered").count }.from(0).to(1)
-    end
-
-    it "skips registration if target group is not found" do
-      elb_client.stub_responses(:register_targets, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
-      expect { nx.register_initial_targets }.to hop("create_endpoint_service")
-    end
-
-    it "hops to create_endpoint_service with no VMs" do
-      pl.vm_ports_dataset.destroy
-      pl.privatelink_aws_vms_dataset.destroy
-      expect { nx.register_initial_targets }.to hop("create_endpoint_service")
+    it "signals vm strands with add_port if they exist" do
+      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: create_hosted_vm(ps.project, ps, "test-vm").id)
+      Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "wait")
+      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect(pl_vm.strand.reload.semaphores.map(&:name)).to include("add_port")
     end
   end
 
@@ -171,11 +143,15 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect { nx.wait }.to nap(30)
     end
 
-    it "hops to update_targets when semaphore is set" do
-      nx.incr_update_targets
-      expect { nx.wait }.to hop("update_targets")
+    it "hops to add_port when semaphore is set" do
+      nx.incr_add_port
+      expect { nx.wait }.to hop("add_port")
     end
 
+    it "hops to remove_port when semaphore is set" do
+      nx.incr_remove_port
+      expect { nx.wait }.to hop("remove_port")
+    end
   end
 
   describe "#before_run" do
@@ -211,12 +187,30 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       nx.incr_destroy
     }
 
+    it "naps while vm strands are still running" do
+      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: create_hosted_vm(ps.project, ps, "test-vm").id)
+      Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "wait")
+      expect { nx.destroy }.to nap(5)
+      expect(pl_vm.strand.reload.semaphores.map(&:name)).to include("destroy")
+    end
+
+    it "destroys a vm directly if it has no strand" do
+      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: create_hosted_vm(ps.project, ps, "test-vm").id)
+      ec2_client.stub_responses(:delete_vpc_endpoint_service_configurations)
+      ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations,
+        Aws::EC2::Errors::InvalidVpcEndpointServiceIdNotFound.new(nil, nil))
+      elb_client.stub_responses(:delete_listener)
+      elb_client.stub_responses(:delete_target_group)
+      elb_client.stub_responses(:delete_load_balancer)
+      expect { nx.destroy }.to hop("wait_nlb_deletion")
+      expect(PrivatelinkAwsVm[pl_vm.id]).to be_nil
+    end
+
     it "deletes endpoint service, TG, listener, NLB and hops to wait_nlb_deletion" do
       ec2_client.stub_responses(:delete_vpc_endpoint_service_configurations)
       ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations,
         Aws::EC2::Errors::InvalidVpcEndpointServiceIdNotFound.new(nil, nil))
       elb_client.stub_responses(:delete_listener)
-      elb_client.stub_responses(:deregister_targets)
       elb_client.stub_responses(:delete_target_group)
       elb_client.stub_responses(:delete_load_balancer)
       expect { nx.destroy }.to hop("wait_nlb_deletion")

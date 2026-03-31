@@ -3,11 +3,13 @@
 require_relative "../model"
 
 class PrivatelinkAwsVm < Sequel::Model(:privatelink_aws_vm)
+  one_to_one :strand, key: :id
   many_to_one :privatelink_aws_resource
   many_to_one :vm
   one_to_many :vm_ports, class: :PrivatelinkAwsVmPort, key: :privatelink_aws_vm_id
 
   plugin ResourceMethods
+  plugin SemaphoreMethods, :destroy, :add_port
 end
 
 # Table: privatelink_aws_vm
