@@ -4,6 +4,7 @@ require_relative "../model"
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
 require "google/cloud/compute/v1"
+require "google/cloud/storage"
 require "googleauth"
 
 class LocationCredential < Sequel::Model
@@ -114,6 +115,13 @@ class LocationCredential < Sequel::Model
       )
       client
     end
+  end
+
+  def storage_client
+    @storage_client ||= Google::Cloud::Storage.new(
+      project_id:,
+      credentials: parsed_credentials
+    )
   end
 end
 
