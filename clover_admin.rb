@@ -337,7 +337,7 @@ class CloverAdmin < Roda
           typecast: :str!,
           type: "select",
           add_blank: true,
-          options: Project.instance_methods.filter_map { it.to_s.delete_prefix("set_ff_") if it.start_with?("set_ff_") }
+          options: Project.instance_methods.filter_map { it.to_s.delete_prefix!("set_ff_") }.sort
         },
         value: {
           typecast: :nonempty_str,
