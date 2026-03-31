@@ -2,6 +2,20 @@
 
 class PostgresResource < Sequel::Model
   module Metal
+    def self.available_families_and_sizes(_location)
+      nil
+    end
+
+    def self.family_allowed?(_location, _project, family)
+      family == "standard" || family == "hobby"
+    end
+
+    def self.storage_sizes(_location, family, vcpu_count)
+      min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
+      min_storage /= 2 if family == "hobby"
+      [min_storage, min_storage * 2, min_storage * 4]
+    end
+
     private
 
     def metal_upgrade_candidate_server

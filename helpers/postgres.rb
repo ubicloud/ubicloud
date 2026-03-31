@@ -116,29 +116,6 @@ class Clover
     end
   end
 
-  def filter_option_tree_by_availability(tree, locations)
-    aws_locations = locations.select { |l| l.provider == "aws" }
-
-    tree["flavor"].each_value do |flavor_node|
-      location_tree = flavor_node["location"]
-      aws_locations.each do |location|
-        location_node = location_tree[location.name] || next
-
-        available = Set.new(
-          OptionTreeFilter.filter(provider: "aws", location: location.name).map { |e| [e[:family], e[:size]] },
-        )
-
-        family_tree = location_node["family"]
-        family_tree.each do |family_name, family_node|
-          family_node["size"].select! { |size, _| available.include?([family_name, size]) }
-        end
-        family_tree.select! { |_, family_node| family_node["size"].any? }
-      end
-    end
-
-    tree
-  end
-
   def postgres_option_metadata(locations)
     {
       flavor: Option::POSTGRES_FLAVOR_OPTIONS.transform_values { |v| {display_name: v.title} },

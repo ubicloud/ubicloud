@@ -3,13 +3,10 @@
 require "yaml"
 
 class OptionTreeFilter
-  def self.freeze
-    data
-    super
-  end
+  @data = YAML.load_file("config/instance_availability.yml")
 
   def self.data
-    @data ||= YAML.load_file("config/instance_availability.yml")
+    @data
   end
 
   def self.filter(**options)

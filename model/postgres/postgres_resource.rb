@@ -494,29 +494,24 @@ class PostgresResource < Sequel::Model
       flavor == PostgresResource.default_flavor || location.provider != "aws"
     end
 
+    availability_cache = {}
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
-      if location.aws?
-        ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
-      else
-        family == "standard" || family == "hobby"
-      end
+      available = (availability_cache[location.name] ||= available_families_and_sizes(location))
+      next false if available&.none? { |f, _| f == family }
+      family_allowed?(location, project, family)
     end
 
     options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
-      Option::POSTGRES_SIZE_OPTIONS[size].family == family
+      next false unless Option::POSTGRES_SIZE_OPTIONS[size].family == family
+      available = availability_cache[location.name]
+      next true unless available
+      available.include?([family, size])
     end
 
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
-
-      if location.aws?
-        Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
-      else
-        min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
-        min_storage /= 2 if family == "hobby"
-        [min_storage, min_storage * 2, min_storage * 4].include?(storage_size)
-      end
+      storage_sizes(location, family, vcpu_count).include?(storage_size)
     end
 
     options.add_option(name: "version", values: Option::POSTGRES_VERSION_OPTIONS.values.flatten.uniq, parent: "flavor") do |flavor, version|

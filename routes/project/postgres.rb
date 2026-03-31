@@ -7,10 +7,8 @@ class Clover
         authorize("Postgres:view", @project)
         option_tree, = PostgresResource.generate_postgres_options(@project)
         locations = Location.postgres_locations + @project.locations
-        serialized = serialize_option_tree(option_tree)
-        filter_option_tree_by_availability(serialized, locations)
         {
-          option_tree: serialized,
+          option_tree: serialize_option_tree(option_tree),
           metadata: postgres_option_metadata(locations),
         }
       end

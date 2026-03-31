@@ -97,7 +97,6 @@ RSpec.describe Clover, "postgres/capabilities" do
       families = tree.dig("flavor", "standard", "location", aws_location, "family")
       expect(families).to include("m8gd")
 
-      # metal instance types from YAML should be excluded (not in POSTGRES_SIZE_OPTIONS)
       m8gd_sizes = families["m8gd"]["size"].keys
       expect(m8gd_sizes).to include("m8gd.large")
       expect(m8gd_sizes).not_to include("m8gd.metal-24xl")
