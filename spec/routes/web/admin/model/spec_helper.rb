@@ -412,6 +412,11 @@ module AdminModelSpecHelper
       NicAwsResource.create_with_id(nic, network_interface_id: "eni-12345")
     end
 
+    def create_nic_gcp_resource
+      nic = create_nic
+      NicGcpResource.create_with_id(nic, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+    end
+
     def create_object_tag
       project = Project.create(name: "test-project")
       ObjectTag.create(project_id: project.id, name: "test-object-tag")
