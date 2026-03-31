@@ -107,6 +107,8 @@ module Prog::Vnet; end
 
 module Prog::Vnet::Aws; end
 
+module Prog::Vnet::Gcp; end
+
 module Prog::Vnet::Metal; end
 
 module Scheduling; end
@@ -252,6 +254,7 @@ def clover_freeze
     Prog::Vm::Metal,
     Prog::Vnet,
     Prog::Vnet::Aws,
+    Prog::Vnet::Gcp,
     Prog::Vnet::Metal,
     Prog::Vnet::RekeyNicTunnel::Xfrm,
     ResourceMethods,

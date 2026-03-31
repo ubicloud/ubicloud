@@ -40,6 +40,155 @@ RSpec.describe LocationCredential do
     end
   end
 
+  context "with GCP credentials" do
+    subject(:location_credential) {
+      described_class.create_with_id(location.id,
+        project_id: "test-project",
+        service_account_email: "test@test-project.iam.gserviceaccount.com",
+        credentials_json: '{"type":"service_account","project_id":"test-project"}')
+    }
+
+    let(:location) {
+      Location.create(
+        name: "gcp-test-location",
+        display_name: "test-location",
+        ui_name: "Test Location (GCP)",
+        visible: false,
+        provider: "gcp"
+      )
+    }
+
+    it "parses credentials JSON" do
+      expect(location_credential.parsed_credentials).to eq(
+        "type" => "service_account",
+        "project_id" => "test-project"
+      )
+    end
+
+    it "creates a subnetworks client" do
+      client = instance_double(Google::Cloud::Compute::V1::Subnetworks::Rest::Client)
+      expect(Google::Cloud::Compute::V1::Subnetworks::Rest::Client).to receive(:new).and_yield(
+        instance_double(Google::Cloud::Compute::V1::Subnetworks::Rest::Client::Configuration).tap {
+          expect(it).to receive(:credentials=).with(location_credential.parsed_credentials)
+        }
+      ).and_return(client)
+      expect(location_credential.subnetworks_client).to be(client)
+    end
+
+    it "creates a global_operations client" do
+      client = instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client)
+      expect(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client).to receive(:new).and_yield(
+        instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client::Configuration).tap {
+          expect(it).to receive(:credentials=).with(location_credential.parsed_credentials)
+        }
+      ).and_return(client)
+      expect(location_credential.global_operations_client).to be(client)
+    end
+
+    it "creates an addresses client" do
+      client = instance_double(Google::Cloud::Compute::V1::Addresses::Rest::Client)
+      expect(Google::Cloud::Compute::V1::Addresses::Rest::Client).to receive(:new).and_yield(
+        instance_double(Google::Cloud::Compute::V1::Addresses::Rest::Client::Configuration).tap {
+          expect(it).to receive(:credentials=).with(location_credential.parsed_credentials)
+        }
+      ).and_return(client)
+      expect(location_credential.addresses_client).to be(client)
+    end
+
+    it "creates a network_firewall_policies client" do
+      client = instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client)
+      expect(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client).to receive(:new).and_yield(
+        instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client::Configuration).tap {
+          expect(it).to receive(:credentials=).with(location_credential.parsed_credentials)
+        }
+      ).and_return(client)
+      expect(location_credential.network_firewall_policies_client).to be(client)
+    end
+
+    it "creates a CRM client" do
+      creds = instance_double(Google::Auth::ServiceAccountCredentials)
+      expect(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).with(
+        json_key_io: an_instance_of(StringIO),
+        scope: "https://www.googleapis.com/auth/cloud-platform"
+      ).and_return(creds)
+
+      client = location_credential.crm_client
+      expect(client).to be_a(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      expect(client.authorization).to eq(creds)
+    end
+
+    it "memoizes the CRM client" do
+      creds = instance_double(Google::Auth::ServiceAccountCredentials)
+      expect(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).once.and_return(creds)
+
+      client1 = location_credential.crm_client
+      client2 = location_credential.crm_client
+      expect(client1).to be(client2)
+    end
+
+    it "creates a networks client" do
+      client = instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client)
+      expect(Google::Cloud::Compute::V1::Networks::Rest::Client).to receive(:new).and_yield(
+        instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client::Configuration).tap {
+          expect(it).to receive(:credentials=).with(location_credential.parsed_credentials)
+        }
+      ).and_return(client)
+      expect(location_credential.networks_client).to be(client)
+    end
+
+    it "creates a regional CRM client with zone-specific URL" do
+      creds = instance_double(Google::Auth::ServiceAccountCredentials)
+      expect(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).with(
+        json_key_io: an_instance_of(StringIO),
+        scope: "https://www.googleapis.com/auth/cloud-platform"
+      ).and_return(creds)
+
+      client = location_credential.regional_crm_client("us-central1-a")
+      expect(client).to be_a(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
+      expect(client.root_url).to eq("https://us-central1-a-cloudresourcemanager.googleapis.com/")
+      expect(client.authorization).to eq(creds)
+    end
+
+    it "caches regional CRM clients per zone and returns distinct clients for different zones" do
+      creds = instance_double(Google::Auth::ServiceAccountCredentials)
+      allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(creds)
+
+      client_a1 = location_credential.regional_crm_client("us-central1-a")
+      client_a2 = location_credential.regional_crm_client("us-central1-a")
+      client_b = location_credential.regional_crm_client("us-central1-b")
+      expect(client_a1).to be(client_a2)
+      expect(client_a1).not_to be(client_b)
+      expect(client_b.root_url).to eq("https://us-central1-b-cloudresourcemanager.googleapis.com/")
+    end
+
+    it "creates a storage client" do
+      client = instance_double(Google::Cloud::Storage::Project)
+      expect(Google::Cloud::Storage).to receive(:new).with(
+        project_id: "test-project",
+        credentials: {"type" => "service_account", "project_id" => "test-project"}
+      ).and_return(client)
+      expect(location_credential.storage_client).to be(client)
+    end
+
+    it "creates an IAM client" do
+      creds = instance_double(Google::Auth::ServiceAccountCredentials)
+      expect(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).with(
+        json_key_io: an_instance_of(StringIO),
+        scope: "https://www.googleapis.com/auth/cloud-platform"
+      ).and_return(creds)
+
+      client = location_credential.iam_client
+      expect(client).to be_a(Google::Apis::IamV1::IamService)
+      expect(client.authorization).to eq(creds)
+    end
+
+    it "is associated with a location" do
+      location_credential
+      expect(location.location_credential).to eq(location_credential)
+      expect(location_credential.location).to eq(location)
+    end
+  end
+
   context "with AWS access key credentials" do
     subject(:location_credential) {
       described_class.create_with_id(location.id,
