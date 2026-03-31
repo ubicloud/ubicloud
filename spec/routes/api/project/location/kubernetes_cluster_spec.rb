@@ -33,7 +33,8 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
-        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"]
+        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
+        [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/upgrade-option"]
       ].each do |method, path|
         send method, path
 
@@ -175,6 +176,36 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(last_response.status).to eq(200)
           expect(kn.reload.node_count).to eq(4)
         end
+      end
+    end
+
+    describe "upgrade-option" do
+      it "returns upgrade version when cluster is not on the latest version" do
+        kc.update(version: Option.kubernetes_versions.last)
+
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/upgrade-option"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["current_version"]).to eq(Option.kubernetes_versions.last)
+        expect(body["upgrade_version"]).to eq(Option.kubernetes_versions.first)
+      end
+
+      it "returns null upgrade version when cluster is already on the latest version" do
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}/upgrade-option"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["current_version"]).to eq(Option.kubernetes_versions.first)
+        expect(body["upgrade_version"]).to be_nil
+      end
+
+      it "works with ubid" do
+        get "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade-option"
+
+        expect(last_response.status).to eq(200)
+        body = JSON.parse(last_response.body)
+        expect(body["current_version"]).to eq(kc.version)
       end
     end
   end

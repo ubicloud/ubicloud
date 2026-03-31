@@ -738,6 +738,37 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Kubernetes Cluster
+  '/project/{project_id}/location/{location}/kubernetes-cluster/{kubernetes_cluster_reference}/upgrade-option':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/kubernetes_cluster_reference'
+    get:
+      operationId: getKubernetesClusterUpgradeOptions
+      summary: Get available upgrade options for a kubernetes cluster
+      responses:
+        '200':
+          description: Available upgrade options
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  current_version:
+                    description: Current version of the kubernetes cluster
+                    type: string
+                  upgrade_version:
+                    description: 'Available upgrade version, null if already on latest'
+                    type: string
+                    nullable: true
+                additionalProperties: false
+                required:
+                  - current_version
+                  - upgrade_version
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Kubernetes Cluster
   '/project/{project_id}/location/{location}/load-balancer':
     get:
       operationId: listLocationLoadBalancers

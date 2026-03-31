@@ -67,4 +67,11 @@ class Clover
 
     options.serialize
   end
+
+  def generate_kubernetes_upgrade_option(kubernetes_cluster)
+    {
+      current_version: kubernetes_cluster.version,
+      upgrade_version: Option.kubernetes_upgrade_candidate[kubernetes_cluster.version]
+    }
+  end
 end

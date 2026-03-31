@@ -101,6 +101,11 @@ class Clover
           r.redirect kc
         end
       end
+
+      r.get api?, "upgrade-option" do
+        authorize("KubernetesCluster:view", kc)
+        generate_kubernetes_upgrade_option(kc)
+      end
     end
   end
 end
