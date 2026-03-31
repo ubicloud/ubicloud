@@ -2,6 +2,15 @@
 
 class PrivateSubnet < Sequel::Model
   module Gcp
+    private
+
+    def gcp_connect_subnet(subnet)
+      raise "Connected subnets are not supported for GCP"
+    end
+
+    def gcp_disconnect_subnet(subnet)
+      raise "Connected subnets are not supported for GCP"
+    end
   end
 end
 
