@@ -69,6 +69,46 @@ RSpec.describe "Database" do
     end
   end
 
+  ["", "admin_"].each do |prefix|
+    table = :"#{prefix}account_authentication_audit_log"
+
+    describe "#{table} table" do
+      let(:table) { table }
+
+      def insert_row(at)
+        DB[table].returning(:message).insert(at:, message: "login", account_id: Account.generate_uuid)
+      end
+
+      it "inserts row for current date without error" do
+        expect(insert_row(Date.today)).to eq [{message: "login"}]
+      end
+
+      it "needs new partitions (action required)" do
+        # if this test starts to fail, it's time to create new partitions for table audit_log. if this is ignored,
+        # DB[:account_authentication_audit_log].insert will start to fail in 45 days or less.
+        # Add a warning 60 days out, so the issue can be fixed before the warning turns into an test failure.
+
+        begin
+          DB.transaction(savepoint: true) do
+            insert_row(Date.today + 60)
+          end
+        rescue Sequel::ConstraintViolation
+          warn "\n\nNEED TO CREATE MORE #{table} PARTITIONS!\n\n\n"
+        end
+
+        expect(insert_row(Date.today + 45)).to eq [{message: "login"}]
+      end
+
+      it "fails to create in the past" do
+        expect { insert_row(Date.new(2026, 2)) }.to raise_error(Sequel::ConstraintViolation)
+      end
+
+      it "fails to create in the distant future" do
+        expect { insert_row(Date.today >> 120) }.to raise_error(Sequel::ConstraintViolation)
+      end
+    end
+  end
+
   describe "NetAddr extensions" do
     it "converts inet/cidr columns to NetAddr objects" do
       expect(DB.get(Sequel.cast("127.0.0.1", :inet))).to be_a NetAddr::IPv4
