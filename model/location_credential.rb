@@ -3,10 +3,14 @@
 require_relative "../model"
 require "aws-sdk-ec2"
 require "aws-sdk-iam"
+require "google/cloud/compute/v1"
+require "googleauth"
 
 class LocationCredential < Sequel::Model
   plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:access_key, :secret_key, :credentials_json]
   many_to_one :location, key: :id
+
+  # AWS credential methods
 
   def credentials
     @credentials ||= if assume_role
@@ -26,6 +30,42 @@ class LocationCredential < Sequel::Model
 
   def aws_iam_account_id
     @account_id ||= Aws::STS::Client.new(region: location.name, credentials:).get_caller_identity.account
+  end
+
+  # GCP credential methods
+
+  def parsed_credentials
+    @parsed_credentials ||= JSON.parse(credentials_json)
+  end
+
+  def subnetworks_client
+    @subnetworks_client ||= Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def region_operations_client
+    @region_operations_client ||= Google::Cloud::Compute::V1::RegionOperations::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def global_operations_client
+    @global_operations_client ||= Google::Cloud::Compute::V1::GlobalOperations::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def addresses_client
+    @addresses_client ||= Google::Cloud::Compute::V1::Addresses::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def networks_client
+    @networks_client ||= Google::Cloud::Compute::V1::Networks::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
   end
 end
 
