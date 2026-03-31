@@ -337,7 +337,6 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
         nil
       rescue Aws::ElasticLoadBalancingV2::Errors::ResourceInUse
         nap 10
-        return
       end
     end
 
