@@ -9,7 +9,8 @@ class Nic < Sequel::Model
   one_to_many :dst_ipsec_tunnels, key: :dst_nic_id, class: :IpsecTunnel, read_only: true
   one_to_one :strand, key: :id
   one_to_one :nic_aws_resource, key: :id, read_only: true
-  plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy
+  one_to_one :nic_gcp_resource, key: :id, read_only: true
+  plugin :association_dependencies, src_ipsec_tunnels: :destroy, dst_ipsec_tunnels: :destroy, nic_aws_resource: :destroy, nic_gcp_resource: :destroy
 
   plugin ResourceMethods, encrypted_columns: :encryption_key
   plugin SemaphoreMethods, :destroy, :start_rekey, :trigger_outbound_update,

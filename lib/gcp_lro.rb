@@ -49,6 +49,12 @@ module GcpLro
     scope_value = frame["gcp_op_scope_value"]
 
     case scope
+    when "region"
+      credential.region_operations_client.get(
+        project: gcp_project_id,
+        region: scope_value,
+        operation: op_name
+      )
     when "global"
       credential.global_operations_client.get(
         project: gcp_project_id,
