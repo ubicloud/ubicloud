@@ -239,8 +239,10 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
 
     privatelink_aws_resource.ports_dataset
       .where(id: PrivatelinkAwsVmPort.where(state: "deregistering").select(:privatelink_aws_port_id))
+      .eager(vm_ports: {privatelink_aws_vm: {vm: :nics}})
+      .all
       .each do |port|
-        port.vm_ports_dataset.eager(privatelink_aws_vm: {vm: :nics}).all.each do |vm_port|
+        port.vm_ports.each do |vm_port|
           vm = vm_port.vm
           next unless (nic = privatelink_aws_resource.get_vm_nic(vm))
 

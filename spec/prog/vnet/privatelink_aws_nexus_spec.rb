@@ -154,6 +154,92 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     end
   end
 
+  describe "#remove_port" do
+    let(:vm) {
+      vm = create_hosted_vm(ps.project, ps, "test-vm")
+      vm.nics.find { it.private_subnet_id == ps.id }.update(private_ipv4: "10.0.0.5/32")
+      vm
+    }
+    let(:pl_vm) { PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: vm.id) }
+
+    before {
+      pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
+      pl.ports.first.update(
+        target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc",
+        listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"
+      )
+      PrivatelinkAwsVmPort.create(
+        privatelink_aws_vm_id: pl_vm.id,
+        privatelink_aws_port_id: pl.ports.first.id,
+        state: "deregistering"
+      )
+      nx.incr_remove_port
+      elb_client.stub_responses(:deregister_targets)
+      elb_client.stub_responses(:delete_listener)
+      elb_client.stub_responses(:delete_target_group)
+    }
+
+    it "deregisters targets, deletes listener and target group, destroys port, and hops to wait" do
+      port_id = pl.ports.first.id
+      expect { nx.remove_port }.to hop("wait")
+      expect(PrivatelinkAwsPort[port_id]).to be_nil
+      expect(PrivatelinkAwsVmPort.where(privatelink_aws_port_id: port_id).count).to eq(0)
+    end
+
+    it "uses a single query to load vm_ports regardless of port count" do
+      port2 = PrivatelinkAwsPort.create(
+        privatelink_aws_resource_id: pl.id, src_port: 6432, dst_port: 5432,
+        target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/def",
+        listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/ghi"
+      )
+      PrivatelinkAwsVmPort.create(
+        privatelink_aws_vm_id: pl_vm.id,
+        privatelink_aws_port_id: port2.id,
+        state: "deregistering"
+      )
+
+      counter = Struct.new(:n) do
+        def info(sql)
+          # Strip Sequel's "(0.000000s) " timing prefix, then check if
+          # privatelink_aws_vm_port is the primary FROM table (not in a subquery)
+          pure = sql.sub(/\A\([0-9.]+s\)\s+/, "")
+          self.n += 1 if pure.start_with?('SELECT * FROM "privatelink_aws_vm_port"')
+        end
+        def debug(_); end
+        def warn(_); end
+        def error(_); end
+      end.new(0)
+
+      DB.loggers << counter
+      begin
+        expect { nx.remove_port }.to hop("wait")
+      ensure
+        DB.loggers.delete(counter)
+      end
+
+      expect(counter.n).to eq(1)
+    end
+
+    it "handles TargetNotRegisteredException gracefully" do
+      elb_client.stub_responses(:deregister_targets,
+        Aws::ElasticLoadBalancingV2::Errors::TargetNotRegisteredException.new(nil, nil))
+      expect { nx.remove_port }.to hop("wait")
+    end
+
+    it "handles TargetGroupNotFound gracefully" do
+      elb_client.stub_responses(:deregister_targets,
+        Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
+      expect { nx.remove_port }.to hop("wait")
+    end
+
+    it "skips deregistration if vm is not in the subnet" do
+      other_ps = Prog::Vnet::SubnetNexus.assemble(ps.project.id, name: "other-ps", location_id: ps.location.id).subject
+      vm.nics.find { it.private_subnet_id == ps.id }.update(private_subnet_id: other_ps.id)
+      expect(elb_client).not_to receive(:deregister_targets)
+      expect { nx.remove_port }.to hop("wait")
+    end
+  end
+
   describe "#before_run" do
     it "hops to destroy when destroy semaphore is set" do
       expect(nx).to receive(:when_destroy_set?).and_yield
