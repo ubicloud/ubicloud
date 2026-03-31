@@ -239,7 +239,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.mount_data_disk }.to nap(5)
     end
 
-    it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
+    it "mounts data disk if format disk is succeeded and hops to run_init_script" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
       expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/vdb -r 838848").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
@@ -345,8 +345,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
   describe "#configure_walg_credentials" do
     it "hops to initialize_empty_database if the server is primary" do
-      expect(server).to receive(:refresh_walg_credentials)
       expect(server).to receive(:attach_s3_policy_if_needed)
+      expect(server).to receive(:refresh_walg_credentials)
 
       expect { nx.configure_walg_credentials }.to hop("initialize_empty_database")
     end
@@ -354,8 +354,8 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "hops to initialize_database_from_backup if the server is not primary" do
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
-      expect(standby_nx.postgres_server).to receive(:refresh_walg_credentials)
       expect(standby_nx.postgres_server).to receive(:attach_s3_policy_if_needed)
+      expect(standby_nx.postgres_server).to receive(:refresh_walg_credentials)
 
       expect { standby_nx.configure_walg_credentials }.to hop("initialize_database_from_backup")
     end
@@ -1031,12 +1031,6 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(nx.postgres_server).to receive(:refresh_walg_credentials)
       expect { nx.wait }.to nap(6 * 60 * 60)
       expect(Semaphore.where(strand_id: postgres_server.id, name: "refresh_walg_credentials").count).to eq(0)
-    end
-
-    it "decrements and calls attach_s3_policy_if_needed if configure_s3_new_timeline is set" do
-      nx.incr_configure_s3_new_timeline
-      expect { nx.wait }.to nap(6 * 60 * 60)
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "configure_s3_new_timeline").count).to eq(0)
     end
 
     it "pushes restart if restart is set" do
