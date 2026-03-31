@@ -3,36 +3,53 @@
 
 require "json"
 require_relative "../../common/lib/util"
-require_relative "../lib/vector_log_config"
+require_relative "../lib/otel_log_config"
 
 config = JSON.parse($stdin.read)
 resource_id = config["resource_id"]
 instance = config["instance"]
 server_role = config["server_role"]
 log_dir = config["log_dir"]
-vector_version = config["vector_version"]
+otelcol_version = config["otelcol_version"]
 parseable_endpoint = config["parseable_endpoint"]
 parseable_username = config["parseable_username"]
 parseable_password = config["parseable_password"]
 parseable_ca_bundle = config["parseable_ca_bundle"]
 parseable_server_name = config["parseable_server_name"]
+log_destinations = (config["log_destinations"] || []).map { |d|
+  {host: d["host"], port: d["port"], template: d["template"], ca_bundle: d["ca_bundle"]}
+}
 
-vector_current = begin
-  r("vector --version")
+unless parseable_endpoint
+  r "sudo systemctl stop otelcol-contrib || true"
+  r "sudo systemctl disable otelcol-contrib || true"
+  exit 0
+end
+
+otelcol_current = begin
+  r("otelcol-contrib --version")
 rescue
   ""
 end
-unless vector_current.start_with?("vector #{vector_version}")
-  r "wget -q https://github.com/vectordotdev/vector/releases/download/v#{vector_version}/vector-#{vector_version}-x86_64-unknown-linux-gnu.tar.gz -O /tmp/vector.tar.gz"
-  r "tar -xzf /tmp/vector.tar.gz --strip-components=3 -C /usr/local/bin ./vector-x86_64-unknown-linux-gnu/bin/vector"
-  r "chmod +x /usr/local/bin/vector"
-  r "rm /tmp/vector.tar.gz"
+unless otelcol_current.include?(otelcol_version)
+  arch = r("uname -m").strip == "aarch64" ? "arm64" : "amd64"
+  r "wget -q https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v#{otelcol_version}/otelcol-contrib_#{otelcol_version}_linux_#{arch}.tar.gz -O /tmp/otelcol.tar.gz"
+  r "tar -xzf /tmp/otelcol.tar.gz -C /usr/local/bin otelcol-contrib"
+  r "chmod +x /usr/local/bin/otelcol-contrib"
+  r "rm /tmp/otelcol.tar.gz"
 end
 
 r "usermod -aG systemd-journal ubi_monitoring"
 r "usermod -aG postgres ubi_monitoring"
 
-log_config = VectorLogConfig.new(
+tls_curl_flag = parseable_ca_bundle ? "--cacert #{OtelLogConfig::PARSEABLE_CA_CERT_PATH}" : "-k"
+r "mkdir -p /etc/otelcol/certs /var/lib/otelcol/state /tmp/otelcol"
+if parseable_ca_bundle
+  safe_write_to_file(OtelLogConfig::PARSEABLE_CA_CERT_PATH, parseable_ca_bundle)
+end
+r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{resource_id}' || true"
+
+log_config = OtelLogConfig.new(
   resource_id: resource_id,
   instance: instance,
   server_role: server_role,
@@ -41,29 +58,26 @@ log_config = VectorLogConfig.new(
   parseable_username: parseable_username,
   parseable_password: parseable_password,
   parseable_ca_bundle: parseable_ca_bundle,
-  parseable_server_name: parseable_server_name
+  parseable_server_name: parseable_server_name,
+  log_destinations: log_destinations
 )
 
-if log_config.use_tls?
-  r "mkdir -p /etc/vector/certs"
-  safe_write_to_file(log_config.ca_cert_path, parseable_ca_bundle)
+log_destinations.each_with_index do |dest, i|
+  next unless dest[:ca_bundle]
+  safe_write_to_file(log_config.syslog_ca_cert_path(i), dest[:ca_bundle])
 end
 
-tls_curl_flag = log_config.use_tls? ? "--cacert #{log_config.ca_cert_path}" : "-k"
-r "curl -sf #{tls_curl_flag} -u '#{parseable_username}:#{parseable_password}' -X PUT '#{parseable_endpoint}/api/v1/logstream/#{resource_id}' || true"
+safe_write_to_file("/etc/otelcol/postgres.yaml", log_config.to_config)
 
-r "mkdir -p /etc/vector /var/lib/vector"
-safe_write_to_file("/etc/vector/postgres.toml", log_config.to_toml)
-
-vector_service = <<~SERVICE
+otelcol_service = <<~SERVICE
   [Unit]
-  Description=Vector log shipper for PostgreSQL
+  Description=OpenTelemetry Collector for PostgreSQL logs
   After=network.target
 
   [Service]
   Type=simple
   User=root
-  ExecStart=/usr/local/bin/vector --config /etc/vector/postgres.toml
+  ExecStart=/usr/local/bin/otelcol-contrib --config /etc/otelcol/postgres.yaml
   Restart=on-failure
   RestartSec=5
 
@@ -71,7 +85,7 @@ vector_service = <<~SERVICE
   WantedBy=multi-user.target
 SERVICE
 
-safe_write_to_file("/etc/systemd/system/vector-postgres.service", vector_service)
+safe_write_to_file("/etc/systemd/system/otelcol-contrib.service", otelcol_service)
 r "systemctl daemon-reload"
-r "systemctl enable vector-postgres --now"
-r "systemctl restart vector-postgres"
+r "systemctl enable otelcol-contrib --now"
+r "systemctl reload otelcol-contrib || systemctl restart otelcol-contrib"

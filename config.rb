@@ -150,7 +150,7 @@ module Config
   optional :parseable_endpoint_override, string
   optional :parseable_admin_user, string
   optional :parseable_admin_password, string
-  override :vector_version, "0.54.0", string
+  override :otelcol_version, "0.127.0", string
 
   # VictoriaMetrics
   optional :victoria_metrics_service_project_id, uuid
