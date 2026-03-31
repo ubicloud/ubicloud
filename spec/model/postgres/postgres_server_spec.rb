@@ -562,7 +562,7 @@ RSpec.describe PostgresServer do
       location.update(provider: "aws")
       expect(Prog::Postgres::PostgresTimelineNexus).to receive(:assemble).and_return(instance_double(PostgresTimeline, id: "1ff21ff9-7534-4d28-820b-1da97199e39e"))
       expect(postgres_server).to receive(:update).with(timeline_id: "1ff21ff9-7534-4d28-820b-1da97199e39e", timeline_access: "push", synchronization_status: "ready")
-      expect(postgres_server).to receive(:incr_configure_s3_new_timeline)
+      expect(postgres_server).to receive(:attach_s3_policy_if_needed)
       expect(postgres_server.vm.sshable).to receive(:_cmd).with("sudo systemctl stop wal-g")
       expect(postgres_server).to receive(:refresh_walg_credentials)
       expect { postgres_server.switch_to_new_timeline }.not_to raise_error
