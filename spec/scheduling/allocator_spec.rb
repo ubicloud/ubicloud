@@ -946,10 +946,11 @@ RSpec.describe Al do
     end
 
     it "creates volume with track_written set to true" do
+      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.4.0", allocation_weight: 100)
       vm = create_vm
       vol = [{
         "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false, "track_written" => true
+        "boot" => false, "track_written" => true, "vring_workers" => 1
       }]
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.track_written).to be(true)
@@ -1639,6 +1640,18 @@ RSpec.describe Al do
       vbb_1 = VhostBlockBackend.new(allocation_weight: 0) { it.id = VhostBlockBackend.generate_uuid }
       vbb_2 = VhostBlockBackend.new(allocation_weight: 100) { it.id = VhostBlockBackend.generate_uuid }
       expect(Al::StorageAllocation.allocate_vhost_block_backend([vbb_1, vbb_2])).to eq(vbb_2.id)
+    end
+
+    it "filters backends by min_version" do
+      vbb_1 = create_vhost_block_backend(allocation_weight: 100, version: "v0.3.0")
+      vbb_2 = create_vhost_block_backend(allocation_weight: 1, version: "v0.4.0")
+      vbb_3 = create_vhost_block_backend(allocation_weight: 100, version: "v0.1.7")
+      expect(Al::StorageAllocation.allocate_vhost_block_backend([vbb_1, vbb_2, vbb_3], min_version: 400)).to eq(vbb_2.id)
+    end
+
+    it "fails if no backends meet min_version" do
+      vbb_1 = create_vhost_block_backend(allocation_weight: 100, version: "v0.3.0")
+      expect { Al::StorageAllocation.allocate_vhost_block_backend([vbb_1], min_version: 400) }.to raise_error "Total weight of all eligible vhost_block_backends shouldn't be zero."
     end
   end
 end
