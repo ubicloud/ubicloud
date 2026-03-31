@@ -2,6 +2,27 @@
 
 class Location < Sequel::Model
   module Gcp
+    private
+
+    def gcp_azs
+      v = location_azs_dataset.all
+      return v unless v.empty?
+      set_gcp_azs
+    end
+
+    def set_gcp_azs
+      region = name.delete_prefix("gcp-")
+      get_gcp_zones(region).map do |zone|
+        az = zone.name.delete_prefix("#{region}-")
+        LocationAz.create(location_id: id, az:)
+      end
+    end
+
+    def get_gcp_zones(region)
+      credential = location_credential
+      zones = credential.zones_client.list(project: credential.project_id).to_a
+      zones.select { it.name.start_with?("#{region}-") }
+    end
   end
 end
 
