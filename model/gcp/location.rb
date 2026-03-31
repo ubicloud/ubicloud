@@ -2,6 +2,11 @@
 
 class Location < Sequel::Model
   module Gcp
+    private
+
+    def gcp_azs
+      raise "azs is only valid for aws locations"
+    end
   end
 end
 
