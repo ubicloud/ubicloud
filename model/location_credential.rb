@@ -38,8 +38,20 @@ class LocationCredential < Sequel::Model
     @parsed_credentials ||= JSON.parse(credentials_json)
   end
 
+  def zones_client
+    @zones_client ||= Google::Cloud::Compute::V1::Zones::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
   def subnetworks_client
     @subnetworks_client ||= Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def zone_operations_client
+    @zone_operations_client ||= Google::Cloud::Compute::V1::ZoneOperations::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
@@ -58,6 +70,12 @@ class LocationCredential < Sequel::Model
 
   def addresses_client
     @addresses_client ||= Google::Cloud::Compute::V1::Addresses::Rest::Client.new do |config|
+      config.credentials = parsed_credentials
+    end
+  end
+
+  def compute_client
+    @compute_client ||= Google::Cloud::Compute::V1::Instances::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end

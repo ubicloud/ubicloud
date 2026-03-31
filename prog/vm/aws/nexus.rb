@@ -141,7 +141,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
     end
 
     params = {
-      image_id: vm.boot_image, # AMI ID
+      image_id: vm.boot_image,
       instance_type: Option.aws_instance_type_name(vm.family, vm.vcpus),
       block_device_mappings: [
         {
