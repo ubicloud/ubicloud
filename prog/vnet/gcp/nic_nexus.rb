@@ -11,6 +11,9 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   label def start
     register_deadline("wait", 5 * 60)
 
+    # Record which VPC and subnet this NIC belongs to. The VPC is per (project, location)
+    # and the subnet maps 1:1 to an Ubicloud PrivateSubnet. Firewall rules and tag bindings
+    # are managed separately by UpdateFirewallRules when the VM is provisioned.
     ps = nic.private_subnet
     NicGcpResource.create_with_id(
       nic.id,
