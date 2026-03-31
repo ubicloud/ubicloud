@@ -162,6 +162,26 @@ class Prog::Vm::Nexus < Prog::Base
           end
         end
         "Vm::Aws::Nexus"
+      elsif location.gcp?
+        disk_index = 0
+        storage_volumes.each do |volume|
+          # GCP local NVMe SSDs come in 375GB increments; split into
+          # multiple VmStorageVolume records so each maps to one physical disk.
+          disk_count = volume[:boot] ? 1 : (volume[:size_gib] / 375.0).ceil
+
+          disk_count.times do
+            VmStorageVolume.create(
+              vm_id: vm.id,
+              size_gib: volume[:size_gib] / disk_count,
+              boot: volume[:boot],
+              use_bdev_ubi: false,
+              disk_index:
+            )
+
+            disk_index += 1
+          end
+        end
+        "Vm::Gcp::Nexus"
       else
         vm.create_storage_volumes(storage_volumes)
         "Vm::Metal::Nexus"
@@ -184,6 +204,7 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
+          "exclude_availability_zones" => exclude_availability_zones,
           "private_subnet_id" => subnet.id,
           # AZs permanently excluded: seeded from multi-AZ policy (use_different_az),
           # grows with Unsupported errors at runtime. Never cleared during retries.

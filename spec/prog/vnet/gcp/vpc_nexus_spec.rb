@@ -12,7 +12,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
   }
   let(:credential) {
-    LocationCredential.create_with_id(location,
+    LocationCredentialGcp.create_with_id(location,
       project_id: "test-gcp-project",
       service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
       credentials_json: "{}")
