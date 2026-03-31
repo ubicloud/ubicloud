@@ -342,6 +342,7 @@ Post Commands:
     rename             Rename a Kubernetes cluster
     resize-nodepool    Resize a Kubernetes cluster nodepool
     show               Show details for a Kubernetes cluster
+    upgrade-option     Show available upgrade option for a Kubernetes cluster
 
 
 List Kubernetes clusters
@@ -417,6 +418,12 @@ Allowed Option Values:
     Nodepool Fields: id name node-count node-size vms
     Virtual Machine Fields: id name state location size unix-user
                             storage-size-gib ip6 ip4-enabled ip4
+
+
+Show available upgrade option for a Kubernetes cluster
+
+Usage:
+    ubi kc (location/kc-name | kc-id) upgrade-option
 
 
 Manage load balancers

@@ -16,5 +16,9 @@ module Ubicloud
     def resize_nodepool(nodepool_ref, node_count)
       adapter.post(_path("/nodepool/#{nodepool_ref}/resize"), {node_count:})
     end
+
+    def upgrade_option
+      adapter.get(_path("/upgrade-option"))
+    end
   end
 end
