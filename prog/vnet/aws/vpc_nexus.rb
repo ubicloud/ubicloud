@@ -277,6 +277,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
     end
     client.authorize_security_group_ingress({group_id:, ip_permissions: [perm]})
   rescue Aws::EC2::Errors::InvalidPermissionDuplicate
+    nil
   end
 
   def private_subnet_aws_resource
