@@ -15,7 +15,7 @@ RSpec.describe Al do
 
   # Creates a Request object with the given parameters
   #
-  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], os_filter: nil)
+  def create_req(vm, storage_volumes, target_host_utilization: 0.55, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], data_center_exclusion_filter: [], location_filter: [], location_preference: [], use_slices: true, require_shared_slice: false, diagnostics: false, family_filter: [], os_filter: nil, minimum_vhost_block_backend_version: nil)
     Al::Request.new(
       vm.id,
       vm.vcpus,
@@ -41,7 +41,8 @@ RSpec.describe Al do
       require_shared_slice,
       diagnostics,
       family_filter,
-      os_filter
+      os_filter,
+      minimum_vhost_block_backend_version
     )
   end
 
@@ -314,6 +315,50 @@ RSpec.describe Al do
 
       expect(cand.size).to eq(1)
       expect(cand.first[:vm_host_id]).to eq(vmh1.id)
+    end
+
+    it "filters hosts by minimum vhost block backend version" do
+      vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      StorageDevice.create(vm_host_id: vmh2.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      Address.create(cidr: "2.1.1.0/30", routed_to_host_id: vmh2.id)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh2.id, activated_at: Time.now, size_gib: 3)
+      create_vhost_block_backend(version: "v0.4.0", vm_host_id: vmh1.id, allocation_weight: 100)
+      create_vhost_block_backend(version: "v0.3.0", vm_host_id: vmh2.id, allocation_weight: 100)
+      create_vhost_block_backend(version: "v0.1.7", vm_host_id: vmh2.id, allocation_weight: 100)
+
+      req.minimum_vhost_block_backend_version = 400
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh1.id)
+    end
+
+    it "excludes hosts with zero-weight vhost block backend even if version matches" do
+      vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+      create_vhost_block_backend(version: "v0.4.0", vm_host_id: vmh1.id, allocation_weight: 0)
+
+      req.minimum_vhost_block_backend_version = 400
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand).to be_empty
+    end
+
+    it "does not filter by vhost block backend version when not requested" do
+      vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vmh1.id)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+
+      cand = Al::Allocation.candidate_hosts(req)
+
+      expect(cand.size).to eq(1)
     end
 
     it "retrieves candidates with enough storage devices" do
@@ -918,6 +963,23 @@ RSpec.describe Al do
       }]
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.track_written).to be(false)
+    end
+
+    it "succeeds allocation when track_written is set and host has vhost block backend v0.4.0+" do
+      vmh = VmHost.first
+      create_vhost_block_backend(vm_host_id: vmh.id, version: "v0.4.0", allocation_weight: 100)
+
+      vm = create_vm
+      vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true, "vring_workers" => 1}]
+      described_class.allocate(vm, vol)
+      expect(vm.reload.vm_host_id).to eq(vmh.id)
+      expect(vm.vm_storage_volumes.first.track_written).to be(true)
+    end
+
+    it "fails allocation when track_written is set but no host has vhost block backend v0.4.0+" do
+      vm = create_vm
+      vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true}]
+      expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "creates volume with no rate limits" do
