@@ -2,6 +2,9 @@
 
 module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil, data_center_exclusion_filter: [])
+    if storage_volumes.any? { it["track_written"] }
+      minimum_vhost_block_backend_version = VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
+    end
     request = Request.new(
       vm.id,
       vm.vcpus,
@@ -26,7 +29,9 @@ module Scheduling::Allocator
       true, # use slices
       Option::VmFamilies.find { it.name == vm.family }&.require_shared_slice || false,
       vm.project.get_ff_allocator_diagnostics || false,
-      family_filter
+      family_filter,
+      os_filter,
+      minimum_vhost_block_backend_version
     )
     allocation = Allocation.best_allocation(request)
     fail "#{vm} no space left on any eligible host" unless allocation
@@ -60,7 +65,8 @@ module Scheduling::Allocator
     :require_shared_slice,
     :diagnostics,
     :family_filter,
-    :os_filter
+    :os_filter,
+    :minimum_vhost_block_backend_version
   ) do
     def initialize(*args)
       super
@@ -238,6 +244,17 @@ module Scheduling::Allocator
 
       # Temporary while testing CloudHypervisor 46 rollout
       ds = ds.where(Sequel[:vm_host][:os_version] => request.os_filter) if request.os_filter
+
+      if request.minimum_vhost_block_backend_version
+        ds = ds.where(
+          DB[:vhost_block_backend]
+            .where(vm_host_id: Sequel[:vm_host][:id])
+            .exclude(allocation_weight: 0)
+            .where { version_code >= request.minimum_vhost_block_backend_version }
+            .select(1)
+            .exists
+        )
+      end
 
       # If we dont's want to use slices, place those only on hosts that do not accept them
       # If we require a shared slice (for burstable vm), allocate those only on hosts that accept slices
