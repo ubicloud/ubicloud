@@ -701,32 +701,53 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.register_runner }.to raise_error Sshable::SshError
     end
 
-    it "destroys the runner if generate request fails due to self runners disabled error" do
+    it "handles common GitHub API errors during registration" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.register_runner }.to nap(0)
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
+  end
 
-    it "fails if it raises unexpected Octokit error" do
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Unexpected error"}))
-      expect { nx.register_runner }.to raise_error Octokit::Error
+  describe "#rescue_common_github_api_errors" do
+    it "naps until rate limit resets and creates a page when rate limited" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
+        .and change { Page.count }.by(1)
+      expect(Page.first).to have_attributes(
+        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
+        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
+        severity: "warning"
+      )
     end
 
-    it "destroys the runner if generate request fails due to IP allowlist enabled error" do
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "your IP address is not permitted to access this resource"}))
-      expect { nx.register_runner }.to nap(0)
+    it "naps at least 30 seconds even if rate limit resets sooner" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
+    end
+
+    it "destroys the runner if self-hosted runners are disabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
 
-    it "destroys the runner if generate request fails due to resource not accessible by integration error" do
+    it "destroys the runner if IP allowlist is enabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "destroys the runner if resource not accessible by integration" do
       repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
       runner.update(repository_id: repo.id)
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Resource not accessible by integration"}))
-      expect { nx.register_runner }.to nap(0)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
+    end
+
+    it "re-raises unexpected Octokit errors" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Unexpected error"}) } }.to raise_error Octokit::Error
     end
   end
 
@@ -761,23 +782,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
       expect { nx.wait }.to nap(0)
       expect(runner.destroy_set?).to be(true)
-    end
-
-    it "naps until rate limit resets and creates a page when rate limited during wait" do
-      runner.update(ready_at: now - 6 * 60, workflow_job: nil)
-      resets_at = now + 300
-      rate_limit = instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at:)
-      expect(client).to receive(:get).and_raise(Octokit::TooManyRequests)
-      expect(client).to receive(:rate_limit).and_return(rate_limit)
-      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
-
-      expect { nx.wait }.to nap(300)
-      expect(Page.count).to eq(1)
-      expect(Page.first).to have_attributes(
-        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
-        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
-        severity: "warning"
-      )
     end
 
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
