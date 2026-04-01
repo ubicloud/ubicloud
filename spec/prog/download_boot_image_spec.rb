@@ -191,10 +191,9 @@ RSpec.describe Prog::DownloadBootImage do
 
     it "pops early when failed and cancel semaphore is set" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      refresh_frame(dbi, new_values: {"restarted" => 10})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
-      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
-      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
+      expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
       dbi.incr_cancel
       expect { dbi.download }.to exit({"msg" => "operation cancelled"})
       expect(bi.exists?).to be false
