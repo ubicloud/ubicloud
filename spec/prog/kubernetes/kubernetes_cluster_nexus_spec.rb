@@ -567,12 +567,6 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
       expect(child.stack.first["old_node_id"]).to eq first_node.id
     end
 
-    it "hops to wait if cluster version is invalid" do
-      expect(kubernetes_cluster).to receive(:version).and_return("invalid").twice
-      expect(client).to receive(:version).and_return(older_version, older_version)
-      expect { nx.upgrade }.to hop("wait")
-    end
-
     it "does not select a node with a higher minor version than the cluster" do
       expect(client).to receive(:version).and_return(newer_version, cluster_version)
       expect { nx.upgrade }.to hop("wait")

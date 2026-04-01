@@ -70,6 +70,17 @@ RSpec.describe KubernetesCluster do
     end
   end
 
+  describe "#available_upgrade_version" do
+    it "returns upgrade version when available" do
+      kc.update(version: Option.kubernetes_versions[1])
+      expect(kc.available_upgrade_version).to eq(Option.kubernetes_versions.first)
+    end
+
+    it "returns nil when on latest version" do
+      expect(kc.available_upgrade_version).to be_nil
+    end
+  end
+
   it "initiates a new health monitor session" do
     sshable = Sshable.new
     expect(kc).to receive(:sshable).and_return(sshable)

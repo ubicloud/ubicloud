@@ -9,7 +9,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
   let(:k8s_project) { Project.create(name: "UbicloudKubernetesService") }
   let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
-    Prog::Kubernetes::KubernetesClusterNexus.assemble(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "cluster",
       version: Option.kubernetes_versions.first,
       cp_node_count: 3,
@@ -18,6 +18,12 @@ RSpec.describe Clover, "kubernetes-cluster" do
       location_id: Location::HETZNER_FSN1_ID,
       target_node_size: "standard-2",
     ).subject
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+      name: "np",
+      node_count: 2,
+      kubernetes_cluster_id: kc.id,
+    ).subject
+    kc
   }
 
   before do
@@ -34,6 +40,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
         [:delete, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.name}"],
         [:get, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}"],
+        [:post, "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"],
       ].each do |method, path|
         send method, path
 
@@ -130,13 +137,7 @@ RSpec.describe Clover, "kubernetes-cluster" do
     end
 
     describe "nodepool" do
-      let(:kn) do
-        Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
-          name: "np",
-          node_count: 2,
-          kubernetes_cluster_id: kc.id,
-        ).subject
-      end
+      let(:kn) { kc.nodepools.first }
 
       describe "resize" do
         it "success" do
@@ -175,6 +176,28 @@ RSpec.describe Clover, "kubernetes-cluster" do
           expect(last_response.status).to eq(200)
           expect(kn.reload.node_count).to eq(4)
         end
+      end
+    end
+
+    describe "upgrade" do
+      it "upgrades cluster when upgrade is available" do
+        kc.update(version: Option.kubernetes_versions[1])
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
+
+        expect(last_response.status).to eq(200)
+        expect(kc.reload.version).to eq(Option.kubernetes_versions.first)
+        expect(SemSnap.new(kc.id).set?("upgrade")).to be true
+        expect(SemSnap.new(kc.nodepools.first.id).set?("upgrade")).to be true
+      end
+
+      it "returns an error when no upgrade is available" do
+        original_version = kc.version
+
+        post "/project/#{project.ubid}/location/#{kc.display_location}/kubernetes-cluster/#{kc.ubid}/upgrade"
+
+        expect(last_response.status).to eq(422)
+        expect(kc.reload.version).to eq(original_version)
       end
     end
   end

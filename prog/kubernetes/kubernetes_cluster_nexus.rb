@@ -254,9 +254,17 @@ class Prog::Kubernetes::KubernetesClusterNexus < Prog::Base
     node_to_upgrade = kubernetes_cluster.nodes.find do |node|
       node_version = kubernetes_cluster.client(session: node.sshable.connect).version
       node_minor_version = node_version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
-      cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/)&.captures&.first&.to_i
+      cluster_minor_version = kubernetes_cluster.version.match(/^v\d+\.(\d+)$/).captures.first.to_i
 
-      next false unless node_minor_version && cluster_minor_version
+      unless node_minor_version
+        Prog::PageNexus.assemble(
+          "Invalid version format for #{node.name} of cluster #{kubernetes_cluster.ubid}",
+          ["K8sInvalidVersion", kubernetes_cluster.ubid, node.name],
+          [kubernetes_cluster.ubid, node.ubid],
+          extra_data: {node_version:, cluster_version: kubernetes_cluster.version},
+        )
+        next false
+      end
 
       node_minor_version == cluster_minor_version - 1
     end
