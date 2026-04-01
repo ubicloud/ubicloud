@@ -5,6 +5,7 @@ require "aws-sdk-s3"
 
 class Prog::DownloadBootImage < Prog::Base
   subject_is :sshable, :vm_host
+  semaphore :cancel
 
   def image_name
     @image_name ||= frame.fetch("image_name")
@@ -12,6 +13,10 @@ class Prog::DownloadBootImage < Prog::Base
 
   def version
     @version ||= frame["version"] || default_boot_image_version(image_name)
+  end
+
+  def image
+    @image ||= BootImage[vm_host_id: vm_host.id, name: image_name, version:]
   end
 
   def download_from_blob_storage?
@@ -186,6 +191,10 @@ class Prog::DownloadBootImage < Prog::Base
       sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
       hop_update_available_storage_space
     when "NotStarted"
+      if cancel_set?
+        image.destroy
+        pop "operation cancelled"
+      end
       certs = download_from_blob_storage? ? Config.ubicloud_images_blob_storage_certs : nil
       params = {image_name:, url:, version:, sha256sum:, certs:, use_htcat: download_from_r2?}
       sshable.cmd("common/bin/daemonizer 'host/bin/download-boot-image' :daemon_name", daemon_name:, stdin: params.to_json)
@@ -197,8 +206,11 @@ class Prog::DownloadBootImage < Prog::Base
         sshable.cmd("common/bin/daemonizer --clean :daemon_name", daemon_name:)
         update_stack({"restarted" => restarted + 1})
       else
-        vm_host.boot_images_dataset.where(name: image_name, version:).destroy
         Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
+      end
+      if cancel_set?
+        image.destroy
+        pop "operation cancelled"
       end
     end
 
@@ -206,7 +218,6 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def update_available_storage_space
-    image = BootImage[vm_host_id: vm_host.id, name: image_name, version:]
     image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
@@ -217,11 +228,12 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   label def activate_boot_image
-    BootImage.where(
-      vm_host_id: vm_host.id,
-      name: image_name,
-      version:
-    ).update(activated_at: Time.now)
+    if cancel_set?
+      image.remove_boot_image
+      pop "operation cancelled"
+    end
+
+    image.update(activated_at: Time.now)
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end
 end
