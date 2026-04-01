@@ -412,4 +412,36 @@ RSpec.describe PrivateSubnet do
       expect(IpsecTunnel.count).to eq 2
     end
   end
+
+  describe "AWS connect/disconnect subnet" do
+    let(:prj) { Project.create(name: "test-aws-prj") }
+
+    let(:location) {
+      loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
+      LocationCredential.create_with_id(loc, access_key: "test-access-key", secret_key: "test-secret-key")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      loc
+    }
+
+    let(:ps1) {
+      described_class.create(name: "aws-ps1", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    let(:ps2) {
+      described_class.create(name: "aws-ps2", location_id: location.id,
+        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26",
+        state: "waiting", project_id: prj.id)
+    }
+
+    it "raises error on connect_subnet" do
+      expect { ps1.connect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
+    end
+
+    it "raises error on disconnect_subnet" do
+      expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
+    end
+  end
 end
