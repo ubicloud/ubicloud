@@ -3,13 +3,12 @@
 require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
-  subject(:st) { Strand.new(id: "8148ebdf-66b8-8ed0-9c2f-8cfe93f5aa77") }
+  subject(:nx) { described_class.new(kn.strand) }
 
-  let(:nx) { described_class.new(st) }
   let(:project) { Project.create(name: "default") }
   let(:subnet) { PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "x", location_id: Location::HETZNER_FSN1_ID, project_id: project.id) }
   let(:kc) {
-    kc = KubernetesCluster.create(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "k8scluster",
       version: Option.kubernetes_versions.first,
       cp_node_count: 3,
@@ -17,7 +16,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-2",
-    )
+    ).subject
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)
     LoadBalancerPort.create(load_balancer_id: lb.id, src_port: 123, dst_port: 456)
@@ -27,7 +26,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     kc.update(api_server_lb_id: lb.id)
   }
   let(:kn) {
-    kn = KubernetesNodepool.create(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
+    kn = described_class.assemble(name: "k8stest-np", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2").subject
     [create_vm, create_vm].each do |vm|
       KubernetesNode.create(vm_id: vm.id, kubernetes_cluster_id: kc.id, kubernetes_nodepool_id: kn.id)
     end
@@ -35,6 +34,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
   }
 
   before do
+    prj = Project.create(name: "UbicloudKubernetesService")
+    allow(Config).to receive(:kubernetes_service_project_id).and_return(prj.id)
     allow(nx).to receive(:kubernetes_nodepool).and_return(kn)
   end
 
@@ -107,13 +108,13 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
 
   describe "#wait_worker_node" do
     it "hops back to bootstrap_worker_nodes if there are no sub-programs running" do
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_worker_node", stack: [{}])
+      kn.strand.update(label: "wait_worker_node")
       expect { nx.wait_worker_node }.to hop("wait")
     end
 
     it "donates if there are sub-programs running" do
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_worker_node", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
+      kn.strand.update(label: "wait_worker_node")
+      Strand.create(parent_id: kn.strand.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", lease: Time.now + 10)
       expect { nx.wait_worker_node }.to nap(120)
     end
   end
@@ -140,84 +141,102 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
     let(:second_node) { kn.nodes[1] }
     let(:client) { instance_double(Kubernetes::Client) }
 
-    before do
-      sshable0, sshable1 = Sshable.new, instance_double(Sshable)
-      allow(first_node).to receive(:sshable).and_return(sshable0)
-      allow(second_node).to receive(:sshable).and_return(sshable1)
-      allow(sshable0).to receive(:connect)
-      allow(sshable1).to receive(:connect)
-
-      expect(kn.cluster).to receive(:client).and_return(client).at_least(:once)
+    it "naps when cluster strand is in upgrade label" do
+      kc.strand.update(label: "upgrade")
+      expect { nx.upgrade }.to nap(10)
     end
 
-    it "selects a node with minor version one less than the cluster's version" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.32", "v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_node_id" => second_node.id, "subject_id" => kn.cluster.id})
-      expect { nx.upgrade }.to hop("wait_upgrade")
+    it "naps when cluster strand is in wait_upgrade label" do
+      kc.strand.update(label: "wait_upgrade")
+      expect { nx.upgrade }.to nap(10)
     end
 
-    it "hops to wait when all nodes are at the cluster's version" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.32", "v1.32")
-      expect { nx.upgrade }.to hop("wait")
+    it "naps when cluster upgrade semaphore is set" do
+      kc.strand.update(label: "wait")
+      kc.incr_upgrade
+      expect { nx.upgrade }.to nap(10)
     end
 
-    it "does not select a node with minor version more than one less than the cluster's version" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.30", "v1.32")
-      expect { nx.upgrade }.to hop("wait")
-    end
+    context "when cluster is not upgrading" do
+      before do
+        kc.strand.update(label: "wait")
+        sshable0, sshable1 = Sshable.new, instance_double(Sshable)
+        allow(first_node).to receive(:sshable).and_return(sshable0)
+        allow(second_node).to receive(:sshable).and_return(sshable1)
+        allow(sshable0).to receive(:connect)
+        allow(sshable1).to receive(:connect)
 
-    it "skips nodes with invalid version formats" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("invalid", "v1.32")
-      expect { nx.upgrade }.to hop("wait")
-    end
+        expect(kn.cluster).to receive(:client).and_return(client).at_least(:once)
+      end
 
-    it "selects the first node that is one minor version behind" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32")
-      expect(client).to receive(:version).and_return("v1.31")
-      expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"nodepool_id" => kn.id, "old_node_id" => first_node.id, "subject_id" => kn.cluster.id})
-      expect { nx.upgrade }.to hop("wait_upgrade")
-    end
+      it "selects a node with minor version one less than the cluster's version" do
+        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions[1])
+        expect { nx.upgrade }.to hop("wait_upgrade")
+        st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
+        expect(st).not_to be_nil
+        expect(st.stack.first).to eq({"nodepool_id" => kn.id, "old_node_id" => second_node.id, "subject_id" => kn.cluster.id})
+      end
 
-    it "hops to wait if cluster version is invalid" do
-      expect(kn.cluster).to receive(:version).and_return("invalid").twice
-      expect(client).to receive(:version).and_return("v1.31", "v1.31")
-      expect { nx.upgrade }.to hop("wait")
-    end
+      it "hops to wait when all nodes are at the cluster's version" do
+        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions.first)
+        expect { nx.upgrade }.to hop("wait")
+      end
 
-    it "does not select a node with a higher minor version than the cluster" do
-      expect(kn.cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.33", "v1.32")
-      expect { nx.upgrade }.to hop("wait")
+      it "does not select a node with minor version more than one less than the cluster's version" do
+        expect(client).to receive(:version).and_return(Option.kubernetes_versions.last, Option.kubernetes_versions.first)
+        expect { nx.upgrade }.to hop("wait")
+      end
+
+      it "skips nodes with invalid version formats and creates a page" do
+        expect(client).to receive(:version).and_return("invalid", "invalid")
+        expect { nx.upgrade }.to hop("wait")
+
+        page = Page.from_tag_parts("K8sInvalidVersion", kc.ubid, first_node.name)
+        expect(page).not_to be_nil
+        expect(page.summary).to eq "Invalid version format for #{first_node.name} of cluster #{kc.ubid}"
+        expect(page.details["node_version"]).to eq "invalid"
+        expect(page.details["cluster_version"]).to eq Option.kubernetes_versions.first
+      end
+
+      it "selects the first node that is one minor version behind" do
+        expect(client).to receive(:version).and_return(Option.kubernetes_versions[1])
+        expect { nx.upgrade }.to hop("wait_upgrade")
+        st = Strand[prog: "Kubernetes::UpgradeKubernetesNode"]
+        expect(st).not_to be_nil
+        expect(st.stack.first).to eq({"nodepool_id" => kn.id, "old_node_id" => first_node.id, "subject_id" => kn.cluster.id})
+      end
+
+      it "does not select a node with a higher minor version than the cluster" do
+        kc.update(version: Option.kubernetes_versions[1])
+        expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions.first)
+        expect { nx.upgrade }.to hop("wait")
+      end
     end
   end
 
   describe "#wait_upgrade" do
     it "hops back to upgrade if there are no sub-programs running" do
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
+      kn.strand.update(label: "wait_upgrade")
       expect { nx.wait_upgrade }.to hop("upgrade")
     end
 
     it "donates if there are sub-programs running" do
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
+      kn.strand.update(label: "wait_upgrade")
+      Strand.create(parent_id: kn.strand.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", lease: Time.now + 10)
       expect { nx.wait_upgrade }.to nap(120)
     end
   end
 
   describe "#destroy" do
     it "donates if there are sub-programs running (Provision...)" do
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "wait_upgrade", stack: [{}])
-      Strand.create(parent_id: st.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", stack: [{}], lease: Time.now + 10)
+      kn.strand.update(label: "wait_upgrade")
+      Strand.create(parent_id: kn.strand.id, prog: "Kubernetes::UpgradeKubernetesNode", label: "start", lease: Time.now + 10)
       expect { nx.destroy }.to nap(120)
     end
 
     it "completes destroy when nodes are gone" do
       KubernetesNode.create(vm_id: create_vm.id, kubernetes_cluster_id: kn.cluster.id, kubernetes_nodepool_id: kn.id)
-      st.update(prog: "Kubernetes::KubernetesNodepoolNexus", label: "destroy", stack: [{}])
+      kn.strand.update(label: "destroy")
       expect(kn.nodes).to all(receive(:incr_destroy))
 
       expect { nx.destroy }.to nap(5)

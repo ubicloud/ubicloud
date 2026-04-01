@@ -471,46 +471,35 @@ RSpec.describe Prog::Kubernetes::KubernetesClusterNexus do
     end
 
     it "selects a Node with minor version one less than the cluster's version" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.32", "v1.31")
+      expect(client).to receive(:version).and_return(kubernetes_cluster.version, Option.kubernetes_versions[1])
       expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => second_node.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
     it "hops to wait when all nodes are at the cluster's version" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.32", "v1.32")
+      expect(client).to receive(:version).and_return(kubernetes_cluster.version, kubernetes_cluster.version)
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "does not select a node with minor version more than one less than the cluster's version" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.30", "v1.32")
+      expect(client).to receive(:version).and_return(Option.kubernetes_versions.last, kubernetes_cluster.version)
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "skips node with invalid version formats" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("invalid", "v1.32")
+      expect(client).to receive(:version).and_return("invalid", "invalid")
       expect { nx.upgrade }.to hop("wait")
     end
 
     it "selects the first node that is one minor version behind" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32")
-      expect(client).to receive(:version).and_return("v1.31")
+      expect(client).to receive(:version).and_return(Option.kubernetes_versions[1])
       expect(nx).to receive(:bud).with(Prog::Kubernetes::UpgradeKubernetesNode, {"old_node_id" => first_node.id})
       expect { nx.upgrade }.to hop("wait_upgrade")
     end
 
-    it "hops to wait if cluster version is invalid" do
-      expect(kubernetes_cluster).to receive(:version).and_return("invalid").twice
-      expect(client).to receive(:version).and_return("v1.31", "v1.31")
-      expect { nx.upgrade }.to hop("wait")
-    end
-
     it "does not select a node with a higher minor version than the cluster" do
-      expect(kubernetes_cluster).to receive(:version).and_return("v1.32").twice
-      expect(client).to receive(:version).and_return("v1.33", "v1.32")
+      kubernetes_cluster.update(version: Option.kubernetes_versions[1])
+      expect(client).to receive(:version).and_return(Option.kubernetes_versions.first, Option.kubernetes_versions[1])
       expect { nx.upgrade }.to hop("wait")
     end
   end

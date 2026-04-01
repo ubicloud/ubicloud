@@ -101,6 +101,28 @@ class Clover
           r.redirect kc
         end
       end
+
+      r.post "upgrade" do
+        authorize("KubernetesCluster:edit", kc)
+        upgrade_candidate = kc.available_upgrade_version
+        if upgrade_candidate
+          DB.transaction do
+            kc.update(version: upgrade_candidate)
+            kc.incr_upgrade
+            kc.nodepools.first.incr_upgrade
+            audit_log(kc, "upgrade")
+          end
+        else
+          raise CloverError.new(422, "UnprocessableContent", "There is no available upgrade option")
+        end
+
+        if api?
+          Serializers::KubernetesCluster.serialize(kc, {detailed: true})
+        else
+          flash["notice"] = "#{kc.name} will be upgraded to #{upgrade_candidate}"
+          r.redirect kc
+        end
+      end
     end
   end
 end
