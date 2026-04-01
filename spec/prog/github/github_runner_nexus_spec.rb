@@ -763,6 +763,23 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
+    it "naps until rate limit resets and creates a page when rate limited during wait" do
+      runner.update(ready_at: now - 6 * 60, workflow_job: nil)
+      resets_at = now + 300
+      rate_limit = instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at:)
+      expect(client).to receive(:get).and_raise(Octokit::TooManyRequests)
+      expect(client).to receive(:rate_limit).and_return(rate_limit)
+      expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")
+
+      expect { nx.wait }.to nap(300)
+      expect(Page.count).to eq(1)
+      expect(Page.first).to have_attributes(
+        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
+        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
+        severity: "warning"
+      )
+    end
+
     it "does not destroy runner if it doesn not pick a job but two minutes not pass yet" do
       runner.update(ready_at: now - 60, workflow_job: nil)
       expect(vm.sshable).to receive(:_cmd).with("systemctl show -p SubState --value runner-script").and_return("running")

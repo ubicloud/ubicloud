@@ -166,6 +166,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   def busy?
     client.get(runners_path(github_runner.runner_id))[:busy]
   rescue Octokit::NotFound
+  rescue Octokit::TooManyRequests
+    rate_limit = client.rate_limit
+    installation_ubid = github_runner.installation.ubid
+    Prog::PageNexus.assemble(
+      "GitHub API rate limit exceeded for installation #{installation_ubid}",
+      ["GithubRateLimitExceeded", installation_ubid],
+      installation_ubid,
+      severity: "warning",
+      extra_data: {
+        remaining: rate_limit.remaining,
+        limit: rate_limit.limit,
+        resets_at: rate_limit.resets_at
+      }
+    )
+    nap [rate_limit.resets_at - Time.now, 30].max
   end
 
   def arch
