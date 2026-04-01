@@ -5,6 +5,8 @@ require "aws-sdk-ec2"
 require "aws-sdk-iam"
 require "google/cloud/compute/v1"
 require "google/cloud/storage"
+require "google/apis/cloudresourcemanager_v3"
+require "google/apis/iam_v1"
 require "googleauth"
 
 class LocationCredential < Sequel::Model
@@ -26,7 +28,11 @@ class LocationCredential < Sequel::Model
   end
 
   def iam_client
-    @iam_client ||= Aws::IAM::Client.new(region: location.name, credentials:)
+    @iam_client ||= if credentials_json
+      gcp_iam_client
+    else
+      Aws::IAM::Client.new(region: location.name, credentials:)
+    end
   end
 
   def aws_iam_account_id
@@ -122,6 +128,19 @@ class LocationCredential < Sequel::Model
       project_id:,
       credentials: parsed_credentials
     )
+  end
+
+  private
+
+  def gcp_iam_client
+    @gcp_iam_client ||= begin
+      client = Google::Apis::IamV1::IamService.new
+      client.authorization = Google::Auth::ServiceAccountCredentials.make_creds(
+        json_key_io: StringIO.new(credentials_json),
+        scope: "https://www.googleapis.com/auth/cloud-platform"
+      )
+      client
+    end
   end
 end
 

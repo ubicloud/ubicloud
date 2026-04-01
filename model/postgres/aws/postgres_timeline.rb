@@ -103,6 +103,8 @@ PGDATA=/dat/#{version}/data
         end
         iam_client.delete_user(user_name: ubid)
       end
+    rescue ::Aws::IAM::Errors::NoSuchEntity
+      nil
     end
 
     def aws_setup_blob_storage
