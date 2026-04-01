@@ -127,6 +127,38 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(st.subject.vm.strand.stack.first["swap_size_bytes"]).to eq(4 * 1024 * 1024 * 1024)
     end
 
+    it "picks correct base image for GCP" do
+      gcp_location = Location.create(
+        name: "us-central1",
+        display_name: "gcp-us-central1",
+        ui_name: "gcp-us-central1",
+        visible: true,
+        provider: "gcp",
+        project_id: user_project.id
+      )
+      LocationCredential.create_with_id(gcp_location,
+        project_id: "test-gcp-project",
+        service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(arch: "x64").destroy
+      PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+      gcp_resource = PostgresResource.create(
+        project: user_project,
+        location_id: gcp_location.id,
+        name: "pg-gcp16",
+        target_vm_size: "standard-2",
+        target_storage_size_gib: 64,
+        superuser_password: "dummy-password",
+        target_version: "16"
+      )
+      Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
+      postgres_timeline = PostgresTimeline.create
+      allow(Validation).to receive(:validate_billing_rate)
+
+      st = described_class.assemble(resource_id: gcp_resource.id, timeline_id: postgres_timeline.id, timeline_access: "push", is_representative: true)
+      expect(st.subject.vm.boot_image).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
+    end
+
     it "raises error if the version is not supported for AWS" do
       # Use an AWS location that doesn't have any AMI records
       new_aws_location = Location.create(
