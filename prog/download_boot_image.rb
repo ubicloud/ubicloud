@@ -208,7 +208,7 @@ class Prog::DownloadBootImage < Prog::Base
       else
         Clog.emit("Failed to download boot image", {failed_boot_image_download: [vm_host, {image_name:, version:}]})
       end
-      if cancel_set?
+      if cancel_set? || (frame["exit_on_fail"] && restarted >= 10)
         image.destroy
         pop "operation cancelled"
       end
