@@ -188,20 +188,19 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     )
     nap [rate_limit.resets_at - Time.now, 30].max
   rescue Octokit::Error => e
-    if e.message.include?("Repository level self-hosted runners are disabled")
-      installation_ubid = github_runner.installation.ubid
-      Prog::PageNexus.assemble("Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], installation_ubid, severity: "warning")
-      github_runner.incr_destroy
-      nap 0
-    elsif e.message.include?("your IP address is not permitted to access this resource")
-      installation_ubid = github_runner.installation.ubid
-      Prog::PageNexus.assemble("The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], installation_ubid, severity: "warning")
-      github_runner.incr_destroy
-      nap 0
-    elsif e.message.include?("Resource not accessible by integration")
-      installation_ubid = github_runner.installation.ubid
+    installation_ubid = github_runner.installation.ubid
+    page_args = case e.message
+    when /Repository level self-hosted runners are disabled/
+      ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
+    when /your IP address is not permitted to access this resource/
+      ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
+    when /Resource not accessible by integration/
       repository_ubid = github_runner.repository.ubid
-      Prog::PageNexus.assemble("Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid], installation_ubid, severity: "warning")
+      ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]]
+    end
+
+    if page_args
+      Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
       github_runner.incr_destroy
       nap 0
     end
