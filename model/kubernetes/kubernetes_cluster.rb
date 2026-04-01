@@ -32,6 +32,7 @@ class KubernetesCluster < Sequel::Model
   def display_state
     label = strand.label
     return "deleting" if destroying_set? || destroy_set?
+    return "upgrading" if upgrading?
     return "running" if label == "wait"
 
     "creating"
@@ -194,6 +195,20 @@ class KubernetesCluster < Sequel::Model
 
   def worker_functional_nodes
     nodepools.flat_map(&:functional_nodes)
+  end
+
+  def ready_for_upgrade?
+    !upgrading? && available_upgrade_version && strand.label == "wait" \
+    && !nodepools.empty? && nodepools.first.strand.label == "wait"
+  end
+
+  def upgrading?
+    upgrade_labels = %w[upgrade wait_upgrade].freeze
+    return true if upgrade_labels.include?(strand.label) || upgrade_set?
+
+    return false if nodepools.empty?
+    nodepool = nodepools.first
+    upgrade_labels.include?(nodepool.strand.label) || nodepool.upgrade_set?
   end
 end
 
