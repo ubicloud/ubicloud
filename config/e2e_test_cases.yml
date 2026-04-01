@@ -5,4 +5,4 @@
 - { name: postgres_ha,               images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
 - { name: postgres_upgrade,          images: ["postgres-ubuntu-2204", "ubuntu-jammy"] }
 - { name: postgres_firewall,         images: ["postgres-ubuntu-2204"] }
-- { name: kubernetes,                images: ["kubernetes-v1_35"]}
+- { name: kubernetes,                images: ["kubernetes-v1_34", "kubernetes-v1_35"]}
