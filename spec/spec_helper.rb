@@ -281,6 +281,15 @@ RSpec.configure do |config|
       VhostBlockBackend.create(**args)
     end
 
+    def create_machine_image_version_metal(project_id: nil, machine_image_id: nil, machine_image_store_id: nil, version: "v1", location_id: Location::HETZNER_FSN1_ID, store_prefix: "prefix/path")
+      project_id ||= Project.create(name: "miv-metal-project").id
+      machine_image_store_id ||= MachineImageStore.create(project_id:, location_id:, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk").id
+      machine_image_id ||= MachineImage.create(name: "test-mi", project_id:, arch: "x64", location_id:).id
+      miv = MachineImageVersion.create(machine_image_id:, version:)
+      archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
+      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:)
+    end
+
     def create_vm_host_slice(**args)
       args = {name: "testslice", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0}.merge!(args)
       args[:vm_host_id] ||= create_vm_host.id
