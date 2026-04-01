@@ -127,6 +127,7 @@ class PostgresServer < Sequel::Model
 
     {
       configs:,
+      is_primary: primary?,
       user_config: resource.user_config,
       pgbouncer_user_config: resource.pgbouncer_user_config,
       physical_slots: caught_up_standbys&.map(&:ubid),

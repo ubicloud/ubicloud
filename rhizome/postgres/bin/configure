@@ -159,8 +159,29 @@ TIMER
 r "systemctl daemon-reload"
 r "systemctl enable --now io-throttle@#{v}-main.timer"
 
-# Reload the postmaster to apply changes
-r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
+# After read replica promotion, standby.signal may still be present from
+# initial provisioning. Try SQL promotion first (handles running server
+# cleanly — pg_promote removes standby.signal and backup_label itself).
+# Fall back to file removal only if the server isn't running.
+data_dir = "/dat/#{v}/data"
+standby_signal = "#{data_dir}/standby.signal"
+needs_restart = false
+if configure_hash["is_primary"] && File.exist?(standby_signal)
+  begin
+    r "sudo -u postgres psql -c 'SELECT pg_promote(wait := true)'"
+  rescue CommandFail
+    FileUtils.rm_f(standby_signal)
+    needs_restart = true
+  end
+end
+
+# Reload the postmaster to apply changes. Force a restart if we had to
+# remove standby.signal manually — reload won't exit recovery mode.
+if needs_restart
+  r "pg_ctlcluster #{v} main restart"
+else
+  r "pg_ctlcluster #{v} main reload || pg_ctlcluster #{v} main restart"
+end
 
 if configure_hash["physical_slots"]
   if configure_hash["physical_slots"].size == 0

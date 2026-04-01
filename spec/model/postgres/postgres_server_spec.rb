@@ -65,6 +65,12 @@ RSpec.describe PostgresServer do
       expect(postgres_server.configure_hash[:configs]).to include(:archive_mode, :archive_timeout, :archive_command)
     end
 
+    it "sets is_primary based on server role" do
+      expect(postgres_server.configure_hash[:is_primary]).to be true
+      postgres_server.timeline_access = "fetch"
+      expect(postgres_server.configure_hash[:is_primary]).to be false
+    end
+
     it "sets synchronized_standby_slots on Postgres 17" do
       postgres_server.update(version: "17")
       expect(postgres_server.configure_hash[:configs]).to include(:synchronized_standby_slots)
