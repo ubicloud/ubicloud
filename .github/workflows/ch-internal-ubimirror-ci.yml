@@ -52,6 +52,11 @@ jobs:
         env:
           CLOVER_DATABASE_URL: postgres:///clover_test?user=clover
         run: ruby bin/production_check
+      - name: Install otelcol-contrib
+        run: |
+          OTEL_VERSION="0.146.0"
+          curl -fsSL "https://github.com/open-telemetry/opentelemetry-collector-releases/releases/download/v${OTEL_VERSION}/otelcol-contrib_${OTEL_VERSION}_linux_amd64.tar.gz" \
+            | sudo tar xz -C /usr/local/bin otelcol-contrib
       - name: Run controlplane tests
         run: bundle exec rake
       - name: Run dataplane tests

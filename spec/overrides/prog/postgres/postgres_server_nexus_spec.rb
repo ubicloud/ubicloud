@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "open3"
 require_relative "../../../prog/postgres/spec_helper"
 
 RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:disable RSpec/SpecFilePathFormat
@@ -23,6 +24,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:
     it "writes otel config, enables and reloads otelcol-contrib, then hops to bootstrap_rhizome" do
       postgres_server.resource.location.update(otel_otlp_export_endpoint: "https://otel.example.com:4317")
       expect(sshable).to receive(:write_file).with("/home/otelcol/otel-config-override.yaml", anything, user: "otelcol")
+      expect(sshable).to receive(:write_file).with("/home/otelcol/otel-config.yaml", anything, user: "otelcol")
       expect(sshable).to receive(:write_file).with("/var/lib/node_exporter/vm_sku.prom", match(/node_memory_sku_total_bytes/))
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now otelcol-contrib")
       expect(sshable).to receive(:_cmd).with("sudo systemctl reload otelcol-contrib || sudo systemctl restart otelcol-contrib")
@@ -32,6 +34,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:
 
   describe "#setup_otel" do
     before do
+      allow(sshable).to receive(:write_file).with("/home/otelcol/otel-config.yaml", anything, user: "otelcol")
       allow(sshable).to receive(:write_file).with("/var/lib/node_exporter/vm_sku.prom", match(/node_memory_sku_total_bytes/))
     end
 
@@ -131,8 +134,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:
           expect(content).to include("auth:")
           expect(content).to include("authenticator: bearertokenauth/otlp-export")
         end
-
-        expect(nx).to receive(:otel_token_needs_refresh?).and_return(false)
+        expect(nx).to receive(:write_otel_token)
 
         nx.setup_otel
       end
@@ -147,18 +149,17 @@ RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:
         expect(standby_sshable).to receive(:write_file).with("/home/otelcol/otel-config-override.yaml", anything, user: "otelcol") do |_, content, _|
           expect(content).to include("value: 'standby'")
         end
+        expect(standby_sshable).to receive(:write_file).with("/home/otelcol/otel-config.yaml", anything, user: "otelcol")
         expect(standby_sshable).to receive(:write_file).with("/var/lib/node_exporter/vm_sku.prom", match(/node_memory_sku_total_bytes/))
-
-        expect(standby_nx).to receive(:otel_token_needs_refresh?).and_return(false)
+        expect(standby_nx).to receive(:write_otel_token)
 
         standby_nx.setup_otel
       end
 
-      it "calls write_otel_token when token needs refresh" do
+      it "always calls write_otel_token" do
         postgres_server.resource.location.update(otel_otlp_export_endpoint: "https://otel.example.com:4317")
 
         expect(sshable).to receive(:write_file).with("/home/otelcol/otel-config-override.yaml", anything, user: "otelcol")
-        expect(nx).to receive(:otel_token_needs_refresh?).and_return(true)
         expect(nx).to receive(:write_otel_token)
 
         nx.setup_otel
@@ -173,9 +174,34 @@ RSpec.describe Prog::Postgres::PostgresServerNexus::PrependMethods do # rubocop:
           expect(content).not_to include("authenticator: bearertokenauth/otlp-export")
         end
 
-        expect(nx).to receive(:otel_token_needs_refresh?).and_return(false)
-
         nx.setup_otel
+      end
+    end
+
+    it "generates a valid otelcol-contrib config", no_otel_binary: false do
+      postgres_server.resource.location.update(otel_otlp_export_endpoint: "https://otel.example.com:4317")
+
+      configs = {}
+      allow(sshable).to receive(:write_file) do |path, content, **|
+        configs[path] = content
+      end
+      expect(nx).to receive(:write_otel_token)
+
+      nx.setup_otel
+
+      Dir.mktmpdir("otel-config-validate") do |tmpdir|
+        configs.each do |path, content|
+          filename = File.basename(path)
+          File.write(File.join(tmpdir, filename), content)
+        end
+
+        config_flags = ["otel-config.yaml", "otel-config-override.yaml"]
+          .select { |f| File.exist?(File.join(tmpdir, f)) }
+          .map { |f| "--config=#{File.join(tmpdir, f)}" }
+          .join(" ")
+
+        stdout, stderr, status = Open3.capture3("otelcol-contrib validate #{config_flags}")
+        expect(status.success?).to be(true), "otelcol-contrib validate failed:\nstdout: #{stdout}\nstderr: #{stderr}"
       end
     end
   end

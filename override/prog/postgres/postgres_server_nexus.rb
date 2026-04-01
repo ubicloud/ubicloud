@@ -35,13 +35,121 @@ AUTH
       else
         ""
       end
-
+      # TODO add on_truncate: read_whole_file on file_log receiver once an applicable version is available
       vm.sshable.write_file("/home/otelcol/otel-config-override.yaml", <<OTEL_CONFIG_OVERRIDE, user: "otelcol")
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  bearertokenauth/otlp-export:
+    filename: "otlp-export.token"
+  file_storage/state:
+    directory: /home/otelcol/storage
+    create_directory: true
+    recreate: true
+    compaction:
+      directory: /tmp/otelcol
+      on_start: true
+      on_rebound: true
+      rebound_needed_threshold_mib: 1024
+      rebound_trigger_threshold_mib: 100
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  journald:
+    storage: file_storage/state
+    operators:
+      - id: add_journald_id
+        type: add
+        field: resource.otel_logs_receiver
+        value: journald
+      - id: move_all_to_attrs
+        type: move
+        from: body
+        to: attributes.journald
+      - id: move_journald_message
+        type: move
+        from: attributes.journald.MESSAGE
+        to: body
+      - id: flatten_journald_attributes
+        type: flatten
+        field: attributes.journald
+  prometheus/node:
+    config:
+      scrape_configs:
+        - job_name: node
+          static_configs:
+            - targets: ['localhost:9100']
+  prometheus/postgres:
+    config:
+      scrape_configs:
+        - job_name: postgres
+          static_configs:
+            - targets: ['localhost:9187']
+  filelog/postgresql_json:
+    storage: file_storage/state
+    include:
+      - /dat/16/data/pg_log/postgresql*.json
+      - /dat/17/data/pg_log/postgresql*.json
+      - /dat/18/data/pg_log/postgresql*.json
+      - /dat/19/data/pg_log/postgresql*.json
+      - /dat/20/data/pg_log/postgresql*.json
+      - /dat/21/data/pg_log/postgresql*.json
+      - /dat/22/data/pg_log/postgresql*.json
+      - /dat/23/data/pg_log/postgresql*.json
+      - /dat/24/data/pg_log/postgresql*.json
+    operators:
+      - type: json_parser
+        severity:
+          parse_from: attributes.error_severity
+          mapping:
+            debug:
+              - DEBUG1
+              - DEBUG2
+              - DEBUG3
+              - DEBUG4
+              - DEBUG5
+            info:
+              - INFO
+              - LOG
+              - NOTICE
+              - DETAIL
+            warn: WARNING
+            error: ERROR
+            fatal:
+              - FATAL
+              - PANIC
+        on_error: send
+      - type: add
+        field: resource.otel_logs_receiver
+        value: postgresql
 exporters:
+  nop:
+  debug:
+    verbosity: detailed
+  file:
+    path: /tmp/otel-logs/postgresql.json
+    rotation:
+      max_megabytes: 100
+      max_days: 7
+      max_backups: 3
   otlp/export:
     endpoint: #{postgres_server.resource.otel_otlp_export_endpoint}
+    compression: zstd
+    timeout: 30s
 #{auth_config}
 processors:
+  resourcedetection/ec2:
+    detectors:
+      - ec2
+  resource/datagres:
+    attributes:
+      - key: service.source
+        value: datagres
+        action: upsert
   resource/ubiMetadata:
     attributes:
       - key: ubi.postgres_server_ubid
@@ -69,9 +177,76 @@ processors:
         value: '#{postgres_server.resource.target_server_count}'
         action: upsert
 #{tag_attributes}
+service:
+  extensions:
+    - health_check
+    - file_storage/state
+    - bearertokenauth/otlp-export
+  pipelines:
+    logs:
+      receivers:
+        - otlp
+        - filelog/postgresql_json
+        - journald
+      processors:
+        - resource/datagres
+        - resourcedetection/ec2
+        - resource/ubiMetadata
+      exporters:
+        - nop
+        - otlp/export
+    metrics:
+      receivers:
+        - otlp
+        - prometheus/node
+        - prometheus/postgres
+      processors:
+        - resource/datagres
+        - resourcedetection/ec2
+        - resource/ubiMetadata
+      exporters:
+        - nop
+        - otlp/export
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - resource/datagres
+        - resourcedetection/ec2
+        - resource/ubiMetadata
+      exporters:
+        - nop
+        - otlp/export
+  telemetry:
+    resource:
+      service.otelcol.location: 'postgres_resource'
+    logs:
+      encoding: console
+    metrics:
+      level: normal
+      readers:
+        - periodic:
+            interval: 60000
+            exporter:
+              otlp:
+                protocol: grpc
+                endpoint: http://localhost:4317
+                insecure: true
 OTEL_CONFIG_OVERRIDE
+      # we will just reset the base config for now to prevent any issues on merging from previous images
+      vm.sshable.write_file("/home/otelcol/otel-config.yaml", <<OTEL_CONFIG_BASE, user: "otelcol")
+service:
+  pipelines:
+    traces:
+      receivers: [nop]
+      exporters: [nop]
+receivers:
+  nop:
+exporters:
+  nop:
+OTEL_CONFIG_BASE
 
-      write_otel_token if otel_token_needs_refresh?
+      write_otel_token
 
       vm_sku_prom = <<~PROM
         # HELP node_memory_sku_total_bytes Total memory in bytes as defined by VM SKU
