@@ -168,6 +168,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       client.get(runners_path(github_runner.runner_id))[:busy]
     end
   rescue Octokit::NotFound
+    nil
   end
 
   def rescue_common_github_api_errors
