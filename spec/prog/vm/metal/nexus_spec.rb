@@ -94,6 +94,22 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
     end
 
+    it "sets machine_image_version_id if provided" do
+      miv = create_machine_image_version_metal
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true, image: "model"}], machine_image_version_id: miv.id)
+      vols = st.stack.first["storage_volumes"]
+      expect(vols[0]["machine_image_version_id"]).to eq(miv.id)
+      expect(vols[1]).not_to have_key("machine_image_version_id")
+    end
+
+    it "fails if MachineImageVersionMetal with given machine_image_version_id does not exist" do
+      miv = create_machine_image_version_metal.machine_image_version
+      miv.metal.destroy
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
+      }.to raise_error RuntimeError, "No existing machine image version metal"
+    end
+
     it "fails if given nic_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")

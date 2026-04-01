@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "base64"
 require "jwt"
 require "shellwords"
 require_relative "../model"
@@ -338,7 +339,26 @@ class Vm < Sequel::Model
         "queue_size" => s.queue_size,
         "copy_on_read" => false,
         "track_written" => s.track_written,
-      }.tap { |v| v["cpus"] = cpus if add_cpus }
+      }.tap { |v|
+        v["cpus"] = cpus if add_cpus
+        v["archive_source"] = storage_archive_source(s) if s.machine_image_version_id
+      }
+    }
+  end
+
+  def storage_archive_source(sv)
+    metal = sv.machine_image_version.metal
+    store = metal.store
+    kek = sv.key_encryption_key_1
+
+    {
+      "bucket" => store.bucket,
+      "prefix" => metal.store_prefix,
+      "region" => store.region,
+      "endpoint" => store.endpoint,
+      "encrypted_access_key_id" => kek.encrypt(store.access_key, "archive-access-key"),
+      "encrypted_secret_access_key" => kek.encrypt(store.secret_key, "archive-secret-key"),
+      "encrypted_archive_kek" => kek.encrypt(Base64.decode64(metal.archive_kek.key), "archive-kek"),
     }
   end
 

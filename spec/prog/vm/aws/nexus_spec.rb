@@ -119,6 +119,13 @@ usermod -L ubuntu
       expect(vm.vm_storage_volumes.count).to eq(2)
       expect(vm.vm_storage_volumes.sum { it.size_gib }).to equal(5000)
     end
+
+    it "fails if machine image version is provided for non-metal location" do
+      miv = create_machine_image_version_metal
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, location_id: assemble_loc.id, machine_image_version_id: miv.id)
+      }.to raise_error("Machine images are only supported for metal locations")
+    end
   end
 
   describe "#before_destroy" do

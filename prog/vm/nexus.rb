@@ -12,7 +12,8 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
+    machine_image_version_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -23,6 +24,11 @@ class Prog::Vm::Nexus < Prog::Base
 
     unless (location = (allow_private_subnet_in_other_project ? Location : Location.for_project(project_id)).with_pk(location_id))
       fail "No existing location in project"
+    end
+
+    if machine_image_version_id
+      fail "Machine images are only supported for metal locations" unless location.provider_dispatcher_group_name == "metal"
+      fail "No existing machine image version metal" unless MachineImageVersionMetal[machine_image_version_id]
     end
 
     vm_size = Validation.validate_vm_size(size, arch)
@@ -39,6 +45,7 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:encrypted] = true if !volume.has_key? :encrypted
       volume[:track_written] = false if !volume.has_key? :track_written
       volume[:boot] = disk_index == boot_disk_index
+      volume[:machine_image_version_id] = machine_image_version_id if volume[:boot] && machine_image_version_id
 
       if volume[:read_only]
         volume[:size_gib] = 0

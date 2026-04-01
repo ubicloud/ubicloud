@@ -348,7 +348,7 @@ RSpec.describe Vm do
     let(:spdk_installation) { SpdkInstallation.create_with_id(vm_host.id, vm_host_id: vm_host.id, version: "spdk1", allocation_weight: 100, cpu_count: 2) }
     let(:storage_device) { StorageDevice.create(vm_host_id: vm_host.id, name: "default", available_storage_gib: 200, total_storage_gib: 200) }
     let(:boot_image) { BootImage.create(name: "boot_image", version: "1", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1) }
-    let(:kek) { StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth") }
+    let(:kek) { StorageKeyEncryptionKey.create_random(auth_data: "auth_data") }
     let(:vbb) { create_vhost_block_backend(vm_host_id: vm_host.id) }
     let(:vm) { create_vm(vm_host_id: vm_host.id) }
 
@@ -416,6 +416,31 @@ RSpec.describe Vm do
       storage_volumes = vm.storage_volumes
       expect(storage_volumes[0]["cpus"].count).to eq(1)
       expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
+    end
+
+    it "adds archive_source when volume has machine_image_version_id" do
+      project_id = Project.create(name: "test").id
+      store = MachineImageStore.create(
+        project_id:, location_id: Location::HETZNER_FSN1_ID,
+        provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/",
+        bucket: "test-bucket", access_key: "ak", secret_key: "sk",
+      )
+      miv = create_machine_image_version_metal(project_id:, machine_image_store_id: store.id, store_prefix: "prefix/path")
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(machine_image_version_id: miv.id, boot_image_id: nil)
+
+      volumes = vm.storage_volumes
+
+      expect(volumes[0]).to have_key("archive_source")
+      src = volumes[0]["archive_source"]
+      expect(src["bucket"]).to eq("test-bucket")
+      expect(src["prefix"]).to eq("prefix/path")
+      expect(src["region"]).to eq("auto")
+      expect(src["endpoint"]).to eq("https://r2.cloudflare.com/")
+      expect(src).to have_key("encrypted_access_key_id")
+      expect(src).to have_key("encrypted_secret_access_key")
+      expect(src).to have_key("encrypted_archive_kek")
+
+      expect(volumes[1]).not_to have_key("archive_source")
     end
   end
 
