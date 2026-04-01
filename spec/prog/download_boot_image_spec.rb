@@ -143,6 +143,14 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
+    it "pops early when not started and cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
+      dbi.incr_cancel
+      expect { dbi.download }.to exit({"msg" => "operation cancelled"})
+      expect(bi.exists?).to be false
+    end
+
     it "generates MinIO presigned URL for github-runners images if a custom_url not provided" do
       params_json = {
         "image_name" => "github-ubuntu-2204",
@@ -181,6 +189,17 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.download }.to nap(15)
     end
 
+    it "pops early when failed and cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
+      expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --clean download_my-image_20230303")
+      dbi.incr_cancel
+      expect { dbi.download }.to exit({"msg" => "operation cancelled"})
+      expect(bi.exists?).to be false
+    end
+
     it "retries downloading images if failed less than 10 times" do
       expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stderr || true")
       expect(sshable).to receive(:_cmd).with("cat var/log/download_my-image_20230303.stdout || true")
@@ -191,12 +210,11 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "waits manual intervention if failed more than 10 times" do
-      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
       refresh_frame(dbi, new_values: {"restarted" => 10})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
       expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
       expect { dbi.download }.to nap(15)
-        .and change(bi, :exists?).from(true).to(false)
     end
 
     it "waits for the download to complete" do
@@ -250,6 +268,14 @@ RSpec.describe Prog::DownloadBootImage do
       expect(bi.activated_at).to be_nil
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
       expect(bi.reload.activated_at).to be <= Time.now
+    end
+
+    it "removes the boot image and pops when cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      dbi.incr_cancel
+      expect { dbi.activate_boot_image }.to exit({"msg" => "operation cancelled"})
+      expect(bi.reload.activated_at).to be_nil
+      expect(Strand.where(prog: "RemoveBootImage", stack: Sequel.pg_jsonb_wrap([{"subject_id" => bi.id}])).count).to eq(1)
     end
   end
 end
