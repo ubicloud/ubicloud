@@ -983,6 +983,28 @@ RSpec.describe Al do
       expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
+    it "allocates without boot image filter when using machine_image_version_id" do
+      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.4.0", allocation_weight: 100)
+      vm = create_vm
+      miv = create_machine_image_version_metal
+      vol = [{
+        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
+        "boot" => true, "machine_image_version_id" => miv.id,
+        "vring_workers" => 1,
+      }]
+      BootImage.dataset.destroy
+      described_class.allocate(vm, vol)
+      expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
+      expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
+    end
+
+    it "fails allocation when machine_image_version_id is set but no host has vhost block backend v0.4.0+" do
+      vm = create_vm
+      miv = create_machine_image_version_metal
+      vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "machine_image_version_id" => miv.id}]
+      expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
+    end
+
     it "creates volume with no rate limits" do
       vm = create_vm
       described_class.allocate(vm, vol)

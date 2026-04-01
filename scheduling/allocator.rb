@@ -2,7 +2,9 @@
 
 module Scheduling::Allocator
   def self.allocate(vm, storage_volumes, distinct_storage_devices: false, gpu_count: 0, gpu_device: nil, allocation_state_filter: ["accepting"], host_filter: [], host_exclusion_filter: [], location_filter: [], location_preference: [], family_filter: [], os_filter: nil, data_center_exclusion_filter: [])
-    if storage_volumes.any? { it["track_written"] }
+    requires_track_written = storage_volumes.any? { it["track_written"] }
+    uses_machine_image = storage_volumes.any? { it["machine_image_version_id"] }
+    if requires_track_written || uses_machine_image
       minimum_vhost_block_backend_version = VhostBlockBackend::MIN_ARCHIVE_SUPPORT_VERSION
     end
     request = Request.new(
@@ -11,7 +13,7 @@ module Scheduling::Allocator
       vm.memory_gib,
       storage_volumes.map { it["size_gib"] }.sum,
       storage_volumes.size.times.zip(storage_volumes).to_h.sort_by { |k, v| v["size_gib"] * -1 },
-      vm.boot_image,
+      uses_machine_image ? nil : vm.boot_image,
       distinct_storage_devices,
       gpu_count,
       gpu_device,
@@ -221,9 +223,11 @@ module Scheduling::Allocator
           .where { (total_cores - used_cores >= Sequel.function(:greatest, 1, request.vcpus * total_cores / total_cpus)) }
       end
 
-      ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
-        .where(Sequel[:boot_image][:name] => request.boot_image)
-        .exclude(Sequel[:boot_image][:activated_at] => nil)
+      if request.boot_image
+        ds = ds.join(:boot_image, Sequel[:vm_host][:id] => Sequel[:boot_image][:vm_host_id])
+          .where(Sequel[:boot_image][:name] => request.boot_image)
+          .exclude(Sequel[:boot_image][:activated_at] => nil)
+      end
 
       request.storage_volumes.select { it[1]["read_only"] && it[1]["image"] }.map { [it[0], it[1]["image"]] }.each do |idx, img|
         table_alias = :"boot_image_#{idx}"
@@ -709,7 +713,9 @@ module Scheduling::Allocator
           StorageKeyEncryptionKey.create_random(auth_data: "#{vm.inhost_name}_#{disk_index}")
         end
 
-        image_id = if volume["boot"]
+        image_id = if volume["machine_image_version_id"]
+          nil
+        elsif volume["boot"]
           allocate_boot_image(vm_host, vm.boot_image)
         elsif volume["read_only"]
           allocate_boot_image(vm_host, volume["image"])
