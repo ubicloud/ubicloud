@@ -45,6 +45,27 @@ RSpec.describe Location do
     expect(p2_loc.provider_dispatcher_group_name).to eq("metal")
   end
 
+  it ".postgres_locations includes metal, AWS, and GCP locations" do
+    locations = described_class.postgres_locations
+    names = locations.map(&:name)
+
+    expect(names).to include("hetzner-fsn1", "leaseweb-wdc02")
+    expect(names).to include("us-east-1", "us-west-2")
+    expect(names).to include("gcp-us-central1")
+    expect(names).not_to include("github-runners")
+  end
+
+  it ".postgres_locations excludes project-specific locations" do
+    described_class.create(name: "my-aws", display_name: "my-aws", ui_name: "my-aws", visible: true, provider: "aws", project_id: p1_id)
+    described_class.create(name: "my-gcp", display_name: "my-gcp", ui_name: "my-gcp", visible: true, provider: "gcp", project_id: p1_id)
+
+    locations = described_class.postgres_locations
+    names = locations.map(&:name)
+
+    expect(names).not_to include("my-aws")
+    expect(names).not_to include("my-gcp")
+  end
+
   it "#azs raises if not aws location" do
     p1_loc.update(provider: "hetzner")
     expect { p1_loc.azs }.to raise_error("azs is only valid for aws locations")
