@@ -43,13 +43,19 @@ RSpec.describe Clover, "Kubernetes" do
   end
 
   let(:kc_no_perm) do
-    Prog::Kubernetes::KubernetesClusterNexus.assemble(
+    kc = Prog::Kubernetes::KubernetesClusterNexus.assemble(
       name: "not-my-k8s",
       version: Option.kubernetes_versions.first,
       project_id: project_wo_permissions.id,
       private_subnet_id: PrivateSubnet.create(net6: "0::0", net4: "127.0.0.1", name: "othersubnet", location_id: Location::HETZNER_FSN1_ID, project_id: project_wo_permissions.id).id,
       location_id: Location::HETZNER_FSN1_ID,
     ).subject
+    Prog::Kubernetes::KubernetesNodepoolNexus.assemble(
+      name: "np-no-perm",
+      node_count: 2,
+      kubernetes_cluster_id: kc.id,
+    ).subject
+    kc
   end
 
   before do
@@ -418,6 +424,71 @@ RSpec.describe Clover, "Kubernetes" do
         AccessControlEntry.create(project_id: project_wo_permissions.id, subject_id: user.id, action_id: ActionType::NAME_MAP["KubernetesCluster:view"])
         visit "#{project_wo_permissions.path}#{kc_no_perm.path}/settings"
         expect(page).to have_no_content("Resize")
+      end
+    end
+
+    describe "upgrade" do
+      it "shows upgrade button when upgrade is available and cluster is ready" do
+        kc.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "Upgrade Cluster & Nodepool"
+        expect(page).to have_content "can be upgraded to version"
+        expect(page).to have_content Option.kubernetes_versions.first
+        expect(page).to have_button "Upgrade"
+      end
+
+      it "shows upgrading in progress when cluster strand is upgrading" do
+        kc.strand.update(label: "upgrade")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "Upgrade Cluster & Nodepool"
+        expect(page).to have_content "is currently in progress"
+        expect(page).to have_button "Upgrading...", disabled: true
+      end
+
+      it "shows upgrading in progress when nodepool strand is upgrading" do
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait_upgrade")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "is currently in progress"
+        expect(page).to have_button "Upgrading...", disabled: true
+      end
+
+      it "shows not ready when upgrade is available but strands are busy" do
+        kc.update(version: Option.kubernetes_versions.last)
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "bootstrap_worker_nodes")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "Cluster is not ready for upgrade"
+        expect(page).to have_button "Upgrade", disabled: true
+      end
+
+      it "shows up to date when no upgrade is available" do
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/settings"
+        expect(page).to have_content "Your cluster is up to date on version"
+        expect(page).to have_content Option.kubernetes_versions.first
+      end
+
+      it "can upgrade kubernetes cluster" do
+        kc.update(version: Option.kubernetes_versions[1])
+        kc.strand.update(label: "wait")
+        kc.nodepools.first.strand.update(label: "wait")
+
+        visit "#{project.path}#{kc.path}/settings"
+        click_button "Upgrade"
+
+        expect(page).to have_flash_notice("myk8s will be upgraded to #{Option.kubernetes_versions.first}")
+        expect(kc.reload.version).to eq Option.kubernetes_versions.first
+        expect(SemSnap.new(kc.id).set?("upgrade")).to be true
       end
     end
 
