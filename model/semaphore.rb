@@ -25,7 +25,7 @@ class Semaphore < Sequel::Model
   end
 
   def self.set_at(id)
-    Time.at((UBID.from_uuidish(id).to_i >> 80) / 1000.0).utc
+    Time.at((UBID.from_uuidish(id).to_i >> 80)/1000r).utc
   end
 
   def set_at
