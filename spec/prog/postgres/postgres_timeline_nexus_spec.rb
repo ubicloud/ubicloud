@@ -205,6 +205,18 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       nx.destroy_aws_s3
     end
 
+    it "#destroy_aws_s3 ignores NoSuchEntity error" do
+      aws_location = create_aws_location
+      postgres_timeline.update(location_id: aws_location.id)
+
+      iam_client = Aws::IAM::Client.new(stub_responses: true)
+      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+
+      expect(iam_client).to receive(:list_attached_user_policies).and_raise(Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity"))
+
+      nx.destroy_aws_s3
+    end
+
     it "naps if aws and the key is not available" do
       aws_location = create_aws_location
       postgres_timeline.update(location_id: aws_location.id, access_key: "not-access-key")
