@@ -2,7 +2,7 @@
 
 require_relative "spec_helper"
 require "jwt"
-require "cgi"
+require "cgi/escape"
 
 # Rack middleware acting as a fake OIDC authorization server.
 # Intercepts GET /fake_oidc/authorize, captures the nonce for later use,
@@ -32,25 +32,27 @@ class FakeOidcApp
 
     location = case @callback_mode
     when :error
-      "#{redirect_uri}#{sep}error=access_denied"
+      "error=access_denied"
     when :error_with_uri
-      "#{redirect_uri}#{sep}error=access_denied&error_description=User+denied&error_uri=#{CGI.escape("http://help.example.com")}"
+      "error=access_denied&error_description=User+denied&error_uri=#{CGI.escape("http://help.example.com")}"
     when :error_reason
-      "#{redirect_uri}#{sep}error_reason=server_error&error_description=Internal+error"
+      "error_reason=server_error&error_description=Internal+error"
     when :no_code
-      "#{redirect_uri}#{sep}state=#{state}"
+      "state=#{state}"
     when :wrong_state
-      "#{redirect_uri}#{sep}code=testcode&state=wrongstate"
+      "code=testcode&state=wrongstate"
     else
-      "#{redirect_uri}#{sep}code=testcode&state=#{state}"
+      "code=testcode&state=#{state}"
     end
 
-    [302, {"Location" => location, "Content-Type" => "text/html"}, []]
+    [302, {"Location" => "#{redirect_uri}#{sep}#{location}", "Content-Type" => "text/html"}, []]
   end
+
+  APP = new(RACK_TEST_APP)
 end
 
 RSpec.describe Clover, "OIDC auth" do
-  let(:fake_oidc) { FakeOidcApp.new(RACK_TEST_APP) }
+  let(:fake_oidc) { FakeOidcApp::APP }
 
   let(:oidc_provider) do
     OidcProvider.create(
@@ -61,7 +63,7 @@ RSpec.describe Clover, "OIDC auth" do
       authorization_endpoint: "/fake_oidc/authorize",
       token_endpoint: "/fake_oidc/token",
       userinfo_endpoint: "/fake_oidc/userinfo",
-      jwks_uri: "http://www.example.com/fake_oidc/jwks"
+      jwks_uri: "http://www.example.com/fake_oidc/jwks",
     )
   end
 
@@ -71,8 +73,10 @@ RSpec.describe Clover, "OIDC auth" do
   before do
     OmniAuth.config.logger = Logger.new(IO::NULL)
     OmniAuth.config.test_mode = false
-    allow(Config).to receive(:base_url).and_return("http://www.example.com")
     Capybara.app = fake_oidc
+    fake_oidc.last_nonce = nil
+    fake_oidc.callback_mode = :success
+    allow(Config).to receive(:base_url).and_return("http://www.example.com")
   end
 
   after do
@@ -80,34 +84,33 @@ RSpec.describe Clover, "OIDC auth" do
     Capybara.app = RACK_TEST_APP
   end
 
-  def generate_id_token(nonce:, iss: "http://www.example.com", aud: "client_id_test",
-                        sub: "oidc_sub_123", email: "user@example.com", **opts)
-    payload = {
-      "iss" => iss, "aud" => aud, "sub" => sub, "email" => email, "nonce" => nonce,
-      "iat" => Time.now.to_i, "exp" => Time.now.to_i + 3600
-    }.merge(opts.transform_keys(&:to_s))
+  def generate_id_token(nonce:, iss: "http://www.example.com", aud: "client_id_test", sub: "oidc_sub_123", email: "user@example.com", array_wrap: false, **)
+    time = Time.now.to_i
+    payload = {iss:, aud:, sub:, email:, nonce:, iat: time, exp: time + 3600, **}.transform_keys!(&:to_s)
+    payload.compact!
+    payload = [payload] if array_wrap
     JWT.encode(payload, nil, "none")
   end
 
   # Stubs the OIDC token endpoint via WebMock.
-  # id_token values: :auto (generate from current nonce), :none (omit), or a literal string
-  def stub_token_endpoint(token_type: "bearer", id_token: :auto, **extra)
+  def stub_token_endpoint(token_type: "bearer", id_token: {}, **)
     stub_request(:post, token_url).to_return do |_req|
-      resolved_id_token = case id_token
-      when :auto then generate_id_token(nonce: fake_oidc.last_nonce)
-      when :none then nil
-      else id_token
+      body = {access_token: "access_tok", token_type:, expires_in: 3600, **}.transform_keys!(&:to_s)
+
+      case id_token
+      when Hash
+        body["id_token"] = generate_id_token(nonce: fake_oidc.last_nonce, **id_token)
+      when String
+        body["id_token"] = id_token
       end
-      body = {"access_token" => "access_tok", "token_type" => token_type, "expires_in" => 3600}
-      body["id_token"] = resolved_id_token unless resolved_id_token.nil?
-      body.merge!(extra.transform_keys(&:to_s))
+
       {status: 200, body: body.to_json, headers: {"Content-Type" => "application/json"}}
     end
   end
 
   def stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "email" => "user@example.com"})
     stub_request(:get, userinfo_url).to_return(
-      status: 200, body: body.to_json, headers: {"Content-Type" => "application/json"}
+      status: 200, body: body.to_json, headers: {"Content-Type" => "application/json"},
     )
   end
 
@@ -119,66 +122,30 @@ RSpec.describe Clover, "OIDC auth" do
   it "performs full OIDC login creating account (string aud, no email_verified, no groups)" do
     stub_token_endpoint
     stub_userinfo_endpoint
-
     initiate_oidc_login
 
     expect(page.title).to eq("Ubicloud - Default Dashboard")
     expect(page).to have_flash_notice("You have been logged in")
     account = Account.first
     expect(account.email).to eq("user@example.com")
-    expect(AccountIdentity.select_hash(:account_id, :provider)).to eq(account.id => oidc_provider.ubid)
+    expect(AccountIdentity.select_map([:account_id, :provider])).to eq([[account.id, oidc_provider.ubid]])
   end
 
   it "handles array aud in id_token (aud.is_a?(String) false branch)" do
-    stub_request(:post, token_url).to_return do |_req|
-      id_token = generate_id_token(nonce: fake_oidc.last_nonce, aud: ["client_id_test"])
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "expires_in" => 3600, "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
-    stub_userinfo_endpoint
-
+    stub_token_endpoint(id_token: {aud: ["client_id_test"]})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Default Dashboard")
   end
 
   it "handles email_verified present in id_token" do
-    stub_request(:post, token_url).to_return do |_req|
-      id_token = generate_id_token(nonce: fake_oidc.last_nonce, email_verified: true)
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "expires_in" => 3600, "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
-    stub_userinfo_endpoint
-
-    initiate_oidc_login
-    expect(page.title).to eq("Ubicloud - Default Dashboard")
-  end
-
-  it "handles non-array JWT.decode result (token.is_a?(Array) false branch)" do
-    stub_request(:post, token_url).to_return(
-      status: 200,
-      body: {"access_token" => "tok", "token_type" => "bearer", "expires_in" => 3600, "id_token" => "placeholder"}.to_json,
-      headers: {"Content-Type" => "application/json"}
-    )
-    allow(JWT).to receive(:decode) do
-      {"iss" => "http://www.example.com", "aud" => "client_id_test", "sub" => "oidc_sub_123",
-       "email" => "user@example.com", "nonce" => fake_oidc.last_nonce,
-       "iat" => Time.now.to_i, "exp" => Time.now.to_i + 3600}
-    end
-    stub_userinfo_endpoint
-
+    stub_token_endpoint(id_token: {email_verified: true})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Default Dashboard")
   end
 
   it "handles non-hash JWT payload (token.is_a?(Hash) false branch)" do
-    stub_request(:post, token_url).to_return(
-      status: 200,
-      body: {"access_token" => "tok", "token_type" => "bearer", "id_token" => "placeholder"}.to_json,
-      headers: {"Content-Type" => "application/json"}
-    )
-    allow(JWT).to receive(:decode).and_return(["not_a_hash", {"alg" => "none"}])
+    stub_token_endpoint(id_token: {array_wrap: true})
+    stub_userinfo_endpoint(body: {})
 
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
@@ -188,27 +155,30 @@ RSpec.describe Clover, "OIDC auth" do
   describe "with group_prefix configured" do
     before { oidc_provider.update(group_prefix: "org-") }
 
-    it "extracts groups from id_token and calls userinfo when groups present" do
-      stub_request(:post, token_url).to_return do |_req|
-        id_token = generate_id_token(nonce: fake_oidc.last_nonce, groups: %w[eng ops])
-        {status: 200,
-         body: {"access_token" => "tok", "token_type" => "bearer", "expires_in" => 3600, "id_token" => id_token}.to_json,
-         headers: {"Content-Type" => "application/json"}}
-      end
-      stub_userinfo_endpoint
-
+    it "extracts groups from id_token without calling userinfo endpoint" do
+      stub_token_endpoint(id_token: {groups: %w[eng ops]})
       initiate_oidc_login
       expect(page.title).to eq("Ubicloud - Default Dashboard")
-      expect(a_request(:get, userinfo_url)).to have_been_made
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-eng,org-ops"
     end
 
-    it "skips userinfo call when groups not in id_token (need_user_info reset to true)" do
+    it "issues userinfo call when groups not in id_token" do
       stub_token_endpoint  # generates id_token with sub+email but no groups
-      # userinfo endpoint is NOT called because need_user_info gets reset to true
-
+      stub_userinfo_endpoint(body: {"sub" => "oidc_sub_123", "email" => "user@example.com", "groups" => %w[foo bar]})
       initiate_oidc_login
       expect(page.title).to eq("Ubicloud - Default Dashboard")
-      expect(a_request(:get, userinfo_url)).not_to have_been_made
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-foo,org-bar"
+    end
+
+    it "handles userinfo call not including information that was in id token" do
+      stub_token_endpoint(id_token: {email_verified: true})
+      stub_userinfo_endpoint(body: {"groups" => %w[foo bar]})
+      initiate_oidc_login
+      expect(page.title).to eq("Ubicloud - Default Dashboard")
+      visit "/oidc-groups"
+      expect(page.body).to eq "org-foo,org-bar"
     end
   end
 
@@ -268,62 +238,47 @@ RSpec.describe Clover, "OIDC auth" do
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
-  it "handles absent id_token in token response (id_token false branch)" do
-    stub_token_endpoint(id_token: :none)
+  it "handles absent id_token in token response" do
+    stub_token_endpoint(id_token: nil)
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
   it "handles invalid issuer in id_token (iss mismatch, short-circuits || chain)" do
-    stub_request(:post, token_url).to_return do |_req|
-      id_token = generate_id_token(nonce: fake_oidc.last_nonce, iss: "http://evil.example.com")
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
+    stub_token_endpoint(id_token: {iss: "http://evil.example.com"})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
   it "handles invalid audience in id_token (iss ok, aud mismatch)" do
-    stub_request(:post, token_url).to_return do |_req|
-      id_token = generate_id_token(nonce: fake_oidc.last_nonce, aud: "wrong_client_id")
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
+    stub_token_endpoint(id_token: {aud: "wrong_client_id"})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
   it "handles invalid nonce in id_token (iss and aud ok, nonce mismatch)" do
-    stub_request(:post, token_url).to_return do |_req|
-      id_token = generate_id_token(nonce: "totally_wrong_nonce")
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
+    stub_token_endpoint(id_token: {nonce: "wrong_nonce"})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
     expect(page).to have_flash_error("There was an error logging in with the external provider")
   end
 
-  it "handles id_token without email (user_info.length != 2 false branch)" do
-    stub_request(:post, token_url).to_return do |_req|
-      payload = {"iss" => "http://www.example.com", "aud" => "client_id_test",
-                 "sub" => "oidc_sub_123", "nonce" => fake_oidc.last_nonce,
-                 "iat" => Time.now.to_i, "exp" => Time.now.to_i + 3600}
-      id_token = JWT.encode(payload, nil, "none")
-      {status: 200,
-       body: {"access_token" => "tok", "token_type" => "bearer", "id_token" => id_token}.to_json,
-       headers: {"Content-Type" => "application/json"}}
-    end
+  it "handles id_token without email, but email in userinfo" do
+    stub_token_endpoint(id_token: {email: nil})
+    stub_userinfo_endpoint
+    initiate_oidc_login
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
+  end
+
+  it "handles id_token without email, and email not in userinfo" do
+    stub_token_endpoint(id_token: {email: nil})
+    stub_userinfo_endpoint(body: {})
     initiate_oidc_login
     expect(page.title).to eq("Ubicloud - Login")
-    expect(page).to have_flash_error("There was an error logging in with the external provider")
+    expect(page).to have_flash_error("Social login is only allowed if social login provider provides email")
   end
 
   it "handles Excon::Error from token endpoint" do
@@ -356,7 +311,6 @@ RSpec.describe Clover, "OIDC auth" do
 
   it "appends redirect_uri to callback URL when redirect_uri param is present in OIDC request" do
     stub_token_endpoint
-    stub_userinfo_endpoint
 
     # Visit the auth page to establish session and obtain a CSRF token from the form
     visit "/auth/#{oidc_provider.ubid}"
@@ -367,10 +321,11 @@ RSpec.describe Clover, "OIDC auth" do
     page.driver.browser.process_and_follow_redirects(
       :post,
       "/auth/#{oidc_provider.ubid}",
-      "_csrf" => csrf_token, "redirect_uri" => "http://example.com/after-auth"
+      "_csrf" => csrf_token, "redirect_uri" => "http://example.com/after-auth",
     )
 
     expect(Account.count).to eq 1
+    expect(page.title).to eq("Ubicloud - Default Dashboard")
   end
 
   describe OmniAuth::Strategies::Oidc::CallbackError do
