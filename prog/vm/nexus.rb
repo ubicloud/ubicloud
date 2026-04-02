@@ -163,7 +163,7 @@ class Prog::Vm::Nexus < Prog::Base
           "gpu_count" => gpu_count,
           "gpu_device" => gpu_device,
           "hugepages" => hugepages,
-          "hypervisor" => hypervisor,
+          "hypervisor" => boot_image&.start_with?("vmware-") ? "qemu" : hypervisor,
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,

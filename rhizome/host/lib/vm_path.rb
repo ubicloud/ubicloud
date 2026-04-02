@@ -52,6 +52,7 @@ class VmPath
     cloudinit.img
     ch-api.sock
     serial.log
+    vnc.sock
     hugepages
     public_ipv4
     nftables_conf

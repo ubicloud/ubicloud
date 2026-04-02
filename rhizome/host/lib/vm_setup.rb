@@ -790,23 +790,39 @@ DNSMASQ_SERVICE
   end
 
   def build_qemu_service(header:, footer:, slice_name:, mem_gib:, max_vcpus:, cpu_topology:, storage_volumes:, storage_params:, nics:, pci_devices:)
-    disk_parts = storage_volumes.each_with_index.flat_map do |vol, i|
-      if vol.read_only
-        [
-          "-drive if=none,file=#{vol.image_path},format=raw,readonly=on,id=disk#{i}",
-          "-device virtio-blk-pci,drive=disk#{i},romfile="
-        ]
-      else
-        [
-          "-chardev socket,id=vhostblk#{i},path=#{vol.vhost_sock},server=off",
-          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile="
+    vmware_mode = storage_params.any? { |p| p["image"]&.start_with?("vmware-") }
+
+    disk_parts = if vmware_mode
+      # VMware ESXi/NSX don't have virtio drivers — use AHCI/SATA
+      ahci = ["-device ahci,id=ahci0"]
+      storage_volumes.each_with_index do |vol, i|
+        ahci += [
+          "-drive if=none,file=#{vol.disk_file},format=raw,id=disk#{i}",
+          "-device ide-hd,drive=disk#{i},bus=ahci0.#{i}"
         ]
       end
+      ahci
+    else
+      storage_volumes.each_with_index.flat_map do |vol, i|
+        if vol.read_only
+          [
+            "-drive if=none,file=#{vol.image_path},format=raw,readonly=on,id=disk#{i}",
+            "-device virtio-blk-pci,drive=disk#{i},romfile="
+          ]
+        else
+          [
+            "-chardev socket,id=vhostblk#{i},path=#{vol.vhost_sock},server=off",
+            "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile="
+          ]
+        end
+      end
     end
-    disk_parts += [
-      "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
-      "-device virtio-blk-pci,drive=cidrive,romfile="
-    ]
+    unless vmware_mode
+      disk_parts += [
+        "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
+        "-device virtio-blk-pci,drive=cidrive,romfile="
+      ]
+    end
 
     mem_parts =
       if @hugepages
@@ -828,10 +844,17 @@ DNSMASQ_SERVICE
     ]
 
     net_parts = nics.each_with_index.flat_map { |nic, i|
-      [
-        "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
-        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile="
-      ]
+      if vmware_mode
+        [
+          "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=1",
+          "-device e1000,mac=#{nic.mac},netdev=net#{i},romfile="
+        ]
+      else
+        [
+          "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
+          "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile="
+        ]
+      end
     }
 
     pci_parts = pci_devices.map.with_index(1) do |(bdf), i|
@@ -843,8 +866,8 @@ DNSMASQ_SERVICE
 
     serial_parts = [
       "-serial file:#{vp.serial_log}",
-      "-display none",
-      "-vga none"
+      "-vnc unix:#{vp.vnc_sock}",
+      "-vga std"
     ]
 
     kernel_parts = [
