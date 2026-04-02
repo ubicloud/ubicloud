@@ -45,7 +45,7 @@ class Prog::DnsZone::DnsZoneNexus < Prog::Base
       DB[:seen_dns_records_by_dns_servers].multi_insert(records_to_rectify.map { {dns_record_id: it.id, dns_server_id: dns_server.id} })
     end
 
-    hop_wait
+    hop_purge_obsolete_records
   end
 
   label def purge_obsolete_records
