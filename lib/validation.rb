@@ -157,6 +157,9 @@ module Validation
       volume.each_key { |key|
         fail ValidationFailed.new({storage_volumes: "Invalid key: #{key}"}) unless allowed_keys.include?(key)
       }
+      if !volume.fetch(:encrypted, true) && !volume.fetch(:read_only, false)
+        fail ValidationFailed.new({storage_volumes: "Unencrypted non-read-only volumes are not allowed."})
+      end
     }
   end
 
