@@ -16,7 +16,9 @@ RSpec.describe Semaphore do
   end
 
   it ".set_at returns the Time the given semaphore id was set at" do
-    expect(described_class.set_at(described_class.generate_uuid)).to be_within(1).of(Time.now)
+    time = described_class.set_at(described_class.generate_uuid)
+    expect(time).to be_within(1).of(Time.now)
+    expect(time.inspect).to match(/\A\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(\.\d{1,3})? UTC\z/)
   end
 
   it "#set_at returns the Time the semaphore was set at" do
