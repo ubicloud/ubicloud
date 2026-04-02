@@ -139,6 +139,14 @@ RSpec.describe Validation do
       it "fails if contains an invalid key" do
         expect { described_class.validate_storage_volumes([xyz: 1], 0) }.to raise_error described_class::ValidationFailed
       end
+
+      it "fails if unencrypted and writable volume is included" do
+        expect { described_class.validate_storage_volumes([{encrypted: false, read_only: false}], 0) }.to raise_error described_class::ValidationFailed
+      end
+
+      it "succeeds if unencrypted volume is read-only" do
+        expect { described_class.validate_storage_volumes([{encrypted: false, read_only: true}], 0) }.not_to raise_error
+      end
     end
 
     describe "#validate_minio_username" do
