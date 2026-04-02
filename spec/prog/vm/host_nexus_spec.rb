@@ -141,11 +141,7 @@ RSpec.describe Prog::Vm::HostNexus do
 
   describe "#bootstrap_rhizome" do
     it "pushes a bootstrap rhizome process" do
-      expect { nx.bootstrap_rhizome }.to raise_error(Prog::Base::Hop) { |hop|
-        expect(hop.new_label).to eq("start")
-        expect(hop.new_prog).to eq("BootstrapRhizome")
-        expect(hop.strand_update_args[:stack].first).to include("target_folder" => "host")
-      }
+      expect { nx.bootstrap_rhizome }.to push("BootstrapRhizome").with("target_folder" => "host")
     end
 
     it "hops once BootstrapRhizome has returned" do
@@ -240,11 +236,7 @@ RSpec.describe Prog::Vm::HostNexus do
   describe "#setup_storage_backend" do
     it "pushes the vhost_block_backend program by default" do
       vm_host.update(arch: "x64")
-      expect { nx.setup_storage_backend }.to raise_error(Prog::Base::Hop) { |hop|
-        expect(hop.new_label).to eq("start")
-        expect(hop.new_prog).to eq("Storage::SetupVhostBlockBackend")
-        expect(hop.strand_update_args[:stack].first).to include("allocation_weight" => 100)
-      }
+      expect { nx.setup_storage_backend }.to push("Storage::SetupVhostBlockBackend").with("allocation_weight" => 100)
     end
 
     it "hops once SetupVhostBlockBackend has returned" do

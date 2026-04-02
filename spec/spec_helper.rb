@@ -195,6 +195,30 @@ RSpec.configure do |config|
     end
   end
 
+  # Custom matcher to expect Progs to push a new prog
+  RSpec::Matchers.define :push do |expected_prog, expected_label = "start"|
+    supports_block_expectations
+
+    chain :with do |expected_frame|
+      @expected_frame = expected_frame
+    end
+
+    match do |block|
+      block.call
+      false
+    rescue Prog::Base::Hop => hop
+      @hop = hop
+      hop.new_prog == expected_prog &&
+        hop.new_label == expected_label &&
+        (!@expected_frame || hop.strand_update_args[:stack].first >= @expected_frame)
+    end
+
+    failure_message do
+      "expected: hop #{expected_prog}##{expected_label}\n" \
+        "     got: #{@hop || "not hopped"}"
+    end
+  end
+
   # Custom matcher to expect Progs to exit
   # If expected_exitval is not provided, it expects to exit with any value.
   RSpec::Matchers.define :exit do |expected_exitval|
