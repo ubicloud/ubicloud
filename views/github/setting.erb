@@ -136,4 +136,34 @@
       </div>
     </div>
   </div>
+  <% if @custom_labels %>
+    <% installation_path = path(@installation) %>
+    <%== part(
+      "components/table_card",
+      id: "custom-labels-table",
+      title: "Custom Labels",
+      right_items: @custom_labels.empty? ? nil : [part("components/button", text: "Add Custom Label", link: "#{installation_path}/custom-label/create")],
+      headers: ["Name", "Alias For", "Concurrency Limit", "Active Runners", "", ""],
+      rows: @custom_labels.map do |label|
+        [
+          [
+            label.name,
+            label.alias_for,
+            (label.concurrent_runner_count_limit || "Unlimited").to_s,
+            label.allocated_runner_count.to_s,
+            ["button", {component: {text: "", icon: "hero-pencil", link: "#{installation_path}/custom-label/#{label.ubid}"}, extra_class: "w-px text-right"}],
+            ["delete_button", {component: {url: "#{installation_path}/custom-label/#{label.ubid}", text: ""}, extra_class: "w-px text-right"}]
+          ],
+          {id: "label-#{label.ubid}"}
+        ]
+      end,
+      empty_state: {
+        icon: "hero-squares-plus",
+        title: "No custom labels",
+        description: "Create custom runner labels to define friendly aliases or set concurrency limits for specific runner types.",
+        button_link: "#{installation_path}/custom-label/create",
+        button_title: "Add Custom Label"
+      }
+    ) %>
+  <% end %>
 </div>

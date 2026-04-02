@@ -346,6 +346,157 @@ RSpec.describe Clover, "github" do
     end
   end
 
+  describe "custom-label" do
+    before do
+      project.set_ff_custom_runner_labels(true)
+    end
+
+    it "returns 404 when feature flag is not set" do
+      project.set_ff_custom_runner_labels(nil)
+
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      expect(page.status_code).to eq(404)
+    end
+
+    it "shows custom labels section on settings page" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "my-label", alias_for: "ubicloud-standard-4-ubuntu-2404")
+      GithubCustomLabel.create(installation_id: installation.id, name: "big-runner", alias_for: "ubicloud-standard-16-ubuntu-2404", concurrent_runner_count_limit: 5)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "Custom Labels"
+      expect(page).to have_content "big-runner"
+      expect(page).to have_content "my-label"
+      expect(page).to have_content "ubicloud-standard-4-ubuntu-2404"
+      expect(page).to have_content "ubicloud-standard-16-ubuntu-2404"
+      expect(page).to have_content "5"
+      expect(page).to have_content "Unlimited"
+    end
+
+    it "does not show custom labels section when feature flag is not set" do
+      project.set_ff_custom_runner_labels(nil)
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_no_content "Custom Labels"
+    end
+
+    it "shows empty state when no custom labels" do
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      expect(page.status_code).to eq(200)
+      expect(page).to have_content "No custom labels"
+      expect(page).to have_content "Create custom runner labels to define friendly aliases or set concurrency limits for specific runner types."
+      expect(page).to have_link "Add Custom Label"
+    end
+
+    it "renders create form" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Add Custom Label")
+      expect(page).to have_field "name"
+      expect(page).to have_select "alias_for"
+    end
+
+    it "creates a custom label" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      fill_in "name", with: "my-label"
+      select "ubicloud-standard-4-ubuntu-2404", from: "alias_for"
+      fill_in "concurrent_runner_count_limit", with: "3"
+      click_button "Add Custom Label"
+
+      expect(page).to have_flash_notice("Custom label 'my-label' created")
+      expect(GithubCustomLabel.first(name: "my-label")).not_to be_nil
+      expect(GithubCustomLabel.first(name: "my-label").concurrent_runner_count_limit).to eq(3)
+    end
+
+    it "creates a custom label without concurrency limit" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      fill_in "name", with: "my-label"
+      select "ubicloud-standard-4-ubuntu-2404", from: "alias_for"
+      click_button "Add Custom Label"
+
+      expect(page).to have_flash_notice("Custom label 'my-label' created")
+      expect(GithubCustomLabel.first(name: "my-label").concurrent_runner_count_limit).to be_nil
+    end
+
+    it "fails to create with validation error" do
+      GithubCustomLabel.create(installation_id: installation.id, name: "existing-label", alias_for: "ubicloud-standard-4-ubuntu-2404")
+
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      fill_in "name", with: "existing-label"
+      select "ubicloud-standard-4-ubuntu-2404", from: "alias_for"
+      click_button "Add Custom Label"
+
+      expect(page.status_code).to eq(400)
+      expect(page.title).to eq("Ubicloud - Add Custom Label")
+    end
+
+    it "fails to create with name starting with ubicloud" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/create"
+
+      fill_in "name", with: "ubicloud-my-label"
+      select "ubicloud-standard-4-ubuntu-2404", from: "alias_for"
+      click_button "Add Custom Label"
+
+      expect(page.status_code).to eq(400)
+      expect(page).to have_flash_error("name is reserved. Custom labels cannot start with 'ubicloud'")
+      expect(page.title).to eq("Ubicloud - Add Custom Label")
+    end
+
+    it "renders edit form with existing values" do
+      label = GithubCustomLabel.create(installation_id: installation.id, name: "my-label", alias_for: "ubicloud-standard-4-ubuntu-2404", concurrent_runner_count_limit: 5)
+
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/#{label.ubid}"
+
+      expect(page.status_code).to eq(200)
+      expect(page.title).to eq("Ubicloud - Edit Custom Label")
+      expect(page).to have_field "name", with: "my-label"
+      expect(page).to have_select "alias_for", selected: "ubicloud-standard-4-ubuntu-2404"
+      expect(page).to have_field "concurrent_runner_count_limit", with: "5"
+    end
+
+    it "updates a custom label" do
+      label = GithubCustomLabel.create(installation_id: installation.id, name: "my-label", alias_for: "ubicloud-standard-4-ubuntu-2404")
+
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/#{label.ubid}"
+
+      fill_in "name", with: "updated-label"
+      select "ubicloud-standard-16-ubuntu-2404", from: "alias_for"
+      fill_in "concurrent_runner_count_limit", with: "10"
+      click_button "Edit Custom Label"
+
+      expect(page).to have_flash_notice("Custom label 'updated-label' updated")
+      label.reload
+      expect(label.name).to eq("updated-label")
+      expect(label.alias_for).to eq("ubicloud-standard-16-ubuntu-2404")
+      expect(label.concurrent_runner_count_limit).to eq(10)
+    end
+
+    it "deletes a custom label" do
+      label = GithubCustomLabel.create(installation_id: installation.id, name: "my-label", alias_for: "ubicloud-standard-4-ubuntu-2404")
+
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+
+      find("#label-#{label.ubid} .delete-btn").click
+      expect(page).to have_flash_notice("Custom label 'my-label' deleted")
+      expect(GithubCustomLabel[label.id]).to be_nil
+    end
+
+    it "returns 404 when custom label not found" do
+      visit "#{project.path}/github/#{installation.ubid}/custom-label/#{GithubCustomLabel.generate_ubid}"
+
+      expect(page.status_code).to eq(404)
+    end
+  end
+
   describe "cache" do
     def create_cache_entry(**)
       GithubCacheEntry.create(key: "k#{Random.rand}", version: "v1", scope: "main", repository_id: repository.id, created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b", committed_at: Time.now, **)

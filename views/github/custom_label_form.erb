@@ -1,0 +1,52 @@
+<% if (cl = @custom_label)
+  heading = "Edit"
+  action = "#{path(@installation)}/custom-label/#{cl.ubid}/patch"
+  name = cl.name
+  alias_for = cl.alias_for
+  concurrent_runner_count_limit = cl.concurrent_runner_count_limit
+else
+  heading = "Add"
+  action = "#{path(@installation)}/custom-label/create"
+end
+
+@page_title = "#{heading} Custom Label" %>
+
+<%== render("github/tabbar") %>
+
+<% form(action:, method: :post) do %>
+  <div class="grid gap-6">
+    <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white">
+      <div class="px-4 py-5 sm:p-6">
+        <div class="space-y-12">
+          <div class="mt-2 grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+            <div class="col-span-full">
+              <%== part("components/form/text", name: "name", label: "Name", attributes: {required: true, placeholder: "my-ubicloud-runner-concurrency-2"}, value: name) %>
+            </div>
+
+            <div class="col-span-full">
+              <%== part(
+                "components/form/select",
+                label: "Alias For",
+                name: "alias_for",
+                placeholder: "Select a runner label",
+                attributes: {required: true},
+                selected: alias_for,
+                options: Github.runner_labels.keys.select { it.include?("standard") && it.include?("ubuntu") }.map { [it, it] }
+              ) %>
+            </div>
+
+            <div class="col-span-full">
+              <%== part("components/form/text", name: "concurrent_runner_count_limit", label: "Concurrency Limit (optional)", type: "number", attributes: {min: 1, placeholder: "Unlimited"}, value: concurrent_runner_count_limit) %>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="px-4 py-5 sm:p-6">
+        <div class="flex items-center justify-end gap-x-6">
+          <a href="<%= path(@installation) %>/setting" class="text-sm font-semibold leading-6 text-gray-900">Cancel</a>
+          <%== part("components/form/submit_button", text: @page_title) %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

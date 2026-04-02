@@ -47,6 +47,9 @@ class Clover
       end
 
       r.get web?, "setting" do
+        if @project.get_ff_custom_runner_labels
+          @custom_labels = @installation.custom_labels_dataset.order(:name).all
+        end
         view "github/setting"
       end
 
@@ -92,6 +95,59 @@ class Clover
           no_audit_log
         end
         r.redirect @installation, "/setting"
+      end
+
+      r.on web?, "custom-label" do
+        next unless @project.get_ff_custom_runner_labels
+
+        r.get "create" do
+          view "github/custom_label_form"
+        end
+
+        r.post "create" do
+          handle_validation_failure("github/custom_label_form")
+          label = GithubCustomLabel.new(installation_id: @installation.id)
+          label.name = typecast_params.nonempty_str!("name")
+          label.alias_for = typecast_params.nonempty_str!("alias_for")
+          label.concurrent_runner_count_limit = typecast_params.pos_int("concurrent_runner_count_limit")
+          DB.transaction do
+            label.save_changes
+            audit_log(label, "create")
+          end
+          flash["notice"] = "Custom label '#{label.name}' created"
+          r.redirect @installation, "/setting#custom-labels-table"
+        end
+
+        r.on :ubid_uuid do |id|
+          @custom_label = @installation.custom_labels_dataset.with_pk(id)
+          check_found_object(@custom_label)
+
+          r.get true do
+            view "github/custom_label_form"
+          end
+
+          r.post "patch" do
+            handle_validation_failure("github/custom_label_form")
+            @custom_label.name = typecast_params.nonempty_str!("name")
+            @custom_label.alias_for = typecast_params.nonempty_str!("alias_for")
+            @custom_label.concurrent_runner_count_limit = typecast_params.pos_int("concurrent_runner_count_limit")
+            DB.transaction do
+              @custom_label.save_changes
+              audit_log(@custom_label, "update")
+            end
+            flash["notice"] = "Custom label '#{@custom_label.name}' updated"
+            r.redirect @installation, "/setting#custom-labels-table"
+          end
+
+          r.delete true do
+            DB.transaction do
+              @custom_label.destroy
+              audit_log(@custom_label, "destroy")
+            end
+            flash["notice"] = "Custom label '#{@custom_label.name}' deleted"
+            r.redirect @installation, "/setting#custom-labels-table"
+          end
+        end
       end
 
       r.on web?, "runner" do

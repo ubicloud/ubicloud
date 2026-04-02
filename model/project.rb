@@ -233,7 +233,8 @@ class Project < Sequel::Model
     :visible_locations,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
-    :cache_proxy_download_url
+    :cache_proxy_download_url,
+    :custom_runner_labels
   )
 end
 
