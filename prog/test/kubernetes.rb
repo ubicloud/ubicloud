@@ -42,23 +42,18 @@ class Prog::Test::Kubernetes < Prog::Test::Base
   label def update_loadbalancer_hostname
     nap 5 unless kubernetes_cluster.api_server_lb
     kubernetes_cluster.api_server_lb.update(custom_hostname: "k8s-e2e-test.ubicloud.test")
-    hop_update_all_nodes_hosts_entries
+    hop_update_all_nodes_dns_records
   end
 
-  label def update_all_nodes_hosts_entries
+  label def update_all_nodes_dns_records
     expected_node_count = kubernetes_cluster.cp_node_count + nodepool.node_count
-    current_nodes = kubernetes_cluster.nodes + nodepool.nodes
-    current_node_count = current_nodes.count
 
-    current_nodes.each { |node|
-      unless node_host_entries_set?(node.name)
-        nap 5 unless vm_ready?(node.vm)
-        ensure_hosts_entry(node.sshable, kubernetes_cluster.api_server_lb.hostname)
-        set_node_entries_status(node.name)
-      end
+    kubernetes_cluster.all_nodes.each { |node|
+      nap 5 unless node.vm.vm_host
+      ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname)
     }
 
-    hop_wait_for_kubernetes_bootstrap if current_node_count == expected_node_count
+    hop_wait_for_kubernetes_bootstrap if kubernetes_cluster.all_nodes.count == expected_node_count
     nap 10
   end
 
@@ -371,12 +366,7 @@ STS
   label def wait_for_upgrade
     unless kubernetes_cluster.display_state == "running"
       kubernetes_cluster.all_nodes.each do |node|
-        unless node_host_entries_set?(node.name)
-          if vm_ready?(node.vm)
-            ensure_hosts_entry(node.sshable, kubernetes_cluster.api_server_lb.hostname)
-            set_node_entries_status(node.name)
-          end
-        end
+        ensure_dns_record(node.vm, kubernetes_cluster.api_server_lb.hostname) if node.vm.vm_host
       end
       nap 15
     end
@@ -414,12 +404,22 @@ STS
     nap 15
   end
 
-  def ensure_hosts_entry(sshable, api_hostname)
-    host_line = "#{kubernetes_cluster.sshable.host} #{api_hostname}"
-    output = sshable.cmd("cat /etc/hosts")
-    unless output.include?(host_line)
-      sshable.cmd("echo :host_line | sudo tee -a /etc/hosts > /dev/null", host_line:)
-    end
+  def ensure_dns_record(vm, api_hostname)
+    host_sshable = vm.vm_host.sshable
+    inhost_name = vm.inhost_name
+    dnsmasq_conf = "/vm/#{inhost_name}/dnsmasq.conf"
+    api_ip = kubernetes_cluster.sshable.host
+    address_line = "address=/#{api_hostname}/#{api_ip}"
+
+    conf = host_sshable.cmd("sudo cat :dnsmasq_conf", dnsmasq_conf:)
+    return if conf.include?(address_line)
+
+    host_sshable.cmd(<<~SH, dnsmasq_conf:, address_line:, service: "#{inhost_name}-dnsmasq")
+      set -ueo pipefail
+      sudo sed -i '/^address=/d' :dnsmasq_conf
+      echo :address_line | sudo tee -a :dnsmasq_conf > /dev/null
+      sudo systemctl restart :service
+    SH
   end
 
   def vm_ready?(vm)
@@ -441,17 +441,6 @@ STS
 
   def nodepool
     kubernetes_cluster.nodepools.first
-  end
-
-  def node_host_entries_set?(node_name)
-    strand.stack.first.dig("nodes_status", node_name) == true
-  end
-
-  def set_node_entries_status(node_name)
-    frame = strand.stack.first
-    frame["nodes_status"] ||= {}
-    frame["nodes_status"][node_name] = true
-    update_stack(frame)
   end
 
   def migration_number
