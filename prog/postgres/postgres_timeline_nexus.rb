@@ -123,6 +123,8 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
       end
       iam_client.delete_user(user_name: postgres_timeline.ubid)
     end
+  rescue Aws::IAM::Errors::NoSuchEntity
+    nil
   end
 
   def setup_blob_storage
