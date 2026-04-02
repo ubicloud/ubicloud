@@ -56,7 +56,7 @@ RSpec.describe Prog::DnsZone::DnsZoneNexus do
       DB[:seen_dns_records_by_dns_servers].insert(DB[:dns_record].select(:id, dns_server.id))
 
       expect(sshable).not_to receive(:_cmd)
-      expect { nx.refresh_dns_servers }.to hop("wait")
+      expect { nx.refresh_dns_servers }.to hop("purge_obsolete_records")
     end
 
     it "gathers unseen records for each dns server and pushes them to dns servers" do
@@ -70,12 +70,12 @@ COMMANDS
 
       expect(sshable).to receive(:_cmd).with("sudo -u knot knotc", stdin: expected_commands.chomp).and_return("OK\nOK\nOK\nOK\nOK")
       DnsRecord.where(data: "5.6.7.8").update(created_at: Time.now - 60)
-      expect { nx.refresh_dns_servers }.to hop("wait")
+      expect { nx.refresh_dns_servers }.to hop("purge_obsolete_records")
     end
 
     it "ignores unimportant errors" do
       expect(sshable).to receive(:_cmd).and_return("no active transaction\nOK\nno such record in zone found\nsuch record already exists in zone\nOK\n")
-      expect { nx.refresh_dns_servers }.to hop("wait")
+      expect { nx.refresh_dns_servers }.to hop("purge_obsolete_records")
     end
 
     it "raises an exception for unexpected failures" do
