@@ -89,7 +89,7 @@ RSpec.describe PrivateSubnet do
 
   describe "#inspect" do
     it "includes ubid if id is available" do
-      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", firewall_priority: nil}>"
+      expect(private_subnet.inspect).to eq "#<PrivateSubnet[\"#{private_subnet.ubid}\"] @values={net6: \"fd1b:9793:dcef:cd0a::/64\", net4: \"10.9.39.0/26\", state: \"waiting\", name: \"ps\", last_rekey_at: \"#{private_subnet.last_rekey_at.strftime("%F %T")}\", project_id: \"#{private_subnet.project.ubid}\", location_id: \"10saktg1sprp3mxefj1m3kppq2\", firewall_priority: nil, gcp_vpc_id: nil}>"
     end
   end
 

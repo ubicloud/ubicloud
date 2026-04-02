@@ -30,6 +30,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         name: "ubicloud-#{project.ubid}-#{location.ubid}")
       Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") { it.id = vpc.id }
     end
+  rescue Sequel::UniqueConstraintViolation, Sequel::ValidationFailed
+    GcpVpc.where(project_id:, location_id:).first
   end
 
   label def start
@@ -39,10 +41,11 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   label def create_vpc
     begin
-      credential.networks_client.get(
+      network = credential.networks_client.get(
         project: gcp_project_id,
         network: gcp_vpc.name
       )
+      cache_network_self_link(network)
     rescue Google::Cloud::NotFoundError
       begin
         op = credential.networks_client.insert(
@@ -59,6 +62,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         hop_wait_create_vpc
       rescue Google::Cloud::AlreadyExistsError
         # Another strand created the VPC between our GET and INSERT
+        network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
+        cache_network_self_link(network)
       end
     end
 
@@ -83,7 +88,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
-    gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/#{gcp_project_id}/global/networks/#{network.id}")
+    cache_network_self_link(network)
 
     clear_gcp_op
     hop_create_firewall_policy
@@ -327,7 +332,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
     resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
     (resp.tag_keys || []).each do |tk|
-      next unless tk.short_name.start_with?("ubicloud-") && tk.purpose == "GCE_FIREWALL"
+      next unless tk.short_name.start_with?("ubicloud-fw-") && tk.purpose == "GCE_FIREWALL"
       next unless tk.purpose_data&.dig("network") == network_self_link
 
       values_resp = credential.crm_client.list_tag_values(parent: tk.name)
@@ -377,8 +382,14 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   rescue Google::Cloud::NotFoundError
     # Already deleted
   rescue Google::Cloud::InvalidArgumentError => e
+    raise if e.message.include?("being used by")
     Clog.emit("Failed to delete VPC network during cleanup",
       {vpc_cleanup_network_error: {vpc: gcp_vpc.name, error: e.message}})
+  end
+
+  def cache_network_self_link(network)
+    return if gcp_vpc.network_self_link
+    gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/#{gcp_project_id}/global/networks/#{network.id}")
   end
 
   def credential

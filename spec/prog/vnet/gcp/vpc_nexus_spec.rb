@@ -63,6 +63,16 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { described_class.assemble(project.id, SecureRandom.uuid) }
         .to raise_error("No existing location")
     end
+
+    it "returns existing VPC on duplicate project+location" do
+      assemble_project = Project.create(name: "test-gcp-vpc-dup")
+      described_class.assemble(assemble_project.id, location.id)
+      existing_vpc = GcpVpc.first(project_id: assemble_project.id, location_id: location.id)
+
+      result = described_class.assemble(assemble_project.id, location.id)
+      expect(result).to be_a(GcpVpc)
+      expect(result.id).to eq(existing_vpc.id)
+    end
   end
 
   describe "#start" do
@@ -72,13 +82,25 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#create_vpc" do
-    it "skips creation if VPC already exists" do
+    it "skips creation and caches network_self_link if VPC already exists" do
       expect(networks_client).to receive(:get).with(
         project: "test-gcp-project",
         network: vpc_name
-      ).and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name))
+      ).and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
 
       expect { nx.create_vpc }.to hop("create_firewall_policy")
+      expect(gcp_vpc.reload.network_self_link).to include("67890")
+    end
+
+    it "does not overwrite network_self_link if already cached" do
+      original_link = "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"
+      gcp_vpc.update(network_self_link: original_link)
+
+      expect(networks_client).to receive(:get)
+        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
+
+      expect { nx.create_vpc }.to hop("create_firewall_policy")
+      expect(gcp_vpc.reload.network_self_link).to eq(original_link)
     end
 
     it "creates VPC and hops to wait_create_vpc" do
@@ -97,12 +119,15 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(st.stack.first["gcp_op_name"]).to eq("op-vpc-123")
     end
 
-    it "handles AlreadyExistsError on INSERT from concurrent strands" do
+    it "handles AlreadyExistsError on INSERT and caches network_self_link" do
       expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(networks_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(networks_client).to receive(:get)
+        .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 11111))
 
       expect { nx.create_vpc }.to hop("create_firewall_policy")
+      expect(gcp_vpc.reload.network_self_link).to include("11111")
     end
   end
 
@@ -442,6 +467,25 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.create_vpc_deny_rules }.to hop("wait")
     end
+
+    it "creates rule with custom layer4_configs and target_secure_tags" do
+      expect(nfp_client).to receive(:get_rule)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(nfp_client).to receive(:add_rule) do |args|
+        rule = args[:firewall_policy_rule_resource]
+        expect(rule.match.layer4_configs.first.ip_protocol).to eq("tcp")
+        expect(rule.match.layer4_configs.first.ports).to eq(["443"])
+        expect(rule.target_secure_tags.first.name).to eq("tagValues/123")
+      end
+
+      nx.send(:ensure_policy_rule,
+        priority: 1000,
+        direction: "INGRESS",
+        action: "allow",
+        src_ip_ranges: ["10.0.0.0/8"],
+        layer4_configs: [{ip_protocol: "tcp", ports: ["443"]}],
+        target_secure_tags: ["tagValues/123"])
+    end
   end
 
   describe "#wait" do
@@ -528,6 +572,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles errors during VPC cleanup gracefully" do
+      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
       # list_tag_keys raises
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
@@ -588,6 +634,37 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
+    it "raises when VPC network is still in use" do
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+      )
+      allow(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:delete)
+        .and_raise(Google::Cloud::InvalidArgumentError.new("The resource is being used by another resource"))
+
+      expect { nx.destroy }.to raise_error(Google::Cloud::InvalidArgumentError, /being used by/)
+    end
+
+    it "skips firewall tag keys with nil purpose_data" do
+      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
+      nil_purpose_data_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+        name: "tagKeys/888", short_name: "ubicloud-fw-nilpurpose", purpose: "GCE_FIREWALL",
+        purpose_data: nil
+      )
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [nil_purpose_data_tag])
+      )
+      expect(crm_client).not_to receive(:delete_tag_key)
+
+      allow(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
     it "skips tag cleanup when network_self_link is nil" do
       gcp_vpc.update(network_self_link: nil)
 
@@ -600,6 +677,16 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
   end
+
+  # rubocop:disable RSpec/VerifiedDoubles
+  describe "#normalize_layer4_configs" do
+    it "handles configs with nil ports" do
+      config = double("config", ip_protocol: "all", ports: nil)
+      result = nx.send(:normalize_layer4_configs, [config])
+      expect(result).to eq([["all", []]])
+    end
+  end
+  # rubocop:enable RSpec/VerifiedDoubles
 
   describe "#policy_rule_matches_desired?" do
     it "returns false when existing.match is nil" do
