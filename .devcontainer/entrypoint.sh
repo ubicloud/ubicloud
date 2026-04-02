@@ -10,6 +10,14 @@ if [ -f /tmp/.host-gitconfig ]; then
 fi
 
 
+# Regenerate .env.rb and append overrides (must happen before database setup)
+echo "=== Generating .env.rb ==="
+rake overwrite_envrb
+if [ -f ".devcontainer/env-overrides.rb" ]; then
+  cat .devcontainer/env-overrides.rb >> .env.rb
+  echo "Appended env-overrides.rb to .env.rb"
+fi
+
 # Run once on first start (equivalent to postCreateCommand)
 if [ ! -f "$MARKER_FILE" ]; then
   echo "=== First start: initializing sql users and databases ==="
@@ -18,14 +26,6 @@ if [ ! -f "$MARKER_FILE" ]; then
   bundle exec rake 'setup_database[development,false]'
   bundle exec rake 'setup_database[test,true]'
   touch "$MARKER_FILE"
-fi
-
-# Regenerate .env.rb and append overrides
-echo "=== Generating .env.rb ==="
-rake overwrite_envrb
-if [ -f ".devcontainer/env-overrides.rb" ]; then
-  cat .devcontainer/env-overrides.rb >> .env.rb
-  echo "Appended env-overrides.rb to .env.rb"
 fi
 
 # Run on every start (equivalent to postStartCommand)
