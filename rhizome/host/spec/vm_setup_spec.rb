@@ -384,7 +384,14 @@ RSpec.describe VmSetup do
   end
 
   describe "#install_systemd_unit" do
-    let(:args) { [2, "1:1:1:2", 2, [], [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
+    let(:storage_params) {
+      [
+        {"disk_index" => 0, "device_id" => "vol_0", "encrypted" => true, "vhost_block_backend_version" => "v0.4.0"},
+        {"disk_index" => 1, "device_id" => "vol_1", "encrypted" => false, "read_only" => true, "image" => "some-ai-model", "vhost_block_backend_version" => "v0.4.0"},
+        {"disk_index" => 2, "device_id" => "vol_2", "encrypted" => true, "read_only" => false, "vhost_block_backend_version" => "v0.4.0"},
+      ]
+    }
+    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
 
     it "uses cloud-hypervisor by default" do
       vps = instance_spy(VmPath)
@@ -446,6 +453,12 @@ RSpec.describe VmSetup do
         expect(content).to include("User=test")
         expect(content).to include("Group=test")
         expect(content).to include("LimitNOFILE=500000")
+        expect(content).to include("After=test-0-storage.service")
+        expect(content).to include("Requires=test-0-storage.service")
+        expect(content).not_to include("After=test-1-storage.service")
+        expect(content).not_to include("Requires=test-1-storage.service")
+        expect(content).to include("After=test-2-storage.service")
+        expect(content).to include("Requires=test-2-storage.service")
       }
     end
 
