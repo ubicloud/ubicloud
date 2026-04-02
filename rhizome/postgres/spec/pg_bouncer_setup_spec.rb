@@ -29,6 +29,10 @@ RSpec.describe PgBouncerSetup do
       expect(config).to include("auth_hba_file = /etc/postgresql/17-main/main/pg_hba.conf")
     end
 
+    it "sets auth_dbname to ubi_admin" do
+      expect(config).to include("auth_dbname = ubi_admin")
+    end
+
     it "sets the pool_mode to transaction" do
       expect(config).to include("pool_mode = transaction")
     end

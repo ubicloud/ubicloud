@@ -98,6 +98,7 @@ auth_type = hba
 auth_hba_file = /etc/postgresql/#{@version}/main/pg_hba.conf
 auth_ident_file = /etc/postgresql/#{@version}/main/pg_ident.conf
 auth_user = pgbouncer
+auth_dbname = ubi_admin
 auth_query = SELECT p_user, p_password FROM pgbouncer.get_auth($1)
 
 client_tls_sslmode = require

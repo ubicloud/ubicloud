@@ -12,7 +12,7 @@ role_creation_queries = <<~ROLE_CREATION
   DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN CREATE ROLE pgbouncer LOGIN; END IF; END $$;
 ROLE_CREATION
 
-database_init_queries = <<~DATABASE_INIT
+ubi_admin_init_queries = <<~UBI_ADMIN_INIT
   /**
     * Lock down the privileges of the pgbouncer role.
     */
@@ -43,11 +43,11 @@ database_init_queries = <<~DATABASE_INIT
 
   REVOKE ALL ON FUNCTION pgbouncer.get_auth(name) FROM PUBLIC, pgbouncer;
   GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(name) TO pgbouncer;
-DATABASE_INIT
+UBI_ADMIN_INIT
 
 r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: role_creation_queries
-r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: database_init_queries
-r "sudo -u postgres psql -d template1 -v 'ON_ERROR_STOP=1'", stdin: database_init_queries
+r "sudo -u postgres createdb ubi_admin"
+r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1'", stdin: ubi_admin_init_queries
 
 Dir.glob("/var/cache/postgresql-init/*.sql").sort.each do |sql_file|
   r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: File.read(sql_file)
