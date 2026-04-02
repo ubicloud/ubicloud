@@ -107,6 +107,13 @@ RSpec.describe LoadBalancer do
       }.to change { LoadBalancerVm.where(load_balancer_id: lb.id).count }.from(0).to(1)
         .and change { Semaphore.where(strand_id: lb.id, name: "rewrite_dns_records").count }.from(0).to(1)
     end
+
+    it "returns distinct VMs for vms_to_dns when a VM is attached through multiple ports" do
+      lb.add_vm(vm1)
+      lb.add_port(443, 8443)
+
+      expect(lb.reload.vms_to_dns.map(&:id)).to eq([vm1.id])
+    end
   end
 
   describe "evacuate_vm" do
