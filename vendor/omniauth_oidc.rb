@@ -93,9 +93,6 @@ module OmniAuth
 
         unless (code = params["code"])
           fail!(:missing_code, MissingCodeError.new(params['error']))
-          # :nocov:
-          return
-          # :nocov:
         end
 
         opts = client_options
@@ -118,53 +115,53 @@ module OmniAuth
         token_type = token_hash['token_type']&.downcase
         unless token_type == "bearer"
           fail!(:unexpected_token_type, RuntimeError.new("Unexpected token type returned by OIDC token request: #{token_type}"))
-          # :nocov:
-          return
-          # :nocov:
         end
 
         @access_token = token_hash["access_token"]
         @access_token_expires_in = token_hash["expires_in"]
         need_user_info = true
 
-        if (@id_token = token_hash["id_token"])
-          token = JWT.decode(@id_token, nil, false)
-          token = token[0] if token.is_a?(Array)
-          if token.is_a?(Hash)
-            nonce = session.delete('omniauth.nonce')
-            aud = token["aud"]
-            aud = [aud] if aud.is_a?(String)
-            if token["iss"] != opts.issuer || !aud.include?(opts.identifier) || token["nonce"] != nonce
-              fail!(:unable_to_verify_id_token, RuntimeError.new("Unable to verify id token"))
-              # :nocov:
-              return
-              # :nocov:
-            end
-            user_info = token.slice("sub", "email").compact
-            # The id_token must contain sub to be compliant with OpenID Connect.
-            # It is not required to provide email.  If it doesn't, we'll need to make a request
-            # to the userinfo endpoint.
-            if user_info.length == 2
-              if (email_verified = token["email_verified"])
-                user_info["email_verified"] = token["email_verified"]
-              end
-              @user_info = user_info
-              need_user_info = false
-            end
+        unless (@id_token = token_hash["id_token"])
+          fail!(:unable_to_verify_id_token, RuntimeError.new("No id token provided in JWT"))
+        end
 
-            if opts.need_groups
-              if (groups = token["groups"])
-                Clog.emit("OIDC groups found in token", oidc_groups_found: {groups:, user_info:})
-                user_info["groups"] = groups
-              else
-                Clog.emit("OIDC groups not found in token", oidc_groups_not_found: {keys: token.keys, user_info:})
-                need_user_info = true
-              end
-            end
+        token, = JWT.decode(@id_token, nil, false)
+
+        unless token.is_a?(Hash)
+          fail!(:unable_to_verify_id_token, RuntimeError.new("Given id token in JWT is not a hash"))
+        end
+
+        nonce = session.delete('omniauth.nonce')
+        aud = token["aud"]
+        aud = [aud] if aud.is_a?(String)
+
+        if token["iss"] != opts.issuer || !aud.include?(opts.identifier) || token["nonce"] != nonce
+          fail!(:unable_to_verify_id_token, RuntimeError.new("Unable to verify id token"))
+        end
+
+        user_info = token.slice("sub", "email").compact
+        # The id_token must contain sub to be compliant with OpenID Connect.
+        # It is not required to provide email.  If it doesn't, we'll need to make a request
+        # to the userinfo endpoint.
+        if user_info.length == 2
+          if (email_verified = token["email_verified"])
+            user_info["email_verified"] = token["email_verified"]
+          end
+          @user_info = user_info
+          need_user_info = false
+        end
+
+        if opts.need_groups
+          if (groups = token["groups"])
+            Clog.emit("OIDC groups found in token", oidc_groups_found: {groups:, user_info:})
+            user_info["groups"] = groups
+          else
+            Clog.emit("OIDC groups not found in token", oidc_groups_not_found: {keys: token.keys, user_info:})
+            need_user_info = true
           end
         end
 
-        unless need_user_info
+        if need_user_info
           response = Excon.get(
             base_url_for(opts.userinfo_endpoint),
             headers: {'Authorization' => "Bearer #{@access_token}", "Accept" => "application/json"},

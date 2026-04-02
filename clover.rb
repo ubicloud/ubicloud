@@ -943,6 +943,12 @@ class Clover < Roda
       end
     end
 
+    hash_branch("oidc-groups") do |r|
+      no_authorization_needed
+      prefix = session["oidc_group_prefix"]
+      session["oidc_groups"].map { "#{prefix}#{it}" }.join(",")
+    end
+
     hash_branch("clear-last-password-entry") do |r|
       no_authorization_needed
       session.delete("last_password_entry")
