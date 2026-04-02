@@ -92,6 +92,7 @@ end
 #  location_provider_fkey   | (provider) REFERENCES provider(name)
 # Referenced By:
 #  firewall                  | firewall_location_id_fkey                  | (location_id) REFERENCES location(id)
+#  gcp_vpc                   | gcp_vpc_location_id_fkey                   | (location_id) REFERENCES location(id)
 #  inference_endpoint        | inference_endpoint_location_id_fkey        | (location_id) REFERENCES location(id)
 #  inference_router          | inference_router_location_id_fkey          | (location_id) REFERENCES location(id)
 #  kubernetes_cluster        | kubernetes_cluster_location_id_fkey        | (location_id) REFERENCES location(id)

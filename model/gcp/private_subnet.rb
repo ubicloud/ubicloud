@@ -25,6 +25,7 @@ end
 #  project_id        | uuid                     | NOT NULL
 #  location_id       | uuid                     | NOT NULL
 #  firewall_priority | integer                  |
+#  gcp_vpc_id        | uuid                     |
 # Indexes:
 #  vm_private_subnet_pkey                                | PRIMARY KEY btree (id)
 #  private_subnet_project_id_location_id_name_uidx       | UNIQUE btree (project_id, location_id, name)
@@ -32,6 +33,7 @@ end
 # Check constraints:
 #  private_subnet_firewall_priority_check | (firewall_priority IS NULL OR firewall_priority >= 1000 AND firewall_priority <= 8998 AND (firewall_priority % 2) = 0)
 # Foreign key constraints:
+#  private_subnet_gcp_vpc_id_fkey  | (gcp_vpc_id) REFERENCES gcp_vpc(id)
 #  private_subnet_location_id_fkey | (location_id) REFERENCES location(id)
 #  private_subnet_project_id_fkey  | (project_id) REFERENCES project(id)
 # Referenced By:
