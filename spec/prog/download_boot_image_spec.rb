@@ -263,16 +263,18 @@ RSpec.describe Prog::DownloadBootImage do
   end
 
   describe "#activate_boot_image" do
-    it "activates the boot image" do
+    it "activates the boot image and logs completion" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       expect(bi.activated_at).to be_nil
+      expect(Clog).to receive(:emit).with("Boot image download completed", anything).and_call_original
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
       expect(bi.reload.activated_at).to be <= Time.now
     end
 
-    it "removes the boot image and pops when cancel semaphore is set" do
+    it "removes the boot image without logging when cancel semaphore is set" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       dbi.incr_cancel
+      expect(Clog).not_to receive(:emit)
       expect { dbi.activate_boot_image }.to exit({"msg" => "operation cancelled"})
       expect(bi.reload.activated_at).to be_nil
       expect(Strand.where(prog: "RemoveBootImage", stack: Sequel.pg_jsonb_wrap([{"subject_id" => bi.id}])).count).to eq(1)

@@ -234,6 +234,16 @@ class Prog::DownloadBootImage < Prog::Base
     end
 
     image.update(activated_at: Time.now)
+    Clog.emit("Boot image download completed", [
+      image,
+      boot_image_download: {
+        duration: (image.activated_at - image.created_at).round(2),
+        restarts: frame["restarted"] || 0,
+        vm_host_ubid: vm_host.ubid,
+        arch: vm_host.arch,
+        location: vm_host.location.display_name
+      }
+    ])
     pop({"msg" => "image downloaded", "name" => image_name, "version" => version})
   end
 end
