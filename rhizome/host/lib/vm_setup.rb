@@ -656,12 +656,13 @@ ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
+    writable_volumes = storage_volumes.reject(&:read_only)
 
-    spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
+    spdk_services = writable_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    vhost_user_block_services = storage_volumes.filter_map { |volume| volume.vhost_user_block_service }
+    vhost_user_block_services = writable_volumes.filter_map { |volume| volume.vhost_user_block_service }
     vhost_user_block_after = vhost_user_block_services.map { |s| "After=#{s}" }.join("\n")
     vhost_user_block_requires = vhost_user_block_services.map { |s| "Requires=#{s}" }.join("\n")
 
