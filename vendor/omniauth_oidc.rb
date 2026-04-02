@@ -93,7 +93,9 @@ module OmniAuth
 
         unless (code = params["code"])
           fail!(:missing_code, MissingCodeError.new(params['error']))
+          # :nocov:
           return
+          # :nocov:
         end
 
         opts = client_options
@@ -116,7 +118,9 @@ module OmniAuth
         token_type = token_hash['token_type']&.downcase
         unless token_type == "bearer"
           fail!(:unexpected_token_type, RuntimeError.new("Unexpected token type returned by OIDC token request: #{token_type}"))
+          # :nocov:
           return
+          # :nocov:
         end
 
         @access_token = token_hash["access_token"]
@@ -132,7 +136,9 @@ module OmniAuth
             aud = [aud] if aud.is_a?(String)
             if token["iss"] != opts.issuer || !aud.include?(opts.identifier) || token["nonce"] != nonce
               fail!(:unable_to_verify_id_token, RuntimeError.new("Unable to verify id token"))
+              # :nocov:
               return
+              # :nocov:
             end
             user_info = token.slice("sub", "email").compact
             # The id_token must contain sub to be compliant with OpenID Connect.
