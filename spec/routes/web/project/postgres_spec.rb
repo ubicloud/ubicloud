@@ -880,6 +880,97 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "log-destination" do
+      it "can create an otlp log destination" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "nr", type: "otlp", url: "https://otlp.nr-data.net",
+          _csrf:,
+        }
+        expect(page.status_code).to eq(302)
+        ld = pg.reload.log_destinations.first
+        expect(ld.name).to eq "nr"
+        expect(ld.type).to eq "otlp"
+        expect(ld.url).to eq "https://otlp.nr-data.net"
+        expect(ld.options).to be_nil
+      end
+
+      it "can create an otlp log destination with headers, ignoring rows with empty keys" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "nr", type: "otlp", url: "https://otlp.nr-data.net",
+          header_keys: ["api-key", ""],
+          header_values: ["secret", "ignored"],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(302)
+        expect(pg.reload.log_destinations.first.options).to eq({"headers" => {"api-key" => "secret"}})
+      end
+
+      it "can create a syslog log destination without structured_data" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "mezmo", type: "syslog", url: "tcp://syslog-a.logdna.com:6514",
+          structured_data_ids: [""],
+          structured_data_keys: [""],
+          structured_data_values: [""],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(302)
+        ld = pg.reload.log_destinations.first
+        expect(ld.name).to eq "mezmo"
+        expect(ld.type).to eq "syslog"
+        expect(ld.url).to eq "tcp://syslog-a.logdna.com:6514"
+        expect(ld.options).to be_nil
+      end
+
+      it "can create a syslog log destination with structured_data, ignoring rows with empty sd_id or key" do
+        visit "#{project.path}#{pg.path}/logs"
+        _csrf = all("input[name='_csrf']", visible: false).last.value
+        page.driver.post "#{project.path}#{pg.path}/log-destination", {
+          name: "mezmo", type: "syslog", url: "tcp://logs.example.com:6514",
+          structured_data_ids: ["honeybadger@61642", "honeybadger@61642", "", "honeybadger@61642"],
+          structured_data_keys: ["api_key", "env", "ignored", ""],
+          structured_data_values: ["secret", "prod", "ignored", "ignored"],
+          _csrf:,
+        }
+        expect(page.status_code).to eq(302)
+        expect(pg.reload.log_destinations.first.options).to eq({"structured_data" => {"honeybadger@61642" => {"api_key" => "secret", "env" => "prod"}}})
+      end
+
+      it "can delete log destination" do
+        ld = PostgresLogDestination.create(
+          postgres_resource_id: pg.id,
+          name: "graylog",
+          type: "syslog",
+          url: "tcp://logs.example.com:6514",
+        )
+        visit "#{project.path}#{pg.path}/logs"
+
+        find("#ld-delete-#{ld.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL log destination deleted.")
+        expect(pg.reload.log_destinations.count).to eq(0)
+      end
+
+      it "shows success notice when log destination was already deleted" do
+        ld = PostgresLogDestination.create(
+          postgres_resource_id: pg.id,
+          name: "graylog",
+          type: "syslog",
+          url: "tcp://logs.example.com:6514",
+        )
+        visit "#{project.path}#{pg.path}/logs"
+        ld.this.update(id: PostgresLogDestination.generate_uuid)
+
+        find("#ld-delete-#{ld.ubid} .delete-btn").click
+        expect(page).to have_flash_notice("PostgreSQL log destination deleted.")
+        expect(pg.reload.log_destinations.count).to eq(1)
+      end
+    end
+
     describe "ca-certificates" do
       it "sets maintenance window to nil when empty string is passed" do
         pg.update(root_cert_1: "a", root_cert_2: "b")
