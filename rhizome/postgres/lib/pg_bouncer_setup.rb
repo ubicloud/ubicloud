@@ -108,6 +108,7 @@ client_tls_cert_file = /etc/ssl/certs/server.crt
 client_tls_key_file = /etc/ssl/certs/server.key
 
 user = postgres
+stats_users = postgres
 
 pool_mode = transaction
 
