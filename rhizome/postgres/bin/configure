@@ -71,6 +71,11 @@ local   all             ubi_monitoring                          peer
 # Use md5 authentication for all local connections to allow pgbouncer
 # passthrough to work for all non-unix users
 local   all             all                                     md5
+
+# Reject all TCP connections to ubi_admin database.
+# Only local unix socket access is allowed (used by pgbouncer for auth).
+host    ubi_admin       all             all                     reject
+
 # IPv4 local connections:
 host    all             all             127.0.0.1/32            scram-sha-256
 # IPv6 local connections:
