@@ -25,9 +25,23 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       credentials_json: "{}")
   }
 
+  let(:gcp_vpc) {
+    id = GcpVpc.generate_uuid
+    vpc = GcpVpc.create_with_id(id,
+      project_id: project.id,
+      location_id: location.id,
+      name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      firewall_policy_name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345")
+    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "wait") { it.id = vpc.id }
+    vpc
+  }
+
   let(:private_subnet) {
     location_credential
+    gcp_vpc
     ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "test-ps", location_id: location.id).subject
+    ps.update(gcp_vpc_id: gcp_vpc.id)
     ps.strand.update(label: "wait")
     ps
   }

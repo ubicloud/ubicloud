@@ -510,20 +510,16 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     "projects/#{gcp_project_id}"
   end
 
-  def gcp_network_self_link_with_id
-    @gcp_network_self_link_with_id ||= begin
-      network = credential.networks_client.get(project: gcp_project_id, network: gcp_vpc_name)
-      raise "GCP network #{gcp_vpc_name} has no numeric ID" unless network.id.positive?
-      "https://www.googleapis.com/compute/v1/projects/#{gcp_project_id}/global/networks/#{network.id}"
-    end
+  def gcp_vpc
+    @gcp_vpc ||= vm.nic.private_subnet.gcp_vpc
   end
 
-  def gcp_vpc_name
-    @gcp_vpc_name ||= Prog::Vnet::Gcp::SubnetNexus.vpc_name(vm.nic.private_subnet.project, vm.nic.private_subnet.location)
+  def gcp_network_self_link_with_id
+    @gcp_network_self_link_with_id ||= gcp_vpc.network_self_link
   end
 
   def firewall_policy_name
-    @firewall_policy_name ||= gcp_vpc_name
+    @firewall_policy_name ||= gcp_vpc.firewall_policy_name || gcp_vpc.name
   end
 
   def gcp_zone

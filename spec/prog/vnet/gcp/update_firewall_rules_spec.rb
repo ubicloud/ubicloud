@@ -35,7 +35,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   let(:subnet_tag_key_name) { "tagKeys/subnet-123" }
   let(:subnet_tag_value_name) { "tagValues/subnet-tv-1" }
 
-  let(:ps) { instance_double(PrivateSubnet, ubid: "subnetubid1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"), project:, location:) }
+  let(:gcp_vpc) { instance_double(GcpVpc, name: vpc_name, firewall_policy_name: vpc_name, network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890") }
+  let(:ps) { instance_double(PrivateSubnet, ubid: "subnetubid1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"), project:, location:, gcp_vpc:) }
   let(:nic) { instance_double(Nic, private_subnet: ps, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.5/32")) }
 
   let(:crm_done_op) { instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-1", response: {"name" => "tagKeys/created-1"}, error: nil) }
@@ -1635,16 +1636,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nx.send(:firewall_policy_name)).to eq(vpc_name)
     end
 
-    it "returns gcp_network_self_link_with_id" do
+    it "returns gcp_network_self_link_with_id from gcp_vpc" do
       result = nx.send(:gcp_network_self_link_with_id)
       expect(result).to eq("https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890")
-    end
-
-    it "raises if network has no numeric ID" do
-      bad_network = Google::Cloud::Compute::V1::Network.new(name: vpc_name)
-      allow(networks_client).to receive(:get).and_return(bad_network)
-
-      expect { nx.send(:gcp_network_self_link_with_id) }.to raise_error(/has no numeric ID/)
     end
 
     it "returns gcp_project_number from CRM" do

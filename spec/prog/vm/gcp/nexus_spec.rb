@@ -27,11 +27,26 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       credentials_json: "{}")
   }
 
+  let(:gcp_vpc) {
+    id = GcpVpc.generate_uuid
+    vpc = GcpVpc.create_with_id(id,
+      project_id: project.id,
+      location_id: location.id,
+      name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      firewall_policy_name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345")
+    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "wait") { it.id = vpc.id }
+    vpc
+  }
+
   let(:vm) {
     location_credential
-    Prog::Vm::Nexus.assemble_with_sshable(project.id,
+    gcp_vpc
+    v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
       location_id: location.id, unix_user: "test-user", boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
       name: "testvm", size: "c3d-standard-8", arch: "x64").subject
+    v.nics.first.private_subnet.update(gcp_vpc_id: gcp_vpc.id)
+    v
   }
 
   let(:compute_client) { instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client) }
@@ -43,7 +58,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     ps = nic.private_subnet
     NicGcpResource.create_with_id(
       nic.id,
-      network_name: Prog::Vnet::Gcp::SubnetNexus.vpc_name(ps.project, ps.location),
+      network_name: ps.gcp_vpc.name,
       subnet_name: "ubicloud-#{ps.ubid}",
       **overrides
     )
@@ -207,7 +222,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert) do |args|
         ni = args[:instance_resource].network_interfaces.first
         ps = nic.private_subnet
-        expect(ni.network).to include(Prog::Vnet::Gcp::SubnetNexus.vpc_name(ps.project, ps.location))
+        expect(ni.network).to include(ps.gcp_vpc.name)
         expect(ni.subnetwork).to include("ubicloud-#{ps.ubid}")
         op
       end
@@ -772,6 +787,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "returns when nic is nil" do
       allow(nx).to receive(:nic).and_return(nil)
+      expect(nfp_client).not_to receive(:get)
+      nx.send(:cleanup_vm_policy_rules)
+    end
+
+    it "returns when gcp_vpc is nil" do
+      vm.nics.first.private_subnet.update(gcp_vpc_id: nil)
       expect(nfp_client).not_to receive(:get)
       nx.send(:cleanup_vm_policy_rules)
     end

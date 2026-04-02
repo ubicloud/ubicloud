@@ -371,7 +371,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def cleanup_vm_policy_rules
     return unless nic
 
-    policy_name = Prog::Vnet::Gcp::SubnetNexus.vpc_name(nic.private_subnet.project, nic.private_subnet.location)
+    gcp_vpc = nic.private_subnet.gcp_vpc
+    return unless gcp_vpc
+    policy_name = gcp_vpc.firewall_policy_name || gcp_vpc.name
 
     begin
       policy = credential.network_firewall_policies_client.get(
