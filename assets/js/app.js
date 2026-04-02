@@ -5,6 +5,8 @@ $(function () {
   setupPlayground();
   setupMetricsCharts();
   setupPgConfigCard();
+  setupStructuredDataCard();
+  setupLogDestinationForm();
 });
 
 $(".toggle-mobile-menu").on("click", function (event) {
@@ -890,41 +892,131 @@ function flexiblePrecision(value, precision) {
   return (value < 10) ? value.toFixed(increasedPrecision) : value.toFixed(precision);
 }
 
+function addRowToConfigCard(card, key, value) {
+  const placeholder = card.find(".config-placeholder-group");
+  if (!placeholder.length) return;
+  const newRow = placeholder.clone(true);
+  newRow.data("config-id", (placeholder.data("config-id") || 0) + 1);
+  newRow.find("input").prop("disabled", false);
+  newRow.find("input").eq(0).val(key);
+  newRow.find("input").eq(1).val(value);
+  newRow.removeClass("hidden config-placeholder-group").addClass("config-group");
+  placeholder.before(newRow);
+}
+
 function setupPgConfigCard() {
   $(".delete-config-btn").on("click", function (event) {
     const configGroup = $(this).closest(".group");
     configGroup.remove();
   });
 
-  $(".add-config-btn").on("click", function (event) {
-    event.preventDefault();
-    addConfigRow(event.target);
-  });
-
-  function addConfigRow(addBtn) {
-    const createConfigGroup = $(addBtn).closest(".group");
+  $(".add-config-btn").on("click", function (e) {
+    e.preventDefault();
+    const createConfigGroup = $(e.target).closest(".group");
     const keyInput = createConfigGroup.find("input").eq(0);
     const valueInput = createConfigGroup.find("input").eq(1);
     if (!keyInput[0].reportValidity()) return;
-
-    const placeHolderGroup = $(addBtn).closest(".group").siblings(".config-placeholder-group");
-    const configId = placeHolderGroup.data("config-id");
-
-    const newConfigId = configId + 1;
-    const newConfigGroup = placeHolderGroup.clone(true);
-    newConfigGroup.data("config-id", newConfigId);
-    newConfigGroup.find("input").prop("disabled", false);
-
-    newConfigGroup.removeClass("hidden");
-    newConfigGroup.removeClass("config-placeholder-group");
-    newConfigGroup.addClass("config-group");
-
-    newConfigGroup.find("input").eq(0).prop("value", keyInput.val());
-    newConfigGroup.find("input").eq(1).prop("value", valueInput.val());
-
+    addRowToConfigCard(createConfigGroup.parent(), keyInput.val(), valueInput.val());
     keyInput.val("");
     valueInput.val("");
+  });
+}
 
-    $(addBtn).closest(".group").before(newConfigGroup);
+function setupStructuredDataCard() {
+  function addKvRow(addBtn) {
+    const newKvRow = $(addBtn).closest(".new-sd-kv-row");
+    const group = $(addBtn).closest(".sd-id-group");
+    const sdId = group.data("sd-id");
+    const keyInput = newKvRow.find(".new-sd-key");
+    const valueInput = newKvRow.find(".new-sd-value");
+    const key = keyInput.val().trim();
+    if (!key) return;
+
+    const placeholder = group.find(".sd-kv-placeholder-row");
+    const newRow = placeholder.clone(true);
+    newRow.find('input[name="structured_data_ids[]"]').val(sdId).prop("disabled", false);
+    newRow.find('input[name="structured_data_keys[]"]').val(key).prop("disabled", false);
+    newRow.find('input[name="structured_data_values[]"]').val(valueInput.val()).prop("disabled", false);
+    newRow.removeClass("sd-kv-placeholder-row hidden").addClass("sd-kv-row");
+
+    group.find(".sd-kv-rows").append(newRow);
+    keyInput.val("");
+    valueInput.val("");
   }
+
+  $(document).on("click", ".add-sd-id-btn", function (e) {
+    e.preventDefault();
+    const nameInput = $(this).siblings(".new-sd-id-name");
+    const sdId = nameInput.val().trim();
+    if (!sdId) return;
+
+    const placeholder = $(".sd-id-placeholder-group");
+    const newGroup = placeholder.clone(true);
+    newGroup.attr("data-sd-id", sdId);
+    newGroup.find(".sd-id-label").text(sdId);
+    newGroup.removeClass("sd-id-placeholder-group hidden").addClass("sd-id-group");
+
+    placeholder.before(newGroup);
+    nameInput.val("");
+  });
+
+  $(document).on("click", ".add-sd-kv-btn", function (e) {
+    e.preventDefault();
+    addKvRow(this);
+  });
+
+  $(document).on("click", ".delete-sd-id-btn", function (e) {
+    e.preventDefault();
+    $(this).closest(".sd-id-group").remove();
+  });
+
+  $(document).on("click", ".delete-sd-kv-btn", function (e) {
+    e.preventDefault();
+    $(this).closest(".sd-kv-row").remove();
+  });
+
+  $(document).on("submit", "form:has(#sd-id-groups)", function () {
+    $(".sd-id-group .add-sd-kv-btn").each(function () {
+      addKvRow(this);
+    });
+  });
+}
+
+function setupLogDestinationForm() {
+  function protocolFor(type) {
+    return type === "otlp" ? "https://" : "tcp://";
+  }
+
+  function stripProtocol(url) {
+    return url.replace(/^https?:\/\/|^tcp:\/\//, "");
+  }
+
+  $(document).on("change", "#log-destination-provider", function () {
+    const selected = $(this).find("option:selected");
+    const type = selected.data("type");
+    const url = selected.data("url") || "";
+    const headers = selected.data("headers") || [];
+
+    $("#log-destination-type").val(type);
+    $("#url-prefix").text(protocolFor(type));
+    $("#url-display").val(url ? stripProtocol(url) : "");
+    $("label[for='url-display']").text(type === "otlp" ? "OTLP Endpoint URL" : "Syslog TCP Endpoint");
+
+    if (type === "otlp") {
+      $("#log-destination-otlp-auth").removeClass("hidden");
+      $("#log-destination-syslog-auth").addClass("hidden");
+      const card = $("#log-destination-otlp-auth");
+      card.find(".config-group").remove();
+      headers.forEach(([key, value]) => addRowToConfigCard(card, key, value));
+    } else {
+      $("#log-destination-otlp-auth").addClass("hidden");
+      $("#log-destination-syslog-auth").removeClass("hidden");
+    }
+  });
+
+  $(document).on("submit", "form:has(#url-display)", function () {
+    const prefix = $("#url-prefix").text();
+    const suffix = $("#url-display").val();
+    $("#url-hidden").val(prefix + suffix);
+  });
 }

@@ -137,9 +137,9 @@ class Clover
       end
 
       show_actions = if pg.read_replica?
-        %w[overview connection charts networking config settings]
+        %w[overview connection charts networking logs config settings]
       else
-        %w[overview connection charts networking resize high-availability read-replica backup-restore config upgrade settings]
+        %w[overview connection charts networking resize high-availability read-replica backup-restore logs config upgrade settings]
       end
       r.show_object(pg, actions: show_actions, perm: "Postgres:view", template: "postgres/show")
 
@@ -295,6 +295,7 @@ class Clover
       r.on "log-destination" do
         r.post true do
           authorize("Postgres:edit", pg)
+          handle_validation_failure("postgres/show") { @page = "logs" }
 
           name, type = typecast_params.nonempty_str!(["name", "type"])
           url = typecast_params.nonempty_str!("url")
@@ -355,7 +356,12 @@ class Clover
             no_audit_log
           end
 
-          204
+          if web?
+            flash["notice"] = "PostgreSQL log destination deleted."
+            r.redirect pg, "/logs"
+          else
+            204
+          end
         end
       end
 
