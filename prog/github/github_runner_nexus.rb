@@ -164,6 +164,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def busy?
+    return unless github_runner.runner_id
     rescue_common_github_api_errors do
       client.get(runners_path(github_runner.runner_id))[:busy]
     end
