@@ -63,6 +63,13 @@ RSpec.describe Prog::Ai::InferenceRouterNexus do
       Vm.dataset.destroy
       expect {
         ie_project.destroy
+      }.to raise_error(Sequel::ForeignKeyConstraintViolation)
+
+      InferenceRouter.dataset.destroy
+      DnsZone.dataset.destroy
+      ie_project.destroy
+
+      expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, name: "test-router", replica_count: 1)
       }.to raise_error("No project configured for inference routers")
     end

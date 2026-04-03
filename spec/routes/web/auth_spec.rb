@@ -153,7 +153,8 @@ RSpec.describe Clover, "auth" do
     p = Project.create(name: "Invited-project")
     subject_id = SubjectTag.create(project_id: p.id, name: "Admin").id
     AccessControlEntry.create(project_id: p.id, subject_id:, action_id: ActionType::NAME_MAP["Project:view"])
-    p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+    inviter_id = Account.create(email: "test2@example.com", name: "").id
+    p.add_invitation(email: TEST_USER_EMAIL, policy: "Admin", inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
 
     expect(Config).to receive(:managed_service).and_return(true).at_least(:once)
     expect(Config).to receive(:cloudflare_turnstile_site_key).and_return("1")
@@ -173,7 +174,7 @@ RSpec.describe Clover, "auth" do
 
     visit verify_link
     expect(page.title).to eq("Ubicloud - Verify Account")
-    expect(Account.first.default_project.name).to eq "Default"
+    expect(Account.first(email: TEST_USER_EMAIL).default_project.name).to eq "Default"
 
     click_button "Verify Account"
     expect(page.title).to eq("Ubicloud - Projects")
