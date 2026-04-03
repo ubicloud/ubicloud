@@ -561,14 +561,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    # When we attempt to destroy the runner, we also deregister it from GitHub.
-    # We wait to receive a 'not found' response for the runner. If the runner is
-    # still running a job and, due to stale data, it gets mistakenly hopped to
-    # destroy, this prevents the underlying VM from being destroyed and the job
-    # from failing. However, in certain situations like fraudulent activity, we
-    # might need to bypass this verification and immediately remove the runner.
-    # If the busy? returns nil, it means it has already been deleted, so noop.
-    unless github_runner.skip_deregistration_set?
+    # If the runner is still running a job and mistakenly hopped to destroy due
+    # to stale data, we check with the GitHub API to verify if it's busy or not.
+    # This prevents the underlying VM from being destroyed and the job from failing.
+    # If the workflow job status is completed, we can safely destroy it,
+    # since we have the latest data and GitHub deregisters ephemeral runners
+    # when the job is completed. In certain situations, such as fraudulent activity,
+    # we may need to bypass this verification and immediately remove the runner
+    # using the semaphore.
+    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
