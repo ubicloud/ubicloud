@@ -1006,6 +1006,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "naps if runner still running a job" do
+      runner.update(workflow_job: nil)
       expect(client).to receive(:get).and_return(busy: true)
 
       expect { nx.destroy }.to nap(15)
@@ -1035,6 +1036,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "skips deregistration when workflow job status is completed" do
+      runner.update(workflow_job: {"status" => "completed"})
+      expect(client).not_to receive(:get)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "do not skip deregistration when workflow job status is not completed" do
+      runner.update(workflow_job: {"status" => "in_progress"})
+      expect(client).to receive(:get).and_return(busy: true)
+
+      expect { nx.destroy }.to nap(15)
     end
 
     it "does not collect telemetry if the vm not allocated" do
