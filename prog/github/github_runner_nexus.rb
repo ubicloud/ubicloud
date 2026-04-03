@@ -188,12 +188,21 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         resets_at: rate_limit.resets_at,
       },
     )
+    remaining_seconds = rate_limit.resets_at - Time.now
     if destroying_set?
       register_deadline(nil, 15 * 60, allow_extension: true)
+      if remaining_seconds >= 15 * 60
+        github_runner.incr_skip_deregistration
+        nap 0
+      end
     else
       register_deadline("wait", 10 * 60, allow_extension: true)
+      if remaining_seconds >= 10 * 60
+        github_runner.incr_destroy
+        nap 0
+      end
     end
-    nap [rate_limit.resets_at - Time.now, 30].max
+    nap [remaining_seconds, 30].max
   rescue Octokit::Error => e
     installation_ubid = github_runner.installation.ubid
     page_args = case e.message
