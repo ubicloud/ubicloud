@@ -53,6 +53,15 @@ RSpec.describe DnsZone do
       dns_zone.delete_record(record_name: "test1", type: "A", data: "1.2.3.4")
       expect(dns_zone.records_dataset.where(:tombstoned).count).to eq(1)
     end
+
+    it "creates only one tombstone per unique record when duplicates exist" do
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "1.2.3.4")
+      DnsRecord.create(dns_zone_id: dns_zone.id, name: "test1.", type: "A", ttl: 10, data: "1.2.3.4")
+
+      dns_zone.delete_record(record_name: "test1", type: "A", data: "1.2.3.4")
+      tombstone_records = dns_zone.records_dataset.where(name: "test1.", type: "A", data: "1.2.3.4", tombstoned: true)
+      expect(tombstone_records.count).to eq(1)
+    end
   end
 
   it "returns record_name with dot" do
