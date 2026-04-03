@@ -5,10 +5,12 @@ require_relative "../spec_helper"
 RSpec.describe DnsZone do
   subject(:dns_zone) {
     described_class.create(
-      project_id: "00000000-0000-0000-0000-000000000000",
+      project_id:,
       name: "example.com",
     )
   }
+
+  let(:project_id) { Project.create(name: "test").id }
 
   context "when inserting new record" do
     it "creates record in database" do
