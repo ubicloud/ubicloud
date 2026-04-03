@@ -27,3 +27,5 @@ end
 #  value      | integer | NOT NULL
 # Indexes:
 #  project_quota_pkey | PRIMARY KEY btree (project_id, quota_id)
+# Foreign key constraints:
+#  project_quota_project_id_fkey | (project_id) REFERENCES project(id)

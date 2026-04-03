@@ -108,4 +108,5 @@ end
 #  account_verification_keys        | account_verification_keys_id_fkey                | (id) REFERENCES accounts(id)
 #  account_webauthn_keys            | account_webauthn_keys_account_id_fkey            | (account_id) REFERENCES accounts(id)
 #  account_webauthn_user_ids        | account_webauthn_user_ids_id_fkey                | (id) REFERENCES accounts(id)
+#  project_invitation               | project_invitation_inviter_id_fkey               | (inviter_id) REFERENCES accounts(id)
 #  usage_alert                      | usage_alert_user_id_fkey                         | (user_id) REFERENCES accounts(id)
