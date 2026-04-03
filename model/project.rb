@@ -56,8 +56,10 @@ class Project < Sequel::Model
     api_keys: :destroy,
     billing_info: :destroy,
     github_installations: :destroy,
+    invitations: :destroy,
     locations: :destroy,
     object_tags: :destroy,
+    quotas: :destroy,
     ssh_public_keys: :destroy,
     subject_tags: :destroy
 
