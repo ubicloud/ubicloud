@@ -731,6 +731,21 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
     end
 
+    it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
+      nx.incr_destroying
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+        .and change { Page.count }.by(1)
+      expect(runner.skip_deregistration_set?).to be(true)
+    end
+
     it "destroys the runner if self-hosted runners are disabled" do
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
         .and change { Page.count }.by(1)
