@@ -465,7 +465,7 @@ class Clover < Roda
       if (locked_domain = locked_domain_for(email))
         error = if !omniauth_provider
           "Login via username and password"
-        elsif omniauth_provider.to_s != locked_domain.oidc_provider.ubid
+        elsif omniauth_provider != locked_domain.oidc_provider.ubid
           "Login via #{scope.omniauth_provider_name(omniauth_provider)}"
         end
 
@@ -483,7 +483,7 @@ class Clover < Roda
       remember_login if scope.typecast_params.str("remember-me") == "on"
       if omniauth_identity
         if (groups = omniauth_info["groups"]) &&
-            omniauth_provider.to_s.bytesize == 26 &&
+            omniauth_provider.bytesize == 26 &&
             (provider = OidcProvider[omniauth_provider]) &&
             (group_prefix = provider.group_prefix)
           groups = groups.to_a.map(&:to_s)
@@ -544,11 +544,11 @@ class Clover < Roda
     # :nocov:
     if Config.omniauth_github_id
       require "omniauth-github"
-      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email"
+      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email", name: "github"
     end
     if Config.omniauth_google_id
       require "omniauth-google-oauth2"
-      omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: :google
+      omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: "google"
     end
     # :nocov:
 
@@ -590,7 +590,7 @@ class Clover < Roda
         redirect "/login"
       end
 
-      if (locked_domain = locked_domain_for(email)) && omniauth_provider.to_s != locked_domain.oidc_provider.ubid
+      if (locked_domain = locked_domain_for(email)) && omniauth_provider != locked_domain.oidc_provider.ubid
         flash["error"] = "Creating an account via authentication through #{scope.omniauth_provider_name(omniauth_provider)} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
         redirect "/login"
       end
@@ -633,7 +633,7 @@ class Clover < Roda
           add_audit_log(session_value, :connect_provider_failure, {"reason" => "different email", "provider" => provider_name})
           redirect "/account/login-method"
         end
-      elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
+      elsif account && account.identities_dataset.where(provider: omniauth_provider).empty?
         provider_name = scope.omniauth_provider_name(omniauth_provider)
         add_audit_log(account_session_value, :login_failure, {"reason" => "unlinked existing account", "provider" => provider_name})
         flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
