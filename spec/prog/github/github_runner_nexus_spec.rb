@@ -712,8 +712,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
   describe "#rescue_common_github_api_errors" do
     it "naps until rate limit resets and creates a page when rate limited" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
+      refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
         .and change { Page.count }.by(1)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
       expect(Page.first).to have_attributes(
         summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
         tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
@@ -723,7 +725,10 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "naps at least 30 seconds even if rate limit resets sooner" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
+      nx.incr_destroying
+      refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
       expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
     end
 
     it "destroys the runner if self-hosted runners are disabled" do
