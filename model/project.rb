@@ -266,6 +266,7 @@ end
 #  account_default_project   | account_default_project_project_id_fkey   | (project_id) REFERENCES project(id) ON DELETE CASCADE
 #  action_tag                | action_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
+#  dns_zone                  | dns_zone_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)
 #  inference_endpoint        | inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
@@ -279,6 +280,8 @@ end
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
+#  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)
+#  project_quota             | project_quota_project_id_fkey             | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)
