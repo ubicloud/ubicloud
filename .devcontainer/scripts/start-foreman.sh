@@ -8,7 +8,8 @@
 
 set -e
 
-WORKDIR="$(git -C "$(dirname "$0")" rev-parse --show-toplevel)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WORKDIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 LOG_DIR="/var/log/foreman"
 LOG_FILE="$LOG_DIR/foreman.log"
 

@@ -16,7 +16,7 @@ PATH_ARG="${2:?Usage: invoke_ubicloud_api_curl.sh <METHOD> <path> [curl args...]
 shift 2
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 TOKEN=$(cd "$PROJECT_ROOT" && .devcontainer/scripts/get-pat-token.sh)
 API="http://api.localhost:3100"

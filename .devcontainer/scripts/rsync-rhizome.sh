@@ -20,7 +20,7 @@ IP="${2:?Usage: rsync-rhizome.sh <ssh-key> <ip> [relative-rhizome-path]}"
 REL_PATH="${3:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 SSH_OPTS="-i $KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
 if [ -n "$REL_PATH" ]; then

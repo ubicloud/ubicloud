@@ -9,6 +9,19 @@ if [ -f /tmp/.host-gitconfig ]; then
   chown vscode:vscode /home/vscode/.gitconfig
 fi
 
+# Fix git worktree paths: the .git file may reference a host path that doesn't
+# exist inside the container.  Rewrite it to the container-local /workspaces path.
+GIT_FILE="$(pwd)/.git"
+if [ -f "$GIT_FILE" ]; then
+  HOST_GITDIR=$(awk '{print $2}' "$GIT_FILE")
+  # e.g. /Users/user/code/ubicloud/.git/worktrees/name → ubicloud/.git/worktrees/name
+  REL_GITDIR=$(echo "$HOST_GITDIR" | awk -F'/.git/' '{print $1}' | xargs basename)
+  CONTAINER_GITDIR="/workspaces/${REL_GITDIR}/.git/worktrees/$(basename "$(pwd)")"
+  if [ -d "$CONTAINER_GITDIR" ]; then
+    echo "gitdir: $CONTAINER_GITDIR" > "$GIT_FILE"
+    echo "Fixed .git worktree pointer → $CONTAINER_GITDIR"
+  fi
+fi
 
 # Regenerate .env.rb and append overrides (must happen before database setup)
 echo "=== Generating .env.rb ==="
