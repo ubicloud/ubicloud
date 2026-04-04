@@ -30,6 +30,14 @@ RSpec.describe Util do
     end
   end
 
+  describe "#aws_tag_specifications" do
+    it "uses configured tag value" do
+      expect(Config).to receive(:provider_resource_tag_value).and_return("my-controlplane")
+      result = described_class.aws_tag_specifications("instance", "test-vm")
+      expect(result).to eq([{resource_type: "instance", tags: [{key: "Ubicloud", value: "my-controlplane"}, {key: "Name", value: "test-vm"}]}])
+    end
+  end
+
   describe "#parse_key" do
     it "can parse an elliptic key" do
       expect(described_class.parse_key(Clec::Cert::EC_KEY_PEM)).to be_instance_of OpenSSL::PKey::EC

@@ -102,7 +102,7 @@ module Util
   end
 
   def self.aws_tag_specifications(resource_type, name, additional_tags = {})
-    tags = [{key: "Ubicloud", value: "true"}, {key: "Name", value: name}].concat(additional_tags.map { |k, v| {key: k.to_s, value: v.to_s} })
+    tags = [{key: "Ubicloud", value: Config.provider_resource_tag_value}, {key: "Name", value: name}].concat(additional_tags.map { |k, v| {key: k.to_s, value: v.to_s} })
     [{resource_type:, tags:}].compact
   end
 
