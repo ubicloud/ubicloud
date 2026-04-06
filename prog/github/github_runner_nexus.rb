@@ -51,7 +51,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         boot_image: label_data["boot_image"],
         location_id: Location::GITHUB_RUNNERS_ID,
         storage_size_gib: label_data["storage_size_gib"],
-        storage_encrypted: true,
         arch:,
       ).first
     end
