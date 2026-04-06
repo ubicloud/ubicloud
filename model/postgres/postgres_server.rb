@@ -210,6 +210,8 @@ class PostgresServer < Sequel::Model
   end
 
   def lsn_caught_up
+    return true if primary?
+
     parent_server = if read_replica?
       resource.parent&.representative_server
     else
