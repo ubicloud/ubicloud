@@ -1,20 +1,12 @@
 # frozen_string_literal: true
 
+require_relative "base_model"
+
 module Ubicloud
   # Ubicloud::Model is the abstract base class for model classes.  There is a
   # separate model class for each primary object type in Ubicloud's API.
-  class Model
+  class Model < BaseModel
     class << self
-      # A hash of associations for the model.  This is used by instances
-      # to automatically wrap returned objects in model instances.
-      attr_reader :associations
-
-      # The path fragment for this model in the Ubicloud API.
-      attr_reader :fragment
-
-      # A regexp for valid id format for instances of this model.
-      attr_reader :id_regexp
-
       # Return a new model instance for the given values, tied to the
       # related adapter, if the model instance exists and is accessible.
       # Return nil if the model instance does not exist or is not
@@ -45,69 +37,7 @@ module Ubicloud
 
         adapter.get(path)[:items].map { new(adapter, it) }
       end
-
-      # Resolve associations.  This is called after all models have been loaded.
-      # This approach is taken to avoid the need for autoload or const_get.
-      def resolve_associations # :nodoc:
-        @associations = @association_block&.call || {}
-      end
-
-      private
-
-      # Used by models to set defaults for parameters.  Overrides the _create_params
-      # method using the given block.  The block should mutate the parameter hash.
-      def set_create_param_defaults
-        singleton_class.send(:private, define_singleton_method(:_create_params) do |params|
-          params = params.dup || {}
-          yield params
-          params
-        end)
-      end
-
-      # The parameters to use when creating an object.  Uses only the given parameters
-      # by default.
-      def _create_params(params)
-        params
-      end
-
-      # Register the assocation block that will be used for resolving associations.
-      def set_associations(&block)
-        @association_block = block
-      end
-
-      # Create methods for each of the model's columns (unless the method is already defined).
-      # These methods will fully populate the object if the related key is not already present
-      # in the model.
-      def set_columns(*columns)
-        columns.each do |column|
-          next if method_defined?(column)
-
-          define_method(column) do
-            @values.fetch(column) do
-              info
-              @values[column]
-            end
-          end
-        end
-      end
-
-      # Use the given regexp to set the valid id_regexp format for the model.
-      def set_prefix(prefix)
-        @id_regexp = %r{\A#{prefix}[a-tv-z0-9]{24}\z}
-      end
-
-      # Set the path fragment that this model uses in the Ubicloud API.
-      def set_fragment(fragment)
-        @fragment = fragment
-      end
     end
-
-    # Return the adapter used for this model instance.  Each model instance is tied to a
-    # specific adapter, and requests to the Ubicloud API are made through the adapter.
-    attr_reader :adapter
-
-    # A hash of values for the model instance.
-    attr_reader :values
 
     # Create a new model instance, which should represent an object that already exists
     # in Ubicloud. +values+ can be:
@@ -140,16 +70,6 @@ module Ubicloud
       end
     end
 
-    # Return hash of data for this model instance.
-    def to_h
-      @values
-    end
-
-    # Return the value of a specific key for the model instance.
-    def [](key)
-      @values[key]
-    end
-
     # Rename the object to the given name.
     def rename_to(name)
       merge_into_values(adapter.post(_path("/rename"), name:))
@@ -167,7 +87,7 @@ module Ubicloud
     # (such as when it was initialized with a location and name).
     def id
       unless (id = @values[:id])
-        info
+        _info
         id = @values[:id]
       end
 
@@ -203,11 +123,6 @@ module Ubicloud
       _info
     end
 
-    # Show the class name and values hash.
-    def inspect
-      "#<#{self.class.name} #{@values.inspect}>"
-    end
-
     # Check whether the current instance exists in Ubicloud.  Returns nil if the
     # object does not exist.
     def check_exists
@@ -216,57 +131,6 @@ module Ubicloud
 
     private
 
-    def _info(missing: :raise)
-      if (hash = adapter.get(_path, missing:))
-        merge_into_values(hash)
-      end
-    end
-
-    # Raise an error if the given string contains a slash.  This is used for strings
-    # used as path fragments when making requests, to raise an error before issuing
-    # an HTTP request in the case where you know the path would not be valid.
-    def check_no_slash(string, error_message)
-      raise Error, error_message if string.include?("/")
-    end
-
-    # If the given id is not already a string, call id on it to get a string.
-    # This is used in methods that can accept either a model instance or an id.
-    def to_id(id)
-      (String === id) ? id : id.id
-    end
-
-    # For each of the model's associations, convert the related entry in the values
-    # hash to an associated object.
-    def check_associations
-      values = @values
-
-      self.class.associations.each do |key, klass|
-        next unless (value = values[key])
-
-        values[key] = if value.is_a?(Array)
-          value.map do
-            convert_to_association(it, klass)
-          end
-        else
-          convert_to_association(value, klass)
-        end
-      end
-    end
-
-    # Convert the given value to an instance of the given klass.
-    def convert_to_association(value, klass)
-      case value
-      when Hash, klass.id_regexp
-        klass.new(adapter, value)
-      when String
-        # The object is given by name and not by id, assume that
-        # it must be in the same location as the receiver.
-        klass.new(adapter, "#{location}/#{value}")
-      else
-        value
-      end
-    end
-
     # Given only the object's id, find the location and name of the object
     # and merge them into the values hash.
     def load_object_info_from_id(missing: :raise)
@@ -274,14 +138,6 @@ module Ubicloud
         hash.delete("type")
         merge_into_values(hash)
       end
-    end
-
-    # Merge the given values into the values hash, and convert any entries in
-    # the values hash to associated objects.
-    def merge_into_values(values)
-      @values.merge!(values)
-      check_associations
-      self
     end
 
     # The path to use for requests for the model instance.  If +rest+ is given,
@@ -297,4 +153,4 @@ end
 Dir.glob("model/*.rb", base: __dir__) do |file|
   require_relative file
 end
-Ubicloud::Model.subclasses.each(&:resolve_associations)
+(Ubicloud::BaseModel.subclasses + Ubicloud::Model.subclasses - [Ubicloud::Model]).each(&:resolve_associations)

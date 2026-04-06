@@ -1,17 +1,16 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class GithubInstallation < Model
+  class GithubInstallation < BaseModel
+    extend BaseList
+    include BaseCheckExists
+    include BaseLazyId
+
     set_prefix "g1"
 
+    set_fragment "github"
+
     set_columns :id, :name, :key, :size
-
-    singleton_class.undef_method(:create)
-
-    # Do not support a specific location when getting a list of GithubInstallations
-    def self.list(adapter)
-      adapter.get("github")[:items].map { new(adapter, it) }
-    end
 
     # Create a new GithubInstallation instance. +values+ can be:
     #
@@ -40,10 +39,6 @@ module Ubicloud
       end
     end
 
-    undef_method :rename_to
-    undef_method :location
-    undef_method :destroy
-
     def repositories(reload: false)
       if (repositories = @values[:repositories]) && !reload
         return repositories
@@ -52,19 +47,10 @@ module Ubicloud
       @values[:repositories] = adapter.get(_path("/repository"))[:items].map { GithubRepository.new(adapter, it) }
     end
 
-    # Check whether the cache entry exists. Returns nil if it does not exist.
-    def check_exists
-      _info(missing: nil)
-    end
-
     private
 
-    def load_object_info_from_id(missing: :raise)
-      _info(missing:)
-    end
-
     def _path(rest = "")
-      "github/#{values[:id] || values[:name]}#{rest}"
+      "#{self.class.fragment}/#{values[:id] || values[:name]}#{rest}"
     end
   end
 end

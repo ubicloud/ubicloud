@@ -1,7 +1,12 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class SshPublicKey < Model
+  class SshPublicKey < BaseModel
+    extend BaseList
+    include BaseCheckExists
+    include BaseLazyId
+    include BaseDestroy
+
     set_prefix "sk"
 
     set_fragment "ssh-public-key"
@@ -11,11 +16,6 @@ module Ubicloud
     # Create a new SSH public key with the given parameters.
     def self.create(adapter, name:, public_key:)
       new(adapter, adapter.post(fragment.to_s, name:, public_key:))
-    end
-
-    # Do not support a specific location when getting a list of SSH public keys.
-    def self.list(adapter)
-      super
     end
 
     # Create a new SSHPublicKey instance. +values+ can be:
@@ -44,34 +44,6 @@ module Ubicloud
       else
         raise Error, "unsupported value initializing #{self.class}: #{values.inspect}"
       end
-    end
-
-    undef_method :location
-    undef_method :load_object_info_from_id
-
-    # The SSH public key's id, which will be a 26 character string.
-    def id
-      if (id = @values[:id])
-        id
-      else
-        info
-        @values[:id]
-      end
-    end
-
-    # The SSH public key's name.
-    def name
-      if (name = @values[:name])
-        name
-      else
-        info
-        @values[:name]
-      end
-    end
-
-    # Check whether the SSH public key exists. Returns nil if it does not exist.
-    def check_exists
-      _info(missing: nil)
     end
 
     # Update the name of the SSH public key.

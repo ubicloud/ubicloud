@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class GithubCacheEntry < Model
+  class GithubCacheEntry < BaseModel
+    include BaseCheckExists
+    include BaseDestroy
+
     set_prefix "ge"
 
     set_columns :key, :scope, :size, :created_at, :last_accessed_at
-
-    singleton_class.undef_method(:create)
-    singleton_class.undef_method(:list)
+    set_direct_columns :installation_name, :repository_name
 
     # Create a new GithubCacheEntry instance. +values+ must be a hash with
     # :id, :repository_name, and :installation_name keys.
@@ -24,35 +25,6 @@ module Ubicloud
       else
         raise Error, "unsupported value initializing #{self.class}: #{values.inspect}"
       end
-    end
-
-    undef_method :rename_to
-    undef_method :name
-    undef_method :location
-
-    # The cache entry's id, which will be a 26 character string.
-    def id
-      @values[:id]
-    end
-
-    # The installation name for the cache entry.
-    def installation_name
-      @values[:installation_name]
-    end
-
-    # The repository name for the cache entry.
-    def repository_name
-      @values[:repository_name]
-    end
-
-    # Check whether the cache entry exists. Returns nil if it does not exist.
-    def check_exists
-      _info(missing: nil)
-    end
-
-    # Remove the cache entry.
-    def destroy
-      adapter.delete(_path)
     end
 
     private
