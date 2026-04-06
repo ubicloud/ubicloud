@@ -866,6 +866,15 @@ SQL
   end
 
   label def destroy_vm_and_pg
+    # Best-effort: capture kernel logs before destroying the VM.
+    # This preserves OOM kill evidence that otelcol may not have shipped.
+    begin
+      dmesg = vm.sshable.cmd("sudo dmesg --time-format iso | tail -200", timeout: 10, log: false)
+      Clog.emit("dmesg before destroy", {dmesg_capture: {server: postgres_server.ubid, output: dmesg}})
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+      nil
+    end
+
     vm.incr_destroy
     representative_server = resource&.representative_server
     postgres_server.destroy
