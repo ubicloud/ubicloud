@@ -286,11 +286,7 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
     decr_destroy
 
     privatelink_aws_resource.privatelink_aws_vms.each do |pl_vm|
-      if pl_vm.strand
-        pl_vm.incr_destroy
-      else
-        pl_vm.destroy
-      end
+      pl_vm.incr_destroy
     end
 
     nap 5 unless privatelink_aws_resource.privatelink_aws_vms_dataset.empty?

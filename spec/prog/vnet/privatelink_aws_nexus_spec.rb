@@ -280,18 +280,6 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl_vm.strand.reload.semaphores.map(&:name)).to include("destroy")
     end
 
-    it "destroys a vm directly if it has no strand" do
-      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: create_hosted_vm(ps.project, ps, "test-vm").id)
-      ec2_client.stub_responses(:delete_vpc_endpoint_service_configurations)
-      ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations,
-        Aws::EC2::Errors::InvalidVpcEndpointServiceIdNotFound.new(nil, nil))
-      elb_client.stub_responses(:delete_listener)
-      elb_client.stub_responses(:delete_target_group)
-      elb_client.stub_responses(:delete_load_balancer)
-      expect { nx.destroy }.to hop("wait_nlb_deletion")
-      expect(PrivatelinkAwsVm[pl_vm.id]).to be_nil
-    end
-
     it "deletes endpoint service, TG, listener, NLB and hops to wait_nlb_deletion" do
       ec2_client.stub_responses(:delete_vpc_endpoint_service_configurations)
       ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations,

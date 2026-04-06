@@ -47,11 +47,7 @@ class PrivatelinkAwsResource < Sequel::Model
     pl_vm = privatelink_aws_vms_dataset[vm_id: vm.id]
     return unless pl_vm
 
-    if pl_vm.strand
-      pl_vm.incr_destroy
-    else
-      pl_vm.destroy
-    end
+    pl_vm.incr_destroy
   end
 
   def add_port(src_port, dst_port)
