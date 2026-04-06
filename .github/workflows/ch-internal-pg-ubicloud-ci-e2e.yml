@@ -1,0 +1,415 @@
+name: pg-ubicloud-ci E2E
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0,8,16 * * *'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-west-2
+  DEVCONTAINER_IMAGE: ubicloud-devcontainer:latest
+  STRESSHOUSE_IMAGE: stresshouse-ubicloud:latest
+
+jobs:
+  pg-ubicloud-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create GitHub App token
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.WORKFLOW_AUTH_APP_ID }}
+          private-key: ${{ secrets.WORKFLOW_AUTH_PRIVATE_KEY }}
+          owner: ClickHouse
+          repositories: postgres-vm-images,data-plane-configuration,data-plane-application
+
+      - name: Checkout stresshouse tests
+        uses: actions/checkout@v4
+        with:
+          repository: ClickHouse/data-plane-application
+          ref: andreyc/pg-ubicloud-e2e-test
+          token: ${{ steps.app-token.outputs.token }}
+          path: data-plane-application
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::176778311874:role/GitHubOpenIdConnect
+          role-session-name: pg-ubicloud-ci
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: Set up Depot CLI
+        uses: depot/setup-action@b0b1ea4f69e92ebf5dea3f8713a1b0c37b2126a5 # v1
+
+      - name: Build devcontainer image (Depot cached)
+        uses: depot/build-push-action@9785b135c3c76c33db102e45be96a25ab55cd507 # v1
+        with:
+          project: ${{ vars.DEPOT_PROJECT_ID }}
+          context: .
+          file: .devcontainer/Dockerfile
+          load: true
+          tags: ${{ env.DEVCONTAINER_IMAGE }}
+          build-args: WORKSPACE_FOLDER_NAME=ubicloud
+
+      - name: Build stresshouse E2E image (Depot cached)
+        uses: depot/build-push-action@9785b135c3c76c33db102e45be96a25ab55cd507 # v1
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        with:
+          project: ${{ vars.DEPOT_PROJECT_ID }}
+          context: data-plane-application
+          file: data-plane-application/stresshouse/tests/experimental/ubicloud/Dockerfile
+          load: true
+          tags: ${{ env.STRESSHOUSE_IMAGE }}
+          build-args: GOPRIVATE=go.clickhouse.com/*
+          secrets: |
+            git_token=${{ steps.app-token.outputs.token }}
+
+      - name: Start devcontainer
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          mkdir -p ~/.aws/sso
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            up -d --wait --timeout 720
+
+      - name: Run prepare-pg-ubicloud
+        id: prepare
+        run: |
+          OUTPUT=$(docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            exec -T app \
+            .devcontainer/scripts/prepare-pg-ubicloud.sh --region us-west-2 2>&1)
+          echo "$OUTPUT"
+
+          # Extract PAT token and project ubid from prepare output
+          PAT_TOKEN=$(echo "$OUTPUT" | grep "PAT token:" | grep -oP 'pat-\S+')
+          PROJECT_UBID=$(echo "$OUTPUT" | grep "Project " | grep -oP 'ubid: \K\S+' | tr -d ')')
+          if [ -z "$PAT_TOKEN" ]; then echo "FAIL: could not extract PAT token from prepare output"; exit 1; fi
+          if [ -z "$PROJECT_UBID" ]; then echo "FAIL: could not extract project UBID from prepare output"; exit 1; fi
+          echo "pat_token=$PAT_TOKEN" >> "$GITHUB_OUTPUT"
+          echo "project_ubid=$PROJECT_UBID" >> "$GITHUB_OUTPUT"
+          echo "Extracted PAT: ${PAT_TOKEN:0:20}..."
+          echo "Extracted Project UBID: $PROJECT_UBID"
+
+      - name: Test Ubicloud API
+        run: |
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            exec -T app bash -c '
+              TOKEN=$(.devcontainer/scripts/get-pat-token.sh)
+              echo "Got PAT token: ${TOKEN:0:20}..."
+
+              echo ""
+              echo "=== List projects ==="
+              curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:3100/project | jq .
+
+              echo ""
+              echo "=== List Postgres resources ==="
+              PROJECT_ID=$(curl -sf -H "Authorization: Bearer $TOKEN" http://localhost:3100/project | jq -r ".items[0].id")
+              curl -sf -H "Authorization: Bearer $TOKEN" "http://localhost:3100/project/${PROJECT_ID}/location/aws-us-west-2/postgres" | jq .
+            ' 2>&1
+
+      - name: Create logs directory
+        run: mkdir -p /tmp/ci-logs
+
+      - name: Run smoke test
+        id: smoke_test
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          APP_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' devcontainer-app-1)
+          docker run --rm \
+            --network devcontainer_ubicloud \
+            --add-host "api.localhost:${APP_IP}" \
+            --entrypoint /app/provision_smoke \
+            ${{ env.STRESSHOUSE_IMAGE }} \
+            --plugin-config '{"api_base_url":"http://api.localhost:3100","api_token":"${{ steps.prepare.outputs.pat_token }}","project_id":"${{ steps.prepare.outputs.project_ubid }}","location":"aws-us-west-2","server_size":"m8gd.large","target_size":"m8gd.xlarge","storage_size":118,"target_storage_size":237}' \
+            2>&1 | tee /tmp/ci-logs/smoke-test.log
+          grep -q "RESULT_SUCCESS" /tmp/ci-logs/smoke-test.log || { echo "FAIL: RESULT_SUCCESS not found in smoke test output"; exit 1; }
+          ! grep -qE "RESULT_ERROR|^Error:" /tmp/ci-logs/smoke-test.log || { echo "FAIL: errors found in smoke test output"; exit 1; }
+
+      - name: Retry smoke test
+        id: smoke_test_retry
+        if: failure() && steps.smoke_test.outcome == 'failure'
+        timeout-minutes: 10
+        run: |
+          set -o pipefail
+          APP_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' devcontainer-app-1)
+          docker run --rm \
+            --network devcontainer_ubicloud \
+            --add-host "api.localhost:${APP_IP}" \
+            --entrypoint /app/provision_smoke \
+            ${{ env.STRESSHOUSE_IMAGE }} \
+            --plugin-config '{"api_base_url":"http://api.localhost:3100","api_token":"${{ steps.prepare.outputs.pat_token }}","project_id":"${{ steps.prepare.outputs.project_ubid }}","location":"aws-us-west-2","server_size":"m8gd.large","target_size":"m8gd.xlarge","storage_size":118,"target_storage_size":237}' \
+            2>&1 | tee /tmp/ci-logs/smoke-test-retry.log
+          grep -q "RESULT_SUCCESS" /tmp/ci-logs/smoke-test-retry.log || { echo "FAIL: RESULT_SUCCESS not found in smoke test retry output"; exit 1; }
+          ! grep -qE "RESULT_ERROR|^Error:" /tmp/ci-logs/smoke-test-retry.log || { echo "FAIL: errors found in smoke test retry output"; exit 1; }
+
+      - name: Run stresshouse E2E test
+        id: e2e_test
+        if: success() || (steps.smoke_test_retry.outcome == 'success')
+        timeout-minutes: 20
+        run: |
+          set -o pipefail
+          # Run stresshouse container on the devcontainer's network so it can reach the API
+          APP_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' devcontainer-app-1)
+          docker run --rm \
+            --network devcontainer_ubicloud \
+            --add-host "api.localhost:${APP_IP}" \
+            ${{ env.STRESSHOUSE_IMAGE }} \
+            --plugin-config '{"api_base_url":"http://api.localhost:3100","api_token":"${{ steps.prepare.outputs.pat_token }}","project_id":"${{ steps.prepare.outputs.project_ubid }}","location":"aws-us-west-2","server_size":"m8gd.large","target_size":"m8gd.xlarge","storage_size":118,"target_storage_size":237}' \
+            2>&1 | tee /tmp/ci-logs/e2e-test.log
+          # Validate: must contain RESULT_SUCCESS and must not contain errors
+          grep -q "RESULT_SUCCESS" /tmp/ci-logs/e2e-test.log || { echo "FAIL: RESULT_SUCCESS not found in test output"; exit 1; }
+          ! grep -qE "RESULT_ERROR|^Error:" /tmp/ci-logs/e2e-test.log || { echo "FAIL: errors found in test output"; exit 1; }
+
+      - name: Retry stresshouse E2E test
+        id: e2e_test_retry
+        if: failure() && steps.e2e_test.outcome == 'failure'
+        timeout-minutes: 20
+        run: |
+          set -o pipefail
+          APP_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' devcontainer-app-1)
+          docker run --rm \
+            --network devcontainer_ubicloud \
+            --add-host "api.localhost:${APP_IP}" \
+            ${{ env.STRESSHOUSE_IMAGE }} \
+            --plugin-config '{"api_base_url":"http://api.localhost:3100","api_token":"${{ steps.prepare.outputs.pat_token }}","project_id":"${{ steps.prepare.outputs.project_ubid }}","location":"aws-us-west-2","server_size":"m8gd.large","target_size":"m8gd.xlarge","storage_size":118,"target_storage_size":237}' \
+            2>&1 | tee /tmp/ci-logs/e2e-test-retry.log
+          grep -q "RESULT_SUCCESS" /tmp/ci-logs/e2e-test-retry.log || { echo "FAIL: RESULT_SUCCESS not found in test output"; exit 1; }
+          ! grep -qE "RESULT_ERROR|^Error:" /tmp/ci-logs/e2e-test-retry.log || { echo "FAIL: errors found in test output"; exit 1; }
+
+      - name: Cleanup Postgres resources
+        if: always()
+        run: |
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            exec -T app bash -c '
+              TOKEN=$(.devcontainer/scripts/get-pat-token.sh 2>/dev/null) || exit 0
+              API="http://localhost:3100"
+              PROJECT_ID=$(curl -sf -H "Authorization: Bearer $TOKEN" "$API/project" | jq -r ".items[0].id") || exit 0
+
+              echo "=== Deleting all Postgres resources ==="
+              NAMES=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+                "$API/project/${PROJECT_ID}/location/aws-us-west-2/postgres" \
+                | jq -r ".items[]?.name // empty")
+
+              if [ -z "$NAMES" ]; then
+                echo "No Postgres resources to delete"
+                exit 0
+              fi
+
+              for name in $NAMES; do
+                echo "Deleting: $name"
+                curl -sf -X DELETE \
+                  -H "Authorization: Bearer $TOKEN" \
+                  "$API/project/${PROJECT_ID}/location/aws-us-west-2/postgres/${name}" || true
+              done
+              echo "Waiting for Ubicloud to finish teardown..."
+              for i in $(seq 1 60); do
+                REMAINING=$(curl -sf -H "Authorization: Bearer $TOKEN" \
+                  "$API/project/${PROJECT_ID}/location/aws-us-west-2/postgres" \
+                  | jq -r ".items[]?.name // empty")
+                if [ -z "$REMAINING" ]; then
+                  echo "All resources deleted"
+                  break
+                fi
+                echo "Still deleting: $REMAINING"
+                sleep 5
+              done
+            ' 2>&1 || true
+
+      - name: Cleanup stale AWS resources (2+ hours old)
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          REGION=us-west-2
+          CUTOFF=$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%S 2>/dev/null || date -u -v-2H +%Y-%m-%dT%H:%M:%S)
+          echo "Cleaning resources launched before $CUTOFF"
+
+          echo "=== Terminating stale instances ==="
+          INSTANCES=$(aws ec2 describe-instances --region $REGION \
+            --filters "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+              "Name=tag:Ubicloud,Values=true" \
+            --query "Reservations[].Instances[?LaunchTime<'${CUTOFF}'].InstanceId" \
+            --output text || true)
+          if [ -n "$(echo "$INSTANCES" | tr -d ' \t\n')" ]; then
+            echo "Terminating: $INSTANCES"
+            aws ec2 terminate-instances --instance-ids $INSTANCES --region $REGION || true
+            aws ec2 wait instance-terminated --instance-ids $INSTANCES --region $REGION || true
+          else
+            echo "No stale instances"
+          fi
+
+          echo "=== Releasing unattached EIPs ==="
+          for alloc in $(aws ec2 describe-addresses --region $REGION \
+            --query 'Addresses[?AssociationId==null].AllocationId' --output text 2>/dev/null || true); do
+            echo "Releasing unattached EIP: $alloc"
+            aws ec2 release-address --allocation-id $alloc --region $REGION 2>/dev/null || true
+          done
+
+          echo "=== Deleting orphaned ENIs ==="
+          for eni in $(aws ec2 describe-network-interfaces --region $REGION \
+            --filters "Name=status,Values=available" \
+            --query 'NetworkInterfaces[].NetworkInterfaceId' --output text 2>/dev/null); do
+            echo "Deleting ENI: $eni"
+            aws ec2 delete-network-interface --network-interface-id $eni --region $REGION 2>/dev/null || true
+          done
+
+          echo "=== Deleting empty VPCs (no running instances) ==="
+          for vpc_id in $(aws ec2 describe-vpcs --region $REGION \
+            --filters "Name=isDefault,Values=false" \
+            --query 'Vpcs[].VpcId' --output text 2>/dev/null); do
+            # Skip VPCs that still have running instances
+            if ! ACTIVE=$(aws ec2 describe-instances --region $REGION \
+              --filters "Name=vpc-id,Values=$vpc_id" "Name=instance-state-name,Values=pending,running" \
+              --query 'Reservations[].Instances[] | length(@)' --output text 2>/dev/null); then
+              echo "Skipping VPC $vpc_id (failed to check active instances)"
+              continue
+            fi
+            if ! [[ "$ACTIVE" =~ ^[0-9]+$ ]]; then
+              echo "Skipping VPC $vpc_id (unexpected instance count: $ACTIVE)"
+              continue
+            fi
+            if [ "$ACTIVE" != "0" ]; then
+              echo "Skipping VPC $vpc_id (has $ACTIVE active instances)"
+              continue
+            fi
+            echo "Deleting empty VPC: $vpc_id"
+            for igw in $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc_id" \
+              --query 'InternetGateways[].InternetGatewayId' --output text --region $REGION 2>/dev/null); do
+              aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $vpc_id --region $REGION 2>/dev/null || true
+              aws ec2 delete-internet-gateway --internet-gateway-id $igw --region $REGION 2>/dev/null || true
+            done
+            for subnet in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc_id" \
+              --query 'Subnets[].SubnetId' --output text --region $REGION 2>/dev/null); do
+              aws ec2 delete-subnet --subnet-id $subnet --region $REGION 2>/dev/null || true
+            done
+            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$vpc_id" \
+              --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text --region $REGION 2>/dev/null); do
+              aws ec2 delete-security-group --group-id $sg --region $REGION 2>/dev/null || true
+            done
+            for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc_id" \
+              --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text --region $REGION 2>/dev/null); do
+              aws ec2 delete-route-table --route-table-id $rt --region $REGION 2>/dev/null || true
+            done
+            aws ec2 delete-vpc --vpc-id $vpc_id --region $REGION 2>/dev/null || true
+          done
+          echo "=== Stale resource cleanup complete ==="
+
+      - name: Collect debug info
+        if: always()
+        run: |
+          mkdir -p /tmp/ci-logs
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            exec -T app \
+            cat /var/log/foreman/foreman.log > /tmp/ci-logs/foreman.log 2>/dev/null || true
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            logs > /tmp/ci-logs/docker-compose.log 2>&1 || true
+          docker compose \
+            -f .devcontainer/docker-compose.yml \
+            -f .devcontainer/docker-compose.ci.yml \
+            exec -T app bash -c '
+              RACK_ENV=development bundle exec ruby -r ./loader -e "
+                strands = Strand.where(Sequel.like(:prog, \"%Postgres%\")).all
+                strands.each do |s|
+                  puts \"id=#{s.id} prog=#{s.prog} label=#{s.label} exitval=#{s.exitval}\"
+                  puts \"  stack: #{s.stack}\"
+                end
+              " 2>/dev/null
+            ' > /tmp/ci-logs/strand-state.log 2>/dev/null || true
+
+      - name: Triage failure with Claude
+        if: failure()
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          npx -y @anthropic-ai/claude-code --print <<'PROMPT'
+            You are debugging a failed test in the Ubicloud CI pipeline.
+            The test source is in data-plane-application/stresshouse/tests/experimental/ubicloud/.
+            Read the test code to understand what it does before investigating.
+
+            ## Available tools
+
+            You have access to tools defined in .claude/settings.json: Read files, Edit files,
+            Bash (git, grep, cat, tail, curl, bundle exec, docker compose exec, ssh, python3,
+            .devcontainer/scripts/*.sh). Use these to investigate.
+
+            The devcontainer is running. You can exec into it:
+            ```bash
+            docker compose -f .devcontainer/docker-compose.yml -f .devcontainer/docker-compose.ci.yml exec -T app <command>
+            ```
+            This gives you access to: DB queries (bundle exec ruby -r ./loader), Ubicloud API
+            (.devcontainer/scripts/invoke_ubicloud_api_curl.sh), foreman restart, code changes.
+
+            If you need a tool that is not permitted, note it in your output under NEEDS_MORE.
+
+            ## Investigation
+
+            Read these log files to understand the failure:
+            - /tmp/ci-logs/smoke-test.log — smoke test attempt output
+            - /tmp/ci-logs/smoke-test-retry.log — smoke test retry output (if exists)
+            - /tmp/ci-logs/e2e-test.log — E2E test attempt output (if smoke passed)
+            - /tmp/ci-logs/foreman.log — Ubicloud foreman (strand runner) logs
+            - /tmp/ci-logs/strand-state.log — strand state dump from DB
+            - /tmp/ci-logs/docker-compose.log — container logs
+
+            Then dig deeper: read the relevant source code, check git history for recent changes
+            to the failing code path, and correlate errors across logs.
+
+            ## Classification
+
+            Classify the root cause into exactly one category:
+
+            1. TEST_PROBLEM — workflow misconfiguration, wrong API params, timing issue, test infra failure
+            2. INFRASTRUCTURE_PROBLEM — AWS issue (AMI not accessible, VPC limits, IAM permissions, region issue)
+            3. CODE_REGRESSION — Ubicloud code bug (strand crash, migration issue, logic error)
+
+            If the category is CODE_REGRESSION, also identify the likely culprit commit:
+            - Run `git log --oneline -20` to see recent commits
+            - Check `git log --oneline --since="1 week ago"` for recent changes
+            - Use `git log --oneline -- <file>` for files involved in the failure
+            - Report the most likely commit SHA and title
+
+            ## Output
+
+            Output your findings in this exact format:
+
+            CATEGORY: <one of TEST_PROBLEM, INFRASTRUCTURE_PROBLEM, CODE_REGRESSION>
+            ANALYSIS: <2-3 sentence explanation of the root cause>
+            EVIDENCE: <key log lines or facts that support your conclusion>
+            VERIFIED: <yes/no — did you confirm the hypothesis by retrying?>
+            CULPRIT_COMMIT: <SHA and title if CODE_REGRESSION, otherwise N/A>
+            NEEDS_MORE: <list of tools/permissions needed for deeper investigation, or N/A>
+          PROMPT
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs
+          path: /tmp/ci-logs/
+          retention-days: 7

@@ -16,6 +16,12 @@ services:
     ports:
       - "${HOST_PORT:-3100}:3100"
     # command: sleep infinity  # Default CMD from Dockerfile; override for interactive use: bash
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'foreman: main' > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 90s
     depends_on:
       db:
         condition: service_healthy

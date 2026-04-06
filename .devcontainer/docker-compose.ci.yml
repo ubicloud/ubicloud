@@ -1,0 +1,13 @@
+# CI override for docker-compose.yml.
+# Uses pre-built image (from Depot cache) and passes AWS OIDC credentials
+# and GitHub token from the runner environment into the app container.
+services:
+  app:
+    image: ${DEVCONTAINER_IMAGE:-ubicloud-devcontainer:latest}
+    environment:
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - AWS_SESSION_TOKEN
+      - AWS_REGION
+      - GH_TOKEN
+      - AWS_ASSUME_ROLE=arn:aws:iam::176778311874:role/GitHubOpenIdConnect

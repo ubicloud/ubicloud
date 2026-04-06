@@ -21,7 +21,8 @@
       "Bash(.claude/skills/**/*.sh*)",
       "Bash(.devcontainer/scripts/*.sh*)",
       "Bash(curl*)",
-      "Bash(ssh -i /tmp/pg_ssh_key_* -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null *)",
+      "Bash(docker compose*exec*)",
+      "Bash(ssh -i /tmp/pg_ssh_key_* *)",
       "Bash(aws ec2 describe-instances *)",
       "Bash(PGPASSWORD=* psql *)",
       "Bash(chmod 600 /tmp/pg_ssh_key_test)"

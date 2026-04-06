@@ -41,16 +41,25 @@ fi
 # 2. GitHub authentication
 echo ""
 echo "=== GitHub CLI authentication ==="
-gh auth status 2>/dev/null || gh auth login
+if [ -n "${GH_TOKEN:-}" ]; then
+  echo "Using GH_TOKEN — skipping interactive login"
+else
+  gh auth status 2>/dev/null || gh auth login
+fi
 
-# 3. Download AWS config
-echo ""
-echo "=== Downloading AWS config ==="
-mkdir -p ~/.aws
-sudo chown -R "$(id -u):$(id -g)" ~/.aws
-gh api /repos/ClickHouse/data-plane-configuration/contents/aws-config \
-  -H "Accept: application/vnd.github.raw" > ~/.aws/config
-echo "AWS config written to ~/.aws/config"
+# 3. Download AWS config (skip when credentials are already in environment)
+if [ -n "${AWS_ACCESS_KEY_ID:-}" ]; then
+  echo ""
+  echo "=== AWS credentials available in environment — skipping ~/.aws/config download ==="
+else
+  echo ""
+  echo "=== Downloading AWS config ==="
+  mkdir -p ~/.aws
+  sudo chown -R "$(id -u):$(id -g)" ~/.aws
+  gh api /repos/ClickHouse/data-plane-configuration/contents/aws-config \
+    -H "Accept: application/vnd.github.raw" > ~/.aws/config
+  echo "AWS config written to ~/.aws/config"
+fi
 
 # 4. Register regions (create locations + fetch and update AMIs)
 for REGION in "${REGIONS[@]}"; do
