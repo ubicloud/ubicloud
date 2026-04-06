@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class InferenceApiKey < Model
+  class InferenceApiKey < BaseModel
+    extend BaseList
+    include BaseCheckExists
+    include BaseDestroy
+
     set_prefix "ak"
 
     set_fragment "inference-api-key"
@@ -11,11 +15,6 @@ module Ubicloud
     # Create a new inference api key
     def self.create(adapter)
       new(adapter, adapter.post(fragment.to_s))
-    end
-
-    # Do not support a specific location when getting a list of inference api keys.
-    def self.list(adapter)
-      super
     end
 
     # Create a new InferenceApiKey instance. +values+ can be:
@@ -42,20 +41,6 @@ module Ubicloud
       else
         raise Error, "unsupported value initializing #{self.class}: #{values.inspect}"
       end
-    end
-
-    undef_method :location
-    undef_method :name
-    undef_method :load_object_info_from_id
-
-    # The inference api key's id, which will be a 26 character string.
-    def id
-      @values[:id]
-    end
-
-    # Check whether the inference api key exists. Returns nil if it does not exist.
-    def check_exists
-      _info(missing: nil)
     end
 
     private

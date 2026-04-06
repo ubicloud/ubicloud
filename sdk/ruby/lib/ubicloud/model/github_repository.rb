@@ -1,13 +1,14 @@
 # frozen_string_literal: true
 
 module Ubicloud
-  class GithubRepository < Model
+  class GithubRepository < BaseModel
+    include BaseCheckExists
+    include BaseLazyId
+
     set_prefix "gp"
 
     set_columns :id, :name
-
-    singleton_class.undef_method(:create)
-    singleton_class.undef_method(:list)
+    set_direct_columns :installation_name
 
     # Create a new GithubRepository instance. +values+ must be a hash with
     # :installation_name key and either :id or :name keys.
@@ -25,20 +26,6 @@ module Ubicloud
       else
         raise Error, "unsupported value initializing #{self.class}: #{values.inspect}"
       end
-    end
-
-    undef_method :rename_to
-    undef_method :location
-    undef_method :destroy
-
-    # The installation name for the repository.
-    def installation_name
-      @values[:installation_name]
-    end
-
-    # Check whether the repository exists. Returns nil if it does not exist.
-    def check_exists
-      _info(missing: nil)
     end
 
     def cache_entries(reload: false)
@@ -60,10 +47,6 @@ module Ubicloud
     end
 
     private
-
-    def load_object_info_from_id(missing: :raise)
-      _info(missing:)
-    end
 
     def _path(rest = "")
       "github/#{installation_name}/repository/#{values[:id] || values[:name]}#{rest}"
