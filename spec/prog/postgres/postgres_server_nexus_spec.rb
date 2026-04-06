@@ -1557,6 +1557,10 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#destroy_vm_and_pg" do
+    before do
+      expect(sshable).to receive(:_cmd).with("sudo dmesg --time-format iso | tail -200", hash_including(log: false)).and_return("")
+    end
+
     it "deletes resources and exits" do
       vm = postgres_server.vm
 
@@ -1582,6 +1586,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "does not crash when the resource is already deleted" do
       allow(nx).to receive(:resource).and_return(nil)
+      expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
+    end
+  end
+
+  describe "#destroy_vm_and_pg rescue" do # split out from #destroy_vm_and_pg to opt-out of before
+    it "proceeds when dmesg raises an SSH error" do
+      expect(sshable).to receive(:_cmd).with("sudo dmesg --time-format iso | tail -200", hash_including(log: false)).and_raise(Sshable::SshError.new("cmd", "", "", 1, nil))
       expect { nx.destroy_vm_and_pg }.to exit({"msg" => "postgres server is deleted"})
     end
   end
