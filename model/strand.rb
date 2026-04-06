@@ -194,7 +194,7 @@ SQL
     effective_prog = prog
     stack.each do |frame|
       if (deadline_at = frame["deadline_at"])
-        if Time.now > Time.parse(deadline_at)
+        if start_time > Time.parse(deadline_at)
           sbj = subject
           extra_data = case sbj
           when Vm
@@ -223,7 +223,7 @@ SQL
     end
 
     unless top_frame["last_label_changed_at"]
-      top_frame["last_label_changed_at"] = time_string(Time.now)
+      top_frame["last_label_changed_at"] = time_string(start_time)
       modified!(:stack)
     end
 
