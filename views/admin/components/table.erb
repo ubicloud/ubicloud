@@ -23,7 +23,7 @@
             <td>
               <% if use_admin_label && v.is_a?(String) && v.bytesize == 26 && (column_class = UBID.class_for_ubid(v)) && column_class.method_defined?(:ubid) && (obj = UBID.decode(v)) %>
                 <a href="/model/<%= column_class %>/<%= v %>" title="<%= v %>"><%= obj.admin_label %></a>
-              <% elsif v&.is_a?(Sequel::Postgres::JSONBHash) %>
+              <% elsif v&.is_a?(Sequel::Postgres::JSONBHash) || v&.is_a?(Sequel::Postgres::JSONBArray) %>
                 <pre><%== linkify_ubids(JSON.pretty_generate(v)) %></pre>
               <% elsif v.is_a?(CloverAdmin::TableLink) %>
                 <a href="<%= v.link %>"><%= v.value %></a>
