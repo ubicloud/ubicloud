@@ -334,6 +334,11 @@ RSpec.describe PostgresServer do
       allow(resource.parent.representative_server).to receive(:current_lsn).and_return("F/F")
     end
 
+    it "returns true immediately for primary" do
+      postgres_server.update(timeline_access: "push")
+      expect(postgres_server.lsn_caught_up).to be(true)
+    end
+
     it "returns true if the diff is less than 80MB" do
       expect(postgres_server).to receive(:_run_query).with("SELECT pg_last_wal_replay_lsn()").and_return("F/F")
       expect(postgres_server.lsn_caught_up).to be_truthy
