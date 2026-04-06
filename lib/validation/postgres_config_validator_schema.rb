@@ -2525,13 +2525,13 @@ module Validation
         "idle_replication_slot_timeout" => {
           description: "Sets the duration a replication slot can remain idle before it is invalidated.",
           type: :string,
-          pattern: "^[0-9]+(us|ms|s|min|h|d)?$",
+          pattern: /\A[0-9]+(us|ms|s|min|h|d)?\z/,
           default: "0",
         },
         "io_combine_limit" => {
           description: "Limit on the size of data reads and writes.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "128kB",
         },
         "io_max_combine_limit" => {
@@ -2574,7 +2574,7 @@ module Validation
         "log_rotation_size" => {
           description: "Sets the maximum size a log file can reach before being rotated. Maximum 2TB.",
           type: :string,
-          pattern: "^[0-9]+(kB|MB|GB|TB)?$",
+          pattern: /\A[0-9]+(kB|MB|GB|TB)?\z/,
           default: "10MB",
         },
         "maintenance_io_concurrency" => {
