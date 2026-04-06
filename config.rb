@@ -199,10 +199,10 @@ module Config
   override :almalinux_9_version, "9.7-20251118", string
   override :github_ubuntu_2404_version, "20260401.1.0", string
   override :github_ubuntu_2204_version, "20260401.1.0", string
-  override :github_ubuntu_2204_x64_aws_ami_version, "ami-09fa327aee19e9267", string
-  override :github_ubuntu_2404_x64_aws_ami_version, "ami-0d09ec31e790b67a3", string
-  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-0299fb49c9c9c1781", string
-  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0bad254b117d9a8cb", string
+  override :github_ubuntu_2204_x64_aws_ami_version, "ami-08855bdd06e27855c", string
+  override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
+  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
+  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
   override :postgres_ubuntu_2204_version, "20260320.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
