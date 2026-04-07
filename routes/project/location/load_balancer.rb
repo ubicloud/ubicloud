@@ -39,6 +39,10 @@ class Clover
               fail Validation::ValidationFailed.new("vm_id" => "VM is already attached to a load balancer")
             end
 
+            if lb.ipv4_enabled?
+              fail Validation::ValidationFailed.new("vm_id" => "You cannot attach a VM to a load balancer with IPv4 enabled if the VM does not have IPv4 enabled") unless vm.ip4_enabled
+            end
+
             lb.add_vm(vm)
             audit_log(lb, "attach_vm", vm)
             actioned = "attached to"
