@@ -13,7 +13,8 @@
     "watch": "npx tailwindcss -o assets/css/app.css -i assets/css/tailwind.css --watch"
   },
   "overrides": {
-    "rollup": "^2.80.0"
+    "rollup": "^2.80.0",
+    "lodash": "^4.18.0"
   },
   "engines": {
     "node": "24.12.0",
