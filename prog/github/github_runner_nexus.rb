@@ -37,208 +37,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
   end
 
-  def pick_vm
-    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set?
-
-    vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
-      "premium-#{label_data["vcpus"]}"
-    else
-      label_data["vm_size"]
-    end
-    pool = unless skip_pool
-      VmPool.where(
-        vm_size:,
-        boot_image: label_data["boot_image"],
-        location_id: Location::GITHUB_RUNNERS_ID,
-        storage_size_gib: label_data["storage_size_gib"],
-        storage_encrypted: true,
-        arch:,
-      ).first
-    end
-
-    if (picked_vm = pool&.pick_vm)
-      return picked_vm
-    end
-
-    boot_image = label_data["boot_image"]
-    location_id = Location::GITHUB_RUNNERS_ID
-    size = label_data["vm_size"]
-    preferred_azs = []
-    alternative_families = []
-    alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
-    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
-      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
-      location_id = Config.github_runner_aws_location_id
-      if x64?
-        size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
-        alternative_families << "m7i" << "m6a"
-      else
-        size = Option.aws_instance_type_name("m8g", label_data["vcpus"])
-        alternative_families << "m7g"
-      end
-      # eu-central-1a is usually give capacity errors
-      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
-    end
-
-    ps = Prog::Vnet::SubnetNexus.assemble(
-      Config.github_runner_service_project_id,
-      location_id:,
-      allow_only_ssh: true,
-      ipv4_range_size: 28,
-      preferred_azs:,
-    ).subject
-
-    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
-      Config.github_runner_service_project_id,
-      unix_user: "runneradmin",
-      sshable_unix_user: "runneradmin",
-      name: github_runner.ubid.to_s,
-      size:,
-      location_id:,
-      boot_image:,
-      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true}],
-      enable_ip4: true,
-      arch:,
-      swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
-      private_subnet_id: ps.id,
-      alternative_families:,
-    )
-
-    vm_st.subject
-  end
-
-  def update_billing_record
-    # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
-    return unless github_runner.ready_at && github_runner.workflow_job
-
-    billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
-      # If we enable free upgrades for the project, we should charge
-      # the customer for the label's VM size instead of the effective VM size.
-      label_data["vm_size"]
-    elsif vm.location.aws?
-      "standard-#{vm.vcpus}"
-    else
-      "#{vm.family}-#{vm.vcpus}"
-    end
-    billed_vm_size += "-arm" if arch == "arm64"
-    github_runner.update(billed_vm_size:)
-    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
-
-    retries = 0
-    begin
-      begin_time = Time.now.to_date.to_time
-      end_time = begin_time + 24 * 60 * 60
-      duration = Time.now - github_runner.ready_at
-      used_amount = (duration / 60).ceil
-      github_runner.log_duration("runner_completed", duration)
-      today_record = BillingRecord
-        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
-        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
-        .first
-
-      if today_record
-        today_record.amount = Sequel[:amount] + used_amount
-        today_record.save_changes(validate: false)
-      else
-        BillingRecord.create(
-          project_id: project.id,
-          resource_id: project.id,
-          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
-          billing_rate_id: rate_id,
-          span: Sequel.pg_range(begin_time...end_time),
-          amount: used_amount,
-        )
-      end
-    rescue Sequel::Postgres::ExclusionConstraintViolation
-      # The billing record has an exclusion constraint, which prevents the
-      # creation of multiple billing records for the same day. If a thread
-      # encounters this constraint, it immediately retries 4 times.
-      retries += 1
-      retry unless retries > 4
-      raise
-    end
-  end
-
-  def client
-    @client ||= installation.client(auto_paginate: true)
-  end
-
-  def busy?
-    return unless github_runner.runner_id
-    rescue_common_github_api_errors do
-      client.get(runners_path(github_runner.runner_id))[:busy]
-    end
-  rescue Octokit::NotFound
-    nil
-  end
-
-  def rescue_common_github_api_errors
-    yield
-  rescue Octokit::TooManyRequests
-    rate_limit = client.rate_limit
-    installation_ubid = github_runner.installation.ubid
-    Prog::PageNexus.assemble(
-      "GitHub API rate limit exceeded for installation #{installation_ubid}",
-      ["GithubRateLimitExceeded", installation_ubid],
-      installation_ubid,
-      severity: "warning",
-      extra_data: {
-        remaining: rate_limit.remaining,
-        limit: rate_limit.limit,
-        resets_at: rate_limit.resets_at,
-      },
-    )
-    remaining_seconds = rate_limit.resets_at - Time.now
-    if destroying_set?
-      register_deadline(nil, 15 * 60, allow_extension: true)
-      if remaining_seconds >= 15 * 60
-        github_runner.incr_skip_deregistration
-        nap 0
-      end
-    else
-      register_deadline("wait", 10 * 60, allow_extension: true)
-      if remaining_seconds >= 10 * 60
-        github_runner.incr_destroy
-        nap 0
-      end
-    end
-    nap [remaining_seconds, 30].max
-  rescue Octokit::Error => e
-    installation_ubid = github_runner.installation.ubid
-    page_args = case e.message
-    when /Repository level self-hosted runners are disabled/
-      ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
-    when /your IP address is not permitted to access this resource/
-      ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
-    when /Resource not accessible by integration/
-      repository_ubid = github_runner.repository.ubid
-      ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]]
-    end
-
-    if page_args
-      Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
-      github_runner.incr_destroy
-      nap 0
-    end
-    raise
-  end
-
-  def arch
-    label_data["arch"]
-  end
-
-  def x64?
-    arch == "x64"
-  end
-
-  def runners_path(suffix = nil)
-    "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
-  end
-
-  def support_alien?
-    label_data["vcpus"] <= 16
-  end
-
   def before_destroy
     register_deadline(nil, 15 * 60)
     update_billing_record
@@ -252,18 +50,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     hop_wait_concurrency_limit unless quota_available?
     hop_apply_custom_label_quota if github_runner.custom_label
     hop_allocate_vm
-  end
-
-  def quota_available?
-    # In existing Github quota calculations, we compare total allocated cpu count
-    # with the cpu limit and allow passing the limit once. This is because we
-    # check quota and allocate VMs in different labels hence transactions and it
-    # is difficult to enforce quotas in the environment with lots of concurrent
-    # requests. There are some remedies, but it would require some refactoring
-    # that I'm not keen to do at the moment. Although it looks weird, passing 0
-    # as requested_additional_usage keeps the existing behavior.
-    resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
-    project.quota_available?(resource_type, 0)
   end
 
   label def wait_concurrency_limit
@@ -355,26 +141,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     nap 1 unless vm.provisioned_at
     register_deadline("wait", 10 * 60)
     hop_setup_environment
-  end
-
-  def setup_info
-    vmh = vm.vm_host
-    {
-      group: "Ubicloud Managed Runner",
-      detail: {
-        "Name" => github_runner.ubid,
-        "Label" => github_runner.label,
-        "VM Family" => vm.family,
-        "Arch" => vm.arch,
-        "Image" => vm.boot_image,
-        "VM Host" => vmh&.ubid,
-        "VM Pool" => vm.pool_id ? UBID.to_ubid(vm.pool_id) : nil,
-        "Location" => vmh&.location&.name,
-        "Datacenter" => vmh&.data_center,
-        "Project" => project.ubid,
-        "Console URL" => "#{Config.base_url}#{project.path}/github",
-      }.map { "#{_1}: #{_2}" }.join("\n"),
-    }
   end
 
   label def setup_environment
@@ -512,6 +278,299 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     nap 60
   end
 
+  label def destroy
+    decr_destroy
+
+    # If the runner is still running a job and mistakenly hopped to destroy due
+    # to stale data, we check with the GitHub API to verify if it's busy or not.
+    # This prevents the underlying VM from being destroyed and the job from failing.
+    # If the workflow job status is completed, we can safely destroy it,
+    # since we have the latest data and GitHub deregisters ephemeral runners
+    # when the job is completed. In certain situations, such as fraudulent activity,
+    # we may need to bypass this verification and immediately remove the runner
+    # using the semaphore.
+    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
+      case busy?
+      when true
+        Clog.emit("The runner is still running a job", github_runner)
+        register_deadline(nil, 15 * 60, allow_extension: true)
+        register_deadline("wait_vm_destroy", 2 * 60 * 60)
+        nap 15
+      when false
+        rescue_common_github_api_errors do
+          client.delete(runners_path(github_runner.runner_id))
+        end
+        nap 5
+      end
+    end
+
+    if vm
+      vm.private_subnets.each do |subnet|
+        subnet.firewalls.map(&:destroy)
+        subnet.incr_destroy
+      end
+
+      collect_final_telemetry if vm.allocated_at
+
+      vm.incr_destroy
+    end
+
+    if github_runner.custom_label
+      new_runner_count = Sequel[:allocated_runner_count] - 1
+      updated_rows = GithubCustomLabel
+        .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
+        .where(new_runner_count >= 0)
+        .update(allocated_runner_count: new_runner_count)
+
+      if updated_rows != 1
+        Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
+      end
+    end
+    hop_wait_vm_destroy
+  end
+
+  label def wait_vm_destroy
+    register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
+    nap 10 unless vm.nil?
+
+    github_runner.destroy
+    pop "github runner deleted"
+  end
+
+  def client
+    @client ||= installation.client(auto_paginate: true)
+  end
+
+  def arch
+    label_data["arch"]
+  end
+
+  def x64?
+    arch == "x64"
+  end
+
+  def runners_path(suffix = nil)
+    "/repos/#{github_runner.repository_name}/actions/runners#{"/#{suffix}" if suffix}"
+  end
+
+  def support_alien?
+    label_data["vcpus"] <= 16
+  end
+
+  def busy?
+    return unless github_runner.runner_id
+    rescue_common_github_api_errors do
+      client.get(runners_path(github_runner.runner_id))[:busy]
+    end
+  rescue Octokit::NotFound
+    nil
+  end
+
+  def quota_available?
+    # In existing Github quota calculations, we compare total allocated cpu count
+    # with the cpu limit and allow passing the limit once. This is because we
+    # check quota and allocate VMs in different labels hence transactions and it
+    # is difficult to enforce quotas in the environment with lots of concurrent
+    # requests. There are some remedies, but it would require some refactoring
+    # that I'm not keen to do at the moment. Although it looks weird, passing 0
+    # as requested_additional_usage keeps the existing behavior.
+    resource_type = x64? ? "GithubRunnerVCpu" : "GithubRunnerVCpuArm"
+    project.quota_available?(resource_type, 0)
+  end
+
+  def setup_info
+    vmh = vm.vm_host
+    {
+      group: "Ubicloud Managed Runner",
+      detail: {
+        "Name" => github_runner.ubid,
+        "Label" => github_runner.label,
+        "VM Family" => vm.family,
+        "Arch" => vm.arch,
+        "Image" => vm.boot_image,
+        "VM Host" => vmh&.ubid,
+        "VM Pool" => vm.pool_id ? UBID.to_ubid(vm.pool_id) : nil,
+        "Location" => vmh&.location&.name,
+        "Datacenter" => vmh&.data_center,
+        "Project" => project.ubid,
+        "Console URL" => "#{Config.base_url}#{project.path}/github",
+      }.map { "#{_1}: #{_2}" }.join("\n"),
+    }
+  end
+
+  def rescue_common_github_api_errors
+    yield
+  rescue Octokit::TooManyRequests
+    rate_limit = client.rate_limit
+    installation_ubid = github_runner.installation.ubid
+    Prog::PageNexus.assemble(
+      "GitHub API rate limit exceeded for installation #{installation_ubid}",
+      ["GithubRateLimitExceeded", installation_ubid],
+      installation_ubid,
+      severity: "warning",
+      extra_data: {
+        remaining: rate_limit.remaining,
+        limit: rate_limit.limit,
+        resets_at: rate_limit.resets_at,
+      },
+    )
+    remaining_seconds = rate_limit.resets_at - Time.now
+    if destroying_set?
+      register_deadline(nil, 15 * 60, allow_extension: true)
+      if remaining_seconds >= 15 * 60
+        github_runner.incr_skip_deregistration
+        nap 0
+      end
+    else
+      register_deadline("wait", 10 * 60, allow_extension: true)
+      if remaining_seconds >= 10 * 60
+        github_runner.incr_destroy
+        nap 0
+      end
+    end
+    nap [remaining_seconds, 30].max
+  rescue Octokit::Error => e
+    installation_ubid = github_runner.installation.ubid
+    page_args = case e.message
+    when /Repository level self-hosted runners are disabled/
+      ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
+    when /your IP address is not permitted to access this resource/
+      ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
+    when /Resource not accessible by integration/
+      repository_ubid = github_runner.repository.ubid
+      ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]]
+    end
+
+    if page_args
+      Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      github_runner.incr_destroy
+      nap 0
+    end
+    raise
+  end
+
+  def pick_vm
+    skip_pool = project.get_ff_skip_runner_pool || github_runner.spill_over_set?
+
+    vm_size = if installation.premium_runner_enabled? || installation.free_runner_upgrade?
+      "premium-#{label_data["vcpus"]}"
+    else
+      label_data["vm_size"]
+    end
+    pool = unless skip_pool
+      VmPool.where(
+        vm_size:,
+        boot_image: label_data["boot_image"],
+        location_id: Location::GITHUB_RUNNERS_ID,
+        storage_size_gib: label_data["storage_size_gib"],
+        storage_encrypted: true,
+        arch:,
+      ).first
+    end
+
+    if (picked_vm = pool&.pick_vm)
+      return picked_vm
+    end
+
+    boot_image = label_data["boot_image"]
+    location_id = Location::GITHUB_RUNNERS_ID
+    size = label_data["vm_size"]
+    preferred_azs = []
+    alternative_families = []
+    alien_ratio = project.get_ff_aws_alien_runners_ratio || 0
+    if github_runner.spill_over_set? || (support_alien? && rand < alien_ratio)
+      boot_image = Config.send(:"#{boot_image.tr("-", "_")}_#{arch}_aws_ami_version")
+      location_id = Config.github_runner_aws_location_id
+      if x64?
+        size = Option.aws_instance_type_name("m7a", label_data["vcpus"])
+        alternative_families << "m7i" << "m6a"
+      else
+        size = Option.aws_instance_type_name("m8g", label_data["vcpus"])
+        alternative_families << "m7g"
+      end
+      # eu-central-1a is usually give capacity errors
+      preferred_azs << Location[location_id].azs.reject { |az| az == "a" }.sample
+    end
+
+    ps = Prog::Vnet::SubnetNexus.assemble(
+      Config.github_runner_service_project_id,
+      location_id:,
+      allow_only_ssh: true,
+      ipv4_range_size: 28,
+      preferred_azs:,
+    ).subject
+
+    vm_st = Prog::Vm::Nexus.assemble_with_sshable(
+      Config.github_runner_service_project_id,
+      unix_user: "runneradmin",
+      sshable_unix_user: "runneradmin",
+      name: github_runner.ubid.to_s,
+      size:,
+      location_id:,
+      boot_image:,
+      storage_volumes: [{size_gib: label_data["storage_size_gib"], encrypted: true}],
+      enable_ip4: true,
+      arch:,
+      swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
+      private_subnet_id: ps.id,
+      alternative_families:,
+    )
+
+    vm_st.subject
+  end
+
+  def update_billing_record
+    # If the runner is destroyed before it's ready or doesn't pick a job, don't charge for it.
+    return unless github_runner.ready_at && github_runner.workflow_job
+
+    billed_vm_size = if installation.free_runner_upgrade?(github_runner.created_at)
+      # If we enable free upgrades for the project, we should charge
+      # the customer for the label's VM size instead of the effective VM size.
+      label_data["vm_size"]
+    elsif vm.location.aws?
+      "standard-#{vm.vcpus}"
+    else
+      "#{vm.family}-#{vm.vcpus}"
+    end
+    billed_vm_size += "-arm" if arch == "arm64"
+    github_runner.update(billed_vm_size:)
+    rate_id = BillingRate.from_resource_properties("GitHubRunnerMinutes", billed_vm_size, "global")["id"]
+
+    retries = 0
+    begin
+      begin_time = Time.now.to_date.to_time
+      end_time = begin_time + 24 * 60 * 60
+      duration = Time.now - github_runner.ready_at
+      used_amount = (duration / 60).ceil
+      github_runner.log_duration("runner_completed", duration)
+      today_record = BillingRecord
+        .where(project_id: project.id, resource_id: project.id, billing_rate_id: rate_id)
+        .where { Sequel.pg_range(it.span).overlaps(Sequel.pg_range(begin_time...end_time)) }
+        .first
+
+      if today_record
+        today_record.amount = Sequel[:amount] + used_amount
+        today_record.save_changes(validate: false)
+      else
+        BillingRecord.create(
+          project_id: project.id,
+          resource_id: project.id,
+          resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
+          billing_rate_id: rate_id,
+          span: Sequel.pg_range(begin_time...end_time),
+          amount: used_amount,
+        )
+      end
+    rescue Sequel::Postgres::ExclusionConstraintViolation
+      # The billing record has an exclusion constraint, which prevents the
+      # creation of multiple billing records for the same day. If a thread
+      # encounters this constraint, it immediately retries 4 times.
+      retries += 1
+      retry unless retries > 4
+      raise
+    end
+  end
+
   def collect_final_telemetry
     vm_host = vm.vm_host
     # If the runner is not assigned any job or job is not successful, we log
@@ -571,64 +630,5 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     end
   rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
     Clog.emit("Failed to collect final telemetry", github_runner)
-  end
-
-  label def destroy
-    decr_destroy
-
-    # If the runner is still running a job and mistakenly hopped to destroy due
-    # to stale data, we check with the GitHub API to verify if it's busy or not.
-    # This prevents the underlying VM from being destroyed and the job from failing.
-    # If the workflow job status is completed, we can safely destroy it,
-    # since we have the latest data and GitHub deregisters ephemeral runners
-    # when the job is completed. In certain situations, such as fraudulent activity,
-    # we may need to bypass this verification and immediately remove the runner
-    # using the semaphore.
-    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
-      case busy?
-      when true
-        Clog.emit("The runner is still running a job", github_runner)
-        register_deadline(nil, 15 * 60, allow_extension: true)
-        register_deadline("wait_vm_destroy", 2 * 60 * 60)
-        nap 15
-      when false
-        rescue_common_github_api_errors do
-          client.delete(runners_path(github_runner.runner_id))
-        end
-        nap 5
-      end
-    end
-
-    if vm
-      vm.private_subnets.each do |subnet|
-        subnet.firewalls.map(&:destroy)
-        subnet.incr_destroy
-      end
-
-      collect_final_telemetry if vm.allocated_at
-
-      vm.incr_destroy
-    end
-
-    if github_runner.custom_label
-      new_runner_count = Sequel[:allocated_runner_count] - 1
-      updated_rows = GithubCustomLabel
-        .where(name: github_runner.actual_label, installation_id: github_runner.installation_id)
-        .where(new_runner_count >= 0)
-        .update(allocated_runner_count: new_runner_count)
-
-      if updated_rows != 1
-        Clog.emit("failed to decrement custom label allocated runner count", {failed_decrement_custom_label_allocated_runner_count: {actual_label: github_runner.actual_label, label: github_runner.label, installation_id: github_runner.installation_id, repository_name: github_runner.repository_name}})
-      end
-    end
-    hop_wait_vm_destroy
-  end
-
-  label def wait_vm_destroy
-    register_deadline(nil, 15 * 60, allow_extension: true) if vm&.prevent_destroy_set?
-    nap 10 unless vm.nil?
-
-    github_runner.destroy
-    pop "github runner deleted"
   end
 end
