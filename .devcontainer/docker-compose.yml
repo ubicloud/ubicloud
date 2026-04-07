@@ -10,9 +10,11 @@ services:
       - postgres-run:/var/run/postgresql
       - ~/.aws/sso:/home/vscode/.aws/sso
       - ~/.gitconfig:/tmp/.host-gitconfig:ro
+      - ~/.claude:/home/vscode/.claude
     environment:
       - AWS_ASSUME_ROLE=arn:aws:iam::248825820370:role/clickgres-pg-test-local-access-via-pg-dev-admin
       - PORT=3100
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     ports:
       - "${HOST_PORT:-3100}:3100"
     # command: sleep infinity  # Default CMD from Dockerfile; override for interactive use: bash

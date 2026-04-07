@@ -30,6 +30,14 @@ Claude code can be run inside devcontainer
 
 use skill /ubicloud-onebox to interact with onebox
 
+To use your Anthropic API key across all devcontainers, first create one at https://console.anthropic.com/settings/keys, then add it to your shell profile (`~/.zshrc`):
+
+```bash
+export ANTHROPIC_API_KEY="sk-ant-your-key-here"
+```
+
+The devcontainer picks it up automatically via `docker-compose.yml`. No need to log in again inside the container.
+
 ### Or use Pry
 
 ```bash

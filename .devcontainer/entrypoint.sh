@@ -23,12 +23,17 @@ if [ -f "$GIT_FILE" ]; then
   fi
 fi
 
-# Regenerate .env.rb and append overrides (must happen before database setup)
-echo "=== Generating .env.rb ==="
-rake overwrite_envrb
-if [ -f ".devcontainer/env-overrides.rb" ]; then
-  cat .devcontainer/env-overrides.rb >> .env.rb
-  echo "Appended env-overrides.rb to .env.rb"
+# Generate .env.rb only if it doesn't exist (preserves encryption keys across
+# container restarts so existing DB data remains decryptable).
+if [ ! -f ".env.rb" ]; then
+  echo "=== Generating .env.rb ==="
+  rake overwrite_envrb
+  if [ -f ".devcontainer/env-overrides.rb" ]; then
+    cat .devcontainer/env-overrides.rb >> .env.rb
+    echo "Appended env-overrides.rb to .env.rb"
+  fi
+else
+  echo "=== .env.rb already exists, preserving encryption keys ==="
 fi
 
 # Run once on first start (equivalent to postCreateCommand)

@@ -15,6 +15,7 @@ strand_labels=$(cd "$PROJECT_ROOT" && bundle exec ruby -e "
 require_relative 'loader'
 PostgresServer.all.each do |s|
   res = s.resource
+  next unless res
   role = s.primary? ? 'primary' : 'replica'
   label = s.strand&.label || 'n/a'
   puts \"#{res.name}\t#{role}\t#{label}\"
