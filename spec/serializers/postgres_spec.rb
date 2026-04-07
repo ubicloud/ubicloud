@@ -78,4 +78,10 @@ RSpec.describe Serializers::Postgres do
     expect(data).to have_key(:created_at)
     expect(data[:created_at]).to match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[Z+-]/)
   end
+
+  it "includes target_server_count" do
+    create_representative_server(primary: true)
+    data = described_class.serialize(pg)
+    expect(data[:target_server_count]).to eq(pg.target_server_count)
+  end
 end
