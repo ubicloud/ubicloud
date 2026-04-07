@@ -34,7 +34,7 @@ class PostgresUpgrade
       return
     end
 
-    r "sudo pg_ctlcluster promote #{version} main", expect: [0, 1]
+    r "sudo pg_ctlcluster promote #{version} main"
   end
 
   def disable_previous_version

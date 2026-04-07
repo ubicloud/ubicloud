@@ -55,13 +55,13 @@ RSpec.describe PostgresUpgrade do
   describe "#promote" do
     it "promotes server if in recovery mode" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
-      expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
+      expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster promote 16 main")
       postgres_upgrade.promote(16)
     end
 
     it "skips promotion if server is already promoted" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("f\n")
-      expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
+      expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster promote 16 main")
       expect(logger).to receive(:info).with("Server is already promoted (not in recovery mode)")
       postgres_upgrade.promote(16)
     end

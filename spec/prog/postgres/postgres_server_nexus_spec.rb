@@ -1333,12 +1333,11 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.taking_over }.to nap(0)
     end
 
-    it "triggers a page and retries if promote command is failed" do
+    it "retries if promote command is failed" do
       expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "17")
 
       expect(sshable).to receive(:d_check).with("promote_postgres").and_return("Failed")
       expect { nx.taking_over }.to nap(0)
-      expect(Page.where(summary: "#{postgres_server.ubid} promotion failed").count).to eq(1)
     end
 
     it "updates the metadata and hops to configure if promote command is succeeded" do
