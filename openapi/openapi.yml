@@ -3051,6 +3051,9 @@ components:
         ha_type:
           description: High availability type
           type: string
+        target_server_count:
+          description: Target number of servers (primary + standbys)
+          type: integer
         id:
           description: ID of the Postgres database
           type: string
@@ -3119,6 +3122,7 @@ components:
       required:
         - flavor
         - ha_type
+        - target_server_count
         - id
         - location
         - name

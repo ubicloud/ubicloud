@@ -14,6 +14,7 @@ class Serializers::Postgres < Serializers::Base
       target_version: pg.target_version,
       version: pg.version,
       ha_type: pg.ha_type,
+      target_server_count: pg.target_server_count,
       flavor: pg.flavor,
       ca_certificates: pg.ca_certificates,
       maintenance_window_start_at: pg.maintenance_window_start_at,
