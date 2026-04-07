@@ -119,15 +119,16 @@ PG_IDENT
 safe_write_to_file("/etc/postgresql/#{v}/main/pg_ident.conf", pg_ident_entries)
 
 # Create drop-in directory for postgresql@.service to override
-# the default systemd service file with a custom ExecStartPre to configure hugepages.
+# the default systemd service file.
 r "mkdir -p /etc/systemd/system/postgresql@.service.d"
-execstartpre_hugepages_conf = <<-HUGEPAGES_CONF
+postgresql_override_conf = <<-OVERRIDE_CONF
 [Service]
 ExecStartPre=/home/ubi/postgres/bin/configure-hugepages %i
 # Enable cgroup delegation to allow I/O throttling with child cgroups
 Delegate=yes
-HUGEPAGES_CONF
-safe_write_to_file("/etc/systemd/system/postgresql@.service.d/hugepages.conf", execstartpre_hugepages_conf)
+LimitNOFILE=65536
+OVERRIDE_CONF
+safe_write_to_file("/etc/systemd/system/postgresql@.service.d/override.conf", postgresql_override_conf)
 
 # Install systemd timer to enforce I/O throttling every 15 seconds.
 # The timer runs apply-io-throttle which reads the archival backlog locally

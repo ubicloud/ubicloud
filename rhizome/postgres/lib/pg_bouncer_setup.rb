@@ -30,6 +30,7 @@ Requires=pgbouncer@%i.socket
 [Service]
 Type=notify
 User=postgres
+LimitNOFILE=65536
 ExecStart=/usr/sbin/pgbouncer /etc/pgbouncer/pgbouncer_%i.ini
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
