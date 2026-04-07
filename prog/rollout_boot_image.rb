@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 class Prog::RolloutBootImage < Prog::Base
-  semaphore :rollback
+  semaphore :rollback, :pause
 
   def self.assemble(vm_hosts:, concurrency:, image_name:, version:)
     todo = vm_hosts.sort_by(&:created_at).map(&:id)
@@ -51,6 +51,10 @@ class Prog::RolloutBootImage < Prog::Base
   label def wait
     when_rollback_set? do
       hop_rollback
+    end
+
+    when_pause_set? do
+      nap 60 * 60
     end
 
     reaper = lambda do |child|

@@ -67,6 +67,11 @@ RSpec.describe Prog::RolloutBootImage do
   end
 
   describe "#wait" do
+    it "naps when pause semaphore is set" do
+      nx.incr_pause
+      expect { nx.wait }.to nap(60 * 60)
+    end
+
     it "hops to rollback when rollback semaphore is set" do
       nx.incr_rollback
       expect { nx.wait }.to hop("rollback")
