@@ -3,6 +3,9 @@
 source "https://rubygems.org"
 
 # Update ruby version in Dockerfile and .tool_versions when updating this
+#
+# Update BUNDLED WITH version in Gemfile.lock to match bundler version that
+# ships with this Ruby version.
 ruby "4.0.2"
 
 gem "acme-client"
