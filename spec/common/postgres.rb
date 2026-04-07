@@ -46,7 +46,7 @@ module PostgresTestHelpers
 
     ip_rand = SecureRandom.random_number(0xFFFFFF)
     AssignedVmAddress.create(dst_vm_id: vm.id, ip: "10.#{(ip_rand >> 16) & 0xFF}.#{(ip_rand >> 8) & 0xFF}.#{ip_rand & 0xFF}/32")
-    vm.update(ephemeral_net6: "fd10:9b0b:6b4b:#{SecureRandom.hex(2)}::/79")
+    vm.update(ephemeral_net6: "#{SecureRandom.hex(2)}:#{SecureRandom.hex(2)}:#{SecureRandom.hex(2)}:#{SecureRandom.hex(2)}::/79")
 
     s = PostgresServer.create(
       timeline:, resource:, vm_id: vm.id,
