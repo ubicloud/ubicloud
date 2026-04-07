@@ -203,7 +203,7 @@ module Config
   override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
-  override :postgres_ubuntu_2204_version, "20260320.1.0", string
+  override :postgres_ubuntu_2204_version, "20260407.1.0", string
   override :postgres16_ubuntu_2204_version, "20250425.1.1", string
   override :postgres17_ubuntu_2204_version, "20250425.1.1", string
   override :postgres_paradedb_ubuntu_2204_version, "20260107.1.0", string
