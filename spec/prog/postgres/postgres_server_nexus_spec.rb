@@ -241,7 +241,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
     it "mounts data disk if format disk is succeeded and hops to configure_walg_credentials" do
       expect(server).to receive(:storage_device_paths).and_return(["/dev/vdb"])
-      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/vdb -r 838848").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/vdb -r 838860").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/vdb /dat ext4 defaults 0 0")
@@ -255,7 +255,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check format_disk").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf")
       expect(sshable).to receive(:_cmd).with("sudo update-initramfs -u")
-      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/md0 -r 1677696").and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("sudo tune2fs /dev/md0 -r 1677721").and_return("Succeeded")
       expect(sshable).to receive(:_cmd).with("sudo mkdir -p /dat")
       expect(sshable).to receive(:_cmd).with("sudo common/bin/add_to_fstab /dev/md0 /dat ext4 defaults 0 0")
       expect(sshable).to receive(:_cmd).with("sudo mount /dev/md0 /dat")
