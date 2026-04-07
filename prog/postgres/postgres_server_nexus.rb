@@ -127,9 +127,9 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         storage_device_paths.first
       end
 
-      # ext4 defaults to reserving 5% of disk for root, on 1TiB this is 50GiB. Cap this to 50GiB
-      reserved_blocks_per_gb = 13107 # ~5% of 262144 (number of 4KiB blocks per GB)
-      reserve_blocks = [postgres_server.storage_size_gib * reserved_blocks_per_gb, 13107200].min
+      # ext4 defaults to reserving 5% of disk for root, cap this to 50 GiB
+      blocks_per_gib = 262144 # number of 4 KiB blocks per GiB
+      reserve_blocks = [(postgres_server.storage_size_gib * blocks_per_gib * 0.05).to_i, 50 * blocks_per_gib].min
       vm.sshable.cmd("sudo tune2fs :path -r :reserve_blocks", path: device_path, reserve_blocks:)
 
       vm.sshable.cmd("sudo mkdir -p /dat")
