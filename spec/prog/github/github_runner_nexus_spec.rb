@@ -55,240 +55,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
-  describe ".pick_vm" do
-    it "provisions a VM if the pool is not existing" do
-      vm = nx.pick_vm
-      expect(vm.pool_id).to be_nil
-      expect(vm.sshable.unix_user).to eq("runneradmin")
-      expect(vm.unix_user).to eq("runneradmin")
-      expect(vm.family).to eq("standard")
-      expect(vm.vcpus).to eq(4)
-      expect(vm.project_id).to eq(Config.github_runner_service_project_id)
-    end
-
-    it "provisions a new vm if pool is valid but there is no vm" do
-      VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
-      vm = nx.pick_vm
-      expect(vm.pool_id).to be_nil
-      expect(vm.sshable.unix_user).to eq("runneradmin")
-      expect(vm.family).to eq("standard")
-      expect(vm.vcpus).to eq(4)
-    end
-
-    it "uses the existing vm if pool can pick one" do
-      installation.update(allocator_preferences: {})
-      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
-      vm = create_vm(pool_id: pool.id, display_state: "running")
-      picked_vm = nx.pick_vm
-      expect(vm.id).to eq(picked_vm.id)
-    end
-
-    it "uses the premium vm pool if the installation prefers premium runners" do
-      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
-      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
-      expect(installation).to receive(:premium_runner_enabled?).and_return(true)
-      picked_vm = nx.pick_vm
-      expect(vm.id).to eq(picked_vm.id)
-      expect(picked_vm.family).to eq("premium")
-    end
-
-    it "uses the premium vm pool if a free premium upgrade is enabled" do
-      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
-      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
-      expect(installation).to receive(:premium_runner_enabled?).and_return(false)
-      expect(installation).to receive(:free_runner_upgrade?).and_return(true)
-      picked_vm = nx.pick_vm
-      expect(vm.id).to eq(picked_vm.id)
-      expect(picked_vm.family).to eq("premium")
-    end
-
-    it "skips pool if feature flag is enabled even when the pool has a vm" do
-      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
-      vm = create_vm(pool_id: pool.id, display_state: "running")
-      project.set_ff_skip_runner_pool(true)
-      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_call_original
-      picked_vm = nx.pick_vm
-      expect(vm.id).not_to eq(picked_vm.id)
-      expect(picked_vm.pool_id).to be_nil
-    end
-
-    it "uses alien vms by given ratio" do
-      project.set_ff_aws_alien_runners_ratio(0.5)
-      expect(nx).to receive(:rand).and_return(0.4)
-      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
-      picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("m7a")
-      expect(picked_vm.location.aws?).to be(true)
-      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
-      expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
-    end
-
-    it "does not use alien vms for large vcpu runners" do
-      runner.update(label: "ubicloud-standard-30")
-      project.set_ff_aws_alien_runners_ratio(1.0)
-      picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("standard")
-      expect(picked_vm.location.aws?).to be(false)
-    end
-
-    it "uses alien x64 vms if spilled over" do
-      runner.incr_spill_over
-      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
-      picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("m7a")
-      expect(picked_vm.location.aws?).to be(true)
-      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
-    end
-
-    it "uses alien arm64 vms if spilled over" do
-      runner.update(label: "ubicloud-arm")
-      runner.incr_spill_over
-      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
-      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
-      picked_vm = nx.pick_vm
-      expect(picked_vm.family).to eq("m8g")
-      expect(picked_vm.location.aws?).to be(true)
-      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
-    end
-  end
-
-  describe ".update_billing_record" do
-    it "not updates billing record if the runner is destroyed before it's ready" do
-      runner.update(ready_at: nil)
-      expect(nx.update_billing_record).to be_nil
-      expect(BillingRecord.count).to eq(0)
-    end
-
-    it "not updates billing record if the runner does not pick a job" do
-      runner.update(ready_at: now, workflow_job: nil)
-      expect(nx.update_billing_record).to be_nil
-      expect(BillingRecord.count).to eq(0)
-    end
-
-    it "creates new billing record when no daily record" do
-      runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-    end
-
-    it "uses separate billing rate for arm64 runners" do
-      runner.update(label: "ubicloud-arm", ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-      expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
-      expect(runner.billed_vm_size).to eq("standard-2-arm")
-    end
-
-    it "uses the premium billing rate for upgraded runners" do
-      vm.update(family: "premium")
-      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
-
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-      expect(br.billing_rate["resource_family"]).to eq("premium-2")
-      expect(runner.billed_vm_size).to eq("premium-2")
-    end
-
-    it "uses the original billing rate for runners who were upgraded for free based on runner creation time" do
-      vm.update(family: "premium")
-      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
-
-      expect(installation).to receive(:free_runner_upgrade_expires_at).and_return(now - 50)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-      expect(br.billing_rate["resource_family"]).to eq("standard-2")
-      expect(runner.billed_vm_size).to eq("standard-2")
-    end
-
-    it "uses standard billing rate for alien runners" do
-      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
-      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      vm.update(location_id: location.id, family: "m7a")
-      expect(vm.location.aws?).to be(true)
-      expect(BillingRecord).to receive(:create).and_call_original
-      nx.update_billing_record
-
-      br = BillingRecord[resource_id: project.id]
-      expect(br.amount).to eq(5)
-      expect(br.duration(now, now)).to eq(1)
-      expect(br.billing_rate["resource_family"]).to eq("standard-2")
-      expect(runner.billed_vm_size).to eq("standard-2")
-    end
-
-    it "updates the amount of existing billing record" do
-      runner.update(ready_at: now - 5 * 60)
-
-      expect(BillingRecord).to receive(:create).and_call_original
-      # Create a record
-      nx.update_billing_record
-
-      expect { nx.update_billing_record }
-        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
-    end
-
-    it "create a new record for a new day" do
-      today = Time.now
-      tomorrow = today + 24 * 60 * 60
-      expect(Time).to receive(:now).and_return(today)
-      expect(runner).to receive(:ready_at).and_return(today - 5 * 60).twice
-      expect(BillingRecord).to receive(:create).and_call_original
-      # Create today record
-      nx.update_billing_record
-
-      expect(Time).to receive(:now).and_return(tomorrow).at_least(:once)
-      expect(runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
-      expect(BillingRecord).to receive(:create).and_call_original
-      # Create tomorrow record
-      expect { nx.update_billing_record }
-        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
-
-      expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
-    end
-
-    it "tries 3 times and creates single billing record" do
-      runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
-      expect(BillingRecord).to receive(:create).and_call_original
-
-      expect {
-        3.times { nx.update_billing_record }
-      }.to change { BillingRecord.where(resource_id: project.id).count }.from(0).to(1)
-    end
-
-    it "tries 4 times and fails" do
-      runner.update(ready_at: now - 5 * 60)
-      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
-
-      expect {
-        4.times { nx.update_billing_record }
-      }.to raise_error(Sequel::Postgres::ExclusionConstraintViolation)
-    end
-  end
-
   describe "#before_destroy" do
     it "finalizes billing records and register deadline" do
       expect(nx).to receive(:register_deadline)
@@ -538,22 +304,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
-  describe ".setup_info" do
-    it "returns setup info with vm pool ubid" do
-      vm_host = create_vm_host(total_cores: 4, used_cores: 4, data_center: "FSN1-DC8")
-      pool = VmPool.create(size: 1, vm_size: "standard-2", location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
-      vm.update(pool_id: pool.id, vm_host_id: vm_host.id)
-
-      expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: #{vm_host.ubid}\nVM Pool: #{pool.ubid}\nLocation: hetzner-fsn1\nDatacenter: FSN1-DC8\nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
-    end
-
-    it "returns setup info without vm host" do
-      vm.update(vm_host_id: nil)
-
-      expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: \nVM Pool: \nLocation: \nDatacenter: \nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
-    end
-  end
-
   describe "#setup_environment" do
     before do
       vm.update(vm_host_id: create_vm_host(data_center: "FSN1-DC8").id)
@@ -709,68 +459,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
   end
 
-  describe "#rescue_common_github_api_errors" do
-    it "naps until rate limit resets and creates a page when rate limited" do
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
-      refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
-        .and change { Page.count }.by(1)
-      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
-      expect(Page.first).to have_attributes(
-        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
-        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
-        severity: "warning",
-      )
-    end
-
-    it "naps at least 30 seconds even if rate limit resets sooner" do
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
-      nx.incr_destroying
-      refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
-      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
-    end
-
-    it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
-        .and change { Page.count }.by(1)
-      expect(runner.destroy_set?).to be(true)
-    end
-
-    it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
-      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
-      nx.incr_destroying
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
-        .and change { Page.count }.by(1)
-      expect(runner.skip_deregistration_set?).to be(true)
-    end
-
-    it "destroys the runner if self-hosted runners are disabled" do
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
-        .and change { Page.count }.by(1)
-      expect(runner.destroy_set?).to be(true)
-    end
-
-    it "destroys the runner if IP allowlist is enabled" do
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
-        .and change { Page.count }.by(1)
-      expect(runner.destroy_set?).to be(true)
-    end
-
-    it "destroys the runner if resource not accessible by integration" do
-      repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
-      runner.update(repository_id: repo.id)
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
-        .and change { Page.count }.by(1)
-      expect(runner.destroy_set?).to be(true)
-    end
-
-    it "re-raises unexpected Octokit errors" do
-      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Unexpected error"}) } }.to raise_error Octokit::Error
-    end
-  end
-
   describe "#wait" do
     it "does not destroy runner if it does not pick a job in five minutes, and busy" do
       runner.update(ready_at: now - 6 * 60, workflow_job: nil)
@@ -870,6 +558,443 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Clog).to receive(:emit).with("Spot instance interrupted", instance_of(Array)).and_call_original
       expect { nx.wait }.to nap
       expect(runner.destroy_set?).to be(true)
+    end
+  end
+
+  describe "#destroy" do
+    it "naps if runner not deregistered yet" do
+      expect(client).to receive(:get).and_return(busy: false)
+      expect(client).to receive(:delete)
+
+      expect { nx.destroy }.to nap(5)
+    end
+
+    it "naps if runner still running a job" do
+      runner.update(workflow_job: nil)
+      expect(client).to receive(:get).and_return(busy: true)
+
+      expect { nx.destroy }.to nap(15)
+    end
+
+    it "destroys resources and hops if runner deregistered" do
+      vm.update(allocated_at: Time.now)
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+      expect(nx).to receive(:collect_final_telemetry)
+      fw = instance_double(Firewall)
+      ps = instance_double(PrivateSubnet, firewalls: [fw])
+      expect(fw).to receive(:destroy)
+      expect(ps).to receive(:incr_destroy)
+      expect(vm).to receive(:private_subnets).and_return([ps])
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "skip deregistration and destroy vm immediately" do
+      vm.update(allocated_at: Time.now)
+      expect(nx).to receive(:decr_destroy)
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(nx).to receive(:collect_final_telemetry)
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "skips deregistration when workflow job status is completed" do
+      runner.update(workflow_job: {"status" => "completed"})
+      expect(client).not_to receive(:get)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "do not skip deregistration when workflow job status is not completed" do
+      runner.update(workflow_job: {"status" => "in_progress"})
+      expect(client).to receive(:get).and_return(busy: true)
+
+      expect { nx.destroy }.to nap(15)
+    end
+
+    it "does not collect telemetry if the vm not allocated" do
+      vm.update(vm_host_id: nil)
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(nx).not_to receive(:collect_final_telemetry)
+      expect(vm).to receive(:incr_destroy)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "does not destroy vm if it's already destroyed" do
+      runner.update(vm_id: nil)
+      expect(nx).to receive(:vm).and_return(nil).at_least(:once)
+      expect(nx).to receive(:decr_destroy)
+      expect(client).to receive(:get).and_raise(Octokit::NotFound)
+      expect(client).not_to receive(:delete)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "updates custom label allocated runner count" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 5)
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
+      expect(runner).to receive(:installation_id).and_return(installation.id).twice
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      custom_label.reload
+      expect(custom_label.allocated_runner_count).to eq(4)
+    end
+
+    it "does not decrement custom label allocated runner count when already zero" do
+      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
+      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
+      expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
+      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
+      expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count", instance_of(Hash)).and_call_original
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+      custom_label.reload
+      expect(custom_label.allocated_runner_count).to eq(0)
+    end
+  end
+
+  describe "#wait_vm_destroy" do
+    it "naps if vm not destroyed yet" do
+      expect { nx.wait_vm_destroy }.to nap(10)
+    end
+
+    it "extends deadline if vm prevents destroy" do
+      expect(runner.vm).to receive(:prevent_destroy_set?).and_return(true)
+      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
+      expect { nx.wait_vm_destroy }.to nap(10)
+    end
+
+    it "pops if vm destroyed" do
+      expect(nx).to receive(:vm).and_return(nil).twice
+      expect(runner).to receive(:destroy)
+
+      expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+    end
+  end
+
+  describe ".busy?" do
+    it "returns nil if runner_id is not set" do
+      runner.runner_id = nil
+      expect(nx.busy?).to be_nil
+    end
+  end
+
+  describe ".setup_info" do
+    it "returns setup info with vm pool ubid" do
+      vm_host = create_vm_host(total_cores: 4, used_cores: 4, data_center: "FSN1-DC8")
+      pool = VmPool.create(size: 1, vm_size: "standard-2", location_id: Location::GITHUB_RUNNERS_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86)
+      vm.update(pool_id: pool.id, vm_host_id: vm_host.id)
+
+      expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: #{vm_host.ubid}\nVM Pool: #{pool.ubid}\nLocation: hetzner-fsn1\nDatacenter: FSN1-DC8\nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
+    end
+
+    it "returns setup info without vm host" do
+      vm.update(vm_host_id: nil)
+
+      expect(nx.setup_info[:detail]).to eq("Name: #{runner.ubid}\nLabel: ubicloud-standard-4\nVM Family: standard\nArch: x64\nImage: github-ubuntu-2204\nVM Host: \nVM Pool: \nLocation: \nDatacenter: \nProject: #{project.ubid}\nConsole URL: http://localhost:9292/project/#{project.ubid}/github")
+    end
+  end
+
+  describe ".rescue_common_github_api_errors" do
+    it "naps until rate limit resets and creates a page when rate limited" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
+      refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
+        .and change { Page.count }.by(1)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
+      expect(Page.first).to have_attributes(
+        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
+        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
+        severity: "warning",
+      )
+    end
+
+    it "naps at least 30 seconds even if rate limit resets sooner" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
+      nx.incr_destroying
+      refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
+    end
+
+    it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
+      nx.incr_destroying
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+        .and change { Page.count }.by(1)
+      expect(runner.skip_deregistration_set?).to be(true)
+    end
+
+    it "destroys the runner if self-hosted runners are disabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "destroys the runner if IP allowlist is enabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "destroys the runner if resource not accessible by integration" do
+      repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
+      runner.update(repository_id: repo.id)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "re-raises unexpected Octokit errors" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Unexpected error"}) } }.to raise_error Octokit::Error
+    end
+  end
+
+  describe ".pick_vm" do
+    it "provisions a VM if the pool is not existing" do
+      vm = nx.pick_vm
+      expect(vm.pool_id).to be_nil
+      expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.unix_user).to eq("runneradmin")
+      expect(vm.family).to eq("standard")
+      expect(vm.vcpus).to eq(4)
+      expect(vm.project_id).to eq(Config.github_runner_service_project_id)
+    end
+
+    it "provisions a new vm if pool is valid but there is no vm" do
+      VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2204", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = nx.pick_vm
+      expect(vm.pool_id).to be_nil
+      expect(vm.sshable.unix_user).to eq("runneradmin")
+      expect(vm.family).to eq("standard")
+      expect(vm.vcpus).to eq(4)
+    end
+
+    it "uses the existing vm if pool can pick one" do
+      installation.update(allocator_preferences: {})
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running")
+      picked_vm = nx.pick_vm
+      expect(vm.id).to eq(picked_vm.id)
+    end
+
+    it "uses the premium vm pool if the installation prefers premium runners" do
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
+      expect(installation).to receive(:premium_runner_enabled?).and_return(true)
+      picked_vm = nx.pick_vm
+      expect(vm.id).to eq(picked_vm.id)
+      expect(picked_vm.family).to eq("premium")
+    end
+
+    it "uses the premium vm pool if a free premium upgrade is enabled" do
+      pool = VmPool.create(size: 2, vm_size: "premium-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running", family: "premium")
+      expect(installation).to receive(:premium_runner_enabled?).and_return(false)
+      expect(installation).to receive(:free_runner_upgrade?).and_return(true)
+      picked_vm = nx.pick_vm
+      expect(vm.id).to eq(picked_vm.id)
+      expect(picked_vm.family).to eq("premium")
+    end
+
+    it "skips pool if feature flag is enabled even when the pool has a vm" do
+      pool = VmPool.create(size: 2, vm_size: "standard-4", boot_image: "github-ubuntu-2404", location_id: Location::GITHUB_RUNNERS_ID, storage_size_gib: 150, arch: "x64")
+      vm = create_vm(pool_id: pool.id, display_state: "running")
+      project.set_ff_skip_runner_pool(true)
+      expect(Prog::Vm::Nexus).to receive(:assemble_with_sshable).and_call_original
+      picked_vm = nx.pick_vm
+      expect(vm.id).not_to eq(picked_vm.id)
+      expect(picked_vm.pool_id).to be_nil
+    end
+
+    it "uses alien vms by given ratio" do
+      project.set_ff_aws_alien_runners_ratio(0.5)
+      expect(nx).to receive(:rand).and_return(0.4)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
+      expect(picked_vm.strand.stack.first["alternative_families"]).to eq(["m7i", "m6a"])
+    end
+
+    it "does not use alien vms for large vcpu runners" do
+      runner.update(label: "ubicloud-standard-30")
+      project.set_ff_aws_alien_runners_ratio(1.0)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("standard")
+      expect(picked_vm.location.aws?).to be(false)
+    end
+
+    it "uses alien x64 vms if spilled over" do
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m7a")
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_x64_aws_ami_version)
+    end
+
+    it "uses alien arm64 vms if spilled over" do
+      runner.update(label: "ubicloud-arm")
+      runner.incr_spill_over
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
+      picked_vm = nx.pick_vm
+      expect(picked_vm.family).to eq("m8g")
+      expect(picked_vm.location.aws?).to be(true)
+      expect(picked_vm.boot_image).to eq(Config.github_ubuntu_2404_arm64_aws_ami_version)
+    end
+  end
+
+  describe ".update_billing_record" do
+    it "not updates billing record if the runner is destroyed before it's ready" do
+      runner.update(ready_at: nil)
+      expect(nx.update_billing_record).to be_nil
+      expect(BillingRecord.count).to eq(0)
+    end
+
+    it "not updates billing record if the runner does not pick a job" do
+      runner.update(ready_at: now, workflow_job: nil)
+      expect(nx.update_billing_record).to be_nil
+      expect(BillingRecord.count).to eq(0)
+    end
+
+    it "creates new billing record when no daily record" do
+      runner.update(ready_at: now - 5 * 60)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+    end
+
+    it "uses separate billing rate for arm64 runners" do
+      runner.update(label: "ubicloud-arm", ready_at: now - 5 * 60)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2-arm")
+      expect(runner.billed_vm_size).to eq("standard-2-arm")
+    end
+
+    it "uses the premium billing rate for upgraded runners" do
+      vm.update(family: "premium")
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("premium-2")
+      expect(runner.billed_vm_size).to eq("premium-2")
+    end
+
+    it "uses the original billing rate for runners who were upgraded for free based on runner creation time" do
+      vm.update(family: "premium")
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60, created_at: now - 100)
+
+      expect(installation).to receive(:free_runner_upgrade_expires_at).and_return(now - 50)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "uses standard billing rate for alien runners" do
+      runner.update(label: "ubicloud-standard-2", ready_at: now - 5 * 60)
+      location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
+      vm.update(location_id: location.id, family: "m7a")
+      expect(vm.location.aws?).to be(true)
+      expect(BillingRecord).to receive(:create).and_call_original
+      nx.update_billing_record
+
+      br = BillingRecord[resource_id: project.id]
+      expect(br.amount).to eq(5)
+      expect(br.duration(now, now)).to eq(1)
+      expect(br.billing_rate["resource_family"]).to eq("standard-2")
+      expect(runner.billed_vm_size).to eq("standard-2")
+    end
+
+    it "updates the amount of existing billing record" do
+      runner.update(ready_at: now - 5 * 60)
+
+      expect(BillingRecord).to receive(:create).and_call_original
+      # Create a record
+      nx.update_billing_record
+
+      expect { nx.update_billing_record }
+        .to change { BillingRecord[resource_id: project.id].amount }.from(5).to(10)
+    end
+
+    it "create a new record for a new day" do
+      today = Time.now
+      tomorrow = today + 24 * 60 * 60
+      expect(Time).to receive(:now).and_return(today)
+      expect(runner).to receive(:ready_at).and_return(today - 5 * 60).twice
+      expect(BillingRecord).to receive(:create).and_call_original
+      # Create today record
+      nx.update_billing_record
+
+      expect(Time).to receive(:now).and_return(tomorrow).at_least(:once)
+      expect(runner).to receive(:ready_at).and_return(tomorrow - 5 * 60).at_least(:once)
+      expect(BillingRecord).to receive(:create).and_call_original
+      # Create tomorrow record
+      expect { nx.update_billing_record }
+        .to change { BillingRecord.where(resource_id: project.id).count }.from(1).to(2)
+
+      expect(BillingRecord.where(resource_id: project.id).map(&:amount)).to eq([5, 5])
+    end
+
+    it "tries 3 times and creates single billing record" do
+      runner.update(ready_at: now - 5 * 60)
+      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).exactly(3)
+      expect(BillingRecord).to receive(:create).and_call_original
+
+      expect {
+        3.times { nx.update_billing_record }
+      }.to change { BillingRecord.where(resource_id: project.id).count }.from(0).to(1)
+    end
+
+    it "tries 4 times and fails" do
+      runner.update(ready_at: now - 5 * 60)
+      expect(BillingRecord).to receive(:create).and_raise(Sequel::Postgres::ExclusionConstraintViolation).at_least(:once)
+
+      expect {
+        4.times { nx.update_billing_record }
+      }.to raise_error(Sequel::Postgres::ExclusionConstraintViolation)
     end
   end
 
@@ -1014,131 +1139,6 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(Clog).to receive(:emit).with("Failed to collect final telemetry", instance_of(GithubRunner)).and_call_original
 
       nx.collect_final_telemetry
-    end
-  end
-
-  describe "#destroy" do
-    it "naps if runner not deregistered yet" do
-      expect(client).to receive(:get).and_return(busy: false)
-      expect(client).to receive(:delete)
-
-      expect { nx.destroy }.to nap(5)
-    end
-
-    it "naps if runner still running a job" do
-      runner.update(workflow_job: nil)
-      expect(client).to receive(:get).and_return(busy: true)
-
-      expect { nx.destroy }.to nap(15)
-    end
-
-    it "destroys resources and hops if runner deregistered" do
-      vm.update(allocated_at: Time.now)
-      expect(nx).to receive(:decr_destroy)
-      expect(client).to receive(:get).and_raise(Octokit::NotFound)
-      expect(client).not_to receive(:delete)
-      expect(nx).to receive(:collect_final_telemetry)
-      fw = instance_double(Firewall)
-      ps = instance_double(PrivateSubnet, firewalls: [fw])
-      expect(fw).to receive(:destroy)
-      expect(ps).to receive(:incr_destroy)
-      expect(vm).to receive(:private_subnets).and_return([ps])
-      expect(vm).to receive(:incr_destroy)
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-    end
-
-    it "skip deregistration and destroy vm immediately" do
-      vm.update(allocated_at: Time.now)
-      expect(nx).to receive(:decr_destroy)
-      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
-      expect(nx).to receive(:collect_final_telemetry)
-      expect(vm).to receive(:incr_destroy)
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-    end
-
-    it "skips deregistration when workflow job status is completed" do
-      runner.update(workflow_job: {"status" => "completed"})
-      expect(client).not_to receive(:get)
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-    end
-
-    it "do not skip deregistration when workflow job status is not completed" do
-      runner.update(workflow_job: {"status" => "in_progress"})
-      expect(client).to receive(:get).and_return(busy: true)
-
-      expect { nx.destroy }.to nap(15)
-    end
-
-    it "does not collect telemetry if the vm not allocated" do
-      vm.update(vm_host_id: nil)
-      expect(nx).to receive(:decr_destroy)
-      expect(client).to receive(:get).and_raise(Octokit::NotFound)
-      expect(nx).not_to receive(:collect_final_telemetry)
-      expect(vm).to receive(:incr_destroy)
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-    end
-
-    it "does not destroy vm if it's already destroyed" do
-      runner.update(vm_id: nil)
-      expect(nx).to receive(:vm).and_return(nil).at_least(:once)
-      expect(nx).to receive(:decr_destroy)
-      expect(client).to receive(:get).and_raise(Octokit::NotFound)
-      expect(client).not_to receive(:delete)
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-    end
-
-    it "updates custom label allocated runner count" do
-      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 5)
-      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1").twice
-      expect(runner).to receive(:installation_id).and_return(installation.id).twice
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-      custom_label.reload
-      expect(custom_label.allocated_runner_count).to eq(4)
-    end
-
-    it "does not decrement custom label allocated runner count when already zero" do
-      custom_label = GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
-      expect(runner).to receive(:skip_deregistration_set?).and_return(true)
-      expect(runner).to receive(:actual_label).and_return("custom-label-1").exactly(3).times
-      expect(runner).to receive(:installation_id).and_return(installation.id).exactly(3).times
-      expect(Clog).to receive(:emit).with("failed to decrement custom label allocated runner count", instance_of(Hash)).and_call_original
-
-      expect { nx.destroy }.to hop("wait_vm_destroy")
-      custom_label.reload
-      expect(custom_label.allocated_runner_count).to eq(0)
-    end
-  end
-
-  describe "#wait_vm_destroy" do
-    it "naps if vm not destroyed yet" do
-      expect { nx.wait_vm_destroy }.to nap(10)
-    end
-
-    it "extends deadline if vm prevents destroy" do
-      expect(runner.vm).to receive(:prevent_destroy_set?).and_return(true)
-      expect(nx).to receive(:register_deadline).with(nil, 15 * 60, allow_extension: true)
-      expect { nx.wait_vm_destroy }.to nap(10)
-    end
-
-    it "pops if vm destroyed" do
-      expect(nx).to receive(:vm).and_return(nil).twice
-      expect(runner).to receive(:destroy)
-
-      expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
-    end
-  end
-
-  describe ".busy?" do
-    it "returns nil if runner_id is not set" do
-      runner.runner_id = nil
-      expect(nx.busy?).to be_nil
     end
   end
 end
