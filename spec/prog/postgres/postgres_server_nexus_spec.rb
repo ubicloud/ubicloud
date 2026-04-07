@@ -1458,6 +1458,14 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
   end
 
   describe "#taking_over" do
+    let(:standby) { @standby }
+    let(:standby_nx) { @standby_nx }
+
+    before do
+      @standby_nx = create_standby_nexus
+      @standby = @standby_nx.postgres_server
+    end
+
     it "triggers promote if promote command is not sent yet" do
       expect(sshable).to receive(:d_run).with("promote_postgres", "sudo", "postgres/bin/promote", "17")
 
@@ -1473,64 +1481,21 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Page.where(summary: "#{postgres_server.ubid} promotion failed").count).to eq(1)
     end
 
-    it "updates the metadata and hops to configure if promote command is succeeded" do
-      postgres_server
-      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
-      standby_nx = described_class.new(standby.strand)
+    it "hops to wait_promotion_completion if promote command is succeeded" do
       standby_sshable = standby_nx.postgres_server.vm.sshable
-
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-
-      expect { standby_nx.taking_over }.to hop("configure")
-
-      postgres_server.reload
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
-
-      standby.reload
-      expect(standby.timeline_access).to eq("push")
-      expect(standby.is_representative).to be true
-      expect(standby.synchronization_status).to eq("ready")
-
-      expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
-
-      [postgres_server, standby].each do |server|
-        expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
-      end
+      expect { standby_nx.taking_over }.to hop("wait_promotion_completion")
     end
 
-    it "resolves existing page, updates the metadata and hops to configure if promote command is succeeded" do
-      postgres_server
-      standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
-      standby_nx = described_class.new(standby.strand)
+    it "resolves existing page and hops to wait_promotion_completion if promote command is succeeded" do
       standby_sshable = standby_nx.postgres_server.vm.sshable
-
       page = Prog::PageNexus.assemble(
         "#{standby.ubid} promotion failed",
         ["PGPromotionFailed", standby.id],
         standby.ubid
       ).subject
       expect(standby_sshable).to receive(:d_check).with("promote_postgres").and_return("Succeeded")
-
-      expect { standby_nx.taking_over }.to hop("configure")
-
-      postgres_server.reload
-      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
-
-      standby.reload
-      expect(standby.timeline_access).to eq("push")
-      expect(standby.is_representative).to be true
-      expect(standby.synchronization_status).to eq("ready")
-
-      expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
-
-      [postgres_server, standby].each do |server|
-        expect(Semaphore.where(strand_id: server.id, name: "configure").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "configure_metrics").count).to eq(1)
-        expect(Semaphore.where(strand_id: server.id, name: "restart").count).to eq(1)
-      end
-
+      expect { standby_nx.taking_over }.to hop("wait_promotion_completion")
       expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
     end
 
@@ -1552,6 +1517,63 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         expect(Semaphore.where(strand_id: replica_resource.id, name: "refresh_dns_record").count).to eq(1)
         expect(Semaphore.where(strand_id: replica_server.id, name: "configure_metrics").count).to eq(1)
       end
+    end
+  end
+
+  describe "#wait_promotion_completion" do
+    let(:standby_nx) { @standby_nx }
+    let(:standby_server) { standby_nx.postgres_server }
+
+    before do
+      @standby_nx = create_standby_nexus
+    end
+
+    it "updates metadata and hops to configure when promotion is complete" do
+      expect(standby_server).to receive(:_run_query).with("SELECT pg_catalog.pg_is_in_recovery()").and_return("f")
+
+      expect { standby_nx.wait_promotion_completion }.to hop("configure")
+
+      postgres_server.reload
+      expect(Semaphore.where(strand_id: postgres_server.id, name: "destroy").count).to eq(1)
+
+      standby_server.reload
+      expect(standby_server.timeline_access).to eq("push")
+      expect(standby_server.is_representative).to be true
+      expect(standby_server.synchronization_status).to eq("ready")
+
+      expect(Semaphore.where(strand_id: postgres_resource.id, name: "refresh_dns_record").count).to eq(1)
+
+      [postgres_server, standby_server].each do |s|
+        expect(Semaphore.where(strand_id: s.id, name: "configure").count).to eq(1)
+        expect(Semaphore.where(strand_id: s.id, name: "configure_metrics").count).to eq(1)
+        expect(Semaphore.where(strand_id: s.id, name: "restart").count).to eq(1)
+      end
+    end
+
+    it "sets promotion deadline and naps when still in recovery" do
+      expect(standby_server).to receive(:_run_query).with("SELECT pg_catalog.pg_is_in_recovery()").and_return("t")
+
+      expect { standby_nx.wait_promotion_completion }.to nap(5)
+
+      expect(standby_nx.strand.stack.first["promotion_deadline"]).not_to be_nil
+    end
+
+    it "pages when deadline is exceeded and keeps waiting" do
+      expect(standby_server).to receive(:_run_query).with("SELECT pg_catalog.pg_is_in_recovery()").and_return("t")
+
+      # First call sets the deadline
+      expect { standby_nx.wait_promotion_completion }.to nap(5)
+
+      # Expire the deadline
+      standby_nx.instance_variable_set(:@frame, nil)
+      standby_nx.strand.stack.first["promotion_deadline"] = (Time.now - 1).to_s
+      standby_nx.strand.modified!(:stack)
+      standby_nx.strand.save_changes
+
+      expect(standby_server).to receive(:_run_query).with("SELECT pg_catalog.pg_is_in_recovery()").and_return("t")
+      expect(Prog::PageNexus).to receive(:assemble)
+
+      expect { standby_nx.wait_promotion_completion }.to nap(5)
     end
   end
 
