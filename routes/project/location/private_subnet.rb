@@ -108,6 +108,14 @@ class Clover
           fail DependencyError.new("Private subnet '#{ps.name}' has VMs attached, first, delete them.")
         end
 
+        unless PostgresResource.where(private_subnet_id: ps.id).empty?
+          fail DependencyError.new("Private subnet '#{ps.name}' has PostgreSQL resources attached, first delete them.")
+        end
+
+        if ps.privatelink_aws_resource
+          fail DependencyError.new("Private subnet '#{ps.name}' has a PrivateLink attached, first delete it.")
+        end
+
         DB.transaction do
           ps.incr_destroy
           audit_log(ps, "destroy")

@@ -166,6 +166,11 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
 
       nap 5
     end
+    if (pl = private_subnet.privatelink_aws_resource)
+      pl.incr_destroy
+      nap 5
+    end
+
     register_deadline(nil, 10 * 60)
     decr_destroy
     private_subnet.nics.each(&:incr_destroy)
