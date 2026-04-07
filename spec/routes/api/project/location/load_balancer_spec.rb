@@ -253,6 +253,21 @@ RSpec.describe Clover, "load-balancer" do
       }
 
       it "success" do
+        vm.update(project_id: project.id, ip4_enabled: true)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
+
+        expect(last_response.status).to eq(200)
+      end
+
+      it "fails for vm without ip4 when lb has ipv4 enabled" do
+        vm.update(project_id: project.id)
+        post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
+
+        expect(last_response).to have_api_error(400, "Validation failed for following fields: vm_id")
+      end
+
+      it "success for vm without ip4 when lb is ipv6 only" do
+        lb.update(stack: "ipv6")
         vm.update(project_id: project.id)
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/load-balancer/#{lb.name}/attach-vm", {vm_id: vm.ubid}.to_json
 
