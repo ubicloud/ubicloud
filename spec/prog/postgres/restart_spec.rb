@@ -30,6 +30,12 @@ RSpec.describe Prog::Postgres::Restart do
       expect(nx.configure_set?).to be true
     end
 
+    it "does not pop for pending configure when ignore_configure is set" do
+      refresh_frame(nx, new_values: {"ignore_configure" => true})
+      nx.incr_configure
+      expect { nx.start }.to hop("restart")
+    end
+
     it "sets deadline and hops to restart" do
       expect { nx.start }.to hop("restart")
       expect(nx.strand.stack.first["deadline_target"]).to be_nil

@@ -478,7 +478,7 @@ CMD
       if retval&.dig("msg") == "postgres server is restarted"
         hop_run_post_installation_script
       end
-      push Prog::Postgres::Restart
+      push Prog::Postgres::Restart, {"ignore_configure" => true}
     end
 
     hop_wait

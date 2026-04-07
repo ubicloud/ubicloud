@@ -812,7 +812,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         "PGOPTIONS='-c statement_timeout=60s' psql -U postgres -t --csv -v 'ON_ERROR_STOP=1'",
         hash_including(stdin: password_update_sql_matcher),
       ).and_return("")
-      expect(nx).to receive(:push).with(Prog::Postgres::Restart)
+      expect(nx).to receive(:push).with(Prog::Postgres::Restart, {"ignore_configure" => true})
       expect { nx.update_superuser_password }.to hop("wait")
     end
 

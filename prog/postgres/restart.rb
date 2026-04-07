@@ -9,7 +9,7 @@ class Prog::Postgres::Restart < Prog::Base
 
   label def start
     register_deadline(nil, 5 * 60)
-    if postgres_server.configure_set?
+    if !frame["ignore_configure"] && postgres_server.configure_set?
       # Pop so that the parent can handle the configure
       pop "restart deferred due to pending configure"
     end
