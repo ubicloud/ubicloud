@@ -1,7 +1,7 @@
 <% vm_ds = @ps.vms_dataset.where(project_id: @ps.project_id)
 viewable_vm_ds = dataset_authorize(vm_ds, "Vm:view")
-displayable_vm_map, linkable_vm_map = [vm_ds, viewable_vm_ds].map! do
-  it.select_hash(Sequel[:vm][:id], Sequel.as(true, :v))
+displayable_vms, linkable_vms = [vm_ds, viewable_vm_ds].map! do
+  it.select_set(Sequel[:vm][:id])
 end
 pg_resources = dataset_authorize(@project.postgres_resources_dataset.where(private_subnet_id: @ps.id), "Postgres:view").all
 kcs = dataset_authorize(@project.kubernetes_clusters_dataset.where(private_subnet_id: @ps.id), "KubernetesCluster:view").all
@@ -14,12 +14,12 @@ other_resources = pg_resources + kcs %>
     headers: ["VM", "Private IPv4", "Private IPv6"],
     empty_state: "No VM attached",
     rows:
-      @ps.nics(eager: :vm).select { it.vm_id.nil? || displayable_vm_map[it.vm_id] }.map! do |nic|
+      @ps.nics(eager: :vm).select { it.vm_id.nil? || displayable_vms.include?(it.vm_id) }.map! do |nic|
         [
           [
             (
               if nic.vm
-                if linkable_vm_map[nic.vm_id]
+                if linkable_vms.include?(nic.vm_id)
                   [nic.vm.name, { link: path(nic.vm) }]
                 else
                   [nic.vm.name, {}]

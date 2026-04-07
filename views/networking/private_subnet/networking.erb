@@ -22,7 +22,7 @@ ps_path = path(@ps)
 viewable_fws, viewable_subnets, disconnectable_subnets =
   DB.ignore_duplicate_queries do
     perm_checks.map do |perm, ds|
-      dataset_authorize(ds, perm).select_hash(:id, Sequel.as(true, :v))
+      dataset_authorize(ds, perm).select_set(:id)
     end
   end %>
 
@@ -37,7 +37,7 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
         [
           [
             (
-              if viewable_fws[fw.id]
+              if viewable_fws.include?(fw.id)
                 [fw.name, { link: path(fw) }]
               else
                 fw.name
@@ -68,8 +68,8 @@ viewable_fws, viewable_subnets, disconnectable_subnets =
       <tbody class="divide-y divide-gray-200 bg-white">
         <% connected_subnets.each do |subnet| %>
           <%
-            viewable = viewable_subnets[subnet.id]
-            show_delete = disconnectable_subnets[subnet.id]
+            viewable = viewable_subnets.include?(subnet.id)
+            show_delete = disconnectable_subnets.include?(subnet.id)
           %>
           <tr>
             <td class="whitespace nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6" scope="row">
