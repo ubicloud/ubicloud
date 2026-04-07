@@ -797,8 +797,6 @@ SQL
       resource.servers.reject(&:primary?).each { it.update(synchronization_status: "catching_up") }
       hop_configure
     when "Failed"
-      Prog::PageNexus.assemble("#{postgres_server.ubid} promotion failed",
-        ["PGPromotionFailed", postgres_server.id], postgres_server.ubid)
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     when "NotStarted"
