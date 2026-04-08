@@ -35,9 +35,9 @@ class PostgresServer < Sequel::Model
           Google::Apis::IamV1::CreateServiceAccountRequest.new(
             account_id: sa_name,
             service_account: Google::Apis::IamV1::ServiceAccount.new(
-              display_name: "Postgres timeline #{timeline.ubid}"
-            )
-          )
+              display_name: "Postgres timeline #{timeline.ubid}",
+            ),
+          ),
         )
       end
 
@@ -58,7 +58,7 @@ class PostgresServer < Sequel::Model
       existing_policy.bindings = bindings
       credential.iam_client.set_service_account_iam_policy(
         sa.name,
-        Google::Apis::IamV1::SetIamPolicyRequest.new(policy: existing_policy)
+        Google::Apis::IamV1::SetIamPolicyRequest.new(policy: existing_policy),
       )
 
       # Ensure the GCS bucket exists before setting IAM policy on it.
@@ -71,7 +71,7 @@ class PostgresServer < Sequel::Model
       policy = bucket.policy requested_policy_version: 3
       policy.bindings.insert(
         role: "roles/storage.objectAdmin",
-        members: ["serviceAccount:#{sa.email}"]
+        members: ["serviceAccount:#{sa.email}"],
       )
       bucket.policy = policy
 
@@ -91,7 +91,7 @@ class PostgresServer < Sequel::Model
       if (old_timeline = timeline.parent) && old_timeline.access_key
         begin
           credential.iam_client.delete_project_service_account(
-            "projects/-/serviceAccounts/#{old_timeline.access_key}"
+            "projects/-/serviceAccounts/#{old_timeline.access_key}",
           )
         rescue Google::Apis::ClientError
           # SA may already be deleted

@@ -14,7 +14,7 @@ RSpec.describe PostgresResource do
       user_config: {},
       pgbouncer_user_config: {},
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     )
     Strand.create_with_id(pr, prog: "Postgres::PostgresResourceNexus", label: "wait")
     pr
@@ -28,7 +28,7 @@ RSpec.describe PostgresResource do
       display_name: "GCP us-central1",
       ui_name: "GCP US Central 1",
       visible: false,
-      provider: "gcp"
+      provider: "gcp",
     )
   }
 
@@ -51,7 +51,7 @@ RSpec.describe PostgresResource do
       project_id: project.id,
       location_id: location.id,
       name:,
-      memory_gib: 8
+      memory_gib: 8,
     )
     Strand.create(prog: "Vm::Gcp::Nexus", label: "wait",
       stack: [{"gcp_zone_suffix" => zone_suffix}]) { it.id = vm.id }
@@ -67,12 +67,12 @@ RSpec.describe PostgresResource do
           project_id: project.id,
           location_id: location.id,
           name: "gcp-pg-vm",
-          memory_gib: 8
+          memory_gib: 8,
         )
 
         server = PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
 
         expect(postgres_resource.reload).to receive(:servers).and_return([server])
@@ -90,12 +90,12 @@ RSpec.describe PostgresResource do
           project_id: project.id,
           location_id: location.id,
           name: "gcp-pg-vm",
-          memory_gib: 8
+          memory_gib: 8,
         )
 
         server = PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
         DB[:postgres_server].where(id: server.id).update(is_representative: true)
         server.reload
@@ -123,7 +123,7 @@ RSpec.describe PostgresResource do
 
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm1.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
 
         filters = postgres_resource.reload.new_server_exclusion_filters
@@ -137,11 +137,11 @@ RSpec.describe PostgresResource do
 
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm1.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm2.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
 
         filters = postgres_resource.reload.new_server_exclusion_filters
@@ -154,11 +154,11 @@ RSpec.describe PostgresResource do
 
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm1.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
         PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm2.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17"
+          synchronization_status: "ready", timeline_access: "push", version: "17",
         )
 
         filters = postgres_resource.reload.new_server_exclusion_filters

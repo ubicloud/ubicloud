@@ -55,9 +55,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         boot: true,
         initialize_params: Google::Cloud::Compute::V1::AttachedDiskInitializeParams.new(
           source_image: gce_source_image,
-          disk_size_gb: boot_disk_size
-        )
-      )
+          disk_size_gb: boot_disk_size,
+        ),
+      ),
     ]
 
     gcp_res = nic.nic_gcp_resource
@@ -76,37 +76,37 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
               name: "External NAT",
               type: "ONE_TO_ONE_NAT",
               network_tier: "STANDARD",
-              nat_i_p: gcp_res.static_ip.to_s
-            )
+              nat_i_p: gcp_res.static_ip.to_s,
+            ),
           ],
           ipv6_access_configs: [
             Google::Cloud::Compute::V1::AccessConfig.new(
               name: "External IPv6",
               type: "DIRECT_IPV6",
-              network_tier: "PREMIUM"
-            )
-          ]
-        )
+              network_tier: "PREMIUM",
+            ),
+          ],
+        ),
       ],
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
             key: "ssh-keys",
-            value: "#{vm.unix_user}:#{public_keys}"
+            value: "#{vm.unix_user}:#{public_keys}",
           ),
           Google::Cloud::Compute::V1::Items.new(
             key: "startup-script",
-            value: user_data
-          )
-        ]
-      )
+            value: user_data,
+          ),
+        ],
+      ),
     )
 
     begin
       op = compute_client.insert(
         project: gcp_project_id,
         zone: gcp_zone,
-        instance_resource:
+        instance_resource:,
       )
       save_gcp_op(op.name, "zone", gcp_zone)
     rescue Google::Cloud::AlreadyExistsError
@@ -147,7 +147,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     instance = compute_client.get(
       project: gcp_project_id,
       zone: gcp_zone,
-      instance: vm.name
+      instance: vm.name,
     )
 
     case instance.status
@@ -208,7 +208,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       resource_id: vm.id,
       resource_name: vm.name,
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
+      amount: vm.vcpus,
     )
 
     hop_wait
@@ -254,7 +254,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       op = compute_client.delete(
         project: gcp_project_id,
         zone: gcp_zone,
-        instance: vm.name
+        instance: vm.name,
       )
       save_gcp_op(op.name, "zone", gcp_zone)
       hop_wait_destroy_op
@@ -319,7 +319,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   GCE_BOOT_IMAGE_FAMILIES = {
     "ubuntu-noble" => {project: "ubuntu-os-cloud", family: "ubuntu-2404-lts-ARCH"},
-    "ubuntu-jammy" => {project: "ubuntu-os-cloud", family: "ubuntu-2204-lts-ARCH"}
+    "ubuntu-jammy" => {project: "ubuntu-os-cloud", family: "ubuntu-2204-lts-ARCH"},
   }.freeze
 
   def gce_source_image
@@ -354,7 +354,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     @gcp_zone = nil
     update_stack({
       "gcp_zone_suffix" => new_suffix,
-      "exclude_zones" => excluded
+      "exclude_zones" => excluded,
     })
     nap((available.length == gcp_az_suffixes.length) ? 5 * 60 : 5)
   end
@@ -378,7 +378,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     begin
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
-        firewall_policy: policy_name
+        firewall_policy: policy_name,
       )
     rescue Google::Cloud::NotFoundError
       return # Policy already deleted
@@ -394,7 +394,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,
         firewall_policy: policy_name,
-        priority: rule.priority
+        priority: rule.priority,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       # Already deleted or rule rejected as invalid — skip and continue

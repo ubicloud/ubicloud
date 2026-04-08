@@ -60,7 +60,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic.id,
       network_name: ps.gcp_vpc.name,
       subnet_name: "ubicloud-#{ps.ubid}",
-      **overrides
+      **overrides,
     )
   end
 
@@ -68,7 +68,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     allow(location_credential).to receive_messages(
       compute_client:,
       network_firewall_policies_client: nfp_client,
-      zone_operations_client: zone_ops_client
+      zone_operations_client: zone_ops_client,
     )
     %w[a b c].each do |suffix|
       LocationAz.create_with_id(SecureRandom.uuid, location_id: location.id, az: suffix)
@@ -93,7 +93,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
 
       expect { nx.before_destroy }
@@ -262,7 +262,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(
-        Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'.")
+        Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'."),
       )
       expect(Clog).to receive(:emit).with("GCE zone retry", anything)
 
@@ -276,7 +276,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(
-        Google::Cloud::InvalidArgumentError.new("Invalid disk size")
+        Google::Cloud::InvalidArgumentError.new("Invalid disk size"),
       )
 
       expect { nx.start }.to raise_error(Google::Cloud::InvalidArgumentError, /Invalid disk size/)
@@ -414,7 +414,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "GENERIC_ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
 
@@ -432,7 +432,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED", message: "exhausted")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything)
@@ -454,7 +454,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS", message: "exhausted with details")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything)
@@ -476,7 +476,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything)
@@ -500,19 +500,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         network_interfaces: [
           Google::Cloud::Compute::V1::NetworkInterface.new(
             access_configs: [
-              Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")
+              Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1"),
             ],
             ipv6_access_configs: [
-              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1")
-            ]
-          )
-        ]
+              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1"),
+            ],
+          ),
+        ],
       )
 
       expect(compute_client).to receive(:get).with(
         project: "test-gcp-project",
         zone: "us-central1-a",
-        instance: "testvm"
+        instance: "testvm",
       ).and_return(instance)
 
       now = Time.now.floor
@@ -532,13 +532,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         network_interfaces: [
           Google::Cloud::Compute::V1::NetworkInterface.new(
             access_configs: [
-              Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1")
+              Google::Cloud::Compute::V1::AccessConfig.new(nat_i_p: "35.192.0.1"),
             ],
             ipv6_access_configs: [
-              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1")
-            ]
-          )
-        ]
+              Google::Cloud::Compute::V1::AccessConfig.new(external_ipv6: "2600:1900:4000:1::1"),
+            ],
+          ),
+        ],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -549,7 +549,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "updates the vm when instance is RUNNING without network interfaces" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "RUNNING",
-        network_interfaces: []
+        network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -568,8 +568,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "RUNNING",
         network_interfaces: [
-          Google::Cloud::Compute::V1::NetworkInterface.new
-        ]
+          Google::Cloud::Compute::V1::NetworkInterface.new,
+        ],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -587,7 +587,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "naps if the instance is in STAGING state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "STAGING",
-        network_interfaces: []
+        network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -597,7 +597,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "naps if the instance is in PROVISIONING state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "PROVISIONING",
-        network_interfaces: []
+        network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -607,7 +607,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "raises if the instance enters TERMINATED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "TERMINATED",
-        network_interfaces: []
+        network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -617,7 +617,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "raises if the instance enters SUSPENDED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "SUSPENDED",
-        network_interfaces: []
+        network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
@@ -736,7 +736,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:delete).with(
         project: "test-gcp-project",
         zone: "us-central1-a",
-        instance: "testvm"
+        instance: "testvm",
       ).and_return(op)
 
       expect { nx.destroy }.to hop("wait_destroy_op")
@@ -763,7 +763,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:delete).with(
         project: "test-gcp-project",
         zone: "us-central1-c",
-        instance: "testvm"
+        instance: "testvm",
       ).and_return(op)
 
       expect { nx.destroy }.to hop("wait_destroy_op")
@@ -820,13 +820,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         priority: 22222,
         direction: "INGRESS",
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)],
       )
       other_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 33333,
         direction: "INGRESS",
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other")]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other")],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [tag_rule, other_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -848,13 +848,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         priority: 11111,
         direction: "EGRESS",
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)],
       )
       deny_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 22222,
         direction: "INGRESS",
         action: "deny",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [egress_rule, deny_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -875,13 +875,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         priority: 11111,
         direction: "INGRESS",
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)],
       )
       rule2 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 22222,
         direction: "INGRESS",
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: vm_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [rule1, rule2])
       expect(nfp_client).to receive(:get).and_return(policy)

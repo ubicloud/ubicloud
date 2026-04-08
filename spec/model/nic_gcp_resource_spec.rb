@@ -11,7 +11,7 @@ RSpec.describe NicGcpResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "ps", location_id: location.id, project_id: project.id,
-      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active"
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active",
     ) { it.id = SecureRandom.uuid }
   }
 
@@ -31,7 +31,7 @@ RSpec.describe NicGcpResource do
       address_name: "ubicloud-test-nic",
       static_ip: "35.192.0.1",
       network_name: "ubicloud-proj-test",
-      subnet_name: "ubicloud-test"
+      subnet_name: "ubicloud-test",
     )
 
     expect(resource).to be_a(described_class)

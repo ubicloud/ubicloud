@@ -68,7 +68,7 @@ class LocationCredentialGcp < Sequel::Model
       client = Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService.new
       client.authorization = Google::Auth::ServiceAccountCredentials.make_creds(
         json_key_io: StringIO.new(credentials_json),
-        scope: "https://www.googleapis.com/auth/cloud-platform"
+        scope: "https://www.googleapis.com/auth/cloud-platform",
       )
       client
     end
@@ -87,7 +87,7 @@ class LocationCredentialGcp < Sequel::Model
       client.root_url = "https://#{region}-cloudresourcemanager.googleapis.com/"
       client.authorization = Google::Auth::ServiceAccountCredentials.make_creds(
         json_key_io: StringIO.new(credentials_json),
-        scope: "https://www.googleapis.com/auth/cloud-platform"
+        scope: "https://www.googleapis.com/auth/cloud-platform",
       )
       client
     end
@@ -96,7 +96,7 @@ class LocationCredentialGcp < Sequel::Model
   def storage_client
     @storage_client ||= Google::Cloud::Storage.new(
       project_id:,
-      credentials: parsed_credentials
+      credentials: parsed_credentials,
     )
   end
 
@@ -105,7 +105,7 @@ class LocationCredentialGcp < Sequel::Model
       client = Google::Apis::IamV1::IamService.new
       client.authorization = Google::Auth::ServiceAccountCredentials.make_creds(
         json_key_io: StringIO.new(credentials_json),
-        scope: "https://www.googleapis.com/auth/cloud-platform"
+        scope: "https://www.googleapis.com/auth/cloud-platform",
       )
       client
     end

@@ -12,14 +12,14 @@ RSpec.describe PrivateSubnet do
   let(:subnet1) {
     described_class.create(
       name: "ps1", location_id: location.id, project_id: project.id,
-      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active"
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active",
     ) { it.id = SecureRandom.uuid }
   }
 
   let(:subnet2) {
     described_class.create(
       name: "ps2", location_id: location.id, project_id: project.id,
-      net6: "fd10:9b0b:6b4b:9fbb::/64", net4: "10.0.1.0/26", state: "active"
+      net6: "fd10:9b0b:6b4b:9fbb::/64", net4: "10.0.1.0/26", state: "active",
     ) { it.id = SecureRandom.uuid }
   }
 

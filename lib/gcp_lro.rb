@@ -27,7 +27,7 @@ module GcpLro
     update_stack({
       "gcp_op_name" => op_name,
       "gcp_op_scope" => scope,
-      "gcp_op_scope_value" => scope_value
+      "gcp_op_scope_value" => scope_value,
     })
   end
 
@@ -36,7 +36,7 @@ module GcpLro
     update_stack({
       "gcp_op_name" => nil,
       "gcp_op_scope" => nil,
-      "gcp_op_scope_value" => nil
+      "gcp_op_scope_value" => nil,
     })
   end
 
@@ -53,24 +53,18 @@ module GcpLro
       credential.zone_operations_client.get(
         project: gcp_project_id,
         zone: scope_value,
-        operation: op_name
+        operation: op_name,
       )
     when "region"
       credential.region_operations_client.get(
         project: gcp_project_id,
         region: scope_value,
-        operation: op_name
+        operation: op_name,
       )
     when "global"
       credential.global_operations_client.get(
         project: gcp_project_id,
-        operation: op_name
-      )
-    when "region"
-      credential.region_operations_client.get(
-        project: gcp_project_id,
-        region: scope_value,
-        operation: op_name
+        operation: op_name,
       )
     else
       raise "Unknown GCP operation scope: #{scope}"

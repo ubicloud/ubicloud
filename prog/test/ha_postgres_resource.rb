@@ -3,13 +3,14 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HaPostgresResource < Prog::Test::Base
-  def self.assemble(provider: "metal")
+  def self.assemble(provider: "metal", family: nil)
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
     frame = {
       "provider" => provider,
+      "family" => family,
       "postgres_test_project_id" => postgres_test_project.id,
       "failover_wait_started" => false,
     }
@@ -22,7 +23,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"], family: frame["family"])
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
@@ -49,7 +50,21 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
       hop_destroy_postgres
     end
 
-    hop_trigger_failover
+    hop_verify_wal_archiving
+  end
+
+  label def verify_wal_archiving
+    primary = postgres_resource.servers.find { it.timeline_access == "push" }
+    timeline = primary.timeline
+
+    wal_files = timeline.list_objects("wal_005/")
+    if wal_files.any?
+      Clog.emit("WAL archiving verified: found #{wal_files.count} WAL files in blob storage")
+      hop_trigger_failover
+    else
+      Clog.emit("No WAL files found yet, waiting for archiving to start")
+      nap 15
+    end
   end
 
   label def trigger_failover
@@ -103,13 +118,26 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
-    postgres_resource.timeline.incr_destroy
+    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
+    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
+      Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
+    # Timelines are retained for 10 days after resource destruction for
+    # customer recovery. Verify they still exist, then explicitly destroy
+    # them to test timeline cleanup.
+    remaining_timelines = frame["timeline_ids"]&.filter_map { PostgresTimeline[it] } || []
+    if remaining_timelines.any?
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
+      remaining_timelines.each(&:incr_destroy)
+      nap 5
+    end
     hop_finish
   end
 

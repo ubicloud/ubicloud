@@ -3,20 +3,26 @@
 require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::Base
-  def self.assemble(provider: "metal")
+  def self.assemble(provider: "metal", family: nil)
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
+    frame = {
+      "provider" => provider,
+      "family" => family,
+      "postgres_test_project_id" => postgres_test_project.id,
+    }
+
     Strand.create(
       prog: "Test::UpgradePostgresResource",
       label: "start",
-      stack: [{"provider" => provider, "postgres_test_project_id" => postgres_test_project.id}],
+      stack: [frame],
     )
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"], family: frame["family"])
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
@@ -29,7 +35,6 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
     )
 
     update_stack({"postgres_resource_id" => st.id})
-    update_stack({"pre_upgrade_postgres_timeline_id" => PostgresResource[st.id].timeline.id})
     hop_wait_postgres_resource
   end
 
@@ -52,7 +57,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   label def create_read_replica
     Clog.emit("Creating read replica for upgrade test")
 
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"], family: frame["family"])
 
     # Create read replica using the PostgresResourceNexus with parent_id
     st = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -216,15 +221,31 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
-    pre_upgrade_timeline.incr_destroy
-    postgres_resource.timeline.incr_destroy
-    read_replica.incr_destroy
+    primary_timeline_ids = postgres_resource.servers.map(&:timeline_id)
+    replica_timeline_ids = read_replica ? read_replica.servers.map(&:timeline_id) : []
+    update_stack({"timeline_ids" => (primary_timeline_ids + replica_timeline_ids).uniq})
+    read_replica&.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
+    nap 5 if read_replica || postgres_resource
+    if PrivateSubnet[project_id: frame["postgres_test_project_id"]]
+      Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
+
+    # Timelines are retained for 10 days after resource destruction for
+    # customer recovery. Verify they still exist, then explicitly destroy
+    # them to test timeline cleanup.
+    remaining_timelines = (frame["timeline_ids"] || []).filter_map { PostgresTimeline[it] }
+    if remaining_timelines.any?
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
+      remaining_timelines.each(&:incr_destroy)
+      nap 5
+    end
+
     hop_finish
   end
 
@@ -254,10 +275,6 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   def representative_server
     @representative_server ||= postgres_resource.representative_server
-  end
-
-  def pre_upgrade_timeline
-    PostgresTimeline[frame["pre_upgrade_postgres_timeline_id"]]
   end
 
   def test_queries_sql

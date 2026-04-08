@@ -53,7 +53,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       credential.subnetworks_client.get(
         project: gcp_project_id,
         region: gcp_region,
-        subnetwork: subnet_name
+        subnetwork: subnet_name,
       )
     rescue Google::Cloud::NotFoundError
       op = credential.subnetworks_client.insert(
@@ -65,8 +65,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
           private_ip_google_access: true,
           stack_type: "IPV4_IPV6",
-          ipv6_access_type: "EXTERNAL"
-        )
+          ipv6_access_type: "EXTERNAL",
+        ),
       )
       save_gcp_op(op.name, "region", gcp_region)
       hop_wait_create_subnet
@@ -115,7 +115,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       action: "allow",
       dest_ip_ranges: [private_subnet.net4.to_s],
       layer4_configs: [{ip_protocol: "all"}],
-      target_secure_tags: [subnet_tag_value_name]
+      target_secure_tags: [subnet_tag_value_name],
     )
 
     # Allow same-subnet IPv6 egress (overrides VPC-wide deny-egress-ipv6)
@@ -125,7 +125,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       action: "allow",
       dest_ip_ranges: [private_subnet.net6.to_s],
       layer4_configs: [{ip_protocol: "all"}],
-      target_secure_tags: [subnet_tag_value_name]
+      target_secure_tags: [subnet_tag_value_name],
     )
 
     hop_wait
@@ -159,7 +159,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         op = credential.subnetworks_client.delete(
           project: gcp_project_id,
           region: gcp_region,
-          subnetwork: subnet_name
+          subnetwork: subnet_name,
         )
         save_gcp_op(op.name, "region", gcp_region)
         hop_wait_delete_subnet
@@ -222,7 +222,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       }
     else
       [
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
+        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all"),
       ]
     end
 
@@ -230,7 +230,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       priority:,
       direction:,
       action:,
-      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs)
+      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs),
     }
 
     if target_secure_tags
@@ -245,7 +245,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       credential.network_firewall_policies_client.get_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
-        priority:
+        priority:,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       nil
@@ -264,7 +264,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
           priority:,
-          firewall_policy_rule_resource: rule
+          firewall_policy_rule_resource: rule,
         )
       end
     else
@@ -272,7 +272,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         credential.network_firewall_policies_client.add_rule(
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
-          firewall_policy_rule_resource: rule
+          firewall_policy_rule_resource: rule,
         )
       rescue ::Google::Cloud::AlreadyExistsError
         # Concurrent strand added this rule -- proceed.
@@ -303,7 +303,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       existing = credential.network_firewall_policies_client.get_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
-        priority:
+        priority:,
       )
       # Only delete if the rule belongs to this subnet (avoid deleting
       # another subnet's rule in case of a priority collision)
@@ -311,7 +311,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       credential.network_firewall_policies_client.remove_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
-        priority:
+        priority:,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       # Already deleted
@@ -424,7 +424,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       short_name: tag_key_short_name,
       parent: tag_key_parent,
       purpose: "GCE_FIREWALL",
-      purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link}
+      purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
     )
 
     op = credential.crm_client.create_tag_key(tag_key_obj)
@@ -467,7 +467,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
       short_name:,
-      parent: parent_tag_key_name
+      parent: parent_tag_key_name,
     )
 
     op = credential.crm_client.create_tag_value(tag_value_obj)

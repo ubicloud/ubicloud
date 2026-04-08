@@ -25,13 +25,13 @@ RSpec.describe Location do
           arch: "x64")
 
         expect(location.pg_gce_image("x64")).to eq(
-          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218"
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218",
         )
       end
 
       it "raises when no matching PgGceImage is found" do
         expect { location.pg_gce_image("x64") }.to raise_error(
-          RuntimeError, /No GCE image found for arch x64/
+          RuntimeError, /No GCE image found for arch x64/,
         )
       end
     end
@@ -46,7 +46,7 @@ RSpec.describe Location do
           arch: "arm64")
 
         expect(location.send(:gcp_pg_boot_image, "99", "arm64", "standard")).to eq(
-          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218"
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
         )
       end
     end

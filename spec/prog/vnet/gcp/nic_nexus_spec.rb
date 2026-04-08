@@ -166,7 +166,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
       expect(addresses_client).to receive(:get)
@@ -179,7 +179,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
 
@@ -292,7 +292,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       failed_op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(failed_op)
 

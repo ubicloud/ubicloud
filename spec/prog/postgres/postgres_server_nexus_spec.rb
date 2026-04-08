@@ -134,7 +134,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         ui_name: "gcp-us-central1",
         visible: true,
         provider: "gcp",
-        project_id: user_project.id
+        project_id: user_project.id,
       )
       LocationCredentialGcp.create_with_id(gcp_location,
         project_id: "test-gcp-project",
@@ -149,7 +149,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         target_vm_size: "standard-2",
         target_storage_size_gib: 64,
         superuser_password: "dummy-password",
-        target_version: "16"
+        target_version: "16",
       )
       Firewall.create(name: "#{gcp_resource.ubid}-internal-firewall", location: gcp_location, project: service_project)
       postgres_timeline = PostgresTimeline.create

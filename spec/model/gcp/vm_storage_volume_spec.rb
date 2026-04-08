@@ -16,7 +16,7 @@ RSpec.describe VmStorageVolume do
       name: "gcp-storage-test",
       memory_gib: 8,
       family: "c3d-standard",
-      vcpus: 8
+      vcpus: 8,
     )
   }
 

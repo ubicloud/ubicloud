@@ -105,7 +105,7 @@ RSpec.describe LocationCredentialGcp do
     client = instance_double(Google::Cloud::Storage::Project)
     expect(Google::Cloud::Storage).to receive(:new).with(
       project_id: "test-gcp-project",
-      credentials: location_credential_gcp.parsed_credentials
+      credentials: location_credential_gcp.parsed_credentials,
     ).and_return(client)
     expect(location_credential_gcp.storage_client).to be(client)
   end

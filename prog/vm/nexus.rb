@@ -175,7 +175,7 @@ class Prog::Vm::Nexus < Prog::Base
               size_gib: volume[:size_gib] / disk_count,
               boot: volume[:boot],
               use_bdev_ubi: false,
-              disk_index:
+              disk_index:,
             )
 
             disk_index += 1

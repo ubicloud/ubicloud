@@ -49,7 +49,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       subnetworks_client:,
       network_firewall_policies_client: nfp_client,
       global_operations_client: global_ops_client,
-      region_operations_client: region_ops_client
+      region_operations_client: region_ops_client,
     )
     nx.instance_variable_set(:@credential, credential)
   end
@@ -89,7 +89,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(subnetworks_client).to receive(:get).with(
         project: "test-gcp-project",
         region: "us-central1",
-        subnetwork: "ubicloud-#{ps.ubid}"
+        subnetwork: "ubicloud-#{ps.ubid}",
       ).and_return(Google::Cloud::Compute::V1::Subnetwork.new)
 
       expect { nx.create_subnet }.to hop("create_tag_resources")
@@ -143,7 +143,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
       expect(subnetworks_client).to receive(:get)
@@ -156,7 +156,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient error")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
       expect(subnetworks_client).to receive(:get)
@@ -175,12 +175,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     it "creates tag key and tag value, stores in frame, and hops to create_subnet_allow_rules" do
       tag_key_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        done: true, response: {"name" => "tagKeys/111"}
+        done: true, response: {"name" => "tagKeys/111"},
       )
       expect(crm_client).to receive(:create_tag_key).and_return(tag_key_op)
 
       tag_value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        done: true, response: {"name" => "tagValues/222"}
+        done: true, response: {"name" => "tagValues/222"},
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
 
@@ -194,13 +194,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
 
       existing_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/existing", short_name: "ubicloud-subnet-#{ps.ubid}"
+        name: "tagKeys/existing", short_name: "ubicloud-subnet-#{ps.ubid}",
       )
       resp = Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key])
       expect(crm_client).to receive(:list_tag_keys).and_return(resp)
 
       tag_value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        done: true, response: {"name" => "tagValues/333"}
+        done: true, response: {"name" => "tagValues/333"},
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
 
@@ -211,7 +211,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     it "naps when CRM tag key operation is not done and saves pending op in frame" do
       pending_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        name: "operations/tk-create", done: false
+        name: "operations/tk-create", done: false,
       )
       expect(crm_client).to receive(:create_tag_key).and_return(pending_op)
 
@@ -226,12 +226,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       nx.instance_variable_set(:@frame, nil)
 
       done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        done: true, name: "operations/tk-create", response: {"name" => "tagKeys/polled-1"}
+        done: true, name: "operations/tk-create", response: {"name" => "tagKeys/polled-1"},
       )
       expect(crm_client).to receive(:get_operation).with("operations/tk-create").and_return(done_op)
 
       tag_value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        done: true, response: {"name" => "tagValues/222"}
+        done: true, response: {"name" => "tagValues/222"},
       )
       expect(crm_client).to receive(:create_tag_value).and_return(tag_value_op)
 
@@ -248,7 +248,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       nx.instance_variable_set(:@frame, nil)
 
       pending_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-        name: "operations/tv-create", done: false
+        name: "operations/tv-create", done: false,
       )
       expect(crm_client).to receive(:create_tag_value).and_return(pending_op)
 
@@ -278,7 +278,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           direction: rule.direction,
           action: rule.action,
           dest_ip_ranges: rule.match.dest_ip_ranges.to_a,
-          target_secure_tags: rule.target_secure_tags.map(&:name)
+          target_secure_tags: rule.target_secure_tags.map(&:name),
         }
         instance_double(Gapic::GenericLRO::Operation, name: "op-rule")
       end
@@ -304,18 +304,18 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
             direction: "EGRESS", action: "allow",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               dest_ip_ranges: [net4],
-              layer4_configs: [all_proto]
+              layer4_configs: [all_proto],
             ),
-            target_secure_tags: [tag]
+            target_secure_tags: [tag],
           )
         else
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "allow",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               dest_ip_ranges: [net6],
-              layer4_configs: [all_proto]
+              layer4_configs: [all_proto],
             ),
-            target_secure_tags: [tag]
+            target_secure_tags: [tag],
           )
         end
       end
@@ -333,17 +333,17 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: [net4],
-          layer4_configs: [tcp_proto]
+          layer4_configs: [tcp_proto],
         ),
-        target_secure_tags: [tag]
+        target_secure_tags: [tag],
       )
       wrong_proto_rule6 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: [net6],
-          layer4_configs: [tcp_proto]
+          layer4_configs: [tcp_proto],
         ),
-        target_secure_tags: [tag]
+        target_secure_tags: [tag],
       )
       expect(nfp_client).to receive(:get_rule).twice do |args|
         args[:priority].even? ? wrong_proto_rule : wrong_proto_rule6
@@ -360,8 +360,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: ["10.99.0.0/24"]
-        )
+          dest_ip_ranges: ["10.99.0.0/24"],
+        ),
       )
       expect(nfp_client).to receive(:get_rule).twice.and_return(foreign_rule)
 
@@ -500,7 +500,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       allow(credential).to receive(:crm_client).and_return(crm_client)
       # Default: no tag key found (skip tag cleanup)
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
     end
 
@@ -518,7 +518,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(subnetworks_client).to receive(:delete).with(
         project: "test-gcp-project",
         region: "us-central1",
-        subnetwork: "ubicloud-#{ps.ubid}"
+        subnetwork: "ubicloud-#{ps.ubid}",
       ).and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_delete_subnet")
@@ -536,18 +536,18 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       # delete_subnet_tag_resources — per-subnet tag key
       tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+        name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
       )
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
       )
 
       subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-        name: "tagValues/222", short_name: "member"
+        name: "tagValues/222", short_name: "member",
       )
       expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
         .and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]),
         )
 
       expect(crm_client).to receive(:delete_tag_value).with("tagValues/222")
@@ -569,10 +569,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       # Tag key exists but list_tag_values raises 404
       tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+        name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
       )
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
       )
       expect(crm_client).to receive(:list_tag_values)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
@@ -589,8 +589,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       # get_rule returns a rule belonging to a different subnet
       foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: ["10.99.0.0/24"]
-        )
+          dest_ip_ranges: ["10.99.0.0/24"],
+        ),
       )
       expect(nfp_client).to receive(:get_rule).twice.and_return(foreign_rule)
       expect(nfp_client).not_to receive(:remove_rule)
@@ -622,7 +622,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete).and_raise(
-        Google::Cloud::InvalidArgumentError.new("The subnetwork resource is already being used by 'projects/test/instances/vm-1'")
+        Google::Cloud::InvalidArgumentError.new("The subnetwork resource is already being used by 'projects/test/instances/vm-1'"),
       )
       expect { nx.destroy }.to nap(5)
     end
@@ -636,7 +636,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect(subnetworks_client).to receive(:delete).and_raise(
-        Google::Cloud::InvalidArgumentError.new("Invalid CIDR range")
+        Google::Cloud::InvalidArgumentError.new("Invalid CIDR range"),
       )
       expect { nx.destroy }.to raise_error(Google::Cloud::InvalidArgumentError)
     end
@@ -722,7 +722,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(region_ops_client).to receive(:get).and_return(op)
 
@@ -761,7 +761,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   describe "#policy_rule_matches_desired?" do
     it "returns false and covers nil-match &. branches when existing.match is nil" do
       rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
-        direction: "EGRESS", action: "deny"
+        direction: "EGRESS", action: "deny",
       )
       all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
       result = nx.send(:policy_rule_matches_desired?, rule_no_match,
@@ -778,9 +778,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: ["10.0.0.0/26"],
-          layer4_configs: [all_proto]
+          layer4_configs: [all_proto],
         ),
-        target_secure_tags: [tag]
+        target_secure_tags: [tag],
       )
       result = nx.send(:policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",
@@ -797,9 +797,9 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: ["10.0.0.0/26"],
-          layer4_configs: [all_proto]
+          layer4_configs: [all_proto],
         ),
-        target_secure_tags: [tag]
+        target_secure_tags: [tag],
       )
       result = nx.send(:policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",
@@ -815,8 +815,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         direction: "EGRESS", action: "deny",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: ["10.0.0.0/8"],
-          layer4_configs: [all_proto]
-        )
+          layer4_configs: [all_proto],
+        ),
       )
       result = nx.send(:policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "deny",
@@ -867,8 +867,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     it "removes rules that match this subnet's CIDRs" do
       matching_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          dest_ip_ranges: [ps.net4.to_s]
-        )
+          dest_ip_ranges: [ps.net4.to_s],
+        ),
       )
       expect(nfp_client).to receive(:get_rule).twice.and_return(matching_rule)
       expect(nfp_client).to receive(:remove_rule).twice
@@ -923,18 +923,18 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "skips tag value deletion when member tag value not found but still deletes key" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
         other_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-          name: "tagValues/333", short_name: "other"
+          name: "tagValues/333", short_name: "other",
         )
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(
-            Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [other_tv])
+            Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [other_tv]),
           )
         expect(crm_client).not_to receive(:delete_tag_value)
         expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
@@ -944,15 +944,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "handles nil tag_values in list response" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(
-            Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new
+            Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
           )
         expect(crm_client).not_to receive(:delete_tag_value)
         expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
@@ -962,14 +962,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "naps when delete_tag_value raises RuntimeError for ghost bindings" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
         subnet_tv = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-          name: "tagValues/222", short_name: "member"
+          name: "tagValues/222", short_name: "member",
         )
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]))
@@ -981,10 +981,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "naps when delete_tag_key raises RuntimeError with FAILED_PRECONDITION" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
 
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
@@ -997,10 +997,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "re-raises RuntimeError for non-ghost-binding errors" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
         expect(crm_client).to receive(:list_tag_values)
           .and_raise(RuntimeError.new("CRM operation op-1 failed: INTERNAL"))
@@ -1011,10 +1011,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "re-raises non-404 client errors" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
         expect(crm_client).to receive(:list_tag_values)
           .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
@@ -1030,10 +1030,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_key).and_return(op)
 
         existing_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/fallback", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/fallback", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key]),
         )
 
         expect(nx.send(:ensure_tag_key)).to eq("tagKeys/fallback")
@@ -1045,10 +1045,10 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_key).and_return(op)
 
         existing_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/existing", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/existing", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key]),
         )
 
         expect(nx.send(:ensure_tag_key)).to eq("tagKeys/existing")
@@ -1058,7 +1058,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, response: nil)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: nil)
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: nil),
         )
 
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /created but name not found/)
@@ -1068,7 +1068,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_key)
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
         )
 
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /conflict but not found/)
@@ -1079,7 +1079,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
         )
 
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /conflict but not found/)
@@ -1102,7 +1102,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "naps when create operation is not done and saves pending op" do
         pending_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          name: "operations/tk-pending", done: false
+          name: "operations/tk-pending", done: false,
         )
         expect(crm_client).to receive(:create_tag_key).and_return(pending_op)
 
@@ -1117,7 +1117,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tk-poll", response: {"name" => "tagKeys/polled"}
+          done: true, name: "operations/tk-poll", response: {"name" => "tagKeys/polled"},
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-poll").and_return(done_op)
 
@@ -1131,7 +1131,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         still_pending = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          name: "operations/tk-still-pending", done: false
+          name: "operations/tk-still-pending", done: false,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-still-pending").and_return(still_pending)
 
@@ -1146,7 +1146,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tk-error", error:
+          done: true, name: "operations/tk-error", error:,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-error").and_return(error_op)
 
@@ -1160,15 +1160,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tk-no-name", response: nil
+          done: true, name: "operations/tk-no-name", response: nil,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-no-name").and_return(no_name_op)
 
         existing_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-          name: "tagKeys/fallback-poll", short_name: "ubicloud-subnet-#{ps.ubid}"
+          name: "tagKeys/fallback-poll", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [existing_key]),
         )
 
         expect(nx.send(:ensure_tag_key)).to eq("tagKeys/fallback-poll")
@@ -1181,11 +1181,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tk-no-name-nil", response: nil
+          done: true, name: "operations/tk-no-name-nil", response: nil,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-no-name-nil").and_return(no_name_op)
         expect(crm_client).to receive(:list_tag_keys).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
         )
 
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /created but name not found/)
@@ -1198,8 +1198,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/fallback", short_name: "member")]
-          )
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/fallback", short_name: "member")],
+          ),
         )
 
         expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/fallback")
@@ -1210,8 +1210,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")]
-          )
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")],
+          ),
         )
 
         expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/existing")
@@ -1223,8 +1223,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
           Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(
-            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")]
-          )
+            tag_values: [Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/existing", short_name: "member")],
+          ),
         )
 
         expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/existing")
@@ -1234,7 +1234,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, response: nil)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /created but name not found/)
@@ -1244,7 +1244,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(crm_client).to receive(:create_tag_value)
           .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /conflict but not found/)
@@ -1255,7 +1255,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /conflict but not found/)
@@ -1278,7 +1278,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
       it "naps when create operation is not done and saves pending op" do
         pending_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          name: "operations/tv-pending", done: false
+          name: "operations/tv-pending", done: false,
         )
         expect(crm_client).to receive(:create_tag_value).and_return(pending_op)
 
@@ -1293,7 +1293,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tv-poll", response: {"name" => "tagValues/polled"}
+          done: true, name: "operations/tv-poll", response: {"name" => "tagValues/polled"},
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-poll").and_return(done_op)
 
@@ -1307,7 +1307,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         still_pending = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          name: "operations/tv-still-pending", done: false
+          name: "operations/tv-still-pending", done: false,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-still-pending").and_return(still_pending)
 
@@ -1321,15 +1321,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tv-no-name", response: nil
+          done: true, name: "operations/tv-no-name", response: nil,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-no-name").and_return(no_name_op)
 
         existing_value = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-          name: "tagValues/fallback-poll", short_name: "member"
+          name: "tagValues/fallback-poll", short_name: "member",
         )
         expect(crm_client).to receive(:list_tag_values).and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [existing_value])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [existing_value]),
         )
 
         expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/fallback-poll")
@@ -1342,11 +1342,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.instance_variable_set(:@frame, nil)
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tv-no-name-nil", response: nil
+          done: true, name: "operations/tv-no-name-nil", response: nil,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-no-name-nil").and_return(no_name_op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
-          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [])
+          Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
         )
 
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /created but name not found/)
@@ -1360,7 +1360,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
-          done: true, name: "operations/tv-error", error:
+          done: true, name: "operations/tv-error", error:,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
