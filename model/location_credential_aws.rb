@@ -1,0 +1,43 @@
+# frozen_string_literal: true
+
+require_relative "../model"
+require "aws-sdk-ec2"
+require "aws-sdk-iam"
+
+class LocationCredentialAws < Sequel::Model
+  plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:access_key, :secret_key]
+  many_to_one :location, key: :id
+
+  def credentials
+    @credentials ||= if assume_role
+      Aws::AssumeRoleCredentials.new(role_arn: assume_role, role_session_name: Config.aws_role_session_name)
+    else
+      Aws::Credentials.new(access_key, secret_key)
+    end
+  end
+
+  def client
+    @client ||= Aws::EC2::Client.new(region: location.name, credentials:)
+  end
+
+  def iam_client
+    @iam_client ||= Aws::IAM::Client.new(region: location.name, credentials:)
+  end
+
+  def aws_iam_account_id
+    @account_id ||= Aws::STS::Client.new(region: location.name, credentials:).get_caller_identity.account
+  end
+end
+
+# Table: location_credential_aws
+# Columns:
+#  id          | uuid | PRIMARY KEY
+#  access_key  | text |
+#  secret_key  | text |
+#  assume_role | text |
+# Indexes:
+#  location_credential_aws_pkey | PRIMARY KEY btree (id)
+# Check constraints:
+#  location_credential_aws_single_auth_mechanism | (access_key IS NOT NULL AND secret_key IS NOT NULL AND assume_role IS NULL OR access_key IS NULL AND secret_key IS NULL AND assume_role IS NOT NULL)
+# Foreign key constraints:
+#  location_credential_aws_id_fkey | (id) REFERENCES location(id)
