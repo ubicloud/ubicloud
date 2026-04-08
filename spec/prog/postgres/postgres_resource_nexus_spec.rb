@@ -206,12 +206,12 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
   end
 
   describe "#start" do
-    it "naps if vm not ready" do
+    it "naps if postgres server is not ready" do
       postgres_server
       expect { nx.start }.to nap(5)
     end
 
-    it "registers deadline and hops" do
+    it "hops if postgres server is ready" do
       postgres_server.vm.strand.update(label: "wait")
       expect { nx.start }.to hop("refresh_dns_record")
       expect(Semaphore.where(strand_id: st.id, name: "initial_provisioning").first).to exist
