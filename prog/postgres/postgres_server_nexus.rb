@@ -197,6 +197,17 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
       hop_refresh_certificates
+    when "InProgress"
+      disk_usage = begin
+        vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
+      rescue
+        0
+      end
+      previous_disk_usage = frame["disk_usage"] || 0
+      if disk_usage > previous_disk_usage
+        update_stack({"disk_usage" => disk_usage})
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      end
     when "Failed", "NotStarted"
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
