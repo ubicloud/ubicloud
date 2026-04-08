@@ -9,7 +9,11 @@ end
 load_db = lambda do
   ENV["SKIP_LIT_REQUIRE_FROZEN"] = "1"
   require "bundler"
-  Bundler.setup(:default, :development)
+  if ENV["RACK_ENV"] == "production"
+    Bundler.setup(:default)
+  else
+    Bundler.setup(:default, :development)
+  end
   require "logger"
   require_relative "../db"
 end
