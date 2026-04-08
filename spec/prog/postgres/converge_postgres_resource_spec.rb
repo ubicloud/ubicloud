@@ -166,6 +166,20 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server.vm.update(vm_host_id: nil)
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
+
+    it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
+      location.update(provider: "gcp")
+      LocationCredentialGcp.create_with_id(location.id,
+        project_id: "test-project",
+        service_account_email: "test@test.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      PgGceImage.where(arch: "x64").each(&:destroy)
+      PgGceImage.create(gcp_project_id: "test-project", arch: "x64", gce_image_name: "postgres-x64-test")
+      server = create_server(is_representative: true)
+      server.incr_recycle
+      server.vm.update(vm_host_id: nil)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+    end
   end
 
   describe "#wait_servers_to_be_ready" do
