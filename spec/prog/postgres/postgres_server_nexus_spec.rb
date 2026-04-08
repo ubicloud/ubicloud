@@ -1318,24 +1318,13 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
     end
 
-    it "skips host_routing lockout on AWS" do
-      aws_location = Location.create(
-        name: "us-west-2",
-        display_name: "aws-us-west-2",
-        ui_name: "aws-us-west-2",
-        visible: true,
-        provider: "aws",
-        project_id: project.id,
-      )
-      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "az1")
-      aws_resource = create_postgres_resource(project:, location_id: aws_location.id)
-      aws_server = create_postgres_server(resource: aws_resource, timeline: postgres_timeline)
-      aws_nx = described_class.new(aws_server.strand)
+    it "skips host_routing lockout on cloud providers" do
+      expect(server).to receive(:lockout_mechanisms).and_return(["pg_stop", "hba"])
 
-      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
-      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
-      expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
-      expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
+      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
+      expect { nx.lockout }.to hop("wait_lockout_attempt")
     end
   end
 

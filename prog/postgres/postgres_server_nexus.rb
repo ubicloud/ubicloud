@@ -752,10 +752,8 @@ SQL
   label def lockout
     decr_lockout
 
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
-    bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless resource.location.aws?
-      bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
+    postgres_server.lockout_mechanisms.each do |mechanism|
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => mechanism}
     end
 
     hop_wait_lockout_attempt
