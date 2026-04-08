@@ -235,8 +235,13 @@ class PostgresServer < Sequel::Model
       .reject { it.is_representative }
       .select { it.strand.label == "wait" && !it.needs_recycling? }
 
-    # Planned failover requires physical slot ready to ensure logical slots are synced
-    candidates = candidates.select { it.physical_slot_ready_id == resource.representative_server.id } if mode == "planned" && !read_replica?
+    if mode == "planned" && !read_replica?
+      ready = candidates.select { it.physical_slot_ready_id == resource.representative_server.id }
+      if ready.empty? && candidates.any?
+        Clog.emit("Planned failover waiting for physical slot ready", {ubid:, standby_count: candidates.count})
+      end
+      candidates = ready
+    end
 
     target = candidates
       .map { {server: it, lsn: it.current_lsn} }
@@ -249,7 +254,26 @@ class PostgresServer < Sequel::Model
       return if lsn_diff(last_known_lsn, target[:lsn]) > 80 * 1024 * 1024 # 80 MB or ~5 WAL files
     end
 
+    if mode == "planned"
+      missing = unsynced_logical_failover_slots(target[:server])
+      unless missing.empty?
+        Clog.emit("Planned failover waiting for logical slot sync", {ubid:, standby: target[:server].ubid, missing_slots: missing})
+        return
+      end
+    end
+
     target[:server]
+  end
+
+  # PG17+: returns logical failover slot names from primary not yet synced on standby
+  def unsynced_logical_failover_slots(standby)
+    return [] if read_replica? || version.to_i < 17
+
+    primary_slot_names = run_query("SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND failover").split("\n")
+    return [] if primary_slot_names.empty?
+
+    synced_slot_names = standby.run_query("SELECT slot_name FROM pg_replication_slots WHERE slot_type = 'logical' AND synced AND NOT temporary").split("\n")
+    primary_slot_names - synced_slot_names
   end
 
   def lsn_function_name
