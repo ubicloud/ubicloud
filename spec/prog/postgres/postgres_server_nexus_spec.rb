@@ -407,20 +407,27 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
-    it "resolves page and hops if initialize_database_from_backup command is succeeded" do
+    it "resolves page, cleans up the stack and hops if initialize_database_from_backup command is succeeded" do
       page = Prog::PageNexus.assemble("#{server.ubid} initialize database from backup failed after 3 attempts",
         ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid).subject
-
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
-      expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
-      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
-    end
-
-    it "hops when succeeded without an existing page" do
       refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
 
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+
+      expect(frame_value(nx, "disk_usage")).to be_nil
+      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to be_nil
+    end
+
+    it "cleans up the stack and hops when succeeded without an existing page" do
+      refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
+
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
+      expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
+
+      expect(frame_value(nx, "disk_usage")).to be_nil
+      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to be_nil
     end
 
     it "naps if script return unknown status" do
