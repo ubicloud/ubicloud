@@ -36,7 +36,6 @@ class Clover
             byoc: true,
           )
           LocationCredentialAws.create_with_id(loc, access_key:, secret_key:)
-          LocationCredential.create_with_id(loc, access_key:, secret_key:)
           audit_log(loc, "create")
         end
 

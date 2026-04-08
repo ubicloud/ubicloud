@@ -7,12 +7,11 @@ class Location < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   dataset_module Pagination
 
-  one_to_one :location_credential, key: :id, read_only: true
   one_to_one :location_credential_aws, key: :id, read_only: true
   many_to_one :project
   one_to_many :postgres_resources, read_only: true
 
-  plugin :association_dependencies, location_credential: :destroy, location_credential_aws: :destroy
+  plugin :association_dependencies, location_credential_aws: :destroy
 
   HETZNER_FSN1_ID = "caa7a807-36c5-8420-a75c-f906839dad71"
   HETZNER_HEL1_ID = "1f214853-0bc4-8020-b910-dffb867ef44f"
@@ -87,7 +86,6 @@ end
 #  kubernetes_cluster        | kubernetes_cluster_location_id_fkey        | (location_id) REFERENCES location(id)
 #  kubernetes_etcd_backup    | kubernetes_etcd_backup_location_id_fkey    | (location_id) REFERENCES location(id)
 #  location_az               | location_aws_az_location_id_fkey           | (location_id) REFERENCES location(id) ON DELETE CASCADE
-#  location_credential       | location_credential_id_fkey                | (id) REFERENCES location(id)
 #  location_credential_aws   | location_credential_aws_id_fkey            | (id) REFERENCES location(id)
 #  machine_image             | machine_image_location_id_fkey             | (location_id) REFERENCES location(id)
 #  machine_image_store       | machine_image_store_location_id_fkey       | (location_id) REFERENCES location(id)
