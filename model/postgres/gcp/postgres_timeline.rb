@@ -67,7 +67,7 @@ PGDATA=/dat/#{version}/data
         credential = location.location_credential_gcp
         begin
           credential.iam_client.delete_project_service_account(
-            "projects/-/serviceAccounts/#{access_key}"
+            "projects/-/serviceAccounts/#{access_key}",
           )
         rescue Google::Apis::ClientError
           # SA may already be deleted

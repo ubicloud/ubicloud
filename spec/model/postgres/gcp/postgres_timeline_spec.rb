@@ -7,7 +7,7 @@ RSpec.describe PostgresTimeline do
     described_class.create(
       access_key: "test-sa@test-project.iam.gserviceaccount.com",
       secret_key: '{"type":"service_account"}',
-      location_id: location.id
+      location_id: location.id,
     )
   }
 
@@ -17,7 +17,7 @@ RSpec.describe PostgresTimeline do
       display_name: "GCP us-central1",
       ui_name: "GCP US Central 1",
       visible: false,
-      provider: "gcp"
+      provider: "gcp",
     )
   }
 
@@ -145,7 +145,7 @@ PGDATA=/dat/17/data
         expect(storage_client).to receive(:create_bucket).with(postgres_timeline.ubid, location: "us-central1").and_yield(
           instance_double(Google::Cloud::Storage::Bucket::Updater).tap do |b|
             expect(b).to receive(:uniform_bucket_level_access=).with(true)
-          end
+          end,
         )
 
         postgres_timeline.create_bucket
@@ -170,7 +170,7 @@ PGDATA=/dat/17/data
         expect(bucket).to receive(:lifecycle).and_yield(
           instance_double(Google::Cloud::Storage::Bucket::Lifecycle).tap do |l|
             expect(l).to receive(:add_delete_rule).with(age: PostgresTimeline::BACKUP_BUCKET_EXPIRATION_DAYS)
-          end
+          end,
         )
 
         postgres_timeline.set_lifecycle_policy
@@ -195,7 +195,7 @@ PGDATA=/dat/17/data
         allow(postgres_timeline.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
         allow(location_credential_gcp).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:delete_project_service_account).with(
-          "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
+          "projects/-/serviceAccounts/#{postgres_timeline.access_key}",
         )
 
         postgres_timeline.destroy_blob_storage

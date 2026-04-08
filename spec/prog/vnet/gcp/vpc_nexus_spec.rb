@@ -38,7 +38,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       networks_client:,
       network_firewall_policies_client: nfp_client,
       global_operations_client: global_ops_client,
-      crm_client:
+      crm_client:,
     )
     nx.instance_variable_set(:@credential, credential)
   end
@@ -85,7 +85,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     it "skips creation and caches network_self_link if VPC already exists" do
       expect(networks_client).to receive(:get).with(
         project: "test-gcp-project",
-        network: vpc_name
+        network: vpc_name,
       ).and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
 
       expect { nx.create_vpc }.to hop("create_firewall_policy")
@@ -159,7 +159,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       expect(networks_client).to receive(:get)
@@ -173,7 +173,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient error")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       # First call in op_error? recovery, second call for network_self_link
@@ -206,9 +206,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
           associations: [
             Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
-              name: vpc_name, attachment_target: vpc_target
-            )
-          ])
+              name: vpc_name, attachment_target: vpc_target,
+            ),
+          ]),
       )
       expect(nfp_client).not_to receive(:insert)
       expect(nfp_client).not_to receive(:add_association)
@@ -218,7 +218,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "creates association when policy exists but has no association" do
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       expect(nfp_client).not_to receive(:insert)
 
@@ -231,7 +231,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "proceeds when association raises AlreadyExistsError from concurrent strand" do
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
@@ -241,7 +241,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "proceeds when association raises InvalidArgumentError with 'already exists'" do
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
@@ -251,7 +251,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "naps when VPC resource is not ready for association" do
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("The resource 'projects/test/global/networks/ubicloud-gcp-us-central1' is not ready"))
@@ -261,7 +261,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "re-raises InvalidArgumentError when not about association already existing or resource not ready" do
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("Invalid CIDR range"))
@@ -275,7 +275,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .and_raise(Google::Cloud::AlreadyExistsError.new("policy already exists"))
 
       expect(nfp_client).to receive(:get).and_return(
-        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
       assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-recovery")
       expect(nfp_client).to receive(:add_association).and_return(assoc_op)
@@ -324,7 +324,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       expect(nfp_client).to receive(:get)
@@ -337,7 +337,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient error")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       expect(nfp_client).to receive(:get)
@@ -371,7 +371,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry])
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
       expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
@@ -408,32 +408,32 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
             direction: "INGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               src_ip_ranges: described_class::RFC1918_RANGES,
-              layer4_configs: [all_proto]
-            ), target_secure_tags: []
+              layer4_configs: [all_proto],
+            ), target_secure_tags: [],
           )
         when 65533
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               dest_ip_ranges: described_class::RFC1918_RANGES,
-              layer4_configs: [all_proto]
-            ), target_secure_tags: []
+              layer4_configs: [all_proto],
+            ), target_secure_tags: [],
           )
         when 65532
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "INGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               src_ip_ranges: described_class::GCE_INTERNAL_IPV6_RANGES,
-              layer4_configs: [all_proto]
-            ), target_secure_tags: []
+              layer4_configs: [all_proto],
+            ), target_secure_tags: [],
           )
         when 65531
           Google::Cloud::Compute::V1::FirewallPolicyRule.new(
             direction: "EGRESS", action: "deny",
             match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
               dest_ip_ranges: described_class::GCE_INTERNAL_IPV6_RANGES,
-              layer4_configs: [all_proto]
-            ), target_secure_tags: []
+              layer4_configs: [all_proto],
+            ), target_secure_tags: [],
           )
         end
       end
@@ -447,8 +447,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       wrong_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["10.0.0.0/8"]
-        ), target_secure_tags: []
+          src_ip_ranges: ["10.0.0.0/8"],
+        ), target_secure_tags: [],
       )
       expect(nfp_client).to receive(:get_rule).exactly(4).times.and_return(wrong_rule)
 
@@ -509,7 +509,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(networks_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
 
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
@@ -533,39 +533,39 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       # delete_all_firewall_tag_keys
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/999", short_name: "ubicloud-fw-fwtest", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"}
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
       )
       other_vpc_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/777", short_name: "ubicloud-fw-other", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"}
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"},
       )
       unrelated_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
-        name: "tagKeys/555", short_name: "other-tag", purpose: "GCE_FIREWALL"
+        name: "tagKeys/555", short_name: "other-tag", purpose: "GCE_FIREWALL",
       )
       tag_val = Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/888", short_name: "active")
       allow(crm_client).to receive_messages(
         list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key, other_vpc_tag, unrelated_tag]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val])
+        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val]),
       )
       expect(crm_client).to receive(:delete_tag_value).with("tagValues/888")
       expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999")
 
       # delete_firewall_policy
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        associations: [Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: vpc_name)]
+        associations: [Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: vpc_name)],
       )
       expect(nfp_client).to receive(:get).with(
-        project: "test-gcp-project", firewall_policy: vpc_name
+        project: "test-gcp-project", firewall_policy: vpc_name,
       ).and_return(policy)
       expect(nfp_client).to receive(:remove_association)
         .and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-remove-assoc"))
       expect(nfp_client).to receive(:delete).with(
-        project: "test-gcp-project", firewall_policy: vpc_name
+        project: "test-gcp-project", firewall_policy: vpc_name,
       ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
 
       # delete_vpc_network
       expect(networks_client).to receive(:delete).with(
-        project: "test-gcp-project", network: vpc_name
+        project: "test-gcp-project", network: vpc_name,
       )
 
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
@@ -594,11 +594,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/999", short_name: "ubicloud-fw-fwfail", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"}
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
       )
       allow(crm_client).to receive_messages(
         list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [])
+        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: []),
       )
       allow(crm_client).to receive(:delete_tag_key)
         .and_raise(Google::Cloud::PermissionDeniedError.new("denied"))
@@ -617,12 +617,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/999", short_name: "ubicloud-fw-fwghost", purpose: "GCE_FIREWALL",
-        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"}
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
       )
       tag_val = Google::Apis::CloudresourcemanagerV3::TagValue.new(name: "tagValues/888", short_name: "active")
       allow(crm_client).to receive_messages(
         list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
-        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val])
+        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [tag_val]),
       )
       allow(crm_client).to receive(:delete_tag_value)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag value still attached to resources"))
@@ -636,7 +636,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "raises when VPC network is still in use" do
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
       allow(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -651,10 +651,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       nil_purpose_data_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/888", short_name: "ubicloud-fw-nilpurpose", purpose: "GCE_FIREWALL",
-        purpose_data: nil
+        purpose_data: nil,
       )
       allow(crm_client).to receive(:list_tag_keys).and_return(
-        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [nil_purpose_data_tag])
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [nil_purpose_data_tag]),
       )
       expect(crm_client).not_to receive(:delete_tag_key)
 
@@ -691,7 +691,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   describe "#policy_rule_matches_desired?" do
     it "returns false when existing.match is nil" do
       rule_no_match = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
-        direction: "EGRESS", action: "deny"
+        direction: "EGRESS", action: "deny",
       )
       all_proto = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
       result = nx.send(:policy_rule_matches_desired?, rule_no_match,
@@ -708,9 +708,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         direction: "EGRESS", action: "allow",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           dest_ip_ranges: ["10.0.0.0/26"],
-          layer4_configs: [all_proto]
+          layer4_configs: [all_proto],
         ),
-        target_secure_tags: [tag]
+        target_secure_tags: [tag],
       )
       result = nx.send(:policy_rule_matches_desired?, rule,
         direction: "EGRESS", action: "allow",

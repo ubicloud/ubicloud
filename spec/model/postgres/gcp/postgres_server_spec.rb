@@ -6,7 +6,7 @@ RSpec.describe PostgresServer do
   subject(:postgres_server) {
     described_class.create(
       timeline:, resource:, vm_id: vm.id, is_representative: true,
-      synchronization_status: "ready", timeline_access: "push", version: "17"
+      synchronization_status: "ready", timeline_access: "push", version: "17",
     )
   }
 
@@ -18,7 +18,7 @@ RSpec.describe PostgresServer do
       display_name: "GCP us-central1",
       ui_name: "GCP US Central 1",
       visible: false,
-      provider: "gcp"
+      provider: "gcp",
     )
   }
 
@@ -33,7 +33,7 @@ RSpec.describe PostgresServer do
     PostgresTimeline.create(
       location_id: location.id,
       access_key: "test-sa@test-project.iam.gserviceaccount.com",
-      secret_key: '{"type":"service_account","key":"data"}'
+      secret_key: '{"type":"service_account","key":"data"}',
     )
   }
 
@@ -48,7 +48,7 @@ RSpec.describe PostgresServer do
       target_version: "17",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
-      superuser_password: "super"
+      superuser_password: "super",
     )
   }
 
@@ -57,7 +57,7 @@ RSpec.describe PostgresServer do
       project_id: project.id,
       location_id: location.id,
       name: "gcp-pg-vm",
-      memory_gib: 8
+      memory_gib: 8,
     )
   }
 
@@ -86,7 +86,7 @@ RSpec.describe PostgresServer do
       it "writes SA key JSON to the server" do
         expect(postgres_server.vm.sshable).to receive(:_cmd).with(
           "sudo -u postgres tee /etc/postgresql/gcs-sa-key.json > /dev/null",
-          stdin: '{"type":"service_account","key":"data"}'
+          stdin: '{"type":"service_account","key":"data"}',
         )
 
         postgres_server.refresh_walg_blob_storage_credentials
@@ -116,7 +116,7 @@ RSpec.describe PostgresServer do
 
         expect(postgres_server.storage_device_paths).to eq([
           "/dev/disk/by-id/google-local-nvme-ssd-0",
-          "/dev/disk/by-id/google-local-nvme-ssd-1"
+          "/dev/disk/by-id/google-local-nvme-ssd-1",
         ])
       end
     end
@@ -146,19 +146,19 @@ RSpec.describe PostgresServer do
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
         expect(iam_client).to receive(:get_project_service_account).and_raise(
-          Google::Apis::ClientError.new("Not Found")
+          Google::Apis::ClientError.new("Not Found"),
         )
 
         expect(iam_client).to receive(:create_service_account).with(
           "projects/test-project",
-          an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest)
+          an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
         ).and_return(sa)
 
         empty_policy = Google::Apis::IamV1::Policy.new(bindings: [])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(empty_policy)
         expect(iam_client).to receive(:set_service_account_iam_policy).with(
           sa_resource_name,
-          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest)
+          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest),
         ) do |_, req|
           binding = req.policy.bindings.find { it.role == "roles/iam.serviceAccountKeyAdmin" }
           expect(binding).not_to be_nil
@@ -176,12 +176,12 @@ RSpec.describe PostgresServer do
         expect(policy).to receive(:bindings).and_return(bindings)
         expect(bindings).to receive(:insert).with(
           role: "roles/storage.objectAdmin",
-          members: ["serviceAccount:pg-tl-abcd1234@test-project.iam.gserviceaccount.com"]
+          members: ["serviceAccount:pg-tl-abcd1234@test-project.iam.gserviceaccount.com"],
         )
         expect(bucket).to receive(:policy=).with(policy)
 
         expect(iam_client).to receive(:create_service_account_key).with(
-          sa_resource_name
+          sa_resource_name,
         ).and_return(key)
 
         postgres_server.attach_s3_policy_if_needed
@@ -247,17 +247,17 @@ RSpec.describe PostgresServer do
         existing_policy = Google::Apis::IamV1::Policy.new(bindings: [
           Google::Apis::IamV1::Binding.new(
             role: "roles/iam.serviceAccountKeyAdmin",
-            members: ["serviceAccount:test@test-project.iam.gserviceaccount.com"]
+            members: ["serviceAccount:test@test-project.iam.gserviceaccount.com"],
           ),
           Google::Apis::IamV1::Binding.new(
             role: "roles/viewer",
-            members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"]
-          )
+            members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"],
+          ),
         ])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(existing_policy)
         expect(iam_client).to receive(:set_service_account_iam_policy).with(
           sa_resource_name,
-          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest)
+          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest),
         ) do |_, req|
           # Should preserve both bindings and not duplicate the member
           key_admin = req.policy.bindings.find { it.role == "roles/iam.serviceAccountKeyAdmin" }
@@ -300,18 +300,18 @@ RSpec.describe PostgresServer do
         existing_policy = Google::Apis::IamV1::Policy.new(bindings: [
           Google::Apis::IamV1::Binding.new(
             role: "roles/iam.serviceAccountKeyAdmin",
-            members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"]
-          )
+            members: ["serviceAccount:other@test-project.iam.gserviceaccount.com"],
+          ),
         ])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(existing_policy)
         expect(iam_client).to receive(:set_service_account_iam_policy).with(
           sa_resource_name,
-          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest)
+          an_instance_of(Google::Apis::IamV1::SetIamPolicyRequest),
         ) do |_, req|
           binding = req.policy.bindings.find { it.role == "roles/iam.serviceAccountKeyAdmin" }
           expect(binding.members).to contain_exactly(
             "serviceAccount:other@test-project.iam.gserviceaccount.com",
-            "serviceAccount:test@test-project.iam.gserviceaccount.com"
+            "serviceAccount:test@test-project.iam.gserviceaccount.com",
           )
         end
 
@@ -366,12 +366,12 @@ RSpec.describe PostgresServer do
           parent_timeline = PostgresTimeline.create(
             location_id: location.id,
             access_key: "old-sa@test-project.iam.gserviceaccount.com",
-            secret_key: '{"type":"service_account","key":"old"}'
+            secret_key: '{"type":"service_account","key":"old"}',
           )
           timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
           expect(iam_client).to receive(:delete_project_service_account).with(
-            "projects/-/serviceAccounts/old-sa@test-project.iam.gserviceaccount.com"
+            "projects/-/serviceAccounts/old-sa@test-project.iam.gserviceaccount.com",
           )
 
           postgres_server.attach_s3_policy_if_needed
@@ -381,7 +381,7 @@ RSpec.describe PostgresServer do
           parent_timeline = PostgresTimeline.create(
             location_id: location.id,
             access_key: nil,
-            secret_key: nil
+            secret_key: nil,
           )
           timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
@@ -394,12 +394,12 @@ RSpec.describe PostgresServer do
           parent_timeline = PostgresTimeline.create(
             location_id: location.id,
             access_key: "deleted-sa@test-project.iam.gserviceaccount.com",
-            secret_key: '{"type":"service_account","key":"old"}'
+            secret_key: '{"type":"service_account","key":"old"}',
           )
           timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
           expect(iam_client).to receive(:delete_project_service_account).and_raise(
-            Google::Apis::ClientError.new("Not Found")
+            Google::Apis::ClientError.new("Not Found"),
           )
 
           expect { postgres_server.attach_s3_policy_if_needed }.not_to raise_error

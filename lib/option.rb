@@ -74,7 +74,7 @@ module Option
     "c4a-highmem" => gcp_c4a_storage,
     "c3-standard" => gcp_c3_storage,
     "c3d-standard" => gcp_c3d_storage,
-    "c3d-highmem" => gcp_c3d_storage
+    "c3d-highmem" => gcp_c3d_storage,
   }.freeze
 
   BootImage = Struct.new(:name, :display_name)
@@ -179,7 +179,7 @@ module Option
     ["c4a-highmem", "Memory Optimized, Google Axion"],
     ["c3-standard", "General Purpose, Intel Sapphire Rapids"],
     ["c3d-standard", "General Purpose, AMD EPYC Genoa"],
-    ["c3d-highmem", "Memory Optimized, AMD EPYC Genoa"]
+    ["c3d-highmem", "Memory Optimized, AMD EPYC Genoa"],
   ].to_h { |args| [args[0], PostgresFamilyOption.new(*args)] }.freeze
 
   PostgresSizeOption = Data.define(:name, :family, :vcpu_count, :memory_gib)
@@ -307,7 +307,7 @@ module Option
     ["c3d-highmem", 60, 480],
     ["c3d-highmem", 90, 720],
     ["c3d-highmem", 180, 1440],
-    ["c3d-highmem", 360, 2880]
+    ["c3d-highmem", 360, 2880],
   ].to_h do |args|
     name = if AWS_FAMILY_OPTIONS.include?(args[0])
       aws_instance_type_name(args[0], args[1])

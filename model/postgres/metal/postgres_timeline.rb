@@ -58,7 +58,7 @@ PGDATA=/dat/#{version}/data
         endpoint: blob_storage_endpoint,
         access_key: blob_storage.admin_user,
         secret_key: blob_storage.admin_password,
-        ssl_ca_data: blob_storage.root_certs
+        ssl_ca_data: blob_storage.root_certs,
       )
       admin_client.admin_remove_user(access_key)
       admin_client.admin_policy_remove(ubid)
@@ -69,7 +69,7 @@ PGDATA=/dat/#{version}/data
         endpoint: blob_storage_endpoint,
         access_key: blob_storage.admin_user,
         secret_key: blob_storage.admin_password,
-        ssl_ca_data: blob_storage.root_certs
+        ssl_ca_data: blob_storage.root_certs,
       )
       admin_client.admin_add_user(access_key, secret_key)
       admin_client.admin_policy_add(ubid, blob_storage_policy)

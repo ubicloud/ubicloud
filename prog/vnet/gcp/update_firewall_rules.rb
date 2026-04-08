@@ -108,7 +108,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       short_name:,
       parent: tag_key_parent,
       purpose: "GCE_FIREWALL",
-      purpose_data: {"network" => gcp_network_self_link_with_id}
+      purpose_data: {"network" => gcp_network_self_link_with_id},
     )
 
     op = credential.crm_client.create_tag_key(tag_key_obj)
@@ -153,7 +153,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
     tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
       short_name:,
-      parent: tag_key_name
+      parent: tag_key_name,
     )
 
     op = credential.crm_client.create_tag_value(tag_value_obj)
@@ -205,7 +205,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   def sync_tag_policy_rules(desired_rules, tag_value_name)
     policy = credential.network_firewall_policies_client.get(
       project: gcp_project_id,
-      firewall_policy: firewall_policy_name
+      firewall_policy: firewall_policy_name,
     )
 
     all_rules = policy.rules || []
@@ -251,7 +251,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       credential.network_firewall_policies_client.add_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
-        firewall_policy_rule_resource: rule
+        firewall_policy_rule_resource: rule,
       )
     rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
       raise if e.is_a?(Google::Cloud::InvalidArgumentError) && !e.message.include?("same priorities")
@@ -262,7 +262,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       # Re-read policy to get current used priorities and pick a new slot
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
-        firewall_policy: firewall_policy_name
+        firewall_policy: firewall_policy_name,
       )
       used = Set.new((policy.rules || []).map(&:priority))
       next_p = TAG_RULE_BASE_PRIORITY
@@ -277,7 +277,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     credential.network_firewall_policies_client.remove_rule(
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
-      priority:
+      priority:,
     )
   rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
     # Already deleted
@@ -326,7 +326,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   def create_tag_binding(parent_resource, tag_value_name)
     tag_binding_obj = Google::Apis::CloudresourcemanagerV3::TagBinding.new(
       parent: parent_resource,
-      tag_value: tag_value_name
+      tag_value: tag_value_name,
     )
 
     # Fire-and-forget — the binding completes asynchronously.
@@ -342,7 +342,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       instance = credential.compute_client.get(
         project: gcp_project_id,
         zone: gcp_zone,
-        instance: vm.name
+        instance: vm.name,
       )
       # Tag Binding API requires project number (not project ID) and numeric instance ID
       "//compute.googleapis.com/projects/#{gcp_project_number}/zones/#{gcp_zone}/instances/#{instance.id}"
@@ -384,7 +384,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         all_rules ||= begin
           policy = credential.network_firewall_policies_client.get(
             project: gcp_project_id,
-            firewall_policy: firewall_policy_name
+            firewall_policy: firewall_policy_name,
           )
           policy.rules || []
         end
@@ -432,7 +432,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         direction: "INGRESS",
         source_ranges: [cidr],
         target_secure_tags: [tag_value_name],
-        layer4_configs:
+        layer4_configs:,
       }
     end
 
@@ -443,7 +443,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     layer4_configs = desired[:layer4_configs].map do |cfg|
       Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(
         ip_protocol: cfg[:ip_protocol],
-        ports: cfg[:ports]
+        ports: cfg[:ports],
       )
     end
 
@@ -453,11 +453,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       action: "allow",
       match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
         src_ip_ranges: desired[:source_ranges],
-        layer4_configs:
+        layer4_configs:,
       ),
       target_secure_tags: desired[:target_secure_tags].map { |t|
         Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: t)
-      }
+      },
     )
   end
 

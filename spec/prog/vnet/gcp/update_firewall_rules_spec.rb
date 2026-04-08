@@ -18,7 +18,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
   let(:regional_crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
   let(:credential) {
-    instance_double(LocationCredential,
+    instance_double(LocationCredentialGcp,
       network_firewall_policies_client: nfp_client,
       global_operations_client: global_ops_client,
       compute_client:,
@@ -777,7 +777,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }]
 
       expect(nfp_client).to receive(:add_rule) do |args|
@@ -801,13 +801,13 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
           src_ip_ranges: ["0.0.0.0/0"],
           layer4_configs: [
             Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(
-              ip_protocol: "tcp", ports: ["22"]
-            )
-          ]
+              ip_protocol: "tcp", ports: ["22"],
+            ),
+          ],
         ),
         target_secure_tags: [
-          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value)
-        ]
+          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value),
+        ],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [existing_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -816,7 +816,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }]
 
       expect(nfp_client).not_to receive(:add_rule)
@@ -833,12 +833,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["10.0.0.0/8"],
           layer4_configs: [
-            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])
-          ]
+            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"]),
+          ],
         ),
         target_secure_tags: [
-          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value)
-        ]
+          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value),
+        ],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [stale_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -854,8 +854,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         action: "deny",
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
-          src_ip_ranges: ["192.168.0.0/16"]
-        )
+          src_ip_ranges: ["192.168.0.0/16"],
+        ),
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [occupied_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -864,7 +864,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }]
 
       expect(nfp_client).to receive(:add_rule) do |args|
@@ -884,12 +884,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["10.0.0.0/8"],
           layer4_configs: [
-            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"])
-          ]
+            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["80"]),
+          ],
         ),
         target_secure_tags: [
-          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value)
-        ]
+          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: tag_value),
+        ],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [stale_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -898,7 +898,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: [tag_value],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }]
 
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10000)).and_return(lro_op)
@@ -919,12 +919,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
           src_ip_ranges: ["0.0.0.0/0"],
           layer4_configs: [
-            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"])
-          ]
+            Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp", ports: ["22"]),
+          ],
         ),
         target_secure_tags: [
-          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")
-        ]
+          Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv"),
+        ],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [other_tag_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -943,7 +943,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }
 
       expect(nfp_client).to receive(:add_rule).and_return(lro_op)
@@ -956,11 +956,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }
 
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        rules: [Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: 10000)]
+        rules: [Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: 10000)],
       )
 
       expect(nfp_client).to receive(:add_rule).ordered
@@ -979,11 +979,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }
 
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        rules: [Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: 10000)]
+        rules: [Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: 10000)],
       )
 
       expect(nfp_client).to receive(:add_rule).ordered
@@ -1002,7 +1002,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }
 
       expect(nfp_client).to receive(:add_rule)
@@ -1017,11 +1017,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges: ["0.0.0.0/0"],
         target_secure_tags: ["tagValues/tv-1"],
-        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}]
+        layer4_configs: [{ip_protocol: "tcp", ports: ["22"]}],
       }
 
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
-        rules: (10000..10010).map { |p| Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: p) }
+        rules: (10000..10010).map { |p| Google::Cloud::Compute::V1::FirewallPolicyRule.new(priority: p) },
       )
 
       expect(nfp_client).to receive(:add_rule).exactly(6).times
@@ -1134,7 +1134,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 10005,
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [orphan_rule])
       allow(nfp_client).to receive(:get).and_return(policy)
@@ -1163,7 +1163,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       orphan_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 10010,
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [orphan_rule])
       allow(nfp_client).to receive(:get).and_return(policy)
@@ -1319,7 +1319,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       deny_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 10005,
         action: "deny",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: orphan_tag_value_name)],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [deny_rule])
       allow(nfp_client).to receive(:get).and_return(policy)
@@ -1347,7 +1347,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       unrelated_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 10005,
         action: "allow",
-        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")]
+        target_secure_tags: [Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: "tagValues/other-tv")],
       )
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [unrelated_rule])
       allow(nfp_client).to receive(:get).and_return(policy)
@@ -1446,7 +1446,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "groups rules by CIDR" do
       rules = [
         instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (443...444), protocol: "tcp", ip6?: false)
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (443...444), protocol: "tcp", ip6?: false),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1458,7 +1458,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "creates separate rules for different CIDRs" do
       rules = [
         instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("10.0.0.0/8"), port_range: (5432...5433), protocol: "tcp", ip6?: false)
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("10.0.0.0/8"), port_range: (5432...5433), protocol: "tcp", ip6?: false),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1473,7 +1473,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "groups by protocol within a CIDR" do
       rules = [
         instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (53...54), protocol: "udp", ip6?: false)
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (53...54), protocol: "udp", ip6?: false),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1485,7 +1485,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "formats port ranges correctly" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (80...9999), protocol: "tcp", ip6?: false)
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (80...9999), protocol: "tcp", ip6?: false),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1494,7 +1494,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "formats single-port ranges as single number" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (5432...5433), protocol: "tcp", ip6?: false)
+        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (5432...5433), protocol: "tcp", ip6?: false),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1513,13 +1513,13 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
           src_ip_ranges: src_ranges,
           layer4_configs: l4.map { |c|
             Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(
-              ip_protocol: c[:proto], ports: c[:ports]
+              ip_protocol: c[:proto], ports: c[:ports],
             )
-          }
+          },
         ),
         target_secure_tags: tags.map { |t|
           Google::Cloud::Compute::V1::FirewallPolicyRuleSecureTag.new(name: t)
-        }
+        },
       )
     end
 
@@ -1528,7 +1528,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         direction: "INGRESS",
         source_ranges:,
         target_secure_tags: tags,
-        layer4_configs: l4
+        layer4_configs: l4,
       }
     end
 

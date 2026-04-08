@@ -18,7 +18,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     NicGcpResource.create_with_id(
       nic.id,
       network_name: ps.gcp_vpc.name,
-      subnet_name: "ubicloud-#{ps.ubid}"
+      subnet_name: "ubicloud-#{ps.ubid}",
     )
 
     hop_allocate_static_ip
@@ -41,14 +41,14 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     address_resource = Google::Cloud::Compute::V1::Address.new(
       name: address_name,
       address_type: "EXTERNAL",
-      network_tier: "STANDARD"
+      network_tier: "STANDARD",
     )
 
     begin
       op = addresses_client.insert(
         project: gcp_project_id,
         region: gcp_region,
-        address_resource:
+        address_resource:,
       )
     rescue Google::Cloud::AlreadyExistsError
       addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)

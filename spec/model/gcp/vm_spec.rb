@@ -14,7 +14,7 @@ RSpec.describe Vm do
       project_id: project.id,
       location_id: location.id,
       name: "gcp-test-vm",
-      memory_gib: 8
+      memory_gib: 8,
     )
   }
 

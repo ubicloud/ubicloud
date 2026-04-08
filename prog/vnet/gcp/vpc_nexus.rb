@@ -43,7 +43,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     begin
       network = credential.networks_client.get(
         project: gcp_project_id,
-        network: gcp_vpc.name
+        network: gcp_vpc.name,
       )
       cache_network_self_link(network)
     rescue Google::Cloud::NotFoundError
@@ -54,9 +54,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
             name: gcp_vpc.name,
             auto_create_subnetworks: false,
             routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
-              routing_mode: "REGIONAL"
-            )
-          )
+              routing_mode: "REGIONAL",
+            ),
+          ),
         )
         save_gcp_op(op.name, "global")
         hop_wait_create_vpc
@@ -98,7 +98,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     policy = begin
       credential.network_firewall_policies_client.get(
         project: gcp_project_id,
-        firewall_policy: firewall_policy_name
+        firewall_policy: firewall_policy_name,
       )
     rescue Google::Cloud::NotFoundError
       begin
@@ -106,8 +106,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           project: gcp_project_id,
           firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
             name: firewall_policy_name,
-            description: "Ubicloud network firewall policy for #{gcp_vpc.name}"
-          )
+            description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
+          ),
         )
         save_gcp_op(op.name, "global")
         hop_wait_firewall_policy_created
@@ -119,7 +119,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
     policy ||= credential.network_firewall_policies_client.get(
       project: gcp_project_id,
-      firewall_policy: firewall_policy_name
+      firewall_policy: firewall_policy_name,
     )
 
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
@@ -133,8 +133,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         firewall_policy: firewall_policy_name,
         firewall_policy_association_resource: Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
           name: gcp_vpc.name,
-          attachment_target: vpc_target
-        )
+          attachment_target: vpc_target,
+        ),
       )
       save_gcp_op(assoc_op.name, "global")
       hop_wait_firewall_policy_associated
@@ -191,28 +191,28 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       priority: DENY_RULE_BASE_PRIORITY,
       direction: "INGRESS",
       action: "deny",
-      src_ip_ranges: RFC1918_RANGES
+      src_ip_ranges: RFC1918_RANGES,
     )
 
     ensure_policy_rule(
       priority: DENY_RULE_BASE_PRIORITY - 1,
       direction: "EGRESS",
       action: "deny",
-      dest_ip_ranges: RFC1918_RANGES
+      dest_ip_ranges: RFC1918_RANGES,
     )
 
     ensure_policy_rule(
       priority: DENY_RULE_BASE_PRIORITY - 2,
       direction: "INGRESS",
       action: "deny",
-      src_ip_ranges: GCE_INTERNAL_IPV6_RANGES
+      src_ip_ranges: GCE_INTERNAL_IPV6_RANGES,
     )
 
     ensure_policy_rule(
       priority: DENY_RULE_BASE_PRIORITY - 3,
       direction: "EGRESS",
       action: "deny",
-      dest_ip_ranges: GCE_INTERNAL_IPV6_RANGES
+      dest_ip_ranges: GCE_INTERNAL_IPV6_RANGES,
     )
 
     hop_wait
@@ -260,7 +260,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       }
     else
       [
-        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
+        Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all"),
       ]
     end
 
@@ -268,7 +268,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       priority:,
       direction:,
       action:,
-      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs)
+      match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(**matcher_attrs),
     }
 
     if target_secure_tags
@@ -283,7 +283,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       credential.network_firewall_policies_client.get_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
-        priority:
+        priority:,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       nil
@@ -297,7 +297,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
           priority:,
-          firewall_policy_rule_resource: rule
+          firewall_policy_rule_resource: rule,
         )
       end
     else
@@ -305,7 +305,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         credential.network_firewall_policies_client.add_rule(
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
-          firewall_policy_rule_resource: rule
+          firewall_policy_rule_resource: rule,
         )
       rescue ::Google::Cloud::AlreadyExistsError
         # Concurrent strand added this rule -- proceed.
@@ -352,19 +352,19 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     begin
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
-        firewall_policy: firewall_policy_name
+        firewall_policy: firewall_policy_name,
       )
       policy.associations.each do |assoc|
         credential.network_firewall_policies_client.remove_association(
           project: gcp_project_id,
           firewall_policy: firewall_policy_name,
-          name: assoc.name
+          name: assoc.name,
         )
       end
 
       credential.network_firewall_policies_client.delete(
         project: gcp_project_id,
-        firewall_policy: firewall_policy_name
+        firewall_policy: firewall_policy_name,
       )
     rescue Google::Cloud::NotFoundError
       # Already deleted
@@ -377,7 +377,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   def delete_vpc_network
     credential.networks_client.delete(
       project: gcp_project_id,
-      network: gcp_vpc.name
+      network: gcp_vpc.name,
     )
   rescue Google::Cloud::NotFoundError
     # Already deleted

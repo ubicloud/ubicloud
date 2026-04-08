@@ -57,7 +57,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       display_name: "GCP US Central 1",
       ui_name: "gcp-us-central1",
       visible: true,
-      provider: "gcp"
+      provider: "gcp",
     )
     LocationCredentialGcp.create_with_id(loc,
       project_id: "test-gcp-project",
@@ -218,7 +218,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:create_policy, {policy: {arn: "policy-arn"}})
-      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       postgres_timeline.setup_blob_storage
     end
@@ -229,8 +229,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
-      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("123456789012")
+      expect(postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("123456789012")
 
       expect(iam_client).to receive(:delete_policy).with(policy_arn: "arn:aws:iam::123456789012:policy/#{postgres_timeline.ubid}")
 
@@ -242,7 +242,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       expect(iam_client).to receive(:list_attached_user_policies).and_raise(Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity"))
 
@@ -480,7 +480,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         expect(bucket).to receive(:delete)
 
         expect(iam_service).to receive(:delete_project_service_account).with(
-          "projects/-/serviceAccounts/#{postgres_timeline.access_key}"
+          "projects/-/serviceAccounts/#{postgres_timeline.access_key}",
         )
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
