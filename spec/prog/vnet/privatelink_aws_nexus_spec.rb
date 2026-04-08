@@ -58,6 +58,10 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       end
     end
 
+    it "fails if no ports are given" do
+      expect { described_class.assemble(private_subnet_id: ps.id, ports: []) }.to raise_error("PrivateLink must have at least one port")
+    end
+
     it "creates PrivatelinkAwsResource, ports, and strand" do
       strand = described_class.assemble(private_subnet_id: ps.id, ports: [[5432, 5432], [6432, 5432]], description: "test PL")
       pl = strand.subject

@@ -19,6 +19,8 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
       raise CloverError.new(409, "InvalidRequest", "PrivateLink already exists for this subnet")
     end
 
+    fail "PrivateLink must have at least one port" if ports.empty?
+
     DB.transaction do
       pl = PrivatelinkAwsResource.create(
         private_subnet_id:,
@@ -68,8 +70,6 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
   end
 
   label def start
-    fail "PrivateLink must have at least one port" if privatelink_aws_resource.ports.empty?
-
     nic = private_subnet.nics.find(&:nic_aws_resource)
 
     unless nic
