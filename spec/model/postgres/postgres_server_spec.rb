@@ -42,6 +42,38 @@ RSpec.describe PostgresServer do
     allow(Config).to receive(:postgres_service_project_id).and_return(project_service.id)
   end
 
+  describe "#aws_lockout_mechanisms" do
+    it "returns pg_stop and hba for AWS servers" do
+      aws_location = Location.create(
+        name: "us-east-1", project:, display_name: "us-east-1",
+        ui_name: "us-east-1", provider: "aws", visible: true
+      )
+      aws_timeline = PostgresTimeline.create(location_id: aws_location.id)
+      aws_resource = PostgresResource.create(
+        name: "aws-postgres-resource", project:, location_id: aws_location.id,
+        ha_type: PostgresResource::HaType::NONE, user_config: {},
+        pgbouncer_user_config: {}, target_version: "16",
+        target_vm_size: "standard-2", target_storage_size_gib: 64,
+        superuser_password: "super"
+      )
+      aws_ps = PrivateSubnet.create(
+        name: "aws-pg-subnet", project:, location: aws_location,
+        net4: NetAddr::IPv4Net.parse("172.0.1.0/26"),
+        net6: NetAddr::IPv6Net.parse("fdfa:b5aa:14a3:4a4d::/64")
+      )
+      aws_vm = Prog::Vm::Nexus.assemble_with_sshable(
+        project.id, name: "aws-pg-vm", private_subnet_id: aws_ps.id,
+        location_id: aws_location.id, unix_user: "ubi"
+      ).subject
+      aws_server = described_class.create(
+        timeline: aws_timeline, resource: aws_resource, vm_id: aws_vm.id,
+        is_representative: true, synchronization_status: "ready",
+        timeline_access: "push", version: "16"
+      )
+      expect(aws_server.lockout_mechanisms).to eq(["pg_stop", "hba"])
+    end
+  end
+
   describe "#configure" do
     before do
       resource.update(flavor: PostgresResource::Flavor::STANDARD, cert_auth_users: [])
