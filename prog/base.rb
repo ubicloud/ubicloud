@@ -346,6 +346,12 @@ end
     strand.save_changes
   end
 
+  def delete_from_stack(*keys)
+    keys.flatten.each { |key| strand.stack.first.delete(key) }
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
