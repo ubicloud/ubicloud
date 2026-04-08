@@ -407,7 +407,18 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.initialize_database_from_backup }.to nap(5)
     end
 
-    it "hops to refresh_certificates if initialize_database_from_backup command is succeeded" do
+    it "resolves page and hops if initialize_database_from_backup command is succeeded" do
+      page = Prog::PageNexus.assemble("#{server.ubid} initialize database from backup failed after 3 attempts",
+        ["PGInitializeDatabaseFromBackupFailed", server.id], server.ubid).subject
+
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
+      expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
+      expect(Semaphore.where(strand_id: page.id, name: "resolve").count).to eq(1)
+    end
+
+    it "hops when succeeded without an existing page" do
+      refresh_frame(nx, new_values: {"disk_usage" => 1024, "initialize_database_from_backup_try_count" => 3})
+
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Succeeded")
       expect { nx.initialize_database_from_backup }.to hop("refresh_certificates")
     end
@@ -463,6 +474,26 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(standby_sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("InProgress")
       expect(standby_sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
       expect { standby_nx.initialize_database_from_backup }.to nap(5)
+    end
+
+    it "increments try count on Failed" do
+      postgres_resource.update(restore_target: Time.now)
+      expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label")
+      expect(sshable).to receive(:_cmd).with(/daemonizer2 run/, anything)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Failed")
+      expect { nx.initialize_database_from_backup }.to nap(5)
+      expect(frame_value(nx, "initialize_database_from_backup_try_count")).to eq(1)
+    end
+
+    it "creates a page when try count reaches 3" do
+      refresh_frame(nx, new_values: {"initialize_database_from_backup_try_count" => 3})
+      postgres_resource.update(restore_target: Time.now)
+      expect(server.timeline).to receive(:latest_backup_label_before_target).and_return("backup-label")
+      expect(sshable).to receive(:_cmd).with(/daemonizer2 run/, anything)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer2 check initialize_database_from_backup").and_return("Failed")
+
+      expect { nx.initialize_database_from_backup }.to nap(5)
+      expect(Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", server.id)).not_to be_nil
     end
   end
 

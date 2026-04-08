@@ -196,6 +196,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def initialize_database_from_backup
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
+      Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", postgres_server.id)&.incr_resolve
       hop_refresh_certificates
     when "InProgress"
       disk_usage = begin
@@ -209,6 +210,13 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
       end
     when "Failed", "NotStarted"
+      previous_try_count = frame["initialize_database_from_backup_try_count"] || 0
+      if previous_try_count >= 3
+        Prog::PageNexus.assemble("#{postgres_server.ubid} initialize database from backup failed after 3 attempts",
+          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid)
+      end
+      update_stack({"initialize_database_from_backup_try_count" => previous_try_count + 1})
+
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
       else
