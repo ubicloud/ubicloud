@@ -6,6 +6,7 @@ class MachineImageVersionMetal < Sequel::Model
   many_to_one :machine_image_version, key: :id, read_only: true, is_used: true
   many_to_one :store, class: :MachineImageStore, read_only: true
   many_to_one :archive_kek, class: :StorageKeyEncryptionKey, read_only: true
+  one_to_many :vm_storage_volumes, key: :machine_image_version_id, read_only: true
 
   plugin ResourceMethods, referencing: UBID::TYPE_MACHINE_IMAGE_VERSION
 end
