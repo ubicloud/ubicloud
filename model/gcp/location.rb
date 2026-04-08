@@ -2,7 +2,17 @@
 
 class Location < Sequel::Model
   module Gcp
+    def pg_gce_image(arch)
+      image = PgGceImage.find(arch:)
+      raise "No GCE image found for arch #{arch}" unless image
+      "projects/#{image.gcp_project_id}/global/images/#{image.gce_image_name}"
+    end
+
     private
+
+    def gcp_pg_boot_image(pg_version, arch, flavor)
+      pg_gce_image(arch)
+    end
 
     def gcp_azs
       v = location_azs_dataset.all
