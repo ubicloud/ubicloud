@@ -78,9 +78,18 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
   end
 
   describe "#start" do
-    it "creates an NLB and hops to wait_nlb_active" do
-      nlb_arn = "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/pl-test/abc123"
+    let(:nlb_arn) { "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/pl-test/abc123" }
+
+    it "creates an NLB when none exists and hops to wait_nlb_active" do
+      elb_client.stub_responses(:describe_load_balancers, Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound.new(nil, nil))
       elb_client.stub_responses(:create_load_balancer, load_balancers: [{load_balancer_arn: nlb_arn}])
+      expect { nx.start }.to hop("wait_nlb_active")
+        .and change { pl.reload.nlb_arn }.from(nil).to(nlb_arn)
+    end
+
+    it "uses an existing NLB if already created in AWS and hops to wait_nlb_active" do
+      elb_client.stub_responses(:describe_load_balancers, load_balancers: [{load_balancer_arn: nlb_arn}])
+      expect(elb_client).not_to receive(:create_load_balancer)
       expect { nx.start }.to hop("wait_nlb_active")
         .and change { pl.reload.nlb_arn }.from(nil).to(nlb_arn)
     end
@@ -109,7 +118,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
   describe "#create_target_groups_and_listeners" do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
+      elb_client.stub_responses(:describe_target_groups, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
       elb_client.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc"}])
+      elb_client.stub_responses(:describe_listeners, listeners: [])
       elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
@@ -120,13 +131,29 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(port.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
 
-    it "skips target group creation if already present" do
+    it "recovers an existing target group created in AWS but not yet saved to DB" do
+      elb_client.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered"}])
+      expect(elb_client).not_to receive(:create_target_group)
+      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered")
+    end
+
+    it "skips target group creation if already present in DB" do
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing")
+      elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing", port: 5432}])
       expect(elb_client).not_to receive(:create_target_group)
       expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
     end
 
-    it "skips listener creation if already present" do
+    it "recovers an existing listener created in AWS but not yet saved to DB" do
+      pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing")
+      elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered", port: 5432}])
+      expect(elb_client).not_to receive(:create_listener)
+      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered")
+    end
+
+    it "skips listener creation if already present in DB" do
       pl.ports.first.update(
         target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing",
         listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing"
@@ -147,11 +174,23 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
   describe "#create_endpoint_service" do
     before { pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc") }
 
-    it "creates endpoint service and hops to wait" do
+    it "creates endpoint service when none exists and hops to wait" do
+      ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations, service_configurations: [])
       ec2_client.stub_responses(:create_vpc_endpoint_service_configuration, service_configuration: {
         service_name: "com.amazonaws.vpce.us-east-1.vpce-svc-0abc123",
         service_id: "vpce-svc-0abc123"
       })
+      expect { nx.create_endpoint_service }.to hop("wait")
+        .and change { pl.reload.service_name }.from(nil).to("com.amazonaws.vpce.us-east-1.vpce-svc-0abc123")
+        .and change { pl.reload.service_id }.from(nil).to("vpce-svc-0abc123")
+    end
+
+    it "uses an existing endpoint service if already created in AWS and hops to wait" do
+      ec2_client.stub_responses(:describe_vpc_endpoint_service_configurations, service_configurations: [{
+        service_name: "com.amazonaws.vpce.us-east-1.vpce-svc-0abc123",
+        service_id: "vpce-svc-0abc123"
+      }])
+      expect(ec2_client).not_to receive(:create_vpc_endpoint_service_configuration)
       expect { nx.create_endpoint_service }.to hop("wait")
         .and change { pl.reload.service_name }.from(nil).to("com.amazonaws.vpce.us-east-1.vpce-svc-0abc123")
         .and change { pl.reload.service_id }.from(nil).to("vpce-svc-0abc123")
@@ -178,6 +217,7 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       nx.incr_add_port
+      elb_client.stub_responses(:describe_target_groups, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
       elb_client.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/new"}])
     }
 
@@ -187,8 +227,16 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.listener_arn).to be_nil
     end
 
-    it "skips ports that already have a target group" do
+    it "recovers an existing target group created in AWS but not yet saved to DB" do
+      elb_client.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered"}])
+      expect(elb_client).not_to receive(:create_target_group)
+      expect { nx.add_port }.to hop("add_listener")
+      expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered")
+    end
+
+    it "skips ports that already have a target group in DB" do
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing")
+      expect(elb_client).not_to receive(:describe_target_groups)
       expect(elb_client).not_to receive(:create_target_group)
       expect { nx.add_port }.to hop("add_listener")
     end
@@ -198,6 +246,7 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
+      elb_client.stub_responses(:describe_listeners, listeners: [])
       elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
@@ -206,8 +255,16 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
 
-    it "skips ports that already have a listener" do
+    it "recovers an existing listener created in AWS but not yet saved to DB" do
+      elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered", port: 5432}])
+      expect(elb_client).not_to receive(:create_listener)
+      expect { nx.add_listener }.to hop("wait")
+      expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered")
+    end
+
+    it "skips ports that already have a listener in DB" do
       pl.ports.first.update(listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing")
+      expect(elb_client).not_to receive(:describe_listeners)
       expect(elb_client).not_to receive(:create_listener)
       expect { nx.add_listener }.to hop("wait")
     end

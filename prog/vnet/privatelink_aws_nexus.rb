@@ -77,17 +77,23 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
       nap 10
     end
 
-    nlb_arn = elb_client.create_load_balancer(
-      name: "pl-#{privatelink_aws_resource.ubid}",
-      type: "network",
-      scheme: "internal",
-      ip_address_type: "ipv4",
-      subnets: [nic.nic_aws_resource.subnet_id],
-      tags: [
-        {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
-        {key: "subnet_ubid", value: private_subnet.ubid.to_s}
-      ]
-    ).load_balancers.first.load_balancer_arn
+    nlb_arn = begin
+      elb_client.describe_load_balancers(
+        names: ["pl-#{privatelink_aws_resource.ubid}"]
+      ).load_balancers.first.load_balancer_arn
+    rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
+      elb_client.create_load_balancer(
+        name: "pl-#{privatelink_aws_resource.ubid}",
+        type: "network",
+        scheme: "internal",
+        ip_address_type: "ipv4",
+        subnets: [nic.nic_aws_resource.subnet_id],
+        tags: [
+          {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
+          {key: "subnet_ubid", value: private_subnet.ubid.to_s}
+        ]
+      ).load_balancers.first.load_balancer_arn
+    end
 
     privatelink_aws_resource.update(nlb_arn:)
 
@@ -111,42 +117,8 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
     vpc_id = private_subnet.private_subnet_aws_resource.vpc_id
 
     privatelink_aws_resource.ports.each do |port|
-      unless port.target_group_arn
-        target_group_arn = elb_client.create_target_group(
-          name: "pl-tg-#{port.src_port}-#{privatelink_aws_resource.ubid}"[..31],
-          protocol: "TCP",
-          port: port.dst_port,
-          vpc_id:,
-          target_type: "ip",
-          health_check_protocol: "TCP",
-          health_check_port: port.dst_port.to_s,
-          health_check_interval_seconds: 30,
-          healthy_threshold_count: 3,
-          unhealthy_threshold_count: 3,
-          tags: [
-            {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
-            {key: "port_ubid", value: port.ubid.to_s}
-          ]
-        ).target_groups.first.target_group_arn
-
-        port.update(target_group_arn:)
-      end
-
-      unless port.listener_arn
-        listener_arn = elb_client.create_listener(
-          load_balancer_arn: privatelink_aws_resource.nlb_arn,
-          protocol: "TCP",
-          port: port.src_port,
-          default_actions: [
-            {
-              type: "forward",
-              target_group_arn: port.target_group_arn
-            }
-          ]
-        ).listeners.first.listener_arn
-
-        port.update(listener_arn:)
-      end
+      ensure_target_group(port, vpc_id)
+      ensure_listener(port)
     end
 
     privatelink_aws_resource.privatelink_aws_vms.each do |pl_vm|
@@ -157,7 +129,11 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
   end
 
   label def create_endpoint_service
-    result = ec2_client.create_vpc_endpoint_service_configuration(
+    service = ec2_client.describe_vpc_endpoint_service_configurations(
+      filters: [{name: "tag:ubid", values: [privatelink_aws_resource.ubid.to_s]}]
+    ).service_configurations.first
+
+    service ||= ec2_client.create_vpc_endpoint_service_configuration(
       network_load_balancer_arns: [privatelink_aws_resource.nlb_arn],
       acceptance_required: false,
       tag_specifications: [
@@ -169,11 +145,11 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
           ]
         }
       ]
-    )
+    ).service_configuration
 
     privatelink_aws_resource.update(
-      service_name: result.service_configuration.service_name,
-      service_id: result.service_configuration.service_id
+      service_name: service.service_name,
+      service_id: service.service_id
     )
 
     hop_wait
@@ -197,26 +173,7 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
     vpc_id = private_subnet.private_subnet_aws_resource.vpc_id
 
     privatelink_aws_resource.ports.each do |port|
-      next if port.target_group_arn
-
-      target_group_arn = elb_client.create_target_group(
-        name: "pl-tg-#{port.src_port}-#{privatelink_aws_resource.ubid}"[..31],
-        protocol: "TCP",
-        port: port.dst_port,
-        vpc_id:,
-        target_type: "ip",
-        health_check_protocol: "TCP",
-        health_check_port: port.dst_port.to_s,
-        health_check_interval_seconds: 30,
-        healthy_threshold_count: 3,
-        unhealthy_threshold_count: 3,
-        tags: [
-          {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
-          {key: "port_ubid", value: port.ubid.to_s}
-        ]
-      ).target_groups.first.target_group_arn
-
-      port.update(target_group_arn:)
+      ensure_target_group(port, vpc_id)
     end
 
     hop_add_listener
@@ -224,21 +181,7 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
 
   label def add_listener
     privatelink_aws_resource.ports.each do |port|
-      next if port.listener_arn
-
-      listener_arn = elb_client.create_listener(
-        load_balancer_arn: privatelink_aws_resource.nlb_arn,
-        protocol: "TCP",
-        port: port.src_port,
-        default_actions: [
-          {
-            type: "forward",
-            target_group_arn: port.target_group_arn
-          }
-        ]
-      ).listeners.first.listener_arn
-
-      port.update(listener_arn:)
+      ensure_listener(port)
     end
 
     privatelink_aws_resource.privatelink_aws_vms.each do |pl_vm|
@@ -377,5 +320,50 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
       privatelink_aws_resource.destroy
       pop "PrivateLink deleted"
     end
+  end
+
+  def ensure_target_group(port, vpc_id)
+    return if port.target_group_arn
+
+    tg_name = "pl-tg-#{port.src_port}-#{privatelink_aws_resource.ubid}"[..31]
+    target_group_arn = begin
+      elb_client.describe_target_groups(names: [tg_name]).target_groups.first.target_group_arn
+    rescue Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound
+      elb_client.create_target_group(
+        name: tg_name,
+        protocol: "TCP",
+        port: port.dst_port,
+        vpc_id:,
+        target_type: "ip",
+        health_check_protocol: "TCP",
+        health_check_port: port.dst_port.to_s,
+        health_check_interval_seconds: 30,
+        healthy_threshold_count: 3,
+        unhealthy_threshold_count: 3,
+        tags: [
+          {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
+          {key: "port_ubid", value: port.ubid.to_s}
+        ]
+      ).target_groups.first.target_group_arn
+    end
+
+    port.update(target_group_arn:)
+  end
+
+  def ensure_listener(port)
+    return if port.listener_arn
+
+    listener_arn = elb_client.describe_listeners(
+      load_balancer_arn: privatelink_aws_resource.nlb_arn
+    ).listeners.find { |l| l.port == port.src_port }&.listener_arn
+
+    listener_arn ||= elb_client.create_listener(
+      load_balancer_arn: privatelink_aws_resource.nlb_arn,
+      protocol: "TCP",
+      port: port.src_port,
+      default_actions: [{type: "forward", target_group_arn: port.target_group_arn}]
+    ).listeners.first.listener_arn
+
+    port.update(listener_arn:)
   end
 end
