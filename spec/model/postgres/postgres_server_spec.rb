@@ -170,7 +170,7 @@ RSpec.describe PostgresServer do
 
     it "logs error when no suitable standby found" do
       expect(postgres_server).to receive(:is_representative).and_return(true)
-      expect(postgres_server).to receive(:failover_target).and_return(nil)
+      expect(postgres_server).to receive(:failover_target).with(mode: "planned").and_return(nil)
       expect(Clog).to receive(:emit).with("No suitable standby found for failover", instance_of(Hash))
       expect(postgres_server.trigger_failover(mode: "planned")).to be false
     end
@@ -180,7 +180,7 @@ RSpec.describe PostgresServer do
         timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
         synchronization_status: "ready", timeline_access: "fetch", version: "16",
       )
-      expect(postgres_server).to receive(:failover_target).and_return(standby)
+      expect(postgres_server).to receive(:failover_target).with(mode: "planned").and_return(standby)
       expect(standby).to receive(:incr_planned_take_over)
       expect(postgres_server.trigger_failover(mode: "planned")).to be true
     end
@@ -257,13 +257,21 @@ RSpec.describe PostgresServer do
       POSTGRES_MONITOR_DB[:postgres_lsn_monitor].where(postgres_server_id: postgres_server.id).delete
     end
 
-    it "returns standby with physical_slot_ready_id nil as fallback" do
+    it "returns standby with physical_slot_ready_id nil as fallback for unplanned failover" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
         instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready"),
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
+    end
+
+    it "returns nil for planned failover when no standby has physical_slot_ready" do
+      expect(resource).to receive(:servers).and_return([
+        postgres_server,
+        instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: nil, synchronization_status: "ready"),
+      ]).at_least(:once)
+      expect(postgres_server.failover_target(mode: "planned")).to be_nil
     end
 
     it "prefers standby with physical_slot_ready_id set over higher lsn without" do
