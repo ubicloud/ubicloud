@@ -197,6 +197,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
       Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", postgres_server.id)&.incr_resolve
+      delete_from_stack("disk_usage", "initialize_database_from_backup_try_count")
       hop_refresh_certificates
     when "InProgress"
       disk_usage = begin
