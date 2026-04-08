@@ -376,11 +376,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def client
-    @client ||= vm.location.location_credential.client
+    @client ||= vm.location.location_credential_aws.client
   end
 
   def iam_client
-    @iam_client ||= vm.location.location_credential.iam_client
+    @iam_client ||= vm.location.location_credential_aws.iam_client
   end
 
   def cloudwatch_policy

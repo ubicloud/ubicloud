@@ -116,6 +116,10 @@ RSpec.configure do |config|
         project_id: project.id,
       )
 
+      LocationCredentialAws.create(
+        access_key: "access-key-id",
+        secret_key: "secret-access-key",
+      ) { it.id = loc.id }
       LocationCredential.create(
         access_key: "access-key-id",
         secret_key: "secret-access-key",

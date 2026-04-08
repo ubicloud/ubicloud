@@ -34,7 +34,7 @@ RSpec.describe Prog::Postgres::PostgresResourceNexus do
         provider: "aws",
         project: postgres_project,
       )
-      LocationCredential.create(
+      LocationCredentialAws.create(
         access_key: "access-key-id",
         secret_key: "secret-access-key",
       ) { it.id = loc.id }

@@ -80,6 +80,6 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   end
 
   def aws_client
-    @aws_client ||= vm.location.location_credential.client
+    @aws_client ||= vm.location.location_credential_aws.client
   end
 end

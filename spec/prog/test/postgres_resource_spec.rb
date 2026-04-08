@@ -52,7 +52,7 @@ RSpec.describe Prog::Test::PostgresResource do
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
       LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
-      expect(LocationCredential[location.id].access_key).to eq("access_key")
+      expect(LocationCredentialAws[location.id].access_key).to eq("access_key")
     end
   end
 

@@ -18,7 +18,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     if provider == "aws"
       customer_project.set_ff_aws_alien_runners_ratio(1)
       location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
-      LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
     end
 
     if (url = Config.e2e_cache_proxy_download_url) && !url.empty?

@@ -19,8 +19,8 @@ RSpec.describe Prog::Vm::Aws::Nexus do
       display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
   }
 
-  let(:location_credential) {
-    loc = LocationCredential.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
+  let(:location_credential_aws) {
+    loc = LocationCredentialAws.create_with_id(location, access_key: "test-access-key", secret_key: "test-secret-key")
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
   }
@@ -35,12 +35,12 @@ RSpec.describe Prog::Vm::Aws::Nexus do
   }
 
   let(:vm) {
-    location_credential  # force creation
+    location_credential_aws  # force creation
     Prog::Vm::Nexus.assemble_with_sshable(project.id, **vm_params).subject
   }
 
   let(:vm_without_sshable) {
-    location_credential
+    location_credential_aws
     Prog::Vm::Nexus.assemble("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI", project.id, **vm_params).subject
   }
 
@@ -82,7 +82,7 @@ usermod -L ubuntu
   describe ".assemble" do
     let(:assemble_loc) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "us-west-2", ui_name: "us-west-2", visible: true)
-      LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
+      LocationCredentialAws.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     }

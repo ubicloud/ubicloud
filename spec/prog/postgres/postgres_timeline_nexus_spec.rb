@@ -44,7 +44,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       visible: true,
       provider: "aws",
     )
-    LocationCredential.create_with_id(loc,
+    LocationCredentialAws.create_with_id(loc,
       access_key: "access-key-id",
       secret_key: "secret-access-key")
     LocationAz.create(location_id: loc.id, az: "a", zone_id: "az1")
@@ -153,7 +153,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:attach_user_policy)
         iam_client.stub_responses(:create_access_key, access_key: {access_key_id: "access-key", secret_access_key: "secret-key", user_name: "username", status: "Active"})
 
-        expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
         expect { nx.start }.to hop("setup_bucket")
 
@@ -186,7 +186,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:create_policy, {policy: {arn: "policy-arn"}})
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       nx.setup_aws_s3
     end
@@ -197,8 +197,8 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("123456789012")
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("123456789012")
 
       expect(iam_client).to receive(:delete_policy).with(policy_arn: "arn:aws:iam::123456789012:policy/#{postgres_timeline.ubid}")
 
@@ -210,7 +210,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
       postgres_timeline.update(location_id: aws_location.id)
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       expect(iam_client).to receive(:list_attached_user_policies).and_raise(Aws::IAM::Errors::NoSuchEntity.new(nil, "NoSuchEntity"))
 
@@ -223,7 +223,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       expect { nx.setup_bucket }.to nap(1)
     end
@@ -234,7 +234,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
 
       iam_client = Aws::IAM::Client.new(stub_responses: true)
       iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "dummy-access-key"}])
-      expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+      expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
       s3_client = Aws::S3::Client.new(stub_responses: true)
       s3_client.stub_responses(:create_bucket)
@@ -418,7 +418,7 @@ RSpec.describe Prog::Postgres::PostgresTimelineNexus do
         iam_client.stub_responses(:delete_policy)
         iam_client.stub_responses(:list_access_keys, access_key_metadata: [{access_key_id: "access-key"}])
         iam_client.stub_responses(:delete_access_key)
-        expect(nx.postgres_timeline.location.location_credential).to receive(:iam_client).and_return(iam_client).at_least(:once)
+        expect(nx.postgres_timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client).at_least(:once)
 
         expect { nx.destroy }.to exit({"msg" => "postgres timeline is deleted"})
         expect(postgres_timeline).not_to exist

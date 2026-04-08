@@ -6,7 +6,7 @@ RSpec.describe LocationAz do
   let(:project) { Project.create(name: "test-az-prj") }
   let(:location) {
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+    LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
     loc
   }
 

@@ -7,7 +7,7 @@ class PostgresTimeline < Sequel::Model
     end
 
     def aws_iam_account_id
-      location.location_credential.aws_iam_account_id
+      location.location_credential_aws.aws_iam_account_id
     end
 
     def aws_s3_policy_arn
@@ -27,7 +27,7 @@ class PostgresTimeline < Sequel::Model
     def aws_blob_storage_client
       @blob_storage_client ||= ::Aws::S3::Client.new(
         region: location.name,
-        credentials: location.location_credential.credentials,
+        credentials: location.location_credential_aws.credentials,
         endpoint: blob_storage_endpoint,
         force_path_style: true,
       )

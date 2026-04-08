@@ -116,7 +116,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       project.set_ff_aws_alien_runners_ratio(0.5)
       expect(nx).to receive(:rand).and_return(0.4)
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
@@ -137,7 +137,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "uses alien x64 vms if spilled over" do
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
@@ -150,7 +150,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(label: "ubicloud-arm")
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
       LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
@@ -841,7 +841,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "raises ssh exception again if aws instance not terminated due to interruption" do
       location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
-      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      LocationCredentialAws.create_with_id(location_id, access_key: "key", secret_key: "secret")
       vm.update(location_id:)
       AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
       client = Aws::EC2::Client.new(stub_responses: true)
@@ -860,7 +860,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "logs when aws instance terminated due to interruption" do
       location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
-      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      LocationCredentialAws.create_with_id(location_id, access_key: "key", secret_key: "secret")
       vm.update(location_id:)
       AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
       client = Aws::EC2::Client.new(stub_responses: true)

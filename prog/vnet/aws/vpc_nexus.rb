@@ -248,7 +248,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   end
 
   def client
-    @client ||= location.location_credential.client
+    @client ||= location.location_credential_aws.client
   end
 
   def allow_ingress(group_id, from_port, to_port, cidr)

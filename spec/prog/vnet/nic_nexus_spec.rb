@@ -57,7 +57,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     it "assembles AWS NIC with correct prog and state" do
       project = Project.create(name: "test-aws-assemble")
       aws_location = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredential.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationCredentialAws.create_with_id(aws_location.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
       aws_credentials = Aws::Credentials.new("stubbed-akid", "stubbed-secret")
       allow(Aws::Credentials).to receive(:new).with("stubbed-akid", "stubbed-secret").and_return(aws_credentials)
@@ -82,7 +82,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     let(:project) { Project.create(name: "test-aws-prj") }
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
     let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
@@ -147,7 +147,7 @@ RSpec.describe Prog::Vnet::NicNexus do
     let(:project) { Project.create(name: "test-alloc-prj") }
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+      LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
       loc
     }
     let(:az_a) { LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1") }
