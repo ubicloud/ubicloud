@@ -1,33 +1,90 @@
 # frozen_string_literal: true
 
 class PostgresTimeline < Sequel::Model
+  GcsBlobStorage = Struct.new(:url)
+
   module Gcp
     private
 
+    def gcp_generate_walg_config(version)
+      <<-WALG_CONF
+WALG_GS_PREFIX=gs://#{ubid}
+GOOGLE_APPLICATION_CREDENTIALS=/etc/postgresql/gcs-sa-key.json
+PGHOST=/var/run/postgresql
+PGDATA=/dat/#{version}/data
+      WALG_CONF
+    end
+
     def gcp_walg_config_region
-      raise "GCP Postgres not yet supported"
+      location.name.delete_prefix("gcp-")
     end
 
     def gcp_blob_storage
-      raise "GCP Postgres not yet supported"
+      @blob_storage ||= GcsBlobStorage.new("https://storage.googleapis.com")
     end
 
     def gcp_blob_storage_client
-      raise "GCP Postgres not yet supported"
+      @blob_storage_client ||= location.location_credential_gcp.storage_client
     end
 
     def gcp_list_objects(prefix, delimiter: "")
-      raise "GCP Postgres not yet supported"
+      bucket = blob_storage_client.bucket(ubid)
+      return [] unless bucket
+
+      files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter)
+      all_files = files.to_a
+      while (token = files.token)
+        files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter, token:)
+        all_files.concat(files.to_a)
+      end
+
+      all_files.map { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
     end
 
     def gcp_create_bucket
-      raise "GCP Postgres not yet supported"
+      blob_storage_client.create_bucket(ubid, location: location.name.delete_prefix("gcp-")) do |b|
+        b.uniform_bucket_level_access = true
+      end
+    rescue Google::Cloud::AlreadyExistsError
+      # Ignore if bucket already exists
     end
 
     def gcp_set_lifecycle_policy
-      raise "GCP Postgres not yet supported"
+      bucket = blob_storage_client.bucket(ubid)
+      bucket.lifecycle do |l|
+        l.add_delete_rule(age: BACKUP_BUCKET_EXPIRATION_DAYS)
+      end
+    end
+
+    def gcp_destroy_blob_storage
+      bucket = blob_storage_client.bucket(ubid)
+      if bucket
+        bucket.files.each(&:delete)
+        bucket.delete
+      end
+
+      if access_key
+        credential = location.location_credential_gcp
+        begin
+          credential.iam_client.delete_project_service_account(
+            "projects/-/serviceAccounts/#{access_key}"
+          )
+        rescue Google::Apis::ClientError
+          # SA may already be deleted
+        end
+      end
+    end
+
+    def gcp_setup_blob_storage
+      # GCS setup is automatic via SA credentials — no-op
+    end
+
+    def gcp_generate_blob_storage_credentials?
+      false
     end
   end
+
+  GcsFileWrapper = Struct.new(:key, :last_modified)
 end
 
 # Table: postgres_timeline

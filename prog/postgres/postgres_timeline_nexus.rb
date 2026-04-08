@@ -154,13 +154,4 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   def iam_client
     postgres_timeline.location.location_credential_aws.iam_client
   end
-
-  def admin_client
-    @admin_client ||= Minio::Client.new(
-      endpoint: postgres_timeline.blob_storage_endpoint,
-      access_key: postgres_timeline.blob_storage.admin_user,
-      secret_key: postgres_timeline.blob_storage.admin_password,
-      ssl_ca_data: postgres_timeline.blob_storage.root_certs,
-    )
-  end
 end
