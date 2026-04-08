@@ -401,7 +401,7 @@ class PostgresServer < Sequel::Model
       synchronization_status: "ready",
     )
 
-    increment_s3_new_timeline
+    attach_s3_policy_if_needed
     refresh_walg_credentials
   end
 
