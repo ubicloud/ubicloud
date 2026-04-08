@@ -491,12 +491,14 @@ class PostgresResource < Sequel::Model
     options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
 
     options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
-      flavor == PostgresResource.default_flavor || location.provider != "aws"
+      flavor == PostgresResource.default_flavor || (location.provider != "aws" && location.provider != "gcp")
     end
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
       if location.aws?
         ["m8gd", "i8g"].include?(family) || (Option::AWS_FAMILY_OPTIONS.include?(family) && project.send(:"get_ff_enable_#{family}"))
+      elsif location.gcp?
+        Option::GCP_FAMILY_OPTIONS.include?(family)
       else
         family == "standard" || family == "hobby"
       end
@@ -506,12 +508,16 @@ class PostgresResource < Sequel::Model
       Option::POSTGRES_SIZE_OPTIONS[size].family == family
     end
 
-    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
+    storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS +
+      Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq +
+      Option::GCP_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq
     options.add_option(name: "storage_size", values: storage_size_options, parent: "size") do |flavor, location, family, size, storage_size|
       vcpu_count = Option::POSTGRES_SIZE_OPTIONS[size].vcpu_count
 
       if location.aws?
         Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
+      elsif location.gcp?
+        Option::GCP_STORAGE_SIZE_OPTIONS[family][vcpu_count].include?(storage_size)
       else
         min_storage = (vcpu_count >= 30) ? 1024 : vcpu_count * 32
         min_storage /= 2 if family == "hobby"
