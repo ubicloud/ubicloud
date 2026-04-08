@@ -18,6 +18,10 @@ RSpec.describe Clover, "private-location" do
       provider: "aws",
       project_id: project.id,
     )
+    LocationCredentialAws.create(
+      access_key: "access-key-id",
+      secret_key: "secret-access-key",
+    ) { it.id = loc.id }
     LocationCredential.create(
       access_key: "access-key-id",
       secret_key: "secret-access-key",
@@ -104,7 +108,7 @@ RSpec.describe Clover, "private-location" do
         expect(last_response.status).to eq(204)
 
         expect(Location.where(project_id: project.id).count).to eq(0)
-        expect(LocationCredential.where(id: reg.id).count).to eq(0)
+        expect(LocationCredentialAws.where(id: reg.id).count).to eq(0)
       end
 
       it "success with non-existing region" do

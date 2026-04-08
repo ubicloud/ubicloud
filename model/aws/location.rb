@@ -25,7 +25,7 @@ class Location < Sequel::Model
     end
 
     def get_azs_from_aws
-      location_credential.client.describe_availability_zones.availability_zones
+      location_credential_aws.client.describe_availability_zones.availability_zones
     end
   end
 end

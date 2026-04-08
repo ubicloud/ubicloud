@@ -197,7 +197,7 @@ class Prog::Vnet::Aws::BackfillAwsSubnets < Prog::Base
   end
 
   def client
-    @client ||= location.location_credential.client
+    @client ||= location.location_credential_aws.client
   end
 
   def private_subnet_aws_resource

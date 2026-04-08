@@ -152,7 +152,7 @@ class Prog::Postgres::PostgresTimelineNexus < Prog::Base
   end
 
   def iam_client
-    postgres_timeline.location.location_credential.iam_client
+    postgres_timeline.location.location_credential_aws.iam_client
   end
 
   def admin_client

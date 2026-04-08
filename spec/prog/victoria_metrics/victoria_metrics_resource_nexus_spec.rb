@@ -52,7 +52,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
         provider: "aws",
         project_id: victoria_metrics_project.id,
       )
-      LocationCredential.create(
+      LocationCredentialAws.create(
         access_key: "access-key-id",
         secret_key: "secret-access-key",
       ) { it.id = loc.id }

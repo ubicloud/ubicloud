@@ -24,7 +24,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(Config).to receive(:e2e_cache_proxy_download_url).and_return("http://example.com/cache-proxy")
       described_class.assemble([], provider: "aws")
       expect(Location[location_id]).not_to be_nil
-      expect(LocationCredential[location_id].access_key).to eq("access_key")
+      expect(LocationCredentialAws[location_id].access_key).to eq("access_key")
       expect(GithubInstallation.first.project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
     end
 

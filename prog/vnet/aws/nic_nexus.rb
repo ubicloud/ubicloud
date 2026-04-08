@@ -154,7 +154,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   def client
-    @client ||= private_subnet.location.location_credential.client
+    @client ||= private_subnet.location.location_credential_aws.client
   end
 
   def private_subnet

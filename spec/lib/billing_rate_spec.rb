@@ -74,7 +74,7 @@ RSpec.describe BillingRate do
       byoc: true,
     )
 
-    LocationCredential.create(
+    LocationCredentialAws.create(
       access_key: "test",
       secret_key: "test",
     ) { it.id = loc.id }

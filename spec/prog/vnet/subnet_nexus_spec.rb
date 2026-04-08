@@ -155,7 +155,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe ".create_aws_subnet_records" do
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredential.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
+      LocationCredentialAws.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
       loc
     }
 

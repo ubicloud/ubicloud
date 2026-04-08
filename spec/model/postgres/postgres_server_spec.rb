@@ -1043,10 +1043,10 @@ RSpec.describe PostgresServer do
         expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
         AwsInstance.create_with_id(vm, iam_role: "role")
         iam_client = Aws::IAM::Client.new(stub_responses: true)
-        LocationCredential.create(location:, assume_role: "role")
+        LocationCredentialAws.create(location:, assume_role: "role")
 
-        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
-        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_server.timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(postgres_server.timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed
       end
@@ -1056,13 +1056,13 @@ RSpec.describe PostgresServer do
         expect(Config).to receive(:aws_postgres_iam_access).and_return(true)
         AwsInstance.create_with_id(vm, iam_role: "role")
         iam_client = Aws::IAM::Client.new(stub_responses: true)
-        LocationCredential.create(location:, assume_role: "role")
+        LocationCredentialAws.create(location:, assume_role: "role")
 
         parent = create_postgres_timeline(location_id: location.id)
         timeline.update(parent:)
-        expect(postgres_server.timeline.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
-        expect(postgres_server.timeline.location.location_credential).to receive(:iam_client).and_return(iam_client)
-        expect(postgres_server.timeline.parent.location.location_credential).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(postgres_server.timeline.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
+        expect(postgres_server.timeline.location.location_credential_aws).to receive(:iam_client).and_return(iam_client)
+        expect(postgres_server.timeline.parent.location.location_credential_aws).to receive(:aws_iam_account_id).and_return("aws-account-id").at_least(:once)
         expect(iam_client).to receive(:attach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.aws_s3_policy_arn)
         expect(iam_client).to receive(:detach_role_policy).with(role_name: "role", policy_arn: postgres_server.timeline.parent.aws_s3_policy_arn)
         postgres_server.attach_s3_policy_if_needed
@@ -1071,15 +1071,15 @@ RSpec.describe PostgresServer do
       it "does not detach parent timeline when Config.aws_postgres_iam_access not set" do
         location.update(provider: "aws")
         AwsInstance.create_with_id(vm, iam_role: "role")
-        LocationCredential.create(location:, assume_role: "role")
+        LocationCredentialAws.create(location:, assume_role: "role")
 
         expect(postgres_server.vm.aws_instance).not_to receive(:iam_role)
         postgres_server.attach_s3_policy_if_needed
       end
 
       it "does not call attach_role_policy when needs s3 policy attachment" do
-        LocationCredential.create(location:, assume_role: "role")
-        expect(postgres_server.timeline.location.location_credential).not_to receive(:aws_iam_account_id)
+        LocationCredentialAws.create(location:, assume_role: "role")
+        expect(postgres_server.timeline.location.location_credential_aws).not_to receive(:aws_iam_account_id)
         postgres_server.attach_s3_policy_if_needed
       end
     end

@@ -41,7 +41,7 @@ class PostgresServer < Sequel::Model
     end
 
     def client
-      @client ||= timeline.location.location_credential.iam_client
+      @client ||= timeline.location.location_credential_aws.iam_client
     end
   end
 end

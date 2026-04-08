@@ -6,7 +6,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   let(:ps) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+    LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
     az_a = LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records

@@ -35,8 +35,8 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
     let(:ec2_client) { instance_double(Aws::EC2::Client) }
 
     before do
-      lcred = instance_double(LocationCredential, client: ec2_client)
-      loc = instance_double(Location, provider: "aws", location_credential: lcred)
+      lcred = instance_double(LocationCredentialAws, client: ec2_client)
+      loc = instance_double(Location, provider: "aws", location_credential_aws: lcred)
       allow(nx).to receive(:vm).and_return(vm)
       allow(vm).to receive(:location).and_return(loc)
     end
@@ -142,8 +142,8 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
     let(:ec2_client) { Aws::EC2::Client.new(stub_responses: true) }
 
     before do
-      lcred = instance_double(LocationCredential, client: ec2_client)
-      loc = instance_double(Location, provider: "aws", location_credential: lcred)
+      lcred = instance_double(LocationCredentialAws, client: ec2_client)
+      loc = instance_double(Location, provider: "aws", location_credential_aws: lcred)
       allow(nx).to receive(:vm).and_return(vm)
       allow(vm).to receive(:location).and_return(loc)
     end
