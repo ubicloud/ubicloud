@@ -857,6 +857,29 @@ usermod -L ubuntu
         ))
     end
 
+    it "naps if the vm still has privatelink_aws_vm records" do
+      iam_client.stub_responses(:list_policies, policies: [])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:delete_role, {})
+      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: PrivatelinkAwsResource.create(private_subnet_id: vm.nics.first.private_subnet_id, description: "test").id, vm_id: vm.id)
+      Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "wait")
+      expect { nx.cleanup_roles }.to nap(5)
+      expect(pl_vm.strand.reload.semaphores.map(&:name)).to include("destroy")
+    end
+
+    it "does not signal destroy twice if already signaled" do
+      iam_client.stub_responses(:list_policies, policies: [])
+      iam_client.stub_responses(:remove_role_from_instance_profile, {})
+      iam_client.stub_responses(:delete_instance_profile, {})
+      iam_client.stub_responses(:delete_role, {})
+      pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: PrivatelinkAwsResource.create(private_subnet_id: vm.nics.first.private_subnet_id, description: "test").id, vm_id: vm.id)
+      Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "wait")
+      pl_vm.incr_destroy
+      expect { nx.cleanup_roles }.to nap(5)
+      expect(pl_vm.strand.reload.semaphores.map(&:name).count("destroy")).to eq(1)
+    end
+
     it "skips policy cleanup if the cloudwatch policy doesn't exist" do
       iam_client.stub_responses(:list_policies, policies: [])
       iam_client.stub_responses(:remove_role_from_instance_profile, {})

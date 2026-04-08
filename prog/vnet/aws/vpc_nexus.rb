@@ -207,8 +207,13 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
   label def delete_az_subnets
     # Delete AWS subnets tracked in our database
     private_subnet_aws_resource.aws_subnets.each do |aws_subnet|
-      ignore_invalid_id do
-        client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+      begin
+        ignore_invalid_id do
+          client.delete_subnet({subnet_id: aws_subnet.subnet_id})
+        end
+      rescue Aws::EC2::Errors::DependencyViolation => e
+        Clog.emit("Subnet has dependencies, waiting before retry", {subnet_dependency: {subnet_id: aws_subnet.subnet_id, error: e.message}})
+        nap 5
       end
     end
 

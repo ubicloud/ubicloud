@@ -14,7 +14,7 @@ class PrivatelinkAwsResource < Sequel::Model
   plugin SemaphoreMethods, :destroy, :add_port, :remove_port
 
   def display_state
-    return "deleting" if destroy_set? || strand.nil? || strand.label == "destroy"
+    return "deleting" if destroy_set? || strand.nil? || strand.label.start_with?("destroy")
     return "available" if strand.label == "wait"
 
     "creating"

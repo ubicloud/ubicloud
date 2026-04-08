@@ -361,6 +361,12 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       iam_client.delete_role({role_name:})
     end
 
+    pl_vms = PrivatelinkAwsVm.where(vm_id: vm.id).all
+    if pl_vms.any?
+      pl_vms.each { |pl_vm| pl_vm.incr_destroy unless pl_vm.destroy_set? }
+      nap 5
+    end
+
     final_clean_up
     pop "vm destroyed"
   end
