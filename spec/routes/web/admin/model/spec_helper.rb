@@ -128,6 +128,13 @@ module AdminModelSpecHelper
       FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80..80))
     end
 
+    def create_gcp_vpc
+      project = Project.create(name: "test-project")
+      location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
+      GcpVpc.create_with_id(GcpVpc.generate_uuid, project_id: project.id, location_id: location.id, name: "ubicloud-test")
+    end
+
     def create_github_cache_entry
       installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
       repo = GithubRepository.create(installation_id: installation.id, name: "test-repo")
