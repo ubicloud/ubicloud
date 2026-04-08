@@ -265,6 +265,22 @@ RSpec.describe PostgresServer do
       expect(postgres_server.failover_target(mode: "planned")).to be_nil
     end
 
+    it "returns nil for planned failover when logical slots not synced on standby" do
+      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready")
+      expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server).to receive(:unsynced_logical_failover_slots).with(standby).and_return(["slot1"])
+      expect(postgres_server.failover_target(mode: "planned")).to be_nil
+    end
+
+    it "returns standby for planned failover when logical slots are synced" do
+      standby = instance_double(described_class, ubid: "pgubidstandby1", is_representative: false, current_lsn: "1/10", strand: instance_double(Strand, label: "wait"), needs_recycling?: false, read_replica?: false, physical_slot_ready_id: postgres_server.id, synchronization_status: "ready")
+      expect(resource).to receive(:servers).and_return([postgres_server, standby]).at_least(:once)
+      expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
+      expect(postgres_server).to receive(:unsynced_logical_failover_slots).with(standby).and_return([])
+      expect(postgres_server.failover_target(mode: "planned").ubid).to eq("pgubidstandby1")
+    end
+
     it "prefers standby with physical_slot_ready_id set over higher lsn without" do
       allow(resource).to receive(:servers).and_return([
         postgres_server,
@@ -273,6 +289,48 @@ RSpec.describe PostgresServer do
       ])
       expect(resource).to receive(:ha_type).and_return(PostgresResource::HaType::SYNC)
       expect(postgres_server.failover_target.ubid).to eq("pgubidstandby1")
+    end
+  end
+
+  describe "#unsynced_logical_failover_slots" do
+    let(:standby) {
+      described_class.create(
+        timeline:, resource_id: resource.id, vm_id: create_hosted_vm(project, private_subnet, "standby").id,
+        synchronization_status: "ready", timeline_access: "fetch", version: "16",
+      )
+    }
+
+    it "returns empty for read replicas" do
+      expect(postgres_server).to receive(:read_replica?).and_return(true)
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
+    it "returns empty for versions below 17" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
+    it "returns empty when primary has no logical failover slots" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("")
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
+    it "returns empty when all primary logical failover slots are synced on standby" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
+      expect(standby.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to be_empty
+    end
+
+    it "returns missing slot names when standby is missing a synced logical slot" do
+      expect(postgres_server).to receive(:read_replica?).and_return(false)
+      postgres_server.update(version: "17")
+      expect(postgres_server.vm.sshable).to receive(:_cmd).and_return("slot1\nslot2")
+      expect(standby.vm.sshable).to receive(:_cmd).and_return("slot1")
+      expect(postgres_server.unsynced_logical_failover_slots(standby)).to eq(["slot2"])
     end
   end
 
