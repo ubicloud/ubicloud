@@ -120,10 +120,6 @@ RSpec.configure do |config|
         access_key: "access-key-id",
         secret_key: "secret-access-key",
       ) { it.id = loc.id }
-      LocationCredential.create(
-        access_key: "access-key-id",
-        secret_key: "secret-access-key",
-      ) { it.id = loc.id }
       LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     end

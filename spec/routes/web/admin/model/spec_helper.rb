@@ -364,11 +364,6 @@ module AdminModelSpecHelper
       LocationAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
     end
 
-    def create_location_credential
-      location = Location.create(name: "test-loc-cred-old", display_name: "Test Location Old", ui_name: "Test Old", visible: true, provider: "aws")
-      LocationCredential.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
-    end
-
     def create_location_credential_aws
       location = Location.create(name: "test-loc-cred", display_name: "Test Location", ui_name: "Test", visible: true, provider: "aws")
       LocationCredentialAws.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
