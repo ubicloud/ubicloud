@@ -109,64 +109,70 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect { nx.wait_nlb_active }.to nap(5)
     end
 
-    it "hops to create_target_groups_and_listeners when NLB is active" do
+    it "hops to create_target_groups when NLB is active" do
       elb_client.stub_responses(:describe_load_balancers, load_balancers: [{state: {code: "active"}}])
-      expect { nx.wait_nlb_active }.to hop("create_target_groups_and_listeners")
+      expect { nx.wait_nlb_active }.to hop("create_target_groups")
     end
   end
 
-  describe "#create_target_groups_and_listeners" do
+  describe "#create_target_groups" do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       elb_client.stub_responses(:describe_target_groups, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
       elb_client.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc"}])
-      elb_client.stub_responses(:describe_listeners, listeners: [])
-      elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
-    it "creates a target group and listener for each port, signals vm strands, then hops to create_endpoint_service" do
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
-      port = pl.ports.first.reload
-      expect(port.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
-      expect(port.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
+    it "creates a target group for each port and hops to create_listeners" do
+      expect { nx.create_target_groups }.to hop("create_listeners")
+      expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
     end
 
     it "recovers an existing target group created in AWS but not yet saved to DB" do
       elb_client.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered"}])
       expect(elb_client).not_to receive(:create_target_group)
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect { nx.create_target_groups }.to hop("create_listeners")
       expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered")
     end
 
     it "skips target group creation if already present in DB" do
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing")
-      elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing", port: 5432}])
+      expect(elb_client).not_to receive(:describe_target_groups)
       expect(elb_client).not_to receive(:create_target_group)
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect { nx.create_target_groups }.to hop("create_listeners")
+    end
+  end
+
+  describe "#create_listeners" do
+    before {
+      pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
+      pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
+      elb_client.stub_responses(:describe_listeners, listeners: [])
+      elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
+    }
+
+    it "creates a listener for each port, signals vm strands, then hops to create_endpoint_service" do
+      expect { nx.create_listeners }.to hop("create_endpoint_service")
+      expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
 
     it "recovers an existing listener created in AWS but not yet saved to DB" do
-      pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing")
       elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered", port: 5432}])
       expect(elb_client).not_to receive(:create_listener)
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect { nx.create_listeners }.to hop("create_endpoint_service")
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered")
     end
 
     it "skips listener creation if already present in DB" do
-      pl.ports.first.update(
-        target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/existing",
-        listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing"
-      )
-      expect(elb_client).not_to receive(:create_target_group)
+      pl.ports.first.update(listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/existing")
+      expect(elb_client).not_to receive(:describe_listeners)
       expect(elb_client).not_to receive(:create_listener)
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect { nx.create_listeners }.to hop("create_endpoint_service")
     end
 
     it "signals vm strands with add_port if they exist" do
       pl_vm = PrivatelinkAwsVm.create(privatelink_aws_resource_id: pl.id, vm_id: create_hosted_vm(ps.project, ps, "test-vm").id)
       Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "wait")
-      expect { nx.create_target_groups_and_listeners }.to hop("create_endpoint_service")
+      expect { nx.create_listeners }.to hop("create_endpoint_service")
       expect(pl_vm.strand.reload.semaphores.map(&:name)).to include("add_port")
     end
   end

@@ -106,18 +106,25 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
     ).load_balancers.first.state.code
 
     if nlb_state == "active"
-      hop_create_target_groups_and_listeners
+      hop_create_target_groups
     else
       Clog.emit("NLB not yet active", {privatelink_aws_nlb: {state: nlb_state, arn: privatelink_aws_resource.nlb_arn}})
       nap 5
     end
   end
 
-  label def create_target_groups_and_listeners
+  label def create_target_groups
     vpc_id = private_subnet.private_subnet_aws_resource.vpc_id
 
     privatelink_aws_resource.ports.each do |port|
       ensure_target_group(port, vpc_id)
+    end
+
+    hop_create_listeners
+  end
+
+  label def create_listeners
+    privatelink_aws_resource.ports.each do |port|
       ensure_listener(port)
     end
 
