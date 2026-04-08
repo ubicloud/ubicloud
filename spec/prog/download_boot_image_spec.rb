@@ -156,7 +156,7 @@ RSpec.describe Prog::DownloadBootImage do
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
         "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version),
         "certs" => "certs",
         "use_htcat" => false,
       }.to_json
@@ -179,7 +179,7 @@ RSpec.describe Prog::DownloadBootImage do
         "image_name" => "github-ubuntu-2204",
         "url" => "https://r2.example.com/my-image.raw",
         "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version),
         "certs" => nil,
         "use_htcat" => true,
       }.to_json
