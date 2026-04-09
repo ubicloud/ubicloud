@@ -28,10 +28,42 @@ RSpec.describe PrivateSubnet do
   end
 
   describe "random ip generation" do
-    it "returns random private ipv4" do
+    it "returns random private ipv4 on metal (skips first 4 + last 1, same as AWS)" do
       private_subnet
-      expect(SecureRandom).to receive(:random_number).with(58).and_return(5)
+      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
       expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
+    end
+
+    it "returns random private ipv4 on aws (skips first 4 + last 1)" do
+      prj = Project.create(name: "aws-rand-prj")
+      loc = Location.create(name: "us-west-2r", provider: "aws", project_id: prj.id,
+        display_name: "aws-us-west-2r", ui_name: "AWS US West 2R", visible: true)
+      LocationCredentialAws.create_with_id(loc, access_key: "k", secret_key: "s")
+      ps = described_class.create(name: "aws-rand-ps", location_id: loc.id,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/26",
+        state: "waiting", project_id: prj.id)
+      expect(SecureRandom).to receive(:random_number).with(59).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.39.9/32"
+    end
+
+    it "returns random private ipv4 on gcp (skips first 2 + last 2)" do
+      prj = Project.create(name: "gcp-rand-prj")
+      loc = Location.create(name: "gcp-us-central1r", provider: "gcp", project_id: prj.id,
+        display_name: "GCP US Central 1R", ui_name: "GCP US Central 1R", visible: true)
+      ps = described_class.create(name: "gcp-rand-ps", location_id: loc.id,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/26",
+        state: "waiting", project_id: prj.id)
+      expect(SecureRandom).to receive(:random_number).with(60).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.39.7/32"
+    end
+
+    it "does not subtract any reservation for bigger parent subnets" do
+      prj = Project.create(name: "big-net-prj")
+      ps = described_class.create(name: "big-ps", location_id: Location::HETZNER_FSN1_ID,
+        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.0.0/16",
+        state: "waiting", project_id: prj.id)
+      expect(SecureRandom).to receive(:random_number).with(256).and_return(5)
+      expect(ps.random_private_ipv4.to_s).to eq "10.9.5.0/24"
     end
 
     it "returns random private ipv6" do
@@ -54,8 +86,8 @@ RSpec.describe PrivateSubnet do
       end
 
       it "returns random private ipv4" do
-        expect(SecureRandom).to receive(:random_number).with(58).and_return(1, 2)
-        expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.6/32"
+        expect(SecureRandom).to receive(:random_number).with(59).and_return(1, 5)
+        expect(private_subnet.random_private_ipv4.to_s).to eq "10.9.39.9/32"
       end
 
       it "returns random private ipv6" do

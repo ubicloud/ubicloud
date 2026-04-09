@@ -42,5 +42,11 @@ class PrivateSubnet < Sequel::Model
       subnet.incr_refresh_keys
       incr_refresh_keys
     end
+
+    # Reserve the same addresses as AWS for future-proofing: first four
+    # (network, router, DNS, future use) and last one (broadcast).
+    def metal_ipv4_reservation
+      [4, 1]
+    end
   end
 end

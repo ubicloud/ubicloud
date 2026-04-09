@@ -31,5 +31,12 @@ RSpec.describe PrivateSubnet do
     it "raises error on disconnect_subnet" do
       expect { subnet1.disconnect_subnet(subnet2) }.to raise_error("Connected subnets are not supported for GCP")
     end
+
+    it "reserves first 2 and last 2 addresses when picking a random IPv4" do
+      subnet1
+      # /26 (64 addresses) - 2 (network + gateway) - 2 (second-to-last + broadcast) = 60
+      expect(SecureRandom).to receive(:random_number).with(60).and_return(0)
+      expect(subnet1.random_private_ipv4.to_s).to eq "10.0.0.2/32"
+    end
   end
 end
