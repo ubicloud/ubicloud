@@ -9,7 +9,6 @@ require "googleauth"
 
 class LocationCredentialGcp < Sequel::Model
   plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:credentials_json]
-  many_to_one :location, key: :id
 
   def parsed_credentials
     @parsed_credentials ||= JSON.parse(credentials_json)
