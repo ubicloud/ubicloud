@@ -179,8 +179,11 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
       hop_finish_destroy
     else
-      private_subnet.nics.map { |n| n.incr_destroy }
-      private_subnet.load_balancers.map { |lb| lb.incr_destroy }
+      Semaphore.incr(
+        private_subnet.nics_dataset.select(:id)
+          .union(private_subnet.load_balancers_dataset.select(:id)),
+        :destroy,
+      )
       nap rand(5..10)
     end
   end
