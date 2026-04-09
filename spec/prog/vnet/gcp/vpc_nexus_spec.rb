@@ -187,9 +187,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#create_firewall_policy" do
     it "creates firewall policy and hops to wait_firewall_policy_created" do
-      expect(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-policy")
       expect(nfp_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
@@ -203,6 +200,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "skips creation but ensures association when firewall policy already exists and is associated" do
       vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
           associations: [
@@ -211,17 +210,17 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
             ),
           ]),
       )
-      expect(nfp_client).not_to receive(:insert)
       expect(nfp_client).not_to receive(:add_association)
 
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
     it "creates association when policy exists but has no association" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
-      expect(nfp_client).not_to receive(:insert)
 
       assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc")
       expect(nfp_client).to receive(:add_association).and_return(assoc_op)
@@ -231,6 +230,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "proceeds when association raises AlreadyExistsError from concurrent strand" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
@@ -241,6 +242,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "proceeds when association raises InvalidArgumentError with 'already exists'" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
@@ -251,6 +254,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "naps when VPC resource is not ready for association" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
@@ -261,6 +266,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "re-raises InvalidArgumentError when not about association already existing or resource not ready" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
       )
@@ -271,7 +278,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "re-fetches and adds association after AlreadyExistsError from policy insert" do
-      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("policy already exists"))
 
@@ -286,7 +292,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     # rubocop:disable RSpec/VerifiedDoubles
     it "adds association when re-fetch after insert AlreadyExistsError returns nil associations" do
-      expect(nfp_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
 
       policy_nil_assoc = double("policy", associations: nil)

@@ -87,31 +87,24 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   label def create_firewall_policy
     policy = begin
+      op = credential.network_firewall_policies_client.insert(
+        project: gcp_project_id,
+        firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
+          name: firewall_policy_name,
+          description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
+        ),
+      )
+      save_gcp_op(op.name, "global")
+      hop_wait_firewall_policy_created
+    rescue Google::Cloud::AlreadyExistsError
+      # Policy already exists -- either a concurrent strand just created
+      # it, or we are on the second pass after wait_firewall_policy_created
+      # hopped back here. Fetch it so we can continue with association.
       credential.network_firewall_policies_client.get(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-    rescue Google::Cloud::NotFoundError
-      begin
-        op = credential.network_firewall_policies_client.insert(
-          project: gcp_project_id,
-          firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
-            name: firewall_policy_name,
-            description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
-          ),
-        )
-        save_gcp_op(op.name, "global")
-        hop_wait_firewall_policy_created
-      rescue Google::Cloud::AlreadyExistsError
-        # Policy created by a concurrent strand between our GET and INSERT.
-        nil
-      end
     end
-
-    policy ||= credential.network_firewall_policies_client.get(
-      project: gcp_project_id,
-      firewall_policy: firewall_policy_name,
-    )
 
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
     if policy.associations&.any? { |a| a.attachment_target == vpc_target }
