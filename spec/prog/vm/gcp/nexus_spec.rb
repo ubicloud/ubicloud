@@ -317,18 +317,63 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(stack["gcp_zone_suffix"]).to eq("c")
     end
 
-    it "only attaches boot disk since all GCP types use LSSD" do
+    it "attaches only the boot disk when no non-boot volumes exist" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
-      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 750, disk_index: 1)
-
-      op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd")
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-boot-only")
       expect(compute_client).to receive(:insert) do |args|
         disks = args[:instance_resource].disks
         expect(disks.length).to eq(1)
         expect(disks[0].boot).to be true
+        expect(disks[0].initialize_params.source_image).to eq(vm.boot_image)
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "attaches a SCRATCH local NVMe SSD for each non-boot vm_storage_volume" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 1)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd-1")
+      expect(compute_client).to receive(:insert) do |args|
+        disks = args[:instance_resource].disks
+        expect(disks.length).to eq(2)
+        expect(disks[0].boot).to be true
+        expect(disks[1].boot).to be false
+        expect(disks[1].type).to eq("SCRATCH")
+        expect(disks[1].interface).to eq("NVME")
+        expect(disks[1].auto_delete).to be true
+        expect(disks[1].initialize_params.disk_size_gb).to eq(375)
+        expect(disks[1].initialize_params.disk_type).to include("diskTypes/local-ssd")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
+    end
+
+    it "attaches multiple non-boot LSSDs in disk_index order" do
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 2)
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 375, disk_index: 1)
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-lssd-2")
+      expect(compute_client).to receive(:insert) do |args|
+        disks = args[:instance_resource].disks
+        expect(disks.length).to eq(3)
+        expect(disks[0].boot).to be true
+        expect(disks[1..].map(&:boot)).to eq([false, false])
+        expect(disks[1..].map(&:type)).to eq(%w[SCRATCH SCRATCH])
+        expect(disks[1..].map(&:interface)).to eq(%w[NVME NVME])
         op
       end
 
