@@ -175,8 +175,20 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     nap 5 unless op.status == :DONE
 
     if op_error?(op)
-      Clog.emit("GCP LRO error during firewall policy association",
-        {gcp_lro_assoc_error: {policy: firewall_policy_name, error: op_error_message(op)}})
+      vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
+      policy = credential.network_firewall_policies_client.get(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+      )
+      if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+        Clog.emit("GCP LRO error but firewall policy association exists",
+          {gcp_lro_recovered: {resource: "firewall policy association #{firewall_policy_name}", error: op_error_message(op)}})
+      else
+        Clog.emit("GCP firewall policy association LRO failed, clearing op and retrying",
+          {gcp_assoc_retry: {policy: firewall_policy_name, vpc: gcp_vpc.name, error: op_error_message(op)}})
+        clear_gcp_op
+        hop_create_firewall_policy
+      end
     end
 
     clear_gcp_op
