@@ -25,7 +25,7 @@ class Prog::DownloadBootImage < Prog::Base
 
   def latest_boot_image_version(image_name)
     arch_versions = BOOT_IMAGE_SHA256.dig(image_name, vm_host.arch)
-    fail "Unknown boot image: #{image_name}" unless arch_versions
+    fail "Unknown boot image: #{image_name}" unless arch_versions && !arch_versions.empty?
 
     arch_versions.keys.max
   end
@@ -320,11 +320,6 @@ class Prog::DownloadBootImage < Prog::Base
 
   label def start
     register_deadline(nil, 24 * 60 * 60)
-
-    # YYY: we can remove this once we enforce it in the database layer.
-    # Although the default version is used if version is not passed, adding
-    # a sanity check here to make sure version is not passed as nil.
-    fail "Neither a version nor a default version was provided" if version.nil?
 
     pop "Image already exists on host" unless vm_host.boot_images_dataset.where(name: image_name, version:).empty?
 
