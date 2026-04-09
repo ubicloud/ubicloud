@@ -8,6 +8,8 @@ require "google/apis/iam_v1"
 require "googleauth"
 
 class LocationCredentialGcp < Sequel::Model
+  V1 = Google::Cloud::Compute::V1
+
   plugin ResourceMethods, referencing: UBID::TYPE_LOCATION, encrypted_columns: [:credentials_json]
 
   def parsed_credentials
@@ -15,49 +17,49 @@ class LocationCredentialGcp < Sequel::Model
   end
 
   def zones_client
-    @zones_client ||= Google::Cloud::Compute::V1::Zones::Rest::Client.new do |config|
+    @zones_client ||= V1::Zones::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def subnetworks_client
-    @subnetworks_client ||= Google::Cloud::Compute::V1::Subnetworks::Rest::Client.new do |config|
+    @subnetworks_client ||= V1::Subnetworks::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def zone_operations_client
-    @zone_operations_client ||= Google::Cloud::Compute::V1::ZoneOperations::Rest::Client.new do |config|
+    @zone_operations_client ||= V1::ZoneOperations::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def region_operations_client
-    @region_operations_client ||= Google::Cloud::Compute::V1::RegionOperations::Rest::Client.new do |config|
+    @region_operations_client ||= V1::RegionOperations::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def global_operations_client
-    @global_operations_client ||= Google::Cloud::Compute::V1::GlobalOperations::Rest::Client.new do |config|
+    @global_operations_client ||= V1::GlobalOperations::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def addresses_client
-    @addresses_client ||= Google::Cloud::Compute::V1::Addresses::Rest::Client.new do |config|
+    @addresses_client ||= V1::Addresses::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def compute_client
-    @compute_client ||= Google::Cloud::Compute::V1::Instances::Rest::Client.new do |config|
+    @compute_client ||= V1::Instances::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
 
   def network_firewall_policies_client
-    @network_firewall_policies_client ||= Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client.new do |config|
+    @network_firewall_policies_client ||= V1::NetworkFirewallPolicies::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
@@ -74,7 +76,7 @@ class LocationCredentialGcp < Sequel::Model
   end
 
   def networks_client
-    @networks_client ||= Google::Cloud::Compute::V1::Networks::Rest::Client.new do |config|
+    @networks_client ||= V1::Networks::Rest::Client.new do |config|
       config.credentials = parsed_credentials
     end
   end
