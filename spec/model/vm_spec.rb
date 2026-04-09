@@ -336,6 +336,7 @@ RSpec.describe Vm do
     vmh = create_vm_host(total_cpus: 12, total_cores: 12, total_dies: 1, total_sockets: 1, accepts_slices: true)
     vm = Prog::Vm::Nexus.assemble("a a", project_id).subject
     vm.update(vm_host_id: vmh.id)
+    vm.vm_storage_volumes_dataset.destroy
 
     expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
     VmInitScript.create_with_id(vm, init_script: "c")
@@ -474,6 +475,7 @@ RSpec.describe Vm do
       vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
       expect(vm_host).not_to receive(:ip6_random_vm_network)
       DB[:nic].where(vm_id: vm.id).delete
+      DB[:vm_storage_volume].where(vm_id: vm.id).delete
       DB[:vm].where(id: vm.id).delete
       expect { vm.save_with_ephemeral_net6_error_retrying(vm_host) }.to raise_error(Sequel::NoExistingObject)
     end
@@ -545,6 +547,38 @@ RSpec.describe Vm do
     it "includes the private IPv6 address as a string" do
       vm.define_singleton_method(:private_ipv6) { NetAddr.parse_ip("::2") }
       expect(vm.private_ipv6_string).to eq "::2"
+    end
+  end
+
+  describe "#create_storage_volumes" do
+    it "creates storage volumes" do
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0},
+        {boot: false, size_gib: 20, disk_index: 1},
+      ]
+      vm.create_storage_volumes(params)
+      expect(vm.vm_storage_volumes_dataset.count).to eq(2)
+      vol1 = vm.vm_storage_volumes_dataset.first(disk_index: 0)
+      expect(vol1.boot).to be true
+      expect(vol1.size_gib).to eq(10)
+      vol2 = vm.vm_storage_volumes_dataset.first(disk_index: 1)
+      expect(vol2.boot).to be false
+      expect(vol2.size_gib).to eq(20)
+    end
+
+    it "creates storage volumes with machine image if specified" do
+      miv = create_machine_image_version_metal
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
+      ]
+      vm.create_storage_volumes(params)
+      expect(vm.vm_storage_volumes_dataset.count).to eq(1)
+      vol = vm.vm_storage_volumes_dataset.first
+      expect(vol.boot).to be true
+      expect(vol.size_gib).to eq(10)
+      expect(vol.machine_image_version_id).to eq(miv.id)
     end
   end
 end

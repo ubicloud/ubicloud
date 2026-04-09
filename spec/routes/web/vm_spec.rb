@@ -159,6 +159,7 @@ RSpec.describe Clover, "vm" do
           spdk_installation_id: spdk_installation.id,
           storage_device_id: storage_device.id,
         )
+        vm.vm_storage_volumes_dataset.destroy
         vm.add_vm_storage_volume(storage_volume)
 
         visit "#{project.path}/vm"

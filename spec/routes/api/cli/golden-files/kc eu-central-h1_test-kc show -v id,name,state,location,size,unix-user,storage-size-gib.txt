@@ -17,7 +17,7 @@ nodepool 1:
     location: eu-central-h1
     size: standard-2
     unix-user: ubi
-    storage-size-gib: 0
+    storage-size-gib: 40
 cp-vms 1:
   id: vmgbbazmznfa0mp49nzh5v0z25
   name: kc-cp-vm
@@ -25,4 +25,4 @@ cp-vms 1:
   location: eu-central-h1
   size: standard-2
   unix-user: ubi
-  storage-size-gib: 0
+  storage-size-gib: 40

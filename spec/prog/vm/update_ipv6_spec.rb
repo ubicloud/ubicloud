@@ -36,6 +36,7 @@ RSpec.describe Prog::Vm::UpdateIpv6 do
   let(:vm) {
     v = vm_strand.subject
     v.update(vm_host_id: vm_host.id)
+    v.vm_storage_volumes_dataset.destroy
     v
   }
 

@@ -283,7 +283,7 @@ RSpec.configure do |config|
       machine_image_id ||= MachineImage.create(name: "test-mi", project_id:, arch: "x64", location_id:).id
       miv = MachineImageVersion.create(machine_image_id:, version:)
       archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
-      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:)
+      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, enabled: true, archive_size_mib: 1024)
     end
 
     def create_vm_host_slice(**args)
@@ -293,10 +293,15 @@ RSpec.configure do |config|
     end
 
     def create_hosted_vm(project, private_subnet, name)
-      Prog::Vm::Nexus.assemble_with_sshable(
+      vm = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name:, private_subnet_id: private_subnet.id,
         location_id: location.id, unix_user: "ubi",
       ).subject
+      # YYY: We moved storage volume creation from allocation to Nexus.assemble,
+      # but many of the tests rely on VMs without storage volumes. We will need
+      # to update those tests and remove the following hack.
+      vm.vm_storage_volumes_dataset.each(&:destroy)
+      vm
     end
 
     def create_vm_from_size(size, arch, **args)

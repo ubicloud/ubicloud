@@ -632,7 +632,18 @@ module Scheduling::Allocator
 
     def update(vm, vm_host)
       @storage_device_allocations.each { it.update }
-      create_storage_volumes(vm, vm_host)
+
+      # Backwards compatibility: We now pre-populate storage volumes in
+      # Vm::Nexus.assemble; However, some VMs might have been assembled before
+      # this change but not yet allocated. For those VMs, we need to create the
+      # storage volumes here during allocation. This can be removed after the
+      # initial rollout is done.
+      if vm.vm_storage_volumes_dataset.empty?
+        params = @request.storage_volumes.sort_by(&:first).map! { |_, v| v.transform_keys(&:to_sym) }
+        vm.create_storage_volumes(params)
+      end
+
+      allocate_storage_volume_associations(vm, vm_host)
     end
 
     def utilization
@@ -696,11 +707,13 @@ module Scheduling::Allocator
       true
     end
 
-    def create_storage_volumes(vm, vm_host)
-      @request.storage_volumes.each do |disk_index, volume|
+    def allocate_storage_volume_associations(vm, vm_host)
+      params_by_disk_index = @request.storage_volumes.to_h
+      vm.vm_storage_volumes.each do |volume|
+        params = params_by_disk_index[volume.disk_index]
         if vm_host.vhost_block_backends_dataset.exclude(allocation_weight: 0).empty?
           spdk_installation_id = StorageAllocation.allocate_spdk_installation(vm_host.spdk_installations)
-          use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume["boot"]
+          use_bdev_ubi = SpdkInstallation[spdk_installation_id].supports_bdev_ubi? && volume.boot
         else
           vhost_block_backend_id = StorageAllocation.allocate_vhost_block_backend(
             vm_host.vhost_block_backends,
@@ -709,34 +722,21 @@ module Scheduling::Allocator
           use_bdev_ubi = false
         end
 
-        key_encryption_key = if volume["encrypted"]
-          StorageKeyEncryptionKey.create_random(auth_data: "#{vm.inhost_name}_#{disk_index}")
-        end
-
-        image_id = if volume["machine_image_version_id"]
+        boot_image_id = if volume.machine_image_version_id
           nil
-        elsif volume["boot"]
+        elsif volume.boot
           allocate_boot_image(vm_host, vm.boot_image)
-        elsif volume["read_only"]
-          allocate_boot_image(vm_host, volume["image"])
+        elsif params["read_only"]
+          allocate_boot_image(vm_host, params["image"])
         end
 
-        VmStorageVolume.create(
-          vm_id: vm.id,
-          boot: volume["boot"],
-          size_gib: volume["size_gib"],
+        volume.update(
           use_bdev_ubi:,
-          boot_image_id: image_id,
-          disk_index:,
-          key_encryption_key_1_id: key_encryption_key&.id,
+          boot_image_id:,
           spdk_installation_id:,
           vhost_block_backend_id:,
-          storage_device_id: @volume_to_device_map[disk_index],
-          max_read_mbytes_per_sec: volume["max_read_mbytes_per_sec"],
-          max_write_mbytes_per_sec: volume["max_write_mbytes_per_sec"],
-          vring_workers: vhost_block_backend_id ? volume["vring_workers"] : nil,
-          track_written: volume.fetch("track_written", false),
-          machine_image_version_id: volume["machine_image_version_id"],
+          storage_device_id: @volume_to_device_map[volume.disk_index],
+          vring_workers: vhost_block_backend_id ? params["vring_workers"] : nil,
         )
       end
     end

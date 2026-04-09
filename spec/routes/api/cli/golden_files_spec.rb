@@ -51,7 +51,6 @@ RSpec.describe Clover, "cli" do
     pg = PostgresResource.first(name: "test-pg")
     pg.pg_firewall_rules.find { it.ubid == "frpqgkgjd09y4pnjaq2pkeacam" }.update(description: "pg-fw-desc")
     pg.update(user_config: {allow_in_place_tablespaces: "on", max_connections: "1000"}, pgbouncer_user_config: {server_round_robin: "1", disable_pqexec: "1"})
-    pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     backup = Struct.new(:key, :last_modified)
     expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
     expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", now - 5 * 60 * 60)])).at_least(:once)
