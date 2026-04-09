@@ -137,7 +137,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         hop_create_vpc_deny_rules
       when /is not ready/
         Clog.emit("GCP resource not ready for association, will retry",
-          {gcp_resource_not_ready: {policy: firewall_policy_name, vpc: gcp_vpc.name, error: e.message}})
+          {gcp_resource_not_ready: Util.exception_to_hash(e, into: {policy: firewall_policy_name, vpc: gcp_vpc.name})})
         nap 5
       else
         raise
@@ -338,11 +338,11 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       credential.crm_client.delete_tag_key(tk.name)
     rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
       Clog.emit("Failed to delete firewall tag key during VPC cleanup",
-        {vpc_cleanup_tag_error: {tag_key: tk.name, error: e.message}})
+        {vpc_cleanup_tag_error: Util.exception_to_hash(e, into: {tag_key: tk.name})})
     end
   rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
     Clog.emit("Failed to list tag keys during VPC cleanup",
-      {vpc_cleanup_list_tags_error: {error: e.message}})
+      {vpc_cleanup_list_tags_error: Util.exception_to_hash(e)})
   end
 
   def delete_firewall_policy
@@ -368,7 +368,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
   rescue Google::Cloud::Error => e
     Clog.emit("Failed to delete firewall policy during VPC cleanup",
-      {vpc_cleanup_policy_error: {policy: firewall_policy_name, error: e.message}})
+      {vpc_cleanup_policy_error: Util.exception_to_hash(e, into: {policy: firewall_policy_name})})
   end
 
   def delete_vpc_network
@@ -381,7 +381,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   rescue Google::Cloud::InvalidArgumentError => e
     raise if e.message.include?("being used by")
     Clog.emit("Failed to delete VPC network during cleanup",
-      {vpc_cleanup_network_error: {vpc: gcp_vpc.name, error: e.message}})
+      {vpc_cleanup_network_error: Util.exception_to_hash(e, into: {vpc: gcp_vpc.name})})
   end
 
   def cache_network_self_link(network)

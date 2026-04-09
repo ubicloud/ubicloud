@@ -398,10 +398,10 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
       credential.crm_client.delete_tag_key(tk.name)
     rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-      Clog.emit("Failed to clean up orphaned firewall tag resources", {cleanup_orphaned_tag_error: {tag_key: tk.name, error: e.message}})
+      Clog.emit("Failed to clean up orphaned firewall tag resources", {cleanup_orphaned_tag_error: Util.exception_to_hash(e, into: {tag_key: tk.name})})
     end
   rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-    Clog.emit("Failed to clean up orphaned firewall rules", {cleanup_orphaned_firewall_rules_error: {error: e.message}})
+    Clog.emit("Failed to clean up orphaned firewall rules", {cleanup_orphaned_firewall_rules_error: Util.exception_to_hash(e)})
   end
 
   # --- Rule builders ---
