@@ -39,10 +39,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     register_deadline("wait", 5 * 60)
 
     gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    unless gcp_vpc
-      Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id)
-      gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    end
+    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id)
     gcp_vpc.add_private_subnet(private_subnet) unless private_subnet.gcp_vpc
 
     hop_wait_vpc_ready
@@ -291,12 +288,17 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def policy_rule_matches_desired?(existing, direction:, action:, src_ip_ranges:, dest_ip_ranges:, layer4_configs:, target_secure_tags: nil)
+    match = existing.match
     existing.direction == direction &&
       existing.action == action &&
-      (existing.match&.src_ip_ranges&.to_a || []).sort == (src_ip_ranges || []).sort &&
-      (existing.match&.dest_ip_ranges&.to_a || []).sort == (dest_ip_ranges || []).sort &&
-      normalize_layer4_configs(existing.match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs || []) &&
+      sorted_ranges_eq?(match&.src_ip_ranges, src_ip_ranges) &&
+      sorted_ranges_eq?(match&.dest_ip_ranges, dest_ip_ranges) &&
+      normalize_layer4_configs(match&.layer4_configs&.to_a || []) == normalize_layer4_configs(layer4_configs || []) &&
       existing.target_secure_tags.map(&:name).sort == (target_secure_tags || []).sort
+  end
+
+  def sorted_ranges_eq?(existing_ranges, desired_ranges)
+    (existing_ranges&.to_a || []).sort == (desired_ranges || []).sort
   end
 
   def normalize_layer4_configs(configs)

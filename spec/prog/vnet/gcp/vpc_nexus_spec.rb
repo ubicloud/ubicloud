@@ -46,12 +46,13 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   describe ".assemble" do
     it "creates a GcpVpc and a strand" do
       assemble_project = Project.create(name: "test-gcp-vpc-assemble")
-      st = described_class.assemble(assemble_project.id, location.id)
+      result = described_class.assemble(assemble_project.id, location.id)
       vpc = GcpVpc.first(project_id: assemble_project.id, location_id: location.id)
       expect(vpc).not_to be_nil
       expect(vpc.name).to start_with("ubicloud-")
-      expect(st).to be_a(Strand)
-      expect(st.prog).to eq("Vnet::Gcp::VpcNexus")
+      expect(result).to be_a(GcpVpc)
+      expect(result.id).to eq(vpc.id)
+      expect(vpc.strand.prog).to eq("Vnet::Gcp::VpcNexus")
     end
 
     it "raises for invalid project" do

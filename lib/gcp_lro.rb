@@ -42,6 +42,13 @@ module GcpLro
 
   # Poll the previously saved GCP operation and return its proto.
   #
+  # INVARIANT: Labels that call poll_gcp_op must only be entered after a
+  # save_gcp_op(...); hop_<wait_label> sequence in the same strand. The
+  # frame keys "gcp_op_name", "gcp_op_scope", and "gcp_op_scope_value"
+  # are expected to be present; if the label is entered any other way,
+  # this method will either raise ("Unknown GCP operation scope") or
+  # issue a malformed request to GCP. Do NOT bypass save_gcp_op.
+  #
   # @return [Google::Cloud::Compute::V1::Operation] the operation status
   def poll_gcp_op
     op_name = frame["gcp_op_name"]
