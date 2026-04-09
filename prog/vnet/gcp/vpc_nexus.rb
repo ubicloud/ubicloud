@@ -129,13 +129,10 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       )
       save_gcp_op(assoc_op.name, "global")
       hop_wait_firewall_policy_associated
-    rescue Google::Cloud::AlreadyExistsError
-      hop_create_vpc_deny_rules
-    rescue Google::Cloud::InvalidArgumentError => e
-      case e.message
-      when /already exists/
+    rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
+      if e.is_a?(Google::Cloud::AlreadyExistsError) || e.message.include?("already exists")
         hop_create_vpc_deny_rules
-      when /is not ready/
+      elsif e.message.include?("is not ready")
         Clog.emit("GCP resource not ready for association, will retry",
           {gcp_resource_not_ready: Util.exception_to_hash(e, into: {policy: firewall_policy_name, vpc: gcp_vpc.name})})
         nap 5
