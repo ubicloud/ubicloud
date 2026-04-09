@@ -765,13 +765,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#normalize_layer4_configs" do
-    # rubocop:disable RSpec/VerifiedDoubles
     it "handles layer4 configs with nil ports (covers &.to_a nil branch)" do
-      config = double("layer4_config", ip_protocol: "tcp", ports: nil)
+      config = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp")
       result = nx.send(:normalize_layer4_configs, [config])
       expect(result).to eq([["tcp", []]])
     end
-    # rubocop:enable RSpec/VerifiedDoubles
   end
 
   describe "#delete_subnet_policy_rules" do
