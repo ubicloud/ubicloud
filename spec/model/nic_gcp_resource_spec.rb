@@ -30,7 +30,7 @@ RSpec.describe NicGcpResource do
       nic.id,
       address_name: "ubicloud-test-nic",
       static_ip: "35.192.0.1",
-      network_name: "ubicloud-proj-test",
+      vpc_name: "ubicloud-proj-test",
       subnet_name: "ubicloud-test",
     )
 
@@ -38,12 +38,12 @@ RSpec.describe NicGcpResource do
     expect(resource.id).to eq(nic.id)
     expect(resource.address_name).to eq("ubicloud-test-nic")
     expect(resource.static_ip.to_s).to eq("35.192.0.1")
-    expect(resource.network_name).to eq("ubicloud-proj-test")
+    expect(resource.vpc_name).to eq("ubicloud-proj-test")
     expect(resource.subnet_name).to eq("ubicloud-test")
   end
 
   it "is associated with its NIC" do
-    resource = described_class.create_with_id(nic.id, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+    resource = described_class.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     expect(resource.nic.id).to eq(nic.id)
   end
 end

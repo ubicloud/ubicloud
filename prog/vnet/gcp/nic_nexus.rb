@@ -14,7 +14,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     ps = nic.private_subnet
     NicGcpResource.create_with_id(
       nic.id,
-      network_name: ps.gcp_vpc.name,
+      vpc_name: ps.gcp_vpc.name,
       subnet_name: "ubicloud-#{ps.ubid}",
     )
 

@@ -65,7 +65,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       disks:,
       network_interfaces: [
         Google::Cloud::Compute::V1::NetworkInterface.new(
-          network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.network_name}",
+          network: "projects/#{gcp_project_id}/global/networks/#{gcp_res.vpc_name}",
           subnetwork: "projects/#{gcp_project_id}/regions/#{gcp_region}/subnetworks/#{gcp_res.subnet_name}",
           network_i_p: nic.private_ipv4.network.to_s,
           stack_type: "IPV4_IPV6",

@@ -414,7 +414,7 @@ module AdminModelSpecHelper
 
     def create_nic_gcp_resource
       nic = create_nic
-      NicGcpResource.create_with_id(nic, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
     def create_object_tag

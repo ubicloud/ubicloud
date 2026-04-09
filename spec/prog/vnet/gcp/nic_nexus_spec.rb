@@ -65,14 +65,14 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.start }.to hop("allocate_static_ip")
       gcp_res = NicGcpResource[nic.id]
       expect(gcp_res).not_to be_nil
-      expect(gcp_res.network_name).to eq("ubicloud-#{private_subnet.project.ubid}-#{private_subnet.location.ubid}")
+      expect(gcp_res.vpc_name).to eq("ubicloud-#{private_subnet.project.ubid}-#{private_subnet.location.ubid}")
       expect(gcp_res.subnet_name).to eq("ubicloud-#{private_subnet.ubid}")
     end
   end
 
   describe "#allocate_static_ip" do
     before do
-      NicGcpResource.create_with_id(nic.id, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
     it "fails if address name exceeds 63 characters" do
@@ -132,7 +132,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#wait_allocate_ip" do
     before do
-      NicGcpResource.create_with_id(nic.id, network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
       st.stack.first["gcp_op_name"] = "op-addr-123"
       st.stack.first["gcp_op_scope"] = "region"
       st.stack.first["gcp_op_scope_value"] = "us-central1"
@@ -206,7 +206,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
   describe "#destroy" do
     it "releases static IP and hops to wait_release_ip" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-addr")
       expect(addresses_client).to receive(:delete)
@@ -218,7 +218,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "handles already-deleted static IP" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       expect(addresses_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -231,7 +231,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "naps when IP release operation is still running" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       st.stack.first["gcp_op_name"] = "op-delete-running"
       st.stack.first["gcp_op_scope"] = "region"
@@ -262,7 +262,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "completes IP release and destroys resources on success" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       st.stack.first["gcp_op_name"] = "op-delete-ok"
       st.stack.first["gcp_op_scope"] = "region"
@@ -280,7 +280,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", network_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
       st.stack.first["gcp_op_name"] = "op-delete-fail"
       st.stack.first["gcp_op_scope"] = "region"
