@@ -40,13 +40,13 @@ RSpec.describe PostgresUpgrade do
 
   describe "#disable_archiving" do
     it "disables archiving without reload by default" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/17/main/conf.d/100-upgrade.conf")
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/17/main/conf.d/100-upgrade.conf")
       expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster 17 main reload")
       postgres_upgrade.disable_archiving(17)
     end
 
     it "disables archiving and reloads when reload: true" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
       expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster 16 main reload")
       postgres_upgrade.disable_archiving(16, reload: true)
     end
