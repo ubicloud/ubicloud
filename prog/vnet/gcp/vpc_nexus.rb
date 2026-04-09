@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
-require "google/apis/cloudresourcemanager_v3"
-require_relative "../../../lib/gcp_lro"
-
 class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   include GcpLro
 
@@ -113,8 +109,8 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         hop_wait_firewall_policy_created
       rescue Google::Cloud::AlreadyExistsError
         # Policy created by a concurrent strand between our GET and INSERT.
+        nil
       end
-      nil
     end
 
     policy ||= credential.network_firewall_policies_client.get(

@@ -1,8 +1,5 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
-require_relative "../../../lib/gcp_lro"
-
 class Prog::Vnet::Gcp::NicNexus < Prog::Base
   include GcpLro
 

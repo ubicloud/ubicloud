@@ -1,9 +1,5 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
-require "google/apis/cloudresourcemanager_v3"
-require_relative "../../../lib/gcp_lro"
-
 class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   include GcpLro
 

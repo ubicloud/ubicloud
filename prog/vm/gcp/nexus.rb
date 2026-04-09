@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 require "base64"
-require "google/cloud/compute/v1"
-require_relative "../../../lib/gcp_lro"
 
 class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
