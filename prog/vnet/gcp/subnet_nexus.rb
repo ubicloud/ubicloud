@@ -56,12 +56,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   label def create_subnet
     subnet_name = "ubicloud-#{private_subnet.ubid}"
     begin
-      credential.subnetworks_client.get(
-        project: gcp_project_id,
-        region: gcp_region,
-        subnetwork: subnet_name,
-      )
-    rescue Google::Cloud::NotFoundError
       op = credential.subnetworks_client.insert(
         project: gcp_project_id,
         region: gcp_region,
@@ -76,9 +70,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       )
       save_gcp_op(op.name, "region", gcp_region)
       hop_wait_create_subnet
+    rescue Google::Cloud::AlreadyExistsError
+      # Retry after partial crash -- subnet already exists, proceed.
+      hop_create_tag_resources
     end
-
-    hop_create_tag_resources
   end
 
   label def wait_create_subnet

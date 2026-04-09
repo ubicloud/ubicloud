@@ -83,18 +83,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#create_subnet" do
     it "skips creation if subnet already exists" do
-      expect(subnetworks_client).to receive(:get).with(
-        project: "test-gcp-project",
-        region: "us-central1",
-        subnetwork: "ubicloud-#{ps.ubid}",
-      ).and_return(Google::Cloud::Compute::V1::Subnetwork.new)
+      expect(subnetworks_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
 
       expect { nx.create_subnet }.to hop("create_tag_resources")
     end
 
     it "creates dual-stack subnet and hops to wait_create_subnet" do
-      expect(subnetworks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-123")
       expect(subnetworks_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
