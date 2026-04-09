@@ -367,15 +367,54 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
     end
 
-    it "logs and proceeds when LRO errors" do
+    it "logs and proceeds when LRO errors but association already exists" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "operation failed")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(
+          name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name,
+              attachment_target: vpc_target,
+            ),
+          ],
+        ),
+      )
+      expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
+    end
+
+    it "hops back to create_firewall_policy when LRO errors and association is missing" do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
         status: :DONE,
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
-      expect { nx.wait_firewall_policy_associated }.to hop("create_vpc_deny_rules")
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, associations: []),
+      )
+      expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
+      expect(st.reload.stack.first["gcp_op_name"]).to be_nil
     end
+
+    # rubocop:disable RSpec/VerifiedDoubles
+    it "hops back to create_firewall_policy when LRO errors and re-fetched policy has nil associations" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect(nfp_client).to receive(:get).and_return(double("policy", associations: nil))
+      expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
+    end
+    # rubocop:enable RSpec/VerifiedDoubles
   end
 
   describe "#create_vpc_deny_rules" do
