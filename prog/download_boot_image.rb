@@ -12,7 +12,7 @@ class Prog::DownloadBootImage < Prog::Base
   end
 
   def version
-    @version ||= frame["version"] || default_boot_image_version(image_name)
+    @version ||= frame["version"] || latest_boot_image_version(image_name)
   end
 
   def image
@@ -23,11 +23,11 @@ class Prog::DownloadBootImage < Prog::Base
     image_name.start_with?("github", "postgres", "ai-", "kubernetes", "gpu") || Config.production?
   end
 
-  def default_boot_image_version(image_name)
-    config_name = image_name.tr("-", "_") + "_version"
-    fail "Unknown boot image: #{image_name}" unless Config.respond_to?(config_name)
+  def latest_boot_image_version(image_name)
+    arch_versions = BOOT_IMAGE_SHA256.dig(image_name, vm_host.arch)
+    fail "Unknown boot image: #{image_name}" unless arch_versions
 
-    Config.send(config_name)
+    arch_versions.keys.max
   end
 
   def download_from_r2?
