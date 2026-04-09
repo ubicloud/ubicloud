@@ -297,8 +297,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
-        user_config = typecast_params.Hash("pg_config", {})
-        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
@@ -373,8 +373,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
-        user_config = typecast_params.Hash("pg_config", {})
-        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
         tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
