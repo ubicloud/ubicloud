@@ -72,11 +72,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def wait_create_subnet
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
     subnet_name = "ubicloud-#{private_subnet.ubid}"
-    if op_error?(op)
+    poll_and_clear_gcp_op do |op|
       begin
         credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
       rescue Google::Cloud::NotFoundError
@@ -85,8 +82,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       Clog.emit("GCP LRO error but resource exists",
         {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
     end
-
-    clear_gcp_op
     hop_create_tag_resources
   end
 

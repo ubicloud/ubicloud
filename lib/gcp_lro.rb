@@ -97,6 +97,21 @@ module GcpLro
     op_errors(op).first&.code
   end
 
+  # Poll the saved LRO, nap if still running, yield to a block if it errored,
+  # and clear the op when done. The block receives the operation proto and is
+  # responsible for any resource-specific recovery (GET the resource, hop back
+  # on persistent failure, emit a recovery Clog, etc.). If the block falls
+  # through (returns normally), we assume recovery succeeded and clear the op.
+  # If the block needs to raise, nap, or hop, it should do so explicitly --
+  # those control-flow exits unwind before clear_gcp_op.
+  def poll_and_clear_gcp_op
+    op = poll_gcp_op
+    nap 5 unless op.status == :DONE
+    yield op if op_error?(op)
+    clear_gcp_op
+    op
+  end
+
   private
 
   # Returns detailed operation errors as an array. The Operation proto's

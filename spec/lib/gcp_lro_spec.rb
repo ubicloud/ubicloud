@@ -104,4 +104,61 @@ RSpec.describe GcpLro do
       expect(nx.send(:op_error?, build_op(http_error_status_code: 403))).to be(true)
     end
   end
+
+  describe "#poll_and_clear_gcp_op" do
+    before do
+      strand.stack.first["gcp_op_name"] = "op-abc"
+      strand.stack.first["gcp_op_scope"] = "global"
+      strand.stack.first["gcp_op_scope_value"] = nil
+      strand.modified!(:stack)
+      strand.save_changes
+      nx.instance_variable_set(:@frame, nil)
+    end
+
+    it "naps when the operation is still running and does not yield" do
+      op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
+      expect(global_ops_client).to receive(:get).and_return(op)
+      yielded = false
+      expect { nx.poll_and_clear_gcp_op { yielded = true } }.to raise_error(Prog::Base::Nap)
+      expect(yielded).to be(false)
+      expect(strand.reload.stack.first["gcp_op_name"]).to eq("op-abc")
+    end
+
+    it "clears the op and does not yield when the operation succeeds" do
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get).and_return(op)
+      yielded = false
+      result = nx.poll_and_clear_gcp_op { yielded = true }
+      expect(yielded).to be(false)
+      expect(result).to eq(op)
+      expect(strand.reload.stack.first["gcp_op_name"]).to be_nil
+    end
+
+    it "yields the errored op then clears the op when the block falls through" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "TRANSIENT", message: "transient")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      yielded_op = nil
+      result = nx.poll_and_clear_gcp_op { |o| yielded_op = o }
+      expect(yielded_op).to eq(op)
+      expect(result).to eq(op)
+      expect(strand.reload.stack.first["gcp_op_name"]).to be_nil
+    end
+
+    it "does not clear the op when the recovery block raises" do
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "FATAL", message: "fatal")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(global_ops_client).to receive(:get).and_return(op)
+      expect {
+        nx.poll_and_clear_gcp_op { |_| raise "recovery failed" }
+      }.to raise_error(RuntimeError, "recovery failed")
+      expect(strand.reload.stack.first["gcp_op_name"]).to eq("op-abc")
+    end
+  end
 end
