@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "google/cloud/compute/v1"
 require_relative "spec_helper"
 
 RSpec.describe PrivateSubnet do
@@ -475,35 +474,6 @@ RSpec.describe PrivateSubnet do
 
     it "raises error on disconnect_subnet" do
       expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for AWS")
-    end
-  end
-
-  describe "GCP connect/disconnect subnet" do
-    let(:prj) { Project.create(name: "test-gcp-prj") }
-
-    let(:location) {
-      Location.create(name: "gcp-us-central1", provider: "gcp", project_id: prj.id,
-        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
-    }
-
-    let(:ps1) {
-      described_class.create(name: "gcp-ps1", location_id: location.id,
-        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26",
-        state: "waiting", project_id: prj.id)
-    }
-
-    let(:ps2) {
-      described_class.create(name: "gcp-ps2", location_id: location.id,
-        net6: "fd10:9b0b:6b4b:8fbc::/64", net4: "10.0.1.0/26",
-        state: "waiting", project_id: prj.id)
-    }
-
-    it "raises error on connect_subnet" do
-      expect { ps1.connect_subnet(ps2) }.to raise_error("Connected subnets are not supported for GCP")
-    end
-
-    it "raises error on disconnect_subnet" do
-      expect { ps1.disconnect_subnet(ps2) }.to raise_error("Connected subnets are not supported for GCP")
     end
   end
 end

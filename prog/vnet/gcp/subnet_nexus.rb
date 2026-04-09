@@ -32,7 +32,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   #   65531–65534 VPC-wide DENY: unconditional deny for all private traffic (default-deny posture).
   #              Subnet/VM rules override these by having lower (= higher-precedence) priorities.
   #
-  # See model/gcp/gcp_firewall_architecture.md for the full design.
+  # See doc/gcp_firewall_architecture.md for the full design.
   ALLOW_SUBNET_BASE_PRIORITY = 1000
 
   label def start

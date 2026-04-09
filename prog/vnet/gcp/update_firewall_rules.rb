@@ -8,7 +8,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   # so rules for different firewalls can share the same priority number — GCP only
   # evaluates a rule for VMs bound to its target tag. Priorities are not stored in the
   # DB; they're allocated on-the-fly by reading the current policy and finding free slots.
-  # See model/gcp/gcp_firewall_architecture.md for the full priority band layout.
+  # See doc/gcp_firewall_architecture.md for the full priority band layout.
   TAG_RULE_BASE_PRIORITY = 10000
   GCP_MAX_TAGS_PER_NIC = 10
 
