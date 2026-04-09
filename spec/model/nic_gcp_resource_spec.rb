@@ -12,17 +12,17 @@ RSpec.describe NicGcpResource do
     PrivateSubnet.create(
       name: "ps", location_id: location.id, project_id: project.id,
       net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active",
-    ) { it.id = SecureRandom.uuid }
+    )
   }
 
   let(:nic) {
-    nic_id = SecureRandom.uuid
-    Nic.create_with_id(nic_id,
+    Nic.create(
       private_ipv6: "fd10:9b0b:6b4b:8fbb::1",
       private_ipv4: "10.0.0.1",
       name: "test-nic",
       private_subnet_id: private_subnet.id,
-      state: "active")
+      state: "active",
+    )
   }
 
   it "creates a NicGcpResource associated with a NIC" do

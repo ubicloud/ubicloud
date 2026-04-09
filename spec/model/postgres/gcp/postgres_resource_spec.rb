@@ -37,14 +37,14 @@ RSpec.describe PostgresResource do
     @nic_counter += 1
     subnet = PrivateSubnet.create(name: "#{name}-subnet", location_id: location.id,
       project_id: project.id,
-      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.#{@nic_counter}.0/26", state: "active") { it.id = SecureRandom.uuid }
-    nic_id = SecureRandom.uuid
-    nic = Nic.create_with_id(nic_id,
+      net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.#{@nic_counter}.0/26", state: "active")
+    nic = Nic.create(
       private_ipv6: "fd10:9b0b:6b4b:8fbb::#{@nic_counter}",
       private_ipv4: "10.0.#{@nic_counter}.1",
       name: "#{name}-nic",
       private_subnet_id: subnet.id,
-      state: "active")
+      state: "active",
+    )
     Strand.create_with_id(nic, prog: "Vnet::Gcp::NicNexus", label: "wait")
 
     vm = create_vm(

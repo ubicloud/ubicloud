@@ -19,10 +19,11 @@ RSpec.describe Location do
       before { PgGceImage.dataset.destroy }
 
       it "returns a GCE image path using the image's hosting project" do
-        PgGceImage.create_with_id(SecureRandom.uuid,
+        PgGceImage.create(
           gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-x64-20260218",
-          arch: "x64")
+          arch: "x64",
+        )
 
         expect(location.pg_gce_image("x64")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218",
@@ -40,10 +41,11 @@ RSpec.describe Location do
       before { PgGceImage.dataset.destroy }
 
       it "delegates to pg_gce_image" do
-        PgGceImage.create_with_id(SecureRandom.uuid,
+        PgGceImage.create(
           gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
-          arch: "arm64")
+          arch: "arm64",
+        )
 
         expect(location.send(:gcp_pg_boot_image, "99", "arm64", "standard")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
@@ -55,8 +57,8 @@ RSpec.describe Location do
       let(:zones_client) { instance_double(Google::Cloud::Compute::V1::Zones::Rest::Client) }
 
       it "returns cached AZs when they exist" do
-        LocationAz.create_with_id(SecureRandom.uuid, location_id: location.id, az: "a")
-        LocationAz.create_with_id(SecureRandom.uuid, location_id: location.id, az: "b")
+        LocationAz.create(location_id: location.id, az: "a")
+        LocationAz.create(location_id: location.id, az: "b")
 
         azs = location.send(:gcp_azs)
         expect(azs.map(&:az)).to contain_exactly("a", "b")

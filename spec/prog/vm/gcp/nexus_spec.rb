@@ -71,7 +71,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       zone_operations_client: zone_ops_client,
     )
     %w[a b c].each do |suffix|
-      LocationAz.create_with_id(SecureRandom.uuid, location_id: location.id, az: suffix)
+      LocationAz.create(location_id: location.id, az: suffix)
     end
   end
 
