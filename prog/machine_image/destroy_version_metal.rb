@@ -7,6 +7,8 @@ class Prog::MachineImage::DestroyVersionMetal < Prog::Base
 
   def self.assemble(machine_image_version_metal)
     DB.transaction do
+      # Mark the version as disabled first to acquire a row lock and prevent
+      # concurrent creation of storage volumes based on this version.
       machine_image_version_metal.update(enabled: false)
 
       miv = machine_image_version_metal.machine_image_version

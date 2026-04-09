@@ -580,5 +580,26 @@ RSpec.describe Vm do
       expect(vol.size_gib).to eq(10)
       expect(vol.machine_image_version_id).to eq(miv.id)
     end
+
+    it "fails if machine image version is specified but not found" do
+      miv = create_machine_image_version_metal
+      miv_id = miv.id
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv_id},
+      ]
+      miv.destroy
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv_id} is not available")
+    end
+
+    it "fails if machine image version is specified but not enabled" do
+      miv = create_machine_image_version_metal
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
+      ]
+      miv.update(enabled: false)
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
+    end
   end
 end
