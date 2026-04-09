@@ -35,75 +35,73 @@ RSpec.describe GcpLro do
     end
   end
 
-  # rubocop:disable RSpec/VerifiedDoubles
+  def build_op(error: nil, http_error_status_code: 0, http_error_message: "")
+    Google::Cloud::Compute::V1::Operation.new(
+      error:,
+      http_error_status_code:,
+      http_error_message:,
+    )
+  end
+
+  def build_error(*details)
+    Google::Cloud::Compute::V1::Error.new(
+      errors: details.map { |d| Google::Cloud::Compute::V1::Errors.new(code: d[:code], message: d.fetch(:message, "")) },
+    )
+  end
+
   describe "#op_error_message" do
-    it "returns string when error does not respond to :errors" do
-      op = double("op", error: "simple string error")
-      expect(nx.send(:op_error_message, op)).to eq("simple string error")
+    it "joins structured error details" do
+      op = build_op(error: build_error({code: "QUOTA_EXCEEDED", message: "quota"}))
+      expect(nx.send(:op_error_message, op)).to eq("quota (code: QUOTA_EXCEEDED)")
     end
 
-    it "returns string when error.errors is empty" do
-      err = double("err", errors: [], to_s: "error with empty errors")
-      op = double("op", error: err)
-      expect(nx.send(:op_error_message, op)).to eq("error with empty errors")
+    it "returns stringified error when structured details are empty" do
+      op = build_op(error: build_error)
+      expect(nx.send(:op_error_message, op)).to eq(op.error.to_s)
     end
 
     it "includes HTTP status and message when present" do
-      op = double("op", error: nil, http_error_status_code: 409, http_error_message: "Already exists")
+      op = build_op(http_error_status_code: 409, http_error_message: "Already exists")
       expect(nx.send(:op_error_message, op)).to eq("Already exists (HTTP 409)")
     end
 
-    it "includes bare HTTP status when op has no http_error_message method" do
-      op = double("op", error: nil, http_error_status_code: 500)
+    it "includes bare HTTP status when http_error_message is empty" do
+      op = build_op(http_error_status_code: 500)
       expect(nx.send(:op_error_message, op)).to eq("HTTP 500")
     end
 
-    it "returns nil when op has no error or HTTP error methods" do
-      op = double("op")
-      expect(nx.send(:op_error_message, op)).to be_nil
+    it "returns nil when no structured or HTTP error is set" do
+      expect(nx.send(:op_error_message, build_op)).to be_nil
     end
   end
 
   describe "#op_error_code" do
-    it "returns nil when error does not respond to :errors" do
-      op = double("op", error: "simple string error")
-      expect(nx.send(:op_error_code, op)).to be_nil
+    it "returns the first detail code when present" do
+      op = build_op(error: build_error({code: "QUOTA_EXCEEDED"}, {code: "OTHER"}))
+      expect(nx.send(:op_error_code, op)).to eq("QUOTA_EXCEEDED")
     end
 
-    it "returns nil when errors is nil" do
-      err = double("err", errors: nil)
-      op = double("op", error: err)
-      expect(nx.send(:op_error_code, op)).to be_nil
+    it "returns nil when error is unset" do
+      expect(nx.send(:op_error_code, build_op)).to be_nil
     end
 
-    it "returns nil when errors is empty" do
-      err = double("err", errors: [])
-      op = double("op", error: err)
-      expect(nx.send(:op_error_code, op)).to be_nil
+    it "returns nil when errors list is empty" do
+      expect(nx.send(:op_error_code, build_op(error: build_error))).to be_nil
     end
   end
 
   describe "#op_error?" do
     it "returns false when there is no structured or HTTP error" do
-      op = double("op", error: nil, http_error_status_code: nil)
-      expect(nx.send(:op_error?, op)).to be(false)
-    end
-
-    it "returns false when HTTP error code is zero" do
-      op = double("op", error: nil, http_error_status_code: 0)
-      expect(nx.send(:op_error?, op)).to be(false)
+      expect(nx.send(:op_error?, build_op)).to be(false)
     end
 
     it "returns true when structured operation errors exist" do
-      err = double("err", errors: [double("detail", code: "QUOTA_EXCEEDED")])
-      op = double("op", error: err, http_error_status_code: nil)
+      op = build_op(error: build_error({code: "QUOTA_EXCEEDED"}))
       expect(nx.send(:op_error?, op)).to be(true)
     end
 
     it "returns true when only HTTP error exists" do
-      op = double("op", error: nil, http_error_status_code: 403)
-      expect(nx.send(:op_error?, op)).to be(true)
+      expect(nx.send(:op_error?, build_op(http_error_status_code: 403))).to be(true)
     end
   end
-  # rubocop:enable RSpec/VerifiedDoubles
 end

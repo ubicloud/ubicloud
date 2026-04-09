@@ -82,15 +82,14 @@ module GcpLro
     messages = errors.map { |e| "#{e.message} (code: #{e.code})" }
 
     if (status = op_http_error_code(op))
-      http_message = op.respond_to?(:http_error_message) ? op.http_error_message : nil
+      http_message = op.http_error_message
       label = "HTTP #{status}"
-      messages.unshift((http_message && !http_message.empty?) ? "#{http_message} (#{label})" : label)
+      messages.unshift(http_message.empty? ? label : "#{http_message} (#{label})")
     end
 
     return messages.join("; ") unless messages.empty?
 
-    err = op.respond_to?(:error) ? op.error : nil
-    err&.to_s
+    op.error&.to_s
   end
 
   # Extract the first error code from an operation's error details.
@@ -100,19 +99,17 @@ module GcpLro
 
   private
 
-  # Returns detailed operation errors as an array.
+  # Returns detailed operation errors as an array. The Operation proto's
+  # `error` submessage is nil when unset; otherwise its `errors` field is
+  # always a repeated field.
   def op_errors(op)
-    return [] unless op.respond_to?(:error)
-    err = op.error
-    return [] unless err.respond_to?(:errors)
-    Array(err.errors)
+    Array(op.error&.errors)
   end
 
-  # Returns HTTP error status code for operations that fail at HTTP layer.
+  # Returns HTTP error status code for operations that fail at HTTP layer,
+  # or nil when unset. The proto int32 field defaults to 0.
   def op_http_error_code(op)
-    return nil unless op.respond_to?(:http_error_status_code)
     code = op.http_error_status_code
-    return nil if code.nil? || code.zero?
-    code
+    code unless code.zero?
   end
 end
