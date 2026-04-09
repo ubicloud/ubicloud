@@ -11,7 +11,7 @@ class PrivateSubnet < Sequel::Model
   one_to_many :load_balancers, read_only: true
   many_to_one :location
   one_to_one :private_subnet_aws_resource, key: :id, read_only: true
-  one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc
+  one_through_one :gcp_vpc, join_table: :private_subnet_gcp_vpc, read_only: true
 
   PRIVATE_24_BLOCK_COUNT = 2**16 + 2**12 + 2**8
   PRIVATE_SUBNET_RANGES = [
