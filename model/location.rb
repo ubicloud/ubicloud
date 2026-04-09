@@ -36,8 +36,7 @@ class Location < Sequel::Model
 
   def self.postgres_locations
     where(name: ["hetzner-fsn1", "leaseweb-wdc02"])
-      .or(provider: "aws", project_id: nil)
-      .or(provider: "gcp", project_id: nil)
+      .or(provider: %w[aws gcp], project_id: nil)
       .all
   end
 
