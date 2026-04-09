@@ -23,15 +23,15 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     DB.transaction do
-      id = GcpVpc.generate_uuid
-      vpc = GcpVpc.create_with_id(id,
+      vpc = GcpVpc.create(
         project_id: project.id,
         location_id: location.id,
-        name: "ubicloud-#{project.ubid}-#{location.ubid}")
-      Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") { it.id = vpc.id }
+        name: "ubicloud-#{project.ubid}-#{location.ubid}",
+      )
+      Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
     end
   rescue Sequel::UniqueConstraintViolation, Sequel::ValidationFailed
-    GcpVpc.where(project_id:, location_id:).first
+    GcpVpc.where(project_id:, location_id:).first!
   end
 
   label def start
