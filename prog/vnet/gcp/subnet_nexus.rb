@@ -393,43 +393,21 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def ensure_tag_key
-    if (pending = frame["pending_tag_key_crm_op"])
-      op = credential.crm_client.get_operation(pending)
-      unless op.done?
-        nap 5
-      end
-      update_stack({"pending_tag_key_crm_op" => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
-      name = op.response&.dig("name")
-      return name if name
-      return lookup_tag_key&.name ||
-          raise("Tag key #{tag_key_short_name} created but name not found in operation response or listing")
-    end
-
-    tag_key_obj = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+    ensure_crm_resource(
+      pending_key: "pending_tag_key_crm_op",
+      label: "Tag key",
       short_name: tag_key_short_name,
-      parent: tag_key_parent,
-      purpose: "GCE_FIREWALL",
-      purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
-    )
-
-    op = credential.crm_client.create_tag_key(tag_key_obj)
-    unless op.done?
-      update_stack({"pending_tag_key_crm_op" => op.name})
-      nap 5
+      lookup: -> { lookup_tag_key&.name },
+    ) do
+      credential.crm_client.create_tag_key(
+        Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          short_name: tag_key_short_name,
+          parent: tag_key_parent,
+          purpose: "GCE_FIREWALL",
+          purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
+        ),
+      )
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
-    name = op.response&.dig("name")
-    return name if name
-
-    lookup_tag_key&.name ||
-      raise("Tag key #{tag_key_short_name} created but name not found in operation response or listing")
-  rescue Google::Apis::ClientError => e
-    raise unless e.status_code == 409
-    lookup_tag_key&.name || raise("Tag key #{tag_key_short_name} conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_key&.name || raise("Tag key #{tag_key_short_name} conflict but not found on lookup")
   end
 
   def lookup_tag_key
@@ -438,43 +416,52 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def ensure_tag_value(parent_tag_key_name, short_name)
-    if (pending = frame["pending_tag_value_crm_op"])
+    ensure_crm_resource(
+      pending_key: "pending_tag_value_crm_op",
+      label: "Tag value",
+      short_name:,
+      lookup: -> { lookup_tag_value_name(parent_tag_key_name, short_name) },
+    ) do
+      credential.crm_client.create_tag_value(
+        Google::Apis::CloudresourcemanagerV3::TagValue.new(short_name:, parent: parent_tag_key_name),
+      )
+    end
+  end
+
+  # Polls/creates a CRM long-running operation for tag-key / tag-value flows.
+  # The create block is called to start the LRO; `lookup` is a proc that
+  # returns the resource name (string) on fallback lookup or nil.
+  def ensure_crm_resource(pending_key:, label:, short_name:, lookup:)
+    if (pending = frame[pending_key])
       op = credential.crm_client.get_operation(pending)
       unless op.done?
         nap 5
       end
-      update_stack({"pending_tag_value_crm_op" => nil})
+      update_stack({pending_key => nil})
       raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
       name = op.response&.dig("name")
       return name if name
-      return lookup_tag_value_name(parent_tag_key_name, short_name) ||
-          raise("Tag value #{short_name} created but name not found in operation response or listing")
+      return lookup.call ||
+          raise("#{label} #{short_name} created but name not found in operation response or listing")
     end
 
-    tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
-      short_name:,
-      parent: parent_tag_key_name,
-    )
-
-    op = credential.crm_client.create_tag_value(tag_value_obj)
+    op = yield
     unless op.done?
-      update_stack({"pending_tag_value_crm_op" => op.name})
+      update_stack({pending_key => op.name})
       nap 5
     end
     raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
     name = op.response&.dig("name")
     return name if name
 
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} created but name not found in operation response or listing")
+    lookup.call ||
+      raise("#{label} #{short_name} created but name not found in operation response or listing")
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
+    lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
   rescue RuntimeError => e
     raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_value_name(parent_tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
+    lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
   end
 
   def lookup_tag_value_name(parent_tag_key_name, short_name)
