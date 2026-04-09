@@ -5,7 +5,7 @@ require "google/cloud/compute/v1"
 RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.create(prog: "Vnet::Gcp::SubnetNexus", label: "start") }
+  let(:st) { Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label: "start") }
   let(:project) { Project.create(name: "test-gcp-subnet") }
   let(:location) {
     Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
@@ -31,7 +31,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   }
   let(:ps) {
     credential
-    gcp_vpc
     ps = PrivateSubnet.create(name: "ps", location_id: location.id, net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "10.0.0.0/26", state: "waiting", project_id: project.id, firewall_priority: 1000)
     DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps.id, gcp_vpc_id: gcp_vpc.id)
@@ -44,14 +43,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   let(:done_op) { Google::Cloud::Compute::V1::Operation.new(status: :DONE) }
 
   before do
-    nx.instance_variable_set(:@private_subnet, ps)
-    allow(credential).to receive_messages(
+    allow(nx.send(:credential)).to receive_messages(
       subnetworks_client:,
       network_firewall_policies_client: nfp_client,
       global_operations_client: global_ops_client,
       region_operations_client: region_ops_client,
     )
-    nx.instance_variable_set(:@credential, credential)
   end
 
   describe "#start" do
@@ -119,12 +116,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#wait_create_subnet" do
     before do
-      st.stack.first["gcp_op_name"] = "op-subnet-123"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"gcp_op_name" => "op-subnet-123", "gcp_op_scope" => "region", "gcp_op_scope_value" => "us-central1"})
     end
 
     it "naps when operation is still running" do
@@ -170,7 +162,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
 
     before do
-      allow(credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
     end
 
     it "creates tag key and tag value, stores in frame, and hops to create_subnet_allow_rules" do
@@ -220,10 +212,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "polls pending tag key operation on re-entry and proceeds to create tag value" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/tk-create"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-create"})
 
       done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
         done: true, name: "operations/tk-create", response: {"name" => "tagKeys/polled-1"},
@@ -242,10 +231,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
     it "naps when CRM tag value operation is not done and saves pending op in frame" do
       # Tag key already completed and saved in frame
-      st.stack.first["tag_key_name"] = "tagKeys/111"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"tag_key_name" => "tagKeys/111"})
 
       pending_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
         name: "operations/tv-create", done: false,
@@ -261,10 +247,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     let(:subnet_tag_value_name) { "tagValues/222" }
 
     before do
-      st.stack.first["subnet_tag_value_name"] = subnet_tag_value_name
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"subnet_tag_value_name" => subnet_tag_value_name})
     end
 
     it "creates IPv4+IPv6 tag-based egress allow rules (fire-and-forget)" do
@@ -383,7 +366,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "allocates firewall_priority when not yet set" do
-      ps.update(firewall_priority: nil)
+      nx.private_subnet.update(firewall_priority: nil)
 
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -397,7 +380,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#allocate_subnet_firewall_priority" do
     before do
-      ps.update(firewall_priority: nil)
+      nx.private_subnet.update(firewall_priority: nil)
     end
 
     it "allocates the lowest available even slot starting at 1000" do
@@ -432,10 +415,15 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "raises when all slots are exhausted" do
-      fake_ds = instance_double(Sequel::Dataset)
-      allow(fake_ds).to receive_messages(where: fake_ds, exclude: fake_ds, select_set: (1000..8998).step(2).to_set)
-      allow(DB).to receive(:[]).and_call_original
-      allow(DB).to receive(:[]).with(:private_subnet).and_return(fake_ds)
+      # Fill every even priority from 1000..8998 so no slot is available.
+      DB.run(Sequel.lit(<<~SQL, location.id, project.id))
+        INSERT INTO private_subnet
+          (id, name, location_id, project_id, net6, net4, state, firewall_priority)
+        SELECT
+          gen_random_uuid(), 'filler-' || p, ?, ?,
+          'fd11::/64'::cidr, '10.0.1.0/26'::cidr, 'waiting', p
+        FROM generate_series(1000, 8998, 2) AS p
+      SQL
 
       expect { nx.send(:allocate_subnet_firewall_priority) }
         .to raise_error(RuntimeError, /GCP firewall priority range exhausted for project/)
@@ -448,22 +436,23 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "clears refresh_keys semaphore when set" do
-      st_real = Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
-      real_nx = described_class.new(st_real)
-      real_nx.incr_refresh_keys
-      expect { real_nx.wait }.to nap(10 * 60)
-      expect(Semaphore.where(strand_id: st_real.id, name: "refresh_keys").count).to eq(0)
+      nx.incr_refresh_keys
+      expect { nx.wait }.to nap(10 * 60)
+      expect(Semaphore.where(strand_id: st.id, name: "refresh_keys").count).to eq(0)
     end
 
     it "propagates firewall updates to VMs" do
-      st_real = Strand.create_with_id(ps, prog: "Vnet::Gcp::SubnetNexus", label: "wait")
-      real_nx = described_class.new(st_real)
-      real_nx.incr_update_firewall_rules
-      vm = instance_double(Vm)
-      expect(real_nx).to receive(:private_subnet).and_return(ps).at_least(:once)
-      expect(ps).to receive(:vms).and_return([vm])
-      expect(vm).to receive(:incr_update_firewall_rules)
-      expect { real_nx.wait }.to nap(10 * 60)
+      vm = create_vm(project_id: project.id, location_id: location.id)
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
+      Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.5", mac: "00:00:00:00:00:00",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        name: "default-nic", vm_id: vm.id, state: "active")
+
+      nx.incr_update_firewall_rules
+      expect { nx.wait }.to nap(10 * 60)
+
+      expect(Semaphore.where(strand_id: vm.id, name: "update_firewall_rules").any?).to be true
     end
   end
 
@@ -471,7 +460,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
 
     before do
-      allow(credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       # Default: no tag key found (skip tag cleanup)
       allow(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
@@ -479,10 +468,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "fires delete op and hops to wait_delete_subnet" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       # delete_subnet_policy_rules — rules already deleted
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -500,10 +485,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "cleans up tag value and tag key (per-subnet)" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       # delete_subnet_policy_rules
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
@@ -534,10 +515,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "handles 404 during tag cleanup" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
@@ -556,10 +533,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "skips deleting rules that belong to a foreign subnet (collision)" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       # get_rule returns a rule belonging to a different subnet
       foreign_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         match: Google::Cloud::Compute::V1::FirewallPolicyRuleMatcher.new(
@@ -576,10 +549,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "handles already-deleted GCP subnet" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
@@ -588,10 +557,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "naps when GCE subnet is still in use by a terminating instance" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
@@ -602,10 +567,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "re-raises InvalidArgumentError when not about subnet being used" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
@@ -616,11 +577,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "skips rule deletion when firewall_priority is nil (early destroy)" do
-      ps.update(firewall_priority: nil)
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
+      nx.private_subnet.update(firewall_priority: nil)
       expect(nfp_client).not_to receive(:get_rule)
       expect(nfp_client).not_to receive(:remove_rule)
 
@@ -631,22 +588,25 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "destroys nics and load balancers first" do
-      nic = instance_double(Nic)
-      lb = instance_double(LoadBalancer)
-      expect(ps).to receive(:nics).and_return([nic]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([lb]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-      expect(nic).to receive(:incr_destroy)
-      expect(lb).to receive(:incr_destroy)
+      vm = create_vm(project_id: project.id, location_id: location.id)
+      Strand.create_with_id(vm, prog: "Vm::Nexus", label: "wait")
+      nic = Nic.create(private_subnet_id: ps.id, private_ipv6: "fd10:9b0b:6b4b:8fbb:abc::",
+        private_ipv4: "10.0.0.5", mac: "00:00:00:00:00:00",
+        encryption_key: "0x736f6d655f656e6372797074696f6e5f6b6579",
+        name: "default-nic", vm_id: vm.id, state: "active")
+      Strand.create_with_id(nic, prog: "Vnet::NicNexus", label: "wait")
+      lb = LoadBalancer.create(name: "test-lb", health_check_endpoint: "/",
+        project_id: project.id, private_subnet_id: ps.id)
+      Strand.create_with_id(lb, prog: "Vnet::LoadBalancerNexus", label: "wait")
+
       expect(nx).to receive(:rand).with(5..10).and_return(7)
       expect { nx.destroy }.to nap(7)
+
+      expect(Semaphore.where(strand_id: nic.id, name: "destroy").any?).to be true
+      expect(Semaphore.where(strand_id: lb.id, name: "destroy").any?).to be true
     end
 
     it "handles policy not found during rule cleanup" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
@@ -657,10 +617,6 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "handles InvalidArgumentError during rule cleanup" do
-      expect(ps).to receive(:nics).and_return([]).at_least(:once)
-      expect(ps).to receive(:load_balancers).and_return([]).at_least(:once)
-      expect(ps).to receive(:remove_all_firewalls)
-
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::InvalidArgumentError.new("does not contain a rule"))
 
@@ -673,12 +629,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
   describe "#wait_delete_subnet" do
     before do
-      st.stack.first["gcp_op_name"] = "op-delete-subnet"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"gcp_op_name" => "op-delete-subnet", "gcp_op_scope" => "region", "gcp_op_scope_value" => "us-central1"})
     end
 
     it "naps when operation is still running" do
@@ -712,23 +663,23 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps2.id, gcp_vpc_id: gcp_vpc.id)
 
       expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
-      expect(PrivateSubnet[ps.id]).to be_nil
+      expect(ps.exists?).to be false
       # VPC should not be marked for destruction since other subnets exist
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(0)
     end
 
     it "cleans up VPC via incr_destroy when last subnet destroyed" do
       expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
-      expect(PrivateSubnet[ps.id]).to be_nil
+      expect(ps.exists?).to be false
       expect(Semaphore.where(strand_id: gcp_vpc.id, name: "destroy").count).to eq(1)
     end
 
     it "handles nil gcp_vpc gracefully" do
       DB[:private_subnet_gcp_vpc].where(private_subnet_id: ps.id).delete
-      nx.instance_variable_set(:@private_subnet, ps.reload)
+      nx.private_subnet.refresh
 
       expect { nx.finish_destroy }.to exit({"msg" => "subnet destroyed"})
-      expect(PrivateSubnet[ps.id]).to be_nil
+      expect(ps.exists?).to be false
     end
   end
 
@@ -855,7 +806,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
 
     before do
-      allow(credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
     end
 
     describe "#tag_key_short_name" do
@@ -1085,10 +1036,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "polls pending op on re-entry and returns name" do
-        st.stack.first["pending_tag_key_crm_op"] = "operations/tk-poll"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-poll"})
 
         done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tk-poll", response: {"name" => "tagKeys/polled"},
@@ -1099,10 +1047,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "naps again when polling pending op that is still not done" do
-        st.stack.first["pending_tag_key_crm_op"] = "operations/tk-still-pending"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-still-pending"})
 
         still_pending = Google::Apis::CloudresourcemanagerV3::Operation.new(
           name: "operations/tk-still-pending", done: false,
@@ -1113,10 +1058,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when polled pending op has error" do
-        st.stack.first["pending_tag_key_crm_op"] = "operations/tk-error"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-error"})
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
@@ -1128,10 +1070,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "falls back to lookup when polled pending op has no name in response" do
-        st.stack.first["pending_tag_key_crm_op"] = "operations/tk-no-name"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-no-name"})
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tk-no-name", response: nil,
@@ -1149,10 +1088,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when polled pending op has no name and lookup returns nil" do
-        st.stack.first["pending_tag_key_crm_op"] = "operations/tk-no-name-nil"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-no-name-nil"})
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tk-no-name-nil", response: nil,
@@ -1261,10 +1197,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "polls pending op on re-entry and returns name" do
-        st.stack.first["pending_tag_value_crm_op"] = "operations/tv-poll"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-poll"})
 
         done_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tv-poll", response: {"name" => "tagValues/polled"},
@@ -1275,10 +1208,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "naps again when polling pending op that is still not done" do
-        st.stack.first["pending_tag_value_crm_op"] = "operations/tv-still-pending"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-still-pending"})
 
         still_pending = Google::Apis::CloudresourcemanagerV3::Operation.new(
           name: "operations/tv-still-pending", done: false,
@@ -1289,10 +1219,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "falls back to lookup when polled pending op has no name in response" do
-        st.stack.first["pending_tag_value_crm_op"] = "operations/tv-no-name"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-no-name"})
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tv-no-name", response: nil,
@@ -1310,10 +1237,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when polled pending op has no name and lookup returns nil" do
-        st.stack.first["pending_tag_value_crm_op"] = "operations/tv-no-name-nil"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-no-name-nil"})
 
         no_name_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tv-no-name-nil", response: nil,
@@ -1327,10 +1251,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when polled pending op has error" do
-        st.stack.first["pending_tag_value_crm_op"] = "operations/tv-error"
-        st.modified!(:stack)
-        st.save_changes
-        nx.instance_variable_set(:@frame, nil)
+        refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-error"})
 
         error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
