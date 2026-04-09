@@ -79,11 +79,11 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     if op_error?(op)
       begin
         credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
-        Clog.emit("GCP LRO error but resource exists",
-          {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
       rescue Google::Cloud::NotFoundError
         raise "GCP subnet #{subnet_name} creation failed: #{op_error_message(op)}"
       end
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: "subnet #{subnet_name}", error: op_error_message(op)}})
     end
 
     clear_gcp_op
@@ -164,7 +164,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         nil
       rescue Google::Cloud::InvalidArgumentError => e
         raise unless e.message.include?("being used by")
-        Clog.emit("GCP subnet still in use, retrying", {gcp_subnet_in_use: {subnet: subnet_name, error: e.message}})
+        Clog.emit("GCP subnet still in use, retrying",
+          {gcp_subnet_in_use: Util.exception_to_hash(e, into: {subnet: subnet_name})})
         nap 5
       end
 
@@ -313,9 +314,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
       # Already deleted
+      nil
     end
-  rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-    # Policy already deleted
   end
 
   def delete_subnet_tag_resources
@@ -332,7 +332,8 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     raise unless e.status_code == 404
   rescue RuntimeError => e
     raise unless e.message.include?("still attached to resources") || e.message.include?("FAILED_PRECONDITION")
-    Clog.emit("Tag value still attached to resources, will retry", {tag_value_retry: {tag_key: tag_key.name, error: e.message}})
+    Clog.emit("Tag value still attached to resources, will retry",
+      {tag_value_retry: Util.exception_to_hash(e, into: {tag_key: tag_key.name})})
     nap 15
   end
 
