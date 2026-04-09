@@ -885,7 +885,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         nx.send(:delete_subnet_tag_resources)
       end
 
-      it "naps when delete_tag_value raises RuntimeError for ghost bindings" do
+      it "naps when delete_tag_value fails with FAILED_PRECONDITION (still attached)" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
           name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
@@ -898,13 +898,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         )
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new(tag_values: [subnet_tv]))
+        body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Cannot delete tag value still attached to resources"}}.to_json
         expect(crm_client).to receive(:delete_tag_value).with("tagValues/222")
-          .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag value still attached to resources in 'us-central1-a' region"))
+          .and_raise(Google::Apis::ClientError.new("FAILED_PRECONDITION: still attached", status_code: 400, body:))
         expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything)
         expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
       end
 
-      it "naps when delete_tag_key raises RuntimeError with FAILED_PRECONDITION" do
+      it "naps when delete_tag_key fails with FAILED_PRECONDITION" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
           name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
@@ -914,13 +915,29 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
 
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/111")
           .and_return(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new)
+        body = {error: {code: 400, status: "FAILED_PRECONDITION", message: "Tag key has children"}}.to_json
         expect(crm_client).to receive(:delete_tag_key).with("tagKeys/111")
-          .and_raise(RuntimeError.new("CRM operation op-1 failed: FAILED_PRECONDITION"))
+          .and_raise(Google::Apis::ClientError.new("FAILED_PRECONDITION: has children", status_code: 400, body:))
         expect(Clog).to receive(:emit).with("Tag value still attached to resources, will retry", anything)
         expect { nx.send(:delete_subnet_tag_resources) }.to nap(15)
       end
 
-      it "re-raises RuntimeError for non-ghost-binding errors" do
+      it "re-raises 400 errors that are not FAILED_PRECONDITION" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        body = {error: {code: 400, status: "INVALID_ARGUMENT", message: "bad request"}}.to_json
+        expect(crm_client).to receive(:list_tag_values)
+          .and_raise(Google::Apis::ClientError.new("INVALID_ARGUMENT: bad request", status_code: 400, body:))
+
+        expect { nx.send(:delete_subnet_tag_resources) }
+          .to raise_error(Google::Apis::ClientError, /INVALID_ARGUMENT/)
+      end
+
+      it "re-raises 400 errors whose body has no parseable JSON" do
         tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
           name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
         )
@@ -928,10 +945,24 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
           Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
         )
         expect(crm_client).to receive(:list_tag_values)
-          .and_raise(RuntimeError.new("CRM operation op-1 failed: INTERNAL"))
+          .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400, body: "not json"))
 
         expect { nx.send(:delete_subnet_tag_resources) }
-          .to raise_error(RuntimeError, /INTERNAL/)
+          .to raise_error(Google::Apis::ClientError, /bad request/)
+      end
+
+      it "re-raises 400 errors with an empty body" do
+        tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+          name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
+        )
+        expect(crm_client).to receive(:list_tag_keys).and_return(
+          Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [tag_key]),
+        )
+        expect(crm_client).to receive(:list_tag_values)
+          .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400, body: ""))
+
+        expect { nx.send(:delete_subnet_tag_resources) }
+          .to raise_error(Google::Apis::ClientError, /bad request/)
       end
 
       it "re-raises non-404 client errors" do
@@ -964,8 +995,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(nx.send(:ensure_tag_key)).to eq("tagKeys/fallback")
       end
 
-      it "handles ALREADY_EXISTS RuntimeError from CRM LRO" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "ALREADY_EXISTS: tag key already exists")
+      it "handles ALREADY_EXISTS CRM LRO error via op.error.code" do
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag key already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
 
@@ -1000,7 +1031,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when ALREADY_EXISTS and lookup returns nil" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "ALREADY_EXISTS: tag key already exists")
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag key already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
         expect(crm_client).to receive(:list_tag_keys).and_return(
@@ -1010,12 +1041,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
-      it "re-raises non-ALREADY_EXISTS RuntimeError" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
+      it "re-raises non-ALREADY_EXISTS CrmOperationError" do
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-        expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /INTERNAL/)
+        expect { nx.send(:ensure_tag_key) }.to raise_error(described_class::CrmOperationError, /server error/)
       end
 
       it "re-raises non-409 ClientError" do
@@ -1060,13 +1091,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "raises when polled pending op has error" do
         refresh_frame(nx, new_values: {"pending_tag_key_crm_op" => "operations/tk-error"})
 
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tk-error", error:,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tk-error").and_return(error_op)
 
-        expect { nx.send(:ensure_tag_key) }.to raise_error(RuntimeError, /INTERNAL/)
+        expect { nx.send(:ensure_tag_key) }.to raise_error(described_class::CrmOperationError, /server error/)
       end
 
       it "falls back to lookup when polled pending op has no name in response" do
@@ -1127,8 +1158,8 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(nx.send(:ensure_tag_value, "tagKeys/123", "member")).to eq("tagValues/existing")
       end
 
-      it "handles ALREADY_EXISTS RuntimeError from CRM LRO" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "ALREADY_EXISTS: tag value already exists")
+      it "handles ALREADY_EXISTS CRM LRO error via op.error.code" do
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag value already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
@@ -1161,7 +1192,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
 
       it "raises when ALREADY_EXISTS and lookup returns nil" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "ALREADY_EXISTS: tag value already exists")
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 6, message: "tag value already exists")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
         expect(crm_client).to receive(:list_tag_values).with(parent: "tagKeys/123").and_return(
@@ -1171,12 +1202,12 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /conflict but not found/)
       end
 
-      it "re-raises non-ALREADY_EXISTS RuntimeError" do
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
+      it "re-raises non-ALREADY_EXISTS CrmOperationError" do
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, error:)
         expect(crm_client).to receive(:create_tag_value).and_return(op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /INTERNAL/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(described_class::CrmOperationError, /server error/)
       end
 
       it "re-raises non-409 ClientError" do
@@ -1253,13 +1284,13 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       it "raises when polled pending op has error" do
         refresh_frame(nx, new_values: {"pending_tag_value_crm_op" => "operations/tv-error"})
 
-        error = Google::Apis::CloudresourcemanagerV3::Status.new(message: "INTERNAL: server error")
+        error = Google::Apis::CloudresourcemanagerV3::Status.new(code: 13, message: "server error")
         error_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
           done: true, name: "operations/tv-error", error:,
         )
         expect(crm_client).to receive(:get_operation).with("operations/tv-error").and_return(error_op)
 
-        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(RuntimeError, /INTERNAL/)
+        expect { nx.send(:ensure_tag_value, "tagKeys/123", "member") }.to raise_error(described_class::CrmOperationError, /server error/)
       end
     end
   end

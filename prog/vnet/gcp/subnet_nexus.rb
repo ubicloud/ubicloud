@@ -5,6 +5,19 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   subject_is :private_subnet
 
+  # Raised when a Cloud Resource Manager long-running operation completes
+  # with a google.rpc.Status error attached. Carries the numeric
+  # google.rpc.Code enum (e.g. 6 = ALREADY_EXISTS, 9 = FAILED_PRECONDITION)
+  # so callers can branch on the code instead of parsing the message.
+  class CrmOperationError < StandardError
+    attr_reader :code
+
+    def initialize(op_name, status)
+      @code = status.code
+      super("CRM operation #{op_name} failed: #{status.message}")
+    end
+  end
+
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   # GCE internal IPv6 ranges used by dual-stack subnets (ULA space)
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
@@ -324,12 +337,21 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     # Per-subnet tag key -- always delete it when the subnet is destroyed
     credential.crm_client.delete_tag_key(tag_key.name)
   rescue Google::Apis::ClientError => e
-    raise unless e.status_code == 404
-  rescue RuntimeError => e
-    raise unless e.message.include?("still attached to resources") || e.message.include?("FAILED_PRECONDITION")
-    Clog.emit("Tag value still attached to resources, will retry",
-      {tag_value_retry: Util.exception_to_hash(e, into: {tag_key: tag_key.name})})
-    nap 15
+    case e.status_code
+    when 404
+      # Tag key / value already deleted -- swallow.
+      nil
+    when 400
+      # CRM returns HTTP 400 with a v2 error body whose `status` field is
+      # FAILED_PRECONDITION when a tag value is still bound to resources
+      # (ghost bindings lingering after VM/NIC deletion). Nap and retry.
+      raise unless crm_error_status(e) == "FAILED_PRECONDITION"
+      Clog.emit("Tag value still attached to resources, will retry",
+        {tag_value_retry: Util.exception_to_hash(e, into: {tag_key: tag_key.name})})
+      nap 15
+    else
+      raise
+    end
   end
 
   # --- Shared helpers ---
@@ -433,7 +455,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         nap 5
       end
       update_stack({pending_key => nil})
-      raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
+      raise CrmOperationError.new(pending, op.error) if op.error
       name = op.response&.dig("name")
       return name if name
       return lookup.call ||
@@ -445,7 +467,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       update_stack({pending_key => op.name})
       nap 5
     end
-    raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
+    raise CrmOperationError.new(op.name, op.error) if op.error
     name = op.response&.dig("name")
     return name if name
 
@@ -454,13 +476,28 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
     lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
-  rescue RuntimeError => e
-    raise unless e.message.include?("ALREADY_EXISTS")
+  rescue CrmOperationError => e
+    # google.rpc.Code 6 = ALREADY_EXISTS. The CRM LRO can surface a
+    # conflict via the operation's error Status instead of an HTTP 409,
+    # typically on retries that create the same tag key/value concurrently.
+    raise unless e.code == 6
     lookup.call || raise("#{label} #{short_name} conflict but not found on lookup")
   end
 
   def lookup_tag_value_name(parent_tag_key_name, short_name)
     resp = credential.crm_client.list_tag_values(parent: parent_tag_key_name)
     resp.tag_values&.find { |v| v.short_name == short_name }&.name
+  end
+
+  # Extracts the v2 error `status` field (e.g. "FAILED_PRECONDITION") from a
+  # Google::Apis::ClientError body. google-apis-core builds ClientError
+  # messages by prefixing `reason` (the v2 `status`) but we prefer reading
+  # the structured body so we are not brittle to message-format changes.
+  def crm_error_status(error)
+    body = error.body
+    return nil if body.nil? || body.empty?
+    JSON.parse(body).dig("error", "status")
+  rescue JSON::ParserError
+    nil
   end
 end
