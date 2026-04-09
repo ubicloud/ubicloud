@@ -58,21 +58,17 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   end
 
   label def wait_allocate_ip
-    op = poll_gcp_op
-    nap 5 unless op.status == :DONE
-
     address_name = frame["gcp_address_name"]
-    if op_error?(op)
+    poll_and_clear_gcp_op do |op|
       begin
         addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
-        Clog.emit("GCP LRO error but resource exists",
-          {gcp_lro_recovered: {resource: "static IP #{address_name}", error: op_error_message(op)}})
       rescue Google::Cloud::NotFoundError
         raise "GCP static IP #{address_name} creation failed: #{op_error_message(op)}"
       end
+      Clog.emit("GCP LRO error but resource exists",
+        {gcp_lro_recovered: {resource: "static IP #{address_name}", error: op_error_message(op)}})
     end
 
-    clear_gcp_op
     addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
     nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
 
