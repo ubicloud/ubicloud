@@ -165,6 +165,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         hop_wait_delete_subnet
       rescue Google::Cloud::NotFoundError
         # Already deleted
+        nil
       rescue Google::Cloud::InvalidArgumentError => e
         raise unless e.message.include?("being used by")
         Clog.emit("GCP subnet still in use, retrying", {gcp_subnet_in_use: {subnet: subnet_name, error: e.message}})
@@ -276,6 +277,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         )
       rescue ::Google::Cloud::AlreadyExistsError
         # Concurrent strand added this rule -- proceed.
+        nil
       end
     end
   end
@@ -290,7 +292,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def normalize_layer4_configs(configs)
-    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort
+    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort!
   end
 
   # --- Destroy helpers ---
@@ -346,38 +348,25 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def allocate_subnet_firewall_priority
-    retries = 0
     project_id = private_subnet.project_id
     location_id = private_subnet.location_id
-    begin
-      used = DB[:private_subnet]
-        .where(project_id:, location_id:)
-        .exclude(id: private_subnet.id)
-        .where(Sequel.~(firewall_priority: nil))
-        .select_map(:firewall_priority)
-        .to_set
+    used = DB[:private_subnet]
+      .where(project_id:, location_id:)
+      .exclude(id: private_subnet.id)
+      .exclude(firewall_priority: nil)
+      .select_set(:firewall_priority)
 
-      slot = nil
-      (1000..8998).step(2) do |p|
-        unless used.include?(p)
-          slot = p
-          break
-        end
+    slot = nil
+    (1000..8998).step(2) do |p|
+      unless used.include?(p)
+        slot = p
+        break
       end
-
-      raise "GCP firewall priority range exhausted for project #{project_id}" unless slot
-
-      private_subnet.update(firewall_priority: slot)
-    rescue Sequel::UniqueConstraintViolation
-      begin
-        private_subnet.update(firewall_priority: nil)
-      rescue
-        nil
-      end
-      retries += 1
-      raise "GCP subnet firewall priority allocation failed after #{retries} concurrent retries" if retries > 5
-      retry
     end
+
+    raise "GCP firewall priority range exhausted for project #{project_id}" unless slot
+
+    private_subnet.update(firewall_priority: slot)
   end
 
   def credential
