@@ -124,6 +124,7 @@ class Prog::DownloadBootImage < Prog::Base
       "x64" => {
         "20260312.1.0" => "bbfc41f0db56fb28f5845d37bbe7f4ef1334557b27af68530117bb76ff1b6398",
         "20260401.1.0" => "d0751f04ca3a3052c46aa3afcd23d7b22345adb670ad14b54522502cad6f4e7c",
+        "20260408.1.0" => "1495548c90309169f57fbedf72ee43217c8c0bbff5910d6e4942b3d0787feca5",
       },
       "arm64" => {
         "20260312.1.0" => "c6fb2fa0ae2912be2222a02cf8a25250d4cbaa7b876cd3b24363bb18438deb81",
