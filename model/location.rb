@@ -63,10 +63,9 @@ class Location < Sequel::Model
   end
 
   def provider_dispatcher_group_name
-    if aws?
-      "aws"
-    elsif gcp?
-      "gcp"
+    case provider
+    when "aws", "gcp"
+      provider
     else
       "metal"
     end
