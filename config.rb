@@ -197,26 +197,10 @@ module Config
   optional :ubicloud_images_r2_access_key, string, clear: true
   optional :ubicloud_images_r2_secret_key, string, clear: true
 
-  override :ubuntu_noble_version, "20250502.1", string
-  override :ubuntu_jammy_version, "20250508", string
-  override :debian_12_version, "20250428-2096", string
-  override :almalinux_9_version, "9.7-20251118", string
-  override :github_ubuntu_2404_version, "20260401.1.0", string
-  override :github_ubuntu_2204_version, "20260401.1.0", string
   override :github_ubuntu_2204_x64_aws_ami_version, "ami-08855bdd06e27855c", string
   override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
   override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
   override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
-  override :postgres_ubuntu_2204_version, "20260409.1.0", string
-  override :postgres16_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres17_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres_paradedb_ubuntu_2204_version, "20260107.1.0", string
-  override :postgres16_paradedb_ubuntu_2204_version, "20250901.1.0", string
-  override :postgres17_paradedb_ubuntu_2204_version, "20250901.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
-  override :kubernetes_v1_32_version, "20250320.1.0", string
-  override :kubernetes_v1_33_version, "20250506.1.0", string
-  override :kubernetes_v1_34_version, "20250828.1.0", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float

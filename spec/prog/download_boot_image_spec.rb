@@ -28,32 +28,21 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
     end
 
-    it "resolves default version when version is nil" do
+    it "resolves latest version when version is nil" do
       refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
       expect { dbi.start }.to hop("download")
       bi = BootImage.first(vm_host_id: vm_host.id, name: "ubuntu-noble")
-      expect(bi.version).to eq(Config.ubuntu_noble_version)
-    end
-
-    it "fails if neither version nor default version is provided" do
-      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
-      expect(Config).to receive(:ubuntu_noble_version).and_return(nil)
-      expect { dbi.start }.to raise_error RuntimeError, "Neither a version nor a default version was provided"
+      expect(bi.version).to eq(described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max)
     end
   end
 
-  describe "#default_boot_image_version" do
-    it "returns the version for the default image" do
-      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
-    end
-
-    it "escapes the image name" do
-      expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
-      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
+  describe "#latest_boot_image_version" do
+    it "returns the latest version for the image" do
+      expect(dbi.latest_boot_image_version("ubuntu-noble")).to eq(described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max)
     end
 
     it "fails for unknown images" do
-      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
+      expect { dbi.latest_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
   end
 
@@ -63,7 +52,8 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "returns presigned URL if custom_url is not provided" do
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil})
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
     end
@@ -152,40 +142,42 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "generates MinIO presigned URL for github-runners images if a custom_url not provided" do
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
-        "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version),
+        "version" => version,
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, version),
         "certs" => "certs",
         "use_htcat" => false,
       }.to_json
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil})
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{version}", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
     it "generates R2 presigned URL for github-runners images if a custom_url not provided" do
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
       allow(Config).to receive_messages(ubicloud_images_r2_bucket_name: "images-bucket", ubicloud_images_blob_storage_certs: nil)
       url_presigner = instance_double(Aws::S3::Presigner)
       s3_client = instance_double(Aws::S3::Client)
       allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(url_presigner)
       allow(Aws::S3::Client).to receive(:new).and_return(s3_client)
-      expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: "images-bucket", key: "github-ubuntu-2204-x64-#{Config.github_ubuntu_2204_version}.raw")).and_return("https://r2.example.com/my-image.raw")
+      expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: "images-bucket", key: "github-ubuntu-2204-x64-#{version}.raw")).and_return("https://r2.example.com/my-image.raw")
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://r2.example.com/my-image.raw",
-        "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version),
+        "version" => version,
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, version),
         "certs" => nil,
         "use_htcat" => true,
       }.to_json
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil, "download_r2" => true})
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil, "download_r2" => true})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{version}", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
@@ -245,7 +237,7 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "checks the correct path when version resolves to default" do
-      version = Config.ubuntu_noble_version
+      version = described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max
       BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-noble", version:, size_gib: 0)
       refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
       sd = StorageDevice.create(
