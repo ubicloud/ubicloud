@@ -74,13 +74,15 @@ class StorageVolume
 
     FileUtils.mkdir_p storage_dir
     FileUtils.chown @vm_name, @vm_name, storage_dir
-    encryption_key = setup_data_encryption_key(key_wrapping_secrets)
+    encryption_key = generate_data_encryption_key
 
     if @vhost_backend_version
       create_empty_disk_file
       prep_vhost_backend(encryption_key, key_wrapping_secrets)
       return
     end
+
+    store_spdk_data_encryption_key(encryption_key, key_wrapping_secrets)
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
@@ -533,27 +535,27 @@ class StorageVolume
     rm_if_exists(SpdkPath.vhost_sock(vhost_controller))
   end
 
-  def setup_data_encryption_key(key_wrapping_secrets)
+  def generate_data_encryption_key
     data_encryption_key = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
 
-    result = {
+    {
       cipher: "AES_XTS",
       key: data_encryption_key[..63],
       key2: data_encryption_key[64..],
     }
+  end
 
+  def store_spdk_data_encryption_key(data_encryption_key, key_wrapping_secrets)
     key_file = data_encryption_key_path
 
     # save encrypted key
     sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.write_encrypted_dek(key_file, result)
+    sek.write_encrypted_dek(key_file, data_encryption_key)
 
     FileUtils.chown @vm_name, @vm_name, key_file
     FileUtils.chmod "u=rw,g=,o=", key_file
 
     sync_parent_dir(key_file)
-
-    result
   end
 
   def read_data_encryption_key(key_wrapping_secrets)

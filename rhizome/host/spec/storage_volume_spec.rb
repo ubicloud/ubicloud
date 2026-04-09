@@ -84,11 +84,13 @@ RSpec.describe StorageVolume do
   describe "#prep" do
     it "can prep a non-imaged encrypted disk" do
       key_wrapping_secrets = "key_wrapping_secrets"
+      encryption_key = {cipher: "AES_XTS", key: "k1", key2: "k2"}
       vol = described_class.new("test", {"disk_index" => 1, "encrypted" => true})
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/1")
       expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/1")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
-      expect(vol).to receive(:setup_data_encryption_key).with(key_wrapping_secrets)
+      expect(vol).to receive(:generate_data_encryption_key).and_return(encryption_key)
+      expect(vol).to receive(:store_spdk_data_encryption_key).with(encryption_key, key_wrapping_secrets)
       expect(vol).to receive(:create_empty_disk_file).with(no_args)
       vol.prep(key_wrapping_secrets)
     end
@@ -107,7 +109,8 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
       expect(encrypted_sv).to receive(:verify_imaged_disk_size).with(no_args)
-      expect(encrypted_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_sv).to receive(:generate_data_encryption_key).and_return(encryption_key)
+      expect(encrypted_sv).to receive(:store_spdk_data_encryption_key).with(encryption_key, key_wrapping_secrets)
       expect(encrypted_sv).to receive(:create_empty_disk_file)
       expect(encrypted_sv).to receive(:encrypted_image_copy).with(encryption_key, image_path)
       encrypted_sv.prep(key_wrapping_secrets)
@@ -119,7 +122,7 @@ RSpec.describe StorageVolume do
       expect(FileUtils).to receive(:mkdir_p).with("/var/storage/test/2")
       expect(FileUtils).to receive(:chown).with("test", "test", "/var/storage/test/2")
       expect(File).to receive(:exist?).with("/var/storage").and_return(true)
-      expect(encrypted_vhost_sv).to receive(:setup_data_encryption_key).with(key_wrapping_secrets).and_return(encryption_key)
+      expect(encrypted_vhost_sv).to receive(:generate_data_encryption_key).and_return(encryption_key)
       expect(encrypted_vhost_sv).to receive(:create_empty_disk_file)
       expect(encrypted_vhost_sv).to receive(:prep_vhost_backend).with(encryption_key, key_wrapping_secrets)
       encrypted_vhost_sv.prep(key_wrapping_secrets)
@@ -194,15 +197,40 @@ RSpec.describe StorageVolume do
     end
   end
 
-  describe "#setup_data_encryption_key" do
-    it "can setup data encryption key" do
+  describe "#generate_data_encryption_key" do
+    it "can generate data encryption key" do
+      result = encrypted_sv.generate_data_encryption_key
+      expect(result).to have_key(:cipher)
+      expect(result[:cipher]).to eq("AES_XTS")
+      expect(result).to have_key(:key)
+      expect(result).to have_key(:key2)
+      expect(result[:key].length).to eq(64)
+      expect(result[:key2].length).to eq(64)
+    end
+  end
+
+  describe "#store_spdk_data_encryption_key" do
+    it "can store spdk data encryption key" do
       key_file = "/var/storage/test/2/data_encryption_key.json"
-      key_wrapping_secrets = "key_wrapping_secrets"
+      key_wrapping_secrets = {
+        "algorithm" => "aes-256-gcm",
+        "key" => Base64.strict_encode64("01234567890123456789012345678901"),
+        "init_vector" => Base64.strict_encode64("012345678901"),
+        "auth_data" => "testauthdata",
+      }
+      encryption_key = {
+        cipher: "AES_XTS",
+        key: "01234567890123456789012345678901",
+        key2: "01234567890123456789012345678901",
+      }
       expect(FileUtils).to receive(:chown).with("test", "test", key_file)
       expect(FileUtils).to receive(:chmod).with("u=rw,g=,o=", key_file)
-      expect(File).to receive(:open).with(key_file, "w")
       expect(encrypted_sv).to receive(:sync_parent_dir).with(key_file)
-      encrypted_sv.setup_data_encryption_key(key_wrapping_secrets)
+      f = instance_double(File)
+      expect(File).to receive(:open).with(key_file, "w").and_yield(f)
+      expect(f).to receive(:write)
+      expect(f).to receive(:fsync)
+      encrypted_sv.store_spdk_data_encryption_key(encryption_key, key_wrapping_secrets)
     end
   end
 
