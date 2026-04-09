@@ -169,7 +169,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on GCP even if a server is not assigned to a vm_host" do
       location.update(provider: "gcp")
-      LocationCredentialGcp.create_with_id(location.id,
+      LocationCredentialGcp.create_with_id(location,
         project_id: "test-project",
         service_account_email: "test@test.iam.gserviceaccount.com",
         credentials_json: "{}")

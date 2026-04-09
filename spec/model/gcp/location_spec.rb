@@ -8,7 +8,7 @@ RSpec.describe Location do
       display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
   }
   let(:location_credential_gcp) {
-    LocationCredentialGcp.create_with_id(location.id,
+    LocationCredentialGcp.create_with_id(location,
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')

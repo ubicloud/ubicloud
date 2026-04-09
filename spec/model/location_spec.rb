@@ -99,7 +99,7 @@ RSpec.describe Location do
   it "#pg_gce_image returns image path using image's hosting project" do
     PgGceImage.dataset.destroy
     gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
-    PgGceImage.create_with_id(PgGceImage.generate_uuid, gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+    PgGceImage.create(gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
     expect(gcp_loc.pg_gce_image("x64")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
   end
 

@@ -19,14 +19,14 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   }
   let(:vpc_name) { "ubicloud-#{project.ubid}-#{location.ubid}" }
   let(:gcp_vpc) {
-    id = GcpVpc.generate_uuid
-    vpc = GcpVpc.create_with_id(id,
+    vpc = GcpVpc.create(
       project_id: project.id,
       location_id: location.id,
       name: vpc_name,
       firewall_policy_name: vpc_name,
-      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345")
-    Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "wait") { it.id = vpc.id }
+      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/12345",
+    )
+    Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
     vpc
   }
   let(:ps) {

@@ -132,7 +132,7 @@ module AdminModelSpecHelper
       project = Project.create(name: "test-project")
       location = Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
         display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
-      GcpVpc.create_with_id(GcpVpc.generate_uuid, project_id: project.id, location_id: location.id, name: "ubicloud-test")
+      GcpVpc.create(project_id: project.id, location_id: location.id, name: "ubicloud-test")
     end
 
     def create_github_cache_entry

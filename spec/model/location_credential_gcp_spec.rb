@@ -4,7 +4,7 @@ require_relative "spec_helper"
 
 RSpec.describe LocationCredentialGcp do
   subject(:location_credential_gcp) {
-    described_class.create_with_id(location.id,
+    described_class.create_with_id(location,
       project_id: "test-gcp-project",
       service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-gcp-project"}')

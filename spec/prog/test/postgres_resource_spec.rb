@@ -60,7 +60,7 @@ RSpec.describe Prog::Test::PostgresResource do
       aws_pgr_test = described_class.new(aws_strand)
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
       LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
-      LocationCredentialAws.create_with_id(location.id, access_key: "existing_key", secret_key: "existing_secret")
+      LocationCredentialAws.create_with_id(location, access_key: "existing_key", secret_key: "existing_secret")
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
       expect(LocationCredentialAws[location.id].access_key).to eq("existing_key")
     end
@@ -71,10 +71,11 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       gcp_location = Location[provider: "gcp", project_id: nil]
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
+      PgGceImage.create(
         gcp_project_id: "test-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
-        arch: "arm64")
+        arch: "arm64",
+      )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
@@ -83,12 +84,13 @@ RSpec.describe Prog::Test::PostgresResource do
 
     it "skips gcp credential creation when credential already exists" do
       location = Location[provider: "gcp", project_id: nil]
-      LocationCredentialGcp.create_with_id(location.id, credentials_json: "{}", project_id: "existing-project", service_account_email: "existing@test.iam.gserviceaccount.com")
+      LocationCredentialGcp.create_with_id(location, credentials_json: "{}", project_id: "existing-project", service_account_email: "existing@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
+      PgGceImage.create(
         gcp_project_id: "existing-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
-        arch: "arm64")
+        arch: "arm64",
+      )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")
@@ -100,10 +102,11 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Config).to receive(:e2e_gcp_project_id).and_return("test-project")
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
-      PgGceImage.create_with_id(PgGceImage.generate_uuid,
+      PgGceImage.create(
         gcp_project_id: "test-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
-        arch: "arm64")
+        arch: "arm64",
+      )
       gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard")
       gcp_pgr_test = described_class.new(gcp_strand)
       expect { gcp_pgr_test.start }.to hop("wait_postgres_resource")

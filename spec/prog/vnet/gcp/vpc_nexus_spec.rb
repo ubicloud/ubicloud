@@ -19,11 +19,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   }
   let(:gcp_vpc) {
     credential
-    id = GcpVpc.generate_uuid
-    GcpVpc.create_with_id(id,
+    GcpVpc.create(
       project_id: project.id,
       location_id: location.id,
-      name: "ubicloud-#{project.ubid}-#{location.ubid}")
+      name: "ubicloud-#{project.ubid}-#{location.ubid}",
+    )
   }
   let(:vpc_name) { gcp_vpc.name }
   let(:networks_client) { instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client) }
@@ -494,7 +494,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "hops to destroy when destroy semaphore is set" do
-      st_real = Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "wait") { it.id = gcp_vpc.id }
+      st_real = Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
       real_nx = described_class.new(st_real)
       real_nx.instance_variable_set(:@credential, credential)
       real_nx.incr_destroy
