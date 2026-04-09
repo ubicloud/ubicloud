@@ -133,6 +133,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }.to raise_error RuntimeError, "No existing machine image version metal"
     end
 
+    it "fails if MachineImageVersionMetal with given machine_image_version_id is not enabled" do
+      miv = create_machine_image_version_metal
+      miv.update(enabled: false)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
+      }.to raise_error RuntimeError, "machine image version #{miv.id} is not available"
+    end
+
     it "fails if given nic_id is not valid" do
       expect {
         Prog::Vm::Nexus.assemble("some_ssh key", project.id, nic_id: "0a9a166c-e7e7-4447-ab29-7ea442b5bb0e")
