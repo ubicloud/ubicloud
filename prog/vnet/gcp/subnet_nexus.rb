@@ -242,17 +242,24 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
     rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(**rule_attrs)
 
-    existing = begin
-      credential.network_firewall_policies_client.get_rule(
+    begin
+      existing = credential.network_firewall_policies_client.get_rule(
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
         priority:,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      nil
-    end
-
-    if existing
+      begin
+        credential.network_firewall_policies_client.add_rule(
+          project: gcp_project_id,
+          firewall_policy: firewall_policy_name,
+          firewall_policy_rule_resource: rule,
+        )
+      rescue ::Google::Cloud::AlreadyExistsError
+        # Concurrent strand added this rule -- proceed.
+        nil
+      end
+    else
       # If an existing rule at this priority doesn't match our desired state
       # (e.g., priority collision from concurrent allocation), overwrite it with ours.
       # We overwrite (rather than skip) because subnet allow rules only run
@@ -267,17 +274,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           priority:,
           firewall_policy_rule_resource: rule,
         )
-      end
-    else
-      begin
-        credential.network_firewall_policies_client.add_rule(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          firewall_policy_rule_resource: rule,
-        )
-      rescue ::Google::Cloud::AlreadyExistsError
-        # Concurrent strand added this rule -- proceed.
-        nil
       end
     end
   end
