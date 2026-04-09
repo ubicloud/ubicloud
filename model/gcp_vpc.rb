@@ -5,8 +5,8 @@ require_relative "../model"
 class GcpVpc < Sequel::Model
   one_to_one :strand, key: :id
   many_to_one :project
-  many_to_one :location
-  many_to_many :private_subnets, join_table: :private_subnet_gcp_vpc
+  many_to_one :location, read_only: true
+  many_to_many :private_subnets, join_table: :private_subnet_gcp_vpc, remover: nil, clearer: nil
 
   plugin ResourceMethods
   plugin SemaphoreMethods, :destroy
