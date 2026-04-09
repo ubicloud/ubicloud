@@ -54,30 +54,26 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def create_subnet
-    subnet_name = "ubicloud-#{private_subnet.ubid}"
-    begin
-      op = credential.subnetworks_client.insert(
-        project: gcp_project_id,
-        region: gcp_region,
-        subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
-          name: subnet_name,
-          ip_cidr_range: private_subnet.net4.to_s,
-          network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
-          private_ip_google_access: true,
-          stack_type: "IPV4_IPV6",
-          ipv6_access_type: "EXTERNAL",
-        ),
-      )
-      save_gcp_op(op.name, "region", gcp_region)
-      hop_wait_create_subnet
-    rescue Google::Cloud::AlreadyExistsError
-      # Retry after partial crash -- subnet already exists, proceed.
-      hop_create_tag_resources
-    end
+    op = credential.subnetworks_client.insert(
+      project: gcp_project_id,
+      region: gcp_region,
+      subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
+        name: subnet_name,
+        ip_cidr_range: private_subnet.net4.to_s,
+        network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
+        private_ip_google_access: true,
+        stack_type: "IPV4_IPV6",
+        ipv6_access_type: "EXTERNAL",
+      ),
+    )
+    save_gcp_op(op.name, "region", gcp_region)
+    hop_wait_create_subnet
+  rescue Google::Cloud::AlreadyExistsError
+    # Retry after partial crash -- subnet already exists, proceed.
+    hop_create_tag_resources
   end
 
   label def wait_create_subnet
-    subnet_name = "ubicloud-#{private_subnet.ubid}"
     poll_and_clear_gcp_op do |op|
       begin
         credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
@@ -151,7 +147,6 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       delete_subnet_tag_resources
 
       begin
-        subnet_name = "ubicloud-#{private_subnet.ubid}"
         op = credential.subnetworks_client.delete(
           project: gcp_project_id,
           region: gcp_region,
@@ -351,6 +346,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   # --- Shared helpers ---
+
+  def subnet_name
+    "ubicloud-#{private_subnet.ubid}"
+  end
 
   def subnet_allow_priority
     private_subnet.firewall_priority ||
