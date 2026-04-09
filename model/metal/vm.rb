@@ -181,6 +181,32 @@ class Vm < Sequel::Model
       }.to_h
     end
 
+    def create_storage_volumes(storage_volume_params)
+      # Some tests create VMs with two storage volumes, and the shape of
+      # StorageKeyEncryptionKey creation query will be the same for both. So,
+      # ignore duplicate key errors.
+      DB.ignore_duplicate_queries do
+        storage_volume_params.each_with_index do |params, index|
+          key_encryption_key = if params[:encrypted]
+            StorageKeyEncryptionKey.create_random(auth_data: "#{inhost_name}_#{index}")
+          end
+
+          VmStorageVolume.create(
+            vm_id: id,
+            boot: params[:boot],
+            size_gib: params[:size_gib],
+            disk_index: index,
+            use_bdev_ubi: false,
+            max_read_mbytes_per_sec: params[:max_read_mbytes_per_sec],
+            max_write_mbytes_per_sec: params[:max_write_mbytes_per_sec],
+            track_written: params.fetch(:track_written, false),
+            key_encryption_key_1_id: key_encryption_key&.id,
+            machine_image_version_id: params[:machine_image_version_id],
+          )
+        end
+      end
+    end
+
     private
 
     def metal_ip6

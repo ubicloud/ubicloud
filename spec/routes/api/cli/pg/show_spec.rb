@@ -20,7 +20,6 @@ RSpec.describe Clover, "cli pg show" do
     DnsZone.create(project_id: @project.id, name: "pg.example.com")
     @pg.add_metric_destination(username: "md-user", password: "1", url: "https://md.example.com")
     @pg.update(root_cert_1: "a", root_cert_2: "b")
-    @pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 64, disk_index: 0)
     rules = @pg.pg_firewall_rules
     rules[0].update(description: "my fwr desc")
 

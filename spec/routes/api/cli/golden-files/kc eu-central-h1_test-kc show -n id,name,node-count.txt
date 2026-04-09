@@ -16,7 +16,7 @@ cp-vms 1:
   location: eu-central-h1
   size: standard-2
   unix-user: ubi
-  storage-size-gib: 0
+  storage-size-gib: 40
   ip6: ccab:de77:9a94:fa69::2
   ip4-enabled: true
   ip4: 129.0.0.2

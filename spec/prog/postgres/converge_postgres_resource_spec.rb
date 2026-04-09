@@ -56,7 +56,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         vm.update(vm_host_id: vm_host.id)
       end
       boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
-      VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: true, disk_index: 0, boot_image_id: boot_image.id)
+      vm.vm_storage_volumes_dataset.where(disk_index: 0).update(boot_image_id: boot_image.id)
     end
 
     server

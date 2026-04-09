@@ -1045,6 +1045,55 @@ RSpec.describe Al do
       expect(volume.vring_workers).to eq(3)
     end
 
+    it "assigns correct params to each volume when volumes have different sizes" do
+      vmh = VmHost.first
+      vhost_backend = create_vhost_block_backend(vm_host_id: vmh.id)
+      vm = create_vm
+      volumes = [
+        {"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "vring_workers" => 2},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 3},
+        {"size_gib" => 14, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 1},
+      ]
+      described_class.allocate(vm, volumes)
+      vol1 = vm.vm_storage_volumes.find { |v| v.disk_index == 0 }
+      vol2 = vm.vm_storage_volumes.find { |v| v.disk_index == 1 }
+      vol3 = vm.vm_storage_volumes.find { |v| v.disk_index == 2 }
+      expect(vol1.size_gib).to eq(5)
+      expect(vol1.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol1.vring_workers).to eq(2)
+      expect(vol2.size_gib).to eq(20)
+      expect(vol2.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol2.vring_workers).to eq(3)
+      expect(vol3.size_gib).to eq(14)
+      expect(vol3.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol3.vring_workers).to eq(1)
+    end
+
+    it "assigns correct params to each volume when volumes have different sizes & have been prepoulled" do
+      vmh = VmHost.first
+      vhost_backend = create_vhost_block_backend(vm_host_id: vmh.id)
+      vm = create_vm
+      volumes = [
+        {"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "vring_workers" => 2},
+        {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 3},
+        {"size_gib" => 14, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 1},
+      ]
+      vm.create_storage_volumes(volumes.map { it.transform_keys(&:to_sym) })
+      described_class.allocate(vm, volumes)
+      vol1 = vm.vm_storage_volumes_dataset.first(disk_index: 0)
+      vol2 = vm.vm_storage_volumes_dataset.first(disk_index: 1)
+      vol3 = vm.vm_storage_volumes_dataset.first(disk_index: 2)
+      expect(vol1.size_gib).to eq(5)
+      expect(vol1.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol1.vring_workers).to eq(2)
+      expect(vol2.size_gib).to eq(20)
+      expect(vol2.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol2.vring_workers).to eq(3)
+      expect(vol3.size_gib).to eq(14)
+      expect(vol3.vhost_block_backend_id).to eq(vhost_backend.id)
+      expect(vol3.vring_workers).to eq(1)
+    end
+
     it "uses SPDK if vhost block backend has allocation_weight 0" do
       vmh = VmHost.first
       create_vhost_block_backend(vm_host_id: vmh.id, allocation_weight: 0)
@@ -1175,6 +1224,22 @@ RSpec.describe Al do
         described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
           {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
+    end
+
+    it "skips volume creation and only updates associations when storage volumes already exist" do
+      vm = create_vm
+      vm.create_storage_volumes([
+        {boot: true, size_gib: 5, encrypted: false, track_written: false},
+      ])
+      existing_id = vm.vm_storage_volumes_dataset.first.id
+
+      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true}])
+
+      volumes = vm.vm_storage_volumes_dataset.all
+      expect(volumes.length).to eq 1
+      expect(volumes.first.id).to eq(existing_id)
+      expect(volumes.first.storage_device_id).not_to be_nil
+      expect(volumes.first.spdk_installation_id).not_to be_nil
     end
   end
 

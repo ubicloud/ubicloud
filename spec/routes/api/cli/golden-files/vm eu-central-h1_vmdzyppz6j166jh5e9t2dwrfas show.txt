@@ -4,7 +4,7 @@ state: running
 location: eu-central-h1
 size: standard-2
 unix-user: ubi
-storage-size-gib: 0
+storage-size-gib: 40
 ip6: 
 ip4-enabled: true
 ip4: 128.0.0.1
