@@ -713,7 +713,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "naps until rate limit resets and creates a page when rate limited" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
       refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(300)
         .and change { Page.count }.by(1)
       expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
       expect(Page.first).to have_attributes(
@@ -727,13 +727,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
       nx.incr_destroying
       refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap(30)
       expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
     end
 
     it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
@@ -741,7 +741,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
       nx.incr_destroying
-      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "API rate limit exceeded"}) } }.to nap
         .and change { Page.count }.by(1)
       expect(runner.skip_deregistration_set?).to be(true)
     end
@@ -766,8 +766,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner.destroy_set?).to be(true)
     end
 
+    it "destroys the runner if TooManyRequests is raised with a self-hosted runners disabled message" do
+      expect(client).not_to receive(:rate_limit)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
     it "re-raises unexpected Octokit errors" do
       expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Unexpected error"}) } }.to raise_error Octokit::Error
+    end
+
+    it "re-raises TooManyRequests without a rate limit message" do
+      expect(client).not_to receive(:rate_limit)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests.new({body: "Something else"}) } }.to raise_error Octokit::TooManyRequests
     end
   end
 
