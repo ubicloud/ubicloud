@@ -44,15 +44,14 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe ".assemble" do
-    it "creates a GcpVpc and a strand" do
+    it "creates a GcpVpc and returns its strand" do
       assemble_project = Project.create(name: "test-gcp-vpc-assemble")
-      result = described_class.assemble(assemble_project.id, location.id)
-      vpc = GcpVpc.first(project_id: assemble_project.id, location_id: location.id)
-      expect(vpc).not_to be_nil
+      st = described_class.assemble(assemble_project.id, location.id)
+      expect(st).to be_a(Strand)
+      expect(st.prog).to eq("Vnet::Gcp::VpcNexus")
+      vpc = st.subject
+      expect(vpc).to be_a(GcpVpc)
       expect(vpc.name).to start_with("ubicloud-")
-      expect(result).to be_a(GcpVpc)
-      expect(result.id).to eq(vpc.id)
-      expect(vpc.strand.prog).to eq("Vnet::Gcp::VpcNexus")
     end
 
     it "raises for invalid project" do
@@ -65,14 +64,14 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .to raise_error("No existing location")
     end
 
-    it "returns existing VPC on duplicate project+location" do
+    it "returns existing VPC's strand on duplicate project+location" do
       assemble_project = Project.create(name: "test-gcp-vpc-dup")
       described_class.assemble(assemble_project.id, location.id)
       existing_vpc = GcpVpc.first(project_id: assemble_project.id, location_id: location.id)
 
       result = described_class.assemble(assemble_project.id, location.id)
-      expect(result).to be_a(GcpVpc)
-      expect(result.id).to eq(existing_vpc.id)
+      expect(result).to be_a(Strand)
+      expect(result.subject.id).to eq(existing_vpc.id)
     end
   end
 

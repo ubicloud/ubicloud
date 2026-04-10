@@ -25,10 +25,9 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         name: "ubicloud-#{project.ubid}-#{location.ubid}",
       )
       Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "start")
-      vpc
     end
   rescue Sequel::UniqueConstraintViolation, Sequel::ValidationFailed
-    GcpVpc.where(project_id:, location_id:).first!
+    GcpVpc.where(project_id:, location_id:).first!.strand
   end
 
   label def start

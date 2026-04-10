@@ -39,7 +39,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     register_deadline("wait", 5 * 60)
 
     gcp_vpc = GcpVpc.where(project_id: private_subnet.project_id, location_id: private_subnet.location_id).first
-    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id)
+    gcp_vpc ||= Prog::Vnet::Gcp::VpcNexus.assemble(private_subnet.project_id, private_subnet.location_id).subject
     gcp_vpc.add_private_subnet(private_subnet) unless private_subnet.gcp_vpc
 
     hop_wait_vpc_ready
