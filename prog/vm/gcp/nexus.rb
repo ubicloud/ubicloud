@@ -371,6 +371,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       "gcp_zone_suffix" => new_suffix,
       "exclude_zones" => excluded,
     })
+    # 5 minutes: all zones exhausted, exclusions reset -- wait for capacity to free up
+    # 5 seconds: still have untried zones -- move on to the next one quickly
     nap((available.length == gcp_az_suffixes.length) ? 5 * 60 : 5)
   end
 
