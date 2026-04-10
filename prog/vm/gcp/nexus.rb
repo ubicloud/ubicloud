@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "base64"
-
 class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
@@ -26,7 +24,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     public_keys = vm.sshable.keys.map(&:public_key).join("\n")
-    public_keys_b64 = Base64.strict_encode64(public_keys)
     user_data = <<~STARTUP
       #!/bin/bash
       custom_user="#{vm.unix_user}"
@@ -38,7 +35,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         chown -R $custom_user:$custom_user /home/$custom_user/.ssh
         chmod 700 /home/$custom_user/.ssh
       fi
-      echo '#{public_keys_b64}' | base64 -d > /home/$custom_user/.ssh/authorized_keys
+      echo #{NetSsh.command(":public_keys", public_keys:)} > /home/$custom_user/.ssh/authorized_keys
       chown $custom_user:$custom_user /home/$custom_user/.ssh/authorized_keys
       chmod 600 /home/$custom_user/.ssh/authorized_keys
     STARTUP

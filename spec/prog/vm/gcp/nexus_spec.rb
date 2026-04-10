@@ -388,13 +388,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "base64-encodes SSH keys so single quotes in key material do not break the startup script" do
+    it "shell-escapes SSH keys via NetSsh.command in the startup script" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
 
       captured_startup = nil
-      op = instance_double(Gapic::GenericLRO::Operation, name: "op-b64")
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-ssh")
       expect(compute_client).to receive(:insert) do |args|
         captured_startup = args[:instance_resource].metadata.items.find { |i| i.key == "startup-script" }.value
         op
@@ -402,12 +402,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.start }.to hop("wait_create_op")
 
-      # Script must pipe through base64 -d so single quotes in key material are safe
-      expect(captured_startup).to include("| base64 -d >")
-      # The embedded b64 must decode back to the real SSH public key
-      b64 = captured_startup[/echo '([A-Za-z0-9+\/=]+)'/, 1]
       expected_key = vm.sshable.keys.map(&:public_key).join("\n")
-      expect(Base64.strict_decode64(b64)).to eq(expected_key)
+      expect(captured_startup).to include(expected_key.shellescape)
+      expect(captured_startup).to include("> /home/$custom_user/.ssh/authorized_keys")
     end
   end
 
