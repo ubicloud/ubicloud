@@ -341,22 +341,32 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-      policy.associations.each do |assoc|
-        credential.network_firewall_policies_client.remove_association(
-          project: gcp_project_id,
-          firewall_policy: firewall_policy_name,
-          name: assoc.name,
-        )
-      end
-
-      credential.network_firewall_policies_client.delete(
-        project: gcp_project_id,
-        firewall_policy: firewall_policy_name,
-      )
     rescue Google::Cloud::NotFoundError
       # Already deleted
-      nil
+      return
     end
+
+    policy.associations.each do |assoc|
+      credential.network_firewall_policies_client.remove_association(
+        project: gcp_project_id,
+        firewall_policy: firewall_policy_name,
+        name: assoc.name,
+      )
+    rescue Google::Cloud::NotFoundError
+      # Association already removed
+      nil
+    rescue Google::Cloud::Error => e
+      Clog.emit("Failed to remove firewall policy association during VPC cleanup",
+        {vpc_cleanup_assoc_error: Util.exception_to_hash(e, into: {policy: firewall_policy_name, association: assoc.name})})
+    end
+
+    credential.network_firewall_policies_client.delete(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name,
+    )
+  rescue Google::Cloud::NotFoundError
+    # Policy deleted between get and delete
+    nil
   rescue Google::Cloud::Error => e
     Clog.emit("Failed to delete firewall policy during VPC cleanup",
       {vpc_cleanup_policy_error: Util.exception_to_hash(e, into: {policy: firewall_policy_name})})

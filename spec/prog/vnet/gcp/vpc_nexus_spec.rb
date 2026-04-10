@@ -656,6 +656,70 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
+    it "handles per-association errors independently during firewall policy cleanup" do
+      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
+      )
+
+      # Policy has two associations; first removal fails, second should still proceed
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        associations: [
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-fail"),
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-ok"),
+        ],
+      )
+      expect(nfp_client).to receive(:get).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(policy)
+
+      expect(nfp_client).to receive(:remove_association).with(
+        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-fail",
+      ).and_raise(Google::Cloud::InternalError.new("internal"))
+
+      expect(nfp_client).to receive(:remove_association).with(
+        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-ok",
+      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-remove-ok"))
+
+      expect(nfp_client).to receive(:delete).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
+
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
+    it "handles NotFoundError on individual association removal during firewall policy cleanup" do
+      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
+      )
+
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        associations: [
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-gone"),
+        ],
+      )
+      expect(nfp_client).to receive(:get).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(policy)
+
+      expect(nfp_client).to receive(:remove_association).with(
+        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-gone",
+      ).and_raise(Google::Cloud::NotFoundError.new("not found"))
+
+      expect(nfp_client).to receive(:delete).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
+
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
     it "handles RuntimeError from CRM LRO during firewall tag cleanup" do
       gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
@@ -673,6 +737,27 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       allow(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
+    it "handles policy deleted between get and delete" do
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
+      )
+
+      # get succeeds — policy exists at this point
+      policy = Google::Cloud::Compute::V1::FirewallPolicy.new(associations: [])
+      expect(nfp_client).to receive(:get).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_return(policy)
+
+      # delete raises NotFoundError — policy was deleted between get and delete
+      expect(nfp_client).to receive(:delete).with(
+        project: "test-gcp-project", firewall_policy: vpc_name,
+      ).and_raise(Google::Cloud::NotFoundError.new("not found"))
+
       expect(networks_client).to receive(:delete)
 
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
