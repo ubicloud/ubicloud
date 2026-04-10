@@ -79,6 +79,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "creates strand with Vm::Gcp::Nexus prog" do
       expect(vm.strand.prog).to eq("Vm::Gcp::Nexus")
     end
+
+    it "skips zero-size non-boot volumes without crashing" do
+      location_credential
+      gcp_vpc
+      v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+        location_id: location.id, unix_user: "test-user",
+        boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+        name: "testvm-zero", size: "c3d-standard-8", arch: "x64",
+        storage_volumes: [{size_gib: 375}, {size_gib: 0}]).subject
+      # Only the boot disk should be created; the zero-size volume is skipped
+      expect(v.vm_storage_volumes.count).to eq(1)
+      expect(v.vm_storage_volumes.first.boot).to be true
+    end
   end
 
   describe "#before_destroy" do
