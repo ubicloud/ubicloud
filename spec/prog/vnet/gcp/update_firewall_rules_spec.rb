@@ -75,7 +75,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     }
 
     before do
-      allow(vm).to receive_messages(firewall_rules: [fw_rule], firewalls: [firewall])
+      allow(vm).to receive(:firewalls).and_return([firewall])
+      allow(firewall).to receive(:firewall_rules).and_return([fw_rule])
 
       # Tag key creation
 
@@ -138,7 +139,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "syncs empty rules for firewall with no rules and does not bind its tag" do
-      allow(vm).to receive(:firewall_rules).and_return([])
+      allow(firewall).to receive(:firewall_rules).and_return([])
 
       expect(crm_client).to receive(:create_tag_key)
       expect(crm_client).to receive(:create_tag_value)
@@ -158,7 +159,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         firewall_id: "fw-id-2", port_range: (443...444), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
         ip6?: false, protocol: "tcp")
 
-      allow(vm).to receive_messages(firewalls: [firewall, firewall2], firewall_rules: [fw_rule, fw_rule2])
+      allow(vm).to receive(:firewalls).and_return([firewall, firewall2])
+      allow(firewall).to receive(:firewall_rules).and_return([fw_rule])
+      allow(firewall2).to receive(:firewall_rules).and_return([fw_rule2])
 
       # Each firewall gets its own tag key
       created_keys = []
@@ -305,13 +308,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "truncates desired tags and logs when exceeding GCP 10-tag NIC limit" do
       # Create 11 firewalls (each with rules) to exceed the 10-tag limit
       firewalls = (1..11).map { |i| instance_double(Firewall, id: "fw-id-#{i}", ubid: "fwubid#{i}") }
-      fw_rules = firewalls.map { |fw|
-        instance_double(FirewallRule,
+      firewalls.each do |fw|
+        rule = instance_double(FirewallRule,
           firewall_id: fw.id, port_range: (22...23), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
           ip6?: false, protocol: "tcp")
-      }
+        allow(fw).to receive(:firewall_rules).and_return([rule])
+      end
 
-      allow(vm).to receive_messages(firewalls:, firewall_rules: fw_rules)
+      allow(vm).to receive(:firewalls).and_return(firewalls)
 
       # Each firewall gets its own tag key and value
       allow(crm_client).to receive(:create_tag_key) do |tag_key|
@@ -341,13 +345,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "truncates to 10 without subnet tag when subnet tag is not found" do
       firewalls = (1..11).map { |i| instance_double(Firewall, id: "fw-id-#{i}", ubid: "fwubid#{i}") }
-      fw_rules = firewalls.map { |fw|
-        instance_double(FirewallRule,
+      firewalls.each do |fw|
+        rule = instance_double(FirewallRule,
           firewall_id: fw.id, port_range: (22...23), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
           ip6?: false, protocol: "tcp")
-      }
+        allow(fw).to receive(:firewall_rules).and_return([rule])
+      end
 
-      allow(vm).to receive_messages(firewalls:, firewall_rules: fw_rules)
+      allow(vm).to receive(:firewalls).and_return(firewalls)
 
       allow(crm_client).to receive(:create_tag_key) do |tag_key|
         instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
@@ -1661,6 +1666,23 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
 
       nx.send(:sync_firewall_rules, [ipv4_rule, ipv6_rule], "tagValues/tv-1")
+    end
+
+    it "treats nil port_range as all ports (no ports field in layer4 config)" do
+      rule = instance_double(FirewallRule,
+        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil, protocol: "tcp", ip6?: false)
+
+      empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+
+      expect(nfp_client).to receive(:add_rule) do |args|
+        l4 = args[:firewall_policy_rule_resource].match.layer4_configs.first
+        expect(l4.ip_protocol).to eq("tcp")
+        expect(l4.ports).to be_empty
+        lro_op
+      end
+
+      nx.send(:sync_firewall_rules, [rule], "tagValues/tv-1")
     end
   end
 end

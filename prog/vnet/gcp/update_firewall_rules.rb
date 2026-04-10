@@ -19,8 +19,6 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   label def update_firewall_rules
-    rules = vm.firewall_rules.select(&:port_range)
-
     # For each firewall attached to this VM:
     #   1. Ensure per-firewall tag key exists (GCE_FIREWALL purpose)
     #   2. Ensure 'active' tag value exists under that key
@@ -32,8 +30,8 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     fw_tag_data = frame["fw_tag_data"] || {}
     desired_tag_values = []
 
-    vm.firewalls.each do |fw|
-      fw_rules = rules.select { |r| r.firewall_id == fw.id }
+    vm.firewalls(eager: :firewall_rules).each do |fw|
+      fw_rules = fw.firewall_rules
 
       if fw_tag_data[fw.ubid]
         tag_value_name = fw_tag_data[fw.ubid]
@@ -420,8 +418,10 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
     rules_by_cidr.each do |cidr, cidr_rules|
       layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
-        ports = proto_rules.map { |r| format_port_range(r.port_range) }
-        {ip_protocol: proto, ports:}
+        config = {ip_protocol: proto}
+        ports = proto_rules.filter_map { |r| format_port_range(r.port_range) if r.port_range }
+        config[:ports] = ports if ports.any?
+        config
       end
 
       desired << {
