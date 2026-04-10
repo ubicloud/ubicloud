@@ -90,6 +90,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
         hop_wait_release_ip
       rescue Google::Cloud::NotFoundError
         # Already released
+        nil
       end
     end
 
