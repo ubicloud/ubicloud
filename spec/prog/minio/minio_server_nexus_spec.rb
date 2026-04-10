@@ -161,7 +161,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
 
-    it "hops to setup if bootstrap rhizome is done" do
+    it "hops to create_minio_user if bootstrap rhizome is done" do
       expect { nx.wait_bootstrap_rhizome }.to hop("create_minio_user")
     end
   end

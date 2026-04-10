@@ -102,7 +102,7 @@ RSpec.describe Prog::Ai::InferenceEndpointReplicaNexus do
   end
 
   describe "#wait_bootstrap_rhizome" do
-    it "hops to setup if there are no sub-programs running" do
+    it "hops to download_lb_cert if there are no sub-programs running" do
       expect { nx.wait_bootstrap_rhizome }.to hop("download_lb_cert")
     end
 

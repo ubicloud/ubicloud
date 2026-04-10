@@ -128,7 +128,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect { nx.install }.to nap(5)
     end
 
-    it "hops to configure if install is complete" do
+    it "hops to mount_data_disk if install is complete" do
       expect(vm.sshable).to receive(:d_check).with("install_victoria_metrics").and_return("Succeeded")
       expect(vm.sshable).to receive(:d_clean).with("install_victoria_metrics")
       expect { nx.install }.to hop("mount_data_disk")

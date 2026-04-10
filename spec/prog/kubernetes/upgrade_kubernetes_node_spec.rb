@@ -80,7 +80,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       expect { prog.wait_new_node }.to nap(120)
     end
 
-    it "hops to assign_role if there are no sub-programs running" do
+    it "hops to drain_old_node if there are no sub-programs running" do
       st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"node_id" => "12345"})
       expect { prog.wait_new_node }.to hop("drain_old_node")

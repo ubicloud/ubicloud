@@ -811,7 +811,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { nx.configure }.to hop("wait")
     end
 
-    it "hops to wait_catchup for standbys if configure command is succeeded at times other than the initial provisioning" do
+    it "hops to wait_catch_up for standbys if configure command succeeds at times other than the initial provisioning" do
       server
       standby = create_postgres_server(resource: postgres_resource, timeline: postgres_timeline, is_representative: false)
       standby_nx = described_class.new(standby.strand)
@@ -822,7 +822,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect { standby_nx.configure }.to hop("wait_catch_up")
     end
 
-    it "hops to wait for read replicas if configure command is succeeded" do
+    it "hops to wait_catch_up for read replicas if configure command succeeds" do
       replica_resource = create_read_replica_resource(parent: postgres_resource)
       replica_server = create_postgres_server(resource: replica_resource, timeline: postgres_timeline, timeline_access: "fetch", is_representative: true)
       replica_nx = described_class.new(replica_server.strand)

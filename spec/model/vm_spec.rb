@@ -79,7 +79,7 @@ RSpec.describe Vm do
   end
 
   describe "#load_balancer_state" do
-    it "returns nil if there is related object" do
+    it "returns nil if there is no related object" do
       expect(vm.load_balancer_state).to be_nil
     end
 

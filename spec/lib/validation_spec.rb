@@ -348,7 +348,7 @@ RSpec.describe Validation do
   end
 
   describe "#validate_url" do
-    it "valid account names" do
+    it "valid urls" do
       [
         "https://example.com",
         "https://example.com:1234",
@@ -357,7 +357,7 @@ RSpec.describe Validation do
       end
     end
 
-    it "invalid account names" do
+    it "invalid urls" do
       [
         nil,
         "",
