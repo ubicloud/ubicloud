@@ -91,6 +91,6 @@ module GcpFirewallPolicy
   end
 
   def normalize_layer4_configs(configs)
-    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort
+    configs.map { |c| [c.ip_protocol, c.ports.to_a.sort] }.sort
   end
 end

@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
 require "google/cloud/compute/v1"
+require "google/apis/cloudresourcemanager_v3"
+require "googleauth"
 
 RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.create(prog: "Vnet::Gcp::VpcNexus", label: "start") }
   let(:project) { Project.create(name: "test-gcp-vpc") }
   let(:location) {
     Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
@@ -25,6 +26,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       name: "ubicloud-#{project.ubid}-#{location.ubid}",
     )
   }
+  let(:st) { Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "start") }
   let(:vpc_name) { gcp_vpc.name }
   let(:networks_client) { instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client) }
   let(:nfp_client) { instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client) }
@@ -33,14 +35,12 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   let(:done_op) { Google::Cloud::Compute::V1::Operation.new(status: :DONE) }
 
   before do
-    nx.instance_variable_set(:@gcp_vpc, gcp_vpc)
-    allow(credential).to receive_messages(
-      networks_client:,
-      network_firewall_policies_client: nfp_client,
-      global_operations_client: global_ops_client,
-      crm_client:,
-    )
-    nx.instance_variable_set(:@credential, credential)
+    allow(Google::Cloud::Compute::V1::Networks::Rest::Client).to receive(:new).and_return(networks_client)
+    allow(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client).to receive(:new).and_return(nfp_client)
+    allow(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client).to receive(:new).and_return(global_ops_client)
+    allow(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService).to receive(:new).and_return(crm_client)
+    allow(crm_client).to receive(:authorization=)
+    allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds).and_return(nil)
   end
 
   describe ".assemble" do
@@ -76,7 +76,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
   end
 
   describe "#start" do
-    it "hops to create_vpc" do
+    it "registers deadline and hops to create_vpc" do
+      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.start }.to hop("create_vpc")
     end
   end
@@ -94,7 +95,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
     it "does not overwrite network_self_link if already cached" do
       original_link = "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/99999"
-      gcp_vpc.update(network_self_link: original_link)
+      nx.gcp_vpc.update(network_self_link: original_link)
 
       expect(networks_client).to receive(:get)
         .and_return(Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 67890))
@@ -133,11 +134,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_create_vpc" do
     before do
-      st.stack.first["create_vpc_name"] = "op-vpc-123"
-      st.stack.first["create_vpc_scope"] = "global"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"create_vpc_name" => "op-vpc-123", "create_vpc_scope" => "global"})
     end
 
     it "naps when operation is still running" do
@@ -289,11 +286,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_associated")
     end
 
-    # rubocop:disable RSpec/VerifiedDoubles
     it "adds association when re-fetch after insert AlreadyExistsError returns nil associations" do
       expect(nfp_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
 
-      policy_nil_assoc = double("policy", associations: nil)
+      policy_nil_assoc = Google::Cloud::Compute::V1::FirewallPolicy.new
       expect(nfp_client).to receive(:get).and_return(policy_nil_assoc)
 
       assoc_op = instance_double(Gapic::GenericLRO::Operation, name: "op-assoc-nil")
@@ -301,16 +297,11 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_associated")
     end
-    # rubocop:enable RSpec/VerifiedDoubles
   end
 
   describe "#wait_firewall_policy_created" do
     before do
-      st.stack.first["create_fw_policy_name"] = "op-policy-123"
-      st.stack.first["create_fw_policy_scope"] = "global"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"create_fw_policy_name" => "op-policy-123", "create_fw_policy_scope" => "global"})
     end
 
     it "naps when operation is still running" do
@@ -354,11 +345,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_associated" do
     before do
-      st.stack.first["associate_fw_policy_name"] = "op-assoc"
-      st.stack.first["associate_fw_policy_scope"] = "global"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"associate_fw_policy_name" => "op-assoc", "associate_fw_policy_scope" => "global"})
     end
 
     it "naps when operation is still running" do
@@ -408,7 +395,6 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(st.reload.stack.first["associate_fw_policy_name"]).to be_nil
     end
 
-    # rubocop:disable RSpec/VerifiedDoubles
     it "hops back to create_firewall_policy when LRO errors and re-fetched policy has nil associations" do
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -416,10 +402,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(global_ops_client).to receive(:get).and_return(op)
-      expect(nfp_client).to receive(:get).and_return(double("policy", associations: nil))
+      expect(nfp_client).to receive(:get).and_return(Google::Cloud::Compute::V1::FirewallPolicy.new)
       expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
     end
-    # rubocop:enable RSpec/VerifiedDoubles
   end
 
   describe "#create_vpc_deny_rules" do
@@ -538,11 +523,9 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "hops to destroy when destroy semaphore is set" do
-      st_real = Strand.create_with_id(gcp_vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
-      real_nx = described_class.new(st_real)
-      real_nx.instance_variable_set(:@credential, credential)
-      real_nx.incr_destroy
-      expect { real_nx.wait }.to hop("destroy")
+      st
+      gcp_vpc.incr_destroy
+      expect { nx.wait }.to hop("destroy")
     end
   end
 
@@ -568,11 +551,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       DB[:private_subnet_gcp_vpc].insert(private_subnet_id: ps.id, gcp_vpc_id: gcp_vpc.id)
 
       expect { nx.destroy }.to nap(10)
-      ps.destroy
     end
 
     it "cleans up firewall tag keys, policy, and VPC network" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       # delete_all_firewall_tag_keys
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
@@ -616,7 +598,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles errors during VPC cleanup gracefully" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       # list_tag_keys raises
       allow(crm_client).to receive(:list_tag_keys)
@@ -634,7 +616,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles per-tag-key errors independently during cleanup" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/999", short_name: "ubicloud-fw-fwfail", purpose: "GCE_FIREWALL",
@@ -657,7 +639,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles per-association errors independently during firewall policy cleanup" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       allow(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
@@ -692,7 +674,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles NotFoundError on individual association removal during firewall policy cleanup" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       allow(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
@@ -721,7 +703,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "handles RuntimeError from CRM LRO during firewall tag cleanup" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/999", short_name: "ubicloud-fw-fwghost", purpose: "GCE_FIREWALL",
@@ -776,7 +758,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "skips firewall tag keys with nil purpose_data" do
-      gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       nil_purpose_data_tag = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/888", short_name: "ubicloud-fw-nilpurpose", purpose: "GCE_FIREWALL",
@@ -829,7 +811,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
 
     it "skips tag cleanup when network_self_link is nil" do
-      gcp_vpc.update(network_self_link: nil)
+      nx.gcp_vpc.update(network_self_link: nil)
 
       expect(crm_client).not_to receive(:list_tag_keys)
 
@@ -841,15 +823,13 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
   end
 
-  # rubocop:disable RSpec/VerifiedDoubles
   describe "#normalize_layer4_configs" do
     it "handles configs with nil ports" do
-      config = double("config", ip_protocol: "all", ports: nil)
+      config = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "all")
       result = nx.send(:normalize_layer4_configs, [config])
       expect(result).to eq([["all", []]])
     end
   end
-  # rubocop:enable RSpec/VerifiedDoubles
 
   describe "#policy_rule_matches_desired?" do
     it "returns false when existing.match is nil" do

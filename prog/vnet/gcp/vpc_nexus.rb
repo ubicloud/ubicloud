@@ -107,7 +107,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     end
 
     vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
-    if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+    if policy.associations.any? { |a| a.attachment_target == vpc_target }
       hop_create_vpc_deny_rules
     end
 
@@ -155,7 +155,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-      if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+      if policy.associations.any? { |a| a.attachment_target == vpc_target }
         Clog.emit("GCP LRO error but firewall policy association exists",
           {gcp_lro_recovered: {resource: "firewall policy association #{firewall_policy_name}", error: op_error_message(op)}})
       else
