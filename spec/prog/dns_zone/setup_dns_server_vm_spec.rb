@@ -196,6 +196,8 @@ k8s.ubicloud.com.          3600    SOA     ns.k8s.ubicloud.com. k8s.ubicloud.com
 k8s.ubicloud.com.          3600    NS      toruk.
       CONF
 
+      expect(prog.sshable).to receive(:_cmd).with("sudo rm -f /var/lib/knot/*.zone /var/lib/knot/journal/*")
+
       expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/zone1.domain.io.zone > /dev/null", stdin: f1)
       expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/zone2.domain.io.zone > /dev/null", stdin: f2)
       expect(prog.sshable).to receive(:_cmd).with("sudo -u knot tee /var/lib/knot/k8s.ubicloud.com.zone > /dev/null", stdin: f3)
