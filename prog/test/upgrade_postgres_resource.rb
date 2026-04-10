@@ -2,7 +2,7 @@
 
 require_relative "../../lib/util"
 
-class Prog::Test::UpgradePostgresResource < Prog::Test::Base
+class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
     Project[Config.postgres_service_project_id] ||
@@ -229,42 +229,18 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def finish
-    postgres_test_project.destroy
-
-    fail_test(frame["fail_message"]) if frame["fail_message"]
-
-    pop "Postgres upgrade tests are finished!"
+    finish_test("Postgres upgrade tests are finished!")
   end
 
   label def failed
     nap 15
   end
 
-  def postgres_test_project
-    Project[frame["postgres_test_project_id"]]
-  end
-
-  def postgres_resource
-    PostgresResource[frame["postgres_resource_id"]]
-  end
-
   def read_replica
     @read_replica ||= PostgresResource[frame["read_replica_id"]]
   end
 
-  def representative_server
-    @representative_server ||= postgres_resource.representative_server
-  end
-
   def pre_upgrade_timeline
     PostgresTimeline[frame["pre_upgrade_postgres_timeline_id"]]
-  end
-
-  def test_queries_sql
-    File.read("./prog/test/testdata/order_analytics_queries.sql").freeze
-  end
-
-  def read_queries_sql
-    File.read("./prog/test/testdata/order_analytics_read_queries.sql").freeze
   end
 end

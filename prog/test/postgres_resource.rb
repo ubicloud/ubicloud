@@ -2,7 +2,7 @@
 
 require_relative "../../lib/util"
 
-class Prog::Test::PostgresResource < Prog::Test::Base
+class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-Test-Project")
     postgres_service_project = Project[Config.postgres_service_project_id] ||
@@ -70,30 +70,10 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def finish
-    postgres_test_project.destroy
-
-    fail_test(frame["fail_message"]) if frame["fail_message"]
-
-    pop "Postgres tests are finished!"
+    finish_test("Postgres tests are finished!")
   end
 
   label def failed
     nap 15
-  end
-
-  def postgres_test_project
-    @postgres_test_project ||= Project[frame["postgres_test_project_id"]]
-  end
-
-  def postgres_resource
-    @postgres_resource ||= PostgresResource[frame["postgres_resource_id"]]
-  end
-
-  def representative_server
-    @representative_server ||= postgres_resource.representative_server
-  end
-
-  def test_queries_sql
-    File.read("./prog/test/testdata/order_analytics_queries.sql").freeze
   end
 end
