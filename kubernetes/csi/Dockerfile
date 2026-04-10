@@ -1,4 +1,4 @@
-FROM ruby:3.4-slim AS builder
+FROM ruby:4.0.2-slim AS builder
 
 RUN apt update && apt install -y build-essential
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY Gemfile ubi-csi.gemspec ./
 RUN bundle config set without 'development test' && bundle install
 
-FROM ruby:3.4-slim
+FROM ruby:4.0.2-slim
 
 RUN apt update && apt install -y apt-transport-https ca-certificates curl gnupg openssh-client e2fsprogs xfsprogs
 RUN curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.35/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
