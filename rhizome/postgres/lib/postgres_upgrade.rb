@@ -34,7 +34,7 @@ class PostgresUpgrade
       return
     end
 
-    r "sudo pg_ctlcluster promote #{version} main"
+    r "sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\""
   end
 
   def disable_previous_version
