@@ -99,6 +99,38 @@ RSpec.describe Hosting::HetznerApis do
     end
   end
 
+  describe "find_server_identifier" do
+    it "returns the server number for the main server ip" do
+      Excon.stub({path: "/server", method: :get}, {status: 200, body: JSON.dump([
+        {"server" => {"server_ip" => "1.2.3.4", "server_number" => 321, "ip" => ["1.2.3.4"]}},
+      ])})
+
+      expect(hetzner_apis.find_server_identifier("1.2.3.4")).to eq "321"
+    end
+
+    it "matches a server through an additional assigned ip" do
+      Excon.stub({path: "/server", method: :get}, {status: 200, body: JSON.dump([
+        {"server" => {"server_ip" => "1.2.3.4", "server_number" => 321, "ip" => ["1.2.3.4", "1.2.3.5"]}},
+      ])})
+
+      expect(hetzner_apis.find_server_identifier("1.2.3.5")).to eq "321"
+    end
+
+    it "returns nil when no server matches the given ip" do
+      Excon.stub({path: "/server", method: :get}, {status: 200, body: JSON.dump([
+        {"server" => {"server_ip" => "1.2.3.4", "server_number" => 321, "ip" => ["1.2.3.4"]}},
+      ])})
+
+      expect(hetzner_apis.find_server_identifier("9.9.9.9")).to be_nil
+    end
+
+    it "raises an error if listing servers fails" do
+      Excon.stub({path: "/server", method: :get}, {status: 404, body: ""})
+
+      expect { hetzner_apis.find_server_identifier("1.2.3.4") }.to raise_error Excon::Error::NotFound
+    end
+  end
+
   describe "pull_dc" do
     it "can get the dc info" do
       Excon.stub({path: "/server/123", method: :get}, {status: 200, body: "{\"server\": {\"dc\": \"fsn1-dc8\"}}"})
