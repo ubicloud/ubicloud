@@ -632,12 +632,6 @@ SQL
       hop_configure_metrics
     end
 
-    when_promote_read_replica_set? do
-      decr_promote_read_replica
-      register_deadline("wait", 10 * 60)
-      hop_promote_read_replica
-    end
-
     when_refresh_walg_credentials_set? do
       decr_refresh_walg_credentials
       postgres_server.refresh_walg_credentials
@@ -806,20 +800,6 @@ SQL
     end
 
     nap 1
-  end
-
-  label def promote_read_replica
-    case vm.sshable.d_check("promote_postgres")
-    when "Succeeded"
-      vm.sshable.d_clean("promote_postgres")
-      resource.servers.each(&:incr_configure)
-      resource.servers.each(&:incr_configure_metrics)
-      hop_configure
-    when "NotStarted", "Failed"
-      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
-    end
-
-    nap 5
   end
 
   label def taking_over
