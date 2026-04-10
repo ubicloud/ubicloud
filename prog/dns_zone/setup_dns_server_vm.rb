@@ -148,6 +148,8 @@ zone:
   label def sync_zones
     nap 5 if ds.dns_zones.any?(&:refresh_dns_servers_set?)
 
+    sshable.cmd "sudo rm -f /var/lib/knot/*.zone /var/lib/knot/journal/*"
+
     ds.dns_zones.each do |dz|
       zone_config = <<-CONF
 #{dz.name}.          3600    SOA     ns.#{dz.name}. #{dz.name}. 37 86400 7200 1209600 #{dz.neg_ttl}
