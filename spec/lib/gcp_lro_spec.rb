@@ -33,6 +33,21 @@ RSpec.describe GcpLro do
 
       expect { nx.send(:poll_gcp_op) }.to raise_error(RuntimeError, /Unknown GCP operation scope: invalid/)
     end
+
+    it "polls a named LRO slot" do
+      strand.stack.first["my_lro_name"] = "op-named"
+      strand.stack.first["my_lro_scope"] = "global"
+      strand.stack.first["my_lro_scope_value"] = nil
+      strand.modified!(:stack)
+      strand.save_changes
+      nx.instance_variable_set(:@frame, nil)
+
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get)
+        .with(project: "test-gcp-project", operation: "op-named")
+        .and_return(op)
+      expect(nx.send(:poll_gcp_op, name: "my_lro")).to eq(op)
+    end
   end
 
   def build_op(error: nil, http_error_status_code: 0, http_error_message: "")
@@ -105,6 +120,23 @@ RSpec.describe GcpLro do
     end
   end
 
+  describe "#save_gcp_op and #clear_gcp_op" do
+    it "saves and clears a named LRO slot" do
+      nx.save_gcp_op("op-named", "region", "us-central1", name: "my_lro")
+      strand.reload
+      expect(strand.stack.first["my_lro_name"]).to eq("op-named")
+      expect(strand.stack.first["my_lro_scope"]).to eq("region")
+      expect(strand.stack.first["my_lro_scope_value"]).to eq("us-central1")
+
+      nx.instance_variable_set(:@frame, nil)
+      nx.clear_gcp_op(name: "my_lro")
+      strand.reload
+      expect(strand.stack.first["my_lro_name"]).to be_nil
+      expect(strand.stack.first["my_lro_scope"]).to be_nil
+      expect(strand.stack.first["my_lro_scope_value"]).to be_nil
+    end
+  end
+
   describe "#poll_and_clear_gcp_op" do
     before do
       strand.stack.first["gcp_op_name"] = "op-abc"
@@ -159,6 +191,23 @@ RSpec.describe GcpLro do
         nx.poll_and_clear_gcp_op { |_| raise "recovery failed" }
       }.to raise_error(RuntimeError, "recovery failed")
       expect(strand.reload.stack.first["gcp_op_name"]).to eq("op-abc")
+    end
+
+    it "works with a named LRO slot" do
+      strand.stack.first["my_lro_name"] = "op-named"
+      strand.stack.first["my_lro_scope"] = "global"
+      strand.stack.first["my_lro_scope_value"] = nil
+      strand.modified!(:stack)
+      strand.save_changes
+      nx.instance_variable_set(:@frame, nil)
+
+      op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
+      expect(global_ops_client).to receive(:get)
+        .with(project: "test-gcp-project", operation: "op-named")
+        .and_return(op)
+      result = nx.poll_and_clear_gcp_op(name: "my_lro") {}
+      expect(result).to eq(op)
+      expect(strand.reload.stack.first["my_lro_name"]).to be_nil
     end
   end
 end
