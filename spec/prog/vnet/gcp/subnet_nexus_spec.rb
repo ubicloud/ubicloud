@@ -765,7 +765,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
   end
 
   describe "#normalize_layer4_configs" do
-    it "handles layer4 configs with nil ports (covers &.to_a nil branch)" do
+    it "normalizes layer4 configs with no ports" do
       config = Google::Cloud::Compute::V1::FirewallPolicyRuleMatcherLayer4Config.new(ip_protocol: "tcp")
       result = nx.send(:normalize_layer4_configs, [config])
       expect(result).to eq([["tcp", []]])

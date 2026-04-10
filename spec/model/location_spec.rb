@@ -103,6 +103,21 @@ RSpec.describe Location do
     expect(gcp_loc.pg_gce_image("x64")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
   end
 
+  it "#pg_boot_image returns correct image for metal standard flavor" do
+    metal_loc = described_class[name: "hetzner-fsn1"]
+    expect(metal_loc.pg_boot_image("16", "x64", PostgresResource::Flavor::STANDARD)).to eq("postgres-ubuntu-2204")
+  end
+
+  it "#pg_boot_image returns correct image for metal lantern flavor" do
+    metal_loc = described_class[name: "hetzner-fsn1"]
+    expect(metal_loc.pg_boot_image("16", "x64", PostgresResource::Flavor::LANTERN)).to eq("postgres16-lantern-ubuntu-2204")
+  end
+
+  it "#pg_boot_image raises for unknown metal flavor" do
+    metal_loc = described_class[name: "hetzner-fsn1"]
+    expect { metal_loc.pg_boot_image("16", "x64", "unknown") }.to raise_error("Unknown PostgreSQL flavor: unknown")
+  end
+
   it "#pg_gce_image raises when no image found" do
     PgGceImage.dataset.destroy
     gcp_loc = described_class.create(name: "gcp-image-err", display_name: "gcp-image-err", ui_name: "gcp-image-err", visible: false, provider: "gcp")

@@ -288,7 +288,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   def normalize_layer4_configs(configs)
-    configs.map { |c| [c.ip_protocol, (c.ports&.to_a || []).sort] }.sort!
+    configs.map { |c| [c.ip_protocol, c.ports.to_a.sort] }.sort!
   end
 
   # --- Destroy helpers ---
