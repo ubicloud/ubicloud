@@ -3,13 +3,7 @@
 require "google/cloud/compute/v1"
 
 RSpec.describe Prog::Vnet::Gcp::NicNexus do
-  subject(:nx) {
-    described_class.new(st)
-  }
-
-  let(:st) {
-    Strand.create(prog: "Vnet::Gcp::NicNexus", stack: [{"subject_id" => nic.id}], label: "start")
-  }
+  subject(:nx) { described_class.new(st) }
 
   let(:project) { Project.create(name: "test-prj") }
 
@@ -47,17 +41,15 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   }
 
   let(:nic) {
-    n = Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic").subject
-    n
+    Prog::Vnet::NicNexus.assemble(private_subnet.id, name: "test-nic").subject
   }
 
+  let(:st) { nic.strand }
   let(:addresses_client) { instance_double(Google::Cloud::Compute::V1::Addresses::Rest::Client) }
   let(:region_ops_client) { instance_double(Google::Cloud::Compute::V1::RegionOperations::Rest::Client) }
 
   before do
-    allow(nx).to receive(:nic).and_return(nic)
-    allow(location_credential).to receive_messages(addresses_client:, region_operations_client: region_ops_client)
-    nx.instance_variable_set(:@credential, location_credential)
+    allow(nx.send(:credential)).to receive_messages(addresses_client:, region_operations_client: region_ops_client)
   end
 
   describe "#start" do
@@ -76,7 +68,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "fails if address name exceeds 63 characters" do
-      allow(nic).to receive(:name).and_return("a" * 60)
+      allow(nx.nic).to receive(:name).and_return("a" * 60)
       expect { nx.allocate_static_ip }.to raise_error(RuntimeError, /GCP address name too long/)
     end
 
@@ -113,13 +105,12 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   describe "#wait_allocate_ip" do
     before do
       NicGcpResource.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-      st.stack.first["allocate_ip_name"] = "op-addr-123"
-      st.stack.first["allocate_ip_scope"] = "region"
-      st.stack.first["allocate_ip_scope_value"] = "us-central1"
-      st.stack.first["gcp_address_name"] = "ubicloud-#{nic.name}"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "allocate_ip_name" => "op-addr-123",
+        "allocate_ip_scope" => "region",
+        "allocate_ip_scope_value" => "us-central1",
+        "gcp_address_name" => "ubicloud-#{nic.name}",
+      })
     end
 
     it "naps when operation is still running" do
@@ -212,13 +203,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
     it "naps when IP release operation is still running" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["release_ip_name"] = "op-delete-running"
-      st.stack.first["release_ip_scope"] = "region"
-      st.stack.first["release_ip_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-running", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       running_op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(region_ops_client).to receive(:get).and_return(running_op)
@@ -227,12 +212,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "completes IP release and hops to finalize_destroy" do
-      st.stack.first["release_ip_name"] = "op-delete-ok"
-      st.stack.first["release_ip_scope"] = "region"
-      st.stack.first["release_ip_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-ok", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(region_ops_client).to receive(:get).and_return(done_op)
@@ -242,13 +222,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["release_ip_name"] = "op-delete-fail"
-      st.stack.first["release_ip_scope"] = "region"
-      st.stack.first["release_ip_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"release_ip_name" => "op-delete-fail", "release_ip_scope" => "region", "release_ip_scope_value" => "us-central1"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       failed_op = Google::Cloud::Compute::V1::Operation.new(
