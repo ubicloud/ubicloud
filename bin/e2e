@@ -83,6 +83,12 @@ def test_aws(options, test_cases)
   if options[:test_cases].include?("postgres_standard")
     tests_to_wait << Prog::Test::PostgresResource.assemble(provider: "aws")
   end
+  if options[:test_cases].include?("postgres_ha")
+    tests_to_wait << Prog::Test::HaPostgresResource.assemble(provider: "aws")
+  end
+  if options[:test_cases].include?("postgres_upgrade")
+    tests_to_wait << Prog::Test::UpgradePostgresResource.assemble(provider: "aws")
+  end
 
   tests_to_wait.each { |st| wait_until(st) }
 end
