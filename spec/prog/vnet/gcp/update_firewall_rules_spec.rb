@@ -1684,5 +1684,24 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       nx.send(:sync_firewall_rules, [rule], "tagValues/tv-1")
     end
+
+    it "nil port_range dominates when mixed with specific ports in the same protocol group" do
+      all_ports_rule = instance_double(FirewallRule,
+        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil, protocol: "tcp", ip6?: false)
+      specific_rule = instance_double(FirewallRule,
+        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: 22..23, protocol: "tcp", ip6?: false)
+
+      empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
+      expect(nfp_client).to receive(:get).and_return(empty_policy)
+
+      expect(nfp_client).to receive(:add_rule) do |args|
+        l4 = args[:firewall_policy_rule_resource].match.layer4_configs.first
+        expect(l4.ip_protocol).to eq("tcp")
+        expect(l4.ports).to be_empty
+        lro_op
+      end
+
+      nx.send(:sync_firewall_rules, [all_ports_rule, specific_rule], "tagValues/tv-1")
+    end
   end
 end

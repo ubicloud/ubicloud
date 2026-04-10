@@ -419,8 +419,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     rules_by_cidr.each do |cidr, cidr_rules|
       layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
         config = {ip_protocol: proto}
-        ports = proto_rules.filter_map { |r| format_port_range(r.port_range) if r.port_range }
-        config[:ports] = ports if ports.any?
+        # nil port_range means all ports — omit :ports entirely when any
+        # rule in the group covers all ports so GCP treats it as "all".
+        unless proto_rules.any? { |r| r.port_range.nil? }
+          config[:ports] = proto_rules.map { |r| format_port_range(r.port_range) }
+        end
         config
       end
 
