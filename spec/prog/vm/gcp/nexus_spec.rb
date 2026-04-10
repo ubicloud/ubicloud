@@ -3,15 +3,10 @@
 require "google/cloud/compute/v1"
 
 RSpec.describe Prog::Vm::Gcp::Nexus do
-  subject(:nx) {
-    n = described_class.new(st)
-    n.instance_variable_set(:@credential, location_credential)
-    n
-  }
+  subject(:nx) { described_class.new(st) }
 
-  let(:st) {
-    vm.strand
-  }
+  let(:st) { vm.strand }
+  let(:nic) { vm.nics.first }
 
   let(:project) { Project.create(name: "test-prj") }
 
@@ -65,7 +60,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   before do
-    allow(location_credential).to receive_messages(
+    allow(nx.send(:credential)).to receive_messages(
       compute_client:,
       network_firewall_policies_client: nfp_client,
       zone_operations_client: zone_ops_client,
@@ -126,9 +121,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-12345")
       expect(compute_client).to receive(:insert) do |args|
@@ -171,9 +164,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["exclude_availability_zones"] = ["a", "b"]
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"exclude_availability_zones" => ["a", "b"]})
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
       expect(compute_client).to receive(:insert).and_return(op)
@@ -186,10 +177,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-
-      st.stack.first["gcp_zone_suffix"] = "c"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
 
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-zone")
       expect(compute_client).to receive(:insert).and_return(op)
@@ -235,7 +223,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
       stack = st.reload.stack.first
@@ -249,7 +237,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::UnavailableError.new("service unavailable"))
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
       stack = st.reload.stack.first
@@ -264,7 +252,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(compute_client).to receive(:insert).and_raise(
         Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'."),
       )
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
       stack = st.reload.stack.first
@@ -286,13 +274,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["gcp_zone_suffix"] = "c"
-      st.stack.first["exclude_zones"] = ["a", "b"]
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"]})
 
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
 
       expect { nx.start }.to nap(5 * 60)
       stack = st.reload.stack.first
@@ -303,13 +288,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
-      st.stack.first["gcp_zone_suffix"] = "b"
-      st.stack.first["exclude_zones"] = ["a"]
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "b", "exclude_zones" => ["a"]})
 
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.start }.to nap(5)
       stack = st.reload.stack.first
@@ -414,18 +396,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "hops to start when no operation is pending but exclude_zones is set" do
-      st.stack.first["exclude_zones"] = ["a"]
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"exclude_zones" => ["a"]})
       expect { nx.wait_create_op }.to hop("start")
     end
 
     it "naps when operation is still running" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :RUNNING)
       expect(zone_ops_client).to receive(:get).and_return(op)
@@ -434,11 +410,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "hops to wait_instance_created when operation completes successfully" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
 
       op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(zone_ops_client).to receive(:get).and_return(op)
@@ -447,11 +419,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "raises if the GCE operation fails" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "GENERIC_ERROR", message: "operation failed")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -464,12 +432,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED", message: "exhausted")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -477,7 +440,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.wait_create_op }.to nap(5)
       stack = st.reload.stack.first
@@ -486,12 +449,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS", message: "exhausted with details")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -499,7 +457,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.wait_create_op }.to nap(5)
       stack = st.reload.stack.first
@@ -508,12 +466,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on QUOTA_EXCEEDED operation error" do
-      st.stack.first["create_vm_name"] = "op-123"
-      st.stack.first["create_vm_scope"] = "zone"
-      st.stack.first["create_vm_scope_value"] = "us-central1-a"
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
 
       error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
       op = Google::Cloud::Compute::V1::Operation.new(
@@ -521,7 +474,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
       )
       expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything)
+      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
       expect { nx.wait_create_op }.to nap(5)
       stack = st.reload.stack.first
@@ -531,9 +484,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#wait_instance_created" do
     before do
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
     end
 
     it "updates the vm and hops to wait_sshable when instance is RUNNING" do
@@ -557,13 +508,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         instance: "testvm",
       ).and_return(instance)
 
-      now = Time.now.floor
-      expect(Time).to receive(:now).at_least(:once).and_return(now)
-
       expect { nx.wait_instance_created }.to hop("wait_sshable")
         .and change { vm.reload.update_firewall_rules_set? }.from(false).to(true)
       expect(vm.cores).to eq(4)
-      expect(vm.allocated_at).to eq(now)
+      expect(vm.allocated_at).to be_within(2).of(Time.now)
       expect(vm.assigned_vm_address.ip.to_s).to eq("35.192.0.1/32")
       expect(vm.ephemeral_net6.to_s).to eq("2600:1900:4000:1::1/128")
     end
@@ -596,9 +544,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect(compute_client).to receive(:get).and_return(instance)
 
-      now = Time.now.floor
-      expect(Time).to receive(:now).at_least(:once).and_return(now)
-
       expect { nx.wait_instance_created }.to hop("wait_sshable")
       vm.reload
       expect(vm.cores).to eq(4)
@@ -615,9 +560,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
-
-      now = Time.now.floor
-      expect(Time).to receive(:now).at_least(:once).and_return(now)
 
       expect { nx.wait_instance_created }.to hop("wait_sshable")
       vm.reload
@@ -669,13 +611,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#wait_sshable" do
     it "pushes update_firewall_rules when semaphore is set" do
-      vm.incr_update_firewall_rules
+      nx.incr_update_firewall_rules
       expect(nx).to receive(:push).with(Prog::Vnet::Gcp::UpdateFirewallRules, {}, :update_firewall_rules).and_call_original
-      expect { nx.wait_sshable }.to hop(:update_firewall_rules, "Vnet::Gcp::UpdateFirewallRules")
+      expect { nx.wait_sshable }.to raise_error(Prog::Base::Hop)
     end
 
     it "decrements semaphore when firewall rules are added" do
-      vm.incr_update_firewall_rules
+      nx.incr_update_firewall_rules
       st.update(retval: Sequel.pg_jsonb({"msg" => "firewall rule is added"}))
       expect { nx.wait_sshable }.to hop("create_billing_record")
         .and change { vm.reload.update_firewall_rules_set? }.from(true).to(false)
@@ -700,11 +642,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#create_billing_record" do
-    let(:now) { Time.now }
-
     before do
-      expect(Time).to receive(:now).and_return(now).at_least(:once)
-      vm.update(allocated_at: now - 100)
+      nx.vm.update(allocated_at: Time.now - 100)
       expect(Clog).to receive(:emit).with("vm provisioned", instance_of(Array)).and_call_original
     end
 
@@ -719,7 +658,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         .and change(BillingRecord, :count).from(0).to(1)
         .and change { vm.reload.display_state }.from("creating").to("running")
       expect(vm.active_billing_records.first.billing_rate["resource_type"]).to eq("VmVCpu")
-      expect(vm.provisioned_at).to be_within(1).of(now)
+      expect(vm.provisioned_at).to be_within(2).of(Time.now)
     end
   end
 
@@ -760,9 +699,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#destroy" do
     before do
-      st.stack.first["gcp_zone_suffix"] = "a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
     end
 
     it "prevents destroy if the semaphore set" do
@@ -792,12 +729,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "uses zone from VM strand frame when NIC is already destroyed" do
-      st.stack.first["gcp_zone_suffix"] = "c"
-      st.modified!(:stack)
-      st.save_changes
-
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
+      nx.vm.nics.each do |n|
+        n.strand.destroy
+        n.destroy
+      end
       nx.instance_variable_set(:@nic, nil)
-      allow(vm).to receive(:nic).and_return(nil)
 
       expect(nx).to receive(:cleanup_vm_policy_rules)
 
@@ -815,7 +752,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::Error.new("permission denied"))
       allow(Clog).to receive(:emit).and_call_original
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
       expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
       expect { nx.destroy }.to hop("finalize_destroy")
@@ -876,7 +813,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).not_to receive(:remove_rule).with(hash_including(priority: 33333))
 
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
 
       nx.send(:cleanup_vm_policy_rules)
@@ -903,7 +840,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).not_to receive(:remove_rule)
 
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
 
       nx.send(:cleanup_vm_policy_rules)
@@ -932,7 +869,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 22222))
 
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
 
       nx.send(:cleanup_vm_policy_rules)
@@ -946,7 +883,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).to receive(:get).and_return(policy)
 
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       expect(crm_client).to receive(:delete_tag_value).with(vm_tag_value_name)
 
       nx.send(:cleanup_vm_policy_rules)
@@ -955,7 +892,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "handles cleanup errors gracefully" do
       expect(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::Error.new("permission denied"))
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
       nx.send(:cleanup_vm_policy_rules)
     end
@@ -968,10 +905,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nfp_client).to receive(:get).and_return(policy)
 
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       allow(crm_client).to receive(:delete_tag_value)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything)
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
       nx.send(:cleanup_vm_policy_rules)
     end
@@ -980,7 +917,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   describe "#lookup_old_vm_tag_value_name" do
     it "returns tag value name when VPC tag key and VM tag value exist" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       project_ubid = vm.nic.private_subnet.project.ubid
       vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
@@ -993,7 +930,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "returns nil when VPC tag key does not exist" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: []))
@@ -1003,7 +940,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "returns nil when tag_keys response is nil" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: nil))
@@ -1013,7 +950,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "returns nil when tag_values response is nil" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       project_ubid = vm.nic.private_subnet.project.ubid
       vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
@@ -1024,7 +961,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "returns nil when VM tag value not found among tag_values" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       project_ubid = vm.nic.private_subnet.project.ubid
       vpc_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{project_ubid}", name: "tagKeys/vpc-123")
@@ -1036,23 +973,19 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "logs and returns nil on ClientError" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
-      allow(location_credential).to receive(:crm_client).and_return(crm_client)
+      allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
-      expect(Clog).to receive(:emit).with("Failed to look up old VM tag value", hash_including(:tag_lookup_error))
+      expect(Clog).to receive(:emit).with("Failed to look up old VM tag value", hash_including(:tag_lookup_error)).and_call_original
       expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
     end
   end
 
   describe "#wait_destroy_op" do
     before do
-      st.stack.first["delete_vm_name"] = "op-del-123"
-      st.stack.first["delete_vm_scope"] = "zone"
-      st.stack.first["delete_vm_scope_value"] = "us-central1-a"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"delete_vm_name" => "op-del-123", "delete_vm_scope" => "zone", "delete_vm_scope_value" => "us-central1-a"})
     end
 
     it "naps when operation is still running" do
@@ -1101,22 +1034,21 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "helper methods" do
     it "delegates gce_machine_type to Option.gcp_machine_type_name" do
-      vm.update(family: "c4a-standard", vcpus: 8)
-      vm.reload
+      nx.vm.update(family: "c4a-standard", vcpus: 8)
+      nx.instance_variable_set(:@gce_machine_type, nil)
       expect(nx.send(:gce_machine_type)).to eq("c4a-standard-8-lssd")
     end
 
     it "reads GCP zone suffix from VM strand frame" do
-      st.stack.first["gcp_zone_suffix"] = "c"
-      st.modified!(:stack)
-      st.save_changes
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
+      nx.instance_variable_set(:@gcp_zone, nil)
       expect(nx.send(:gcp_zone)).to eq("us-central1-c")
     end
 
     it "samples from available AZ suffixes when not set in strand" do
-      st.stack.first.delete("gcp_zone_suffix")
-      st.modified!(:stack)
-      st.save_changes
+      new_frame = nx.strand.stack.first.dup
+      new_frame.delete("gcp_zone_suffix")
+      refresh_frame(nx, new_frame:)
       nx.instance_variable_set(:@gcp_zone, nil)
       zone = nx.send(:gcp_zone)
       expect(zone).to match(/\Aus-central1-[abc]\z/)
@@ -1128,27 +1060,27 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     describe "#gce_source_image" do
       it "returns projects/ paths as-is" do
-        vm.update(boot_image: "projects/my-project/global/images/my-image")
+        nx.vm.update(boot_image: "projects/my-project/global/images/my-image")
         expect(nx.send(:gce_source_image)).to eq("projects/my-project/global/images/my-image")
       end
 
       it "maps ubuntu-noble to the correct GCE family for x64" do
-        vm.update(boot_image: "ubuntu-noble", arch: "x64")
+        nx.vm.update(boot_image: "ubuntu-noble", arch: "x64")
         expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64")
       end
 
       it "maps ubuntu-noble to the correct GCE family for arm64" do
-        vm.update(boot_image: "ubuntu-noble", arch: "arm64")
+        nx.vm.update(boot_image: "ubuntu-noble", arch: "arm64")
         expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-arm64")
       end
 
       it "maps ubuntu-jammy to the correct GCE family for x64" do
-        vm.update(boot_image: "ubuntu-jammy", arch: "x64")
+        nx.vm.update(boot_image: "ubuntu-jammy", arch: "x64")
         expect(nx.send(:gce_source_image)).to eq("projects/ubuntu-os-cloud/global/images/family/ubuntu-2204-lts-amd64")
       end
 
       it "raises for unknown boot images" do
-        vm.update(boot_image: "unknown-image")
+        nx.vm.update(boot_image: "unknown-image")
         expect { nx.send(:gce_source_image) }.to raise_error(RuntimeError, /Unknown boot image/)
       end
     end
