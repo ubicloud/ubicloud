@@ -173,35 +173,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
 
   def rescue_common_github_api_errors
     yield
-  rescue Octokit::TooManyRequests
-    rate_limit = client.rate_limit
-    installation_ubid = github_runner.installation.ubid
-    Prog::PageNexus.assemble(
-      "GitHub API rate limit exceeded for installation #{installation_ubid}",
-      ["GithubRateLimitExceeded", installation_ubid],
-      installation_ubid,
-      severity: "warning",
-      extra_data: {
-        remaining: rate_limit.remaining,
-        limit: rate_limit.limit,
-        resets_at: rate_limit.resets_at,
-      },
-    )
-    remaining_seconds = rate_limit.resets_at - Time.now
-    if destroying_set?
-      register_deadline(nil, 15 * 60, allow_extension: true)
-      if remaining_seconds >= 15 * 60
-        github_runner.incr_skip_deregistration
-        nap 0
-      end
-    else
-      register_deadline("wait", 10 * 60, allow_extension: true)
-      if remaining_seconds >= 10 * 60
-        github_runner.incr_destroy
-        nap 0
-      end
-    end
-    nap [remaining_seconds, 30].max
   rescue Octokit::Error => e
     installation_ubid = github_runner.installation.ubid
     page_args = case e.message
@@ -219,6 +190,37 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       github_runner.incr_destroy
       nap 0
     end
+
+    if e.message.include?("API rate limit exceeded")
+      rate_limit = client.rate_limit
+      Prog::PageNexus.assemble(
+        "GitHub API rate limit exceeded for installation #{installation_ubid}",
+        ["GithubRateLimitExceeded", installation_ubid],
+        installation_ubid,
+        severity: "warning",
+        extra_data: {
+          remaining: rate_limit.remaining,
+          limit: rate_limit.limit,
+          resets_at: rate_limit.resets_at,
+        },
+      )
+      remaining_seconds = rate_limit.resets_at - Time.now
+      if destroying_set?
+        register_deadline(nil, 15 * 60, allow_extension: true)
+        if remaining_seconds >= 15 * 60
+          github_runner.incr_skip_deregistration
+          nap 0
+        end
+      else
+        register_deadline("wait", 10 * 60, allow_extension: true)
+        if remaining_seconds >= 10 * 60
+          github_runner.incr_destroy
+          nap 0
+        end
+      end
+      nap [remaining_seconds, 30].max
+    end
+
     raise
   end
 
