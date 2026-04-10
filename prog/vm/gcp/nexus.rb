@@ -168,7 +168,11 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     when "RUNNING"
       # proceed
     when "TERMINATED", "SUSPENDED"
-      raise "GCE instance entered terminal state: #{instance.status}"
+      # TERMINATED: VM was shut down (auto-restart didn't help or isn't enabled).
+      # SUSPENDED: VM was suspended by GCE (e.g. preemption, maintenance).
+      # Both are unrecoverable without user intervention — fail immediately
+      # so the deadline page fires with a specific reason.
+      fail "GCE instance entered terminal state: #{instance.status}"
     else
       nap 5
     end
