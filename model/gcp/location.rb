@@ -22,16 +22,17 @@ class Location < Sequel::Model
 
     def set_gcp_azs
       region = name.delete_prefix("gcp-")
-      get_gcp_zones(region).map do |zone|
-        az = zone.name.delete_prefix("#{region}-")
+      prefix = "#{region}-"
+      get_gcp_zones(region, prefix).map do |zone|
+        az = zone.name.delete_prefix(prefix)
         LocationAz.create(location_id: id, az:)
       end
     end
 
-    def get_gcp_zones(region)
+    def get_gcp_zones(region, prefix = "#{region}-")
       credential = location_credential_gcp
       zones = credential.zones_client.list(project: credential.project_id).to_a
-      zones.select { it.name.start_with?("#{region}-") }
+      zones.select { it.name.start_with?(prefix) }
     end
   end
 end
