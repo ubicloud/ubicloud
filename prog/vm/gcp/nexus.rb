@@ -134,7 +134,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
   label def wait_create_op
     unless frame["create_vm_name"]
-      hop_start if frame["exclude_zones"]
+      # No pending LRO. If we got here via retry_zone_capacity (which sets
+      # exclude_zones), hop back to start to attempt the next zone. Otherwise
+      # the instance was created via AlreadyExistsError -- go straight to wait.
+      hop_start if frame.key?("exclude_zones")
       hop_wait_instance_created
     end
 
