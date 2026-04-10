@@ -22,7 +22,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: ubicsi
-          image: ubicloud/ubicsi:v0.9.0
+          image: ubicloud/ubicsi:v0.10.0
           imagePullPolicy: IfNotPresent
           args: ["node"]
           env:
