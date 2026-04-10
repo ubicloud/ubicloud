@@ -347,7 +347,8 @@ class PostgresServer < Sequel::Model
     # session does not use an event loop. Calling exec! on an SSH session with
     # an active event loop is not thread-safe and leads to stuck sessions.
     if session[:export_count] % 12 == 1
-      observe_disk_usage(session)
+      observe_data_disk_usage(session)
+      observe_root_disk_usage(session)
       observe_archival_backlog(session)
       observe_io_throttle(session)
       observe_metrics_backlog(session)
@@ -524,7 +525,7 @@ class PostgresServer < Sequel::Model
     end
   end
 
-  def observe_disk_usage(session)
+  def observe_data_disk_usage(session)
     disk_usage_percent = session[:ssh_session].exec!("df --output=pcent /dat | tail -n 1").strip.delete("%").to_i
     session[:disk_usage_percent] = disk_usage_percent
     if reload.primary?
@@ -537,7 +538,18 @@ class PostgresServer < Sequel::Model
       Page.from_tag_parts("PGDiskUsageHigh", id)&.incr_resolve
     end
   rescue => ex
-    Clog.emit("Failed to observe disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+    Clog.emit("Failed to observe data disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def observe_root_disk_usage(session)
+    root_disk_usage_percent = session[:ssh_session].exec!("df --output=pcent / | tail -n 1").strip.delete("%").to_i
+    if root_disk_usage_percent >= 90
+      Prog::PageNexus.assemble("High root disk usage on PG server (#{root_disk_usage_percent}%)", ["PGRootDiskUsageHigh", id], ubid, severity: primary? ? "error" : "warning", extra_data: {root_disk_usage_percent:})
+    else
+      Page.from_tag_parts("PGRootDiskUsageHigh", id)&.incr_resolve
+    end
+  rescue => ex
+    Clog.emit("Failed to observe root disk usage", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
   end
 
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
