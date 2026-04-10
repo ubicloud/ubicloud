@@ -22,9 +22,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || []
       available = gcp_az_suffixes - excluded
-      strand.stack.first["gcp_zone_suffix"] = available.sample || gcp_az_suffixes.sample
-      strand.modified!(:stack)
-      strand.save_changes
+      update_stack({"gcp_zone_suffix" => available.sample || gcp_az_suffixes.sample})
     end
 
     public_keys = vm.sshable.keys.map(&:public_key).join("\n")
@@ -146,7 +144,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
     if op_error?(op)
       error_code = op_error_code(op)
-      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].include?(error_code)
+      if RETRIABLE_ZONE_ERRORS.include?(error_code)
         clear_gcp_op(name: "create_vm")
         retry_zone_capacity("GCE operation error: #{error_code}")
       end
@@ -173,7 +171,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     end
 
     ni = instance.network_interfaces.first
-    public_ipv4 = ni && ni.access_configs.first&.nat_i_p
+    public_ipv4 = ni&.access_configs&.first&.nat_i_p
     public_ipv6 = ni&.ipv6_access_configs&.first&.external_ipv6
 
     if public_ipv4
@@ -209,9 +207,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def create_billing_record
-    vm.update(display_state: "running", provisioned_at: Time.now)
+    now = Time.now
+    vm.update(display_state: "running", provisioned_at: now)
 
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (Time.now - vm.allocated_at).round(3)}}])
+    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (now - vm.allocated_at).round(3)}}])
 
     project = vm.project
     hop_wait unless project.billable
@@ -330,6 +329,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def gce_machine_type
     @gce_machine_type ||= Option.gcp_machine_type_name(vm.family, vm.vcpus)
   end
+
+  RETRIABLE_ZONE_ERRORS = %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze
 
   GCE_BOOT_IMAGE_FAMILIES = {
     "ubuntu-noble" => {project: "ubuntu-os-cloud", family: "ubuntu-2404-lts-ARCH"},
