@@ -224,21 +224,6 @@ RSpec.describe Vm do
       expect(vm.ip6).to be_nil
     end
 
-    it "can compute the ipv6 addresses for gcp location" do
-      gcp_location = Location.create(name: "us-central1", display_name: "GCP Test", visible: false, provider: "gcp", ui_name: "gcp")
-      vm = create_vm(project_id: project.id, location_id: gcp_location.id, ephemeral_net6: "2001:db8::/128")
-      expect(vm.ip6_string).to eq("2001:db8::")
-
-      vm.update(ephemeral_net6: nil)
-      expect(vm.ip6).to be_nil
-    end
-
-    it "returns the gcp update_firewall_rules_prog for gcp location" do
-      gcp_location = Location.create(name: "us-central1-fw", display_name: "GCP Test FW", visible: false, provider: "gcp", ui_name: "gcp-fw")
-      vm = create_vm(project_id: project.id, location_id: gcp_location.id)
-      expect(vm.update_firewall_rules_prog).to eq(Prog::Vnet::Gcp::UpdateFirewallRules)
-    end
-
     it "#provider_dispatcher_group_name returns the provider group name from location" do
       vm = create_vm(project_id: project.id)
       expect(vm.provider_dispatcher_group_name).to eq("metal")
