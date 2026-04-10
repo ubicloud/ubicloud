@@ -414,6 +414,10 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
   end
 
+  def install_rhizome(install_specs: false)
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.id, target_folder: "postgres", install_specs:}])
+  end
+
   def observe_archival_backlog(session)
     oldest_pending = session[:ssh_session].exec!(
       "sudo -u postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
