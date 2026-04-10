@@ -579,6 +579,14 @@ RSpec.describe PostgresServer do
     end
   end
 
+  describe "#install_rhizome" do
+    it "has a shortcut to install Rhizome" do
+      st = postgres_server.install_rhizome
+      expect(st.prog).to eq("InstallRhizome")
+      expect(st.stack).to eq(["subject_id" => postgres_server.vm.id, "target_folder" => "postgres", "install_specs" => false])
+    end
+  end
+
   describe "#export_metrics" do
     let(:session) { {ssh_session: Net::SSH::Connection::Session.allocate} }
     let(:tsdb_client) { instance_double(VictoriaMetrics::Client) }
