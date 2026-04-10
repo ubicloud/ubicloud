@@ -3,10 +3,13 @@
 require_relative "../../lib/util"
 
 class Prog::Test::HaPostgresResource < Prog::Test::Base
-  def self.assemble
+  def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-HA-Test-Project")
+    Project[Config.postgres_service_project_id] ||
+      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
     frame = {
+      "provider" => provider,
       "postgres_test_project_id" => postgres_test_project.id,
       "failover_wait_started" => false,
     }
@@ -19,12 +22,14 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
   end
 
   label def start
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id: Location::HETZNER_FSN1_ID,
+      location_id:,
       name: "postgres-test-ha",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 128,
+      target_vm_size:,
+      target_storage_size_gib:,
       ha_type: "async",
     )
 
