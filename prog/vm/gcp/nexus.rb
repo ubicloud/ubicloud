@@ -96,6 +96,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           ],
         ),
       ],
+      # ssh-keys metadata: GCE guest-agent fallback that provisions keys
+      # even if the startup script fails. The startup script is the primary
+      # mechanism (creates the custom user, sets permissions, writes keys).
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
