@@ -238,7 +238,7 @@ RSpec.describe Prog::Test::Kubernetes do
       expect { kubernetes_test.test_lsblk }.to hop("destroy_kubernetes")
     end
 
-    it "hops to the next test if lsblk output is ok" do
+    it "hops to test_data_write if lsblk output is ok" do
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("NAME MAJ:MIN RM SIZE RO TYPE MOUNTPOINTS\nloop3 7:3 0 5G 0 loop /etc/data\nvda 252:0 0 40G 0 disk\n|-vda1 252:1 0 39.9G 0 part /etc/resolv.conf\n| /etc/hosts\n|-vda14 252:14 0 4M 0 part", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf exec -t ubuntu-statefulset-0 -- lsblk").and_return(response)
       expect { kubernetes_test.test_lsblk }.to hop("test_data_write")

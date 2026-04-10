@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "vm" do
+RSpec.describe Clover, "load-balancer" do
   let(:user) { create_account }
 
   let(:project) { project_with_default_policy(user) }

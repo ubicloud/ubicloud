@@ -164,7 +164,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect { nx.wait_outbound_setup }.to nap(5)
     end
 
-    it "hops to wait_state_dropped if policy update is done" do
+    it "hops to wait_old_state_drop if policy update is done" do
       nic.strand.update(label: "wait_rekey_old_state_drop_trigger")
       expect(nic.old_state_drop_trigger_set?).to be false
       expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")

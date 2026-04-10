@@ -41,7 +41,7 @@ RSpec.describe Prog::Vnet::Aws::UpdateFirewallRules do
       allow(vm).to receive(:location).and_return(loc)
     end
 
-    it "hops to remove_aws_firewall_rules if there are no fw rules to add" do
+    it "hops to remove_aws_old_rules if there are no fw rules to add" do
       expect(nx).to receive(:vm).and_return(vm).at_least(:once)
       expect(vm).to receive(:firewall_rules).and_return([])
       expect { nx.update_firewall_rules }.to hop("remove_aws_old_rules")

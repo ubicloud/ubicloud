@@ -219,7 +219,7 @@ RSpec.describe LoadBalancer do
       expect(lb.need_certificates?).to be(true)
     end
 
-    it "returns false if there are certs but either expired or close to expiry" do
+    it "returns true if there are certs but either expired or close to expiry" do
       cert = Prog::Vnet::CertNexus.assemble(lb.hostname, dns_zone.id).subject
       lb.add_cert(cert)
 

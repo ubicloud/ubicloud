@@ -228,7 +228,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#prep" do
-    it "hops to run if prep command is succeeded" do
+    it "hops to clean_prep if prep command succeeds" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
       expect { nx.prep }.to hop("clean_prep")
     end
@@ -985,7 +985,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to nap(0)
     end
 
-    it "hops to start when needed" do
+    it "hops to start_after_stop when needed" do
       vm.incr_start
       expect { nx.stopped }.to hop("start_after_stop")
       frame = st.stack[0]
@@ -998,7 +998,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to nap(5 * 60)
     end
 
-    it "hops to unavailable if available" do
+    it "hops to wait if available" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.stopped }.to hop("wait")
     end
@@ -1018,7 +1018,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.restart_set? }.from(true).to(false)
     end
 
-    it "hops to start when needed" do
+    it "hops to start_after_stop when needed" do
       vm.incr_start
       expect { nx.unavailable }.to hop("start_after_stop")
       frame = st.stack[0]
@@ -1181,7 +1181,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { dev.reload.available_storage_gib }.from(500).to(520)
     end
 
-    it "hops to lb_expiry if vm is part of a load balancer" do
+    it "hops to remove_vm_from_load_balancer if vm is part of a load balancer" do
       expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")

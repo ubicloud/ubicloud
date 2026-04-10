@@ -21,7 +21,7 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#setup_vms" do
-    it "hops to wait_children_ready" do
+    it "hops to wait_vms" do
       expect(vg_test).to receive(:update_stack).and_call_original
       expect { vg_test.setup_vms }.to hop("wait_vms")
       vm_images = vg_test.strand.stack.first["vms"].map { Vm[it].boot_image }
@@ -39,7 +39,7 @@ RSpec.describe Prog::Test::VmGroup do
       expect(vm_images).to eq(["ubuntu-noble", "ubuntu-jammy", "debian-12", "almalinux-9"])
     end
 
-    it "hops to wait_children_ready if test_slices" do
+    it "hops to wait_vms if test_slices" do
       expect(vg_test).to receive(:update_stack).and_call_original
       refresh_frame(vg_test, new_values: {
         "test_reboot" => true,
@@ -77,7 +77,7 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#wait_verify_vms" do
-    it "hops to hop_wait_verify_vms" do
+    it "hops to verify_host_capacity" do
       expect { vg_test.wait_verify_vms }.to hop("verify_host_capacity")
     end
 
@@ -138,7 +138,7 @@ RSpec.describe Prog::Test::VmGroup do
       expect { vg_test.verify_vm_host_slices }.to hop("start", "Test::VmHostSlices")
     end
 
-    it "hops to verify_firewall_rules if tests are done" do
+    it "hops to verify_storage_rpc if tests are done" do
       refresh_frame(vg_test, new_values: {"test_slices" => true})
       st.retval = {"msg" => "Verified VM Host Slices!"}
       expect { vg_test.verify_vm_host_slices }.to hop("verify_storage_rpc")
@@ -174,7 +174,7 @@ RSpec.describe Prog::Test::VmGroup do
   end
 
   describe "#verify_firewall_rules" do
-    it "hops to test_reboot if tests are done" do
+    it "hops to verify_connected_subnets if tests are done" do
       st.retval = {"msg" => "Verified Firewall Rules!"}
       expect { vg_test.verify_firewall_rules }.to hop("verify_connected_subnets")
     end

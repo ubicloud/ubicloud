@@ -315,7 +315,7 @@ RSpec.describe PostgresServer do
       expect(postgres_server.storage_size_gib).to eq(64)
     end
 
-    it "returns nil if there is no storage volume" do
+    it "returns zero if there is no storage volume" do
       expect(postgres_server.storage_size_gib).to be_zero
     end
   end

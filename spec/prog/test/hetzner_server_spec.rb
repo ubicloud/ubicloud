@@ -251,7 +251,7 @@ RSpec.describe Prog::Test::HetznerServer do
       expect(strand.reload.exitval).to eq({"msg" => "available_storage_gib was not reclaimed as expected: 500, actual: 860"})
     end
 
-    it "hops to destroy after resource verified" do
+    it "hops to destroy_vm_host after resource verified" do
       refresh_frame(hs_test, new_values: {"available_storage_gib" => 860})
       expect { hs_test.verify_resources_reclaimed }.to hop("destroy_vm_host")
     end
