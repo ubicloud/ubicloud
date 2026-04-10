@@ -1034,13 +1034,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
     end
 
-    it "returns nil on ClientError" do
+    it "logs and returns nil on ClientError" do
       crm_client = instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService)
       allow(location_credential).to receive(:crm_client).and_return(crm_client)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
+      expect(Clog).to receive(:emit).with("Failed to look up old VM tag value", hash_including(:tag_lookup_error))
       expect(nx.send(:lookup_old_vm_tag_value_name)).to be_nil
     end
   end
