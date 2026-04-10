@@ -81,10 +81,6 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "reserves a new static IP and hops to wait_allocate_ip" do
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       op = instance_double(Gapic::GenericLRO::Operation, name: "op-addr-123")
       expect(addresses_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
@@ -100,23 +96,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(st.stack.first["gcp_address_name"]).to eq("ubicloud-#{nic.name}")
     end
 
-    it "uses existing static IP if already reserved" do
-      addr = Google::Cloud::Compute::V1::Address.new(address: "35.192.0.2")
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_return(addr)
-
-      expect(addresses_client).not_to receive(:insert)
-
-      expect { nx.allocate_static_ip }.to hop("wait")
-      expect(nic.nic_gcp_resource.reload.static_ip.to_s).to eq("35.192.0.2")
-    end
-
     it "handles AlreadyExistsError on insert by falling back to get" do
-      expect(addresses_client).to receive(:get)
-        .with(project: "test-gcp-project", region: "us-central1", address: "ubicloud-#{nic.name}")
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
       expect(addresses_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
 
@@ -223,11 +203,11 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect(addresses_client).to receive(:delete)
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+      expect { nx.destroy }.to hop("finalize_destroy")
     end
 
     it "destroys nic even without NicGcpResource" do
-      expect { nx.destroy }.to exit({"msg" => "nic deleted"})
+      expect { nx.destroy }.to hop("finalize_destroy")
     end
 
     it "naps when IP release operation is still running" do
@@ -246,7 +226,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       expect { nx.wait_release_ip }.to nap(5)
     end
 
-    it "completes IP release and destroys NIC even without NicGcpResource" do
+    it "completes IP release and hops to finalize_destroy" do
       st.stack.first["release_ip_name"] = "op-delete-ok"
       st.stack.first["release_ip_scope"] = "region"
       st.stack.first["release_ip_scope_value"] = "us-central1"
@@ -257,26 +237,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
       expect(region_ops_client).to receive(:get).and_return(done_op)
 
-      expect { nx.wait_release_ip }.to exit({"msg" => "nic deleted"})
-      expect(Nic[nic.id]).to be_nil
-    end
-
-    it "completes IP release and destroys resources on success" do
-      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-
-      st.stack.first["release_ip_name"] = "op-delete-ok"
-      st.stack.first["release_ip_scope"] = "region"
-      st.stack.first["release_ip_scope_value"] = "us-central1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
-
-      done_op = Google::Cloud::Compute::V1::Operation.new(status: :DONE)
-      expect(region_ops_client).to receive(:get).and_return(done_op)
-
-      expect { nx.wait_release_ip }.to exit({"msg" => "nic deleted"})
-      expect(NicGcpResource[nic.id]).to be_nil
-      expect(Nic[nic.id]).to be_nil
+      expect { nx.wait_release_ip }.to hop("finalize_destroy")
     end
 
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
@@ -298,6 +259,21 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
 
       expect { nx.wait_release_ip }.to raise_error(RuntimeError, /static IP deletion failed/)
       expect(NicGcpResource[nic.id]).not_to be_nil
+    end
+  end
+
+  describe "#finalize_destroy" do
+    it "destroys NicGcpResource and NIC" do
+      NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
+
+      expect { nx.finalize_destroy }.to exit({"msg" => "nic deleted"})
+      expect(NicGcpResource[nic.id]).to be_nil
+      expect(Nic[nic.id]).to be_nil
+    end
+
+    it "destroys NIC even without NicGcpResource" do
+      expect { nx.finalize_destroy }.to exit({"msg" => "nic deleted"})
+      expect(Nic[nic.id]).to be_nil
     end
   end
 end

@@ -27,14 +27,6 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     address_name = "ubicloud-#{nic.name}"
     fail "GCP address name too long: #{address_name.length} chars" if address_name.length > 63
 
-    begin
-      addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
-      nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
-      hop_wait
-    rescue Google::Cloud::NotFoundError
-      # Address does not exist yet, reserve it
-    end
-
     address_resource = Google::Cloud::Compute::V1::Address.new(
       name: address_name,
       address_type: "EXTERNAL",
@@ -48,8 +40,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
         address_resource:,
       )
     rescue Google::Cloud::AlreadyExistsError
-      addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
-      nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
+      fetch_and_save_static_ip(address_name)
       hop_wait
     end
     save_gcp_op(op.name, "region", gcp_region, name: "allocate_ip")
@@ -69,8 +60,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
         {gcp_lro_recovered: {resource: "static IP #{address_name}", error: op_error_message(op)}})
     end
 
-    addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
-    nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
+    fetch_and_save_static_ip(address_name)
 
     hop_wait
   end
@@ -94,9 +84,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       end
     end
 
-    nic.nic_gcp_resource&.destroy
-    nic.destroy
-    pop "nic deleted"
+    hop_finalize_destroy
   end
 
   label def wait_release_ip
@@ -106,12 +94,21 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     raise "GCP static IP deletion failed: #{op_error_message(op)}" if op_error?(op)
 
     clear_gcp_op(name: "release_ip")
+    hop_finalize_destroy
+  end
+
+  label def finalize_destroy
     nic.nic_gcp_resource&.destroy
     nic.destroy
     pop "nic deleted"
   end
 
   private
+
+  def fetch_and_save_static_ip(address_name)
+    addr = addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
+    nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
+  end
 
   def credential
     @credential ||= nic.private_subnet.location.location_credential_gcp
