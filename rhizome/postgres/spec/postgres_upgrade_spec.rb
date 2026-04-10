@@ -93,13 +93,6 @@ RSpec.describe PostgresUpgrade do
     end
   end
 
-  describe "#stop_new_version" do
-    it "stops new version service" do
-      expect(postgres_upgrade).to receive(:r).with("sudo systemctl stop postgresql@17-main")
-      postgres_upgrade.stop_new_version
-    end
-  end
-
   describe "#run_check" do
     it "runs pg_upgrade with --check option" do
       expect(postgres_upgrade).to receive(:run_pg_upgrade_cmd).with("--check")
@@ -202,7 +195,6 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:promote).with(16).ordered
       expect(postgres_upgrade).to receive(:initialize_new_version).ordered
-      expect(postgres_upgrade).to receive(:stop_new_version).ordered
       expect(postgres_upgrade).to receive(:run_check).ordered
       expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered

@@ -49,10 +49,6 @@ class PostgresUpgrade
     pg_setup.create_cluster
   end
 
-  def stop_new_version
-    r "sudo systemctl stop postgresql@#{@version}-main"
-  end
-
   def run_check
     run_pg_upgrade_cmd("--check")
   end
@@ -112,8 +108,6 @@ class PostgresUpgrade
     promote @prev_version
     @logger.info("Initializing new version")
     initialize_new_version
-    @logger.info("Stop new version")
-    stop_new_version
     @logger.info("Running check")
     run_check
     @logger.info("Running pg upgrade")
