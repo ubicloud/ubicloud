@@ -66,7 +66,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         ipv6_access_type: "EXTERNAL",
       ),
     )
-    save_gcp_op(op.name, "region", gcp_region)
+    save_gcp_op(op.name, "region", gcp_region, name: "create_subnet")
     hop_wait_create_subnet
   rescue Google::Cloud::AlreadyExistsError
     # Retry after partial crash -- subnet already exists, proceed.
@@ -74,7 +74,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def wait_create_subnet
-    poll_and_clear_gcp_op do |op|
+    poll_and_clear_gcp_op(name: "create_subnet") do |op|
       begin
         credential.subnetworks_client.get(project: gcp_project_id, region: gcp_region, subnetwork: subnet_name)
       rescue Google::Cloud::NotFoundError
@@ -152,7 +152,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           region: gcp_region,
           subnetwork: subnet_name,
         )
-        save_gcp_op(op.name, "region", gcp_region)
+        save_gcp_op(op.name, "region", gcp_region, name: "delete_subnet")
         hop_wait_delete_subnet
       rescue Google::Cloud::NotFoundError
         # Already deleted
@@ -176,7 +176,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def wait_delete_subnet
-    op = poll_gcp_op
+    op = poll_gcp_op(name: "delete_subnet")
     nap 5 unless op.status == :DONE
 
     if op_error?(op)
@@ -184,7 +184,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
         {gcp_subnet_delete_error: {error: op_error_message(op)}})
     end
 
-    clear_gcp_op
+    clear_gcp_op(name: "delete_subnet")
     hop_finish_destroy
   end
 

@@ -121,7 +121,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         zone: gcp_zone,
         instance_resource:,
       )
-      save_gcp_op(op.name, "zone", gcp_zone)
+      save_gcp_op(op.name, "zone", gcp_zone, name: "create_vm")
     rescue Google::Cloud::AlreadyExistsError
       # Instance already exists from a prior attempt — proceed to wait
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
@@ -135,24 +135,24 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def wait_create_op
-    unless frame["gcp_op_name"]
+    unless frame["create_vm_name"]
       hop_start if frame["exclude_zones"]
       hop_wait_instance_created
     end
 
-    op = poll_gcp_op
+    op = poll_gcp_op(name: "create_vm")
     unless op.status == :DONE
       nap 5
     end
     if op_error?(op)
       error_code = op_error_code(op)
       if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].include?(error_code)
-        clear_gcp_op
+        clear_gcp_op(name: "create_vm")
         retry_zone_capacity("GCE operation error: #{error_code}")
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
     end
-    clear_gcp_op
+    clear_gcp_op(name: "create_vm")
     hop_wait_instance_created
   end
 
@@ -269,7 +269,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         zone: gcp_zone,
         instance: vm.name,
       )
-      save_gcp_op(op.name, "zone", gcp_zone)
+      save_gcp_op(op.name, "zone", gcp_zone, name: "delete_vm")
       hop_wait_destroy_op
     rescue Google::Cloud::NotFoundError
     end
@@ -278,12 +278,12 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def wait_destroy_op
-    op = poll_gcp_op
+    op = poll_gcp_op(name: "delete_vm")
     unless op.status == :DONE
       nap 5
     end
     raise "GCE instance deletion failed: #{op_error_message(op)}" if op_error?(op)
-    clear_gcp_op
+    clear_gcp_op(name: "delete_vm")
     hop_finalize_destroy
   end
 

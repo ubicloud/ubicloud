@@ -52,14 +52,14 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       nic.nic_gcp_resource.update(address_name:, static_ip: addr.address)
       hop_wait
     end
-    save_gcp_op(op.name, "region", gcp_region)
+    save_gcp_op(op.name, "region", gcp_region, name: "allocate_ip")
     update_stack({"gcp_address_name" => address_name})
     hop_wait_allocate_ip
   end
 
   label def wait_allocate_ip
     address_name = frame["gcp_address_name"]
-    poll_and_clear_gcp_op do |op|
+    poll_and_clear_gcp_op(name: "allocate_ip") do |op|
       begin
         addresses_client.get(project: gcp_project_id, region: gcp_region, address: address_name)
       rescue Google::Cloud::NotFoundError
@@ -86,7 +86,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     if address_name
       begin
         op = addresses_client.delete(project: gcp_project_id, region: gcp_region, address: address_name)
-        save_gcp_op(op.name, "region", gcp_region)
+        save_gcp_op(op.name, "region", gcp_region, name: "release_ip")
         hop_wait_release_ip
       rescue Google::Cloud::NotFoundError
         # Already released
@@ -99,12 +99,12 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   end
 
   label def wait_release_ip
-    op = poll_gcp_op
+    op = poll_gcp_op(name: "release_ip")
     nap 5 unless op.status == :DONE
 
     raise "GCP static IP deletion failed: #{op_error_message(op)}" if op_error?(op)
 
-    clear_gcp_op
+    clear_gcp_op(name: "release_ip")
     nic.nic_gcp_resource&.destroy
     nic.destroy
     pop "nic deleted"

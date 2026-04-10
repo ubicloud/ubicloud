@@ -96,7 +96,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       end
 
       expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-addr-123")
+      expect(st.reload.stack.first["allocate_ip_name"]).to eq("op-addr-123")
       expect(st.stack.first["gcp_address_name"]).to eq("ubicloud-#{nic.name}")
     end
 
@@ -133,9 +133,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
   describe "#wait_allocate_ip" do
     before do
       NicGcpResource.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
-      st.stack.first["gcp_op_name"] = "op-addr-123"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
+      st.stack.first["allocate_ip_name"] = "op-addr-123"
+      st.stack.first["allocate_ip_scope"] = "region"
+      st.stack.first["allocate_ip_scope_value"] = "us-central1"
       st.stack.first["gcp_address_name"] = "ubicloud-#{nic.name}"
       st.modified!(:stack)
       st.save_changes
@@ -214,7 +214,7 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         .and_return(delete_op)
 
       expect { nx.destroy }.to hop("wait_release_ip")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-delete-addr")
+      expect(st.reload.stack.first["release_ip_name"]).to eq("op-delete-addr")
     end
 
     it "handles already-deleted static IP" do
@@ -233,9 +233,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "naps when IP release operation is still running" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
-      st.stack.first["gcp_op_name"] = "op-delete-running"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
+      st.stack.first["release_ip_name"] = "op-delete-running"
+      st.stack.first["release_ip_scope"] = "region"
+      st.stack.first["release_ip_scope_value"] = "us-central1"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -247,9 +247,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     end
 
     it "completes IP release and destroys NIC even without NicGcpResource" do
-      st.stack.first["gcp_op_name"] = "op-delete-ok"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
+      st.stack.first["release_ip_name"] = "op-delete-ok"
+      st.stack.first["release_ip_scope"] = "region"
+      st.stack.first["release_ip_scope_value"] = "us-central1"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -264,9 +264,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "completes IP release and destroys resources on success" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
-      st.stack.first["gcp_op_name"] = "op-delete-ok"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
+      st.stack.first["release_ip_name"] = "op-delete-ok"
+      st.stack.first["release_ip_scope"] = "region"
+      st.stack.first["release_ip_scope_value"] = "us-central1"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -282,9 +282,9 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
     it "raises when delete LRO fails in wait_release_ip, leaving NicGcpResource intact for retry" do
       NicGcpResource.create_with_id(nic.id, address_name: "ubicloud-#{nic.name}", static_ip: "35.192.0.1", vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
 
-      st.stack.first["gcp_op_name"] = "op-delete-fail"
-      st.stack.first["gcp_op_scope"] = "region"
-      st.stack.first["gcp_op_scope_value"] = "us-central1"
+      st.stack.first["release_ip_name"] = "op-delete-fail"
+      st.stack.first["release_ip_scope"] = "region"
+      st.stack.first["release_ip_scope_value"] = "us-central1"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)

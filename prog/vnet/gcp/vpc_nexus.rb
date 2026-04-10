@@ -54,7 +54,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
             ),
           ),
         )
-        save_gcp_op(op.name, "global")
+        save_gcp_op(op.name, "global", name: "create_vpc")
         hop_wait_create_vpc
       rescue Google::Cloud::AlreadyExistsError
         # Another strand created the VPC between our GET and INSERT
@@ -67,14 +67,14 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_create_vpc
-    poll_and_clear_gcp_op do |op|
+    poll_and_clear_gcp_op(name: "create_vpc") do |op|
       credential.networks_client.get(project: gcp_project_id, network: gcp_vpc.name)
       Clog.emit("GCP LRO error but resource exists",
         {gcp_lro_recovered: {resource: "VPC #{gcp_vpc.name}", error: op_error_message(op)}})
     rescue Google::Cloud::NotFoundError
       Clog.emit("GCP VPC creation LRO failed, clearing op and retrying",
         {gcp_vpc_retry: {vpc: gcp_vpc.name, error: op_error_message(op)}})
-      clear_gcp_op
+      clear_gcp_op(name: "create_vpc")
       hop_create_vpc
     end
 
@@ -93,7 +93,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
         ),
       )
-      save_gcp_op(op.name, "global")
+      save_gcp_op(op.name, "global", name: "create_fw_policy")
       hop_wait_firewall_policy_created
     rescue Google::Cloud::AlreadyExistsError
       # Policy already exists -- either a concurrent strand just created
@@ -119,7 +119,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           attachment_target: vpc_target,
         ),
       )
-      save_gcp_op(assoc_op.name, "global")
+      save_gcp_op(assoc_op.name, "global", name: "associate_fw_policy")
       hop_wait_firewall_policy_associated
     rescue Google::Cloud::AlreadyExistsError, Google::Cloud::InvalidArgumentError => e
       if e.is_a?(Google::Cloud::AlreadyExistsError) || e.message.include?("already exists")
@@ -135,7 +135,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_firewall_policy_created
-    poll_and_clear_gcp_op do |op|
+    poll_and_clear_gcp_op(name: "create_fw_policy") do |op|
       credential.network_firewall_policies_client.get(project: gcp_project_id, firewall_policy: firewall_policy_name)
       Clog.emit("GCP LRO error but resource exists",
         {gcp_lro_recovered: {resource: "firewall policy #{firewall_policy_name}", error: op_error_message(op)}})
@@ -148,7 +148,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   end
 
   label def wait_firewall_policy_associated
-    poll_and_clear_gcp_op do |op|
+    poll_and_clear_gcp_op(name: "associate_fw_policy") do |op|
       vpc_target = "projects/#{gcp_project_id}/global/networks/#{gcp_vpc.name}"
       policy = credential.network_firewall_policies_client.get(
         project: gcp_project_id,
@@ -160,7 +160,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       else
         Clog.emit("GCP firewall policy association LRO failed, clearing op and retrying",
           {gcp_assoc_retry: {policy: firewall_policy_name, vpc: gcp_vpc.name, error: op_error_message(op)}})
-        clear_gcp_op
+        clear_gcp_op(name: "associate_fw_policy")
         hop_create_firewall_policy
       end
     end

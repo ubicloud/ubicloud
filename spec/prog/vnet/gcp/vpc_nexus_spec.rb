@@ -116,7 +116,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       end
 
       expect { nx.create_vpc }.to hop("wait_create_vpc")
-      expect(st.stack.first["gcp_op_name"]).to eq("op-vpc-123")
+      expect(st.stack.first["create_vpc_name"]).to eq("op-vpc-123")
     end
 
     it "handles AlreadyExistsError on INSERT and caches network_self_link" do
@@ -133,8 +133,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_create_vpc" do
     before do
-      st.stack.first["gcp_op_name"] = "op-vpc-123"
-      st.stack.first["gcp_op_scope"] = "global"
+      st.stack.first["create_vpc_name"] = "op-vpc-123"
+      st.stack.first["create_vpc_scope"] = "global"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -166,7 +166,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
       expect { nx.wait_create_vpc }.to hop("create_vpc")
-      expect(st.stack.first["gcp_op_name"]).to be_nil
+      expect(st.stack.first["create_vpc_name"]).to be_nil
     end
 
     it "continues if LRO errors but VPC was created" do
@@ -194,7 +194,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       end
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_created")
-      expect(st.stack.first["gcp_op_name"]).to eq("op-policy")
+      expect(st.stack.first["create_fw_policy_name"]).to eq("op-policy")
     end
 
     it "skips creation but ensures association when firewall policy already exists and is associated" do
@@ -225,7 +225,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nfp_client).to receive(:add_association).and_return(assoc_op)
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_associated")
-      expect(st.stack.first["gcp_op_name"]).to eq("op-assoc")
+      expect(st.stack.first["associate_fw_policy_name"]).to eq("op-assoc")
     end
 
     it "proceeds when association raises AlreadyExistsError from concurrent strand" do
@@ -306,8 +306,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_created" do
     before do
-      st.stack.first["gcp_op_name"] = "op-policy-123"
-      st.stack.first["gcp_op_scope"] = "global"
+      st.stack.first["create_fw_policy_name"] = "op-policy-123"
+      st.stack.first["create_fw_policy_scope"] = "global"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -354,8 +354,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#wait_firewall_policy_associated" do
     before do
-      st.stack.first["gcp_op_name"] = "op-assoc"
-      st.stack.first["gcp_op_scope"] = "global"
+      st.stack.first["associate_fw_policy_name"] = "op-assoc"
+      st.stack.first["associate_fw_policy_scope"] = "global"
       st.modified!(:stack)
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
@@ -405,7 +405,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name, associations: []),
       )
       expect { nx.wait_firewall_policy_associated }.to hop("create_firewall_policy")
-      expect(st.reload.stack.first["gcp_op_name"]).to be_nil
+      expect(st.reload.stack.first["associate_fw_policy_name"]).to be_nil
     end
 
     # rubocop:disable RSpec/VerifiedDoubles

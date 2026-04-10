@@ -152,7 +152,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       end
 
       expect { nx.start }.to hop("wait_create_op")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-12345")
+      expect(st.reload.stack.first["create_vm_name"]).to eq("op-12345")
     end
 
     it "selects a zone suffix and persists it in VM strand frame" do
@@ -424,9 +424,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "naps when operation is still running" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.modified!(:stack)
       st.save_changes
 
@@ -437,9 +437,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "hops to wait_instance_created when operation completes successfully" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.modified!(:stack)
       st.save_changes
 
@@ -450,9 +450,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "raises if the GCE operation fails" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.modified!(:stack)
       st.save_changes
 
@@ -467,9 +467,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.stack.first["gcp_zone_suffix"] = "a"
       st.modified!(:stack)
       st.save_changes
@@ -489,9 +489,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.stack.first["gcp_zone_suffix"] = "a"
       st.modified!(:stack)
       st.save_changes
@@ -511,9 +511,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "retries in a different zone on QUOTA_EXCEEDED operation error" do
-      st.stack.first["gcp_op_name"] = "op-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["create_vm_name"] = "op-123"
+      st.stack.first["create_vm_scope"] = "zone"
+      st.stack.first["create_vm_scope_value"] = "us-central1-a"
       st.stack.first["gcp_zone_suffix"] = "a"
       st.modified!(:stack)
       st.save_changes
@@ -785,7 +785,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       ).and_return(op)
 
       expect { nx.destroy }.to hop("wait_destroy_op")
-      expect(st.reload.stack.first["gcp_op_name"]).to eq("op-del-123")
+      expect(st.reload.stack.first["delete_vm_name"]).to eq("op-del-123")
     end
 
     it "handles already-deleted instances by hopping to finalize_destroy" do
@@ -1050,9 +1050,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#wait_destroy_op" do
     before do
-      st.stack.first["gcp_op_name"] = "op-del-123"
-      st.stack.first["gcp_op_scope"] = "zone"
-      st.stack.first["gcp_op_scope_value"] = "us-central1-a"
+      st.stack.first["delete_vm_name"] = "op-del-123"
+      st.stack.first["delete_vm_scope"] = "zone"
+      st.stack.first["delete_vm_scope_value"] = "us-central1-a"
       st.modified!(:stack)
       st.save_changes
     end
