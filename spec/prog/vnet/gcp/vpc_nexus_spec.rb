@@ -709,6 +709,40 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
+    it "handles nil tag_keys from CRM response" do
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
+      allow(crm_client).to receive(:list_tag_keys).and_return(
+        Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new,
+      )
+
+      allow(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
+    it "handles nil tag_values from CRM response" do
+      nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
+
+      fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
+        name: "tagKeys/999", short_name: "ubicloud-fw-fwnilvals", purpose: "GCE_FIREWALL",
+        purpose_data: {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555"},
+      )
+      allow(crm_client).to receive_messages(
+        list_tag_keys: Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: [fw_tag_key]),
+        list_tag_values: Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse.new,
+      )
+      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/999")
+
+      allow(nfp_client).to receive(:get)
+        .and_raise(Google::Cloud::NotFoundError.new("not found"))
+      expect(networks_client).to receive(:delete)
+
+      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+    end
+
     it "skips tag cleanup when network_self_link is nil" do
       gcp_vpc.update(network_self_link: nil)
 

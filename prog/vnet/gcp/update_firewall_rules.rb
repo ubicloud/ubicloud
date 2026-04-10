@@ -5,7 +5,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   # Per-VM INGRESS rules start at priority 10000 in the VPC's network firewall policy.
   # These rules target per-firewall secure tags (ubicloud-fw-{firewall.ubid}/active),
-  # so rules for different firewalls can share the same priority number — GCP only
+  # so rules for different firewalls can share the same priority number -- GCP only
   # evaluates a rule for VMs bound to its target tag. Priorities are not stored in the
   # DB; they're allocated on-the-fly by reading the current policy and finding free slots.
   # See doc/gcp_firewall_architecture.md for the full priority band layout.
@@ -52,8 +52,8 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     end
 
     # Bind the subnet's "member" tag so this VM gets the subnet's EGRESS allow rules
-    # (priorities 1000–8998, created by SubnetNexus#create_subnet_allow_rules).
-    # Without this binding, the VPC-wide DENY rules (65531–65534) would block all
+    # (priorities 1000-8998, created by SubnetNexus#create_subnet_allow_rules).
+    # Without this binding, the VPC-wide DENY rules (65531-65534) would block all
     # private egress from this VM.
     subnet_tv = lookup_subnet_tag_value
     desired_tag_values << subnet_tv if subnet_tv
@@ -308,7 +308,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       failed_creates << tv
     end
 
-    # Unbind stale tags (fire-and-forget — the delete completes asynchronously)
+    # Unbind stale tags (fire-and-forget -- the delete completes asynchronously)
     stale_bindings.each do |binding|
       regional_crm_client.delete_tag_binding(binding.name)
     rescue Google::Apis::ClientError => e
@@ -325,7 +325,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       tag_value: tag_value_name,
     )
 
-    # Fire-and-forget — the binding completes asynchronously.
+    # Fire-and-forget -- the binding completes asynchronously.
     regional_crm_client.create_tag_binding(tag_binding_obj)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409 || e.status_code == 400
@@ -357,11 +357,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     vpc_network_link = gcp_network_self_link_with_id
 
     resp = credential.crm_client.list_tag_keys(parent: tag_key_parent)
-    fw_tag_keys = (resp.tag_keys || []).select { |tk|
+    fw_tag_keys = resp.tag_keys&.select { |tk|
       tk.short_name.start_with?("ubicloud-fw-") &&
         tk.purpose == "GCE_FIREWALL" &&
         tk.purpose_data&.dig("network") == vpc_network_link
-    }
+    } || []
 
     orphaned_tag_keys = fw_tag_keys.reject { |tk|
       fw_ubid = tk.short_name.delete_prefix("ubicloud-fw-")

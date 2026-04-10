@@ -17,7 +17,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap 5 unless nic.private_subnet.strand.label == "wait"
     nap 1 unless nic.strand.label == "wait"
 
-    # Zone selection is a VM concern — pick a zone on first entry,
+    # Zone selection is a VM concern -- pick a zone on first entry,
     # then honour the value already set by retry_zone_capacity.
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || []
@@ -123,7 +123,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
       save_gcp_op(op.name, "zone", gcp_zone, name: "create_vm")
     rescue Google::Cloud::AlreadyExistsError
-      # Instance already exists from a prior attempt — proceed to wait
+      # Instance already exists from a prior attempt -- proceed to wait
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::InvalidArgumentError => e
@@ -272,6 +272,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       save_gcp_op(op.name, "zone", gcp_zone, name: "delete_vm")
       hop_wait_destroy_op
     rescue Google::Cloud::NotFoundError
+      nil
     end
 
     hop_finalize_destroy
@@ -339,7 +340,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     return vm.boot_image if vm.boot_image.start_with?("projects/")
 
     entry = GCE_BOOT_IMAGE_FAMILIES[vm.boot_image]
-    raise "Unknown boot image '#{vm.boot_image}' — expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
+    raise "Unknown boot image '#{vm.boot_image}' -- expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
 
     gce_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
     family = entry[:family].sub("ARCH", gce_arch)
@@ -401,7 +402,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm_tag_value_name = lookup_old_vm_tag_value_name
     return unless vm_tag_value_name
 
-    (policy.rules || []).each do |rule|
+    policy.rules.each do |rule|
       next unless rule.direction == "INGRESS" && rule.action == "allow"
       next unless rule.target_secure_tags.any? { |t| t.name == vm_tag_value_name }
       credential.network_firewall_policies_client.remove_rule(
@@ -410,7 +411,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         priority: rule.priority,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      # Already deleted or rule rejected as invalid — skip and continue
+      # Already deleted or rule rejected as invalid -- skip and continue
+      nil
     end
 
     # Delete the old per-VM tag value

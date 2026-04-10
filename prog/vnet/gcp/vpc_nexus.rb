@@ -290,6 +290,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         )
       rescue ::Google::Cloud::AlreadyExistsError
         # Concurrent strand added this rule -- proceed.
+        nil
       end
     end
   end
@@ -317,12 +318,12 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     return unless network_self_link
 
     resp = credential.crm_client.list_tag_keys(parent: "projects/#{gcp_project_id}")
-    (resp.tag_keys || []).each do |tk|
+    resp.tag_keys&.each do |tk|
       next unless tk.short_name.start_with?("ubicloud-fw-") && tk.purpose == "GCE_FIREWALL"
       next unless tk.purpose_data&.dig("network") == network_self_link
 
       values_resp = credential.crm_client.list_tag_values(parent: tk.name)
-      (values_resp.tag_values || []).each { |tv| credential.crm_client.delete_tag_value(tv.name) }
+      values_resp.tag_values&.each { |tv| credential.crm_client.delete_tag_value(tv.name) }
 
       credential.crm_client.delete_tag_key(tk.name)
     rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
@@ -354,6 +355,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       )
     rescue Google::Cloud::NotFoundError
       # Already deleted
+      nil
     end
   rescue Google::Cloud::Error => e
     Clog.emit("Failed to delete firewall policy during VPC cleanup",
@@ -367,6 +369,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     )
   rescue Google::Cloud::NotFoundError
     # Already deleted
+    nil
   rescue Google::Cloud::InvalidArgumentError => e
     raise if e.message.include?("being used by")
     Clog.emit("Failed to delete VPC network during cleanup",
