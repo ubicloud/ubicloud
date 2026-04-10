@@ -22,15 +22,7 @@ class Prog::Test::PostgresResource < Prog::Test::Base
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
-      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
-      family = "m8gd"
-      vcpus = 2
-      [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
-    else
-      [Location::HETZNER_FSN1_ID, "standard-2", 128]
-    end
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
 
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
