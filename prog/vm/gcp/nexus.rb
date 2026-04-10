@@ -96,9 +96,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           ],
         ),
       ],
-      # ssh-keys metadata: GCE guest-agent fallback that provisions keys
-      # even if the startup script fails. The startup script is the primary
-      # mechanism (creates the custom user, sets permissions, writes keys).
+      # Both ssh-keys metadata and the startup script provision SSH keys.
+      # Metadata lets the GCE guest agent manage keys on supported images;
+      # the startup script ensures our custom user/sudo/permissions setup.
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
           Google::Cloud::Compute::V1::Items.new(
@@ -168,10 +168,9 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     when "RUNNING"
       # proceed
     when "TERMINATED", "SUSPENDED"
-      # TERMINATED: VM was shut down (auto-restart didn't help or isn't enabled).
-      # SUSPENDED: VM was suspended by GCE (e.g. preemption, maintenance).
-      # Both are unrecoverable without user intervention — fail immediately
-      # so the deadline page fires with a specific reason.
+      # Neither state is expected during provisioning. Treat as provisioning
+      # failure — fail immediately so the deadline page fires with a specific
+      # reason rather than napping until timeout.
       fail "GCE instance entered terminal state: #{instance.status}"
     else
       nap 5
