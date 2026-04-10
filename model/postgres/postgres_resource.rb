@@ -117,6 +117,7 @@ class PostgresResource < Sequel::Model
       sslmode: dns_zone ? "verify-full" : "require",
       dbname: "postgres",
       application_name:,
+      tcp_user_timeout: 30000,
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
