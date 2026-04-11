@@ -37,6 +37,11 @@ unless (kek = params["kek"])
   exit 1
 end
 
+unless (stats_file = ARGV.shift)
+  puts "expected stats_file as argument"
+  exit 1
+end
+
 storage_path = StoragePath.new(vm_name, device, disk_index)
 StorageArchive.new(
   storage_path.vhost_backend_config,
@@ -44,4 +49,5 @@ StorageArchive.new(
   kek,
   target_conf,
   vhost_block_backend_version,
+  stats_file,
 ).archive
