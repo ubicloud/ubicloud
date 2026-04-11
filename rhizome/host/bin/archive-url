@@ -19,6 +19,11 @@ unless (vhost_block_backend_version = ARGV.shift)
   exit 1
 end
 
+unless (stats_file = ARGV.shift)
+  puts "expected stats_file as argument"
+  exit 1
+end
+
 params = JSON.parse($stdin.read)
 
 unless (target_conf = params["target_conf"])
@@ -26,4 +31,4 @@ unless (target_conf = params["target_conf"])
   exit 1
 end
 
-StorageArchive.archive_url(url, sha256sum, target_conf, vhost_block_backend_version)
+StorageArchive.archive_url(url, sha256sum, target_conf, vhost_block_backend_version, stats_file)

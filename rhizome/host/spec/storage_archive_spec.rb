@@ -25,13 +25,13 @@ RSpec.describe StorageArchive do
       invalid_target_conf.delete("bucket")
 
       expect {
-        described_class.new(disk_config_path, disk_kek_path, disk_kek, invalid_target_conf, "v0.4.0")
+        described_class.new(disk_config_path, disk_kek_path, disk_kek, invalid_target_conf, "v0.4.0", "/path/to/stats.json")
       }.to raise_error(ArgumentError, "Missing required keys in target_conf: bucket")
     end
 
     it "fails when vhost block backend does not support archive" do
       expect {
-        described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.3.0")
+        described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.3.0", "/path/to/stats.json")
       }.to raise_error(RuntimeError, "vhost block backend version v0.3.0 does not support archive")
     end
 
@@ -39,25 +39,25 @@ RSpec.describe StorageArchive do
       invalid_disk_kek = {"algorithm" => "rsa", "key" => "Zm9v"}
 
       expect {
-        described_class.new(disk_config_path, disk_kek_path, invalid_disk_kek, target_conf, "v0.4.0")
+        described_class.new(disk_config_path, disk_kek_path, invalid_disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
       }.to raise_error(RuntimeError, "unsupported key encryption algorithm rsa for disk_kek")
     end
 
     it "does not require disk KEK" do
       expect {
-        described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0")
+        described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0", "/path/to/stats.json")
       }.not_to raise_error
     end
 
     it "fails when disk KEK is provided without path" do
       expect {
-        described_class.new(disk_config_path, nil, disk_kek, target_conf, "v0.4.0")
+        described_class.new(disk_config_path, nil, disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
       }.to raise_error(RuntimeError, "disk KEK provided without path")
     end
 
     it "fails when disk KEK path is provided without KEK" do
       expect {
-        described_class.new(disk_config_path, disk_kek_path, nil, target_conf, "v0.4.0")
+        described_class.new(disk_config_path, disk_kek_path, nil, target_conf, "v0.4.0", "/path/to/stats.json")
       }.to raise_error(RuntimeError, "disk KEK path provided without KEK")
     end
 
@@ -65,14 +65,14 @@ RSpec.describe StorageArchive do
       invalid_target_conf = target_conf.merge("archive_kek" => {"algorithm" => "rsa", "key" => "Zm9v"})
 
       expect {
-        described_class.new(disk_config_path, disk_kek_path, disk_kek, invalid_target_conf, "v0.4.0")
+        described_class.new(disk_config_path, disk_kek_path, disk_kek, invalid_target_conf, "v0.4.0", "/path/to/stats.json")
       }.to raise_error(RuntimeError, "unsupported key encryption algorithm rsa for target_conf archive_kek")
     end
   end
 
   describe "#build_target_config" do
     it "includes session token configuration when provided" do
-      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf.merge("session_token" => "ghi"), "v0.4.0")
+      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf.merge("session_token" => "ghi"), "v0.4.0", "/path/to/stats.json")
       config = archive.build_target_config.lines.map(&:strip)
 
       expect(config).to include("session_token.ref = \"s3-session-token\"")
@@ -81,7 +81,7 @@ RSpec.describe StorageArchive do
     end
 
     it "builds the target config" do
-      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.4.0")
+      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
       config = archive.build_target_config
       expected_config = <<~CONFIG
 [target]
@@ -114,7 +114,7 @@ allow_inline_plaintext_secrets = true
 
   describe "#archive" do
     it "uses KEK pipe flow when disk KEK path is set" do
-      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.4.0")
+      archive = described_class.new(disk_config_path, disk_kek_path, disk_kek, target_conf, "v0.4.0", "/path/to/stats.json")
       built_config = "[target]\n"
       allow(archive).to receive(:build_target_config).and_return(built_config)
 
@@ -125,6 +125,7 @@ allow_inline_plaintext_secrets = true
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
           "--zstd-level", "3",
+          "--stats", "/path/to/stats.json",
         ],
         kek_pipe: disk_kek_path,
         kek_content: "Zm9v",
@@ -136,7 +137,7 @@ allow_inline_plaintext_secrets = true
     end
 
     it "runs archive command directly when disk KEK path is not set" do
-      archive = described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0")
+      archive = described_class.new(disk_config_path, nil, nil, target_conf, "v0.4.0", "/path/to/stats.json")
       built_config = "[target]\n"
       allow(archive).to receive(:build_target_config).and_return(built_config)
 
@@ -147,6 +148,7 @@ allow_inline_plaintext_secrets = true
         "--target-config", "/dev/stdin",
         "--compression", "zstd",
         "--zstd-level", "3",
+        "--stats", "/path/to/stats.json",
         stdin: built_config,
       )
 
@@ -171,10 +173,11 @@ allow_inline_plaintext_secrets = true
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
           "--zstd-level", "3",
+          "--stats", "/path/to/stats.json",
           stdin: instance_of(String),
         )
 
-        described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0")
+        described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0", "/path/to/stats.json")
 
         expect(File.size("#{tmpdir}/disk.raw")).to eq(6 * 1024 * 1024)
         expect(File.read("#{tmpdir}/vhost-backend.conf")).to eq(<<~CONFIG)

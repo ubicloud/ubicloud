@@ -12,7 +12,7 @@ class StorageArchive
   include Toml
   extend Toml
 
-  def initialize(disk_config_path, disk_kek_path, disk_kek, target_conf, vhost_block_backend_version)
+  def initialize(disk_config_path, disk_kek_path, disk_kek, target_conf, vhost_block_backend_version, stats_file)
     validate_keys(
       "target_conf",
       %w[bucket prefix region endpoint access_key_id secret_access_key archive_kek],
@@ -31,9 +31,10 @@ class StorageArchive
     @disk_kek_path = disk_kek_path
     @disk_kek = disk_kek
     @target_conf = target_conf
+    @stats_file = stats_file
   end
 
-  def self.archive_url(url, sha256sum, target_conf, vhost_block_backend_version)
+  def self.archive_url(url, sha256sum, target_conf, vhost_block_backend_version, stats_file)
     Dir.mktmpdir do |dir|
       # download the image and convert it to raw format.
       boot_image = BootImage.new("image", nil, image_root: dir)
@@ -56,7 +57,7 @@ class StorageArchive
       r({"RUST_LOG" => "info"}, vp.init_metadata_path, "--config", config_path)
 
       # archive
-      StorageArchive.new(config_path, nil, nil, target_conf, vhost_block_backend_version).archive
+      StorageArchive.new(config_path, nil, nil, target_conf, vhost_block_backend_version, stats_file).archive
     end
   end
 
@@ -67,6 +68,7 @@ class StorageArchive
       "--target-config", "/dev/stdin",
       "--compression", "zstd",
       "--zstd-level", "3",
+      "--stats", @stats_file,
     ]
     env = {"RUST_LOG" => "info"}
     target_config = build_target_config
