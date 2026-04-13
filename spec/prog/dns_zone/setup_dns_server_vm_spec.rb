@@ -53,6 +53,19 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       }.to raise_error RuntimeError, "No existing Project"
     end
 
+    it "excludes host ids of existing dns server vms" do
+      existing_vm = create_vm_with_sshable
+      vm_host = create_vm_host
+      existing_vm.update(vm_host_id: vm_host.id)
+      ds.add_vm(existing_vm)
+
+      expect(described_class).to receive(:vms_in_sync?).and_return(true)
+
+      st = described_class.assemble(ds.id)
+      vm_strand = Strand[st.stack.first["subject_id"]]
+      expect(vm_strand.stack.first["exclude_host_ids"]).to eq [existing_vm.vm_host_id]
+    end
+
     it "errors out if the DNS Server VMs are not in sync" do
       expect(described_class).to receive(:vms_in_sync?).and_return(false)
       expect {
