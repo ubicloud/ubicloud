@@ -132,7 +132,7 @@ module Scheduling::Allocator
     def self.candidate_hosts(request)
       ds = DB[:vm_host]
         .join(:storage_devices, vm_host_id: Sequel[:vm_host][:id])
-        .join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
+        .left_join(:available_ipv4, routed_to_host_id: Sequel[:vm_host][:id])
         .left_join(:gpus, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:gpu_partitions, vm_host_id: Sequel[:vm_host][:id])
         .left_join(:vm_provisioning, vm_host_id: Sequel[:vm_host][:id])
@@ -148,7 +148,7 @@ module Scheduling::Allocator
           :available_storage_gib,
           :total_storage_gib,
           :storage_devices,
-          :ipv4_available,
+          Sequel.function(:coalesce, :ipv4_available, false).as(:ipv4_available),
           Sequel.function(:coalesce, :num_gpus, 0).as(:num_gpus),
           Sequel.function(:coalesce, :available_gpus, 0).as(:available_gpus),
           Sequel.function(:coalesce, :use_gpu_partition, false).as(:use_gpu_partition),
