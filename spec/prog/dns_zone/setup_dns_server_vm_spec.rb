@@ -66,6 +66,18 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       expect(vm_strand.stack.first["exclude_host_ids"]).to eq [existing_vm.vm_host_id]
     end
 
+    it "propagates parameters to the created vm" do
+      described_class.assemble(ds.id, name: "custom-dns", vm_size: "standard-4", storage_size_gib: 37, boot_image: "almalinux-9", location_id: Location::LEASEWEB_WDC02_ID)
+
+      vm = Vm.first
+      expect(vm.name).to eq "custom-dns"
+      expect(vm.family).to eq "standard"
+      expect(vm.vcpus).to eq 4
+      expect(vm.boot_image).to eq "almalinux-9"
+      expect(vm.location_id).to eq Location::LEASEWEB_WDC02_ID
+      expect(vm.strand.stack.first["storage_volumes"].first["size_gib"]).to eq 37
+    end
+
     it "errors out if the DNS Server VMs are not in sync" do
       expect(described_class).to receive(:vms_in_sync?).and_return(false)
       expect {
