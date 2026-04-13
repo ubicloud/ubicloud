@@ -822,6 +822,19 @@ RSpec.describe CloverAdmin do
     ENV.delete("DONT_RAISE_ADMIN_ERRORS")
   end
 
+  it "links to archived-record-by-id on 404 when path contains ubid" do
+    ENV["DONT_RAISE_ADMIN_ERRORS"] = "1"
+    vm = create_vm(name: "life-after-death")
+    visit "/model/Vm/#{vm.ubid}"
+    expect(page).to have_content("life-after-death")
+    vm.destroy
+    visit "/model/Vm/#{vm.ubid}"
+    click_link "searching archived records"
+    expect(page).to have_content("life-after-death")
+  ensure
+    ENV.delete("DONT_RAISE_ADMIN_ERRORS")
+  end
+
   it "raises errors by default in tests" do
     expect { visit "/error" }.to raise_error(RuntimeError)
   end

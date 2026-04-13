@@ -107,7 +107,11 @@ class CloverAdmin < Roda
     raise "admin route not handled: #{request.path}" if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
 
     @page_title = "File Not Found"
-    view(content: "")
+    if (ubid = request.path.split("/").find { UBID_REGEXP.match?(it) })
+      view(content: "<p>Try <a href=\"/archived-record-by-id?id=#{h ubid}\">searching archived records</a></p>")
+    else
+      view(content: "")
+    end
   end
 
   plugin :route_csrf do |token|
