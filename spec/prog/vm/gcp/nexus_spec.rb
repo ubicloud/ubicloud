@@ -608,13 +608,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ["GceProvisionTerminal", vm.ubid, "TERMINATED"],
         vm.ubid,
       )
-      st.stack.first["deadline_at"] = "2020-01-01T00:00:00Z"
-      st.stack.first["deadline_target"] = "wait"
-      st.modified!(:stack)
+      expect(nx).to receive(:unregister_deadline).with("wait")
       expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
-      frame = st.reload.stack.first
-      expect(frame).not_to have_key("deadline_at")
-      expect(frame).not_to have_key("deadline_target")
     end
 
     it "pages and naps if the instance enters SUSPENDED state" do
@@ -629,6 +624,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         ["GceProvisionTerminal", vm.ubid, "SUSPENDED"],
         vm.ubid,
       )
+      expect(nx).to receive(:unregister_deadline).with("wait")
       expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
     end
   end
