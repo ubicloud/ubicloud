@@ -761,14 +761,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.destroy }.to hop("wait_destroy_op")
     end
 
-    it "handles firewall cleanup errors gracefully" do
+    it "propagates firewall cleanup errors" do
       expect(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::Error.new("permission denied"))
-      allow(Clog).to receive(:emit).and_call_original
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
-      expect(compute_client).to receive(:delete).and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect { nx.destroy }.to hop("finalize_destroy")
+      expect { nx.destroy }.to raise_error(Google::Cloud::Error, /permission denied/)
     end
   end
 
@@ -902,15 +899,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       nx.send(:cleanup_vm_policy_rules)
     end
 
-    it "handles cleanup errors gracefully" do
+    it "propagates errors from firewall policy get" do
       expect(nfp_client).to receive(:get)
         .and_raise(Google::Cloud::Error.new("permission denied"))
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
-      nx.send(:cleanup_vm_policy_rules)
+      expect { nx.send(:cleanup_vm_policy_rules) }.to raise_error(Google::Cloud::Error, /permission denied/)
     end
 
-    it "handles ClientError during tag value deletion gracefully" do
+    it "propagates ClientError from tag value deletion" do
       vm_tag_value_name = "tagValues/vm-456"
       allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
@@ -921,9 +917,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       allow(nx.send(:credential)).to receive(:crm_client).and_return(crm_client)
       allow(crm_client).to receive(:delete_tag_value)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
-      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", anything).and_call_original
 
-      nx.send(:cleanup_vm_policy_rules)
+      expect { nx.send(:cleanup_vm_policy_rules) }.to raise_error(Google::Apis::ClientError, /not found/)
     end
   end
 

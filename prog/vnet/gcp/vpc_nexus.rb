@@ -244,13 +244,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       values_resp.tag_values&.each { |tv| credential.crm_client.delete_tag_value(tv.name) }
 
       credential.crm_client.delete_tag_key(tk.name)
-    rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-      Clog.emit("Failed to delete firewall tag key during VPC cleanup",
-        {vpc_cleanup_tag_error: Util.exception_to_hash(e, into: {tag_key: tk.name})})
     end
-  rescue Google::Cloud::Error, Google::Apis::ClientError, RuntimeError => e
-    Clog.emit("Failed to list tag keys during VPC cleanup",
-      {vpc_cleanup_list_tags_error: Util.exception_to_hash(e)})
   end
 
   def delete_firewall_policy
@@ -273,9 +267,6 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
     rescue Google::Cloud::NotFoundError
       # Association already removed
       nil
-    rescue Google::Cloud::Error => e
-      Clog.emit("Failed to remove firewall policy association during VPC cleanup",
-        {vpc_cleanup_assoc_error: Util.exception_to_hash(e, into: {policy: firewall_policy_name, association: assoc.name})})
     end
 
     credential.network_firewall_policies_client.delete(
@@ -285,9 +276,6 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   rescue Google::Cloud::NotFoundError
     # Policy deleted between get and delete
     nil
-  rescue Google::Cloud::Error => e
-    Clog.emit("Failed to delete firewall policy during VPC cleanup",
-      {vpc_cleanup_policy_error: Util.exception_to_hash(e, into: {policy: firewall_policy_name})})
   end
 
   def delete_vpc_network
@@ -298,10 +286,6 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   rescue Google::Cloud::NotFoundError
     # Already deleted
     nil
-  rescue Google::Cloud::InvalidArgumentError => e
-    raise if e.message.include?("being used by")
-    Clog.emit("Failed to delete VPC network during cleanup",
-      {vpc_cleanup_network_error: Util.exception_to_hash(e, into: {vpc: gcp_vpc.name})})
   end
 
   def cache_network_self_link(network)

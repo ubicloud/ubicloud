@@ -597,25 +597,16 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
-    it "handles errors during VPC cleanup gracefully" do
+    it "propagates errors from list_tag_keys during destroy" do
       nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
-      # list_tag_keys raises
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Apis::ClientError.new("permission denied", status_code: 403))
 
-      # delete_firewall_policy — not found
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-
-      # delete_vpc_network — not ready
-      expect(networks_client).to receive(:delete)
-        .and_raise(Google::Cloud::InvalidArgumentError.new("not ready"))
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.destroy }.to raise_error(Google::Apis::ClientError, /permission denied/)
     end
 
-    it "handles per-tag-key errors independently during cleanup" do
+    it "propagates errors from delete_tag_key during destroy" do
       nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
@@ -629,27 +620,19 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       allow(crm_client).to receive(:delete_tag_key)
         .and_raise(Google::Cloud::PermissionDeniedError.new("denied"))
 
-      # delete_firewall_policy — general Cloud error
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::InternalError.new("internal"))
-
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.destroy }.to raise_error(Google::Cloud::PermissionDeniedError)
     end
 
-    it "handles per-association errors independently during firewall policy cleanup" do
+    it "propagates errors from remove_association during destroy" do
       nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       allow(crm_client).to receive(:list_tag_keys).and_return(
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
 
-      # Policy has two associations; first removal fails, second should still proceed
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(
         associations: [
           Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-fail"),
-          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(name: "assoc-ok"),
         ],
       )
       expect(nfp_client).to receive(:get).with(
@@ -660,17 +643,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-fail",
       ).and_raise(Google::Cloud::InternalError.new("internal"))
 
-      expect(nfp_client).to receive(:remove_association).with(
-        project: "test-gcp-project", firewall_policy: vpc_name, name: "assoc-ok",
-      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-remove-ok"))
-
-      expect(nfp_client).to receive(:delete).with(
-        project: "test-gcp-project", firewall_policy: vpc_name,
-      ).and_return(instance_double(Gapic::GenericLRO::Operation, name: "op-delete-policy"))
-
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.destroy }.to raise_error(Google::Cloud::InternalError)
     end
 
     it "handles NotFoundError on individual association removal during firewall policy cleanup" do
@@ -702,7 +675,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
     end
 
-    it "handles RuntimeError from CRM LRO during firewall tag cleanup" do
+    it "propagates RuntimeError from CRM LRO during firewall tag cleanup" do
       nx.gcp_vpc.update(network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/55555")
 
       fw_tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
@@ -717,11 +690,7 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       allow(crm_client).to receive(:delete_tag_value)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag value still attached to resources"))
 
-      allow(nfp_client).to receive(:get)
-        .and_raise(Google::Cloud::NotFoundError.new("not found"))
-      expect(networks_client).to receive(:delete)
-
-      expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
+      expect { nx.destroy }.to raise_error(RuntimeError, /Cannot delete tag value/)
     end
 
     it "handles policy deleted between get and delete" do

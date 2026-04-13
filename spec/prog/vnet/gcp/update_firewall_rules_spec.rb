@@ -1364,86 +1364,52 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       nx.send(:cleanup_orphaned_firewall_rules)
     end
 
-    it "continues to next orphan when one fails" do
+    it "propagates errors from per-orphan cleanup" do
       orphan_tk1 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
-      orphan_tk2 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-orphan2", name: "tagKeys/orphan-456", purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
-        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1, orphan_tk2]))
+        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
       allow(nx).to receive(:find_firewall).and_return(nil)
 
-      # First orphan: tag value lookup fails
       allow(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
 
-      # Second orphan: succeeds
-      allow(crm_client).to receive(:list_tag_values)
-        .with(parent: "tagKeys/orphan-456")
-        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
-      allow(crm_client).to receive(:delete_tag_key).with("tagKeys/orphan-456").and_return(crm_done_op)
-
-      expect(Clog).to receive(:emit).with("Failed to clean up orphaned firewall tag resources", anything)
-      expect(crm_client).to receive(:delete_tag_key).with("tagKeys/orphan-456")
-
-      nx.send(:cleanup_orphaned_firewall_rules)
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(Google::Apis::ClientError, /forbidden/)
     end
 
-    it "handles Google::Cloud::Error gracefully and logs" do
+    it "propagates Google::Cloud::Error from list_tag_keys" do
       allow(vm).to receive(:firewalls).and_return([firewall])
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Cloud::Error.new("error"))
 
-      expect(Clog).to receive(:emit).with("Failed to clean up orphaned firewall rules", anything)
-      expect { nx.send(:cleanup_orphaned_firewall_rules) }.not_to raise_error
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(Google::Cloud::Error)
     end
 
-    it "handles Google::Apis::ClientError gracefully and logs" do
-      allow(vm).to receive(:firewalls).and_return([firewall])
-      allow(crm_client).to receive(:list_tag_keys)
-        .and_raise(Google::Apis::ClientError.new("forbidden", status_code: 403))
-
-      expect(Clog).to receive(:emit).with("Failed to clean up orphaned firewall rules", anything)
-      expect { nx.send(:cleanup_orphaned_firewall_rules) }.not_to raise_error
-    end
-
-    it "handles RuntimeError from CRM LRO gracefully and logs (outer)" do
+    it "propagates RuntimeError from list_tag_keys during orphan cleanup" do
       allow(vm).to receive(:firewalls).and_return([firewall])
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: PERMISSION_DENIED"))
 
-      expect(Clog).to receive(:emit).with("Failed to clean up orphaned firewall rules", anything)
-      expect { nx.send(:cleanup_orphaned_firewall_rules) }.not_to raise_error
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(RuntimeError, /PERMISSION_DENIED/)
     end
 
-    it "handles RuntimeError from CRM LRO in per-orphan cleanup (inner)" do
+    it "propagates RuntimeError from delete_tag_key during orphan cleanup" do
       orphan_tk1 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
-      orphan_tk2 = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-orphan2", name: "tagKeys/orphan-456", purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
-        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1, orphan_tk2]))
+        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
       allow(nx).to receive(:find_firewall).and_return(nil)
 
-      # First orphan: delete_tag_key raises RuntimeError (CRM LRO failure)
       allow(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
       allow(crm_client).to receive(:delete_tag_key).with(orphan_tag_key_name)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: Cannot delete tag key still attached to resources"))
 
-      # Second orphan: succeeds
-      allow(crm_client).to receive(:list_tag_values)
-        .with(parent: "tagKeys/orphan-456")
-        .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: nil))
-      allow(crm_client).to receive(:delete_tag_key).with("tagKeys/orphan-456").and_return(crm_done_op)
-
-      expect(Clog).to receive(:emit).with("Failed to clean up orphaned firewall tag resources", anything)
-
-      nx.send(:cleanup_orphaned_firewall_rules)
+      expect { nx.send(:cleanup_orphaned_firewall_rules) }.to raise_error(RuntimeError, /Cannot delete tag key/)
     end
   end
 

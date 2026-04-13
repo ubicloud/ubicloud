@@ -426,10 +426,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
 
     # Delete the old per-VM tag value
     credential.crm_client.delete_tag_value(vm_tag_value_name)
-  rescue Google::Cloud::Error => e
-    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
-  rescue Google::Apis::ClientError => e
-    Clog.emit("Failed to clean up GCE firewall resources", {gcp_firewall_cleanup_error: {vm_name: vm.name, error: e.message}})
   end
 
   def lookup_old_vm_tag_value_name
