@@ -44,7 +44,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
     return true if vms.nil? || vms.empty?
 
     outputs = vms.map do |vm|
-      lines = vm.sshable.cmd("sudo -u knot knotc", stdin: "zone-read --").split("\n")
+      lines = vm.sshable.cmd("sudo -u knot knotc", stdin: "zone-read --", log: false).split("\n")
 
       lines.map do |line|
         parts = line.split
