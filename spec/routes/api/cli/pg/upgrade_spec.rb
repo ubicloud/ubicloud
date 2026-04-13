@@ -7,8 +7,6 @@ RSpec.describe Clover, "cli pg upgrade" do
     expect(Config).to receive(:postgres_service_project_id).and_return(@project.id).at_least(:once)
     cli(%w[pg eu-central-h1/test-pg create -s standard-2 -S 64 -v 16])
     @pg = PostgresResource.first
-    vm = @pg.representative_server.vm
-    VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 64, boot: false)
     @ref = [@pg.display_location, @pg.name].join("/")
   end
 

@@ -52,7 +52,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       postgres_resource = PostgresResource.create(
         project_id:, location_id: location.id, name:,
         target_vm_size:, target_storage_size_gib:,
-        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:
+        superuser_password:, ha_type:, target_version:, flavor:, parent_id:, tags:, restore_target:, hostname_version: "v2", user_config:, pgbouncer_user_config:,
       )
 
       PostgresInitScript.create_with_id(postgres_resource, init_script:) if init_script && !init_script.empty?
@@ -71,8 +71,8 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(5432..5432)},
           {cidr: private_subnet.net4.to_s, port_range: Sequel.pg_range(6432..6432)},
           {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(5432..5432)},
-          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)}
-        ]
+          {cidr: private_subnet.net6.to_s, port_range: Sequel.pg_range(6432..6432)},
+        ],
       )
 
       if with_firewall_rules
@@ -80,7 +80,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432..5432)},
           {cidr: "0.0.0.0/0", port_range: Sequel.pg_range(6432..6432)},
           {cidr: "::/0", port_range: Sequel.pg_range(5432..5432)},
-          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)}
+          {cidr: "::/0", port_range: Sequel.pg_range(6432..6432)},
         ])
       end
 
@@ -118,9 +118,6 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     postgres_resource.incr_initial_provisioning
     if postgres_resource.parent
       bud self.class, frame, :trigger_pg_current_xact_id_on_parent
-      register_deadline("wait", 120 * 60)
-    else
-      register_deadline("wait", 10 * 60)
     end
     hop_refresh_dns_record
   end
@@ -240,7 +237,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         resource_type = index.zero? ? "" : "Standby"
         [
           {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}VCpu", "#{flavor}-#{vm_family}", location.name, location.byoc)["id"], amount: vcpu_count},
-          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib}
+          {billing_rate_id: BillingRate.from_resource_properties("Postgres#{resource_type}Storage", flavor, location.name, location.byoc)["id"], amount: storage_size_gib},
         ]
       end
 
@@ -252,19 +249,23 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
         postgres_resource.active_billing_records.each(&:finalize)
 
         new_billing_records.each do |br|
-          BillingRecord.create(
-            project_id: postgres_resource.project_id,
-            resource_id: postgres_resource.id,
-            resource_name: postgres_resource.name,
-            billing_rate_id: br[:billing_rate_id],
-            amount: br[:amount]
-          )
+          create_billing_record(billing_rate_id: br[:billing_rate_id], amount: br[:amount])
         end
       end
     end
 
     decr_initial_provisioning
     hop_wait
+  end
+
+  def create_billing_record(billing_rate_id:, amount:)
+    BillingRecord.create(
+      project_id: postgres_resource.project_id,
+      resource_id: postgres_resource.id,
+      resource_name: postgres_resource.name,
+      billing_rate_id:,
+      amount:,
+    )
   end
 
   label def wait
@@ -318,7 +319,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
     reap(nap: 5) do
       postgres_resource.private_subnet.incr_destroy_if_only_used_internally(
         ubid: postgres_resource.ubid,
-        vm_ids: servers.map(&:vm_id)
+        vm_ids: servers.map(&:vm_id),
       )
 
       postgres_resource.internal_firewall.destroy
@@ -340,7 +341,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       extensions: ["subjectAltName=DNS:#{postgres_resource.identity},DNS:#{postgres_resource.hostname},DNS:private.#{postgres_resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
-      issuer_key: root_cert_key
+      issuer_key: root_cert_key,
     ).map(&:to_pem)
   end
 
@@ -352,7 +353,7 @@ class Prog::Postgres::PostgresResourceNexus < Prog::Base
       extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert:,
-      issuer_key:
+      issuer_key:,
     ).map(&:to_pem)
   end
 end

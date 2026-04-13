@@ -15,7 +15,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     )
     Firewall.create(name: "#{kc.ubid}-cp-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
     Firewall.create(name: "#{kc.ubid}-worker-vm-firewall", location_id: Location::HETZNER_FSN1_ID, project_id: Config.kubernetes_service_project_id)
@@ -190,7 +190,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "naps when ubicsi VolumeAttachments still reference this node" do
       va_list = {"items" => [{
-        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "csi.ubicloud.com"}
+        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "csi.ubicloud.com"},
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to nap(5)
@@ -204,7 +204,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "hops to wait_for_copy when only non-ubicsi VolumeAttachments remain on this node" do
       va_list = {"items" => [{
-        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "other-csi-driver"}
+        "spec" => {"nodeName" => nx.kubernetes_node.name, "attacher" => "other-csi-driver"},
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to hop("wait_for_copy")
@@ -212,7 +212,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
 
     it "hops to wait_for_copy when ubicsi VolumeAttachments reference a different node" do
       va_list = {"items" => [{
-        "spec" => {"nodeName" => "other-node", "attacher" => "csi.ubicloud.com"}
+        "spec" => {"nodeName" => "other-node", "attacher" => "csi.ubicloud.com"},
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get volumeattachments -ojson").and_return(success_response.replace(JSON.generate(va_list)))
       expect { nx.wait_for_detach }.to hop("wait_for_copy")
@@ -233,8 +233,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {
           "persistentVolumeReclaimPolicy" => "Retain",
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
+        },
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to nap(15)
@@ -249,7 +249,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
     it "hops to remove_node_from_cluster when PVs reference a different node" do
       pv_list = {"items" => [{
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
-        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}}
+        "spec" => {"nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => ["other-node"]}]}]}}},
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")
@@ -260,8 +260,8 @@ RSpec.describe Prog::Kubernetes::KubernetesNodeNexus do
         "metadata" => {"annotations" => {"csi.ubicloud.com/old-pvc-object" => "some-data"}},
         "spec" => {
           "persistentVolumeReclaimPolicy" => "Delete",
-          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}}
-        }
+          "nodeAffinity" => {"required" => {"nodeSelectorTerms" => [{"matchExpressions" => [{"values" => [nx.kubernetes_node.name]}]}]}},
+        },
       }]}
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get pv -ojson").and_return(success_response.replace(JSON.generate(pv_list)))
       expect { nx.wait_for_copy }.to hop("remove_node_from_cluster")

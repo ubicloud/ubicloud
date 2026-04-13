@@ -1,0 +1,54 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+role_creation_queries = <<~ROLE_CREATION
+  /**
+    * Create system roles.
+    */
+  DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ubi_replication') THEN CREATE ROLE ubi_replication WITH REPLICATION LOGIN; END IF; END $$;
+  DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'ubi_monitoring') THEN CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor; END IF; END $$;
+  DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pgbouncer') THEN CREATE ROLE pgbouncer LOGIN; END IF; END $$;
+ROLE_CREATION
+
+ubi_admin_init_queries = <<~UBI_ADMIN_INIT
+  /**
+    * Lock down the privileges of the pgbouncer role.
+    */
+  REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
+
+  /**
+    * Create the pgbouncer schema if it does not exist. All of the
+    * administrative functions for pgbouncer will live in its own schema.
+    */
+  CREATE SCHEMA IF NOT EXISTS pgbouncer;
+
+  /**
+    * Lock down the privileges of the pgbouncer schema.
+    */
+  REVOKE ALL PRIVILEGES ON SCHEMA pgbouncer FROM pgbouncer;
+  GRANT USAGE ON SCHEMA pgbouncer TO pgbouncer;
+
+  /**
+    * The "get_auth" function is used by pgbouncer to authenticate users.
+    * See: https://www.pgbouncer.org/config.html#auth_query
+    */
+  CREATE OR REPLACE FUNCTION pgbouncer.get_auth (
+    INOUT p_user     name,
+    OUT   p_password text
+  ) RETURNS record
+    LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog AS
+  $$SELECT usename, passwd FROM pg_shadow WHERE usename = p_user$$;
+
+  REVOKE ALL ON FUNCTION pgbouncer.get_auth(name) FROM PUBLIC, pgbouncer;
+  GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(name) TO pgbouncer;
+UBI_ADMIN_INIT
+
+r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: role_creation_queries
+r "sudo -u postgres createdb ubi_admin"
+r "sudo -u postgres psql -d ubi_admin -v 'ON_ERROR_STOP=1'", stdin: ubi_admin_init_queries
+
+Dir.glob("/var/cache/postgresql-init/*.sql").sort.each do |sql_file|
+  r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: File.read(sql_file)
+end

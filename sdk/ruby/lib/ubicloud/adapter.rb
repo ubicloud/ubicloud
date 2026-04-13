@@ -13,7 +13,7 @@ module Ubicloud
   class Adapter
     ADAPTERS = {
       net_http: :NetHttp,
-      rack: :Rack
+      rack: :Rack,
     }.freeze
     private_constant :ADAPTERS
 

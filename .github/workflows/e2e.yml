@@ -27,6 +27,7 @@ jobs:
     runs-on: ubuntu-slim
     outputs:
       providers: ${{ steps.set-providers.outputs.providers }}
+      has_github_runner: ${{ steps.set-providers.outputs.has_github_runner }}
     steps:
       - name: Set provider matrix
         id: set-providers
@@ -36,7 +37,12 @@ jobs:
             providers="${{ inputs.providers }}"
           fi
           # Convert comma-separated list to JSON array
+          has_github_runner=false
+          if [[ "${{ github.event_name }}" != "workflow_dispatch" || "${{ inputs.test_cases }}" == *"github_runner"* ]]; then
+            has_github_runner=true
+          fi
           echo "providers=$(echo "$providers" | jq -Rc 'split(",")')" >> $GITHUB_OUTPUT
+          echo "has_github_runner=$has_github_runner" >> $GITHUB_OUTPUT
 
   e2e:
     needs: setup
@@ -48,7 +54,7 @@ jobs:
     runs-on: ubicloud-standard-4
     environment: E2E-${{ matrix.provider }}
     timeout-minutes: 93
-    concurrency: E2E-${{ matrix.provider }}
+    concurrency: ${{ (matrix.provider == 'metal' && 'E2E-metal') || (needs.setup.outputs.has_github_runner == 'true' && 'E2E-aws') || format('E2E-aws-{0}', github.run_id) }}
 
     steps:
     - name: Check out code
@@ -70,9 +76,11 @@ jobs:
       run: npm run prod
 
     - name: Install cloudflared
+      if: needs.setup.outputs.has_github_runner == 'true'
       run: curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb && sudo dpkg -i cloudflared.deb
 
     - name: Set cloudflared token
+      if: needs.setup.outputs.has_github_runner == 'true'
       run: sudo cloudflared service install ${{ secrets.CLOUDFLARED_TOKEN }}
 
     - name: Install mailpit
@@ -156,7 +164,7 @@ jobs:
         SMTP_TLS: false
         STRIPE_PUBLIC_KEY: ${{ secrets.STRIPE_PUBLIC_KEY }}
         STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-        VHOST_BLOCK_BACKEND_VERSION: v0.4.0
+        VHOST_BLOCK_BACKEND_VERSION: v0.4.1
         OPERATOR_SSH_PUBLIC_KEYS: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
       run: |
         set -o pipefail
@@ -272,7 +280,7 @@ jobs:
 
     - name: Send notification if failed
       if: ${{ failure() && github.ref_name == 'main' }}
-      uses: slackapi/slack-github-action@v2.1.1
+      uses: slackapi/slack-github-action@v3.0.1
       with:
         webhook: ${{ secrets.SLACK_WEBHOOK_PAGER_URL }}
         webhook-type: incoming-webhook

@@ -98,7 +98,7 @@ class Clover
         project.id,
         name:,
         location_id: @location.id,
-        **assemble_params
+        **assemble_params,
       ).subject
       audit_log(vm, "create")
     end
@@ -163,14 +163,14 @@ class Clover
       {
         location_id: it.location_id,
         value: it.ubid,
-        display_name: it.name
+        display_name: it.name,
       }
     }
     Option.locations(feature_flags: @project.feature_flags).each do |location|
       subnets << {
         location_id: location.id,
         value: "new-#{location.ubid}",
-        display_name: "New Private Subnet"
+        display_name: "New Private Subnet",
       }
     end
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|

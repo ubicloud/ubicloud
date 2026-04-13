@@ -59,28 +59,19 @@
   <% end_date = @end_date.to_s
   rows =
     @audit_logs.map do |entry|
+      action = "#{entry[:ubid_type]}/#{entry[:action]}"
       [
         [
           entry[:at].getutc.strftime("%F %T"),
-          ["<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;action=#{h entry[:ubid_type]}/#{h entry[:action]}\">#{h entry[:ubid_type]}/#{h entry[:action]}</a>", {escape: false}],
-          [entry[:subject], {escape: false}],
+          [action, {link: "?#{to_query_string("end" => end_date, "action" => action)}"}],
+          entry[:subject],
           [entry[:objects].join("<br>"), {escape: false}]
         ],
         { id: UBID.to_ubid(entry[:id]) }
       ]
     end
 
-    if @pagination_key
-      link_text = "Next Page"
-      @next_page_params["pagination_key"] = @pagination_key
-    elsif @next_end_date
-      link_text = "Prior 3 Months"
-      @next_page_params["end"] = @next_end_date
-    end
-
-    if link_text
-      rows << [[["<a class=\"text-orange-600\" href=\"?#{@next_page_params.map { |k, v| "#{k}=#{h v}" }.join("&amp;")}\">#{link_text}</a>", {escape: false}]]]
-    end %>
+    audit_log_paginate(rows) %>
 
   <%== part(
     "components/table_card",

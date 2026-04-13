@@ -3,19 +3,37 @@
 require_relative "../model"
 
 class VhostBlockBackend < Sequel::Model
+  MIN_ARCHIVE_SUPPORT_VERSION = 400
+
   plugin ResourceMethods, etc_type: true
+
+  def supports_archive?
+    version_code >= MIN_ARCHIVE_SUPPORT_VERSION
+  end
+
+  def version
+    major = version_code / 10000
+    minor = (version_code % 10000) / 100
+    patch = version_code % 100
+    "v#{major}.#{minor}.#{patch}"
+  end
+
+  def version=(version_str)
+    v = Gem::Version.new(version_str.delete_prefix("v")).segments
+    self.version_code = v[0] * 10000 + v[1] * 100 + v[2]
+  end
 end
 
 # Table: vhost_block_backend
 # Columns:
 #  id                | uuid                     | PRIMARY KEY DEFAULT gen_random_ubid_uuid(474)
 #  created_at        | timestamp with time zone | NOT NULL DEFAULT CURRENT_TIMESTAMP
-#  version           | text                     | NOT NULL
 #  allocation_weight | integer                  | NOT NULL
 #  vm_host_id        | uuid                     | NOT NULL
+#  version_code      | integer                  | NOT NULL
 # Indexes:
-#  vhost_block_backend_pkey                   | PRIMARY KEY btree (id)
-#  vhost_block_backend_vm_host_id_version_key | UNIQUE btree (vm_host_id, version)
+#  vhost_block_backend_pkey                        | PRIMARY KEY btree (id)
+#  vhost_block_backend_vm_host_id_version_code_key | UNIQUE btree (vm_host_id, version_code)
 # Check constraints:
 #  vhost_block_backend_allocation_weight_check | (allocation_weight >= 0)
 # Foreign key constraints:

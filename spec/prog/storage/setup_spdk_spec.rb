@@ -8,7 +8,7 @@ RSpec.describe Prog::Storage::SetupSpdk do
       vm_host.id,
       spdk_version,
       start_service: true,
-      allocation_weight: 50
+      allocation_weight: 50,
     ))
   }
 

@@ -24,13 +24,26 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(Config).to receive(:e2e_cache_proxy_download_url).and_return("http://example.com/cache-proxy")
       described_class.assemble([], provider: "aws")
       expect(Location[location_id]).not_to be_nil
-      expect(LocationCredential[location_id].access_key).to eq("access_key")
+      expect(LocationCredentialAws[location_id].access_key).to eq("access_key")
       expect(GithubInstallation.first.project.get_ff_cache_proxy_download_url).to eq({"x64" => "http://example.com/cache-proxy"})
     end
 
     it "assembles labels based on test case names" do
       strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}])
       expect(strand.stack.first["labels"]).to eq(["ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404"])
+    end
+
+    it "includes arm64 labels for aws provider" do
+      location_id = "5f0db214-de30-8420-8a11-98014b01c5b5"
+      expect(Config).to receive(:github_runner_aws_location_id).and_return(location_id)
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      expect(Config).to receive(:e2e_cache_proxy_download_url).and_return("")
+      strand = described_class.assemble([{"name" => "github_runner_ubuntu_2204"}, {"name" => "github_runner_ubuntu_2404"}], provider: "aws")
+      expect(strand.stack.first["labels"]).to eq([
+        "ubicloud-standard-2-ubuntu-2204", "ubicloud-standard-2-ubuntu-2404",
+        "ubicloud-standard-2-arm-ubuntu-2204", "ubicloud-standard-2-arm-ubuntu-2404",
+      ])
     end
   end
 
@@ -78,7 +91,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
       expect(client).to receive(:post).with(
         "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
-        {ref: "enes/simply-tests", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true},
       ).and_return({workflow_run_id: 123456789})
       expect { gr_test.trigger_test_run }.to hop("check_test_run")
     end
@@ -88,7 +101,7 @@ RSpec.describe Prog::Test::GithubRunner do
       expect(ENV).to receive(:[]).with("GITHUB_RUN_ID").and_return("12345")
       expect(client).to receive(:post).with(
         "repos/tahcloud/github-e2e-tests-metal/actions/workflows/test.yml/dispatches",
-        {ref: "enes/simply-tests", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true}
+        {ref: "main", inputs: {triggered_by: "12345", provider: "metal", runners: gr_test.frame["labels"].to_json}, return_run_details: true},
       ).and_return(false)
       expect { gr_test.trigger_test_run }.to hop("clean_resources")
     end
@@ -133,8 +146,7 @@ RSpec.describe Prog::Test::GithubRunner do
     it "waits vm pools to be destroyed" do
       refresh_frame(gr_test, new_values: {"test_run_id" => 10})
       expect(client).to receive(:cancel_workflow_run).with("tahcloud/github-e2e-tests-metal", 10)
-      pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, storage_encrypted: true,
-        arch: "x64").subject
+      pool = Prog::Vm::VmPool.assemble(size: 1, vm_size: "standard-2", location_id: Location::HETZNER_FSN1_ID, boot_image: "github-ubuntu-2204", storage_size_gib: 86, arch: "x64").subject
       expect(VmPool).to receive(:[]).and_return(pool)
       expect { gr_test.clean_resources }.to nap(15)
     end

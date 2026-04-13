@@ -8,8 +8,8 @@ class Prog::Storage::RemoveSpdk < Prog::Base
       prog: "Storage::RemoveSpdk",
       label: "start",
       stack: [{
-        "subject_id" => spdk_installation_id
-      }]
+        "subject_id" => spdk_installation_id,
+      }],
     )
   end
 
@@ -39,7 +39,7 @@ class Prog::Storage::RemoveSpdk < Prog::Base
   label def update_database
     vm_host = spdk_installation.vm_host
     VmHost.where(id: vm_host.id).update(
-      used_hugepages_1g: Sequel[:used_hugepages_1g] - spdk_installation.hugepages
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - spdk_installation.hugepages,
     )
     spdk_installation.destroy
 

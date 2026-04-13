@@ -326,11 +326,29 @@ RSpec.describe Prog::Vnet::LoadBalancerNexus do
         name: "ipv4-pending-vm",
         private_ipv4: "10.0.0.7/32",
         private_ipv6: "fd10:9b0b:6b4b:8fb2::/64",
-        public_ipv6: "2001:db8:2::/64"
+        public_ipv6: "2001:db8:2::/64",
       )
       vm.update(ip4_enabled: true)
       expect { nx.rewrite_dns_records }.to nap(5)
       expect(DnsRecord.where(dns_zone_id: dns_zone.id, tombstoned: false).all).to be_empty
+    end
+
+    it "rewriting repeatedly is relatively safe" do
+      add_lb_vm(
+        stack: "dual",
+        name: "ipv4-pending-vm",
+        private_ipv4: "10.0.0.7/32",
+        private_ipv6: "fd10:9b0b:6b4b:8fb2::/64",
+        public_ipv6: "2001:db8:2::/64",
+        public_ipv4: "203.0.113.1/32",
+      )
+
+      expect { nx.rewrite_dns_records }.to hop("wait")
+      expect(dns_zone.reload.records.count).to eq(4) # Private IPv4, Private IPv6, Public IPv4, Public IPv6
+
+      100.times { expect { nx.rewrite_dns_records }.to hop("wait") }
+
+      expect(dns_zone.reload.records.count).to eq(804) # 4 records to tombstone the previous ones and 4 records to add
     end
   end
 end

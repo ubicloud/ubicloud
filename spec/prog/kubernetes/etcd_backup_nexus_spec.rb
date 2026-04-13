@@ -17,7 +17,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       project_id: project.id,
       private_subnet_id: private_subnet.id,
       cp_node_count: 1,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
     vm = Prog::Vm::Nexus.assemble("public key", project.id, name: "cp", private_subnet_id: kc.private_subnet.id).subject
     Sshable.create_with_id(vm)
@@ -30,14 +30,14 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
       kubernetes_cluster_id: kc.id,
       access_key: "access",
       secret_key: "secret",
-      location_id: location.id
+      location_id: location.id,
     )
   }
 
   before do
     allow(Config).to receive_messages(
       postgres_service_project_id: project.id,
-      kubernetes_service_project_id: project.id
+      kubernetes_service_project_id: project.id,
     )
     allow(nx).to receive(:kubernetes_etcd_backup).and_return(kubernetes_etcd_backup)
   end
@@ -88,7 +88,7 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
         endpoint: "https://minio.test",
         access_key: kubernetes_etcd_backup.access_key,
         secret_key: kubernetes_etcd_backup.secret_key,
-        ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs
+        ssl_ca_data: kubernetes_etcd_backup.blob_storage.root_certs,
       ).and_return(client)
     end
 
@@ -146,14 +146,14 @@ RSpec.describe Prog::Kubernetes::EtcdBackupNexus do
         "secret_key" => kubernetes_etcd_backup.secret_key,
         "endpoint" => kubernetes_etcd_backup.blob_storage_endpoint,
         "bucket" => kubernetes_etcd_backup.ubid,
-        "root_certs" => kubernetes_etcd_backup.blob_storage.root_certs
+        "root_certs" => kubernetes_etcd_backup.blob_storage.root_certs,
       }
 
       expect(nx.kubernetes_cluster.functional_nodes.first.vm.sshable).to receive(:d_run).with(
         "backup_etcd",
         "kubernetes/bin/backup-etcd",
         stdin: JSON.generate(creds),
-        log: false
+        log: false,
       )
 
       expect { nx.run_backup }.to hop("wait")

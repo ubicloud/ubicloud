@@ -8,7 +8,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
   IN_PROGRESS_CONCLUSIONS = %w[in_progress queued requested waiting pending neutral].freeze
   REPOSITORY_NAME_PREFIX = "tahcloud/github-e2e-tests"
   WORKFLOW_NAME = "test.yml"
-  BRANCH_NAME = "enes/simply-tests"
+  BRANCH_NAME = "main"
 
   def self.assemble(test_cases, provider: "metal")
     service_project = Project.create_with_id(Config.github_runner_service_project_id, name: "Github-Runner-Service-Project")
@@ -18,7 +18,7 @@ class Prog::Test::GithubRunner < Prog::Test::Base
     if provider == "aws"
       customer_project.set_ff_aws_alien_runners_ratio(1)
       location = Location.create_with_id(Config.github_runner_aws_location_id, name: "eu-central-1", provider: "aws", project_id: service_project.id, display_name: "aws-e2e", ui_name: "aws-e2e", visible: true)
-      LocationCredential.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+      LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
     end
 
     if (url = Config.e2e_cache_proxy_download_url) && !url.empty?
@@ -31,12 +31,17 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       type: "User",
       project_id: customer_project.id,
       allocator_preferences: {},
-      created_at: Time.now - 8 * 24 * 60 * 60
+      created_at: Time.now - 8 * 24 * 60 * 60,
     )
 
     labels = []
     labels << "ubicloud-standard-2-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
     labels << "ubicloud-standard-2-ubuntu-2404" if test_cases.any? { it["name"].include?("2404") }
+
+    if provider == "aws"
+      labels << "ubicloud-standard-2-arm-ubuntu-2204" if test_cases.any? { it["name"].include?("2204") }
+      labels << "ubicloud-standard-2-arm-ubuntu-2404" if test_cases.any? { it["name"].include?("2404") }
+    end
 
     Strand.create(
       prog: "Test::GithubRunner",
@@ -44,8 +49,8 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       stack: [{
         "provider" => provider,
         "customer_project_id" => customer_project.id,
-        "labels" => labels
-      }]
+        "labels" => labels,
+      }],
     )
   end
 
@@ -63,7 +68,6 @@ class Prog::Test::GithubRunner < Prog::Test::Base
       location_id: Location::GITHUB_RUNNERS_ID,
       storage_size_gib: label_data["storage_size_gib"],
       arch: label_data["arch"],
-      storage_encrypted: true
     ).subject
     update_stack({"vm_pool_id" => pool.id})
 

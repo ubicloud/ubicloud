@@ -87,7 +87,7 @@ RSpec.describe Clover, "github" do
       it "fails if one of the parameters are missing" do
         [
           [nil, "v1"],
-          ["k1", nil]
+          ["k1", nil],
         ].each do |key, version|
           params = {key:, version:}.compact
           post "/runtime/github/caches", params
@@ -219,7 +219,7 @@ RSpec.describe Clover, "github" do
         [
           [["etag-1", "etag-2"], "upload-id", nil],
           [nil, "upload-id", 100],
-          [["etag-1", "etag-2"], nil, 100]
+          [["etag-1", "etag-2"], nil, 100],
         ].each do |etags, upload_id, size|
           params = {etags:, uploadId: upload_id, size:}.compact
           post "/runtime/github/caches/commit", params
@@ -253,7 +253,7 @@ RSpec.describe Clover, "github" do
       it "completes multipart upload" do
         entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id", size: 100)
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
-          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
+          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]}),
         )
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
@@ -264,7 +264,7 @@ RSpec.describe Clover, "github" do
       it "completes multipart upload without size" do
         entry = GithubCacheEntry.create(key: "cache-key", version: "key-version", scope: "dev", repository_id: repository.id, created_by: runner.id, upload_id: "upload-id")
         expect(blob_storage_client).to receive(:complete_multipart_upload).with(
-          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]})
+          hash_including(upload_id: "upload-id", multipart_upload: {parts: [{etag: "etag-1", part_number: 1}, {etag: "etag-2", part_number: 2}]}),
         )
         post "/runtime/github/caches/commit", {etags: ["etag-1", "etag-2"], uploadId: "upload-id", size: 100}
 
@@ -286,7 +286,7 @@ RSpec.describe Clover, "github" do
         [
           ["k1,k2", nil],
           [nil, "v1"],
-          ["", "v1"]
+          ["", "v1"],
         ].each do |keys, version|
           params = {keys:, version:}.compact
           get "/runtime/github/cache", params
@@ -352,7 +352,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "dev"],
           ["k1", "v2", "main"],
           ["k2", "v1", "main"],
-          ["k2", "v1", "dev"]
+          ["k2", "v1", "dev"],
         ].each do |key, version, branch|
           GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
@@ -410,7 +410,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "dev"],
           ["k1", "v2", "main"],
           ["k1", "v1", "feature"],
-          ["k2", "v1", "dev"]
+          ["k2", "v1", "dev"],
         ].each do |key, version, branch|
           GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end
@@ -428,7 +428,7 @@ RSpec.describe Clover, "github" do
           ["k1", "v1", "dev"],
           ["k1", "v2", "main"],
           ["k1", "v1", "feature"],
-          ["k2", "v1", "dev"]
+          ["k2", "v1", "dev"],
         ].each do |key, version, branch|
           GithubCacheEntry.create(key:, version:, scope: branch, repository_id: repository.id, created_by: runner.id, committed_at: Time.now)
         end

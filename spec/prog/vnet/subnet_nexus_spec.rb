@@ -60,7 +60,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         prj.id,
         name: "default-ps",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64"
+        ipv6_range: "fd10:9b0b:6b4b:8fbb::/64",
       )
 
       expect(ps.subject.net6.to_s).to eq("fd10:9b0b:6b4b:8fbb::/64")
@@ -72,7 +72,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
         prj.id,
         name: "default-ps",
         location_id: Location::HETZNER_FSN1_ID,
-        ipv4_range: "10.0.0.0/26"
+        ipv4_range: "10.0.0.0/26",
       )
 
       expect(ps.subject.net4.to_s).to eq("10.0.0.0/26")
@@ -155,14 +155,14 @@ RSpec.describe Prog::Vnet::SubnetNexus do
   describe ".create_aws_subnet_records" do
     let(:aws_location) {
       loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-      LocationCredential.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
+      LocationCredentialAws.create_with_id(loc.id, access_key: "test-key", secret_key: "test-secret")
       loc
     }
 
     it "raises error when VPC is too small for even a single subnet" do
       # /30 VPC with ipv4_range_size=30 -> ipv4_prefix=min(38,28)=28
       # Can't fit a /28 subnet in a /30 VPC
-      LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
       small_ps = PrivateSubnet.create(name: "small-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/30", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(small_ps.id)
 
@@ -175,7 +175,7 @@ RSpec.describe Prog::Vnet::SubnetNexus do
       # /26 VPC can fit 4 /28 subnets (indices 0-3)
       # Create 5 AZs - the 5th should be skipped with a log
       5.times do |i|
-        LocationAwsAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
+        LocationAz.create(location_id: aws_location.id, az: ("a".ord + i).chr, zone_id: "usw2-az#{i + 1}")
       end
       limited_ps = PrivateSubnet.create(name: "limited-ps", location_id: aws_location.id, net6: "fd10::/64", net4: "10.0.0.0/26", state: "waiting", project_id: prj.id)
       ps_aws_resource = PrivateSubnetAwsResource.create_with_id(limited_ps.id)

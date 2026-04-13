@@ -32,7 +32,7 @@ headers = {
   "x-ubi-version" => File.read(File.expand_path("../../cli/version.txt", __FILE__)).chomp,
   "content-type" => "application/json",
   "accept" => "text/plain",
-  "connection" => "close"
+  "connection" => "close",
 }
 confirmation_prompt = false
 confirmation = nil

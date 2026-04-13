@@ -26,7 +26,7 @@ RSpec.describe CloverAdmin do
       vm_size: "standard-2",
       boot_image: "img",
       location_id: Location::HETZNER_FSN1_ID,
-      storage_size_gib: 86
+      storage_size_gib: 86,
     )
     Strand.create(prog: "Vm::VmPool", label: "create_new_vm") { it.id = vp.id }
     vp
@@ -105,7 +105,7 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "unique-pg-search",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     fill_in "UBID, UUID, or prefix:term", with: "pg:unique-pg-search"
@@ -129,7 +129,7 @@ RSpec.describe CloverAdmin do
       content: {billing_info: {country: "NL"}, cost: 1.0, subtotal: 1.0},
       status: "unpaid",
       begin_time: Time.now,
-      end_time: Time.now + 30 * 24 * 60 * 60
+      end_time: Time.now + 30 * 24 * 60 * 60,
     )
 
     fill_in "UBID, UUID, or prefix:term", with: "1v:2512-searchtest-01"
@@ -373,7 +373,7 @@ RSpec.describe CloverAdmin do
       invoice_number: "2512-f859vb27-01",
       content: {billing_info: {country: "NL"}, cost: 1.652, subtotal: 2.6530000000000005},
       begin_time: "2024-11-01 00:00:00",
-      end_time: "2024-12-01 00:00:00"
+      end_time: "2024-12-01 00:00:00",
     )
 
     click_link "Ubicloud Admin"
@@ -423,14 +423,14 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "assoc-table-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     visit "/model/Project/#{project.ubid}"
     within(".association", text: "postgres_resources") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "assoc-table-pg", "assoc-table-test", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     server = pg.servers.first
@@ -438,7 +438,16 @@ RSpec.describe CloverAdmin do
     within(".association", text: "servers") { click_link "(table)" }
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "assoc-table-pg", "push", "ready", "17", "true", server.created_at.to_s,
+    ]
+
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+    visit "/model/VmHost/#{vm_host.ubid}"
+    within(".association", text: "boot_images") { click_link "(table)" }
+    expect(page.title).to eq "Ubicloud Admin - BootImage - Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
     ]
   end
 
@@ -567,13 +576,13 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
 
     click_link "PostgresResource"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     click_link pg.name
@@ -587,7 +596,7 @@ RSpec.describe CloverAdmin do
     fill_in "Created at", with: pg.created_at.strftime("%Y-%m")
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s
+      "test-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "", pg.created_at.to_s,
     ]
 
     child_pg = Prog::Postgres::PostgresResourceNexus.assemble(
@@ -596,14 +605,14 @@ RSpec.describe CloverAdmin do
       name: "test-child-pg",
       target_vm_size: "standard-2",
       target_storage_size_gib: 64,
-      parent_id: pg.id
+      parent_id: pg.id,
     ).subject
 
     click_link "Search"
     fill_in "Parent", with: pg.ubid
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s
+      "test-child-pg", "PgTest", "hetzner-fsn1", "standard", "standard-2", "64", "none", "17", "test-pg", child_pg.created_at.to_s,
     ]
   end
 
@@ -615,14 +624,14 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "test-pg",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
     server = pg.servers.first
 
     click_link "PostgresServer"
     expect(page.title).to eq "Ubicloud Admin - PostgresServer - Browse"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
 
     click_link server.ubid, match: :first
@@ -636,11 +645,22 @@ RSpec.describe CloverAdmin do
     select "push", from: "Timeline access"
     click_button "Search"
     expect(page.all("#autoforme_content td").map(&:text)).to eq [
-      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s
+      server.ubid, server.vm.ubid, "test-pg", "push", "ready", "17", "true", server.created_at.to_s,
     ]
 
     click_link "test-pg"
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg.ubid}"
+  end
+
+  it "renders PostgresServer detail page when resource is nil" do
+    project = Project.create(name: "PgTest")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+
+    resource_id = PostgresResource.generate_uuid
+    server = PostgresServer.create(resource_id:, timeline: create_postgres_timeline(location_id: Location::HETZNER_FSN1_ID), version: PostgresResource::DEFAULT_VERSION)
+
+    visit "/model/PostgresServer/#{server.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - PostgresServer #{server.ubid}"
   end
 
   it "supports downloading invoice PDF" do
@@ -649,7 +669,7 @@ RSpec.describe CloverAdmin do
       invoice_number: "invoice-number-378",
       content: {foo: "bar", billing_info: {country: "NL"}},
       begin_time: "2024-11-01 00:00:00",
-      end_time: "2024-12-01 00:00:00"
+      end_time: "2024-12-01 00:00:00",
     )
 
     visit "/model/Invoice/#{invoice.ubid}"
@@ -683,7 +703,7 @@ RSpec.describe CloverAdmin do
       ["GithubRunnerVCpu", "400", "0"],
       ["GithubRunnerVCpuArm", "100", "0"],
       ["PostgresVCpu", "128", "0"],
-      ["KubernetesVCpu", "32", "0"]
+      ["KubernetesVCpu", "32", "0"],
     ]
   end
 
@@ -696,7 +716,7 @@ RSpec.describe CloverAdmin do
       resource_name: vm.name,
       span: Sequel::Postgres::PGRange.new(Time.now - 3600, nil),
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
+      amount: vm.vcpus,
     )
 
     visit "/model/Project/#{project.ubid}"
@@ -737,7 +757,7 @@ RSpec.describe CloverAdmin do
     page.refresh
     expect(page).to have_content "Active Pages"
     expect(page_data).to eq [
-      ["", page1.ubid, "some problem", "{}"]
+      ["", page1.ubid, "some problem", "{}"],
     ]
     click_link page1.ubid
     expect(page.title).to eq "Ubicloud Admin - Page #{page1.ubid}"
@@ -746,7 +766,7 @@ RSpec.describe CloverAdmin do
     visit "/"
     expect(page_data).to eq [
       ["", page1.ubid, "some problem", "{}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
     click_link vm_pool.ubid
     expect(page.title).to eq "Ubicloud Admin - VmPool #{vm_pool.ubid}"
@@ -760,7 +780,7 @@ RSpec.describe CloverAdmin do
     expect(page_data).to eq [
       [vmh.ubid, page3.ubid, "third problem", "{\"related_resources\" => [\"#{vm.ubid}\"]}"],
       ["", page1.ubid, "some problem", "{}"],
-      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"]
+      [page2.ubid, "another problem", "{\"related_resources\" => [\"#{vm_pool.ubid}\"]}"],
     ]
 
     click_link vmh.ubid
@@ -862,6 +882,140 @@ RSpec.describe CloverAdmin do
     expect(st.reload.schedule).to be_within(5).of(schedule + 300)
   end
 
+  it "shows empty semaphore list for strand without semaphore_names" do
+    st = Strand.create(prog: "Test", label: "test")
+    visit "/model/Strand/#{st.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+
+    click_link "Increment Semaphore"
+    expect(page).to have_select("name", options: [""])
+  end
+
+  it "supports incrementing semaphore of strand" do
+    vp = VmPool.create(
+      size: 3,
+      vm_size: "standard-2",
+      boot_image: "img",
+      location_id: Location::HETZNER_FSN1_ID,
+      storage_size_gib: 86,
+    )
+    st = Strand.create_with_id(vp, prog: "Vm::VmPool", label: "wait")
+    visit "/model/Strand/#{st.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+
+    click_link "Increment Semaphore"
+    select "destroy", from: "name"
+    select "destroying", from: "name_confirmation"
+    expect { click_button "Increment Semaphore" }.to raise_error(CloverError)
+    expect(st.reload.semaphores.map(&:name)).not_to include("destroy")
+
+    visit "/model/Strand/#{st.ubid}/incr_semaphore"
+    select "destroy", from: "name"
+    select "destroy", from: "name_confirmation"
+    click_button "Increment Semaphore"
+    expect(page).to have_flash_notice("Incremented semaphore")
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+    expect(st.reload.semaphores.map(&:name)).to include("destroy")
+
+    Semaphore.incr(st.id, "destroying")
+
+    visit "/model/Strand/#{st.ubid}/decr_semaphore"
+    select "destroy", from: "name"
+    select "destroying", from: "name_confirmation"
+    expect { click_button "Decrement Semaphore" }.to raise_error(CloverError)
+    expect(st.reload.semaphores.map(&:name)).to include("destroy")
+
+    visit "/model/Strand/#{st.ubid}/decr_semaphore"
+    select "destroy", from: "name"
+    select "destroy", from: "name_confirmation"
+    click_button "Decrement Semaphore"
+    expect(page).to have_flash_notice("Decremented semaphore")
+    expect(page.title).to eq "Ubicloud Admin - Strand #{st.ubid}"
+    expect(st.reload.semaphores.map(&:name)).not_to include("destroy")
+  end
+
+  it "allows browsing and searching BootImage" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    click_link "BootImage"
+    expect(page.title).to eq "Ubicloud Admin - BootImage - Browse"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+
+    click_link "ubuntu-jammy"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    click_link "Ubicloud Admin"
+    click_link "BootImage"
+    click_link "Search"
+    fill_in "Vm host", with: vm_host.ubid
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+
+    click_link "Search"
+    fill_in "Created at", with: boot_image.created_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", "", boot_image.created_at.to_s,
+    ]
+
+    boot_image.update(activated_at: Time.now)
+    click_link "Search"
+    fill_in "Activated at", with: boot_image.reload.activated_at.strftime("%Y-%m")
+    click_button "Search"
+    expect(page.all("#autoforme_content td").map(&:text)).to eq [
+      "ubuntu-jammy", "20220202", vm_host.ubid, "14", boot_image.activated_at.to_s, boot_image.created_at.to_s,
+    ]
+  end
+
+  it "supports removing BootImages" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    visit "/model/BootImage/#{boot_image.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    click_link "Remove Boot Image"
+    click_button "Remove Boot Image"
+    expect(page).to have_flash_notice("Boot image removal scheduled")
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+    expect(Strand.where(prog: "RemoveBootImage", label: "start").count).to eq 1
+  end
+
+  it "supports activating BootImages" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14)
+
+    visit "/model/BootImage/#{boot_image.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    expect(boot_image.activated_at).to be_nil
+    click_link "Activate Boot Image"
+    click_button "Activate Boot Image"
+    expect(page).to have_flash_notice("Boot image activated")
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+    expect(boot_image.reload.activated_at).not_to be_nil
+  end
+
+  it "supports disabling BootImages" do
+    vm_host = create_vm_host
+    boot_image = BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vm_host.id, size_gib: 14, activated_at: Time.now)
+
+    visit "/model/BootImage/#{boot_image.ubid}"
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+
+    expect(boot_image.activated_at).not_to be_nil
+    click_link "Disable Boot Image"
+    click_button "Disable Boot Image"
+    expect(page).to have_flash_notice("Boot image disabled")
+    expect(page.title).to eq "Ubicloud Admin - BootImage #{boot_image.ubid}"
+    expect(boot_image.reload.activated_at).to be_nil
+  end
+
   it "supports restarting Vms" do
     vm = Prog::Vm::Nexus.assemble("dummy-public key", Project.create(name: "Default").id, name: "dummy-vm-1").subject
     fill_in "UBID, UUID, or prefix:term", with: vm.ubid
@@ -898,7 +1052,7 @@ RSpec.describe CloverAdmin do
       location_id: Location::HETZNER_FSN1_ID,
       name: "a",
       target_vm_size: "standard-2",
-      target_storage_size_gib: 64
+      target_storage_size_gib: 64,
     ).subject
     fill_in "UBID, UUID, or prefix:term", with: pg.ubid
     click_button "Show Object"
@@ -958,6 +1112,42 @@ RSpec.describe CloverAdmin do
     expect(page).to have_flash_notice("Hardware reset scheduled for VmHost")
     expect(page.title).to eq "Ubicloud Admin - VmHost #{vmh.ubid}"
     expect(vmh.semaphores_dataset.select_map(:name)).to eq ["hardware_reset"]
+  end
+
+  it "supports moving VmHost to a non-github location and downloading boot images" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    target_location = Location[Location::HETZNER_HEL1_ID]
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Move to Location"
+    select target_location.display_name, from: "location"
+    click_button "Move to Location"
+    expect(page).to have_flash_notice("Location updated and missing boot image downloads started")
+    expect(vmh.reload.location_id).to eq target_location.id
+
+    download_strands = Strand.where(prog: "DownloadBootImage").all
+    downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+    expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble]
+  end
+
+  it "supports moving VmHost to github-runners location and downloading github images" do
+    vmh = Prog::Vm::HostNexus.assemble("127.0.0.2").subject
+    target_location = Location[Location::GITHUB_RUNNERS_ID]
+
+    fill_in "UBID, UUID, or prefix:term", with: vmh.ubid
+    click_button "Show Object"
+
+    click_link "Move to Location"
+    select target_location.display_name, from: "location"
+    click_button "Move to Location"
+    expect(page).to have_flash_notice("Location updated and missing boot image downloads started")
+    expect(vmh.reload.location_id).to eq target_location.id
+
+    download_strands = Strand.where(prog: "DownloadBootImage").all
+    downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+    expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404]
   end
 
   it "supports provisioning spare GitHubRunner" do
@@ -1133,7 +1323,7 @@ RSpec.describe CloverAdmin do
       ["aws_alien_runners_ratio", "0.8", 0.8],
       ["enable_m6id", "false", false],
       ["visible_locations", '["eu-central-h1","eu-central-h2"]', ["eu-central-h1", "eu-central-h2"]],
-      ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}]
+      ["private_locations", '{"hetzner-fsn1": {"access_key": "ak"}}', {"hetzner-fsn1" => {"access_key" => "ak"}}],
     ].each do |name, value, expected_value|
       visit path
       select name, from: "name"
@@ -1237,7 +1427,7 @@ RSpec.describe CloverAdmin do
       summary: "Test info page with related resources",
       tag: "tag1",
       details: {"related_resources" => [vm.ubid]},
-      severity: "info"
+      severity: "info",
     )
 
     visit "/"
@@ -1267,27 +1457,9 @@ RSpec.describe CloverAdmin do
     expect(page.all("#admin-list li").map(&:text)).to eq ["admin", "foo"]
   end
 
-  it "allows closing other admin accounts" do
-    DB[:admin_account].insert(login: "foo")
-    click_link "View Admin List"
-    expect(page.title).to eq "Ubicloud Admin - Admin List"
-    expect(page.all("#admin-list li").map(&:text)).to eq ["admin", "foo"]
-    select "foo"
-    expect(Clog).to receive(:emit).with("Admin account closed", {admin_account_closed: {account_closed: "foo", closer: "admin"}}).and_call_original
-    click_button "Close Admin Account"
-    expect(page).to have_flash_notice "Admin account \"foo\" closed."
-    expect(page.all("#admin-list li").map(&:text)).to eq ["admin"]
-
-    DB[:admin_account].insert(login: "foo")
-    page.refresh
-    DB[:admin_account].where(login: "foo").delete
-    select "foo"
-    click_button "Close Admin Account"
-    expect(page).to have_flash_error "Unable to close admin account for \"foo\"."
-  end
-
   it "shows GitHub runner x64 VM usage" do
-    installation_id = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User").id
+    installation = GithubInstallation.create(installation_id: 123, name: "test-installation", type: "User")
+    installation_id = installation.id
     repository_name = "test-repo"
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud", allocated_at: Time.now)
     GithubRunner.create(installation_id:, repository_name:, label: "ubicloud-arm")
@@ -1300,13 +1472,22 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner x64 VM Usage"
     expect(page).to have_link "Show arm64"
     expect(page.all("#content td").map(&:text)).to eq [
-      "test-installation", "true",
+      "TOTAL", "",
       "2", "1", "1", "0", "1", "0",
-      "16/46", "2/14",
+      "16 / 46", "2 / 14",
       "1", "0", "0", "0", "0", "0",
       "0", "1", "0", "0", "0",
-      "0", "0", "1", "0"
+      "0", "0", "1", "0",
+      "test-installation", "true",
+      "2", "1", "1", "0", "1", "0",
+      "16 / 46", "2 / 14",
+      "1", "0", "0", "0", "0", "0",
+      "0", "1", "0", "0", "0",
+      "0", "0", "1", "0",
     ]
+
+    click_link "test-installation"
+    expect(page.title).to eq "Ubicloud Admin - GithubInstallation #{installation.ubid}"
   end
 
   it "shows GitHub runner arm64 VM usage" do
@@ -1322,12 +1503,18 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - GitHub Runner arm64 VM Usage"
     expect(page).to have_link "Show x64"
     expect(page.all("#content td").map(&:text)).to eq [
-      "test-installation", "true",
+      "TOTAL", "",
       "1", "0", "0", "0", "0", "0",
-      "0/2", "0/0",
+      "0 / 2", "0 / 0",
       "0", "0", "0", "0", "0", "0",
       "0", "0", "0", "0", "0",
-      "0", "0", "0", "0"
+      "0", "0", "0", "0",
+      "test-installation", "true",
+      "1", "0", "0", "0", "0", "0",
+      "0 / 2", "0 / 0",
+      "0", "0", "0", "0", "0", "0",
+      "0", "0", "0", "0", "0",
+      "0", "0", "0", "0",
     ]
   end
 
@@ -1515,7 +1702,7 @@ RSpec.describe CloverAdmin do
         action:,
         project_id:,
         subject_id:,
-        object_ids: Sequel.pg_array(object_ids, :uuid)
+        object_ids: Sequel.pg_array(object_ids, :uuid),
       ).first[:id]
     end
 
@@ -1541,7 +1728,7 @@ RSpec.describe CloverAdmin do
       visit "/audit-log"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project2.ubid, "vm/destroy", user.ubid, ""
+        project2.ubid, "vm/destroy", user.ubid, "",
       ]
 
       fill_in "Project", with: project2.ubid
@@ -1552,6 +1739,15 @@ RSpec.describe CloverAdmin do
       expect(page.title).to eq("Ubicloud Admin - Project #{project2.ubid}")
 
       click_link "View Audit Log"
+      expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
+
+      click_link "Older Results"
+      expect(audit_log_content).to eq []
+
+      at = Date.today << 7
+      insert_audit_log(at:)
+      insert_audit_log(project_id: project2.id, action: "destroy", at:)
+      page.refresh
       expect(audit_log_content).to eq [project2.ubid, "vm/destroy", user.ubid, ""]
     end
 
@@ -1564,21 +1760,21 @@ RSpec.describe CloverAdmin do
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
         project.ubid, "vm/destroy", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       fill_in "Action", with: "vm"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "vm/destroy", user.ubid, ""
+        project.ubid, "vm/destroy", user.ubid, "",
       ]
 
       fill_in "Action", with: "create"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       fill_in "Action", with: "vm/create"
@@ -1588,29 +1784,29 @@ RSpec.describe CloverAdmin do
       visit "/audit-log?limit=2"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
-        project.ubid, "vm/destroy", user.ubid, ""
+        project.ubid, "vm/destroy", user.ubid, "",
       ]
 
       click_link "Next Page"
       expect(audit_log_content).to eq [
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       visit "/audit-log?limit=1&action=create"
       expect(audit_log_content).to eq [
-        project.ubid, "vm/create", user.ubid, ""
+        project.ubid, "vm/create", user.ubid, "",
       ]
 
       click_link "Next Page"
       expect(audit_log_content).to eq [
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
 
       visit "/audit-log?limit=a"
       expect(audit_log_content).to eq [
         project.ubid, "vm/create", user.ubid, "",
         project.ubid, "vm/destroy", user.ubid, "",
-        project.ubid, "ps/create", user.ubid, ""
+        project.ubid, "ps/create", user.ubid, "",
       ]
     end
 
@@ -1687,14 +1883,14 @@ RSpec.describe CloverAdmin do
       click_link "Older Results"
       expect(audit_log_content).to eq [
         project.ubid, "vm/update", user.ubid, "",
-        project.ubid, "vm/create", other_account_ubid.to_s, ""
+        project.ubid, "vm/create", other_account_ubid.to_s, "",
       ]
 
       fill_in "End Date", with: "2025-09-01"
       click_button "Search"
       expect(audit_log_content).to eq [
         project.ubid, "vm/update", user.ubid, "",
-        project.ubid, "vm/create", other_account_ubid.to_s, ""
+        project.ubid, "vm/create", other_account_ubid.to_s, "",
       ]
 
       visit(page.current_url + "&limit=1")
@@ -1705,12 +1901,250 @@ RSpec.describe CloverAdmin do
 
       visit(page.current_url[0...-1])
       expect(audit_log_content).to eq [
-        project.ubid, "vm/update", user.ubid, ""
+        project.ubid, "vm/update", user.ubid, "",
       ]
 
       fill_in "End Date", with: "2026-03-aa"
       click_button "Search"
       expect(audit_log_content).to eq []
+    end
+  end
+
+  describe "format_bytes" do
+    let(:app) { described_class.allocate }
+
+    it "formats bytes" do
+      expect(app.format_bytes(0)).to eq "0B"
+      expect(app.format_bytes(1023)).to eq "1023B"
+    end
+
+    it "formats kibibytes" do
+      expect(app.format_bytes(1024)).to eq "1.0KiB"
+      expect(app.format_bytes(1600)).to eq "1.6KiB"
+      expect(app.format_bytes(1024**2 - 1)).to eq "1024.0KiB"
+    end
+
+    it "formats mebibytes" do
+      expect(app.format_bytes(1024**2)).to eq "1.0MiB"
+      expect(app.format_bytes(1024**2 * 5.55)).to eq "5.6MiB"
+      expect(app.format_bytes(1024**3 - 1)).to eq "1024.0MiB"
+    end
+
+    it "formats gibibytes" do
+      expect(app.format_bytes(1024**3)).to eq "1.0GiB"
+      expect(app.format_bytes(1024**3 * 2.25)).to eq "2.3GiB"
+    end
+  end
+
+  describe "format_seconds" do
+    let(:app) { described_class.allocate }
+
+    it "formats zero" do
+      expect(app.format_seconds(0)).to eq "00:00:00"
+    end
+
+    it "formats seconds only" do
+      expect(app.format_seconds(45)).to eq "00:00:45"
+    end
+
+    it "formats minutes and seconds" do
+      expect(app.format_seconds(125)).to eq "00:02:05"
+    end
+
+    it "formats hours, minutes, and seconds" do
+      expect(app.format_seconds(3661)).to eq "01:01:01"
+    end
+
+    it "format allows for more than 2 digits in hour" do
+      expect(app.format_seconds(999999)).to eq "277:46:39"
+    end
+  end
+
+  describe "authentication audit log" do
+    let(:user) { create_account }
+
+    def insert_account_audit_log(account_id:, message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
+      DB[:account_authentication_audit_log].returning(:id).insert(
+        account_id:,
+        message:,
+        metadata: Sequel.pg_jsonb(metadata),
+        at:,
+      ).first[:id]
+    end
+
+    def audit_log_content
+      page.all("#audit-log-search-results td:not(:first-child):not(:only-child)").map(&:text)
+    end
+
+    it "can view authentication audit log entries" do
+      insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+
+      click_link "View Authentication Audit Logs"
+
+      expect(page.title).to eq("Ubicloud Admin - Authentication Audit Log")
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 1.2.3.4"]
+    end
+
+    it "can filter by action" do
+      insert_account_audit_log(account_id: user.id, message: "login")
+      insert_account_audit_log(account_id: user.id, message: "login_failure")
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 127.0.0.1",
+        "login_failure", user.ubid, "ip: 127.0.0.1",
+      ]
+
+      click_link "login_failure"
+      expect(audit_log_content).to eq ["login_failure", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Action", with: "login"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+    end
+
+    it "can filter by metadata" do
+      insert_account_audit_log(account_id: user.id, message: "login", metadata: {"ip" => "1.2.3.4"})
+      insert_account_audit_log(account_id: user.id, message: "login_failure", metadata: {"ip" => "9.9.9.9"})
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 1.2.3.4",
+        "login_failure", user.ubid, "ip: 9.9.9.9",
+      ]
+
+      click_link "ip: 1.2.3.4"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 1.2.3.4"]
+
+      fill_in "Metadata", with: "ip=9.9.9.9"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", user.ubid, "ip: 9.9.9.9"]
+    end
+
+    it "can filter by account name, email, and ubid" do
+      user.update(name: "Test-Name")
+      other = create_account("other@example.com", with_project: false)
+      other.update(name: "Other-Name")
+      insert_account_audit_log(account_id: user.id, message: "login")
+      insert_account_audit_log(account_id: other.id, message: "login_failure")
+
+      click_link "View Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", user.ubid, "ip: 127.0.0.1",
+        "login_failure", other.ubid, "ip: 127.0.0.1",
+      ]
+
+      click_link user.ubid
+      expect(page.title).to eq("Ubicloud Admin - Account #{user.ubid}")
+      click_link "View Authentication Audit Log"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "Other-Name"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", other.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: user.email
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", user.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: other.ubid
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", other.ubid, "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "not-a-ubid-or-name"
+      click_button "Search"
+      expect(audit_log_content).to be_empty
+    end
+  end
+
+  describe "admin authentication audit log" do
+    def insert_account_audit_log(account_id: DB[:admin_account].get(:id), message: "login", metadata: {"ip" => "127.0.0.1"}, at: Sequel::CURRENT_TIMESTAMP)
+      DB[:admin_account_authentication_audit_log].returning(:id).insert(
+        account_id:,
+        message:,
+        metadata: Sequel.pg_jsonb(metadata),
+        at:,
+      ).first[:id]
+    end
+
+    def audit_log_content
+      page.all("#audit-log-search-results td:not(:first-child):not(:only-child)").map(&:text)
+    end
+
+    before do
+      DB[:admin_account_authentication_audit_log].delete
+    end
+
+    it "can view authentication audit log entries" do
+      insert_account_audit_log
+
+      click_link "View Admin Authentication Audit Logs"
+
+      expect(page.title).to eq("Ubicloud Admin - Admin Authentication Audit Log")
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+    end
+
+    it "can filter by action" do
+      insert_account_audit_log
+      insert_account_audit_log(message: "login_failure")
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", "admin", "ip: 127.0.0.1",
+        "login_failure", "admin", "ip: 127.0.0.1",
+      ]
+
+      click_link "login_failure"
+      expect(audit_log_content).to eq ["login_failure", "admin", "ip: 127.0.0.1"]
+
+      fill_in "Action", with: "login"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+    end
+
+    it "can filter by metadata" do
+      insert_account_audit_log(metadata: {"ip" => "1.2.3.4"})
+      insert_account_audit_log(message: "login_failure", metadata: {"ip" => "9.9.9.9"})
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "login", "admin", "ip: 1.2.3.4",
+        "login_failure", "admin", "ip: 9.9.9.9",
+      ]
+
+      click_link "ip: 1.2.3.4"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 1.2.3.4"]
+
+      fill_in "Metadata", with: "ip=9.9.9.9"
+      click_button "Search"
+      expect(audit_log_content).to eq ["login_failure", "admin", "ip: 9.9.9.9"]
+    end
+
+    it "can filter by account login and ubid" do
+      described_class.create_admin_account("other-admin")
+      insert_account_audit_log
+      insert_account_audit_log(account_id: DB[:admin_account].where(login: "other-admin").get(:id), message: "login_failure")
+
+      click_link "View Admin Authentication Audit Logs"
+      expect(audit_log_content).to eq [
+        "create_account", "other-admin", "",
+        "login", "admin", "ip: 127.0.0.1",
+        "login_failure", "other-admin", "ip: 127.0.0.1",
+      ]
+
+      click_link "admin"
+      expect(audit_log_content).to eq ["login", "admin", "ip: 127.0.0.1"]
+
+      fill_in "Account", with: "other-admin"
+      click_button "Search"
+      expect(audit_log_content).to eq [
+        "create_account", "other-admin", "",
+        "login_failure", "other-admin", "ip: 127.0.0.1",
+      ]
+
+      fill_in "Account", with: "not-a-ubid-or-name"
+      click_button "Search"
+      expect(audit_log_content).to be_empty
     end
   end
 end

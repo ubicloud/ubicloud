@@ -98,7 +98,7 @@ class Strand < Sequel::Model
     .returning
     .where(
       Sequel[id: DB[:strand].select(:id).where(id: :$id).for_no_key_update.skip_locked, exitval: nil] &
-        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP)
+        (Sequel[:lease] < Sequel::CURRENT_TIMESTAMP),
     )
     .prepare_sql_type(:update)
     .prepare(:first, :strand_take_lease_and_reload,
@@ -174,6 +174,8 @@ SQL
     Object.const_get("::Prog::" + prog).new(self, snap)
   end
 
+  POSTGRES_SERVER_WITH_RESOURCE = ->(s) { s.is_a?(PostgresServer) && s.resource }
+
   def unsynchronized_run
     start_time = Time.now
     prog_label = "#{prog}.#{label}"
@@ -184,35 +186,33 @@ SQL
 
       top_frame.delete("deadline_target")
       top_frame.delete("deadline_at")
+      top_frame.delete("deadline_start")
 
       modified!(:stack)
     end
 
     effective_prog = prog
     stack.each do |frame|
-      if (deadline_at = frame["deadline_at"])
-        if Time.now > Time.parse(deadline_at.to_s)
-          sbj = subject
-          extra_data = case sbj
-          when Vm
-            {vm_host: sbj.vm_host&.ubid, data_center: sbj.vm_host&.data_center, boot_image: sbj.boot_image, location: sbj.location.display_name, arch: sbj.arch, vcpus: sbj.vcpus, ipv4: sbj.ip4_string}
-          when VmHost
-            {data_center: sbj.data_center, location: sbj.location.display_name, arch: sbj.arch, ipv4: sbj.sshable.host, total_cores: sbj.total_cores, allocation_state: sbj.allocation_state, os_version: sbj.os_version, vm_count: sbj.vms_dataset.count}
-          when VmHostSlice
-            vm_host = sbj.vm_host
-            {vm_host: vm_host.ubid, data_center: vm_host.data_center, location: vm_host.location.display_name, arch: vm_host.arch}
-          when GithubRunner
-            {label: sbj.label, installation: sbj.installation.ubid, vm: sbj.vm&.ubid, vm_host: sbj.vm&.vm_host&.ubid, data_center: sbj.vm&.vm_host&.data_center}
-          when PostgresServer
-            {resource_name: sbj.resource.name, role: sbj.primary? ? "primary" : "standby",
-             location: sbj.resource.location.display_name, needs_recycling: sbj.needs_recycling?}
-          else
-            {}
-          end
-          extra_data.compact!
-          Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
-          modified!(:stack)
+      if (deadline_at = frame["deadline_at"]) && start_time > Time.parse(deadline_at)
+        sbj = subject
+        extra_data = case sbj
+        when Vm
+          {vm_host: sbj.vm_host&.ubid, data_center: sbj.vm_host&.data_center, boot_image: sbj.boot_image, location: sbj.location.display_name, arch: sbj.arch, vcpus: sbj.vcpus, ipv4: sbj.ip4_string}
+        when VmHost
+          {data_center: sbj.data_center, location: sbj.location.display_name, arch: sbj.arch, ipv4: sbj.sshable.host, total_cores: sbj.total_cores, allocation_state: sbj.allocation_state, os_version: sbj.os_version, vm_count: sbj.vms_dataset.count}
+        when VmHostSlice
+          vm_host = sbj.vm_host
+          {vm_host: vm_host.ubid, data_center: vm_host.data_center, location: vm_host.location.display_name, arch: vm_host.arch}
+        when GithubRunner
+          {label: sbj.label, installation: sbj.installation.ubid, vm: sbj.vm&.ubid, vm_host: sbj.vm&.vm_host&.ubid, data_center: sbj.vm&.vm_host&.data_center}
+        when POSTGRES_SERVER_WITH_RESOURCE
+          {resource_name: sbj.resource.name, role: sbj.primary? ? "primary" : "standby", location: sbj.resource.location.display_name, needs_recycling: sbj.needs_recycling?}
+        else
+          {}
         end
+        extra_data.compact!
+        Prog::PageNexus.assemble("#{ubid} has an expired deadline! #{effective_prog}.#{label} did not reach #{frame["deadline_target"]} on time", ["Deadline", id, effective_prog, frame["deadline_target"]], ubid, extra_data:)
+        modified!(:stack)
       end
 
       if (link = frame["link"])
@@ -221,7 +221,7 @@ SQL
     end
 
     unless top_frame["last_label_changed_at"]
-      top_frame["last_label_changed_at"] = Time.now.to_s
+      top_frame["last_label_changed_at"] = time_string(start_time)
       modified!(:stack)
     end
 
@@ -234,9 +234,11 @@ SQL
     rescue Prog::Base::Nap => e
       save_changes
 
-      scheduled = DB[<<SQL, e.seconds, id].get
+      scheduled = DB[<<SQL, schedule, e.seconds, id].get
 UPDATE strand
-SET try = 0, schedule = now() + (? * '1 second'::interval)
+SET try = 0,
+    schedule = CASE WHEN schedule = ? THEN now() + (? * '1 second'::interval)
+                    ELSE schedule END
 WHERE id = ?
 RETURNING schedule
 SQL
@@ -303,6 +305,10 @@ SQL
         end
       end
     end
+  end
+
+  def time_string(time)
+    time.strftime("%F %T.%6N %z")
   end
 end
 

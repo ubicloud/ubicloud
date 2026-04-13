@@ -1,0 +1,13 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require_relative "../lib/vm_stats"
+
+unless (vm_name = ARGV.shift)
+  warn "expected VM name"
+  exit 1
+end
+
+vm_stats = VmStats.new(vm_name)
+puts JSON.pretty_generate(vm_stats.collect)

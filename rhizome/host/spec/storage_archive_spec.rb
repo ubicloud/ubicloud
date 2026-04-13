@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../lib/storage_archive"
+require "tmpdir"
 
 RSpec.describe StorageArchive do
   let(:disk_config_path) { "/var/storage/test/2/vhost-backend.conf" }
@@ -14,7 +15,7 @@ RSpec.describe StorageArchive do
       "endpoint" => "https://s3.example.com",
       "access_key_id" => "abc",
       "secret_access_key" => "def",
-      "archive_kek" => {"algorithm" => "aes-256-gcm", "key" => "Zm9v"}
+      "archive_kek" => {"algorithm" => "aes-256-gcm", "key" => "Zm9v"},
     }
   }
 
@@ -123,12 +124,12 @@ allow_inline_plaintext_secrets = true
           "--config", disk_config_path,
           "--target-config", "/dev/stdin",
           "--compression", "zstd",
-          "--zstd-level", "3"
+          "--zstd-level", "3",
         ],
         kek_pipe: disk_kek_path,
         kek_content: "Zm9v",
         env: {"RUST_LOG" => "info"},
-        stdin: built_config
+        stdin: built_config,
       )
 
       archive.archive
@@ -146,7 +147,7 @@ allow_inline_plaintext_secrets = true
         "--target-config", "/dev/stdin",
         "--compression", "zstd",
         "--zstd-level", "3",
-        stdin: built_config
+        stdin: built_config,
       )
 
       archive.archive
@@ -155,37 +156,41 @@ allow_inline_plaintext_secrets = true
 
   describe ".archive_url" do
     it "downloads image, creates disk with rounded-up size, writes config, and archives" do
-      tmpdir = "/tmp/test-archive-url"
-      boot_image = instance_double(BootImage, image_path: "#{tmpdir}/image.raw")
-      archive_instance = instance_double(described_class)
-      vp = instance_double(VhostBlockBackend, init_metadata_path: "/opt/vhost-block-backend/v0.4.0/init-metadata")
+      Dir.mktmpdir do |tmpdir|
+        allow(Dir).to receive(:mktmpdir).and_yield(tmpdir)
+        expect_any_instance_of(BootImage).to receive(:download).with(url: "https://example.com/image.raw", sha256sum: "abc123") do
+          File.write("#{tmpdir}/image.raw", "x" * (1024 * 1024 * 5 + 1))
+        end
 
-      allow(Dir).to receive(:mktmpdir).and_yield(tmpdir)
-      allow(BootImage).to receive(:new).with("image", nil, image_root: tmpdir).and_return(boot_image)
-      allow(File).to receive(:size).with(boot_image.image_path).and_return(1024 * 1024 * 5 + 1)
+        expect(described_class).to receive(:r).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw").and_call_original
+        expect(described_class).to receive(:r).with({"RUST_LOG" => "info"}, "/opt/vhost-block-backend/v0.4.0/init-metadata", "--config", "#{tmpdir}/vhost-backend.conf")
+        expect_any_instance_of(described_class).to receive(:r).with(
+          {"RUST_LOG" => "info"},
+          "/opt/vhost-block-backend/v0.4.0/archive",
+          "--config", "#{tmpdir}/vhost-backend.conf",
+          "--target-config", "/dev/stdin",
+          "--compression", "zstd",
+          "--zstd-level", "3",
+          stdin: instance_of(String),
+        )
 
-      expect(boot_image).to receive(:download).with(url: "https://example.com/image.raw", sha256sum: "abc123")
-      expect(described_class).to receive(:r).with("truncate", "-s", "6M", "#{tmpdir}/disk.raw")
-      expect(described_class).to receive(:safe_write_to_file).with("#{tmpdir}/vhost-backend.conf", <<~CONFIG
-[device]
-data_path = "/tmp/test-archive-url/disk.raw"
-metadata_path = "/tmp/test-archive-url/metadata"
+        described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0")
 
-[stripe_source]
-type = "raw"
-image_path = "/tmp/test-archive-url/image.raw"
+        expect(File.size("#{tmpdir}/disk.raw")).to eq(6 * 1024 * 1024)
+        expect(File.read("#{tmpdir}/vhost-backend.conf")).to eq(<<~CONFIG)
+          [device]
+          data_path = "#{tmpdir}/disk.raw"
+          metadata_path = "#{tmpdir}/metadata"
 
-[danger_zone]
-enabled = true
-allow_unencrypted_disk = true
-      CONFIG
-      )
-      expect(VhostBlockBackend).to receive(:new).with("v0.4.0").and_return(vp)
-      expect(described_class).to receive(:r).with({"RUST_LOG" => "info"}, vp.init_metadata_path, "--config", "#{tmpdir}/vhost-backend.conf")
-      expect(described_class).to receive(:new).with("#{tmpdir}/vhost-backend.conf", nil, nil, target_conf, "v0.4.0").and_return(archive_instance)
-      expect(archive_instance).to receive(:archive)
+          [stripe_source]
+          type = "raw"
+          image_path = "#{tmpdir}/image.raw"
 
-      described_class.archive_url("https://example.com/image.raw", "abc123", target_conf, "v0.4.0")
+          [danger_zone]
+          enabled = true
+          allow_unencrypted_disk = true
+        CONFIG
+      end
     end
   end
 end

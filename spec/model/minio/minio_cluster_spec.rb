@@ -11,7 +11,7 @@ RSpec.describe MinioCluster do
       admin_password: "dummy-password",
       root_cert_1: "root_cert_1",
       root_cert_2: "root_cert_2",
-      project_id: Project.create(name: "test").id
+      project_id: Project.create(name: "test").id,
     )
     mp = MinioPool.create(
       cluster_id: mc.id,
@@ -19,13 +19,13 @@ RSpec.describe MinioCluster do
       server_count: 1,
       drive_count: 1,
       storage_size_gib: 100,
-      vm_size: "standard-2"
+      vm_size: "standard-2",
     )
 
     MinioServer.create(
       minio_pool_id: mp.id,
       vm_id: create_vm.id,
-      index: 0
+      index: 0,
     )
     mc
   }

@@ -11,8 +11,8 @@ class Serializers::InferenceEndpoint < Serializers::Base
       tags: ie.tags.slice("hf_model", "capability", "multimodal", "context_length"),
       price: {
         per_million_prompt_tokens: BillingRate.million_token_price(ie.prompt_billing_resource),
-        per_million_completion_tokens: BillingRate.million_token_price(ie.completion_billing_resource)
-      }
+        per_million_completion_tokens: BillingRate.million_token_price(ie.completion_billing_resource),
+      },
     }
   end
 end

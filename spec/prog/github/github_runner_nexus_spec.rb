@@ -15,7 +15,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     installation_id = GithubInstallation.create(installation_id: 123, project_id: customer_project.id, name: "ubicloud", type: "Organization", created_at: now - 8 * 24 * 60 * 60).id
     vm_id = create_vm(location_id: Location::GITHUB_RUNNERS_ID, project_id: runner_project.id, boot_image: "github-ubuntu-2204").id
     Sshable.create_with_id(vm_id)
-    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, workflow_job: {"id" => 123})
+    runner = GithubRunner.create(installation_id:, vm_id:, repository_name: "test-repo", label: "ubicloud-standard-4", actual_label: "ubicloud-standard-4", created_at: now, allocated_at: now + 10, ready_at: now + 20, runner_id: 123, workflow_job: {"id" => 123})
     Strand.create_with_id(runner, prog: "Github::GithubRunnerNexus", label: "start")
     runner
   end
@@ -116,8 +116,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       project.set_ff_aws_alien_runners_ratio(0.5)
       expect(nx).to receive(:rand).and_return(0.4)
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
@@ -137,8 +137,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     it "uses alien x64 vms if spilled over" do
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m7a")
@@ -150,8 +150,8 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       runner.update(label: "ubicloud-arm")
       runner.incr_spill_over
       location = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true)
-      LocationCredential.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
-      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
+      LocationCredentialAws.create(access_key: "test-access-key", secret_key: "test-secret-key") { it.id = location.id }
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "euc1-az1")
       expect(Config).to receive(:github_runner_aws_location_id).and_return(location.id)
       picked_vm = nx.pick_vm
       expect(picked_vm.family).to eq("m8g")
@@ -312,7 +312,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.start }.to hop("allocate_vm")
     end
 
-    it "hops to apply_custom_label if there is capacity and the label is a custom label" do
+    it "hops to apply_custom_label_quota if there is capacity and the label is a custom label" do
       GithubCustomLabel.create(installation_id: installation.id, name: "custom-label-1", alias_for: "ubicloud-standard-4", concurrent_runner_count_limit: 10, allocated_runner_count: 0)
       expect(project).to receive(:quota_available?).with("GithubRunnerVCpu", 0).and_return(true)
       expect(project).to receive(:active?).and_return(true)
@@ -335,7 +335,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
         [Location::HETZNER_FSN1_ID, "x64", "standard"],
         [Location::GITHUB_RUNNERS_ID, "x64", "standard"],
         [Location::GITHUB_RUNNERS_ID, "x64", "premium"],
-        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"]
+        [Location::GITHUB_RUNNERS_ID, "arm64", "standard"],
       ].each do |location_id, arch, family|
         create_vm_host(location_id:, arch:, family:, total_cores: 16, used_cores: 16)
       end
@@ -701,23 +701,73 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect { nx.register_runner }.to raise_error Sshable::SshError
     end
 
-    it "destroys the runner if generate request fails due to self runners disabled error" do
+    it "handles common GitHub API errors during registration" do
       expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}))
       expect { nx.register_runner }.to nap(0)
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
     end
+  end
 
-    it "fails if it raises unexpected Octokit error" do
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "Unexpected error"}))
-      expect { nx.register_runner }.to raise_error Octokit::Error
+  describe "#rescue_common_github_api_errors" do
+    it "naps until rate limit resets and creates a page when rate limited" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 300))
+      refresh_frame(nx, new_values: {"deadline_target" => "wait", "deadline_at" => (now - 5 * 60).to_s})
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(300)
+        .and change { Page.count }.by(1)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 10 * 60)
+      expect(Page.first).to have_attributes(
+        summary: "GitHub API rate limit exceeded for installation #{installation.ubid}",
+        tag: Page.generate_tag(["GithubRateLimitExceeded", installation.ubid]),
+        severity: "warning",
+      )
     end
 
-    it "destroys the runner if generate request fails due to IP allowlist enabled error" do
-      expect(client).to receive(:post).and_raise(Octokit::Error.new({body: "your IP address is not permitted to access this resource"}))
-      expect { nx.register_runner }.to nap(0)
+    it "naps at least 30 seconds even if rate limit resets sooner" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 5))
+      nx.incr_destroying
+      refresh_frame(nx, new_values: {"deadline_target" => nil, "deadline_at" => (now - 5 * 60).to_s})
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap(30)
+      expect(Time.parse(nx.frame["deadline_at"])).to eq(now + 15 * 60)
+    end
+
+    it "destroys the runner if the rate limit reset is more than 10 minutes away while provisioning" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 11 * 60))
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
         .and change { Page.count }.by(1)
       expect(runner.destroy_set?).to be(true)
+    end
+
+    it "skips the deregistration if the rate limit reset is more than 15 minutes away while destroying" do
+      expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 0, limit: 5000, resets_at: now + 16 * 60))
+      nx.incr_destroying
+      expect { nx.rescue_common_github_api_errors { raise Octokit::TooManyRequests } }.to nap
+        .and change { Page.count }.by(1)
+      expect(runner.skip_deregistration_set?).to be(true)
+    end
+
+    it "destroys the runner if self-hosted runners are disabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Repository level self-hosted runners are disabled"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "destroys the runner if IP allowlist is enabled" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "your IP address is not permitted to access this resource"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "destroys the runner if resource not accessible by integration" do
+      repo = GithubRepository.create(name: "test-repo", installation_id: runner.installation_id)
+      runner.update(repository_id: repo.id)
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Resource not accessible by integration"}) } }.to nap(0)
+        .and change { Page.count }.by(1)
+      expect(runner.destroy_set?).to be(true)
+    end
+
+    it "re-raises unexpected Octokit errors" do
+      expect { nx.rescue_common_github_api_errors { raise Octokit::Error.new({body: "Unexpected error"}) } }.to raise_error Octokit::Error
     end
   end
 
@@ -791,7 +841,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "raises ssh exception again if aws instance not terminated due to interruption" do
       location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
-      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      LocationCredentialAws.create_with_id(location_id, access_key: "key", secret_key: "secret")
       vm.update(location_id:)
       AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
       client = Aws::EC2::Client.new(stub_responses: true)
@@ -810,7 +860,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
 
     it "logs when aws instance terminated due to interruption" do
       location_id = Location.create(name: "eu-central-1", provider: "aws", project_id: vm.project_id, display_name: "aws-eu-central-1", ui_name: "AWS Frankfurt", visible: true).id
-      LocationCredential.create_with_id(location_id, access_key: "key", secret_key: "secret")
+      LocationCredentialAws.create_with_id(location_id, access_key: "key", secret_key: "secret")
       vm.update(location_id:)
       AwsInstance.create_with_id(vm, instance_id: "i-0123456789abcdefg")
       client = Aws::EC2::Client.new(stub_responses: true)
@@ -918,7 +968,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       [
         {"time" => "2026-02-16T16:20:55.146469774Z", "level" => "ERROR", "msg" => "Request failed with unexpected status code", "version" => "0.7.0", "error_type" => "backend", "function_name" => "GetCacheEntry", "status_code" => 500},
         {"time" => "2026-02-16T16:20:55.730648373Z", "level" => "WARN", "msg" => "Retrying request", "version" => "0.7.0", "error_type" => "r2", "retry_count" => 1, "max_retries" => 3, "error" => "write tcp: connection reset by peer", "status_code" => 0},
-        "invalid json line"
+        "invalid json line",
       ].each do |message|
         expect(Clog).to receive(:emit).with("Cache proxy error", {cache_proxy_error: {message:, label: "ubicloud-standard-4", repository_name: "test-repo", conclusion: "success", vm_host_ubid: vm.vm_host.ubid, data_center: "FSN1-DC8"}})
       end
@@ -976,6 +1026,7 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
     end
 
     it "naps if runner still running a job" do
+      runner.update(workflow_job: nil)
       expect(client).to receive(:get).and_return(busy: true)
 
       expect { nx.destroy }.to nap(15)
@@ -1005,6 +1056,20 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(vm).to receive(:incr_destroy)
 
       expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "skips deregistration when workflow job status is completed" do
+      runner.update(workflow_job: {"status" => "completed"})
+      expect(client).not_to receive(:get)
+
+      expect { nx.destroy }.to hop("wait_vm_destroy")
+    end
+
+    it "do not skip deregistration when workflow job status is not completed" do
+      runner.update(workflow_job: {"status" => "in_progress"})
+      expect(client).to receive(:get).and_return(busy: true)
+
+      expect { nx.destroy }.to nap(15)
     end
 
     it "does not collect telemetry if the vm not allocated" do
@@ -1067,6 +1132,13 @@ RSpec.describe Prog::Github::GithubRunnerNexus do
       expect(runner).to receive(:destroy)
 
       expect { nx.wait_vm_destroy }.to exit({"msg" => "github runner deleted"})
+    end
+  end
+
+  describe ".busy?" do
+    it "returns nil if runner_id is not set" do
+      runner.runner_id = nil
+      expect(nx.busy?).to be_nil
     end
   end
 end

@@ -30,6 +30,7 @@ Requires=pgbouncer@%i.socket
 [Service]
 Type=notify
 User=postgres
+LimitNOFILE=65536
 ExecStart=/usr/sbin/pgbouncer /etc/pgbouncer/pgbouncer_%i.ini
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
@@ -97,6 +98,7 @@ auth_type = hba
 auth_hba_file = /etc/postgresql/#{@version}/main/pg_hba.conf
 auth_ident_file = /etc/postgresql/#{@version}/main/pg_ident.conf
 auth_user = pgbouncer
+auth_dbname = ubi_admin
 auth_query = SELECT p_user, p_password FROM pgbouncer.get_auth($1)
 
 client_tls_sslmode = require
@@ -106,6 +108,7 @@ client_tls_cert_file = /etc/ssl/certs/server.crt
 client_tls_key_file = /etc/ssl/certs/server.key
 
 user = postgres
+stats_users = postgres
 
 pool_mode = transaction
 

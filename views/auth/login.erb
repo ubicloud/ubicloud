@@ -40,7 +40,7 @@
     <% end %>
   <% end %>
 
-  <% if !rodauth.valid_login_entered? || rodauth.has_password? %>
+  <% if rodauth.valid_login_entered? %>
     <div class="flex items-center justify-between">
       <div class="flex items-center">
         <input
@@ -53,12 +53,14 @@
         <label for="remember-me" class="ml-2 block text-sm text-gray-900">Remember me</label>
       </div>
 
-      <div class="text-sm">
-        <a
-          href="/reset-password-request?login=<%= Rack::Utils.escape(rodauth.param("login")) %>"
-          class="font-medium text-orange-600 hover:text-orange-700"
-        >Forgot your password?</a>
-      </div>
+      <% if rodauth.has_password? %>
+        <div class="text-sm">
+          <a
+            href="/reset-password-request?login=<%= Rack::Utils.escape(rodauth.param("login")) %>"
+            class="font-medium text-orange-600 hover:text-orange-700"
+          >Forgot your password?</a>
+        </div>
+      <% end %>
     </div>
   <% end %>
 

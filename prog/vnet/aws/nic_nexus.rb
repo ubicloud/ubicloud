@@ -30,7 +30,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
     nic.nic_aws_resource.update(
       subnet_id: aws_subnet.subnet_id,
       subnet_az: aws_subnet.az_suffix,
-      aws_subnet_id: aws_subnet.id
+      aws_subnet_id: aws_subnet.id,
     )
 
     hop_create_network_interface
@@ -43,10 +43,10 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
         private_ip_address: nic.private_ipv4.network.to_s,
         ipv_6_prefix_count: 1,
         groups: [
-          private_subnet.private_subnet_aws_resource.security_group_id
+          private_subnet.private_subnet_aws_resource.security_group_id,
         ],
         tag_specifications: Util.aws_tag_specifications("network-interface", nic.name),
-        client_token: nic.id
+        client_token: nic.id,
       })
       network_interface_id = network_interface_response.network_interface.network_interface_id
     rescue Aws::EC2::Errors::InvalidIPAddressInUse
@@ -54,8 +54,8 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
           {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
-          {name: "status", values: ["available"]}
-        ]
+          {name: "status", values: ["available"]},
+        ],
       }).network_interfaces
       fail "No available network interface found for IP #{nic.private_ipv4.network}" if network_interfaces.empty?
       network_interface_id = network_interfaces[0].network_interface_id
@@ -154,7 +154,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   def client
-    @client ||= private_subnet.location.location_credential.client
+    @client ||= private_subnet.location.location_credential_aws.client
   end
 
   def private_subnet

@@ -6,12 +6,12 @@ require_relative "../../common/lib/util"
 
 class VhostBlockBackend
   SHA256_BY_VERSION_AND_ARCH = {
-    ["v0.4.0", :x64] => "c74f1d4bef624d5f46e3763d6d63ac79ca3e8f3fccd1696840266398834d53d0",
-    ["v0.4.0", :arm64] => "65dd7354b087a07fca7d35bca00014532fd636e7aae838e32d87ee0d37284fad",
+    ["v0.4.1", :x64] => "8b6af36a1dd24be28cacde3221bdf9895c5afe6e997853b1bc1954acca5b5b35",
+    ["v0.4.1", :arm64] => "6a90963900b39241b6c8fc626ea500bb4199a9d284f1249f13284574829322cd",
     ["v0.3.1", :x64] => "3b4a6d3387a8da7c914d85203955c0a879168518aed76679a334070403630262",
     ["v0.3.1", :arm64] => "d7cd297468569a0fa197d48eb7d21b64aea9598895d1b5b97da8bec5e307d57b",
     ["v0.2.2", :x64] => "f5b7b2b88fa18e5070ff319b15363aed671e496d9f6cccec3bbcc48a6f38a44a",
-    ["v0.2.2", :arm64] => "7f4a5818fdab4e7524855096352d9ceaa038ff254de2b52c88d491f76a05686f"
+    ["v0.2.2", :arm64] => "7f4a5818fdab4e7524855096352d9ceaa038ff254de2b52c88d491f76a05686f",
   }.freeze
 
   SHA256_BY_VERSION_AND_ARCH.each_key(&:freeze)

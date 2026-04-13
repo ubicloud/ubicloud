@@ -12,7 +12,7 @@ RSpec.describe Prog::Minio::MinioPoolNexus do
       admin_user: "minio-admin",
       admin_password: "dummy-password",
       private_subnet_id: ps.id,
-      project_id: minio_project.id
+      project_id: minio_project.id,
     )
   }
   let(:minio_cluster_strand) { Strand.create_with_id(minio_cluster, prog: "Minio::MinioClusterNexus", label: "wait") }

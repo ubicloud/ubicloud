@@ -25,14 +25,10 @@ ENV["OMNIAUTH_GOOGLE_ID"] = "1234567890"
 
 require "warning"
 Warning.ignore(:void_context, /.*ubicloud\/loader\.rb/)
-Warning.ignore(:method_redefined, /.*lib\/net\/ssh\/transport\/gcm_cipher\.rb/)
-Warning.ignore([:not_reached, :unused_var], /.*lib\/mail\/parser/)
-Warning.ignore([:mismatched_indentations], /.*lib\/stripe\/api_operations/)
-Warning.ignore([:unused_var], /.*lib\/aws-sdk-(s3|core)\/(endpoint_provider|cbor)/)
-Warning.ignore(/URI::ABS_URI is obsolete/, /.*lib\/omniauth\/strategy\.rb/)
 Warning.ignore(/URI::RFC3986_PARSER.make_regexp is obsolete/, /.*lib\/capybara\/session\/config\.rb/)
 # https://github.com/prawnpdf/prawn/issues/1349
 Warning.ignore(/circular require considered harmful/, /.*lib\/prawn\/fonts\.rb/)
+Warning.ignore(%r{CGI library is removed from Ruby 4\.0. Please use cgi/escape instead for CGI\.escape and CGI\.unescape features\.}, %r{.*(lib/capybara/rack_test/driver\.rb|lib/stripe\.rb)})
 
 require_relative "coverage_helper"
 require_relative "common/postgres"
@@ -275,11 +271,37 @@ RSpec.configure do |config|
       Vm.create(**args)
     end
 
+    def create_vhost_block_backend(version: "v0.4.1", **)
+      args = {version:, allocation_weight: 100, **}
+      args[:vm_host_id] ||= create_vm_host.id
+      VhostBlockBackend.create(**args)
+    end
+
+    def create_machine_image_version_metal(project_id: nil, machine_image_id: nil, machine_image_store_id: nil, version: "v1", location_id: Location::HETZNER_FSN1_ID, store_prefix: "prefix/path")
+      project_id ||= Project.create(name: "miv-metal-project").id
+      machine_image_store_id ||= MachineImageStore.create(project_id:, location_id:, provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/", bucket: "test-bucket", access_key: "ak", secret_key: "sk").id
+      machine_image_id ||= MachineImage.create(name: "test-mi", project_id:, arch: "x64", location_id:).id
+      miv = MachineImageVersion.create(machine_image_id:, version:)
+      archive_kek = StorageKeyEncryptionKey.create_random(auth_data: "auth_data")
+      MachineImageVersionMetal.create_with_id(miv, archive_kek_id: archive_kek.id, store_id: machine_image_store_id, store_prefix:, enabled: true, archive_size_mib: 1024)
+    end
+
+    def create_vm_host_slice(**args)
+      args = {name: "testslice", family: "standard", cores: 1, total_cpu_percent: 200, used_cpu_percent: 0, total_memory_gib: 8, used_memory_gib: 0}.merge!(args)
+      args[:vm_host_id] ||= create_vm_host.id
+      VmHostSlice.create(**args)
+    end
+
     def create_hosted_vm(project, private_subnet, name)
-      Prog::Vm::Nexus.assemble_with_sshable(
+      vm = Prog::Vm::Nexus.assemble_with_sshable(
         project.id, name:, private_subnet_id: private_subnet.id,
-        location_id: location.id, unix_user: "ubi"
+        location_id: location.id, unix_user: "ubi",
       ).subject
+      # YYY: We moved storage volume creation from allocation to Nexus.assemble,
+      # but many of the tests rely on VMs without storage volumes. We will need
+      # to update those tests and remove the following hack.
+      vm.vm_storage_volumes_dataset.each(&:destroy)
+      vm
     end
 
     def create_vm_from_size(size, arch, **args)
@@ -290,7 +312,7 @@ RSpec.configure do |config|
         cpu_percent_limit: vm_size.cpu_percent_limit,
         cpu_burst_percent_limit: vm_size.cpu_burst_percent_limit,
         memory_gib: vm_size.memory_gib,
-        arch:
+        arch:,
       }
 
       args = args_from_size.merge(args)

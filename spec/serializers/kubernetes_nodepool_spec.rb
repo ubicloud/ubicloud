@@ -14,7 +14,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,
         project_id: project.id,
-        target_node_size: "standard-2"
+        target_node_size: "standard-2",
       )
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
       vm = create_vm
@@ -26,7 +26,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         kubernetes_cluster_id: kc.ubid,
         node_count: 2,
         node_size: "standard-2",
-        vms: Serializers::Vm.serialize([vm])
+        vms: Serializers::Vm.serialize([vm]),
       }
 
       expect(described_class.serialize_internal(kn, {detailed: true})).to eq(expected_result)
@@ -42,7 +42,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         private_subnet_id: subnet.id,
         location_id: Location::HETZNER_FSN1_ID,
         project_id: project.id,
-        target_node_size: "standard-2"
+        target_node_size: "standard-2",
       )
       kn = KubernetesNodepool.create(name: "nodepool", node_count: 2, kubernetes_cluster_id: kc.id, target_node_size: "standard-2")
 
@@ -51,7 +51,7 @@ RSpec.describe Serializers::KubernetesNodepool do
         name: "nodepool",
         kubernetes_cluster_id: kc.ubid,
         node_count: 2,
-        node_size: "standard-2"
+        node_size: "standard-2",
       }
 
       expect(described_class.serialize_internal(kn)).to eq(expected_result)

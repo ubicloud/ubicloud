@@ -11,12 +11,12 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       {
         vm_host_id: vm_host.id, server_id: vm_host.provider.server_identifier,
         hostname: vm_host.sshable.host, setup_host: false,
-        default_boot_images:, provider_name: vm_host.provider_name
+        default_boot_images:, provider_name: vm_host.provider_name,
       }
     else
       {
         server_id: Config.e2e_hetzner_server_id, setup_host: true,
-        default_boot_images:, provider_name: HostProvider::HETZNER_PROVIDER_NAME
+        default_boot_images:, provider_name: HostProvider::HETZNER_PROVIDER_NAME,
       }
     end
 
@@ -27,7 +27,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
     Strand.create(
       prog: "Test::HetznerServer",
       label: "start",
-      stack: [frame]
+      stack: [frame],
     )
   end
 
@@ -45,7 +45,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
   label def reimage
     hetzner_api.reimage(
       frame["server_id"],
-      dist: "Ubuntu 24.04 LTS base"
+      dist: "Ubuntu 24.04 LTS base",
     )
 
     hop_wait_reimage
@@ -66,7 +66,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
       frame["hostname"],
       provider_name: HostProvider::HETZNER_PROVIDER_NAME,
       server_identifier: frame["server_id"],
-      default_boot_images: frame["default_boot_images"]
+      default_boot_images: frame["default_boot_images"],
     ).subject
     update_stack({"vm_host_id" => vm_host.id})
 
@@ -198,7 +198,7 @@ class Prog::Test::HetznerServer < Prog::Test::Base
         hp.server_identifier = frame["server_id"]
         hp.provider_name = HostProvider::HETZNER_PROVIDER_NAME
         hp.id = frame["vm_host_id"]
-      end
+      end,
     )
   end
 

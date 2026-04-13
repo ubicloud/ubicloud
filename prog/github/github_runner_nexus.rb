@@ -15,7 +15,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Config.github_ubuntu_2204_x64_aws_ami_version,
     Config.github_ubuntu_2404_x64_aws_ami_version,
     Config.github_ubuntu_2204_arm64_aws_ami_version,
-    Config.github_ubuntu_2404_arm64_aws_ami_version
+    Config.github_ubuntu_2404_arm64_aws_ami_version,
   ].freeze
 
   def self.assemble(installation, repository_name:, label:, actual_label: nil, default_branch: nil)
@@ -30,7 +30,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         repository_name:,
         repository_id:,
         label:,
-        actual_label: actual_label || label
+        actual_label: actual_label || label,
       )
 
       Strand.create_with_id(github_runner, prog: "Github::GithubRunnerNexus", label: "start")
@@ -51,8 +51,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         boot_image: label_data["boot_image"],
         location_id: Location::GITHUB_RUNNERS_ID,
         storage_size_gib: label_data["storage_size_gib"],
-        storage_encrypted: true,
-        arch:
+        arch:,
       ).first
     end
 
@@ -85,7 +84,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       location_id:,
       allow_only_ssh: true,
       ipv4_range_size: 28,
-      preferred_azs:
+      preferred_azs:,
     ).subject
 
     vm_st = Prog::Vm::Nexus.assemble_with_sshable(
@@ -101,7 +100,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
       arch:,
       swap_size_bytes: 4294963200, # ~4096MB, the same value with GitHub hosted runners
       private_subnet_id: ps.id,
-      alternative_families:
+      alternative_families:,
     )
 
     vm_st.subject
@@ -146,7 +145,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
           resource_name: "Daily Usage #{begin_time.strftime("%Y-%m-%d")}",
           billing_rate_id: rate_id,
           span: Sequel.pg_range(begin_time...end_time),
-          amount: used_amount
+          amount: used_amount,
         )
       end
     rescue Sequel::Postgres::ExclusionConstraintViolation
@@ -164,8 +163,63 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   end
 
   def busy?
-    client.get(runners_path(github_runner.runner_id))[:busy]
+    return unless github_runner.runner_id
+    rescue_common_github_api_errors do
+      client.get(runners_path(github_runner.runner_id))[:busy]
+    end
   rescue Octokit::NotFound
+    nil
+  end
+
+  def rescue_common_github_api_errors
+    yield
+  rescue Octokit::TooManyRequests
+    rate_limit = client.rate_limit
+    installation_ubid = github_runner.installation.ubid
+    Prog::PageNexus.assemble(
+      "GitHub API rate limit exceeded for installation #{installation_ubid}",
+      ["GithubRateLimitExceeded", installation_ubid],
+      installation_ubid,
+      severity: "warning",
+      extra_data: {
+        remaining: rate_limit.remaining,
+        limit: rate_limit.limit,
+        resets_at: rate_limit.resets_at,
+      },
+    )
+    remaining_seconds = rate_limit.resets_at - Time.now
+    if destroying_set?
+      register_deadline(nil, 15 * 60, allow_extension: true)
+      if remaining_seconds >= 15 * 60
+        github_runner.incr_skip_deregistration
+        nap 0
+      end
+    else
+      register_deadline("wait", 10 * 60, allow_extension: true)
+      if remaining_seconds >= 10 * 60
+        github_runner.incr_destroy
+        nap 0
+      end
+    end
+    nap [remaining_seconds, 30].max
+  rescue Octokit::Error => e
+    installation_ubid = github_runner.installation.ubid
+    page_args = case e.message
+    when /Repository level self-hosted runners are disabled/
+      ["Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid]]
+    when /your IP address is not permitted to access this resource/
+      ["The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid]]
+    when /Resource not accessible by integration/
+      repository_ubid = github_runner.repository.ubid
+      ["Repository #{repository_ubid} not accessible by integration on #{installation_ubid}", ["GithubResourceNotAccessible", installation_ubid, repository_ubid]]
+    end
+
+    if page_args
+      Prog::PageNexus.assemble(*page_args, installation_ubid, severity: "warning")
+      github_runner.incr_destroy
+      nap 0
+    end
+    raise
   end
 
   def arch
@@ -317,8 +371,8 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         "Location" => vmh&.location&.name,
         "Datacenter" => vmh&.data_center,
         "Project" => project.ubid,
-        "Console URL" => "#{Config.base_url}#{project.path}/github"
-      }.map { "#{_1}: #{_2}" }.join("\n")
+        "Console URL" => "#{Config.base_url}#{project.path}/github",
+      }.map { "#{_1}: #{_2}" }.join("\n"),
     }
   end
 
@@ -373,7 +427,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     # recommended by GitHub for security reasons.
     # https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-just-in-time-runners
     data = {name: github_runner.ubid.to_s, labels: [github_runner.actual_label || github_runner.label], runner_group_id: 1, work_folder: "/home/runner/work"}
-    response = client.post(runners_path("generate-jitconfig"), data)
+    response = rescue_common_github_api_errors do
+      client.post(runners_path("generate-jitconfig"), data)
+    end
     github_runner.update(runner_id: response[:runner][:id], ready_at: Time.now)
     vm.sshable.cmd(<<~COMMAND, stdin: response[:encoded_jit_config])
     sudo -u runner tee /home/runner/actions-runner/.jit_token > /dev/null
@@ -410,19 +466,6 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     Clog.emit("The runner already exists but the runner script is started too", [github_runner, {existing_runner: {runner_id:}}])
     github_runner.update(runner_id:, ready_at: Time.now)
     hop_wait
-  rescue Octokit::Error => e
-    if e.message.include?("Repository level self-hosted runners are disabled")
-      installation_ubid = github_runner.installation.ubid
-      Prog::PageNexus.assemble("Repository level self-hosted runners are disabled on #{installation_ubid}", ["GithubSelfHostRunnersDisabled", installation_ubid], installation_ubid, severity: "warning")
-      github_runner.incr_destroy
-      nap 0
-    elsif e.message.include?("your IP address is not permitted to access this resource")
-      installation_ubid = github_runner.installation.ubid
-      Prog::PageNexus.assemble("The organization has an IP allow list enabled on #{installation_ubid}", ["GithubIPAllowlistEnabled", installation_ubid], installation_ubid, severity: "warning")
-      github_runner.incr_destroy
-      nap 0
-    end
-    raise
   end
 
   label def wait
@@ -432,7 +475,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     rescue *Sshable::SSH_CONNECTION_ERRORS
       if vm.location.aws? && vm.aws_instance
         instance_id = vm.aws_instance.instance_id
-        instance_response = vm.location.location_credential.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first&.instances&.first
+        instance_response = vm.location.location_credential_aws.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first&.instances&.first
         if instance_response && instance_response.dig(:state, :name) == "terminated" && instance_response.dig(:state_reason, :code) == "Server.SpotInstanceTermination"
           Clog.emit("Spot instance interrupted", [github_runner, {interrupted_runner: {instance_id:}}])
           github_runner.incr_destroy
@@ -498,7 +541,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         limit_window: match[2].to_i,
         remaining: match[3].to_i,
         remaining_window: match[4].to_i,
-        source: match[5]
+        source: match[5],
       }
       Clog.emit("Remaining DockerHub rate limits", {dockerhub_rate_limits:})
     end
@@ -532,14 +575,15 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
   label def destroy
     decr_destroy
 
-    # When we attempt to destroy the runner, we also deregister it from GitHub.
-    # We wait to receive a 'not found' response for the runner. If the runner is
-    # still running a job and, due to stale data, it gets mistakenly hopped to
-    # destroy, this prevents the underlying VM from being destroyed and the job
-    # from failing. However, in certain situations like fraudulent activity, we
-    # might need to bypass this verification and immediately remove the runner.
-    # If the busy? returns nil, it means it has already been deleted, so noop.
-    unless github_runner.skip_deregistration_set?
+    # If the runner is still running a job and mistakenly hopped to destroy due
+    # to stale data, we check with the GitHub API to verify if it's busy or not.
+    # This prevents the underlying VM from being destroyed and the job from failing.
+    # If the workflow job status is completed, we can safely destroy it,
+    # since we have the latest data and GitHub deregisters ephemeral runners
+    # when the job is completed. In certain situations, such as fraudulent activity,
+    # we may need to bypass this verification and immediately remove the runner
+    # using the semaphore.
+    unless github_runner.skip_deregistration_set? || github_runner.workflow_job&.dig("status") == "completed"
       case busy?
       when true
         Clog.emit("The runner is still running a job", github_runner)
@@ -547,7 +591,9 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
         register_deadline("wait_vm_destroy", 2 * 60 * 60)
         nap 15
       when false
-        client.delete(runners_path(github_runner.runner_id))
+        rescue_common_github_api_errors do
+          client.delete(runners_path(github_runner.runner_id))
+        end
         nap 5
       end
     end

@@ -127,7 +127,7 @@ RSpec.describe Clover, "personal access token management" do
     AccessControlEntry.create(project_id: project.id, subject_id: @api_key.id)
     page.refresh
     expect(displayed_access_control_entries).to eq [
-      "All Actions", "All Objects"
+      "All Actions", "All Objects",
     ]
   end
 
@@ -141,7 +141,7 @@ RSpec.describe Clover, "personal access token management" do
     click_button "Save All"
     expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
     expect(displayed_access_control_entries).to eq [
-      "ActionTag:add", "All Objects"
+      "ActionTag:add", "All Objects",
     ]
 
     within("#ace-template .action") { select "ActionTag:view" }
@@ -149,7 +149,7 @@ RSpec.describe Clover, "personal access token management" do
     click_button "Save All"
     expect(displayed_access_control_entries).to eq [
       "ActionTag:add", "All Objects",
-      "ActionTag:view", "OTest"
+      "ActionTag:view", "OTest",
     ]
 
     within("#ace-template .action") { select "SubjectTag:view" }
@@ -158,7 +158,7 @@ RSpec.describe Clover, "personal access token management" do
     click_button "Save All"
     expect(displayed_access_control_entries).to eq [
       "ActionTag:add", "All Objects",
-      "ActionTag:view", "OTest"
+      "ActionTag:view", "OTest",
     ]
   end
 
@@ -173,7 +173,7 @@ RSpec.describe Clover, "personal access token management" do
     click_button "Save All"
     expect(find_by_id("flash-notice").text).to eq "Token access control entries saved successfully"
     expect(displayed_access_control_entries).to eq [
-      "ActionTag:view", "OTest"
+      "ActionTag:view", "OTest",
     ]
   end
 

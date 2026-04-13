@@ -14,7 +14,7 @@ class SpdkRpc
       name: name,
       filename: filename,
       block_size: block_size,
-      readonly: false
+      readonly: false,
     }
     call("bdev_aio_create", params)
   end
@@ -29,7 +29,7 @@ class SpdkRpc
     params = {
       name: name,
       base_bdev_name: base_bdev_name,
-      key_name: key_name
+      key_name: key_name,
     }
     call("bdev_crypto_create", params)
   end
@@ -51,7 +51,7 @@ class SpdkRpc
       stripe_size_kb: stripe_size_kb,
       no_sync: false,
       copy_on_read: copy_on_read,
-      directio: directio
+      directio: directio,
     }
     call("bdev_ubi_create", params)
   end
@@ -65,7 +65,7 @@ class SpdkRpc
   def vhost_create_blk_controller(name, bdev)
     params = {
       ctrlr: name,
-      dev_name: bdev
+      dev_name: bdev,
     }
     call("vhost_create_blk_controller", params)
   end
@@ -81,7 +81,7 @@ class SpdkRpc
       name: name,
       cipher: cipher,
       key: key,
-      key2: key2
+      key2: key2,
     }
     call("accel_crypto_key_create", params)
   end
@@ -98,7 +98,7 @@ class SpdkRpc
       name: name,
       rw_ios_per_sec: rw_ios_per_sec || 0,
       r_mbytes_per_sec: r_mbytes_per_sec || 0,
-      w_mbytes_per_sec: w_mbytes_per_sec || 0
+      w_mbytes_per_sec: w_mbytes_per_sec || 0,
     }
     call("bdev_set_qos_limit", params)
   end
@@ -112,7 +112,7 @@ class SpdkRpc
       jsonrpc: "2.0",
       method: method,
       params: params,
-      id: id
+      id: id,
     }
 
     unix_socket = UNIXSocket.new(@socket_path)

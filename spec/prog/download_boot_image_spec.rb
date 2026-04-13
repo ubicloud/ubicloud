@@ -28,24 +28,21 @@ RSpec.describe Prog::DownloadBootImage do
       expect { dbi.start }.to raise_error RuntimeError, "Unknown boot image: my-image"
     end
 
-    it "fails if version is nil" do
-      refresh_frame(dbi, new_values: {"version" => nil})
-      expect { dbi.start }.to raise_error RuntimeError, "Version can not be passed as nil"
+    it "resolves latest version when version is nil" do
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
+      expect { dbi.start }.to hop("download")
+      bi = BootImage.first(vm_host_id: vm_host.id, name: "ubuntu-noble")
+      expect(bi.version).to eq(described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max)
     end
   end
 
-  describe "#default_boot_image_version" do
-    it "returns the version for the default image" do
-      expect(dbi.default_boot_image_version("ubuntu-noble")).to eq(Config.ubuntu_noble_version)
-    end
-
-    it "escapes the image name" do
-      expect(Config).to receive(:kubernetes_v1_32_version).and_return("version")
-      expect(dbi.default_boot_image_version("kubernetes-v1_32")).to eq("version")
+  describe "#latest_boot_image_version" do
+    it "returns the latest version for the image" do
+      expect(dbi.latest_boot_image_version("ubuntu-noble")).to eq(described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max)
     end
 
     it "fails for unknown images" do
-      expect { dbi.default_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
+      expect { dbi.latest_boot_image_version("unknown-image") }.to raise_error RuntimeError, "Unknown boot image: unknown-image"
     end
   end
 
@@ -55,7 +52,8 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "returns presigned URL if custom_url is not provided" do
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil})
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(dbi.url).to eq("https://minio.example.com/my-image.raw")
     end
@@ -128,49 +126,69 @@ RSpec.describe Prog::DownloadBootImage do
         "version" => "20230303",
         "sha256sum" => nil,
         "certs" => nil,
-        "use_htcat" => false
+        "use_htcat" => false,
       }.to_json
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_my-image_20230303", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
+    it "pops early when not started and cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("NotStarted")
+      dbi.incr_cancel
+      expect { dbi.download }.to exit({"msg" => "operation cancelled"})
+      expect(bi.exists?).to be false
+    end
+
     it "generates MinIO presigned URL for github-runners images if a custom_url not provided" do
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://minio.example.com/my-image.raw",
-        "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
+        "version" => version,
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, version),
         "certs" => "certs",
-        "use_htcat" => false
+        "use_htcat" => false,
       }.to_json
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil})
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil})
       expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, get_presigned_url: "https://minio.example.com/my-image.raw"))
       expect(Config).to receive(:ubicloud_images_blob_storage_certs).and_return("certs").at_least(:once)
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{version}", stdin: params_json)
       expect { dbi.download }.to nap(15)
     end
 
     it "generates R2 presigned URL for github-runners images if a custom_url not provided" do
+      version = described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch).keys.max
       allow(Config).to receive_messages(ubicloud_images_r2_bucket_name: "images-bucket", ubicloud_images_blob_storage_certs: nil)
       url_presigner = instance_double(Aws::S3::Presigner)
       s3_client = instance_double(Aws::S3::Client)
       allow(Aws::S3::Presigner).to receive(:new).with(client: s3_client).and_return(url_presigner)
       allow(Aws::S3::Client).to receive(:new).and_return(s3_client)
-      expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: "images-bucket", key: "github-ubuntu-2204-x64-#{Config.github_ubuntu_2204_version}.raw")).and_return("https://r2.example.com/my-image.raw")
+      expect(url_presigner).to receive(:presigned_url).with(:get_object, hash_including(bucket: "images-bucket", key: "github-ubuntu-2204-x64-#{version}.raw")).and_return("https://r2.example.com/my-image.raw")
       params_json = {
         "image_name" => "github-ubuntu-2204",
         "url" => "https://r2.example.com/my-image.raw",
-        "version" => Config.github_ubuntu_2204_version,
-        "sha256sum" => described_class::BOOT_IMAGE_SHA256[["github-ubuntu-2204", vm_host.arch, Config.github_ubuntu_2204_version]],
+        "version" => version,
+        "sha256sum" => described_class::BOOT_IMAGE_SHA256.dig("github-ubuntu-2204", vm_host.arch, version),
         "certs" => nil,
-        "use_htcat" => true
+        "use_htcat" => true,
       }.to_json
-      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => Config.github_ubuntu_2204_version, "custom_url" => nil, "download_r2" => true})
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}").and_return("NotStarted")
-      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{Config.github_ubuntu_2204_version}", stdin: params_json)
+      refresh_frame(dbi, new_values: {"image_name" => "github-ubuntu-2204", "version" => version, "custom_url" => nil, "download_r2" => true})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_github-ubuntu-2204_#{version}").and_return("NotStarted")
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer 'host/bin/download-boot-image' download_github-ubuntu-2204_#{version}", stdin: params_json)
       expect { dbi.download }.to nap(15)
+    end
+
+    it "pops early when failed and cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      refresh_frame(dbi, new_values: {"restarted" => 10})
+      expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
+      expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
+      dbi.incr_cancel
+      expect { dbi.download }.to exit({"msg" => "operation cancelled"})
+      expect(bi.exists?).to be false
     end
 
     it "retries downloading images if failed less than 10 times" do
@@ -183,12 +201,11 @@ RSpec.describe Prog::DownloadBootImage do
     end
 
     it "waits manual intervention if failed more than 10 times" do
-      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 75)
       refresh_frame(dbi, new_values: {"restarted" => 10})
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check download_my-image_20230303").and_return("Failed")
       expect(Clog).to receive(:emit).with("Failed to download boot image", instance_of(Hash)).and_call_original
       expect { dbi.download }.to nap(15)
-        .and change(bi, :exists?).from(true).to(false)
     end
 
     it "waits for the download to complete" do
@@ -211,7 +228,7 @@ RSpec.describe Prog::DownloadBootImage do
         name: "DEFAULT",
         total_storage_gib: 50,
         available_storage_gib: 35,
-        enabled: true
+        enabled: true,
       )
       expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
@@ -219,28 +236,39 @@ RSpec.describe Prog::DownloadBootImage do
       expect(bi.reload.size_gib).to eq(3)
     end
 
-    it "checks the correct path if version is nil" do
-      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: nil, size_gib: 0)
-      refresh_frame(dbi, new_values: {"version" => nil})
+    it "checks the correct path when version resolves to default" do
+      version = described_class::BOOT_IMAGE_SHA256.dig("ubuntu-noble", vm_host.arch).keys.max
+      BootImage.create(vm_host_id: vm_host.id, name: "ubuntu-noble", version:, size_gib: 0)
+      refresh_frame(dbi, new_values: {"image_name" => "ubuntu-noble", "version" => nil})
       sd = StorageDevice.create(
         vm_host_id: vm_host.id,
         name: "DEFAULT",
         total_storage_gib: 50,
         available_storage_gib: 35,
-        enabled: true
+        enabled: true,
       )
-      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image.raw").and_return("2361393152")
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/ubuntu-noble-#{version}.raw").and_return("2361393152")
       expect { dbi.update_available_storage_space }.to hop("activate_boot_image")
       expect(sd.reload.available_storage_gib).to eq(32)
     end
   end
 
   describe "#activate_boot_image" do
-    it "activates the boot image" do
+    it "activates the boot image and logs completion" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
       expect(bi.activated_at).to be_nil
+      expect(Clog).to receive(:emit).with("Boot image download completed", anything).and_call_original
       expect { dbi.activate_boot_image }.to exit({"msg" => "image downloaded", "name" => "my-image", "version" => "20230303"})
       expect(bi.reload.activated_at).to be <= Time.now
+    end
+
+    it "removes the boot image without logging when cancel semaphore is set" do
+      bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 3)
+      dbi.incr_cancel
+      expect(Clog).not_to receive(:emit)
+      expect { dbi.activate_boot_image }.to exit({"msg" => "operation cancelled"})
+      expect(bi.reload.activated_at).to be_nil
+      expect(Strand.where(prog: "RemoveBootImage", stack: Sequel.pg_jsonb_wrap([{"subject_id" => bi.id}])).count).to eq(1)
     end
   end
 end

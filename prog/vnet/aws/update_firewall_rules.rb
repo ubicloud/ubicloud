@@ -13,7 +13,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
       perm = {
         ip_protocol: rule.protocol,
         from_port: rule.port_range.begin,
-        to_port: rule.port_range.end - 1
+        to_port: rule.port_range.end - 1,
       }
       if rule.ip6?
         perm[:ipv_6_ranges] = [{cidr_ipv_6: rule.cidr.to_s}]
@@ -24,7 +24,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
       begin
         aws_client.authorize_security_group_ingress({
           group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
-          ip_permissions: [perm]
+          ip_permissions: [perm],
         })
       rescue Aws::EC2::Errors::InvalidPermissionDuplicate
         next
@@ -40,7 +40,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
 
     # Fetch existing security group rules
     security_group = aws_client.describe_security_groups({
-      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.security_group_id]
+      group_ids: [vm.private_subnets.first.private_subnet_aws_resource.security_group_id],
     }).security_groups.first
 
     # Remove existing rules that aren't in our current rules list
@@ -58,7 +58,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
       perm = {
         ip_protocol: permission.ip_protocol,
         from_port: permission.from_port,
-        to_port: permission.to_port
+        to_port: permission.to_port,
       }
       perm[:ip_ranges] = ip_ranges_to_revoke if ip_ranges_to_revoke.any?
       perm[:ipv_6_ranges] = ipv_6_ranges_to_revoke if ipv_6_ranges_to_revoke.any?
@@ -69,7 +69,7 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
       permissions_to_revoke.each do |perm|
         aws_client.revoke_security_group_ingress({
           group_id: vm.private_subnets.first.private_subnet_aws_resource.security_group_id,
-          ip_permissions: [perm]
+          ip_permissions: [perm],
         })
       rescue Aws::EC2::Errors::InvalidPermissionNotFound
         next
@@ -80,6 +80,6 @@ class Prog::Vnet::Aws::UpdateFirewallRules < Prog::Base
   end
 
   def aws_client
-    @aws_client ||= vm.location.location_credential.client
+    @aws_client ||= vm.location.location_credential_aws.client
   end
 end

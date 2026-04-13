@@ -11,7 +11,7 @@ RSpec.describe Clover, "cli al search" do
       action:,
       project_id:,
       subject_id:,
-      object_ids: Sequel.pg_array(object_ids, :uuid)
+      object_ids: Sequel.pg_array(object_ids, :uuid),
     ).first[:id]
   end
 

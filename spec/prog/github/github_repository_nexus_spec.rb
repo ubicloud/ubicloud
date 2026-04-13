@@ -46,7 +46,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
 
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
         {id: 1, run_attempt: 2, status: "queued"},
-        {id: 2, run_attempt: 1, status: "queued"}
+        {id: 2, run_attempt: 1, status: "queued"},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 1, 2).and_return({jobs: [
@@ -57,10 +57,10 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
         {status: "queued", labels: ["ubicloud-standard-8"]},
         {status: "queued", labels: ["custom-label-1"]},
         {status: "queued", labels: ["custom-label-2"]},
-        {status: "failed", labels: ["ubicloud"]}
+        {status: "failed", labels: ["ubicloud"]},
       ]})
       expect(client).to receive(:workflow_run_attempt_jobs).with("ubicloud/ubicloud", 2, 1).and_return({jobs: [
-        {status: "queued", labels: ["ubicloud"]}
+        {status: "queued", labels: ["ubicloud"]},
       ]})
 
       # Create existing runners (idle, no workflow_job) - these reduce the number of new runners needed
@@ -79,7 +79,7 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
     it "raises if runtime is too long" do
       expect(nx).to receive(:clock_time).and_return(0, 81)
       expect(client).to receive(:repository_workflow_runs).and_return({workflow_runs: [
-        {id: 1, run_attempt: 2, status: "queued"}
+        {id: 1, run_attempt: 2, status: "queued"},
       ]})
       expect(client).to receive(:rate_limit).and_return(instance_double(Octokit::RateLimit, remaining: 100, limit: 100)).at_least(:once)
       expect { nx.check_queued_jobs }.to raise_error(RuntimeError)
@@ -177,9 +177,35 @@ RSpec.describe Prog::Github::GithubRepositoryNexus do
       nx.cleanup_cache
     end
 
-    it "deletes blob storage if there are no cache entries" do
+    it "sets no_cache_since when cache entries become empty" do
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to eq(now)
+    end
+
+    it "does not overwrite no_cache_since if already set" do
+      purged_at = now - 3 * 24 * 60 * 60
+      repository.update(no_cache_since: purged_at)
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to eq(purged_at)
+    end
+
+    it "deletes blob storage if cache has been empty for more than 7 days" do
+      repository.update(no_cache_since: now - 8 * 24 * 60 * 60)
       expect(nx.github_repository).to receive(:destroy_blob_storage)
       nx.cleanup_cache
+    end
+
+    it "does not delete blob storage if cache has been empty for less than 7 days" do
+      repository.update(no_cache_since: now - 3 * 24 * 60 * 60)
+      expect(nx.github_repository).not_to receive(:destroy_blob_storage)
+      nx.cleanup_cache
+    end
+
+    it "clears no_cache_since when cache entries exist" do
+      repository.update(no_cache_since: now - 1 * 24 * 60 * 60)
+      create_cache_entry
+      nx.cleanup_cache
+      expect(repository.reload.no_cache_since).to be_nil
     end
   end
 

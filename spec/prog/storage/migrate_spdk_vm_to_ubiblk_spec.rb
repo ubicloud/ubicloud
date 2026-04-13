@@ -8,7 +8,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
   let(:st) { Strand.new }
   let(:vm_host) {
     vm_host = create_vm_host
-    vbb = VhostBlockBackend.create(version: Config.vhost_block_backend_version, allocation_weight: 0, vm_host_id: vm_host.id)
+    vbb = create_vhost_block_backend(version: Config.vhost_block_backend_version, allocation_weight: 0, vm_host_id: vm_host.id)
     vm_host.add_vhost_block_backend(vbb)
     si = SpdkInstallation.create(version: "v1", allocation_weight: 100, vm_host_id: vm_host.id)
     vm_host.add_spdk_installation(si)
@@ -19,12 +19,12 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
     vm = create_vm(vm_host_id: vm_host.id, vm_host_slice_id: vm_host_slice.id)
     kek = StorageKeyEncryptionKey.create(
       algorithm: "aes-256-gcm", key: "key_1",
-      init_vector: "iv_1", auth_data: "somedata"
+      init_vector: "iv_1", auth_data: "somedata",
     )
     dev = StorageDevice.create(
       name: "DEFAULT",
       total_storage_gib: 100,
-      available_storage_gib: 80
+      available_storage_gib: 80,
     )
     bi = BootImage.create(name: "ubuntu-noble", version: "20220202", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 3)
     volume = VmStorageVolume.create(boot: true,
@@ -263,7 +263,7 @@ RSpec.describe Prog::Storage::MigrateSpdkVmToUbiblk do
         "disk_index" => 0,
         "vhost_block_backend_version" => Config.vhost_block_backend_version,
         "max_read_mbytes_per_sec" => nil,
-        "max_write_mbytes_per_sec" => nil
+        "max_write_mbytes_per_sec" => nil,
       })
     end
   end

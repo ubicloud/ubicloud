@@ -212,11 +212,25 @@ RSpec.describe Prog::Base do
     st.unsynchronized_run
   end
 
+  describe "#delete_from_stack" do
+    it "deletes specified keys from the stack" do
+      st = Strand.create(prog: "Test", label: "napper",
+        stack: [{"key1" => "value1", "key2" => "value2", "key3" => "value3"}])
+
+      prg = described_class.new(st)
+      prg.delete_from_stack("key1", "key3")
+
+      expect(frame_value(prg, "key1")).to be_nil
+      expect(frame_value(prg, "key2")).to eq("value2")
+      expect(frame_value(prg, "key3")).to be_nil
+    end
+  end
+
   context "when rendering FlowControl strings" do
     it "can render hop" do
       expect(
         described_class::Hop.new("OldProg", "old_label",
-          Strand.new(prog: "NewProg", label: "new_label")).to_s
+          Strand.new(prog: "NewProg", label: "new_label")).to_s,
       ).to eq("hop OldProg#old_label -> NewProg#new_label")
     end
 
@@ -226,7 +240,7 @@ RSpec.describe Prog::Base do
 
     it "can render exit" do
       expect(described_class::Exit.new(
-        Strand.new(prog: "TestProg", label: "exiting_label"), {"msg" => "done"}
+        Strand.new(prog: "TestProg", label: "exiting_label"), {"msg" => "done"},
       ).to_s).to eq('Strand exits from TestProg#exiting_label with {"msg" => "done"}')
     end
   end
@@ -242,7 +256,7 @@ RSpec.describe Prog::Base do
 
       # register if current deadline is further in the time
       st.label = :set_expired_deadline
-      st.stack.first["deadline_at"] = Time.now + 30
+      st.stack.first["deadline_at"] = st.time_string(Time.now + 30)
       expect {
         st.unsynchronized_run
       }.to change { st.stack.first["deadline_at"] }
@@ -257,7 +271,7 @@ RSpec.describe Prog::Base do
 
       # ignore if new deadline is further in the time and target is same
       st.label = :set_expired_deadline
-      st.stack.first["deadline_at"] = Time.now - 60
+      st.stack.first["deadline_at"] = st.time_string(Time.now - 60)
       st.stack.first["deadline_target"] = "pusher2"
       expect {
         st.unsynchronized_run
@@ -265,11 +279,32 @@ RSpec.describe Prog::Base do
 
       # allow to explicitly extend deadline
       st.label = :extend_deadline
-      st.stack.first["deadline_at"] = Time.now
+      st.stack.first["deadline_at"] = st.time_string(Time.now)
       st.stack.first["deadline_target"] = "pusher2"
       expect {
         st.unsynchronized_run
       }.to change { st.stack.first["deadline_at"] }
+    end
+
+    it "limits deadline_at when allow_extension is an integer" do
+      st = Strand.create(prog: "Test", label: :extend_deadline_with_limit)
+      st.unsynchronized_run
+
+      deadline_start = Time.parse(st.stack.first["deadline_start"])
+      deadline_at = Time.parse(st.stack.first["deadline_at"])
+      expect(deadline_start).to be_within(1).of(Time.now)
+      expect(deadline_at).to be_within(1).of(deadline_start + 10 * 60)
+
+      # move back start to test limit
+      st.label = :extend_deadline_with_limit
+      deadline_start -= 25 * 60
+      st.stack.first["deadline_start"] = st.time_string(deadline_start)
+      st.unsynchronized_run
+
+      new_deadline_start = Time.parse(st.stack.first["deadline_start"])
+      new_deadline_at = Time.parse(st.stack.first["deadline_at"])
+      expect(new_deadline_start).to eq(deadline_start)
+      expect(new_deadline_at).to be_within(1).of(deadline_start + 30 * 60)
     end
 
     it "triggers a page exactly once when deadline is expired" do
@@ -337,7 +372,7 @@ RSpec.describe Prog::Base do
       page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, :napper], st.ubid).id
 
       st.stack.first["deadline_target"] = "napper"
-      st.stack.first["deadline_at"] = Time.now - 1
+      st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
 
       st.update(label: :set_popping_deadline2)
 
@@ -353,10 +388,11 @@ RSpec.describe Prog::Base do
     it "deletes the deadline information once the target is reached" do
       st = Strand.create(prog: "Test", label: :napper)
       st.stack.first["deadline_target"] = "napper"
-      st.stack.first["deadline_at"] = Time.now - 1
+      st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
 
       expect(st.stack.first).to receive(:delete).with("deadline_target")
       expect(st.stack.first).to receive(:delete).with("deadline_at")
+      expect(st.stack.first).to receive(:delete).with("deadline_start")
 
       st.unsynchronized_run
     end
@@ -364,11 +400,11 @@ RSpec.describe Prog::Base do
     it "can create pages for progs that are not on the top of the stack" do
       st = Strand.create(prog: "Test2", label: "pusher1")
       st.stack.first["deadline_target"] = "t1"
-      st.stack.first["deadline_at"] = Time.now + 1
+      st.stack.first["deadline_at"] = st.time_string(Time.now + 1)
       st.unsynchronized_run
-      st.stack[1]["deadline_at"] = Time.now - 1
+      st.stack[1]["deadline_at"] = st.time_string(Time.now - 1)
       st.stack.first["deadline_target"] = "t2"
-      st.stack.first["deadline_at"] = Time.now - 1
+      st.stack.first["deadline_at"] = st.time_string(Time.now - 1)
 
       expect {
         st.unsynchronized_run
@@ -376,7 +412,7 @@ RSpec.describe Prog::Base do
 
       expect(Page.all.map(&:summary)).to include(
         "#{st.ubid} has an expired deadline! Test2.pusher2 did not reach t1 on time",
-        "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time"
+        "#{st.ubid} has an expired deadline! Test.pusher2 did not reach t2 on time",
       )
     end
 
@@ -436,7 +472,7 @@ RSpec.describe Prog::Base do
       vm = create_vm(vm_host: create_vm_host(data_center: "FSN1-DC1"))
       installation = GithubInstallation.create(installation_id: 123, name: "test-user", type: "User", project: Project.create(name: "test-project"))
       runner = GithubRunner.create(label: "ubicloud-standard-2", repository_name: "my-repo", vm_id: vm.id, installation:)
-      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      st = Strand.create_with_id(runner, prog: "Test", label: :napper, stack: [{"deadline_at" => (Time.now - 1).to_s, "deadline_target" => "start"}])
       st.unsynchronized_run
       page = Page.first
       expect(page).not_to be_nil
@@ -448,7 +484,7 @@ RSpec.describe Prog::Base do
       project = Project.create(name: "test-project")
       resource = create_postgres_resource(project:, location_id: Location[name: "hetzner-fsn1"].id)
       server = create_postgres_server(resource:)
-      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => server.strand.time_string(Time.now - 1), "deadline_target" => "start"}])
       server.strand.unsynchronized_run
       page = Page.first
       expect(page).not_to be_nil
@@ -462,7 +498,7 @@ RSpec.describe Prog::Base do
       project = Project.create(name: "test-project")
       resource = create_postgres_resource(project:, location_id: Location[name: "hetzner-fsn1"].id)
       server = create_postgres_server(resource:, is_representative: false)
-      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => Time.now - 1, "deadline_target" => "start"}])
+      server.strand.update(prog: "Test", label: :napper, stack: [{"deadline_at" => server.strand.time_string(Time.now - 1), "deadline_target" => "start"}])
       server.strand.unsynchronized_run
       page = Page.first
       expect(page).not_to be_nil
@@ -470,6 +506,37 @@ RSpec.describe Prog::Base do
       expect(page.details["role"]).to eq("standby")
       expect(page.details["location"]).to eq(resource.location.display_name)
       expect(page.details).to have_key("needs_recycling")
+    end
+
+    it "unregister_deadline resolves existing page for the deadline" do
+      st = Strand.create(prog: "Test", label: :napper)
+      nx = Prog::Test.new(st)
+      page_id = Prog::PageNexus.assemble("dummy-summary", ["Deadline", st.id, st.prog, "napper"], st.ubid).id
+
+      st.stack.first["deadline_target"] = "napper"
+      st.stack.first["deadline_at"] = (Time.now - 1).to_s
+      st.modified!(:stack)
+
+      nx.unregister_deadline("napper")
+
+      expect(st.stack.first).not_to have_key("deadline_at")
+      Strand[page_id].unsynchronized_run
+      Strand[page_id].unsynchronized_run
+      expect(Page.where(id: Page.where(id: page_id).get(:id)).count).to eq(0)
+    end
+
+    it "unregister_deadline clears fields even when no page exists" do
+      st = Strand.create(prog: "Test", label: :napper)
+      nx = Prog::Test.new(st)
+      st.stack.first["deadline_target"] = "napper"
+      st.stack.first["deadline_at"] = (Time.now + 60).to_s
+      st.modified!(:stack)
+
+      nx.unregister_deadline("napper")
+
+      expect(st.stack.first).not_to have_key("deadline_at")
+      expect(st.stack.first).not_to have_key("deadline_target")
+      expect(st.stack.first).not_to have_key("deadline_start")
     end
   end
 

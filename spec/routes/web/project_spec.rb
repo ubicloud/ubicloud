@@ -91,15 +91,13 @@ RSpec.describe Clover, "project" do
         project
         new_project = user2.create_project_with_default_policy("project-3")
         new_project.add_invitation(email: user.email, inviter_id: user2.id, policy: "Member2", expires_at: Time.now + 1000)
-        DB[:account_password_hashes].where(id: user2.id).delete
-        user2.destroy
 
         visit "/project"
 
         expect(page.title).to eq("Ubicloud - Projects")
         expect(page).to have_content "Project Invitations"
         expect(page).to have_content new_project.name
-        expect(page).to have_content "-Account Deleted-"
+        expect(page).to have_content user2.email
         click_button "Accept"
         expect(page).to have_flash_notice("Accepted invitation to join project")
         expect(user.invitations.count).to eq 0
@@ -426,6 +424,8 @@ RSpec.describe Clover, "project" do
     end
 
     describe "users" do
+      let(:inviter_id) { Account.create(email: "inviter@example.com").id }
+
       it "can show project users" do
         visit project.path
 
@@ -671,7 +671,7 @@ RSpec.describe Clover, "project" do
 
       it "requires Project:user permissions to remove invited users from project" do
         invited_email = "invited@example.com"
-        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        project.add_invitation(email: invited_email, inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
         within("#invitation-#{invited_email.gsub(/\W+/, "")}") do
@@ -689,7 +689,7 @@ RSpec.describe Clover, "project" do
 
       it "can remove invited user from project" do
         invited_email = "invited@example.com"
-        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        project.add_invitation(email: invited_email, inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
 
         visit "#{project.path}/user"
         expect(page).to have_content invited_email
@@ -706,7 +706,7 @@ RSpec.describe Clover, "project" do
 
       it "requires Project:user permissions to update default policy of invited user, and SubjectTag:add for access to subject tag" do
         invited_email = "invited@example.com"
-        project.add_invitation(email: invited_email, inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        project.add_invitation(email: invited_email, inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
         visit "#{project.path}/user"
         AccessControlEntry.dataset.destroy
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:view"])
@@ -729,8 +729,8 @@ RSpec.describe Clover, "project" do
       it "can update default policy of invited user" do
         invited_email = "invited@example.com"
 
-        project.add_invitation(email: invited_email, policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
-        inv2 = project.add_invitation(email: "invited2@example.com", policy: "Member", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        project.add_invitation(email: invited_email, policy: "Member", inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
+        inv2 = project.add_invitation(email: "invited2@example.com", policy: "Member", inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
 
         visit "#{project.path}/user"
 
@@ -754,7 +754,7 @@ RSpec.describe Clover, "project" do
         ace = AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP["SubjectTag:add"], object_id: to_be_removed.id)
 
         invited_email = "invited@example.com"
-        project.add_invitation(email: invited_email, policy: "Allowed", inviter_id: "bd3479c6-5ee3-894c-8694-5190b76f84cf", expires_at: Time.now + 7 * 24 * 60 * 60)
+        project.add_invitation(email: invited_email, policy: "Allowed", inviter_id:, expires_at: Time.now + 7 * 24 * 60 * 60)
 
         visit "#{project.path}/user"
 
@@ -922,7 +922,7 @@ RSpec.describe Clover, "project" do
           action:,
           project_id:,
           subject_id:,
-          object_ids: Sequel.pg_array(object_ids, :uuid)
+          object_ids: Sequel.pg_array(object_ids, :uuid),
         ).first[:id]
       end
 
@@ -949,21 +949,21 @@ RSpec.describe Clover, "project" do
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
           "vm/destroy", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
 
         fill_in "Action", with: "vm"
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/destroy", user.ubid, ""
+          "vm/destroy", user.ubid, "",
         ]
 
         fill_in "Action", with: "create"
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
 
         click_link "vm/create"
@@ -973,7 +973,7 @@ RSpec.describe Clover, "project" do
         visit "#{project.path}/audit-log?limit=2"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/destroy", user.ubid, ""
+          "vm/destroy", user.ubid, "",
         ]
 
         click_link "Next Page"
@@ -998,7 +998,7 @@ RSpec.describe Clover, "project" do
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
           "vm/destroy", user.ubid, "",
-          "ps/create", user.ubid, ""
+          "ps/create", user.ubid, "",
         ]
       end
 
@@ -1071,7 +1071,7 @@ RSpec.describe Clover, "project" do
         click_button "Search"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/create", other_account_ubid.to_s, ""
+          "vm/create", other_account_ubid.to_s, "",
         ]
 
         visit(page.current_url + "&limit=1")
@@ -1083,18 +1083,18 @@ RSpec.describe Clover, "project" do
         url = page.current_url
         visit(url.sub(/pagination_key=\d+/, "pagination_key=1746082800"))
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         url = page.current_url
         visit(url.sub(/pagination_key=\d+/, "pagination_key=a"))
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         visit(url[0...-1])
         expect(audit_log_content).to eq [
-          "vm/create", user.ubid, ""
+          "vm/create", user.ubid, "",
         ]
 
         fill_in "3 Months Prior To", with: date.strftime("%F")
@@ -1104,7 +1104,7 @@ RSpec.describe Clover, "project" do
         click_link "Prior 3 Months"
         expect(audit_log_content).to eq [
           "vm/create", user.ubid, "",
-          "vm/create", other_account_ubid.to_s, ""
+          "vm/create", other_account_ubid.to_s, "",
         ]
 
         fill_in "3 Months Prior To", with: "2026-03-aa"

@@ -17,7 +17,7 @@ class Prog::PageNexus < Prog::Base
         page.insert_conflict(
           target: :tag,
           conflict_where: {resolved_at: nil},
-          update: {summary: Sequel[:excluded][:summary], details: Sequel[:excluded][:details], severity: Sequel[:excluded][:severity]}
+          update: {summary: Sequel[:excluded][:summary], details: Sequel[:excluded][:details], severity: Sequel[:excluded][:severity]},
         ).save_changes
       end
 

@@ -164,7 +164,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
       expect { nx.wait_outbound_setup }.to nap(5)
     end
 
-    it "hops to wait_state_dropped if policy update is done" do
+    it "hops to wait_old_state_drop if policy update is done" do
       nic.strand.update(label: "wait_rekey_old_state_drop_trigger")
       expect(nic.old_state_drop_trigger_set?).to be false
       expect { nx.wait_outbound_setup }.to hop("wait_old_state_drop")
@@ -227,7 +227,7 @@ RSpec.describe Prog::Vnet::Metal::SubnetNexus do
 
       expect { nx.destroy }.to nap(5)
       expect(nx.strand.stack.first["deadline_target"]).to be_nil
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 10 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 10 * 60)
     end
 
     it "fails if there are active resources" do

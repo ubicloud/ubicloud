@@ -4,7 +4,7 @@ class Serializers::GithubInstallation < Serializers::Base
   def self.serialize_internal(installation, options = {})
     {
       id: installation.ubid,
-      name: installation.name
+      name: installation.name,
     }
   end
 end

@@ -78,4 +78,9 @@
   <% end %>
 </div>
 
-<p><a href="/audit-log?<%= AUDIT_LOG_PARAM_MAP[@klass.name] %>=<%= @obj.ubid %>">View Audit Log</a></p>
+<p>
+  <a href="/audit-log?<%= AUDIT_LOG_PARAM_MAP[@klass.name] %>=<%= @obj.ubid %>">View Audit Log</a>
+  <% if @obj.is_a?(Account) %>
+    | <a href="/authentication-audit-log?account=<%= @obj.ubid %>">View Authentication Audit Log</a>
+  <% end %>
+</p>

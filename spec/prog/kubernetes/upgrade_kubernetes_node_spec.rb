@@ -23,7 +23,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-4",
-      target_node_storage_size_gib: 37
+      target_node_storage_size_gib: 37,
     )
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
@@ -80,7 +80,7 @@ RSpec.describe Prog::Kubernetes::UpgradeKubernetesNode do
       expect { prog.wait_new_node }.to nap(120)
     end
 
-    it "hops to assign_role if there are no sub-programs running" do
+    it "hops to drain_old_node if there are no sub-programs running" do
       st.update(prog: "Kubernetes::UpgradeKubernetesNode", label: "wait_new_node", stack: [{}])
       Strand.create(parent_id: st.id, prog: "Kubernetes::ProvisionKubernetesNode", label: "start", stack: [{}], exitval: {"node_id" => "12345"})
       expect { prog.wait_new_node }.to hop("drain_old_node")

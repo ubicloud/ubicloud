@@ -13,7 +13,7 @@ RSpec.describe VmHostSlice do
       total_cpu_percent: 200,
       used_cpu_percent: 0,
       total_memory_gib: 4,
-      used_memory_gib: 0
+      used_memory_gib: 0,
     )
   end
 
@@ -25,7 +25,7 @@ RSpec.describe VmHostSlice do
         vm_host_id: vm_host.id,
         cpu_number: i,
         spdk: i < 2,
-        vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil
+        vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil,
       )
     }
   end
@@ -77,7 +77,7 @@ RSpec.describe VmHostSlice do
     it "returns the correct allowed_cpus_group if we have multiple disjoint cpus" do
       VmHostCpu.where(
         vm_host_id: vm_host.id,
-        cpu_number: [2, 3, 6, 11, 12, 13]
+        cpu_number: [2, 3, 6, 11, 12, 13],
       ).update(vm_host_slice_id: vm_host_slice.id)
       expect(vm_host_slice.allowed_cpus_cgroup).to eq("2-3,6,11-13")
     end
@@ -119,7 +119,7 @@ RSpec.describe VmHostSlice do
       pulse = {
         reading: "down",
         reading_rpt: 5,
-        reading_chg: Time.now - 30
+        reading_chg: Time.now - 30,
       }
 
       expect(session[:ssh_session]).to receive(:_exec!).with("systemctl is-active standard.slice").and_return("active\nactive\n").once

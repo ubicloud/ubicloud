@@ -5,8 +5,7 @@ require_relative "../../lib/net_ssh"
 class Prog::Vm::VmPool < Prog::Base
   subject_is :vm_pool
 
-  def self.assemble(size:, vm_size:, boot_image:, location_id:, storage_size_gib:,
-    storage_encrypted:, arch:)
+  def self.assemble(size:, vm_size:, boot_image:, location_id:, storage_size_gib:, arch:)
     DB.transaction do
       vm_pool = VmPool.create(
         size:,
@@ -14,22 +13,18 @@ class Prog::Vm::VmPool < Prog::Base
         boot_image:,
         location_id:,
         storage_size_gib:,
-        storage_encrypted:,
-        arch:
+        arch:,
       )
       Strand.create_with_id(vm_pool, prog: "Vm::VmPool", label: "create_new_vm")
     end
   end
 
   label def create_new_vm
-    storage_params = {
-      size_gib: vm_pool.storage_size_gib,
-      encrypted: vm_pool.storage_encrypted
-    }
+    storage_params = {size_gib: vm_pool.storage_size_gib}
     ps = Prog::Vnet::SubnetNexus.assemble(
       Config.vm_pool_project_id,
       location_id: vm_pool.location_id,
-      allow_only_ssh: true
+      allow_only_ssh: true,
     ).subject
 
     Prog::Vm::Nexus.assemble_with_sshable(
@@ -44,7 +39,7 @@ class Prog::Vm::VmPool < Prog::Base
       pool_id: vm_pool.id,
       arch: vm_pool.arch,
       swap_size_bytes: 4294963200,
-      private_subnet_id: ps.id
+      private_subnet_id: ps.id,
     )
 
     hop_wait

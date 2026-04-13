@@ -15,7 +15,7 @@ RSpec.describe Prog::Github::DeleteCacheEntries do
         scope: "main",
         upload_id: "upload-#{it}",
         created_by: "3c9a861c-ab14-8218-a175-875ebb652f7b",
-        created_at: Time.now - 2 + it
+        created_at: Time.now - 2 + it,
       )
     end
   }

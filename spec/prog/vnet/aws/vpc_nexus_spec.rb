@@ -6,8 +6,8 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   let(:ps) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
-    az_a = LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+    az_a = LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
     # Update them with the test values
@@ -15,7 +15,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vpc_id: "vpc-0123456789abcdefg",
       internet_gateway_id: "igw-0123456789abcdefg",
       route_table_id: "rtb-0123456789abcdefg",
-      security_group_id: "sg-0123456789abcdefg"
+      security_group_id: "sg-0123456789abcdefg",
     )
     aws_subnet = AwsSubnet.where(private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id, location_aws_az_id: az_a.id).first
     aws_subnet.update(subnet_id: "subnet-0123456789abcdefg", ipv6_cidr: "2600:1f14:1000::/64")
@@ -170,8 +170,8 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#create_az_subnets" do
-    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
-    let(:az_b) { LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
+    let(:az_a) { location.location_azs_dataset.where(az: "a").first }
+    let(:az_b) { LocationAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
 
     before do
       # Reset the AWS subnets to pre-creation state (no subnet_id, no ipv6_cidr)
@@ -181,7 +181,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       AwsSubnet.create(
         private_subnet_aws_resource_id: aws_resource.id,
         location_aws_az_id: az_b.id,
-        ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s
+        ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s,
       )
       client.stub_responses(:describe_vpcs, vpcs: [{vpc_id: "vpc-0123456789abcdefg", ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}]}])
       client.stub_responses(:create_subnet, ->(context) {
@@ -222,7 +222,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
         end
       })
       client.stub_responses(:describe_subnets, subnets: [
-        {subnet_id: "subnet-recovered-a", availability_zone: "us-west-2a", cidr_block: ipv4_cidr_a, ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]}
+        {subnet_id: "subnet-recovered-a", availability_zone: "us-west-2a", cidr_block: ipv4_cidr_a, ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/64"}]},
       ])
       expect(client).to receive(:create_subnet).twice.and_call_original
       expect(client).to receive(:describe_subnets).once.and_call_original
@@ -241,12 +241,12 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
   end
 
   describe "#associate_az_route_tables" do
-    let(:az_a) { location.location_aws_azs_dataset.where(az: "a").first }
+    let(:az_a) { location.location_azs_dataset.where(az: "a").first }
 
     it "associates route tables for all subnets and hops to wait" do
       expect(client).to receive(:associate_route_table).with({
         route_table_id: "rtb-0123456789abcdefg",
-        subnet_id: "subnet-0123456789abcdefg"
+        subnet_id: "subnet-0123456789abcdefg",
       }).and_call_original
       client.stub_responses(:associate_route_table)
       expect { nx.associate_az_route_tables }.to hop("wait")
@@ -278,7 +278,7 @@ RSpec.describe Prog::Vnet::Aws::VpcNexus do
       vm.incr_prevent_destroy
 
       expect { nx.destroy }.to nap(5)
-      expect(nx.strand.stack.first["deadline_at"]).to be_within(5).of(Time.now + 10 * 60)
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 10 * 60)
       expect(nx.strand.stack.first.fetch("deadline_target")).to be_nil
     end
 

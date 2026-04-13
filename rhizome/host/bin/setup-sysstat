@@ -12,7 +12,7 @@ r "sed -i -E 's/HISTORY=[0-9]+/HISTORY=60/g' /etc/sysstat/sysstat"
 
 # Collect every minute. Default was every 10 minutes.
 FileUtils.mkdir_p "/etc/systemd/system/sysstat-collect.timer.d/"
-File.write("/etc/systemd/system/sysstat-collect.timer.d/override.conf", <<SYSSTAT_TIMER_OVERRIDE
+File.write("/etc/systemd/system/sysstat-collect.timer.d/override.conf", <<SYSSTAT_TIMER_OVERRIDE,
 [Unit]
 Description=Run system activity accounting tool every minute
 

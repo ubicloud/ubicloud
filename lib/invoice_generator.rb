@@ -29,7 +29,7 @@ class InvoiceGenerator
         project_content[:billing_info] = bi&.stripe_data&.merge({
           "id" => bi.id,
           "ubid" => bi.ubid,
-          "in_eu_vat" => !!is_eu
+          "in_eu_vat" => !!is_eu,
         })
 
         project_content[:bank_transfer_info] = if bi && bi.payment_methods.empty?
@@ -42,7 +42,7 @@ class InvoiceGenerator
               "Intermediary BIC" => "CHASGB2L",
               "Beneficiary address" => "Turfschip, 267, 1186XK, Amstelveen, Netherlands",
               "Bank/Payment institution" => "Revolut Bank UAB",
-              "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands"
+              "Bank address" => "Barbara Strozzilaan 201, 1083 HN, Amsterdam, Netherlands",
             }
           else
             {
@@ -51,7 +51,7 @@ class InvoiceGenerator
               "ABA/Routing number" => "121145349",
               "Account number" => "974842159957503",
               "Bank/Payment institution" => "Column NA - Brex",
-              "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129"
+              "Bank address" => "1 Letterman Drive Building A, Suite A4-700, San Francisco, CA 94129",
             }
           end
         end
@@ -69,7 +69,7 @@ class InvoiceGenerator
             postal_code: "1186 XK",
             tax_id: "NL864651442B01",
             trade_id: "88492729",
-            in_eu_vat: true
+            in_eu_vat: true,
           }
         else
           {
@@ -78,7 +78,7 @@ class InvoiceGenerator
             country: "US",
             city: "San Francisco",
             state: "CA",
-            postal_code: "94127"
+            postal_code: "94127",
           }
         end
         vat_info = if is_eu
@@ -228,7 +228,7 @@ class InvoiceGenerator
         cost: (br.amount * duration * br.billing_rate["unit_price"]).round(3),
         duration:,
         begin_time: br.span.begin,
-        unit_price: br.billing_rate["unit_price"]
+        unit_price: br.billing_rate["unit_price"],
       }
     end
   end

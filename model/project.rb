@@ -56,8 +56,10 @@ class Project < Sequel::Model
     api_keys: :destroy,
     billing_info: :destroy,
     github_installations: :destroy,
+    invitations: :destroy,
     locations: :destroy,
     object_tags: :destroy,
+    quotas: :destroy,
     ssh_public_keys: :destroy,
     subject_tags: :destroy
 
@@ -99,7 +101,7 @@ class Project < Sequel::Model
     hash = ProjectDiscountCode.dataset.returning.insert(
       id: ProjectDiscountCode.generate_uuid,
       project_id: id,
-      discount_code_id: discount.id
+      discount_code_id: discount.id,
     ).first
     ProjectDiscountCode.call(hash)
   end
@@ -141,7 +143,7 @@ class Project < Sequel::Model
       "subtotal" => 0.0,
       "credit" => 0.0,
       "discount" => 0.0,
-      "cost" => 0.0
+      "cost" => 0.0,
     }
 
     Invoice.new(project_id: id, content:, begin_time:, end_time:, created_at: Time.now, status: "current")
@@ -208,6 +210,7 @@ class Project < Sequel::Model
 
   feature_flag(
     :allocator_diagnostics,
+    :authentication_audit_log,
     :aws_alien_runners_ratio,
     :aws_cloudwatch_logs,
     :enable_c6gd,
@@ -222,6 +225,7 @@ class Project < Sequel::Model
     :free_runner_upgrade_until,
     :gpu_vm,
     :ipv6_disabled,
+    :machine_image,
     :postgres_hostname_override,
     :postgres_init_script,
     :postgres_lantern,
@@ -232,7 +236,7 @@ class Project < Sequel::Model
     :visible_locations,
     :vm_public_ssh_keys,
     :postgres_aws_use_different_azs_for_standbys,
-    :cache_proxy_download_url
+    :cache_proxy_download_url,
   )
 end
 
@@ -263,6 +267,7 @@ end
 #  account_default_project   | account_default_project_project_id_fkey   | (project_id) REFERENCES project(id) ON DELETE CASCADE
 #  action_tag                | action_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  api_key                   | api_key_project_id_fkey                   | (project_id) REFERENCES project(id)
+#  dns_zone                  | dns_zone_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  firewall                  | firewall_project_id_fkey                  | (project_id) REFERENCES project(id)
 #  github_installation       | github_installation_project_id_fkey       | (project_id) REFERENCES project(id)
 #  inference_endpoint        | inference_endpoint_project_id_fkey        | (project_id) REFERENCES project(id)
@@ -270,10 +275,14 @@ end
 #  kubernetes_cluster        | kubernetes_cluster_project_id_fkey        | (project_id) REFERENCES project(id)
 #  load_balancer             | load_balancer_project_id_fkey             | (project_id) REFERENCES project(id)
 #  location                  | location_project_id_fkey                  | (project_id) REFERENCES project(id)
+#  machine_image             | machine_image_project_id_fkey             | (project_id) REFERENCES project(id)
+#  machine_image_store       | machine_image_store_project_id_fkey       | (project_id) REFERENCES project(id)
 #  minio_cluster             | minio_cluster_project_id_fkey             | (project_id) REFERENCES project(id)
 #  object_tag                | object_tag_project_id_fkey                | (project_id) REFERENCES project(id)
 #  private_subnet            | private_subnet_project_id_fkey            | (project_id) REFERENCES project(id)
 #  project_discount_code     | project_discount_code_project_id_fkey     | (project_id) REFERENCES project(id)
+#  project_invitation        | project_invitation_project_id_fkey        | (project_id) REFERENCES project(id)
+#  project_quota             | project_quota_project_id_fkey             | (project_id) REFERENCES project(id)
 #  ssh_public_key            | ssh_public_key_project_id_fkey            | (project_id) REFERENCES project(id)
 #  subject_tag               | subject_tag_project_id_fkey               | (project_id) REFERENCES project(id)
 #  usage_alert               | usage_alert_project_id_fkey               | (project_id) REFERENCES project(id)

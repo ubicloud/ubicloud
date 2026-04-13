@@ -12,8 +12,8 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
   let(:nic) {
     prj = Project.create(name: "test-prj")
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: prj.id, display_name: "aws-us-west-2", ui_name: "AWS US East 1", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
-    az_a = LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationCredentialAws.create_with_id(loc.id, access_key: "test-access-key", secret_key: "test-secret-key")
+    az_a = LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     ps = Prog::Vnet::SubnetNexus.assemble(prj.id, name: "test-ps", location_id: loc.id).subject
     ps.strand.update(label: "wait")
     # SubnetNexus.assemble creates PrivateSubnetAwsResource and AwsSubnet records
@@ -83,8 +83,8 @@ RSpec.describe Prog::Vnet::Aws::NicNexus do
         filters: [
           {name: "subnet-id", values: [nic.nic_aws_resource.subnet_id]},
           {name: "addresses.private-ip-address", values: [nic.private_ipv4.network.to_s]},
-          {name: "status", values: ["available"]}
-        ]
+          {name: "status", values: ["available"]},
+        ],
       }).and_call_original
       expect { nx.create_network_interface }.to hop("assign_ipv6_address")
       expect(nic.nic_aws_resource.reload.network_interface_id).to eq("eni-existing123")

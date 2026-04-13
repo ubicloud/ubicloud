@@ -5,55 +5,39 @@ require "netaddr"
 
 RSpec.describe Prog::Test::Vm do
   subject(:vm_test) {
-    described_class.new(Strand.create(prog: "Test::Vm", label: "start"))
+    described_class.new(Strand.create(prog: "Test::Vm", label: "start", stack: [{"subject_id" => vm.id}]))
   }
 
+  let(:project) { Project.create(name: "default") }
   let(:strand) { vm_test.strand }
-
-  let(:sshable) {
-    Sshable.new
+  let(:sshable) { vm_test.sshable }
+  let(:vm_host) { create_vm_host }
+  let(:subnet) {
+    Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps1", location_id: Location::HETZNER_FSN1_ID).subject
   }
 
-  before {
-    subnet1 = instance_double(PrivateSubnet, id: "subnet1")
-    subnet2 = instance_double(PrivateSubnet, id: "subnet2")
-
-    main_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0")
-    extra_storage_volume = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_1")
-
-    nic1 = instance_double(Nic,
-      private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a1::/64"),
-      private_ipv4: NetAddr::IPv4Net.parse("192.168.0.1/32"))
-    vm1 = instance_double(Vm, id: "vm1",
-      private_subnets: [subnet1],
-      ip4: "1.1.1.1",
-      ip6: "2001:db8:85a1::2",
-      nics: [nic1],
-      vm_storage_volumes: [main_storage_volume, extra_storage_volume])
-
-    nic2 = instance_double(Nic,
-      private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a2::/64"),
-      private_ipv4: NetAddr::IPv4Net.parse("192.168.0.2/32"))
-    vm2 = instance_double(Vm, id: "vm2",
-      private_subnets: [subnet1],
-      ip4: "1.1.1.2",
-      ip6: "2001:db8:85a2::2",
-      nics: [nic2])
-
-    nic3 = instance_double(Nic,
-      private_ipv6: NetAddr::IPv6Net.parse("fd01:0db8:85a3::/64"),
-      private_ipv4: NetAddr::IPv4Net.parse("192.168.0.3/32"))
-    vm3 = instance_double(Vm, id: "vm3",
-      private_subnets: [subnet2],
-      ip4: "1.1.1.3",
-      ip6: "2001:db8:85a3::2",
-      nics: [nic3])
-
-    project = Project.create(name: "default")
-    allow(project).to receive(:vms).and_return([vm1, vm2, vm3])
-    allow(vm1).to receive(:project).and_return project
-    allow(vm_test).to receive_messages(sshable:, vm: vm1)
+  let(:vm) {
+    vm = create_vm(project_id: project.id, vm_host_id: vm_host.id, name: "test-vm-1",
+      ephemeral_net6: "2001:db8:85a1::/64")
+    Sshable.create_with_id(vm)
+    Strand.create(id: vm.id, prog: "Vm::Nexus", label: "wait")
+    Nic.create(private_subnet_id: subnet.id, vm_id: vm.id, name: "nic-1",
+      private_ipv4: "192.168.0.1/32", private_ipv6: "fd01:db8:85a1::/64",
+      mac: "00:00:00:00:00:01", state: "active")
+    VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false)
+    VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 20, disk_index: 1, use_bdev_ubi: false)
+    vm
   }
+
+  def create_vm_with_nic(subnet:, name:, ephemeral_net6:, nic_name:, private_ipv4:, private_ipv6:, mac:, ipv4:)
+    vm = create_vm(project_id: project.id, vm_host_id: vm_host.id, name:,
+      ephemeral_net6:)
+    Nic.create(private_subnet_id: subnet.id, vm_id: vm.id, name: nic_name,
+      private_ipv4:, private_ipv6:,
+      mac:, state: "active")
+    add_ipv4_to_vm(vm, ipv4)
+    vm
+  end
 
   describe "#start" do
     it "hops to verify_dd" do
@@ -80,7 +64,7 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#storage_persistence" do
     it "creates files on first boot" do
-      expect(vm_test).to receive(:frame).and_return({"first_boot" => true})
+      refresh_frame(vm_test, new_values: {"first_boot" => true})
       expect(sshable).to receive(:_cmd).with("mkdir ~/persistence_test")
       (1..5).each do |i|
         some_sha256 = "sha256_#{i}"
@@ -91,7 +75,7 @@ RSpec.describe Prog::Test::Vm do
     end
 
     it "verifies files on subsequent boots" do
-      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      refresh_frame(vm_test, new_values: {"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
       (1..5).each do |i|
         some_sha256 = "sha256_#{i}"
@@ -101,14 +85,14 @@ RSpec.describe Prog::Test::Vm do
     end
 
     it "fails if number of files is unexpected" do
-      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      refresh_frame(vm_test, new_values: {"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\n")
       expect { vm_test.storage_persistence }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "persistence test: unexpected number of files"})
     end
 
     it "fails if file content mismatches" do
-      expect(vm_test).to receive(:frame).and_return({"first_boot" => false})
+      refresh_frame(vm_test, new_values: {"first_boot" => false})
       expect(sshable).to receive(:_cmd).with("ls ~/persistence_test").and_return("sha256_1\nsha256_2\nsha256_3\nsha256_4\nsha256_5\n")
       expect(sshable).to receive(:_cmd).with("sha256sum /home/ubi/persistence_test/sha256_1 | awk '{print $1}'").and_return("different_sha256")
       expect { vm_test.storage_persistence }.to hop("failed")
@@ -118,28 +102,28 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#install_packages" do
     it "installs packages for ubuntu images and hops to next step" do
-      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "ubuntu-jammy")).at_least(:once)
+      vm.update(boot_image: "ubuntu-jammy")
       expect(sshable).to receive(:_cmd).with("sudo apt update")
       expect(sshable).to receive(:_cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for debian images and hops to next step" do
-      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "debian-12")).at_least(:once)
+      vm.update(boot_image: "debian-12")
       expect(sshable).to receive(:_cmd).with("sudo apt update")
       expect(sshable).to receive(:_cmd).with("sudo apt install -y build-essential fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "installs packages for almalinux images and hops to next step" do
-      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "almalinux-9")).at_least(:once)
+      vm.update(boot_image: "almalinux-9")
       expect(sshable).to receive(:_cmd).with("sudo dnf check-update || [ $? -eq 100 ]")
       expect(sshable).to receive(:_cmd).with("sudo dnf install -y gcc gcc-c++ make fio")
       expect { vm_test.install_packages }.to hop("verify_extra_disks")
     end
 
     it "fails to install packages if the vm has unexpected boot image" do
-      expect(vm_test).to receive(:vm).and_return(instance_double(Vm, boot_image: "windows")).at_least(:once)
+      vm.update(boot_image: "windows")
       expect { vm_test.install_packages }.to hop("failed")
       expect(strand.reload.exitval).to eq({"msg" => "unexpected boot image: windows"})
     end
@@ -167,7 +151,8 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#verify_extra_disks" do
     it "verifies extra disks" do
-      disk_path = "/dev/disk/by-id/disk_1"
+      vol = vm_test.vm.vm_storage_volumes.find { it.disk_index == 1 }
+      disk_path = vol.device_path
       mount_path = "/home/ubi/mnt0"
       expect(vm_test).to receive(:umount_if_mounted).with(mount_path)
       expect(sshable).to receive(:_cmd).with("mkdir -p #{mount_path}")
@@ -176,7 +161,85 @@ RSpec.describe Prog::Test::Vm do
       expect(sshable).to receive(:_cmd).with("sudo chown ubi #{mount_path}")
       expect(sshable).to receive(:_cmd).with("dd if=/dev/urandom of=#{mount_path}/1.txt bs=512 count=10000")
       expect(sshable).to receive(:_cmd).with("sync #{mount_path}/1.txt")
-      expect { vm_test.verify_extra_disks }.to hop("stop_semaphore")
+      expect { vm_test.verify_extra_disks }.to hop("verify_vm_stats")
+    end
+  end
+
+  describe "#verify_vm_stats" do
+    let(:valid_vm_stats_output) {
+      {
+        "main_pid" => "1234",
+        "vcpus" => 8,
+        "active_age_ms" => 60000,
+        "cpu_stats" => {"user_time_ms" => 104780, "system_time_ms" => 4910, "total_time_ms" => 109690},
+      }
+    }
+
+    let(:valid_disk_stats_output) {
+      {
+        "main_pid" => "3162",
+        "memory_peak_bytes" => 40050688,
+        "memory_swap_peak_bytes" => 0,
+        "active_age_ms" => 123000,
+        "num_queues" => 4,
+        "queue_size" => 256,
+        "size_gib" => 100,
+        "vhost_block_backend_version" => "1.0",
+        "cpu_stats" => {"user_time_ms" => 104430, "system_time_ms" => 4900, "total_time_ms" => 109330},
+        "io_stats" => {"read_bytes" => 111111, "write_bytes" => 222222},
+      }
+    }
+
+    it "verifies vm stats and hops to stop_semaphore" do
+      vm_stats_output = {
+        "disk_0" => valid_disk_stats_output,
+        "disk_1" => valid_disk_stats_output,
+        "vm" => valid_vm_stats_output,
+      }
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("stop_semaphore")
+    end
+
+    it "fails if top level key vm is missing in vm-stats output" do
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return({unexpected_key: "value"}.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing top-level key 'vm' in vm-stats output"})
+    end
+
+    it "fails if disk_1 key is missing in vm-stats output" do
+      vm_stats_output = {
+        "disk_0" => valid_disk_stats_output,
+        "vm" => valid_vm_stats_output,
+      }
+
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected key 'disk_1' in vm-stats output"})
+    end
+
+    it "fails if expected keys are missing in vm stats" do
+      vm_stats_output = {
+        "disk_0" => valid_disk_stats_output,
+        "vm" => {
+          "unexpected_key" => "value",
+        },
+      }
+
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected keys in vm stats"})
+    end
+
+    it "fails if expected keys are missing in disk_0 stats" do
+      vm_stats_output = {
+        "disk_0" => {
+          "unexpected_key" => "value",
+        },
+        "vm" => valid_vm_stats_output,
+      }
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm_test.vm.inhost_name}").and_return(vm_stats_output.to_json)
+      expect { vm_test.verify_vm_stats }.to hop("failed")
+      expect(strand.reload.exitval).to eq({"msg" => "missing expected keys in disk_0 stats"})
     end
   end
 
@@ -192,9 +255,9 @@ RSpec.describe Prog::Test::Vm do
       output = {
         "jobs" => [
           {
-            "read" => {"bw_bytes" => 1048576}
-          }
-        ]
+            "read" => {"bw_bytes" => 1048576},
+          },
+        ],
       }
       expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_read_bw_bytes).to eq 1048576
@@ -206,9 +269,9 @@ RSpec.describe Prog::Test::Vm do
       output = {
         "jobs" => [
           {
-            "write" => {"bw_bytes" => 1048576}
-          }
-        ]
+            "write" => {"bw_bytes" => 1048576},
+          },
+        ],
       }
       expect(sshable).to receive(:_cmd).with(/sudo fio.*/).and_return output.to_json
       expect(vm_test.get_write_bw_bytes).to eq 1048576
@@ -217,15 +280,11 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#verify_io_rates" do
     before {
-      vol = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0",
-        max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150)
-      allow(vm_test.vm).to receive(:vm_storage_volumes).and_return([vol])
+      vm_test.vm.vm_storage_volumes.first.update(max_read_mbytes_per_sec: 200, max_write_mbytes_per_sec: 150)
     }
 
     it "skips if io rates are not set" do
-      vol = instance_double(VmStorageVolume, device_path: "/dev/disk/by-id/disk_0",
-        max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil)
-      allow(vm_test.vm).to receive(:vm_storage_volumes).and_return([vol]).at_least(:once)
+      vm_test.vm.vm_storage_volumes.first.update(max_read_mbytes_per_sec: nil, max_write_mbytes_per_sec: nil)
       expect { vm_test.verify_io_rates }.to hop("ping_vms_in_subnet")
     end
 
@@ -251,60 +310,77 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#ping_vms_in_subnet" do
     it "pings vm in same subnet and hops to next step" do
-      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a2::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a2::2")
+      other_vm = create_vm_with_nic(subnet:, name: "test-vm-2",
+        ephemeral_net6: "2001:db8:85a2::/64", nic_name: "nic-2",
+        private_ipv4: "192.168.0.2/32", private_ipv6: "fd01:db8:85a2::/64",
+        mac: "00:00:00:00:00:02", ipv4: "1.1.1.2")
+      nic = other_vm.nics.first
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv6.nth(2)}")
       expect { vm_test.ping_vms_in_subnet }.to hop("ping_vms_not_in_subnet")
     end
   end
 
   describe "#ping_vms_not_in_subnet" do
-    it "fails to ping private interfaces of vms not in the same subnect and hops to next step" do
-      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
-      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+    let(:other_subnet) {
+      Prog::Vnet::SubnetNexus.assemble(project.id, name: "ps2", location_id: Location::HETZNER_FSN1_ID).subject
+    }
+    let(:other_vm) {
+      create_vm_with_nic(subnet: other_subnet, name: "test-vm-3",
+        ephemeral_net6: "2001:db8:85a3::/64", nic_name: "nic-3",
+        private_ipv4: "192.168.0.3/32", private_ipv6: "fd01:db8:85a3::/64",
+        mac: "00:00:00:00:00:03", ipv4: "1.1.2.3")
+    }
+
+    it "fails to ping private interfaces of vms not in the same subnet and hops to next step" do
+      nic = other_vm.nics.first
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv6.nth(2)}").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect { vm_test.ping_vms_not_in_subnet }.to hop("finish")
     end
 
     it "raises error if pinging private ipv4 of vms in other subnets succeed" do
-      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 192.168.0.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
+      nic = other_vm.nics.first
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv4.network}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv6.nth(2)}").and_raise Sshable::SshError.new("ping failed", "", "", nil, nil)
       expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip4 of a vm in different subnet"
     end
 
-    it "raises error if pinging private ipv9 of vms in other subnets succeed" do
-      expect(sshable).to receive(:_cmd).with("ping -c 2 1.1.1.3")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 2001:db8:85a3::2")
-      expect(sshable).to receive(:_cmd).with("ping -c 2 fd01:db8:85a3::2")
+    it "raises error if pinging private ipv6 of vms in other subnets succeed" do
+      nic = other_vm.nics.first
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip4}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{other_vm.ip6}")
+      expect(sshable).to receive(:_cmd).with("ping -c 2 #{nic.private_ipv6.nth(2)}")
       expect { vm_test.ping_vms_not_in_subnet }.to raise_error RuntimeError, "Unexpected successful ping to private ip6 of a vm in different subnet"
     end
   end
 
   describe "#stop_semaphore" do
     it "increments stop semaphore and hops" do
-      expect(vm_test.vm).to receive(:incr_stop)
       expect { vm_test.stop_semaphore }.to hop("check_stopped_by_stop_semaphore")
+      expect(vm_test.vm.stop_set?).to be true
     end
   end
 
   describe "#check_stopped_by_stop_semaphore" do
     it "naps if strand not at expected label" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect { vm_test.check_stopped_by_stop_semaphore }.to nap(5)
     end
 
     it "naps if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
-      expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
+      vm_test.vm.strand.update(label: "stopped")
+      expect(sshable).to receive(:_cmd).with("true").and_return("")
       expect { vm_test.check_stopped_by_stop_semaphore }.to nap(5)
     end
 
     it "hops if VM is down" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      vm_test.vm.strand.update(label: "stopped")
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
       expect { vm_test.check_stopped_by_stop_semaphore }.to hop("start_semaphore_after_stop")
     end
@@ -312,25 +388,23 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#start_semaphore_after_stop" do
     it "increments semaphore and hops" do
-      expect(vm_test.vm).to receive(:incr_start)
       expect { vm_test.start_semaphore_after_stop }.to hop("check_started_by_start_semaphore")
+      expect(vm_test.vm.start_set?).to be true
     end
   end
 
   describe "#check_started_by_start_semaphore" do
     it "naps if strand not at expected label" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      vm_test.vm.strand.update(label: "stopped")
       expect { vm_test.check_started_by_start_semaphore }.to nap(5)
     end
 
     it "naps if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
       expect { vm_test.check_started_by_start_semaphore }.to nap(5)
     end
 
     it "hops if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
       expect { vm_test.check_started_by_start_semaphore }.to hop("shutdown_command")
     end
@@ -350,42 +424,35 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#check_stopped_by_shutdown_command" do
     it "naps if strand not at expected label" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect { vm_test.check_stopped_by_shutdown_command }.to nap(5)
     end
 
     it "naps if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      vm_test.vm.strand.update(label: "stopped")
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
       expect { vm_test.check_stopped_by_shutdown_command }.to nap(5)
     end
 
     it "hops if VM is down" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      vm_test.vm.strand.update(label: "stopped")
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
       expect { vm_test.check_stopped_by_shutdown_command }.to hop("verify_systemd_unit_status_after_shutdown")
     end
   end
 
   describe "#verify_systemd_unit_status_after_shutdown" do
-    before {
-      sshable = Sshable.create
-      vm_host = instance_double(VmHost, sshable:)
-      allow(vm_test.vm).to receive_messages(vm_host:, inhost_name: "vm123456")
-    }
-
     it "verifies systemd unit status and hops" do
-      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_raise(Sshable::SshError.new("systemctl is-active vm123456", "inactive\n", "", nil, nil))
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm_test.vm.inhost_name}").and_raise(Sshable::SshError.new("systemctl is-active #{vm_test.vm.inhost_name}", "inactive\n", "", nil, nil))
       expect { vm_test.verify_systemd_unit_status_after_shutdown }.to hop("start_semaphore_after_shutdown")
     end
 
     it "naps if VM is still active" do
-      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_return("active\n")
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm_test.vm.inhost_name}").and_return("active\n")
       expect { vm_test.verify_systemd_unit_status_after_shutdown }.to nap(5)
     end
 
     it "fails if systemd unit status is unexpected" do
-      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active vm123456").and_return("unknown\n")
+      expect(vm_test.vm.vm_host.sshable).to receive(:_cmd).with("systemctl is-active #{vm_test.vm.inhost_name}").and_return("unknown\n")
       expect { vm_test.verify_systemd_unit_status_after_shutdown }.to hop("failed")
       expect(vm_test.strand.exitval).to eq({msg: "VM should be inactive after shutdown command, but is unknown"})
     end
@@ -393,25 +460,23 @@ RSpec.describe Prog::Test::Vm do
 
   describe "#start_semaphore_after_shutdown" do
     it "increments semaphore and hops" do
-      expect(vm_test.vm).to receive(:incr_start)
       expect { vm_test.start_semaphore_after_shutdown }.to hop("check_started_after_shutdown")
+      expect(vm_test.vm.start_set?).to be true
     end
   end
 
   describe "#check_started_after_shutdown" do
     it "naps if strand not at expected label" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "stopped"))
+      vm_test.vm.strand.update(label: "stopped")
       expect { vm_test.check_started_after_shutdown }.to nap(5)
     end
 
     it "naps if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_raise(Errno::ECONNREFUSED)
       expect { vm_test.check_started_after_shutdown }.to nap(5)
     end
 
     it "hops if VM is up" do
-      expect(vm_test.vm).to receive(:strand).and_return(instance_double(Strand, label: "wait"))
       expect(vm_test.sshable).to receive(:_cmd).with("true").and_return("")
       expect { vm_test.check_started_after_shutdown }.to hop("ping_google")
     end

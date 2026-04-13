@@ -15,12 +15,16 @@ class PostgresSetup
     end
   end
 
-  def configure_memory_overcommit
-    # r "sudo sysctl -w vm.overcommit_memory=2"
-    # r "echo 'vm.overcommit_memory=2' | sudo tee -a /etc/sysctl.conf"
+  def configure_memory_overcommit(strict: false)
+    if strict
+      total_mem_kb = File.read("/proc/meminfo").match(/MemTotal:\s+(\d+)/)[1].to_i
+      overcommit_kbytes = (total_mem_kb * 0.8 + 2 * 1048576).round
+      safe_write_to_file("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=#{overcommit_kbytes}\n")
+    else
+      r "sudo rm -f /etc/sysctl.d/99-overcommit.conf"
+    end
 
-    # r "sudo sysctl -w vm.overcommit_ratio=150"
-    # r "echo 'vm.overcommit_ratio=150' | sudo tee -a /etc/sysctl.conf"
+    r "sudo sysctl --system"
   end
 
   def setup_data_directory
@@ -34,6 +38,6 @@ class PostgresSetup
   end
 
   def create_cluster
-    r "pg_createcluster #{@version} main --port=5432 --start --locale=C.UTF8"
+    r "pg_createcluster #{@version} main --port=5432 --locale=C.UTF8"
   end
 end

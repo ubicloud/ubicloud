@@ -37,7 +37,7 @@ RSpec.describe GithubRunner do
       cores: vm.cores,
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
-      data_center: vm.vm_host.data_center
+      data_center: vm.vm_host.data_center,
     })
   end
 
@@ -58,7 +58,38 @@ RSpec.describe GithubRunner do
       vcpus: vm.vcpus,
       vm_host_ubid: vm.vm_host.ubid,
       data_center: vm.vm_host.data_center,
-      vm_pool_ubid: pool.ubid
+      vm_pool_ubid: pool.ubid,
+    })
+  end
+
+  it "can log duration with vhost block backend version" do
+    vm = github_runner.vm
+    vhost_block_backend = create_vhost_block_backend(vm_host_id: vm.vm_host_id)
+    boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "github-ubuntu-2204", version: "20251211", size_gib: 75)
+    VmStorageVolume.create(
+      vm_id: vm.id,
+      boot: true,
+      size_gib: 75,
+      disk_index: 0,
+      boot_image_id: boot_image.id,
+      vhost_block_backend_id: vhost_block_backend.id,
+      vring_workers: 4,
+    )
+
+    expect(clog_emit_hash).to eq({
+      repository_name: "test-repo",
+      ubid: github_runner.ubid,
+      label: github_runner.label,
+      duration: 10,
+      conclusion: nil,
+      vm_ubid: vm.ubid,
+      arch: vm.arch,
+      boot_image: boot_image.version,
+      vhost_block_backend_version: vhost_block_backend.version,
+      cores: vm.cores,
+      vcpus: vm.vcpus,
+      vm_host_ubid: vm.vm_host.ubid,
+      data_center: vm.vm_host.data_center,
     })
   end
 
@@ -77,7 +108,7 @@ RSpec.describe GithubRunner do
       arch: vm.arch,
       boot_image: vm.boot_image,
       cores: vm.cores,
-      vcpus: vm.vcpus
+      vcpus: vm.vcpus,
     })
   end
 
@@ -88,7 +119,7 @@ RSpec.describe GithubRunner do
       ubid: github_runner.ubid,
       label: github_runner.label,
       duration: 10,
-      conclusion: nil
+      conclusion: nil,
     })
   end
 
@@ -108,12 +139,12 @@ RSpec.describe GithubRunner do
 
   it "checks pulse" do
     session = {
-      ssh_session: Net::SSH::Connection::Session.allocate
+      ssh_session: Net::SSH::Connection::Session.allocate,
     }
     pulse = {
       reading: "up",
       reading_rpt: 5,
-      reading_chg: Time.now - 30
+      reading_chg: Time.now - 30,
     }
 
     expect(session[:ssh_session]).to receive(:_exec!).with("awk '/MemAvailable/ {print $2}' /proc/meminfo").and_return("123\n")

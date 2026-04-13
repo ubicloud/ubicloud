@@ -99,6 +99,7 @@ module Config
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
   override :aws_role_session_name, "ubi", string
+  override :provider_resource_tag_value, "true", string
   override :clover_database_rds_iam_auth_enabled, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
@@ -112,6 +113,7 @@ module Config
   override :allow_unspread_servers, !production?, bool
   override :control_plane_outbound_cidrs, "0.0.0.0/0,::/0", array(string)
   optional :git_commit_hash, string
+  optional :ip_from_header, string
 
   # GitHub Runner App
   optional :github_app_name, string
@@ -158,6 +160,9 @@ module Config
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
 
+  # Machine Images
+  override :machine_image_max_size_gib, 40, int
+
   # Pagerduty
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string
@@ -178,6 +183,9 @@ module Config
 
   # Logging
   optional :database_logger_level, string
+  optional :ingest_key, string, clear: true
+  optional :otel_exporter_otlp_endpoint, string
+  override :pry_logger_truncate_limit, 500, int
 
   # Ubicloud Images (Minio)
   override :ubicloud_images_bucket_name, "ubicloud-images", string
@@ -192,26 +200,10 @@ module Config
   optional :ubicloud_images_r2_access_key, string, clear: true
   optional :ubicloud_images_r2_secret_key, string, clear: true
 
-  override :ubuntu_noble_version, "20250502.1", string
-  override :ubuntu_jammy_version, "20250508", string
-  override :debian_12_version, "20250428-2096", string
-  override :almalinux_9_version, "9.6-20250522", string
-  override :github_ubuntu_2404_version, "20260312.1.0", string
-  override :github_ubuntu_2204_version, "20260312.1.0", string
-  override :github_ubuntu_2204_x64_aws_ami_version, "ami-02609928906c79843", string
-  override :github_ubuntu_2404_x64_aws_ami_version, "ami-04046eda554773409", string
-  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-04ff9b8e3697a7043", string
-  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-009ff0840bb03be9b", string
-  override :postgres_ubuntu_2204_version, "20260218.1.0", string
-  override :postgres16_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres17_ubuntu_2204_version, "20250425.1.1", string
-  override :postgres_paradedb_ubuntu_2204_version, "20260107.1.0", string
-  override :postgres16_paradedb_ubuntu_2204_version, "20250901.1.0", string
-  override :postgres17_paradedb_ubuntu_2204_version, "20250901.1.0", string
-  override :ai_ubuntu_2404_nvidia_version, "20250505.1.0", string
-  override :kubernetes_v1_32_version, "20250320.1.0", string
-  override :kubernetes_v1_33_version, "20250506.1.0", string
-  override :kubernetes_v1_34_version, "20250828.1.0", string
+  override :github_ubuntu_2204_x64_aws_ami_version, "ami-08855bdd06e27855c", string
+  override :github_ubuntu_2404_x64_aws_ami_version, "ami-086d34c41ddb969fa", string
+  override :github_ubuntu_2204_arm64_aws_ami_version, "ami-08781e52ef55da0ae", string
+  override :github_ubuntu_2404_arm64_aws_ami_version, "ami-0d90f4c3402fceb4b", string
 
   # Allocator
   override :allocator_target_host_utilization, 0.72, float

@@ -24,11 +24,11 @@ class StorageVolume
 
   attr_reader :image_path, :read_only
   def initialize(vm_name, params)
+    fail "unencrypted non-read-only volumes are not supported" if !params["encrypted"] && !params["read_only"]
     @vm_name = vm_name
     @vhost_backend_version = params["vhost_block_backend_version"]
     @disk_index = params["disk_index"]
     @device_id = params["device_id"]
-    @encrypted = params["encrypted"]
     @disk_size_gib = params["size_gib"]
     @use_bdev_ubi = params["use_bdev_ubi"] || false
     @image_path = BootImage.new(params["image"], params["image_version"]).image_path if params["image"]
@@ -41,8 +41,10 @@ class StorageVolume
     @num_queues = params.fetch("num_queues", 1)
     @queue_size = params.fetch("queue_size", 256)
     @copy_on_read = params.fetch("copy_on_read", false)
+    @track_written = params.fetch("track_written", false)
     @stripe_sector_count_shift = Integer(params.fetch("stripe_sector_count_shift", 11))
     @cpus = params["cpus"]
+    @archive_source = params["archive_source"]
   end
 
   def vp
@@ -62,19 +64,25 @@ class StorageVolume
   end
 
   def prep(key_wrapping_secrets)
+    # VmSetup should prevent this from being called on read-only volumes, but
+    # check again to fail loudly if it is violated.
+    fail "Cannot prep read-only volumes" if @read_only
+
     # Device path is intended to be created by system admin, so fail loudly if
     # it doesn't exist
     fail "Storage device directory doesn't exist: #{sp.device_path}" if !File.exist?(sp.device_path)
 
     FileUtils.mkdir_p storage_dir
     FileUtils.chown @vm_name, @vm_name, storage_dir
-    encryption_key = setup_data_encryption_key(key_wrapping_secrets) if @encrypted
+    encryption_key = generate_data_encryption_key
 
     if @vhost_backend_version
       create_empty_disk_file
       prep_vhost_backend(encryption_key, key_wrapping_secrets)
       return
     end
+
+    store_spdk_data_encryption_key(encryption_key, key_wrapping_secrets)
 
     if @image_path.nil?
       fail "bdev_ubi requires a base image" if @use_bdev_ubi
@@ -87,17 +95,23 @@ class StorageVolume
 
     if @use_bdev_ubi
       create_ubi_writespace(encryption_key)
-    elsif @encrypted
+    else
       create_empty_disk_file
       encrypted_image_copy(encryption_key, @image_path)
-    else
-      unencrypted_image_copy
     end
+  end
+
+  def has_source?
+    !!(@image_path || @archive_source)
+  end
+
+  def requires_metadata?
+    has_source? || @track_written
   end
 
   def prep_vhost_backend(encryption_key, key_wrapping_secrets)
     vhost_backend_create_config(encryption_key, key_wrapping_secrets)
-    vhost_backend_create_metadata(key_wrapping_secrets) if @image_path
+    vhost_backend_create_metadata(key_wrapping_secrets) if requires_metadata?
     vhost_backend_create_service_file
   end
 
@@ -115,8 +129,8 @@ class StorageVolume
 
   def vhost_backend_create_config(encryption_key, key_wrapping_secrets)
     if use_config_v2?
-      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if @image_path
-      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets)) if @encrypted
+      write_config_file(sp.vhost_backend_stripe_source_config, v2_stripe_source_toml) if has_source?
+      write_config_file(sp.vhost_backend_secrets_config, v2_secrets_toml(encryption_key, key_wrapping_secrets))
       write_config_file(sp.vhost_backend_config, v2_main_toml)
     else
       config = vhost_backend_config(encryption_key, key_wrapping_secrets)
@@ -133,17 +147,12 @@ class StorageVolume
 
   def vhost_backend_create_metadata(key_wrapping_secrets)
     metadata_path = sp.vhost_backend_metadata
-    config_path = sp.vhost_backend_config
 
     write_new_file(metadata_path, @vm_name) do |file|
       file.truncate(8 * 1024 * 1024)
     end
 
-    if @encrypted
-      vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
-    else
-      r("sudo", "-u", @vm_name, vhost_backend.init_metadata_path, "-s", @stripe_sector_count_shift.to_s, "--config", config_path)
-    end
+    vhost_backend_create_encrypted_metadata(key_wrapping_secrets)
 
     sync_parent_dir(metadata_path)
   end
@@ -153,7 +162,7 @@ class StorageVolume
       "sudo", "-u", @vm_name,
       vhost_backend.init_metadata_path,
       "-s", @stripe_sector_count_shift.to_s,
-      "--config", sp.vhost_backend_config
+      "--config", sp.vhost_backend_config,
     ]
     cmd.push("--kek", sp.kek_pipe) unless use_config_v2?
 
@@ -165,8 +174,17 @@ class StorageVolume
 
   def vhost_backend_create_service_file
     # v2 config embeds the kek pipe path in the TOML, so no --kek CLI arg needed
-    kek_arg = if @encrypted && !use_config_v2?
+    kek_arg = if !use_config_v2?
       "--kek #{sp.kek_pipe}"
+    end
+
+    if @archive_source
+      restrict_address_families = "AF_UNIX AF_INET AF_INET6"
+      private_network = "no"
+    else
+      restrict_address_families = "AF_UNIX"
+      private_network = "yes"
+      ip_address_deny = "any"
     end
 
     # systemd-analyze security result:
@@ -182,7 +200,7 @@ class StorageVolume
         Environment=RUST_LOG=info
         Environment=RUST_BACKTRACE=1
         ExecStart=#{vhost_backend.bin_path} --config #{sp.vhost_backend_config} #{kek_arg}
-        Restart=always
+        Restart=no
         User=#{@vm_name}
         Group=#{@vm_name}
         #{systemd_io_rate_limits}
@@ -214,7 +232,7 @@ class StorageVolume
         ProtectKernelLogs=true
         ProtectProc=invisible
         
-        RestrictAddressFamilies=AF_UNIX
+        RestrictAddressFamilies=#{restrict_address_families}
         RestrictNamespaces=true
         SystemCallArchitectures=native
         SystemCallFilter=@system-service
@@ -223,9 +241,9 @@ class StorageVolume
         RestrictSUIDSGID=yes
         RestrictRealtime=yes
         ProcSubset=pid
-        PrivateNetwork=yes
+        PrivateNetwork=#{private_network}
         PrivateUsers=yes
-        IPAddressDeny=any
+        IPAddressDeny=#{ip_address_deny}
 
         [Install]
         WantedBy=multi-user.target
@@ -284,7 +302,7 @@ class StorageVolume
       "poll_queue_timeout_us" => 1000,
       "device_id" => @device_id,
       "write_through" => write_through_device?,
-      "rpc_socket_path" => sp.rpc_socket_path
+      "rpc_socket_path" => sp.rpc_socket_path,
     }
 
     if @image_path
@@ -292,12 +310,10 @@ class StorageVolume
       config["metadata_path"] = sp.vhost_backend_metadata
     end
 
-    if @encrypted
-      key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
-      key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
-      key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
-      config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
-    end
+    key_encryption = StorageKeyEncryption.new(key_wrapping_secrets)
+    key1_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key])
+    key2_wrapped_b64 = wrap_key_b64(key_encryption, encryption_key[:key2])
+    config["encryption_key"] = [key1_wrapped_b64, key2_wrapped_b64]
 
     if @cpus
       config["cpus"] = @cpus
@@ -312,20 +328,14 @@ class StorageVolume
     sections << v2_include_section
     sections << v2_device_section
     sections << v2_tuning_section
-    sections << if @encrypted
-      v2_encryption_section
-    else
-      # unencrypted disks must be explicitly allowed in config v2.
-      v2_danger_zone_section
-    end
+    sections << v2_encryption_section
     sections.join("\n")
   end
 
   def v2_include_section
     includes = []
-    includes << File.basename(sp.vhost_backend_stripe_source_config) if @image_path
-    includes << File.basename(sp.vhost_backend_secrets_config) if @encrypted
-    return "" if includes.empty?
+    includes << File.basename(sp.vhost_backend_stripe_source_config) if has_source?
+    includes << File.basename(sp.vhost_backend_secrets_config)
     items = includes.map { |f| toml_str(f) }.join(", ")
     "include = [#{items}]\n"
   end
@@ -335,9 +345,10 @@ class StorageVolume
       "data_path" => disk_file,
       "vhost_socket" => vhost_sock,
       "rpc_socket" => sp.rpc_socket_path,
-      "device_id" => @device_id
+      "device_id" => @device_id,
+      "track_written" => @track_written,
     }
-    hash["metadata_path"] = sp.vhost_backend_metadata if @image_path
+    hash["metadata_path"] = sp.vhost_backend_metadata if requires_metadata?
     toml_section("device", hash)
   end
 
@@ -349,24 +360,16 @@ class StorageVolume
       "seg_count_max" => 4,
       "poll_timeout_us" => 1000,
       "write_through" => write_through_device?,
-      "cpus" => @cpus
+      "cpus" => @cpus,
     }
     toml_section("tuning", hash.compact)
   end
 
   def v2_encryption_section
     hash = {
-      "xts_key.ref" => "xts-key"
+      "xts_key.ref" => "xts-key",
     }
     toml_section("encryption", hash)
-  end
-
-  def v2_danger_zone_section
-    hash = {
-      "enabled" => true,
-      "allow_unencrypted_disk" => true
-    }
-    toml_section("danger_zone", hash)
   end
 
   def v2_secrets_toml(encryption_key, key_wrapping_secrets)
@@ -374,29 +377,62 @@ class StorageVolume
     xts_plaintext = [encryption_key[:key]].pack("H*") + [encryption_key[:key2]].pack("H*")
     xts_key_name = "xts-key" # we use the key name as auth_data in aes256-gcm
     wrapped_xts_b64 = Base64.strict_encode64(
-      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext)
+      StorageKeyEncryption.aes256gcm_encrypt(kek_bytes, xts_key_name, xts_plaintext),
     )
 
-    secrets_xts_key_section = toml_section("secrets.#{xts_key_name}", {
+    sections = []
+    sections << toml_section("secrets.#{xts_key_name}", {
       "source.inline" => wrapped_xts_b64,
       "encoding" => "base64",
-      "encrypted_by.ref" => "kek"
+      "encrypted_by.ref" => "kek",
     })
 
-    secrets_kek_section = toml_section("secrets.kek", {
+    sections << toml_section("secrets.kek", {
       "source.file" => sp.kek_pipe,
-      "encoding" => "base64"
+      "encoding" => "base64",
     })
 
-    secrets_xts_key_section + "\n" + secrets_kek_section
+    if @archive_source
+      sections << toml_section("secrets.archive-access-key", {
+        "source.inline" => @archive_source["encrypted_access_key_id"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+      sections << toml_section("secrets.archive-secret-key", {
+        "source.inline" => @archive_source["encrypted_secret_access_key"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+      sections << toml_section("secrets.archive-kek", {
+        "source.inline" => @archive_source["encrypted_archive_kek"],
+        "encoding" => "base64",
+        "encrypted_by.ref" => "kek",
+      })
+    end
+
+    sections.join("\n")
   end
 
   def v2_stripe_source_toml
-    hash = {
-      "type" => "raw",
-      "image_path" => @image_path,
-      "copy_on_read" => @copy_on_read
-    }
+    hash = if @archive_source
+      {
+        "type" => "archive",
+        "storage" => "s3",
+        "bucket" => @archive_source["bucket"],
+        "prefix" => @archive_source["prefix"],
+        "region" => @archive_source["region"],
+        "endpoint" => @archive_source["endpoint"],
+        "access_key_id.ref" => "archive-access-key",
+        "secret_access_key.ref" => "archive-secret-key",
+        "archive_kek.ref" => "archive-kek",
+      }
+    else
+      {
+        "type" => "raw",
+        "image_path" => @image_path,
+        "copy_on_read" => @copy_on_read,
+      }
+    end
     toml_section("stripe_source", hash)
   end
 
@@ -411,7 +447,7 @@ class StorageVolume
         "method" => "aes256-gcm",
         "key" => key_wrapping_secrets["key"].strip,
         "init_vector" => key_wrapping_secrets["init_vector"].strip,
-        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip
+        "auth_data" => Base64.strict_encode64(key_wrapping_secrets["auth_data"]).strip,
       }.to_yaml
     end
   end
@@ -427,12 +463,16 @@ class StorageVolume
   end
 
   def start(key_wrapping_secrets)
+    # VmSetup should prevent this from being called on read-only volumes, but
+    # check again to fail loudly if it is violated.
+    fail "Cannot start read-only volumes" if @read_only
+
     if @vhost_backend_version
       vhost_backend_start(key_wrapping_secrets)
       return
     end
 
-    encryption_key = read_data_encryption_key(key_wrapping_secrets) if @encrypted
+    encryption_key = read_data_encryption_key(key_wrapping_secrets)
     retries = 0
     begin
       setup_spdk_bdev(encryption_key)
@@ -456,11 +496,6 @@ class StorageVolume
 
     rm_if_exists(vhost_sock)
     rm_if_exists(sp.rpc_socket_path)
-
-    unless @encrypted
-      r "systemctl", "start", vhost_user_block_service
-      return
-    end
 
     with_kek_pipe(sp.kek_pipe, owner: @vm_name) do |kek_pipe|
       r "systemctl", "start", vhost_user_block_service
@@ -493,53 +528,39 @@ class StorageVolume
       rpc_client.bdev_ubi_delete(@device_id)
     end
 
-    if @encrypted
-      rpc_client.bdev_crypto_delete(non_ubi_bdev)
-      rpc_client.bdev_aio_delete("#{@device_id}_aio")
-      rpc_client.accel_crypto_key_destroy("#{@device_id}_key")
-    else
-      rpc_client.bdev_aio_delete(non_ubi_bdev)
-    end
+    rpc_client.bdev_crypto_delete(non_ubi_bdev)
+    rpc_client.bdev_aio_delete("#{@device_id}_aio")
+    rpc_client.accel_crypto_key_destroy("#{@device_id}_key")
 
     rm_if_exists(SpdkPath.vhost_sock(vhost_controller))
   end
 
-  def setup_data_encryption_key(key_wrapping_secrets)
+  def generate_data_encryption_key
     data_encryption_key = OpenSSL::Cipher.new("aes-256-xts").random_key.unpack1("H*")
 
-    result = {
+    {
       cipher: "AES_XTS",
       key: data_encryption_key[..63],
-      key2: data_encryption_key[64..]
+      key2: data_encryption_key[64..],
     }
+  end
 
+  def store_spdk_data_encryption_key(data_encryption_key, key_wrapping_secrets)
     key_file = data_encryption_key_path
 
     # save encrypted key
     sek = StorageKeyEncryption.new(key_wrapping_secrets)
-    sek.write_encrypted_dek(key_file, result)
+    sek.write_encrypted_dek(key_file, data_encryption_key)
 
     FileUtils.chown @vm_name, @vm_name, key_file
     FileUtils.chmod "u=rw,g=,o=", key_file
 
     sync_parent_dir(key_file)
-
-    result
   end
 
   def read_data_encryption_key(key_wrapping_secrets)
     sek = StorageKeyEncryption.new(key_wrapping_secrets)
     sek.read_encrypted_dek(data_encryption_key_path)
-  end
-
-  def unencrypted_image_copy
-    q_image_path = @image_path.shellescape
-    q_disk_file = disk_file.shellescape
-
-    r "cp --reflink=auto #{q_image_path} #{q_disk_file}"
-    r "truncate -s #{@disk_size_gib}G #{q_disk_file}"
-
-    set_disk_file_permissions
   end
 
   def verify_imaged_disk_size
@@ -561,16 +582,16 @@ class StorageVolume
         name: "aio0",
         block_size: 512,
         filename: disk_file,
-        readonly: false
-      }
+        readonly: false,
+      },
     },
       {
         method: "bdev_crypto_create",
         params: {
           base_bdev_name: "aio0",
           name: "crypt0",
-          key_name: "super_key"
-        }
+          key_name: "super_key",
+        },
       }]
 
     accel_conf = [
@@ -580,22 +601,22 @@ class StorageVolume
           name: "super_key",
           cipher: encryption_key[:cipher],
           key: encryption_key[:key],
-          key2: encryption_key[:key2]
-        }
-      }
+          key2: encryption_key[:key2],
+        },
+      },
     ]
 
     spdk_config_json = {
       subsystems: [
         {
           subsystem: "accel",
-          config: accel_conf
+          config: accel_conf,
         },
         {
           subsystem: "bdev",
-          config: bdev_conf
-        }
-      ]
+          config: bdev_conf,
+        },
+      ],
     }.to_json
 
     # spdk_dd uses the same spdk app infra, so it will bind to an rpc socket,
@@ -615,10 +636,8 @@ class StorageVolume
 
   def create_ubi_writespace(encryption_key)
     create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024 + 16)
-    if @encrypted
-      # just clear the metadata section, i.e. first 8MB
-      encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
-    end
+    # just clear the metadata section, i.e. first 8MB
+    encrypted_image_copy(encryption_key, "/dev/zero", block_size: 2097152, count: 4)
   end
 
   def create_empty_disk_file(disk_size_mib: @disk_size_gib * 1024)
@@ -641,20 +660,16 @@ class StorageVolume
   def setup_spdk_bdev(encryption_key)
     non_ubi_bdev = @use_bdev_ubi ? "#{@device_id}_base" : @device_id
 
-    if encryption_key
-      key_name = "#{@device_id}_key"
-      aio_bdev = "#{@device_id}_aio"
-      rpc_client.accel_crypto_key_create(
-        key_name,
-        encryption_key[:cipher],
-        encryption_key[:key],
-        encryption_key[:key2]
-      )
-      rpc_client.bdev_aio_create(aio_bdev, disk_file, 512)
-      rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
-    else
-      rpc_client.bdev_aio_create(non_ubi_bdev, disk_file, 512)
-    end
+    key_name = "#{@device_id}_key"
+    aio_bdev = "#{@device_id}_aio"
+    rpc_client.accel_crypto_key_create(
+      key_name,
+      encryption_key[:cipher],
+      encryption_key[:key],
+      encryption_key[:key2],
+    )
+    rpc_client.bdev_aio_create(aio_bdev, disk_file, 512)
+    rpc_client.bdev_crypto_create(non_ubi_bdev, aio_bdev, key_name)
 
     if @use_bdev_ubi
       rpc_client.bdev_ubi_create(@device_id, non_ubi_bdev, @image_path)
@@ -667,7 +682,7 @@ class StorageVolume
     rpc_client.bdev_set_qos_limit(
       @device_id,
       r_mbytes_per_sec: @max_read_mbytes_per_sec,
-      w_mbytes_per_sec: @max_write_mbytes_per_sec
+      w_mbytes_per_sec: @max_write_mbytes_per_sec,
     )
   end
 

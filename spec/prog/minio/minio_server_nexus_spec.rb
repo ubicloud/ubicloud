@@ -9,7 +9,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
 
   let(:minio_pool) {
     ps = Prog::Vnet::SubnetNexus.assemble(
-      minio_project.id, name: "minio-cluster-name"
+      minio_project.id, name: "minio-cluster-name",
     )
     mc = MinioCluster.create(
       location_id: Location::HETZNER_FSN1_ID,
@@ -21,7 +21,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       root_cert_1: "root_cert_1",
       root_cert_key_1: "root_cert_key_1",
       root_cert_2: "root_cert_2",
-      root_cert_key_2: "root_cert_key_2"
+      root_cert_key_2: "root_cert_key_2",
     )
 
     MinioPool.create(
@@ -30,7 +30,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       server_count: 1,
       drive_count: 1,
       storage_size_gib: 100,
-      vm_size: "standard-2"
+      vm_size: "standard-2",
     )
   }
 
@@ -44,7 +44,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       extensions: ["subjectAltName=DNS:minio-cluster-name.minio.ubicloud.com,DNS:minio-cluster-name0.minio.ubicloud.com", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6,
       issuer_cert: cert_1,
-      issuer_key: key_1
+      issuer_key: key_1,
     }
   }
 
@@ -161,7 +161,7 @@ RSpec.describe Prog::Minio::MinioServerNexus do
       expect { nx.wait_bootstrap_rhizome }.to nap(120)
     end
 
-    it "hops to setup if bootstrap rhizome is done" do
+    it "hops to create_minio_user if bootstrap rhizome is done" do
       expect { nx.wait_bootstrap_rhizome }.to hop("create_minio_user")
     end
   end

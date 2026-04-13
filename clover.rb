@@ -21,6 +21,10 @@ class Clover < Roda
 
   Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
 
+  include Authorization
+
+  Unreloader.record_dependency("lib/authorization.rb", __FILE__)
+
   OPENAPI = OpenAPIParser.load("openapi/openapi.yml", strict_reference_validation: true)
   SCHEMA = Committee::Drivers::OpenAPI3::Driver.new.parse(OPENAPI)
   SCHEMA_ROUTER = SCHEMA.build_router(schema: SCHEMA, strict: true)
@@ -86,7 +90,7 @@ class Clover < Roda
     PostgresResource,
     PrivateSubnet,
     SshPublicKey,
-    Vm
+    Vm,
   ].each do |model, regexp|
     sym = :"#{model.table_name}_ubid_uuid"
     symbol_matcher(sym, /(#{model.ubid_type}[a-tv-z0-9]{24})/) do |ubid|
@@ -103,7 +107,7 @@ class Clover < Roda
       json: "application/json",
       pdf: "application/pdf",
       pem: "application/x-pem-file",
-      text: "text/plain"
+      text: "text/plain",
     }
 
   plugin :path
@@ -138,6 +142,8 @@ class Clover < Roda
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage
   end
+
+  plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
   # :nocov:
 
   plugin :host_routing, scope_predicates: true do |hosts|
@@ -202,7 +208,7 @@ class Clover < Roda
     @error = {
       code: 404,
       type: "ResourceNotFound",
-      message: "Sorry, we couldn’t find the resource you’re looking for."
+      message: "Sorry, we couldn’t find the resource you’re looking for.",
     }
 
     if api? || request.accepts_json?
@@ -326,8 +332,8 @@ class Clover < Roda
       "error" => {
         "code" => 401,
         "type" => "InvalidCredentials",
-        "message" => "invalid personal access token provided in Authorization header"
-      }
+        "message" => "invalid personal access token provided in Authorization header",
+      },
     }.to_json.freeze
 
     # The only response body that can be generated with this Rodauth configuration
@@ -350,15 +356,56 @@ class Clover < Roda
       :lockout, :login, :logout, :remember, :reset_password,
       :disallow_password_reuse, :password_grace_period, :active_sessions,
       :verify_login_change, :change_password_notify, :confirm_password,
-      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email
+      :otp, :webauthn, :recovery_codes, :omniauth, :otp_unlock, :otp_lockout_email,
+      :audit_logging
 
     title_instance_variable :@page_title
     check_csrf? false
     base_url Config.base_url
 
+    audit_logging_table :account_authentication_audit_log
+    audit_log_metadata do |action|
+      hash = {"ip" => request.ip}
+
+      case action
+      when :login
+        via = authenticated_by.first
+        if via == "omniauth"
+          via = scope.omniauth_provider_name(omniauth_provider)
+        end
+        hash["via"] = via
+      when :login_failure
+        if request.path_info == "/login"
+          hash["reason"] = "incorrect password"
+        end
+      when :two_factor_authentication
+        via = hash["via"] = authenticated_by.last
+        if via == "webauthn"
+          hash["key_name"] = webauthn_keys_ds.where(webauthn_keys_webauthn_id_column => authenticated_webauthn_id).get(:name)
+        end
+      when :webauthn_remove
+        hash["key_name"] = @removed_webauthn_credential_name
+      when :verify_login_change
+        hash["previous_login"] = @previous_login
+        hash["new_login"] = verify_login_change_new_login
+      when :omniauth_create_account
+        hash["provider"] = scope.omniauth_provider_name(omniauth_provider)
+      end
+
+      Sequel.pg_jsonb(hash)
+    end
+    add_audit_log do |account_id, action, metadata = nil|
+      hash = audit_log_insert_hash(account_id, action)
+      hash[:metadata].merge!(metadata) if metadata
+      audit_log_ds.insert(hash)
+    end
+    serialize_audit_log_metadata { it }
+    audit_log_message_for(:omniauth_create_account, "create_account")
+
     # :nocov:
     unless Config.development?
-      enable :disallow_common_passwords, :verify_account
+      enable :disallow_common_passwords, :verify_account,
+        :reset_password_verifies_account
 
       email_from Config.mail_from
 
@@ -371,7 +418,7 @@ class Clover < Roda
             after_close_account
             delete_account
           end
-          check_locked_domain(account[:email], "Verifying accounts")
+          check_locked_domain(account[:email], "Verifying accounts", :verify_account_failure)
         end
       end
       verify_account_view { view "auth/verify_account", "Verify Account" }
@@ -419,12 +466,15 @@ class Clover < Roda
       if (locked_domain = locked_domain_for(email))
         error = if !omniauth_provider
           "Login via username and password"
-        elsif omniauth_provider.to_s != locked_domain.oidc_provider.ubid
+        elsif omniauth_provider != locked_domain.oidc_provider.ubid
           "Login via #{scope.omniauth_provider_name(omniauth_provider)}"
         end
 
         if error
           flash["error"] = "#{error} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
+          hash = omniauth_provider ? {"provider" => scope.omniauth_provider_name(omniauth_provider)} : {"via" => "password"}
+          hash["reason"] = "locked domain"
+          add_audit_log(account_session_value, :login_failure, hash)
           redirect "/login"
         end
       end
@@ -432,11 +482,24 @@ class Clover < Roda
 
     after_login do
       remember_login if scope.typecast_params.str("remember-me") == "on"
-      if omniauth_identity && omniauth_params["redirect_url"]
-        flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
-        # Don't trust the omniauth params, always redirect to the login methods page,
-        # as that is the only page that should be setting redirect_url
-        redirect "/account/login-method"
+      if omniauth_identity
+        if (groups = omniauth_info["groups"]) &&
+            omniauth_provider.bytesize == 26 &&
+            (provider = OidcProvider[omniauth_provider]) &&
+            (group_prefix = provider.group_prefix)
+          groups = groups.to_a.map(&:to_s)
+          session["oidc_groups"] = groups
+          session["oidc_group_prefix"] = group_prefix
+          Clog.emit("OIDC groups login", oidc_groups_login: {groups:, group_prefix:})
+        end
+
+        if omniauth_params["redirect_url"]
+          add_audit_log(session_value, :connect_provider, {"provider" => scope.omniauth_provider_name(omniauth_provider)})
+          flash["notice"] = "You have successfully connected your account with #{scope.omniauth_provider_name(omniauth_provider)}."
+          # Don't trust the omniauth params, always redirect to the login methods page,
+          # as that is the only page that should be setting redirect_url
+          redirect "/account/login-method"
+        end
       end
     end
 
@@ -445,6 +508,7 @@ class Clover < Roda
         flash["error"] = "Your account has been suspended. " \
           "If you believe there's a mistake, or if you need further assistance, " \
           "please reach out to our support team at support@ubicloud.com."
+        add_audit_log(account_session_value, :login_failure, {"reason" => "account suspended"})
         forget_login
         redirect login_route
       end
@@ -457,7 +521,7 @@ class Clover < Roda
     password_confirm_label "Password Confirmation"
     before_create_account do
       scope.handle_validation_failure("auth/create_account")
-      check_locked_domain(account[:email], "Creating accounts with a password")
+      check_locked_domain(account[:email], "Creating accounts with a password", nil)
 
       cf_response = scope.typecast_params.str("cf-turnstile-response").to_s if Config.cloudflare_turnstile_site_key
 
@@ -481,18 +545,22 @@ class Clover < Roda
     # :nocov:
     if Config.omniauth_github_id
       require "omniauth-github"
-      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email"
+      omniauth_provider :github, Config.omniauth_github_id, Config.omniauth_github_secret, scope: "user:email", name: "github"
     end
     if Config.omniauth_google_id
       require "omniauth-google-oauth2"
-      omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: :google
+      omniauth_provider :google_oauth2, Config.omniauth_google_id, Config.omniauth_google_secret, name: "google"
     end
     # :nocov:
 
+    require_relative "vendor/omniauth_oidc"
+    omniauth_provider :oidc
+
     auth_class_eval do
-      def check_locked_domain(email, error_prefix, redirect: nil)
+      def check_locked_domain(email, error_prefix, action, redirect: nil)
         if (locked_domain = locked_domain_for(email))
           flash["error"] = "#{error_prefix} is not supported for the #{domain_for_email(email)} domain.#{" You must authenticate using #{locked_domain.oidc_provider.display_name}." unless redirect}"
+          add_audit_log(account_session_value, action, {"reason" => "locked domain"}) if action
           redirect(redirect || "/auth/#{locked_domain.oidc_provider.ubid}")
         end
       end
@@ -500,17 +568,12 @@ class Clover < Roda
       # If the route isn't already handled and matches a known provider,
       # get the app specific to that provider, and then run it.
       def route_omniauth!
-        super
         if (match = %r{\A/auth/(0p[a-tv-z0-9]{24})(?:/callback)?\z}.match(request.path_info)) &&
             (provider = OidcProvider[match[1]])
-          omniauth_run omniauth_app_for_provider(provider)
-
-          # :nocov:
-          # Not reached in testing due to omniauth_setup throw above.
-          handle_omniauth_callback
-          # :nocov:
+          request.env["clover.oidc_provider"] = provider
         end
-        nil
+
+        super
       end
 
       def domain_for_email(email)
@@ -520,61 +583,6 @@ class Clover < Roda
       def locked_domain_for(email)
         LockedDomain.with_pk(domain_for_email(email))
       end
-
-      omniauth_apps = {}
-      omniauth_app_mutex = Mutex.new
-      builder_app = ->(env) { [404, {}, []] }
-
-      # Return OIDC-provider specific omniauth app.  If there isn't an existing
-      # app for the provider in this process, build one.
-      define_method(:omniauth_app_for_provider) do |provider|
-        name = provider.ubid
-        if (app = omniauth_app_mutex.synchronize { omniauth_apps[name] })
-          return app
-        end
-
-        # Delay loading of omniauth_oidc until it is needed. Generally, this type of
-        # runtime require doesn't work with a frozen environment, but it does in this
-        # as the file does not modify any frozen constants. This is helpful so that
-        # users do not have to pay the cost of loading the file if they do not have
-        # any OidcProviders.
-        require_relative "vendor/omniauth_oidc"
-
-        # This part is copied from rodauth-omniauth's omniauth_app method in order
-        # to integrate with rodauth-omniauth.
-        builder = OmniAuth::Builder.new
-        builder.options(
-          path_prefix: omniauth_prefix,
-          setup: ->(env) { env["rodauth.omniauth.instance"].send(:omniauth_setup) }
-        )
-        builder.configure do |config|
-          [:request_validation_phase, :before_request_phase, :before_callback_phase, :on_failure].each do |hook|
-            config.send(:"#{hook}=", ->(env) { env["rodauth.omniauth.instance"].send(:"omniauth_#{hook}") })
-          end
-        end
-
-        # Only use the provider passed to the method. rodauth-omniauth uses all
-        # statically configured providers in omniauth_app
-        uri = URI(provider.url)
-        builder.provider :oidc,
-          name: name.to_sym,
-          issuer: provider.url,
-          client_options: {
-            port: uri.port,
-            scheme: uri.scheme,
-            host: uri.host,
-            identifier: provider.client_id,
-            secret: provider.client_secret,
-            redirect_uri: provider.callback_url,
-            authorization_endpoint: provider.authorization_endpoint,
-            token_endpoint: provider.token_endpoint,
-            userinfo_endpoint: provider.userinfo_endpoint
-          }
-
-        builder.run builder_app
-        app = builder.to_app
-        omniauth_app_mutex.synchronize { omniauth_apps[name] ||= app }
-      end
     end
 
     before_omniauth_create_account do
@@ -583,7 +591,7 @@ class Clover < Roda
         redirect "/login"
       end
 
-      if (locked_domain = locked_domain_for(email)) && omniauth_provider.to_s != locked_domain.oidc_provider.ubid
+      if (locked_domain = locked_domain_for(email)) && omniauth_provider != locked_domain.oidc_provider.ubid
         flash["error"] = "Creating an account via authentication through #{scope.omniauth_provider_name(omniauth_provider)} is not supported for the #{domain_for_email(email)} domain. You must authenticate using #{locked_domain.oidc_provider.display_name}."
         redirect "/login"
       end
@@ -599,8 +607,8 @@ class Clover < Roda
           invalid_social_login_account_name: {
             omniauth_name:,
             email: account[:email],
-            name:
-          }
+            name:,
+          },
         })
         name = "Unknown"
       end
@@ -621,11 +629,14 @@ class Clover < Roda
       account = Account[account_from_omniauth&.[](:id)]
       if authenticated?
         unless account && account.id == scope.current_account.id
-          flash["error"] = "Your account's email address is different from the email address associated with the #{scope.omniauth_provider_name(omniauth_provider)} account."
+          provider_name = scope.omniauth_provider_name(omniauth_provider)
+          flash["error"] = "Your account's email address is different from the email address associated with the #{provider_name} account."
+          add_audit_log(session_value, :connect_provider_failure, {"reason" => "different email", "provider" => provider_name})
           redirect "/account/login-method"
         end
-      elsif account && account.identities_dataset.where(provider: omniauth_provider.to_s).empty?
+      elsif account && account.identities_dataset.where(provider: omniauth_provider).empty?
         provider_name = scope.omniauth_provider_name(omniauth_provider)
+        add_audit_log(account_session_value, :login_failure, {"reason" => "unlinked existing account", "provider" => provider_name})
         flash["error"] = "There is already an account with this email address, and it has not been linked to the #{provider_name} account.
         Please login to the existing account normally, and then link it to the #{provider_name} account from your account settings.
         Then you can login using the #{provider_name} account."
@@ -635,10 +646,10 @@ class Clover < Roda
 
     omniauth_create_account? { !authenticated? }
 
-    before_unlock_account { check_locked_domain(account[:email], "Unlocking accounts") }
-    before_unlock_account_request { check_locked_domain(account[:email], "Unlocking accounts") }
+    before_unlock_account { check_locked_domain(account[:email], "Unlocking accounts", :unlock_account_failure) }
+    before_unlock_account_request { check_locked_domain(account[:email], "Unlocking accounts", :unlock_account_request_failure) }
 
-    before_reset_password { check_locked_domain(account[:email], "Resetting passwords") }
+    before_reset_password { check_locked_domain(account[:email], "Resetting passwords", :reset_password_failure) }
     reset_password_view { view "auth/reset_password", "Request Password" }
     reset_password_request_view { view "auth/reset_password_request", "Request Password Reset" }
     reset_password_redirect { login_route }
@@ -657,7 +668,7 @@ class Clover < Roda
     end
 
     before_reset_password_request do
-      check_locked_domain(account[:email], "Resetting passwords")
+      check_locked_domain(account[:email], "Resetting passwords", :reset_password_request_failure)
       unless has_password?
         flash["error"] = "Login with password is not enabled for this account. Please use other login methods. For any questions or assistance, reach out to our team at support@ubicloud.com"
         redirect login_route
@@ -669,7 +680,7 @@ class Clover < Roda
       remove_all_active_sessions_except_current
     end
 
-    before_change_password { check_locked_domain(account[:email], "Changing passwords", redirect: "/") }
+    before_change_password { check_locked_domain(account[:email], "Changing passwords", :change_password_failure, redirect: "/") }
     change_password_redirect "/account/change-password"
     change_password_route "account/change-password"
     change_password_view { view "account/change_password", "My Account" }
@@ -686,16 +697,17 @@ class Clover < Roda
     end
 
     before_change_login do
-      check_locked_domain(account[:email], "Changing email addresses", redirect: "/")
-      check_locked_domain(param("login"), "Changing email addresses", redirect: "/")
+      check_locked_domain(account[:email], "Changing email addresses", :change_login_failure, redirect: "/")
+      check_locked_domain(param("login"), "Changing email addresses", :change_login_failure, redirect: "/")
     end
     change_login_redirect "/account/change-login"
     change_login_route "account/change-login"
     change_login_view { view "account/change_login", "My Account" }
 
     before_verify_login_change do
-      check_locked_domain(account[:email], "Changing email addresses", redirect: "/")
-      check_locked_domain(verify_login_change_new_login, "Changing email addresses", redirect: "/")
+      @previous_login = verify_login_change_old_login
+      check_locked_domain(account[:email], "Changing email addresses", :verify_login_change_failure, redirect: "/")
+      check_locked_domain(verify_login_change_new_login, "Changing email addresses", :verify_login_change_failure, redirect: "/")
     end
     verify_login_change_view { view "auth/verify_login_change", "Verify Email Change" }
     send_verify_login_change_email do |new_login|
@@ -725,6 +737,7 @@ class Clover < Roda
       # Do not allow closing account if the project has resources and
       # the account is the only user
       if (project = Account[account_id].first_sole_project_with_resources)
+        add_audit_log(session_value, :close_account_failure)
         fail DependencyError.new("'#{project.name}' project has some resources. Delete all related resources first.")
       end
     end
@@ -766,6 +779,7 @@ class Clover < Roda
     # :nocov:
     after_otp_setup do
       flash["notice"] = otp_setup_notice_flash
+      add_audit_log(session_value, :otp_setup)
       redirect "/" + recovery_codes_route
     end
     # :nocov:
@@ -820,10 +834,15 @@ class Clover < Roda
     webauthn_setup_notice_flash "Security key is now setup, please make note of your recovery codes"
     webauthn_setup_error_flash "Error setting up security key"
     webauthn_key_insert_hash { |credential| super(credential).merge(name: scope.typecast_params.nonempty_str!("name")) }
+    remove_webauthn_key do |webauthn_id|
+      @removed_webauthn_credential_name = webauthn_keys_ds.where(webauthn_keys_webauthn_id_column => webauthn_id).get(:name)
+      super(webauthn_id)
+    end
 
     # :nocov:
     after_webauthn_setup do
       flash["notice"] = webauthn_setup_notice_flash
+      add_audit_log(session_value, :webauthn_setup, {key_name: scope.typecast_params.nonempty_str!("name")})
       redirect "/" + recovery_codes_route
     end
     # :nocov:
@@ -923,6 +942,12 @@ class Clover < Roda
       r.get "runtime-error" do
         raise "foo"
       end
+    end
+
+    hash_branch("oidc-groups") do |r|
+      no_authorization_needed
+      prefix = session["oidc_group_prefix"]
+      session["oidc_groups"].map { "#{prefix}#{it}" }.join(",")
     end
 
     hash_branch("clear-last-password-entry") do |r|

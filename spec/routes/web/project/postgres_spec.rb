@@ -15,7 +15,7 @@ RSpec.describe Clover, "postgres" do
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      target_version: "16"
+      target_version: "16",
     ).subject
   end
 
@@ -26,7 +26,7 @@ RSpec.describe Clover, "postgres" do
       name: "pg-without-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      target_version: "16"
+      target_version: "16",
     ).subject
   end
 
@@ -56,7 +56,7 @@ RSpec.describe Clover, "postgres" do
         name: "walg-minio",
         admin_user: "admin",
         admin_password: "password",
-        root_cert_1: "dummy-certs"
+        root_cert_1: "dummy-certs",
       )
     end
 
@@ -371,7 +371,6 @@ RSpec.describe Clover, "postgres" do
 
       it "can show disk usage details" do
         pg
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "50"]]}])
         expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
@@ -382,7 +381,6 @@ RSpec.describe Clover, "postgres" do
 
       it "shows the disk usage in red if usage is high" do
         pg
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client, query_range: [{"values" => [[Time.now.utc.to_i, "90"]]}])
         expect(VictoriaMetricsResource).to receive(:client_for_project).and_return(vmc)
@@ -393,7 +391,6 @@ RSpec.describe Clover, "postgres" do
 
       it "shows total disk if there is no VictoriaMetricsResource" do
         pg
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         expect(VictoriaMetricsResource).to receive(:client_for_project).at_least(:once).and_return(nil)
 
@@ -410,7 +407,6 @@ RSpec.describe Clover, "postgres" do
 
       it "shows total disk if VictoriaMetricsResource is not accessible" do
         pg
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         vmc = instance_double(VictoriaMetrics::Client)
         expect(vmc).to receive(:query_range).and_raise(Excon::Error::Socket)
@@ -509,8 +505,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL instance size configuration" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
-
         visit "#{project.path}#{pg.path}/resize"
 
         choose option: "standard-8"
@@ -527,8 +521,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update PostgreSQL high availability" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
-
         visit "#{project.path}#{pg.path}"
         click_link "High Availability"
 
@@ -568,8 +560,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can create a read replica of a PostgreSQL database" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -584,7 +575,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "cannot create a read replica if there is no backup, yet" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
         pg.timeline.update(cached_earliest_backup_at: nil)
 
@@ -597,8 +588,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can promote a read replica" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
 
         fill_in "#{pg.name}-read-replica", with: "my-read-replica"
@@ -614,8 +604,7 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "fails to promote if not a read replica" do
-        pg.timeline.update(cached_earliest_backup_at: Time.now.utc)
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
+        pg.timeline.update(cached_earliest_backup_at: Time.now.utc.to_datetime.rfc3339)
         visit "#{project.path}#{pg.path}/read-replica"
         expect(page).to have_content "Read Replicas"
 
@@ -690,16 +679,16 @@ RSpec.describe Clover, "postgres" do
         it "does not show button for AWS instances" do
           aws_location = Location.create(
             name: "us-west-2", provider: "aws", display_name: "aws-us-west-2",
-            ui_name: "AWS US West 2", visible: true
+            ui_name: "AWS US West 2", visible: true,
           )
-          LocationAwsAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
+          LocationAz.create(location_id: aws_location.id, az: "a", zone_id: "usw2-az1")
           pg_aws = Prog::Postgres::PostgresResourceNexus.assemble(
             project_id: project.id,
             location_id: aws_location.id,
             name: "pg-aws",
             target_vm_size: "standard-2",
             target_storage_size_gib: 128,
-            target_version: "16"
+            target_version: "16",
           ).subject
           pg_aws.update(created_at: PostgresResource::AAAA_CUTOFF - 86400)
 
@@ -756,7 +745,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can cancel storage auto-scale" do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         pg.incr_storage_auto_scale_action_performed_90
         Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: pg.strand.id)
         allow(Util).to receive(:send_email)
@@ -768,7 +756,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "shows error when cancel storage auto-scale fails" do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         pg.incr_storage_auto_scale_action_performed_90
         st = Strand.create(prog: "Postgres::ConvergePostgresResource", label: "start", parent_id: pg.strand.id)
         allow(Util).to receive(:send_email)
@@ -792,7 +779,7 @@ RSpec.describe Clover, "postgres" do
 
         expect(page).to have_flash_notice "'#{pg.name}' will be recycled soon"
         expect(page.status_code).to eq(200)
-        expect(pg.representative_server.recycle_set?).to be true
+        expect(pg.representative_server.recycle_by_user_request_set?).to be true
       end
 
       it "doesn't show reset button when does not have permissions" do
@@ -867,7 +854,7 @@ RSpec.describe Clover, "postgres" do
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         )
         visit "#{project.path}#{pg.path}/charts"
 
@@ -881,7 +868,7 @@ RSpec.describe Clover, "postgres" do
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         )
 
         visit "#{project.path}#{pg.path}/charts"
@@ -1116,7 +1103,6 @@ RSpec.describe Clover, "postgres" do
       it "starts the upgrade when user clicks on start upgrade button" do
         old_version_int = pg.version.to_i
         pg.strand.update(label: "wait")
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         visit "#{project.path}#{pg.path}/upgrade"
         click_button "Start Upgrade"
         expect(page).to have_content "Database upgrade is in progress"

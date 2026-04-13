@@ -14,7 +14,7 @@ RSpec.describe Clover, "postgres" do
       name: "pg-with-permission",
       target_vm_size: "standard-2",
       target_storage_size_gib: 128,
-      target_version: "16"
+      target_version: "16",
     ).subject
   end
 
@@ -43,7 +43,7 @@ RSpec.describe Clover, "postgres" do
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/create-client-cert-keypart"],
         [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metrics"],
         [:post, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/upgrade"],
-        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"]
+        [:get, "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"],
       ].each do |method, path|
         send method, path
 
@@ -80,7 +80,7 @@ RSpec.describe Clover, "postgres" do
           location_id: Location::HETZNER_FSN1_ID,
           name: "pg-test-2",
           target_vm_size: "standard-2",
-          target_storage_size_gib: 128
+          target_storage_size_gib: 128,
         )
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres"
@@ -95,7 +95,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "none"
+          ha_type: "none",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -107,7 +107,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-async", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "async"
+          ha_type: "async",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -116,7 +116,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-sync", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "sync"
+          ha_type: "sync",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -126,7 +126,7 @@ RSpec.describe Clover, "postgres" do
           size: "standard-2",
           storage_size: 64,
           ha_type: "none",
-          pg_config: {"wal_level" => "logical"}
+          pg_config: {"wal_level" => "logical"},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -150,7 +150,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-no-ha", {
           size: "standard-2",
           storage_size: 64,
-          flavor: "paradedb"
+          flavor: "paradedb",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -161,7 +161,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-invalid", {
           size: "standard-2",
           storage_size: 64,
-          flavor: "invalid"
+          flavor: "invalid",
         }.to_json
         expect(last_response.status).to eq(400)
       end
@@ -171,7 +171,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-lantern", {
           size: "standard-2",
           storage_size: 64,
-          flavor: "lantern"
+          flavor: "lantern",
         }.to_json
         expect(last_response.status).to eq(400)
       end
@@ -181,7 +181,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/test-postgres-paradedb", {
           size: "standard-2",
           storage_size: 64,
-          flavor: "paradedb"
+          flavor: "paradedb",
         }.to_json
         expect(last_response.status).to eq(400)
       end
@@ -190,7 +190,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/eu-north-h1/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "sync"
+          ha_type: "sync",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: location", {"location" => "Invalid location. Available options: eu-central-h1, us-east-a2, us-east-1, us-west-2"})
@@ -200,7 +200,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/not-exist-location/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "sync"
+          ha_type: "sync",
         }.to_json
 
         expect(last_response).to have_api_error(404, "Validation failed for following path components: location")
@@ -209,7 +209,7 @@ RSpec.describe Clover, "postgres" do
       it "invalid size" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "invalid-size",
-          storage_size: 64
+          storage_size: 64,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size", {"size" => "Invalid size."})
@@ -219,7 +219,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
-          pg_config: {"wal_level" => "invalid"}
+          pg_config: {"wal_level" => "invalid"},
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
@@ -229,7 +229,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
-          pg_config: {"wal_level" => "logical"}
+          pg_config: {"wal_level" => "logical"},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -240,14 +240,14 @@ RSpec.describe Clover, "postgres" do
           size: "standard-2",
           storage_size: 64,
           ha_type: "sync",
-          tags: [{key: "env", value: "test"}, {key: "team", value: "devops"}]
+          tags: [{key: "env", value: "test"}, {key: "team", value: "devops"}],
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(JSON.parse(last_response.body)["tags"]).to eq([{"key" => "env", "value" => "test"}, {"key" => "team", "value" => "devops"}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/test-postgres", {
-          tags: [{key: "env", value: "prod"}, {key: "team", value: "devops"}]
+          tags: [{key: "env", value: "prod"}, {key: "team", value: "devops"}],
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -255,12 +255,10 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can update database properties" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
-
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-8",
           storage_size: 256,
-          ha_type: "async"
+          ha_type: "async",
         }.to_json
 
         expect(pg.reload.target_vm_size).to eq("standard-8")
@@ -270,7 +268,6 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "clears storage auto-scale semaphores on update" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
         pg.incr_storage_auto_scale_action_performed_80
         pg.incr_storage_auto_scale_action_performed_85
         pg.incr_storage_auto_scale_action_performed_90
@@ -278,7 +275,7 @@ RSpec.describe Clover, "postgres" do
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-2",
           storage_size: 128,
-          ha_type: "none"
+          ha_type: "none",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -290,12 +287,11 @@ RSpec.describe Clover, "postgres" do
 
       it "preserves existing init_script when not provided in patch request" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
           size: "standard-2",
           storage_size: 128,
-          ha_type: "none"
+          ha_type: "none",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -303,13 +299,14 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "can scale down storage if the requested size is enough for existing data" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_return("10000000\n")
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "5.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          storage_size: 64
+          storage_size: 64,
         }.to_json
 
         expect(pg.reload.target_storage_size_gib).to eq(64)
@@ -318,11 +315,13 @@ RSpec.describe Clover, "postgres" do
       it "does not scale down storage if the requested size is too small for existing data" do
         expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_return("999999999\n")
+        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128).at_least(:once)
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([{"value" => [Time.now.to_i, "95.0"]}])
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          storage_size: 64
+          storage_size: 64,
         }.to_json
 
         expect(pg.reload.target_storage_size_gib).to eq(128)
@@ -330,46 +329,71 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "returns error message if current usage is unknown" do
-        pg.representative_server.vm.add_vm_storage_volume(boot: false, size_gib: 128, disk_index: 0)
-
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          size: "standard-3"
+          size: "standard-3",
         }.to_json
 
         expect(pg.reload.target_vm_size).to eq("standard-2")
         expect(last_response).to have_api_error(400, "Validation failed for following fields: size")
       end
 
-      it "returns error message if invalid size is requested" do
-        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(Sequel::Dataset, first: pg))
+      it "blocks scale down if metrics query fails" do
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
         expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
-        expect(pg.representative_server).to receive(:storage_size_gib).and_return(128)
-        expect(pg.representative_server.vm.sshable).to receive(:_cmd).and_raise(StandardError.new("error"))
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_raise(StandardError.new("error"))
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          storage_size: 64
+          storage_size: 64,
         }.to_json
 
-        expect(pg.reload.target_storage_size_gib).to eq(128)
-        expect(last_response).to have_api_error(400, "Database is not ready for update")
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics unavailable right now to verify scale down safety")
+      end
+
+      it "skips disk usage check if metrics client is unavailable" do
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(nil)
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64,
+        }.to_json
+
+        expect(pg.reload.target_storage_size_gib).to eq(64)
+      end
+
+      it "blocks scale down if no disk usage data available" do
+        expect(project).to receive(:postgres_resources_dataset).and_return(instance_double(PostgresResource.dataset.class, first: pg, association_join: instance_double(Sequel::Dataset, sum: 1))).at_least(:once)
+        expect(described_class).to receive(:authorized_project).with(user, project.id).and_return(project)
+        tsdb_client = instance_double(VictoriaMetrics::Client)
+        expect(PostgresServer).to receive(:victoria_metrics_client).and_return(tsdb_client)
+        expect(tsdb_client).to receive(:query).and_return([])
+
+        patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
+          storage_size: 64,
+        }.to_json
+
+        expect(last_response.status).to eq(400)
+        expect(JSON.parse(last_response.body)["error"]["message"]).to eq("Metrics unavailable right now to verify scale down safety")
       end
 
       it "fails to update read replica" do
         pg.update(parent_id: pg.id)
 
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}", {
-          size: "standard-4"
+          size: "standard-4",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Read replicas cannot be modified directly! Please modify the parent database instead.")
       end
 
       it "read-replica" do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
-          name: "my-read-replica"
+          name: "my-read-replica",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -377,11 +401,10 @@ RSpec.describe Clover, "postgres" do
 
       it "read-replica inherits init_script from parent" do
         PostgresInitScript.create_with_id(pg, init_script: "sudo whoami")
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
-          name: "my-read-replica-with-init-script"
+          name: "my-read-replica-with-init-script",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -391,14 +414,33 @@ RSpec.describe Clover, "postgres" do
         expect(replica.init_script.init_script).to eq("sudo whoami")
       end
 
+      it "read-replica inherits and merges config from parent" do
+        pg.update(
+          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+        )
+        expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
+
+        post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
+          name: "my-read-replica-with-config",
+          pg_config: {"max_connections" => "3500"},
+          pgbouncer_config: {"pool_mode" => "session"},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        replica = PostgresResource.first(name: "my-read-replica-with-config")
+        expect(replica.user_config).to eq({"max_connections" => "3500", "wal_level" => "replica"})
+        expect(replica.pgbouncer_user_config).to eq({"max_client_conn" => "150", "pool_mode" => "session"})
+      end
+
       it "read-replica with tags" do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         tags = [{"key" => "env", "value" => "test"}, {"key" => "team", "value" => "backend"}]
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica-with-tags",
-          tags:
+          tags:,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -408,12 +450,11 @@ RSpec.describe Clover, "postgres" do
       end
 
       it "read-replica rejects invalid config values" do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         expect(PostgresTimeline).to receive(:earliest_restore_time).and_return(true)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
           name: "my-read-replica-with-invalid-config",
-          pg_config: {"wal_level" => "invalid"}
+          pg_config: {"wal_level" => "invalid"},
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
@@ -426,7 +467,7 @@ RSpec.describe Clover, "postgres" do
         expect(pg).to receive(:ready_for_read_replica?).and_return(false)
 
         post "/project/#{project.ubid}/location/eu-central-h1/postgres/#{pg.name}/read-replica", {
-          name: "my-read-replica"
+          name: "my-read-replica",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Parent server is not ready for read replicas. There are no backups, yet.")
@@ -461,7 +502,7 @@ RSpec.describe Clover, "postgres" do
 
       it "firewall-rule" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
-          cidr: "0.0.0.0/24"
+          cidr: "0.0.0.0/24",
         }.to_json
 
         expect(JSON.parse(last_response.body)["cidr"]).to eq("0.0.0.0/24")
@@ -470,7 +511,7 @@ RSpec.describe Clover, "postgres" do
 
       it "firewall-rule pg ubid" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/firewall-rule", {
-          cidr: "0.0.0.0/24"
+          cidr: "0.0.0.0/24",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -478,7 +519,7 @@ RSpec.describe Clover, "postgres" do
 
       it "firewall-rule invalid cidr" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule", {
-          cidr: "0.0.0"
+          cidr: "0.0.0",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: cidr", {"cidr" => "Invalid CIDR"})
@@ -488,7 +529,7 @@ RSpec.describe Clover, "postgres" do
         fwr = pg.pg_firewall_rules.first
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/firewall-rule/#{fwr.ubid}", {
           cidr: "0.0.0.0/1",
-          description: "Updated rule"
+          description: "Updated rule",
         }.to_json
 
         expect(fwr.reload.cidr.to_s).to eq("0.0.0.0/1")
@@ -499,7 +540,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -509,7 +550,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination", {
           url: "-",
           username: "username",
-          password: "password"
+          password: "password",
         }.to_json
 
         expect(last_response.status).to eq(400)
@@ -524,8 +565,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
-          restore_target:
-
+          restore_target: restore_target.to_datetime.rfc3339,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -540,7 +580,7 @@ RSpec.describe Clover, "postgres" do
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg-with-init-script",
-          restore_target:
+          restore_target: restore_target.to_datetime.rfc3339,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -550,10 +590,34 @@ RSpec.describe Clover, "postgres" do
         expect(restored.init_script.init_script).to eq("sudo whoami")
       end
 
+      it "restore inherits and merges config from parent" do
+        pg.update(
+          user_config: {"max_connections" => "3000", "wal_level" => "replica"},
+          pgbouncer_user_config: {"max_client_conn" => "150", "pool_mode" => "transaction"},
+        )
+        backup = Struct.new(:key, :last_modified)
+        restore_target = Time.now.utc
+        expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
+        expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [backup.new("basebackups_005/backup_stop_sentinel.json", restore_target - 10 * 60)])).at_least(:once)
+
+        post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
+          name: "restored-pg-with-config",
+          restore_target: restore_target.to_datetime.rfc3339,
+          pg_config: {"max_connections" => "3500"},
+          pgbouncer_config: {"pool_mode" => "session"},
+        }.to_json
+
+        expect(last_response.status).to eq(200)
+
+        restored = PostgresResource.first(name: "restored-pg-with-config")
+        expect(restored.user_config).to eq({"max_connections" => "3500", "wal_level" => "replica"})
+        expect(restored.pgbouncer_user_config).to eq({"max_client_conn" => "150", "pool_mode" => "session"})
+      end
+
       it "restore invalid target" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg",
-          restore_target: Time.now.utc
+          restore_target: Time.now.utc.to_datetime.rfc3339,
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: restore_target")
@@ -562,8 +626,8 @@ RSpec.describe Clover, "postgres" do
       it "rejects restoring with invalid config" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/restore", {
           name: "restored-pg-invalid-config",
-          restore_target: Time.now.utc,
-          pg_config: {"wal_level" => "invalid"}
+          restore_target: Time.now.utc.to_datetime.rfc3339,
+          pg_config: {"wal_level" => "invalid"},
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: pg_config.wal_level")
@@ -571,7 +635,7 @@ RSpec.describe Clover, "postgres" do
 
       it "reset password" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
-          password: "DummyPassword123"
+          password: "DummyPassword123",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -581,7 +645,7 @@ RSpec.describe Clover, "postgres" do
         pg.update(parent_id: "cde85384-4cf1-8ad0-aeb0-639f2ad94870")
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
-          password: "DummyPassword123"
+          password: "DummyPassword123",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Superuser password cannot be updated for read replicas!")
@@ -589,7 +653,7 @@ RSpec.describe Clover, "postgres" do
 
       it "invalid password" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/reset-superuser-password", {
-          password: "dummy"
+          password: "dummy",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: password")
@@ -597,7 +661,7 @@ RSpec.describe Clover, "postgres" do
 
       it "reset password ubid" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.ubid}/reset-superuser-password", {
-          password: "DummyPassword123"
+          password: "DummyPassword123",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -605,14 +669,14 @@ RSpec.describe Clover, "postgres" do
 
       it "can set maintenance window" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: "9"
+          maintenance_window_start_at: "9",
         }.to_json
 
         expect(last_response.status).to eq(200)
         expect(pg.reload.maintenance_window_start_at).to eq(9)
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: 12
+          maintenance_window_start_at: 12,
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -624,14 +688,14 @@ RSpec.describe Clover, "postgres" do
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: 25
+          maintenance_window_start_at: 25,
         }.to_json
 
         expect(last_response.status).to eq(400)
         expect(pg.reload.maintenance_window_start_at).to be_nil
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/set-maintenance-window", {
-          maintenance_window_start_at: -2
+          maintenance_window_start_at: -2,
         }.to_json
 
         expect(last_response.status).to eq(400)
@@ -644,7 +708,7 @@ RSpec.describe Clover, "postgres" do
         post "/project/#{project.ubid}/location/#{TEST_LOCATION}/postgres/test-postgres", {
           size: "standard-2",
           storage_size: 64,
-          ha_type: "sync"
+          ha_type: "sync",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Validation failed for following fields: billing_info")
@@ -669,8 +733,8 @@ RSpec.describe Clover, "postgres" do
         query_result = [
           {
             "values" => [[1619712000, "10.5"], [1619715600, "12.3"]],
-            "labels" => {"instance" => "test-instance"}
-          }
+            "labels" => {"instance" => "test-instance"},
+          },
         ]
 
         expect(tsdb_client).to receive(:query_range).and_return(query_result)
@@ -686,8 +750,8 @@ RSpec.describe Clover, "postgres" do
         query_result = [
           {
             "values" => [[1619712000, "10.5"], [1619715600, "12.3"]],
-            "labels" => {"instance" => "test-instance"}
-          }
+            "labels" => {"instance" => "test-instance"},
+          },
         ]
 
         num_time_series = Metrics::POSTGRES_METRICS.values.sum { |metric| metric.series.count }
@@ -703,7 +767,7 @@ RSpec.describe Clover, "postgres" do
       it "fails when end timestamp is before start timestamp" do
         query_params = {
           start: (DateTime.now.new_offset(0) - 1).rfc3339,
-          end: (DateTime.now.new_offset(0) - 2).rfc3339
+          end: (DateTime.now.new_offset(0) - 2).rfc3339,
         }
 
         query_str = URI.encode_www_form(query_params)
@@ -715,7 +779,7 @@ RSpec.describe Clover, "postgres" do
       it "fails when time range is too large" do
         query_params = {
           start: (DateTime.now.new_offset(0) - 32).rfc3339,
-          end: DateTime.now.new_offset(0).rfc3339
+          end: DateTime.now.new_offset(0).rfc3339,
         }
         query_str = URI.encode_www_form(query_params)
 
@@ -727,7 +791,7 @@ RSpec.describe Clover, "postgres" do
       it "fails when start timestamp is too old" do
         query_params = {
           start: (DateTime.now.new_offset(0) - 32).rfc3339,
-          end: (DateTime.now.new_offset(0) - 31).rfc3339
+          end: (DateTime.now.new_offset(0) - 31).rfc3339,
         }
         query_str = URI.encode_www_form(query_params)
 
@@ -900,7 +964,7 @@ RSpec.describe Clover, "postgres" do
       it "can download custom keypair" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
           common_name: "name",
-          duration: 3600
+          duration: 3600,
         }.to_json
         expect(last_response.status).to eq(200)
         header "Content-Type", "application/x-pem-file"
@@ -913,7 +977,7 @@ RSpec.describe Clover, "postgres" do
         %w[postgres ubi_replication].each do
           post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
             common_name: "postgres",
-            duration: 3600
+            duration: 3600,
           }.to_json
           expect(last_response).to have_api_error(400, "Common Name must not be postgres or ubi_replication.")
         end
@@ -922,7 +986,7 @@ RSpec.describe Clover, "postgres" do
       it "rejects duration over 366 days" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
           common_name: "name",
-          duration: 60 * 60 * 24 * 366 + 1
+          duration: 60 * 60 * 24 * 366 + 1,
         }.to_json
         expect(last_response).to have_api_error(400, "Certificate expiry should be less than 367 days.")
       end
@@ -930,7 +994,7 @@ RSpec.describe Clover, "postgres" do
       it "rejects invalid common name" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
           common_name: "pound#",
-          duration: 3600
+          duration: 3600,
         }.to_json
         expect(last_response).to have_api_error(400, "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
       end
@@ -938,7 +1002,7 @@ RSpec.describe Clover, "postgres" do
       it "rejects common names longer than 64 characters" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/create-client-keypair", {
           common_name: "a" * 65,
-          duration: 3600
+          duration: 3600,
         }.to_json
         expect(last_response).to have_api_error(400, "Common Name must only contain alphanumeric characters, underscores, and hyphens. It must not exceed 64 characters.")
       end
@@ -947,22 +1011,22 @@ RSpec.describe Clover, "postgres" do
     describe "cert_auth_users endpoints" do
       it "adds or removes requested user to cert_auth_users" do
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
-          name: "test"
+          name: "test",
         }.to_json
         expect(pg.reload.cert_auth_users).to eq(["test"])
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/add-auth-user", {
-          name: "test"
+          name: "test",
         }.to_json
         expect(pg.reload.cert_auth_users).to eq(["test"])
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/remove-auth-user", {
-          name: "test"
+          name: "test",
         }.to_json
         expect(pg.reload.cert_auth_users).to eq([])
 
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/cert/remove-auth-user", {
-          name: "test"
+          name: "test",
         }.to_json
         expect(pg.reload.cert_auth_users).to eq([])
       end
@@ -1013,7 +1077,7 @@ RSpec.describe Clover, "postgres" do
           postgres_resource_id: pg.id,
           url: "https://example.com",
           username: "username",
-          password: "password"
+          password: "password",
         )
         delete "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/metric-destination/#{pg.metric_destinations.first.ubid}"
 
@@ -1044,7 +1108,7 @@ RSpec.describe Clover, "postgres" do
         pg.update(user_config: {"max_connections" => "100"}, pgbouncer_user_config: {"max_client_conn" => "100"})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
           pg_config: {"archive_mode" => "on"},
-          pgbouncer_config: {"admin_users" => "postgres"}
+          pgbouncer_config: {"admin_users" => "postgres"},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -1062,7 +1126,7 @@ RSpec.describe Clover, "postgres" do
         pg.update(user_config: {"work_mem" => "8MB"}, pgbouncer_user_config: {})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
           pg_config: {"work_mem" => "16MB"},
-          pgbouncer_config: {}
+          pgbouncer_config: {},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -1074,7 +1138,7 @@ RSpec.describe Clover, "postgres" do
         pg.update(user_config: {}, pgbouncer_user_config: {"max_client_conn" => "100"})
         post "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
           pg_config: {},
-          pgbouncer_config: {"max_client_conn" => "200"}
+          pgbouncer_config: {"max_client_conn" => "200"},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -1087,7 +1151,7 @@ RSpec.describe Clover, "postgres" do
         pg.update(user_config: {"max_connections" => "100", "default_transaction_isolation" => "serializable", "archive_mode" => "on"}, pgbouncer_user_config: {"max_client_conn" => "100", "pool_mode" => "session"})
         patch "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/config", {
           pg_config: {"archive_mode" => "on", "max_connections" => "120", "default_transaction_isolation" => nil},
-          pgbouncer_config: {"admin_users" => "postgres", "pool_mode" => nil}
+          pgbouncer_config: {"admin_users" => "postgres", "pool_mode" => nil},
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -1103,7 +1167,6 @@ RSpec.describe Clover, "postgres" do
 
     describe "upgrade" do
       before do
-        VmStorageVolume.create(vm_id: pg.representative_server.vm.id, size_gib: pg.target_storage_size_gib, boot: false, disk_index: 0)
         allow(pg.representative_server).to receive(:version).and_return("16")
       end
 
@@ -1149,6 +1212,24 @@ RSpec.describe Clover, "postgres" do
       end
     end
 
+    describe "server" do
+      it "returns servers successfully" do
+        get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/servers"
+
+        expect(last_response.status).to eq(200)
+        response_body = JSON.parse(last_response.body)
+        expect(response_body["count"]).to be >= 1
+        expect(response_body["items"].length).to eq(response_body["count"])
+
+        server = response_body["items"].first
+        expect(server).to have_key("id")
+        expect(server).to have_key("role")
+        expect(server).to have_key("state")
+        expect(server).to have_key("synchronization_status")
+        expect(server).to have_key("vm")
+      end
+    end
+
     describe "backup" do
       it "returns backups successfully" do
         backup = Struct.new(:key, :last_modified)
@@ -1156,7 +1237,7 @@ RSpec.describe Clover, "postgres" do
         expect(MinioCluster).to receive(:first).and_return(instance_double(MinioCluster, url: "dummy-url", root_certs: "dummy-certs")).at_least(:once)
         expect(Minio::Client).to receive(:new).and_return(instance_double(Minio::Client, list_objects: [
           backup.new("basebackups_005/backup1_backup_stop_sentinel.json", backup_time - 2 * 24 * 60 * 60),
-          backup.new("basebackups_005/backup2_backup_stop_sentinel.json", backup_time - 1 * 24 * 60 * 60)
+          backup.new("basebackups_005/backup2_backup_stop_sentinel.json", backup_time - 1 * 24 * 60 * 60),
         ])).at_least(:once)
 
         get "/project/#{project.ubid}/location/#{pg.display_location}/postgres/#{pg.name}/backup"

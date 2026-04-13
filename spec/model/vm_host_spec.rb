@@ -82,6 +82,36 @@ RSpec.describe VmHost do
     end
   end
 
+  describe "#move_to_location" do
+    it "updates location and downloads boot images" do
+      target_location = Location[Location::HETZNER_HEL1_ID]
+
+      vm_host.move_to_location(target_location.id)
+
+      expect(vm_host.reload.location_id).to eq target_location.id
+      download_strands = Strand.where(prog: "DownloadBootImage").all
+      downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+      expect(downloaded_names).to eq %w[almalinux-9 debian-12 github-ubuntu-2204 github-ubuntu-2404 postgres-ubuntu-2204 ubuntu-jammy ubuntu-noble]
+    end
+
+    it "downloads github images when moving to github-runners location" do
+      target_location = Location[Location::GITHUB_RUNNERS_ID]
+
+      vm_host.move_to_location(target_location.id)
+
+      expect(vm_host.reload.location_id).to eq target_location.id
+      download_strands = Strand.where(prog: "DownloadBootImage").all
+      downloaded_names = download_strands.map { it.stack.first["image_name"] }.sort
+      expect(downloaded_names).to eq %w[github-ubuntu-2204 github-ubuntu-2404]
+    end
+
+    it "logs and returns early if already in the target location" do
+      expect(Clog).to receive(:emit).with("VmHost is already in this location")
+      vm_host.move_to_location(vm_host.location_id)
+      expect(Strand.where(prog: "DownloadBootImage").count).to eq 0
+    end
+  end
+
   describe "#download_firmware" do
     it "has a shortcut to download a new firmware for x64" do
       st = vm_host.download_firmware(version_x64: "202405", sha256_x64: "sha-1")
@@ -193,7 +223,7 @@ RSpec.describe VmHost do
         ["1.1.1.0/30", "1.1.1.1", true],
         ["1.1.1.12/32", "1.1.0.0", true],
         ["1.1.1.13/32", "1.1.1.1", false],
-        ["2a01:4f8:10a:128b::/64", "1.1.1.1", true]
+        ["2a01:4f8:10a:128b::/64", "1.1.1.1", true],
       ].map {
         Hosting::HetznerApis::IpInfo.new(ip_address: _1, source_host_ip: _2, is_failover: _3)
       }
@@ -246,7 +276,7 @@ RSpec.describe VmHost do
 
     it "updates the routed_to_host_id if the address is reassigned to another host and there is no vm using the ip range" do
       expect(Hosting::Apis).to receive(:pull_ips).and_return([
-        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
+        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true),
       ])
       vm_host.sshable.update(host: "1.1.0.0")
       adr = Address.create(cidr: "1.1.1.0/30", routed_to_host_id: vm_host.id)
@@ -259,7 +289,7 @@ RSpec.describe VmHost do
 
     it "fails if the ip range is already assigned to a vm" do
       expect(Hosting::Apis).to receive(:pull_ips).and_return([
-        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true)
+        Hosting::HetznerApis::IpInfo.new(ip_address: "1.1.1.0/30", source_host_ip: "1.1.1.1", is_failover: true),
       ])
 
       vm_host.sshable.update(host: "1.1.0.0")
@@ -336,7 +366,7 @@ RSpec.describe VmHost do
       {
         reading: "down",
         reading_rpt: 5,
-        reading_chg: Time.now - 30
+        reading_chg: Time.now - 30,
       }
     }
 
@@ -525,13 +555,13 @@ RSpec.describe VmHost do
       expect(Config).to receive(:monitoring_service_project_id).and_return("d272dc1f-52ba-4e52-9bcc-f90dce42a226")
       expect(vm_host.metrics_config).to eq({
         endpoints: [
-          "http://localhost:9100/metrics"
+          "http://localhost:9100/metrics",
         ],
         max_file_retention: 120,
         interval: "15s",
         additional_labels: {ubicloud_resource_id: vm_host.ubid},
         metrics_dir: "/home/rhizome/host/metrics",
-        project_id: "d272dc1f-52ba-4e52-9bcc-f90dce42a226"
+        project_id: "d272dc1f-52ba-4e52-9bcc-f90dce42a226",
       })
     end
   end

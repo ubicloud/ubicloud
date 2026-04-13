@@ -67,8 +67,8 @@ RSpec.describe GithubRepository do
         {
           "effect" => "allow",
           "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"}
-        }
+          "resources" => {"com.cloudflare.edge.r2.bucket.123_default_#{bucket_name}" => "*"},
+        },
       ]
       expect(cloudflare_client).to receive(:create_token).with("#{bucket_name}-token", expected_policy).and_return(["test-key", "test-secret"])
       expect(Clog).to receive(:emit).with("Blob storage setup completed", instance_of(Hash)).and_return({blob_storage_setup_completed: {bucket_name:}})

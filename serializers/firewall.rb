@@ -7,7 +7,7 @@ class Serializers::Firewall < Serializers::Base
       name: firewall.name,
       description: firewall.description,
       location: firewall.display_location,
-      firewall_rules: Serializers::FirewallRule.serialize(firewall.firewall_rules.sort)
+      firewall_rules: Serializers::FirewallRule.serialize(firewall.firewall_rules.sort),
     }
 
     if options[:include_path]

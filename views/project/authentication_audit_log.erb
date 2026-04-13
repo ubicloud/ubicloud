@@ -1,0 +1,110 @@
+<% if @project %>
+  <% @page_title = "#{@project.name} - Authentication Audit Log" %>
+  <% headers = ["Time (in UTC)", "Action", "Account", "Metadata"] %>
+
+  <%== part(
+    "components/page_header",
+    title: "Authentication Audit Log",
+    breadcrumbs: [%w[Projects /project], [@project.name, @project.path], ["Authentication Audit Log", "#"]]
+  ) %>
+<% else %>
+  <% @page_title = "Authentication Audit Log" %>
+  <% headers = ["Time (in UTC)", "Action", "Metadata"] %>
+
+  <%== part("components/page_header", title: "Authentication Audit Log") %>
+<% end %>
+
+<div class="grid gap-6">
+  <div class="overflow-hidden rounded-lg shadow ring-1 ring-black ring-opacity-5 bg-white divide-y divide-gray-200">
+    <div class="px-4 py-5 sm:p-6">
+      <% form do %>
+        <div class="grid grid-cols-12 gap-3">
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "action",
+              label: "Action",
+              value: typecast_params.nonempty_str("action"),
+              attributes: { placeholder: "Filter by action" }
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "metadata",
+              label: "Metadata",
+              value: typecast_params.nonempty_str("metadata"),
+              attributes: { placeholder: "Filter by metadata, e.g. ip=1.2.3.4" }
+            ) %>
+          </div>
+          <% if @project %>
+            <div class="col-span-12 sm:col-span-4">
+              <%== part(
+                "components/form/text",
+                name: "account",
+                label: "Account",
+                value: typecast_params.nonempty_str("account"),
+                attributes: { placeholder: "Filter by account name/email/ID" }
+              ) %>
+            </div>
+          <% end %>
+          <div class="col-span-12 sm:col-span-4">
+            <%== part(
+              "components/form/text",
+              name: "end",
+              type: "date",
+              label: "#{@month_limit} Months Prior To",
+              value: @end_date,
+              attributes: {required: true}
+            ) %>
+          </div>
+          <div class="col-span-12 sm:col-span-2 flex items-end">
+            <%== part("components/form/submit_button", text: "Search") %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <% end_date = @end_date.to_s
+  rows =
+    @audit_logs.map do |entry|
+      row = [
+        [
+          entry[:at].getutc.strftime("%F %T"),
+          [entry[:message], {link: "?#{to_query_string("end" => end_date, "action" => entry[:message])}"}],
+          [
+            entry[:metadata].map do |k, v|
+              "<a class=\"text-orange-600\" href=\"?#{h to_query_string("end" => end_date, "metadata" => "#{k}=#{v}")}\">#{h k}: #{h v}</a>"
+            end.join(", "),
+            {escape: false}
+          ]
+        ],
+        { id: UBID.to_ubid(entry[:id]) }
+      ]
+
+      if @project
+        account_ubid = UBID.to_ubid(entry[:account_id])
+        account_name = entry[:account_name] || account_ubid
+        row[0].insert(2, [account_name, {link: "?#{to_query_string("end" => end_date, "account" => account_ubid)}"}])
+      end
+
+      row
+    end
+
+    audit_log_paginate(rows) %>
+
+  <%== part(
+    "components/table_card",
+    id: "authentication-audit-log-table",
+    headers:,
+    empty_state: {
+      icon: "hero-document-text",
+      title: "No matching authentication audit log entries in date range",
+      description: "No matching authentication audit log entries found (access limited to prior 6 months)."
+    },
+    consistent_styling: true,
+    allow_wrap: true,
+    rows:
+  ) %>
+</div>

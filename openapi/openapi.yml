@@ -1055,6 +1055,10 @@ paths:
                 version:
                   description: PostgreSQL version
                   type: string
+                  enum:
+                    - '16'
+                    - '17'
+                    - '18'
                 restrict_by_default:
                   description: 'Whether to restrict access by default (if so, firewall rules must be added to access)'
                   type: boolean
@@ -1653,9 +1657,12 @@ paths:
               type: object
               properties:
                 name:
+                  description: Name for the newly restored Postgres database.
                   type: string
                 restore_target:
+                  description: The RFC 3339-formatted timestamp for the point in time at which to recover.
                   type: string
+                  format: date-time
                 pg_config:
                   type: object
                   example:
@@ -1680,6 +1687,21 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/PostgresDatabase'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Postgres Database
+  '/project/{project_id}/location/{location}/postgres/{postgres_database_reference}/servers':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/postgres_database_reference'
+    get:
+      operationId: listPostgresDatabaseServers
+      summary: List servers for a specific PostgreSQL database
+      responses:
+        '200':
+          $ref: '#/components/responses/PostgresServers'
         default:
           $ref: '#/components/responses/Error'
       tags:
@@ -3064,6 +3086,9 @@ components:
         ha_type:
           description: High availability type
           type: string
+        target_server_count:
+          description: Target number of servers (primary + standbys)
+          type: integer
         id:
           description: ID of the Postgres database
           type: string
@@ -3087,9 +3112,17 @@ components:
         version:
           description: Current Postgres version
           type: string
+          enum:
+            - '16'
+            - '17'
+            - '18'
         target_version:
           description: Target Postgres version
           type: string
+          enum:
+            - '16'
+            - '17'
+            - '18'
         vm_size:
           description: Size of the underlying VM
           type: string
@@ -3124,6 +3157,7 @@ components:
       required:
         - flavor
         - ha_type
+        - target_server_count
         - id
         - location
         - name
@@ -3198,6 +3232,45 @@ components:
       additionalProperties: false
       required:
         - metrics
+    PostgresServer:
+      type: object
+      properties:
+        id:
+          description: ID of the server
+          type: string
+        role:
+          description: Role of the server (primary or standby)
+          type: string
+          enum:
+            - primary
+            - standby
+        state:
+          description: Current state of the server
+          type: string
+          enum:
+            - running
+            - creating
+            - updating
+            - unavailable
+            - failover
+            - restarting
+            - synchronizing
+            - deleting
+        synchronization_status:
+          description: Synchronization status of the server
+          type: string
+          enum:
+            - ready
+            - catching_up
+        vm:
+          $ref: '#/components/schemas/Vm'
+      additionalProperties: false
+      required:
+        - id
+        - role
+        - state
+        - synchronization_status
+        - vm
     PostgresBackup:
       type: object
       properties:
@@ -3879,8 +3952,16 @@ components:
             properties:
               current_version:
                 type: string
+                enum:
+                  - '16'
+                  - '17'
+                  - '18'
               target_version:
                 type: string
+                enum:
+                  - '16'
+                  - '17'
+                  - '18'
               upgrade_status:
                 type: string
               upgrade_stage:
@@ -3922,6 +4003,23 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/PostgresFirewallRule'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    PostgresServers:
+      description: A list of Postgres Database Servers
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PostgresServer'
             additionalProperties: false
             required:
               - count

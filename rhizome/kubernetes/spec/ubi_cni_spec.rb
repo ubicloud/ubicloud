@@ -41,8 +41,8 @@ RSpec.describe UbiCNI do
         "ranges" => {
           "subnet_ula_ipv6" => "fd00::/64",
           "subnet_ipv6" => "2001:db8::/64",
-          "subnet_ipv4" => "192.168.1.0/24"
-        }
+          "subnet_ipv4" => "192.168.1.0/24",
+        },
       }
     end
 
@@ -63,7 +63,7 @@ RSpec.describe UbiCNI do
       expect(ubicni).to receive(:mac_to_ipv6_link_local).with("00:11:22:33:44:55").and_return("fe80::0211:22ff:fe33:4455")
       expect(ubicni).to receive(:mac_to_ipv6_link_local).with("00:aa:bb:cc:dd:ee").and_return("fe80::02aa:bbff:fecc:ddee")
       expect(ubicni).to receive(:find_random_available_ip).and_return(
-        container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip
+        container_ipv6, container_ula_ipv6, ipv4_container_ip, ipv4_gateway_ip,
       )
     end
 
@@ -109,25 +109,25 @@ RSpec.describe UbiCNI do
 
       expect(response).to include("cniVersion" => "1.0.0")
       expect(response["interfaces"]).to include(
-        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/testnetns")
+        hash_including("name" => "eth0", "mac" => "00:11:22:33:44:55", "sandbox" => "/var/run/netns/testnetns"),
       )
       expect(response["ips"]).to include(
         hash_including("address" => "192.168.1.100/32", "gateway" => "192.168.1.1", "interface" => 0),
         hash_including("address" => "fd00::2/128", "gateway" => "fe80::02aa:bbff:fecc:ddee", "interface" => 0),
-        hash_including("address" => "2001:db8::2/128", "gateway" => "fe80::02aa:bbff:fecc:ddee", "interface" => 0)
+        hash_including("address" => "2001:db8::2/128", "gateway" => "fe80::02aa:bbff:fecc:ddee", "interface" => 0),
       )
       expect(response["routes"]).to include(hash_including("dst" => "0.0.0.0/0"))
       expect(response["dns"]).to include(
         "nameservers" => ["10.96.0.10"],
         "search" => ["default.svc.cluster.local", "svc.cluster.local", "cluster.local"],
-        "options" => ["ndots:5"]
+        "options" => ["ndots:5"],
       )
 
       expect(ipam_store["allocated_ips"]["abcdef123456"]).to contain_exactly(
         "192.168.1.100",
         "192.168.1.1",
         "fd00::2",
-        "2001:db8::2"
+        "2001:db8::2",
       )
     end
 
@@ -137,8 +137,8 @@ RSpec.describe UbiCNI do
           "ranges" => {
             "subnet_ula_ipv6" => "fd00::/64",
             "subnet_ipv6" => "2001:db8::/64",
-            "subnet_ipv4" => "192.168.1.0/26"
-          }
+            "subnet_ipv4" => "192.168.1.0/26",
+          },
         }
       end
 
@@ -180,7 +180,7 @@ RSpec.describe UbiCNI do
           "192.168.1.10",
           "192.168.1.2",
           "fd00::2",
-          "2001:db8::2"
+          "2001:db8::2",
         )
       ensure
         temp_file.close
@@ -254,7 +254,7 @@ RSpec.describe UbiCNI do
 
     before do
       expect(ubicni).to receive(:find_random_available_ip).and_return(
-        ula_container_ip, ipv6_container_ip, ipv4_container_ip, ipv4_gateway_ip
+        ula_container_ip, ipv6_container_ip, ipv4_container_ip, ipv4_gateway_ip,
       )
     end
 
@@ -405,8 +405,8 @@ RSpec.describe UbiCNI do
           "ranges" => {
             "subnet_ula_ipv6" => "fd00::/64",
             "subnet_ipv6" => "2001:db8::/64",
-            "subnet_ipv4" => "192.168.1.0/24"
-          }
+            "subnet_ipv4" => "192.168.1.0/24",
+          },
         }
       end
 
@@ -434,8 +434,8 @@ RSpec.describe UbiCNI do
         {
           "ranges" => {
             "subnet_ula_ipv6" => "fd00::/64",
-            "subnet_ipv4" => "192.168.1.0/24"
-          }
+            "subnet_ipv4" => "192.168.1.0/24",
+          },
         }
       end
 
@@ -453,8 +453,8 @@ RSpec.describe UbiCNI do
           "ranges" => {
             "subnet_ula_ipv6" => "fd00::/64",
             "subnet_ipv6" => nil,
-            "subnet_ipv4" => "192.168.1.0/24"
-          }
+            "subnet_ipv4" => "192.168.1.0/24",
+          },
         }
       end
 

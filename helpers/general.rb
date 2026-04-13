@@ -1,8 +1,6 @@
 # frozen_string_literal: true
 
 class Clover < Roda
-  include Authorization
-
   # Designed only for compatibility with existing mocking in the specs
   def self.authorized_project(account, project_id)
     account.projects_dataset[Sequel[:project][:id] => project_id, :visible => true]
@@ -86,7 +84,7 @@ class Clover < Roda
     WEB_DEFAULT_HEADERS = DEFAULT_HEADERS.merge(
       "content-type" => "text/html",
       "x-frame-options" => "deny",
-      "x-content-type-options" => "nosniff"
+      "x-content-type-options" => "nosniff",
     )
     # :nocov:
     if Config.production?
@@ -121,9 +119,15 @@ class Clover < Roda
     destroy
     destroy_invitation
     detach_vm
+    disable_cache
+    disable_cache_scope
+    disable_premium
     disable_ssl
     disassociate
     disconnect
+    enable_cache
+    enable_cache_scope
+    enable_premium
     enable_ssl
     promote_read_replica
     recycle
@@ -236,6 +240,28 @@ class Clover < Roda
     nil
   end
 
+  private def oidc_group_subject_tags_ds
+    if web? && (groups = session["oidc_groups"])
+      prefix = session["oidc_group_prefix"]
+      @project.subject_tags_dataset.select(:id).where(name: groups.map { prefix + it })
+    end
+  end
+
+  private def subject_match_predicate(subject_id)
+    if (ds = oidc_group_subject_tags_ds)
+      super | {subject_id: ds}
+    else
+      super
+    end
+  end
+
+  private def recursive_tag_query(type, values, project_id: nil)
+    if type == :subject && (ds = oidc_group_subject_tags_ds)
+      values = ds.union(DB.values([[Sequel.cast(values, :uuid)]]), from_self: false, all: true)
+    end
+    super
+  end
+
   def authorize(actions, object_id)
     if @project_permissions && (object_id == @project || object_id == @project.id)
       fail Authorization::Unauthorized unless has_project_permission(actions)
@@ -307,7 +333,7 @@ class Clover < Roda
         code: 404,
         type: "InvalidLocation",
         message: "Validation failed for following path components: location",
-        details: {location: "Given location is not a valid location. Available locations: #{valid_locations.join(", ")}"}
+        details: {location: "Given location is not a valid location. Available locations: #{valid_locations.join(", ")}"},
       }}.to_json)
     end
 
@@ -328,7 +354,7 @@ class Clover < Roda
       .each_with_object(Hash.new { |h, k| h[k] = h.class.new(&h.default_proc) }) do |br, hash|
         hash[br["location"]][br["resource_type"]][br["resource_family"]] = {
           hourly: br["unit_price"].to_f * 60,
-          monthly: br["unit_price"].to_f * 60 * 672
+          monthly: br["unit_price"].to_f * 60 * 672,
         }
     end
   end

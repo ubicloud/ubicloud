@@ -19,7 +19,7 @@ class LoadBalancerVmPort < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: vm.vm_host.sshable.start_fresh_session
+      ssh_session: vm.vm_host.sshable.start_fresh_session,
     }
   end
 
@@ -48,7 +48,7 @@ class LoadBalancerVmPort < Sequel::Model
     kw = {
       vm_name: vm.inhost_name,
       timeout: load_balancer.health_check_timeout,
-      dst_port: load_balancer_port.dst_port
+      dst_port: load_balancer_port.dst_port,
     }
 
     cmd = if load_balancer.health_check_protocol == "tcp"

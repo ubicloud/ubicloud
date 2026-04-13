@@ -34,6 +34,17 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(pg.version).to eq("17")
       expect(pg.ha_type).to eq("async")
     end
+
+    it "creates resource on aws and hops to wait_postgres_resource" do
+      expect(Config).to receive(:e2e_aws_access_key).and_return("access_key")
+      expect(Config).to receive(:e2e_aws_secret_key).and_return("secret_key")
+      aws_strand = described_class.assemble(provider: "aws")
+      aws_pgr_test = described_class.new(aws_strand)
+      location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
+      expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
+      expect(LocationCredentialAws[location.id].access_key).to eq("access_key")
+    end
   end
 
   describe "#wait_postgres_resource" do
@@ -335,15 +346,18 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     before do
       pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async", target_version: "17")
       replica_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg-replica", target_vm_size: "standard-2", target_storage_size_gib: 128, parent_id: pg_strand.id)
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id})
+      pre_upgrade_timeline = create_postgres_timeline(location_id: Location::HETZNER_FSN1_ID)
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "read_replica_id" => replica_strand.id, "pre_upgrade_postgres_timeline_id" => pre_upgrade_timeline.id})
       @pg_strand = pg_strand
       @replica_strand = replica_strand
+      @pre_upgrade_timeline = pre_upgrade_timeline
     end
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(@pg_strand.subject.destroy_set?).to be true
       expect(@replica_strand.subject.destroy_set?).to be true
+      expect(@pre_upgrade_timeline.strand.reload.semaphores.map(&:name)).to include("destroy")
     end
   end
 

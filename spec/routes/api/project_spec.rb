@@ -12,7 +12,7 @@ RSpec.describe Clover, "project" do
       [
         [:get, "/project"],
         [:post, "/project", {name: "p-1"}],
-        [:delete, "/project/#{project.ubid}"]
+        [:delete, "/project/#{project.ubid}"],
       ].each do |method, path, body|
         send(method, path, body)
 
@@ -86,7 +86,7 @@ RSpec.describe Clover, "project" do
       it "success" do
         project
         post "/project", {
-          name: "test-project"
+          name: "test-project",
         }.to_json
 
         expect(last_response.status).to eq(200)
@@ -97,7 +97,7 @@ RSpec.describe Clover, "project" do
         project
         (10 - user.projects_dataset.count).times do |i|
           post "/project", {
-            name: "test-project-#{i}"
+            name: "test-project-#{i}",
           }.to_json
 
           expect(last_response.status).to eq(200)
@@ -107,7 +107,7 @@ RSpec.describe Clover, "project" do
         expect(user.projects_dataset.count).to eq(10)
 
         post "/project", {
-          name: "test-project"
+          name: "test-project",
         }.to_json
 
         expect(last_response).to have_api_error(400, "Project limit exceeded. You can create up to 10 projects. Contact support@ubicloud.com if you need more.")

@@ -144,7 +144,7 @@ task "coverage" => [:coverage_spec]
 {
   "sspec" => [" in serial", rspec],
   "pspec" => [" in parallel", turbo_tests],
-  "spec" => ["", spec]
+  "spec" => ["", spec],
 }.each do |task_suffix, (desc_suffix, block)|
   desc "Run specs#{desc_suffix}"
   task task_suffix do
@@ -210,8 +210,13 @@ task "csi_spec" do
 end
 
 desc "Update cli spec golden files"
-task "update_golden_files" do
+task "update_cli_golden_files" do
   sh "mv spec/routes/api/cli/spec-output-files/*.txt spec/routes/api/cli/spec-output-files/.txt spec/routes/api/cli/golden-files/"
+end
+
+desc "Update svg spec golden files"
+task "update_svg_golden_files" do
+  sh "mv spec/lib/svg_chart-spec-output-files/*.svg spec/lib/svg_chart-golden-files/"
 end
 
 # Other
@@ -449,7 +454,8 @@ namespace :linter do
       "render(",
       "rodauth.add_recovery_codes_heading",
       "rodauth.otp_qr_code",
-      "yield"
+      "yield",
+      "SvgChart.render(",
     ]
     safe_regexp = /\A\s*(?:#{Regexp.union(safe_patterns)})/m
 
@@ -478,7 +484,7 @@ namespace :linter do
           file:,
           line: line_number,
           content: display_content,
-          full_line: lines[line_number - 1].strip
+          full_line: lines[line_number - 1].strip,
         }
       end
     end

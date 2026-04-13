@@ -1,6 +1,10 @@
-<% attachable_vms = dataset_authorize(@lb.private_subnet.vms_dataset.eager(:location), "Vm:view")
-  .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
-  .all
+<% ds = @lb.private_subnet.vms_dataset.eager(:location)
+  if @lb.stack == "ipv4" || @lb.stack == "dual"
+    ds = ds.where(Sequel[:vm][:ip4_enabled] => true)
+  end
+  attachable_vms = dataset_authorize(ds, "Vm:view")
+    .exclude(Sequel[:vm][:id] => @lb.vms_dataset.select(Sequel[:vm][:id]))
+    .all
 load_balancer_path = "#{@project.path}#{@lb.path}"
 edit_perm = has_permission?("LoadBalancer:edit", @lb) %>
 

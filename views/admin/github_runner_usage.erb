@@ -1,5 +1,19 @@
 <% @page_title = "GitHub Runner #{@arch} VM Usage" %>
 
+<% total = Hash.new(0)
+types = %w[runner vm]
+@data.each do |row|
+    row[:name] = table_link(value: row[:name], link: "/model/GithubInstallation/#{UBID.to_ubid(row.delete(:id))}")
+    row.each { |k, v| total[k] += v if v.is_a?(Numeric) }
+    types.each do |type|
+      row[:"#{type}_vcpus"] = "#{row.delete(:"allocated_#{type}_vcpus")} / #{row[:"#{type}_vcpus"]}"
+    end
+end
+types.each do |type|
+  total[:"#{type}_vcpus"] = "#{total.delete(:"allocated_#{type}_vcpus")} / #{total[:"#{type}_vcpus"]}"
+end
+@data.prepend({name: "TOTAL", premium: "", **total}) if @data.any? %>
+
 <%== part("components/table", title: nil, table_class: "github-runner-usage-table", data: @data, use_admin_label: false) %>
 
 <% other_arch = (@arch == "x64") ? "arm64" : "x64" %>

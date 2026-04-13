@@ -44,6 +44,22 @@ class VictoriaMetrics::Client
       {"Content-Encoding" => "gzip", "Content-Type" => "application/octet-stream"})
   end
 
+  def query(query:)
+    query_params = [["query", query]]
+    query_encoded = URI.encode_www_form(query_params)
+    query_results = send_request("GET", "/api/v1/query?#{query_encoded}")
+    data = JSON.parse(query_results.body)
+
+    return [] unless data["status"] == "success" && data["data"]["resultType"] == "vector"
+
+    data["data"]["result"].map do |result|
+      {
+        "labels" => result["metric"] || {},
+        "value" => result["value"],
+      }
+    end
+  end
+
   def query_range(query:, start_ts:, end_ts:)
     query_params = [["query", query], ["start", start_ts], ["end", end_ts], ["step", step_seconds(start_ts, end_ts)]]
     query_encoded = URI.encode_www_form(query_params)
@@ -55,7 +71,7 @@ class VictoriaMetrics::Client
     data["data"]["result"].map do |result|
       {
         "labels" => result["metric"] || {},
-        "values" => result["values"]
+        "values" => result["values"],
       }
     end
 
@@ -66,14 +82,17 @@ class VictoriaMetrics::Client
   private
 
   def send_request(method, path, body = nil, headers = {})
-    full_path = path
-
     if @username && @password
       auth = Base64.strict_encode64("#{@username}:#{@password}")
       headers["Authorization"] = "Basic #{auth}"
     end
 
-    response = @client.request(method:, path: full_path, body:, headers:)
+    begin
+      response = @client.request(method:, path:, body:, headers:, timeout: 5)
+    rescue Excon::Error::Timeout, Excon::Error::Socket => e
+      raise VictoriaMetrics::ClientError, "VictoriaMetrics Client error (#{e.class}: #{e.message}), method: #{method}, path: #{path}"
+    end
+
     if [200, 204, 206, 404].include?(response.status)
       response
     else

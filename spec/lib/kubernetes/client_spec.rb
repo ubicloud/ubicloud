@@ -11,7 +11,7 @@ RSpec.describe Kubernetes::Client do
       private_subnet_id: private_subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     )
   }
   let(:session) { Net::SSH::Connection::Session.allocate }
@@ -21,15 +21,15 @@ RSpec.describe Kubernetes::Client do
     it "detects deleted service" do
       svc = {
         "metadata" => {
-          "deletionTimestamp" => "asdf"
-        }
+          "deletionTimestamp" => "asdf",
+        },
       }
       expect(kubernetes_client.service_deleted?(svc)).to be(true)
     end
 
     it "detects not deleted service" do
       svc = {
-        "metadata" => {}
+        "metadata" => {},
       }
       expect(kubernetes_client.service_deleted?(svc)).to be(false)
     end
@@ -40,12 +40,12 @@ RSpec.describe Kubernetes::Client do
       svc_list = [
         {
           "metadata" => {"name" => "svc-b", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
-          "spec" => {"ports" => [{"port" => 80, "nodePort" => 31942}, {"port" => 443, "nodePort" => 33212}]}
+          "spec" => {"ports" => [{"port" => 80, "nodePort" => 31942}, {"port" => 443, "nodePort" => 33212}]},
         },
         {
           "metadata" => {"name" => "svc-a", "namespace" => "default", "creationTimestamp" => "2024-01-01T00:00:00Z"},
-          "spec" => {"ports" => [{"port" => 800, "nodePort" => 32942}]}
-        }
+          "spec" => {"ports" => [{"port" => 800, "nodePort" => 32942}]},
+        },
       ]
       expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[800, 32942], [80, 31942], [443, 33212]])
     end
@@ -54,12 +54,12 @@ RSpec.describe Kubernetes::Client do
       svc_list = [
         {
           "metadata" => {"name" => "svc-newer", "namespace" => "default", "creationTimestamp" => "2024-01-02T00:00:00Z"},
-          "spec" => {"ports" => [{"port" => 443, "nodePort" => 30123}]}
+          "spec" => {"ports" => [{"port" => 443, "nodePort" => 30123}]},
         },
         {
           "metadata" => {"name" => "svc-older", "namespace" => "default", "creationTimestamp" => "2024-01-01T00:00:00Z"},
-          "spec" => {"ports" => [{"port" => 443, "nodePort" => 32003}]}
-        }
+          "spec" => {"ports" => [{"port" => 443, "nodePort" => 32003}]},
+        },
       ]
       expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[443, 32003]])
     end
@@ -67,7 +67,7 @@ RSpec.describe Kubernetes::Client do
     it "returns empty list if no services have ports" do
       svc_list = [
         {"metadata" => {"name" => "svc0", "namespace" => "ns", "creationTimestamp" => "2024-01-01T00:00:00Z"}, "spec" => {}},
-        {"metadata" => {"name" => "svc1", "namespace" => "ns", "creationTimestamp" => "2024-01-02T00:00:00Z"}, "spec" => {"ports" => nil}}
+        {"metadata" => {"name" => "svc1", "namespace" => "ns", "creationTimestamp" => "2024-01-02T00:00:00Z"}, "spec" => {"ports" => nil}},
       ]
       expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([])
     end
@@ -79,10 +79,10 @@ RSpec.describe Kubernetes::Client do
           "spec" => {
             "ports" => [
               {"port" => 1234, "nodePort" => 30001},
-              {"port" => 1234, "nodePort" => 30002}
-            ]
-          }
-        }
+              {"port" => 1234, "nodePort" => 30002},
+            ],
+          },
+        },
       ]
       expect(kubernetes_client.lb_desired_ports(svc_list)).to eq([[1234, 30001]])
     end
@@ -94,10 +94,10 @@ RSpec.describe Kubernetes::Client do
         "status" => {
           "loadBalancer" => {
             "ingress" => [
-              {"hostname" => "asdf.com"}
-            ]
-          }
-        }
+              {"hostname" => "asdf.com"},
+            ],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(false)
     end
@@ -106,9 +106,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => {}
-          }
-        }
+            "ingress" => {},
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -117,9 +117,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => nil
-          }
-        }
+            "ingress" => nil,
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -128,9 +128,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => []
-          }
-        }
+            "ingress" => [],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -139,9 +139,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => [{}]
-          }
-        }
+            "ingress" => [{}],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -150,9 +150,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => [{"hostname" => nil}]
-          }
-        }
+            "ingress" => [{"hostname" => nil}],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -161,9 +161,9 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "status" => {
           "loadBalancer" => {
-            "ingress" => [{"hostname" => ""}]
-          }
-        }
+            "ingress" => [{"hostname" => ""}],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -174,17 +174,17 @@ RSpec.describe Kubernetes::Client do
           "loadBalancer" => {
             "ingress" => [
               {"hostname" => "example.com"},
-              {"hostname" => nil}
-            ]
-          }
-        }
+              {"hostname" => nil},
+            ],
+          },
+        },
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(false)
     end
 
     it "returns true when loadBalancer key is missing" do
       svc = {
-        "status" => {}
+        "status" => {},
       }
       expect(kubernetes_client.load_balancer_hostname_missing?(svc)).to be(true)
     end
@@ -256,8 +256,8 @@ RSpec.describe Kubernetes::Client do
       svc = {
         "metadata" => {
           "namespace" => "default",
-          "name" => "test-svc"
-        }
+          "name" => "test-svc",
+        },
       }
       response = Net::SSH::Connection::Session::StringWithExitstatus.new("node deleted", 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf -n default patch service test-svc --type=merge -p \\{\\\"status\\\":\\{\\\"loadBalancer\\\":\\{\\\"ingress\\\":\\[\\{\\\"hostname\\\":\\\"asdf.com\\\"\\}\\]\\}\\}\\} --subresource=status").and_return(response)
@@ -270,7 +270,7 @@ RSpec.describe Kubernetes::Client do
       lb = Prog::Vnet::LoadBalancerNexus.assemble(private_subnet.id, name: kubernetes_cluster.services_load_balancer_name, src_port: 80, dst_port: 8000).subject
       kubernetes_cluster.update(services_lb: lb)
       @response = {
-        "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}]
+        "items" => ["metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}],
       }.to_json
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
       allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
@@ -280,7 +280,7 @@ RSpec.describe Kubernetes::Client do
 
     it "returns true early since there are no LoadBalancer services but there is a port" do
       response = {
-        "items" => []
+        "items" => [],
       }.to_json
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
@@ -313,19 +313,19 @@ RSpec.describe Kubernetes::Client do
             "status" => {
               "loadBalancer" => {
                 "ingress" => [
-                  {}
-                ]
-              }
-            }
-          }
-        ]
+                  {},
+                ],
+              },
+            },
+          },
+        ],
       }.to_json
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(response, 0)
       expect(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
 
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[], []],
-        port_diff_for_lb: [[], []]
+        port_diff_for_lb: [[], []],
       )
       expect(kubernetes_client.any_lb_services_modified?).to be(true)
     end
@@ -337,8 +337,8 @@ RSpec.describe Kubernetes::Client do
       kubernetes_cluster.update(services_lb: lb)
       @response = {
         "items" => [
-          "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"}
-        ]
+          "metadata" => {"name" => "svc", "namespace" => "default", "creationTimestamp" => "2024-01-03T00:00:00Z"},
+        ],
       }.to_json
       response = Net::SSH::Connection::Session::StringWithExitstatus.new(@response, 0)
       allow(session).to receive(:_exec!).with("sudo kubectl --kubeconfig=/etc/kubernetes/admin.conf get service --all-namespaces --field-selector spec.type=LoadBalancer -ojson").and_return(response)
@@ -352,7 +352,7 @@ RSpec.describe Kubernetes::Client do
       allow(kubernetes_client).to receive(:lb_desired_ports).and_return([[30122, 80]])
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[extra_vm], [missing_vm]],
-        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]]
+        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]],
       )
       expect(kubernetes_client).not_to receive(:set_load_balancer_hostname)
       kubernetes_client.sync_kubernetes_services
@@ -365,7 +365,7 @@ RSpec.describe Kubernetes::Client do
       allow(kubernetes_client).to receive(:lb_desired_ports).and_return([[30122, 80]])
       allow(kubernetes_cluster).to receive_messages(
         vm_diff_for_lb: [[extra_vm], [missing_vm]],
-        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]]
+        port_diff_for_lb: [[kubernetes_cluster.services_lb.ports.first], [missing_port]],
       )
       expect(kubernetes_client).to receive(:set_load_balancer_hostname)
       kubernetes_client.sync_kubernetes_services

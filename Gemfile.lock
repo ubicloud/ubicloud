@@ -8,12 +8,12 @@ GIT
       pg (~> 1.3)
 
 GIT
-  remote: https://github.com/jeremyevans/sequel.git
-  revision: 1540a8f3a9522e307605adab2e2f85023a319711
-  ref: 1540a8f3a9522e307605adab2e2f85023a319711
+  remote: https://github.com/jeremyevans/roda.git
+  revision: f40733e1c22b994b2831fcbf7d5f6f52ee19d044
+  ref: f40733e1c22b994b2831fcbf7d5f6f52ee19d044
   specs:
-    sequel (5.102.0)
-      bigdecimal
+    roda (3.102.0)
+      rack
 
 GIT
   remote: https://github.com/ubicloud/erb-formatter.git
@@ -30,11 +30,11 @@ GEM
       base64 (~> 0.2)
       faraday (>= 1.0, < 3.0.0)
       faraday-retry (>= 1.0, < 3.0.0)
-    addressable (2.8.7)
-      public_suffix (>= 2.0.2, < 7.0)
+    addressable (2.9.0)
+      public_suffix (>= 2.0.2, < 8.0)
     afm (1.0.0)
     android_key_attestation (0.3.0)
-    argon2 (2.3.2)
+    argon2 (2.3.3)
       ffi (~> 1.15)
       ffi-compiler (~> 1.0)
     argon2-kdf (0.3.1)
@@ -78,12 +78,10 @@ GEM
     aws-sigv4 (1.12.1)
       aws-eventstream (~> 1, >= 1.0.2)
     base64 (0.3.0)
-    bcrypt_pbkdf (1.1.1)
-    bcrypt_pbkdf (1.1.1-arm64-darwin)
-    bcrypt_pbkdf (1.1.1-x86_64-darwin)
+    bcrypt_pbkdf (1.1.2)
     bigdecimal (3.3.1)
     bindata (2.5.1)
-    brakeman (7.1.2)
+    brakeman (8.0.4)
       racc
     by (1.1.0)
     byebug (13.0.0)
@@ -111,7 +109,7 @@ GEM
     cose (1.3.1)
       cbor (~> 0.5.9)
       openssl-signature_algorithm (~> 1.0)
-    countries (8.0.4)
+    countries (8.1.0)
       unaccent (~> 0.3)
     crack (1.0.1)
       bigdecimal
@@ -120,14 +118,14 @@ GEM
     cuprite (0.17)
       capybara (~> 3.0)
       ferrum (~> 0.17.0)
-    date (3.5.0)
+    date (3.5.1)
     diff-lcs (1.6.2)
     docile (1.4.1)
     ed25519 (1.4.0)
     enum_csv (1.2.0)
       csv
     erubi (1.13.1)
-    excon (1.3.0)
+    excon (1.4.1)
       logger
     faraday (2.14.1)
       faraday-net_http (>= 2.0, < 3.5)
@@ -135,7 +133,7 @@ GEM
       logger
     faraday-net_http (3.4.2)
       net-http (~> 0.5)
-    faraday-retry (2.3.2)
+    faraday-retry (2.4.0)
       faraday (~> 2.0)
     ferrum (0.17.1)
       addressable (~> 2.5)
@@ -143,14 +141,14 @@ GEM
       concurrent-ruby (~> 1.1)
       webrick (~> 1.7)
       websocket-driver (~> 0.7)
-    ffi (1.17.2-aarch64-linux-gnu)
-    ffi (1.17.2-aarch64-linux-musl)
-    ffi (1.17.2-arm-linux-gnu)
-    ffi (1.17.2-arm-linux-musl)
-    ffi (1.17.2-arm64-darwin)
-    ffi (1.17.2-x86_64-darwin)
-    ffi (1.17.2-x86_64-linux-gnu)
-    ffi (1.17.2-x86_64-linux-musl)
+    ffi (1.17.4-aarch64-linux-gnu)
+    ffi (1.17.4-aarch64-linux-musl)
+    ffi (1.17.4-arm-linux-gnu)
+    ffi (1.17.4-arm-linux-musl)
+    ffi (1.17.4-arm64-darwin)
+    ffi (1.17.4-x86_64-darwin)
+    ffi (1.17.4-x86_64-linux-gnu)
+    ffi (1.17.4-x86_64-linux-musl)
     ffi-compiler (1.3.2)
       ffi (>= 1.15.5)
       rake
@@ -162,17 +160,17 @@ GEM
     hashdiff (1.2.1)
     hashery (2.1.2)
     hashie (5.0.0)
-    herb (0.8.9-aarch64-linux-gnu)
-    herb (0.8.9-aarch64-linux-musl)
-    herb (0.8.9-arm-linux-gnu)
-    herb (0.8.9-arm-linux-musl)
-    herb (0.8.9-arm64-darwin)
-    herb (0.8.9-x86_64-darwin)
-    herb (0.8.9-x86_64-linux-gnu)
-    herb (0.8.9-x86_64-linux-musl)
-    io-console (0.8.1)
+    herb (0.9.4-aarch64-linux-gnu)
+    herb (0.9.4-aarch64-linux-musl)
+    herb (0.9.4-arm-linux-gnu)
+    herb (0.9.4-arm-linux-musl)
+    herb (0.9.4-arm64-darwin)
+    herb (0.9.4-x86_64-darwin)
+    herb (0.9.4-x86_64-linux-gnu)
+    herb (0.9.4-x86_64-linux-musl)
+    io-console (0.8.2)
     jmespath (1.6.2)
-    json (2.18.1)
+    json (2.19.3)
     json_schema (0.21.0)
     jwt (3.1.2)
       base64
@@ -201,7 +199,7 @@ GEM
       timeout
     net-smtp (0.5.1)
       net-protocol
-    net-ssh (7.3.0)
+    net-ssh (7.3.2)
     netaddr (2.0.6)
     nio4r (2.7.5)
     nokogiri (1.19.1-aarch64-linux-gnu)
@@ -247,16 +245,16 @@ GEM
     omniauth-oauth2 (1.8.0)
       oauth2 (>= 1.4, < 3)
       omniauth (~> 2.0)
-    openapi_parser (2.3.0)
-    openssl (4.0.0)
+    openapi_parser (2.3.1)
+    openssl (4.0.1)
     openssl-signature_algorithm (1.3.0)
       openssl (> 2.0)
-    optparse (0.8.0)
+    optparse (0.8.1)
     pagerduty (4.0.1)
     parallel (1.27.0)
     parallel_tests (4.10.1)
       parallel
-    parser (3.3.10.2)
+    parser (3.3.11.1)
       ast (~> 2.4.1)
       racc
     pdf-core (0.10.0)
@@ -266,13 +264,13 @@ GEM
       hashery (~> 2.0)
       ruby-rc4
       ttfunk
-    pg (1.6.2)
-    pg (1.6.2-aarch64-linux)
-    pg (1.6.2-aarch64-linux-musl)
-    pg (1.6.2-arm64-darwin)
-    pg (1.6.2-x86_64-darwin)
-    pg (1.6.2-x86_64-linux)
-    pg (1.6.2-x86_64-linux-musl)
+    pg (1.6.3)
+    pg (1.6.3-aarch64-linux)
+    pg (1.6.3-aarch64-linux-musl)
+    pg (1.6.3-arm64-darwin)
+    pg (1.6.3-x86_64-darwin)
+    pg (1.6.3-x86_64-linux)
+    pg (1.6.3-x86_64-linux-musl)
     prawn (2.5.0)
       matrix (~> 0.4)
       pdf-core (~> 0.10.0)
@@ -280,17 +278,18 @@ GEM
     prawn-table (0.2.2)
       prawn (>= 1.3.0, < 3.0.0)
     prism (1.9.0)
-    pry (0.15.2)
+    pry (0.16.0)
       coderay (~> 1.1)
       method_source (~> 1.0)
+      reline (>= 0.6.0)
     pry-byebug (3.12.0)
       byebug (~> 13.0)
       pry (>= 0.13, < 0.17)
-    public_suffix (6.0.2)
+    public_suffix (7.0.5)
     puma (7.1.0)
       nio4r (~> 2.0)
     racc (1.8.1)
-    rack (3.2.5)
+    rack (3.2.6)
     rack-protection (4.2.1)
       base64 (>= 0.1.0)
       logger (>= 1.6.0)
@@ -300,14 +299,12 @@ GEM
     rack-unreloader (2.1.0)
     rainbow (3.1.1)
     rake (13.3.1)
-    refrigerator (1.8.0)
+    refrigerator (1.9.0)
     regexp_parser (2.11.3)
-    reline (0.6.2)
+    reline (0.6.3)
       io-console (~> 0.5)
     rexml (3.4.4)
-    roda (3.102.0)
-      rack
-    rodauth (2.41.0)
+    rodauth (2.43.0)
       roda (>= 2.6.0)
       sequel (>= 4)
     rodauth-omniauth (0.6.2)
@@ -316,10 +313,10 @@ GEM
     rodish (2.0.1)
       optparse
     rotp (6.3.0)
-    rqrcode (3.1.0)
+    rqrcode (3.2.0)
       chunky_png (~> 1.0)
       rqrcode_core (~> 2.0)
-    rqrcode_core (2.0.0)
+    rqrcode_core (2.1.0)
     rspec (3.13.2)
       rspec-core (~> 3.13.0)
       rspec-expectations (~> 3.13.0)
@@ -329,10 +326,10 @@ GEM
     rspec-expectations (3.13.5)
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
-    rspec-mocks (3.13.7)
+    rspec-mocks (3.13.8)
       diff-lcs (>= 1.2.0, < 2.0)
       rspec-support (~> 3.13.0)
-    rspec-support (3.13.6)
+    rspec-support (3.13.7)
     rubocop (1.84.2)
       json (~> 2.3)
       language_server-protocol (~> 3.17.0.2)
@@ -344,13 +341,13 @@ GEM
       rubocop-ast (>= 1.49.0, < 2.0)
       ruby-progressbar (~> 1.7)
       unicode-display_width (>= 2.4.0, < 4.0)
-    rubocop-ast (1.49.0)
+    rubocop-ast (1.49.1)
       parser (>= 3.3.7.2)
       prism (~> 1.7)
     rubocop-capybara (2.22.1)
       lint_roller (~> 1.1)
       rubocop (~> 1.72, >= 1.72.1)
-    rubocop-erb (0.7.0)
+    rubocop-erb (0.7.1)
       herb (~> 0.7)
       lint_roller (~> 1.1)
       rubocop (~> 1.72, >= 1.72.1)
@@ -374,9 +371,11 @@ GEM
     sawyer (0.9.3)
       addressable (>= 2.3.5)
       faraday (>= 0.17.3, < 3)
+    sequel (5.103.0)
+      bigdecimal
     sequel-annotate (1.7.0)
       sequel (>= 4)
-    sequel_pg (1.18.0)
+    sequel_pg (1.19.0)
       pg (>= 0.18.0, != 1.2.0)
       sequel (>= 4.38.0)
     shellwords (0.2.2)
@@ -429,7 +428,7 @@ GEM
       openssl (>= 2.2)
       safety_net_attestation (~> 0.5.0)
       tpm-key_attestation (~> 0.14.0)
-    webmock (3.26.1)
+    webmock (3.26.2)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
@@ -497,8 +496,7 @@ DEPENDENCIES
   rack-unreloader (>= 1.8)
   rake
   refrigerator (>= 1)
-  reline
-  roda (>= 3.96)
+  roda!
   rodauth (>= 2.41)
   rodauth-omniauth (>= 0.6.2)
   rodish (>= 2.0.1)
@@ -511,7 +509,7 @@ DEPENDENCIES
   rubocop-rake
   rubocop-rspec
   rubocop-sequel
-  sequel!
+  sequel (>= 5.103.0)
   sequel-annotate
   sequel_pg (>= 1.8)
   shellwords
@@ -525,7 +523,7 @@ DEPENDENCIES
   webmock
 
 RUBY VERSION
-   ruby 3.4.9p82
+  ruby 4.0.2p0
 
 BUNDLED WITH
-   2.7.1
+  4.0.6

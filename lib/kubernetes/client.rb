@@ -57,9 +57,9 @@ class Kubernetes::Client
     patch_data = JSON.generate({
       "status" => {
         "loadBalancer" => {
-          "ingress" => [{"hostname" => hostname}]
-        }
-      }
+          "ingress" => [{"hostname" => hostname}],
+        },
+      },
     })
     kubectl("-n :namespace patch service :service --type=merge -p :patch_data --subresource=status",
       namespace: svc.dig("metadata", "namespace"),

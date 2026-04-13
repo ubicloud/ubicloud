@@ -48,7 +48,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         size: postgres_resource.target_vm_size.gsub("hobby", "burstable"),
         storage_volumes: [
           {encrypted: true, size_gib: 16, vring_workers: 1},
-          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1}
+          {encrypted: true, size_gib: postgres_resource.target_storage_size_gib, vring_workers: 1},
         ],
         boot_image:,
         private_subnet_id: postgres_resource.private_subnet_id,
@@ -59,7 +59,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         exclude_availability_zones:,
         availability_zone:,
         exclude_data_centers:,
-        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil
+        swap_size_bytes: postgres_resource.target_vm_size.start_with?("hobby") ? 4 * 1024 * 1024 * 1024 : nil,
       )
 
       synchronization_status = (is_representative && !postgres_resource.read_replica?) ? "ready" : "catching_up"
@@ -71,7 +71,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
         is_representative:,
         synchronization_status:,
         vm_id: vm_st.id,
-        version: server_version
+        version: server_version,
       )
 
       vm_st.subject.add_vm_firewall(postgres_resource.internal_firewall)
@@ -105,11 +105,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   end
 
   label def bootstrap_rhizome
-    if postgres_server.primary?
-      register_deadline("wait", 10 * 60)
-    else
-      register_deadline("wait", 120 * 60)
-    end
+    register_deadline("wait", 10 * 60)
 
     bud Prog::BootstrapRhizome, {"target_folder" => "postgres", "subject_id" => vm.id, "user" => "ubi", "no_bundler_install" => true}
     hop_wait_bootstrap_rhizome
@@ -190,7 +186,8 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
     when "Succeeded"
       hop_refresh_certificates
     when "Failed", "NotStarted"
-      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version)
+      strict_overcommit = resource.skip_strict_memory_overcommit_set? ? "false" : "true"
+      vm.sshable.d_run("initialize_empty_database", "sudo", "postgres/bin/initialize-empty-database", postgres_server.version, strict_overcommit)
     end
 
     nap 5
@@ -199,14 +196,35 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
   label def initialize_database_from_backup
     case vm.sshable.d_check("initialize_database_from_backup")
     when "Succeeded"
+      Page.from_tag_parts("PGInitializeDatabaseFromBackupFailed", postgres_server.id)&.incr_resolve
+      delete_from_stack("disk_usage", "initialize_database_from_backup_try_count")
       hop_refresh_certificates
+    when "InProgress"
+      disk_usage = begin
+        vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
+      rescue
+        0
+      end
+      previous_disk_usage = frame["disk_usage"] || 0
+      if disk_usage > previous_disk_usage
+        update_stack({"disk_usage" => disk_usage})
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      end
     when "Failed", "NotStarted"
+      previous_try_count = frame["initialize_database_from_backup_try_count"] || 0
+      if previous_try_count >= 3
+        Prog::PageNexus.assemble("#{postgres_server.ubid} initialize database from backup failed after 3 attempts",
+          ["PGInitializeDatabaseFromBackupFailed", postgres_server.id], postgres_server.ubid)
+      end
+      update_stack({"initialize_database_from_backup_try_count" => previous_try_count + 1})
+
       backup_label = if postgres_server.standby? || postgres_server.read_replica?
         "LATEST"
       else
         postgres_server.timeline.latest_backup_label_before_target(target: resource.restore_target)
       end
-      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label)
+      strict_overcommit = resource.skip_strict_memory_overcommit_set? ? "false" : "true"
+      vm.sshable.d_run("initialize_database_from_backup", "sudo", "postgres/bin/initialize-database-from-backup", postgres_server.version, backup_label, strict_overcommit)
     end
 
     nap 5
@@ -321,6 +339,37 @@ WantedBy=timers.target
 TIMER
     vm.sshable.write_file("/etc/systemd/system/postgres-metrics.timer", metrics_timer)
 
+    vm.sshable.cmd("sudo mkdir -p /var/lib/node_exporter")
+    vm.sshable.cmd("sudo chown ubi:ubi /var/lib/node_exporter")
+
+    pg_metrics_service = <<SERVICE
+[Unit]
+Description=Postgres Metrics Collection
+After=postgresql.service
+
+[Service]
+Type=oneshot
+User=ubi
+ExecStart=/home/ubi/postgres/bin/collect-pg-metrics #{postgres_server.version}
+StandardOutput=journal
+StandardError=journal
+SERVICE
+    vm.sshable.write_file("/etc/systemd/system/pg-collect-metrics.service", pg_metrics_service)
+
+    pg_metrics_timer = <<TIMER
+[Unit]
+Description=Run pg-collect-metrics periodically
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=1s
+
+[Install]
+WantedBy=timers.target
+TIMER
+    vm.sshable.write_file("/etc/systemd/system/pg-collect-metrics.timer", pg_metrics_timer)
+
     vm.sshable.cmd("sudo systemctl daemon-reload")
 
     when_initial_provisioning_set? do
@@ -328,6 +377,7 @@ TIMER
       vm.sshable.cmd("sudo systemctl enable --now node_exporter")
       vm.sshable.cmd("sudo systemctl enable --now prometheus")
       vm.sshable.cmd("sudo systemctl enable --now postgres-metrics.timer")
+      vm.sshable.cmd("sudo systemctl enable --now pg-collect-metrics.timer")
       vm.sshable.cmd("sudo systemctl enable --now wal-g") if postgres_server.timeline.blob_storage && !resource.use_old_walg_command_set?
 
       hop_setup_cloudwatch if postgres_server.timeline.aws? && resource.project.get_ff_aws_cloudwatch_logs
@@ -351,7 +401,7 @@ TIMER
       "files": {
         "collect_list": [
           {
-            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql.log",
+            "file_path": "/dat/#{postgres_server.version}/data/pg_log/postgresql-*.log",
             "log_group_name": "/#{postgres_server.ubid}/postgresql",
             "log_stream_name": "#{postgres_server.ubid}/postgresql",
             "timestamp_format": "%Y-%m-%d %H:%M:%S"
@@ -400,7 +450,7 @@ CONFIG
       hop_wait_catch_up if postgres_server.standby? && postgres_server.synchronization_status != "ready"
 
       if postgres_server.primary?
-        resource.servers.select { it.standby? && it.synchronization_status == "ready" && !it.physical_slot_ready }.each do |standby|
+        resource.servers.select { it.standby? && it.synchronization_status == "ready" && it.physical_slot_ready_id != postgres_server.id }.each do |standby|
           standby.incr_use_physical_slot
           standby.incr_configure
         end
@@ -409,7 +459,7 @@ CONFIG
       hop_wait
     when "Failed", "NotStarted"
       if postgres_server.use_physical_slot_set?
-        postgres_server.update(physical_slot_ready: true)
+        postgres_server.update(physical_slot_ready_id: postgres_server.resource.representative_server.id)
         decr_use_physical_slot
       end
       configure_hash = postgres_server.configure_hash
@@ -445,29 +495,42 @@ sudo apt-get install /var/cache/paradedb/postgresql-:version-pg-search.deb
 CMD
       end
 
-      if retval&.dig("msg") == "postgres server is restarted"
-        hop_run_post_installation_script
-      end
-      push Prog::Postgres::Restart
+      hop_run_post_installation_script
     end
 
     hop_wait
   end
 
   label def run_post_installation_script
-    if postgres_server.paradedb_and_primary?
-      postgres_server.run_query(<<SQL)
+    case vm.sshable.d_check("post_installation_script")
+    when "Succeeded"
+      if postgres_server.paradedb_and_primary?
+        postgres_server.run_query(<<SQL)
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_search;
 CREATE EXTENSION IF NOT EXISTS pg_analytics;
 CREATE EXTENSION IF NOT EXISTS vector;
 SQL
+      end
+
+      hop_wait
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("post_installation_script", "sudo", "postgres/bin/post-installation-script")
     end
-    hop_wait
+
+    nap 1
   end
 
   label def wait_catch_up
-    nap 30 unless postgres_server.lsn_caught_up
+    unless postgres_server.lsn_caught_up
+      current_lsn = postgres_server.current_lsn
+      previous_lsn = strand.stack.first["current_lsn"]
+      if previous_lsn.nil? || postgres_server.lsn_diff(current_lsn, previous_lsn) > 0
+        update_stack({"current_lsn" => current_lsn})
+        register_deadline("wait", 10 * 60, allow_extension: 24 * 60 * 60)
+      end
+      nap 30
+    end
 
     hop_wait if postgres_server.read_replica?
 
@@ -542,17 +605,11 @@ SQL
 
     when_checkup_set? do
       unless available?
-        deadline = postgres_server.needs_recycling? ? 30 * 60 : 5 * 60
-        register_deadline("wait", deadline)
+        register_deadline("wait", 5 * 60)
         hop_unavailable
       end
 
       decr_checkup
-    end
-
-    when_configure_metrics_set? do
-      decr_configure_metrics
-      hop_configure_metrics
     end
 
     when_configure_set? do
@@ -561,8 +618,24 @@ SQL
     end
 
     when_restart_set? do
-      decr_restart
-      push Prog::Postgres::Restart
+      register_deadline("complete_restart", 2 * 60)
+      if daemonized_restart
+        decr_restart
+        unregister_deadline("complete_restart")
+      else
+        nap 1
+      end
+    end
+
+    when_configure_metrics_set? do
+      decr_configure_metrics
+      hop_configure_metrics
+    end
+
+    when_promote_read_replica_set? do
+      decr_promote_read_replica
+      register_deadline("wait", 10 * 60)
+      hop_promote_read_replica
     end
 
     when_refresh_walg_credentials_set? do
@@ -591,12 +664,12 @@ SQL
         update_stack_lsn(lsn)
         # Even if it is lagging, it has applied new wal files, so, we should
         # give it a chance to catch up
-        decr_recycle
+        decr_recycle_lagging_read_replica
         nap 15 * 60
       else
         # It has not applied any new wal files while has been napping for the
         # last 15 minutes, so, there should be something wrong, we are recycling
-        postgres_server.incr_recycle unless postgres_server.recycle_set?
+        postgres_server.incr_recycle_lagging_read_replica unless postgres_server.recycle_lagging_read_replica_set?
       end
       nap 60
     end
@@ -616,25 +689,24 @@ SQL
       hop_configure
     end
 
-    reap(fallthrough: true)
-    nap 5 unless strand.children_dataset.where(prog: "Postgres::Restart").empty?
-
     if available?
       decr_checkup
-      decr_recycle
+      decr_recycle_unavailable_server
       hop_wait
     end
 
-    unless postgres_server.recycle_set?
-      postgres_server.incr_recycle
-    end
+    postgres_server.incr_recycle_unavailable_server unless postgres_server.recycle_unavailable_server_set?
 
-    bud Prog::Postgres::Restart
+    daemonized_restart
     nap 5
   end
 
   label def fence
     decr_fence
+
+    when_lockout_set? do
+      hop_lockout
+    end
 
     # Use multiple checkpoints so the final shutdown checkpoint is
     # brief.
@@ -707,7 +779,7 @@ SQL
       end
     end
 
-    reap(:wait_locked_out, fallthrough: true, reaper:)
+    reap(:wait_locked_out, fallthrough: true, reaper:, prog: "Postgres::PostgresLockout")
     hop_wait_locked_out if strand.stack.first["lockout_succeeded"]
 
     nap 0.5
@@ -725,9 +797,29 @@ SQL
   end
 
   label def wait_fencing_of_old_primary
-    hop_taking_over if resource.representative_server.strand.label == "wait_in_fence"
+    representative_server = resource.representative_server
+    hop_taking_over if representative_server.strand.label == "wait_in_fence"
+
+    if strand.stack.first["deadline_at"] && Time.now > Time.parse(strand.stack.first["deadline_at"].to_s)
+      representative_server.incr_lockout
+      hop_wait_representative_lockout
+    end
 
     nap 1
+  end
+
+  label def promote_read_replica
+    case vm.sshable.d_check("promote_postgres")
+    when "Succeeded"
+      vm.sshable.d_clean("promote_postgres")
+      resource.servers.each(&:incr_configure)
+      resource.servers.each(&:incr_configure_metrics)
+      hop_configure
+    when "NotStarted", "Failed"
+      vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
+    end
+
+    nap 5
   end
 
   label def taking_over
@@ -756,8 +848,6 @@ SQL
       swap_privatelink_target(old_vm, postgres_server.vm)
       hop_configure
     when "Failed"
-      Prog::PageNexus.assemble("#{postgres_server.ubid} promotion failed",
-        ["PGPromotionFailed", postgres_server.id], postgres_server.ubid)
       vm.sshable.d_run("promote_postgres", "sudo", "postgres/bin/promote", postgres_server.version)
       nap 0
     when "NotStarted"
@@ -780,7 +870,9 @@ SQL
 
   label def destroy_vm_and_pg
     vm.incr_destroy
+    representative_server = resource&.representative_server
     postgres_server.destroy
+    representative_server&.incr_configure
 
     pop "postgres server is deleted"
   end
@@ -800,7 +892,7 @@ SQL
     # Do not declare unavailability if Postgres is in crash recovery.
     # Check if log file was modified recently and last 50 lines contain recovery messages.
     begin
-      log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/postgresql.log -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
+      log_output = vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -mmin -5 -exec tail -n 50 {} \\; | grep -e 'redo in progress' -e 'Consistent recovery state has not been yet reached'", version:)
       return true unless log_output.empty?
     rescue
       nil
@@ -822,5 +914,17 @@ SQL
       pl.remove_vm(old_vm)
       pl.add_vm(new_vm)
     end
+  end
+
+  def daemonized_restart
+    case vm.sshable.d_check("postgres_restart")
+    when "Succeeded"
+      vm.sshable.d_clean("postgres_restart")
+      return true
+    when "Failed", "NotStarted"
+      vm.sshable.d_run("postgres_restart", "sudo", "postgres/bin/restart", postgres_server.version)
+    end
+
+    false
   end
 end

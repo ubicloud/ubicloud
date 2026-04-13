@@ -16,14 +16,14 @@ RSpec.describe Clover, "location-credential" do
       ui_name: "aws-us-west-2",
       visible: false,
       provider: "aws",
-      project_id: project.id
+      project_id: project.id,
     )
 
-    LocationCredential.create(
+    LocationCredentialAws.create(
       access_key: "access_key",
-      secret_key: "secret_key"
+      secret_key: "secret_key",
     ) { it.id = loc.id }
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
     loc
   end
 
@@ -34,14 +34,14 @@ RSpec.describe Clover, "location-credential" do
       ui_name: "aws-us-west-1",
       visible: false,
       provider: "aws",
-      project_id: project_wo_permissions.id
+      project_id: project_wo_permissions.id,
     )
 
-    LocationCredential.create(
+    LocationCredentialAws.create(
       access_key: "access_key",
-      secret_key: "secret_key"
+      secret_key: "secret_key",
     ) { it.id = loc.id }
-    LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw1-az1")
+    LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw1-az1")
     loc
   }
 
@@ -127,12 +127,12 @@ RSpec.describe Clover, "location-credential" do
         click_button "Create"
 
         expect(page.title).to eq("Ubicloud - dummy-private-location")
-        expect(LocationCredential.count).to eq(1)
-        expect(LocationCredential.first.access_key).to eq("access_key")
-        expect(LocationCredential.first.secret_key).to eq("secret_key")
-        expect(LocationCredential.first.location.display_name).to eq(name)
-        expect(LocationCredential.first.location.name).to eq("us-west-2")
-        expect(LocationCredential.first.location.project_id).to eq(project.id)
+        expect(LocationCredentialAws.count).to eq(1)
+        expect(LocationCredentialAws.first.access_key).to eq("access_key")
+        expect(LocationCredentialAws.first.secret_key).to eq("secret_key")
+        expect(LocationCredentialAws.first.location.display_name).to eq(name)
+        expect(LocationCredentialAws.first.location.name).to eq("us-west-2")
+        expect(LocationCredentialAws.first.location.project_id).to eq(project.id)
       end
 
       it "can not create aws region with same display name" do
@@ -180,7 +180,7 @@ RSpec.describe Clover, "location-credential" do
         visit "#{project.path}#{private_location.path}"
         click_button "Delete"
         expect(page).to have_flash_notice("Private location deleted")
-        expect(LocationCredential[private_location.id]).to be_nil
+        expect(LocationCredentialAws[private_location.id]).to be_nil
       end
 
       it "can not delete aws location credential when does not have permissions" do
@@ -201,13 +201,13 @@ RSpec.describe Clover, "location-credential" do
           name: "dummy-postgres",
           location_id: private_location.id,
           target_vm_size: "standard-2",
-          target_storage_size_gib: 118
+          target_storage_size_gib: 118,
         )
 
         visit "#{project.path}#{private_location.path}"
         click_button "Delete"
         expect(page).to have_flash_error("Private location 'aws-us-west-2' has some resources, first, delete them.")
-        expect(LocationCredential[private_location.id]).not_to be_nil
+        expect(LocationCredentialAws[private_location.id]).not_to be_nil
       end
     end
 

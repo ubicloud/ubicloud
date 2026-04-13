@@ -19,5 +19,12 @@ RSpec.describe Validation::PostgresConfigValidatorSchema do
       expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
       expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |k, v| v[:type] == :enum and v[:allowed_values].nil? }.keys).to be_empty
     end
+
+    it "check if all patterns are regexps" do
+      expect(Validation::PostgresConfigValidatorSchema::PG_16_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_17_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PG_18_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
+      expect(Validation::PostgresConfigValidatorSchema::PGBOUNCER_CONFIG_SCHEMA.select { |_, v| v[:pattern] && !v[:pattern].is_a?(Regexp) }.keys).to be_empty
+    end
   end
 end

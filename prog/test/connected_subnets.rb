@@ -144,7 +144,7 @@ ExecStart=nc -l 8080 -6
     uri = URI("https://api.ipify.org")
     my_ip = Net::HTTP.get(uri)
     firewall_rules = [
-      {cidr: "#{my_ip}/32", port_range: Sequel.pg_range(22..22)}
+      {cidr: "#{my_ip}/32", port_range: Sequel.pg_range(22..22)},
     ]
     firewall_rules << case config
     when :perform_tests_public_blocked

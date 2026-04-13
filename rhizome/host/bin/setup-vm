@@ -102,12 +102,12 @@ when "recreate-unpersisted"
     gua, ip4, local_ip4, nics, mem_gib,
     ndp_needed, storage_volumes, storage_secrets, dns_ipv4,
     pci_devices, slice_name, cpu_burst_percent_limit, gpu_partition_id,
-    multiqueue: max_vcpus > 1
+    multiqueue: max_vcpus > 1,
   )
 when "reinstall-systemd-units"
   vm_setup.install_systemd_unit(
     max_vcpus, cpu_topology, mem_gib, storage_volumes, nics,
-    pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit
+    pci_devices, slice_name, cpu_percent_limit, cpu_burst_percent_limit,
   )
 when "reassign-ip6"
   secrets = JSON.parse($stdin.read)

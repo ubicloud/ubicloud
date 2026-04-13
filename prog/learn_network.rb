@@ -24,7 +24,7 @@ class Prog::LearnNetwork < Prog::Base
     if ip6
       vm_host.update(
         ip6: ip6.addr,
-        net6: NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s
+        net6: NetAddr::IPv6Net.new(NetAddr.parse_ip(ip6.addr), NetAddr::Mask128.new(ip6.prefixlen)).to_s,
       )
     end
     pop "learned network information"

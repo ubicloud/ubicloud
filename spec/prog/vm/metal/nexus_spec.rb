@@ -31,7 +31,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       location_id: Location::HETZNER_FSN1_ID,
       created_at: Time.now,
       project_id: project.id,
-      vm_host_id: vm_host.id
+      vm_host_id: vm_host.id,
     )
     Strand.create_with_id(vm.id, prog: "Vm::Metal::Nexus", label: "start")
     vm
@@ -92,6 +92,53 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "creates with custom storage size if provided" do
       st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 40}])
       expect(st.stack.first["storage_volumes"].first["size_gib"]).to eq(40)
+    end
+
+    it "sets track_written when ff_machine_image is set and single volume within size limit" do
+      project.set_ff_machine_image(true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(true)
+    end
+
+    it "does not set track_written when ff_machine_image is not set" do
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+    end
+
+    it "does not set track_written if there are multiple storage volumes" do
+      project.set_ff_machine_image(true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+    end
+
+    it "does not set track_written if storage volume size exceeds machine image max size even if ff_machine_image is set" do
+      project.set_ff_machine_image(true)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: Config.machine_image_max_size_gib + 1}])
+      expect(st.stack.first["storage_volumes"].first["track_written"]).to be(false)
+    end
+
+    it "sets machine_image_version_id if provided" do
+      miv = create_machine_image_version_metal
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true, image: "model"}], machine_image_version_id: miv.id)
+      vols = st.stack.first["storage_volumes"]
+      expect(vols[0]["machine_image_version_id"]).to eq(miv.id)
+      expect(vols[1]).not_to have_key("machine_image_version_id")
+    end
+
+    it "fails if MachineImageVersionMetal with given machine_image_version_id does not exist" do
+      miv = create_machine_image_version_metal.machine_image_version
+      miv.metal.destroy
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
+      }.to raise_error RuntimeError, "No existing machine image version metal"
+    end
+
+    it "fails if MachineImageVersionMetal with given machine_image_version_id is not enabled" do
+      miv = create_machine_image_version_metal
+      miv.update(enabled: false)
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
+      }.to raise_error RuntimeError, "machine image version #{miv.id} is not available"
     end
 
     it "fails if given nic_id is not valid" do
@@ -212,14 +259,14 @@ RSpec.describe Prog::Vm::Metal::Nexus do
   end
 
   describe "#prep" do
-    it "hops to run if prep command is succeeded" do
+    it "hops to clean_prep if prep command succeeds" do
       expect(sshable).to receive(:_cmd).with("common/bin/daemonizer --check prep_#{nx.vm_name}").and_return("Succeeded")
       expect { nx.prep }.to hop("clean_prep")
     end
 
     [
       {"swap_size_bytes" => nil},
-      {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"}
+      {"swap_size_bytes" => nil, "hugepages" => false, "hypervisor" => "ch", "ch_version" => "46.0", "firmware_version" => "202311"},
     ].each do |frame_update|
       it "generates and passes a params json if prep command is not started yet (with frame opts: #{frame_update.inspect})" do
         kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "key", init_vector: "iv", auth_data: "somedata")
@@ -263,7 +310,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
             "slice_name" => "system.slice",
             "cpu_percent_limit" => 200,
             "cpu_burst_percent_limit" => 0,
-            **frame_update
+            **frame_update,
           )
         end
         expect(sshable).to receive(:_cmd).with("common/bin/daemonizer sudo\\ host/bin/setup-vm\\ prep\\ vm4hjdwr prep_vm4hjdwr", {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/})
@@ -290,7 +337,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       [{
         "use_bdev_ubi" => false,
         "size_gib" => 11,
-        "boot" => true
+        "boot" => true,
       }]
     }
 
@@ -300,31 +347,70 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "creates a page if no capacity left and naps" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+      vm.created_at = Time.now - 11 * 60
       expect(vm.waiting_for_capacity_set?).to be(false)
-      expect { nx.start }.to nap(30)
+      expect { nx.start }.to nap(5)
       expect(vm.reload.waiting_for_capacity_set?).to be(true)
       expect(Page.count).to eq(1)
       expect(Page.from_tag_parts("NoCapacity", Location[vm.location_id].display_name, vm.arch, vm.family)).not_to be_nil
 
       # Second run does not generate another page
+      vm.created_at = Time.now - 11 * 60
       expect(nx).not_to receive(:incr_waiting_for_capacity)
-      expect { nx.start }.to nap(30)
+      expect { nx.start }.to nap(5)
       expect(Page.count).to eq(1)
     end
 
-    it "waits for a while before creating a page for github-runners" do
+    it "does not create a page if VM has been waiting less than 10 minutes" do
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
 
-      vm.created_at = Time.now - 10 * 60
-      vm.location_id = Location[name: "github-runners"].id
+      vm.created_at = Time.now + 10
       expect { nx.start }.to nap(30)
       expect(Page.count).to eq(0)
     end
 
+    it "waits 1 hour before creating a page for github-runners" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+
+      vm.created_at = Time.now - 11 * 60
+      vm.location_id = Location[name: "github-runners"].id
+      expect { nx.start }.to nap(5)
+      expect(Page.count).to eq(0)
+
+      vm.created_at = Time.now - 61 * 60
+      expect { nx.start }.to nap(5)
+      expect(Page.count).to eq(1)
+    end
+
+    it "waits 6 hours before creating a page for standard-60 github-runners" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+
+      vm.vcpus = 60
+      vm.created_at = Time.now - 2 * 60 * 60
+      vm.location_id = Location[name: "github-runners"].id
+      expect { nx.start }.to nap(5)
+      expect(Page.count).to eq(0)
+
+      vm.created_at = Time.now - 7 * 60 * 60
+      expect { nx.start }.to nap(5)
+      expect(Page.count).to eq(1)
+    end
+
+    it "naps shorter for VMs that have been waiting longer" do
+      expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host")).twice
+
+      vm.created_at = Time.now + 10
+      expect { nx.start }.to nap(30)
+
+      vm.created_at = Time.now - 600
+      expect { nx.start }.to nap(5)
+    end
+
     it "resolves the page if no VM left in the queue after 15 minutes" do
       # First run creates the page
+      vm.created_at = Time.now - 11 * 60
       expect(Scheduling::Allocator).to receive(:allocate).and_raise(RuntimeError.new("no space left on any eligible host"))
-      expect { nx.start }.to nap(30)
+      expect { nx.start }.to nap(5)
       expect(Page.count).to eq(1)
 
       # Second run is able to allocate, but there are still vms in the queue, so we don't resolve the page
@@ -367,7 +453,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -385,7 +471,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -403,7 +489,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -424,7 +510,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -432,7 +518,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "considers preferred locations for runners if set for the installation" do
       installation = GithubInstallation.create(name: "ubicloud", type: "Organization", installation_id: 123, project_id: project.id, created_at: Time.now - 8 * 24 * 60 * 60, allocator_preferences: {
         "location_filter" => [Location::GITHUB_RUNNERS_ID, Location::HETZNER_FSN1_ID, Location::HETZNER_HEL1_ID, Location::LEASEWEB_WDC02_ID],
-        "location_preference" => [Location::LEASEWEB_WDC02_ID]
+        "location_preference" => [Location::LEASEWEB_WDC02_ID],
       })
       GithubRunner.create(vm_id: vm.id, repository_name: "ubicloud/test", label: "ubicloud", installation_id: installation.id)
       vm.location_id = Location::GITHUB_RUNNERS_ID
@@ -448,7 +534,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::LEASEWEB_WDC02_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -469,7 +555,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard", "premium"]
+        family_filter: ["standard", "premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -490,7 +576,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["premium", "standard"]
+        family_filter: ["premium", "standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -512,7 +598,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["premium"]
+        family_filter: ["premium"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -533,7 +619,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [Location::GITHUB_RUNNERS_ID],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -541,7 +627,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can force allocating a host" do
       st.stack = [{
         "force_host_id" => vm_host.id,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -555,7 +641,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: []
+        family_filter: [],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -563,7 +649,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "can exclude hosts" do
       st.stack = [{
         "exclude_host_ids" => [vm_host.id, "another-vm-host-id"],
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -577,7 +663,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -586,7 +672,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       st.stack = [{
         "distinct_storage_devices" => true,
         "storage_volumes" => storage_volumes,
-        "gpu_count" => 0
+        "gpu_count" => 0,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -600,7 +686,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 0,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -608,7 +694,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "requests gpus" do
       st.stack = [{
         "gpu_count" => 3,
-        "storage_volumes" => storage_volumes
+        "storage_volumes" => storage_volumes,
       }]
 
       expect(Scheduling::Allocator).to receive(:allocate).with(
@@ -622,7 +708,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         location_preference: [],
         gpu_count: 3,
         gpu_device: nil,
-        family_filter: ["standard"]
+        family_filter: ["standard"],
       )
       expect { nx.start }.to hop("create_unix_user")
     end
@@ -727,7 +813,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         resource_id: vm.id,
         resource_name: vm.name,
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
 
       BillingRecord.create(
@@ -735,17 +821,19 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         resource_id: vm.assigned_vm_address.id,
         resource_name: vm.assigned_vm_address.ip,
         billing_rate_id: BillingRate.from_resource_properties("IPAddress", "IPv4", vm.location.name)["id"],
-        amount: 1
+        amount: 1,
       )
 
       vm.active_billing_records.each { expect(it).to receive(:finalize).and_call_original }
       expect(vm.assigned_vm_address.active_billing_record).to receive(:finalize).and_call_original
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
 
     it "skips stopping billing record if not found" do
       expect(vm.active_billing_records).to be_empty
       expect(vm.assigned_vm_address).to be_nil
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
 
@@ -754,6 +842,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       AssignedVmAddress.create(ip: "192.168.1.1", address_id: adr.id, dst_vm_id: vm.id)
       expect(vm.assigned_vm_address).not_to be_nil
       expect(vm.assigned_vm_address.active_billing_record).to be_nil
+      expect(nx).to receive(:log_vm_stats)
       nx.before_destroy
     end
   end
@@ -866,7 +955,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to hop("restart")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "stops the vm and hops to stopped_by_admin with admin_stop semaphore" do
@@ -927,12 +1016,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to nap(0)
     end
 
-    it "hops to start when needed" do
+    it "hops to start_after_stop when needed" do
       vm.incr_start
       expect { nx.stopped }.to hop("start_after_stop")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "does not stop if already stopped" do
@@ -940,7 +1029,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       expect { nx.stopped }.to nap(5 * 60)
     end
 
-    it "hops to unavailable if available" do
+    it "hops to wait if available" do
       expect(sshable).to receive(:_cmd).with("systemctl is-active #{vm.inhost_name} #{vm.inhost_name}-dnsmasq").and_return("active\nactive\n")
       expect { nx.stopped }.to hop("wait")
     end
@@ -960,12 +1049,12 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { vm.reload.restart_set? }.from(true).to(false)
     end
 
-    it "hops to start when needed" do
+    it "hops to start_after_stop when needed" do
       vm.incr_start
       expect { nx.unavailable }.to hop("start_after_stop")
       frame = st.stack[0]
       expect(frame["deadline_target"]).to eq "wait"
-      expect(frame["deadline_at"]).to be_within(10).of(Time.now + 300)
+      expect(Time.parse(frame["deadline_at"])).to be_within(10).of(Time.now + 300)
     end
 
     it "hops to stopped when needed" do
@@ -1075,10 +1164,10 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "absorbs an already deleted errors as a success" do
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10).and_raise(
-        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq").and_raise(
-        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil)
+        Sshable::SshError.new("stop", "", "Failed to stop #{nx.vm_name} Unit .* not loaded.", 1, nil),
       )
       expect(sshable).to receive(:_cmd).with("sudo host/bin/setup-vm delete #{nx.vm_name}")
 
@@ -1123,7 +1212,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
         .and change { dev.reload.available_storage_gib }.from(500).to(520)
     end
 
-    it "hops to lb_expiry if vm is part of a load balancer" do
+    it "hops to remove_vm_from_load_balancer if vm is part of a load balancer" do
       expect(vm).to receive(:load_balancer).and_return(instance_double(LoadBalancer)).at_least(:once)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}", timeout: 10)
       expect(sshable).to receive(:_cmd).with("sudo systemctl stop #{nx.vm_name}-dnsmasq")
@@ -1263,7 +1352,7 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
       expect(sshable).to receive(:_cmd).with(
         /sudo host\/bin\/setup-vm recreate-unpersisted #{nx.vm_name}/,
-        {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/}
+        {stdin: /{"storage":{"vm.*_0":{"key":"key","init_vector":"iv","algorithm":"aes-256-gcm","auth_data":"somedata"}}}/},
       )
       expect(vm).to receive(:update).with(display_state: "starting")
       expect(vm).to receive(:update).with(display_state: "running")
@@ -1281,6 +1370,33 @@ RSpec.describe Prog::Vm::Metal::Nexus do
     it "fails when SSH fails" do
       expect(sshable).to receive(:_cmd).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
       expect(nx.available?).to be false
+    end
+  end
+
+  describe "#log_vm_stats" do
+    it "logs stats" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("{\"stats\": \"stats\"}")
+      expect(Clog).to receive(:emit).with("VM destroy stats", vm_destroy_stats: {"stats" => "stats"})
+      nx.log_vm_stats
+    end
+
+    it "logs an error when SSH fails" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_raise(Sshable::SshError.new("ssh failed", "", "", nil, nil))
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "Sshable::SshError")})
+      nx.log_vm_stats
+    end
+
+    it "logs an error when vm-stats returns bad json" do
+      expect(sshable).to receive(:_cmd).with("sudo host/bin/vm-stats #{vm.inhost_name}", timeout: 10, log: false).and_return("not a json")
+      expect(Clog).to receive(:emit).with("Failed to collect VM destroy stats", failed_vm_destroy_stats: {exception: hash_including(class: "JSON::ParserError")})
+      nx.log_vm_stats
+    end
+
+    it "skips if the vm doesn't allocated yet" do
+      vm.update(vm_host_id: nil)
+      expect(nx).to receive(:host).and_return(nil).at_least(:once)
+      expect(sshable).not_to receive(:_cmd)
+      nx.log_vm_stats
     end
   end
 end

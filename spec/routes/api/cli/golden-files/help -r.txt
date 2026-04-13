@@ -370,7 +370,7 @@ Options:
     -z, --worker-size=size           Worker size
 
 Allowed Option Values:
-    Version: v1.34 v1.33
+    Version: v1.35 v1.34 v1.33
     Control Plane Node Count: 1 3
 
 
@@ -554,6 +554,7 @@ Post Commands:
     delete-metric-destination          Delete a PostgreSQL metric destination
     destroy                            Destroy a PostgreSQL database
     list-backups                       List backups for a PostgreSQL database
+    list-servers                       List servers for a PostgreSQL database
     modify                             Modify a PostgreSQL database cluster
     modify-firewall-rule               Modify a PostgreSQL firewall rule
     pg_dump                            Dump a single PostgreSQL database using `pg_dump`
@@ -718,6 +719,15 @@ List backups for a PostgreSQL database
 
 Usage:
     ubi pg (location/pg-name | pg-id) list-backups [options]
+
+Options:
+    -N, --no-headers                 do not show headers
+
+
+List servers for a PostgreSQL database
+
+Usage:
+    ubi pg (location/pg-name | pg-id) list-servers [options]
 
 Options:
     -N, --no-headers                 do not show headers

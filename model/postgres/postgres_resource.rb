@@ -25,7 +25,7 @@ class PostgresResource < Sequel::Model
   plugin SemaphoreMethods, :initial_provisioning, :update_firewall_rules, :refresh_dns_record, :update_billing_records,
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
     :storage_auto_scale_action_performed_80, :storage_auto_scale_action_performed_85, :storage_auto_scale_action_performed_90,
-    :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable
+    :storage_auto_scale_canceled, :storage_auto_scale_not_cancellable, :skip_strict_memory_overcommit
   include ObjectTag::Cleanup
 
   ServerExclusionFilters = Struct.new(:exclude_host_ids, :exclude_data_centers, :exclude_availability_zones, :availability_zone)
@@ -105,7 +105,7 @@ class PostgresResource < Sequel::Model
       host: hostname,
       port: 5432,
       path: "/postgres",
-      query: "channel_binding=require"
+      query: "channel_binding=require",
     ).to_s
   end
 
@@ -116,7 +116,7 @@ class PostgresResource < Sequel::Model
       sslkey: "/etc/ssl/certs/client.key",
       sslmode: dns_zone ? "verify-full" : "require",
       dbname: "postgres",
-      application_name:
+      application_name:,
     }.map { |k, v| "#{k}=#{v}" }.join("&")
 
     URI::Generic.build2(scheme: "postgres", userinfo: "ubi_replication", host: dns_zone ? identity : representative_server.vm.ip4_string, query: query_parameters).to_s
@@ -128,7 +128,7 @@ class PostgresResource < Sequel::Model
       resource_id: id,
       timeline_id:,
       timeline_access: "fetch",
-      **new_server_exclusion_filters.to_h
+      **new_server_exclusion_filters.to_h,
     )
   end
 
@@ -382,7 +382,7 @@ class PostgresResource < Sequel::Model
   def send_storage_auto_scale_warning_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
-      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
     if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
@@ -412,14 +412,14 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
   def send_storage_auto_scale_started_notification(usage_percent, next_option, extra_content)
     body = [
       "Your PostgreSQL database '#{name}' (#{ubid}) has reached #{usage_percent}% disk usage.",
-      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage."
+      "You are currently using #{storage_size_gib * usage_percent / 100} of #{storage_size_gib} GB of storage.",
     ]
 
     if [:canceled_previously, :at_max_size, :quota_insufficient].include?(extra_content)
@@ -452,7 +452,7 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
@@ -464,7 +464,7 @@ class PostgresResource < Sequel::Model
       "Storage: #{representative_server.storage_size_gib} GB",
       "Instance size: #{vm_size}",
       "Please note that if disk usage reaches to 100%, database would become unavailable.",
-      "We recommend freeing up disk space or contacting support to discuss other options."
+      "We recommend freeing up disk space or contacting support to discuss other options.",
     ]
 
     Util.send_email(
@@ -474,7 +474,7 @@ class PostgresResource < Sequel::Model
       greeting: "Hello,",
       body:,
       button_title: "View Database",
-      button_link: "#{Config.base_url}#{project.path}#{path}"
+      button_link: "#{Config.base_url}#{project.path}#{path}",
     )
   end
 
@@ -585,7 +585,7 @@ class PostgresResource < Sequel::Model
 
   UPGRADE_IMAGE_MIN_VERSIONS = {
     "17" => "20240801",
-    "18" => "20251021"
+    "18" => "20251021",
   }
 end
 
@@ -632,7 +632,8 @@ end
 #  target_version_check               | (target_version = ANY (ARRAY['16'::text, '17'::text, '18'::text]))
 #  valid_maintenance_windows_start_at | (maintenance_window_start_at >= 0 AND maintenance_window_start_at <= 23)
 # Foreign key constraints:
-#  postgres_resource_location_id_fkey | (location_id) REFERENCES location(id)
+#  postgres_resource_location_id_fkey       | (location_id) REFERENCES location(id)
+#  postgres_resource_private_subnet_id_fkey | (private_subnet_id) REFERENCES private_subnet(id)
 # Referenced By:
 #  postgres_init_script        | postgres_init_script_id_fkey                          | (id) REFERENCES postgres_resource(id)
 #  postgres_metric_destination | postgres_metric_destination_postgres_resource_id_fkey | (postgres_resource_id) REFERENCES postgres_resource(id)

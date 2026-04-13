@@ -3,7 +3,10 @@
 source "https://rubygems.org"
 
 # Update ruby version in Dockerfile and .tool_versions when updating this
-ruby "3.4.9"
+#
+# Update BUNDLED WITH version in Gemfile.lock to match bundler version that
+# ships with this Ruby version.
+ruby "4.0.2"
 
 gem "acme-client"
 gem "argon2"
@@ -36,14 +39,13 @@ gem "puma", ">= 6.2.2"
 gem "rack-unreloader", ">= 1.8"
 gem "rake"
 gem "refrigerator", ">= 1"
-gem "reline" # Remove it when pry adds it as a dependency
-gem "roda", ">= 3.96"
+gem "roda", github: "jeremyevans/roda", ref: "f40733e1c22b994b2831fcbf7d5f6f52ee19d044"
 gem "rodauth", ">= 2.41"
 gem "rodauth-omniauth", ">= 0.6.2"
 gem "rodish", ">= 2.0.1"
 gem "rotp"
 gem "rqrcode"
-gem "sequel", github: "jeremyevans/sequel", ref: "1540a8f3a9522e307605adab2e2f85023a319711"
+gem "sequel", ">= 5.103.0"
 gem "sequel_pg", ">= 1.8", require: "sequel"
 gem "shellwords"
 gem "stripe", ">= 13"

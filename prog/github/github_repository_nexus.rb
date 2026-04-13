@@ -82,7 +82,7 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
           github_repository.installation,
           repository_name: github_repository.name,
           label:,
-          actual_label:
+          actual_label:,
         )
       end
     end
@@ -125,8 +125,14 @@ class Prog::Github::GithubRepositoryNexus < Prog::Base
     end
 
     if github_repository.cache_entries.empty?
-      Clog.emit("Deleting empty bucket and tokens", {deleting_empty_bucket: {repository_name: github_repository.name}})
-      github_repository.destroy_blob_storage
+      if !github_repository.no_cache_since
+        github_repository.update(no_cache_since: Time.now)
+      elsif github_repository.no_cache_since < seven_days_ago
+        Clog.emit("Deleting empty bucket and tokens", {deleting_empty_bucket: {repository_name: github_repository.name}})
+        github_repository.destroy_blob_storage
+      end
+    elsif github_repository.no_cache_since
+      github_repository.update(no_cache_since: nil)
     end
   end
 

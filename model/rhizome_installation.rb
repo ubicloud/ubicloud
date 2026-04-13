@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class RhizomeInstallation < Sequel::Model
-  plugin ResourceMethods, etc_type: true
+  plugin ResourceMethods, referencing: UBID::TYPE_SSHABLE
 end
 
 # Table: rhizome_installation

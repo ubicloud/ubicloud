@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="200" nonce="abc123" class="svg-chart">
+  <line x1="70" y1="170.0" x2="570" y2="170.0" stroke="#eee"/><text x="66" y="173.0" text-anchor="end" fill="#666">0.0</text>
+  <line x1="70" y1="130.0" x2="570" y2="130.0" stroke="#eee"/><text x="66" y="133.0" text-anchor="end" fill="#666">5.5</text>
+  <line x1="70" y1="90.0" x2="570" y2="90.0" stroke="#eee"/><text x="66" y="93.0" text-anchor="end" fill="#666">11.0</text>
+  <line x1="70" y1="50.0" x2="570" y2="50.0" stroke="#eee"/><text x="66" y="53.0" text-anchor="end" fill="#666">16.5</text>
+  <line x1="70" y1="10.0" x2="570" y2="10.0" stroke="#eee"/><text x="66" y="13.0" text-anchor="end" fill="#666">22.0</text>
+  <text x="70.0" y="196" text-anchor="middle" fill="#666">22:13</text>
+  <text x="195.0" y="196" text-anchor="middle" fill="#666">22:28</text>
+  <text x="320.0" y="196" text-anchor="middle" fill="#666">22:43</text>
+  <text x="445.0" y="196" text-anchor="middle" fill="#666">22:58</text>
+  <text x="570.0" y="196" text-anchor="middle" fill="#666">23:13</text>
+  <path d="M70.0,97.3L570.0,24.5L570.0,170L70.0,170Z" fill="rgba(70,130,180,0.15)"/>
+  <path d="M70.0,97.3L570.0,24.5" fill="none" stroke="#369" stroke-width="1.5"/>
+</svg>

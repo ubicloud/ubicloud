@@ -12,7 +12,8 @@ class Prog::Vm::Nexus < Prog::Base
     distinct_storage_devices: false, force_host_id: nil, exclude_host_ids: [], gpu_count: 0, gpu_device: nil,
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
-    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [])
+    allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
+    machine_image_version_id: nil)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -23,6 +24,11 @@ class Prog::Vm::Nexus < Prog::Base
 
     unless (location = (allow_private_subnet_in_other_project ? Location : Location.for_project(project_id)).with_pk(location_id))
       fail "No existing location in project"
+    end
+
+    if machine_image_version_id
+      fail "Machine images are only supported for metal locations" unless location.provider_dispatcher_group_name == "metal"
+      fail "No existing machine image version metal" unless MachineImageVersionMetal[machine_image_version_id]
     end
 
     vm_size = Validation.validate_vm_size(size, arch)
@@ -37,7 +43,13 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
+      if !volume.has_key? :track_written
+        volume[:track_written] = !!project.get_ff_machine_image &&
+          storage_volumes.length == 1 &&
+          volume[:size_gib] <= Config.machine_image_max_size_gib
+      end
       volume[:boot] = disk_index == boot_disk_index
+      volume[:machine_image_version_id] = machine_image_version_id if volume[:boot] && machine_image_version_id
 
       if volume[:read_only]
         volume[:size_gib] = 0
@@ -100,7 +112,7 @@ class Prog::Vm::Nexus < Prog::Base
         ip4_enabled: enable_ip4,
         pool_id:,
         arch:,
-        project_id:
+        project_id:,
       ) { it.id = ubid.to_uuid }
       nic.update(vm_id: vm.id)
 
@@ -138,7 +150,7 @@ class Prog::Vm::Nexus < Prog::Base
               size_gib: volume[:size_gib] / disk_count,
               boot: volume[:boot],
               use_bdev_ubi: false,
-              disk_index:
+              disk_index:,
             )
 
             disk_index += 1
@@ -146,6 +158,7 @@ class Prog::Vm::Nexus < Prog::Base
         end
         "Vm::Aws::Nexus"
       else
+        vm.create_storage_volumes(storage_volumes)
         "Vm::Metal::Nexus"
       end
 
@@ -166,8 +179,8 @@ class Prog::Vm::Nexus < Prog::Base
           "ch_version" => ch_version,
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
-          "private_subnet_id" => subnet.id
-        }]
+          "private_subnet_id" => subnet.id,
+        }],
       ) { it.id = vm.id }
     end
   end

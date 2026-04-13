@@ -9,7 +9,7 @@ class Serializers::KubernetesCluster < Serializers::Base
       display_state: kc.display_state,
       cp_node_count: kc.cp_node_count,
       node_size: kc.target_node_size,
-      version: kc.version
+      version: kc.version,
     }
     if options[:detailed]
       base[:cp_vms] = Serializers::Vm.serialize(kc.cp_vms_dataset.all)

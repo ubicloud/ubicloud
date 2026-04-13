@@ -47,16 +47,16 @@ class Prog::Vnet::NicNexus < Prog::Base
     excluded_az_ids = if exclude_availability_zones.empty?
       []
     else
-      subnet.location.location_aws_azs_dataset.where(az: exclude_availability_zones).select_map(:id)
+      subnet.location.location_azs_dataset.where(az: exclude_availability_zones).select_map(:id)
     end
 
     # Try to find subnet for preferred AZ
     if availability_zone
-      location_aws_az = subnet.location.location_aws_azs_dataset.first(az: availability_zone)
-      if location_aws_az
+      location_az = subnet.location.location_azs_dataset.first(az: availability_zone)
+      if location_az
         aws_subnet = AwsSubnet.first(
           private_subnet_aws_resource_id: ps_aws_resource.id,
-          location_aws_az_id: location_aws_az.id
+          location_aws_az_id: location_az.id,
         )
         return aws_subnet if aws_subnet
       end

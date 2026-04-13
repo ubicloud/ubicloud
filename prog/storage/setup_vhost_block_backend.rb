@@ -4,12 +4,12 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
   subject_is :sshable, :vm_host
 
   SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS = [
-    ["v0.4.0", "x64"],
-    ["v0.4.0", "arm64"],
+    ["v0.4.1", "x64"],
+    ["v0.4.1", "arm64"],
     ["v0.3.1", "x64"],
     ["v0.3.1", "arm64"],
     ["v0.2.2", "x64"],
-    ["v0.2.2", "arm64"]
+    ["v0.2.2", "arm64"],
   ].freeze.each(&:freeze)
 
   def self.assemble(vm_host_id, version, allocation_weight: 0)
@@ -19,8 +19,8 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
       stack: [{
         "subject_id" => vm_host_id,
         "version" => version,
-        "allocation_weight" => allocation_weight
-      }]
+        "allocation_weight" => allocation_weight,
+      }],
     )
   end
 
@@ -29,11 +29,13 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     arch = vm_host.arch
     fail "Unsupported version: #{version}, #{arch}" unless SUPPORTED_VHOST_BLOCK_BACKEND_VERSIONS.include? [version, arch]
 
-    VhostBlockBackend.create(
-      version: frame["version"],
+    vbb = VhostBlockBackend.create(
+      version:,
       allocation_weight: 0,
-      vm_host_id: vm_host.id
+      vm_host_id: vm_host.id,
     )
+
+    update_stack(frame.merge("vhost_block_backend_id" => vbb.id))
 
     register_deadline(nil, 5 * 60)
     hop_install_vhost_backend
@@ -45,9 +47,7 @@ class Prog::Storage::SetupVhostBlockBackend < Prog::Base
     case sshable.cmd("common/bin/daemonizer --check :name", name:)
     when "Succeeded"
       sshable.cmd("common/bin/daemonizer --clean :name", name:)
-      VhostBlockBackend.first(
-        vm_host_id: vm_host.id, version: frame["version"]
-      ).update(allocation_weight: frame["allocation_weight"])
+      VhostBlockBackend[frame["vhost_block_backend_id"]].update(allocation_weight: frame["allocation_weight"])
       pop "VhostBlockBackend was setup"
     when "Failed", "NotStarted"
       d_command = NetSsh.command("sudo host/bin/setup-vhost-block-backend install :version", version:)

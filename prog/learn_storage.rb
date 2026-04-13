@@ -13,7 +13,7 @@ class Prog::LearnStorage < Prog::Base
       # reserve 5G the host.
       available_storage_gib: [rec.avail_gib - 5, 0].max,
       total_storage_gib: rec.size_gib,
-      unix_device_list: find_underlying_unix_device_ids(rec.unix_device)
+      unix_device_list: find_underlying_unix_device_ids(rec.unix_device),
     )]
 
     devices.each do |rec|
@@ -23,7 +23,7 @@ class Prog::LearnStorage < Prog::Base
         vm_host_id: vm_host.id, name:,
         available_storage_gib: rec.avail_gib,
         total_storage_gib: rec.size_gib,
-        unix_device_list: find_underlying_unix_device_ids(rec.unix_device)
+        unix_device_list: find_underlying_unix_device_ids(rec.unix_device),
       )
     end
 
@@ -47,7 +47,7 @@ class Prog::LearnStorage < Prog::Base
         sd.insert_conflict(target: [:vm_host_id, :name],
           update: {
             total_storage_gib: Sequel[:excluded][:total_storage_gib],
-            available_storage_gib: Sequel[:excluded][:available_storage_gib]
+            available_storage_gib: Sequel[:excluded][:available_storage_gib],
           }).save_changes
       end
     end

@@ -39,7 +39,7 @@ RSpec.describe UBID do
 
   it "can convert to base32" do
     tests = [
-      ["0", 0], ["o", 0], ["A", 10], ["e", 14], ["m", 20], ["S", 25], ["z", 31]
+      ["0", 0], ["o", 0], ["A", 10], ["e", 14], ["m", 20], ["S", 25], ["z", 31],
     ]
     tests.each {
       expect(described_class.to_base32(it[0])).to eq(it[1])
@@ -63,7 +63,7 @@ RSpec.describe UBID do
 
   it "can convert from base32" do
     tests = [
-      [0, "0"], [12, "c"], [16, "g"], [20, "m"], [26, "t"], [28, "w"], [31, "z"]
+      [0, "0"], [12, "c"], [16, "g"], [20, "m"], [26, "t"], [28, "w"], [31, "z"],
     ]
     tests.each {
       expect(described_class.from_base32(it[0])).to eq(it[1])
@@ -297,7 +297,7 @@ RSpec.describe UBID do
       encryption_key: "0x30613961313636632d653765372d343434372d616232392d376561343432623562623065",
       private_subnet_id: subnet.id,
       name: "def-nic",
-      state: "initializing"
+      state: "initializing",
     )
     expect(nic.ubid).to start_with UBID::TYPE_NIC
     tun = IpsecTunnel.create(src_nic_id: nic.id, dst_nic_id: nic.id)

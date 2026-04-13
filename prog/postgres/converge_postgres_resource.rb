@@ -8,7 +8,7 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def start
     nap 60 if postgres_resource.read_replica? && !postgres_resource.parent.ready_for_read_replica?
 
-    register_deadline("wait_for_maintenance_window", 2 * 60 * 60)
+    register_deadline("wait_for_maintenance_window", 10 * 60)
 
     hop_provision_servers
   end
@@ -26,6 +26,27 @@ class Prog::Postgres::ConvergePostgresResource < Prog::Base
   label def wait_servers_to_be_ready
     hop_provision_servers unless postgres_resource.has_enough_fresh_servers?
     hop_wait_for_maintenance_window if postgres_resource.has_enough_ready_servers?
+
+    waiting_servers = postgres_resource.servers(eager: [:semaphores, vm: [:vm_storage_volumes, :sshable]]).reject { it.is_representative || it.needs_recycling? }
+
+    total_disk_usage = waiting_servers.sum do |s|
+      s.vm.sshable.cmd("df --output=used /dat | tail -n 1").strip.to_i
+    rescue
+      # /dat missing before mount_data_disk, ignore errors, if persistent then deadline will be reached
+      0
+    end
+
+    total_lsn = waiting_servers.sum do |s|
+      last_known_lsn = s.lsn_monitor_ds.get(:last_known_lsn)
+      last_known_lsn ? s.lsn2int(last_known_lsn) : 0
+    end
+
+    previous_total_disk_usage = strand.stack.first["total_disk_usage"] || 0
+    previous_total_lsn = strand.stack.first["total_lsn"] || 0
+    if total_disk_usage > previous_total_disk_usage || total_lsn > previous_total_lsn
+      update_stack({"total_disk_usage" => [total_disk_usage, previous_total_disk_usage].max, "total_lsn" => [total_lsn, previous_total_lsn].max})
+      register_deadline("wait_for_maintenance_window", 10 * 60, allow_extension: 24 * 60 * 60)
+    end
 
     nap 60
   end

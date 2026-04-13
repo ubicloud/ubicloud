@@ -7,10 +7,14 @@ class Account < Sequel::Model(:accounts)
   one_to_many :api_keys, key: :owner_id, conditions: {owner_table: "accounts"}, read_only: true
   one_to_many :identities, class: :AccountIdentity, remover: nil, clearer: nil
   one_to_many :invitations, class: :ProjectInvitation, primary_key: :email, key: :email, read_only: true
+  one_to_many :sent_invitations, class: :ProjectInvitation, key: :inviter_id, read_only: true
   many_to_many :projects, join_table: :access_tag, left_key: :hyper_tag_id
   one_through_one :default_project, class: :Project, join_table: :account_default_project, left_key: :id, right_key: :project_id
 
-  plugin :association_dependencies, usage_alerts: :destroy, projects: :nullify
+  plugin :association_dependencies,
+    projects: :nullify,
+    sent_invitations: :destroy,
+    usage_alerts: :destroy
 
   plugin ResourceMethods
   include SubjectTag::Cleanup
@@ -81,28 +85,28 @@ end
 # Foreign key constraints:
 #  accounts_status_id_fkey | (status_id) REFERENCES account_statuses(id)
 # Referenced By:
-#  access_tag                        | access_tag_hyper_tag_id_fkey                      | (hyper_tag_id) REFERENCES accounts(id)
-#  account_active_session_keys       | account_active_session_keys_account_id_fkey       | (account_id) REFERENCES accounts(id)
-#  account_activity_times            | account_activity_times_id_fkey                    | (id) REFERENCES accounts(id)
-#  account_authentication_audit_logs | account_authentication_audit_logs_account_id_fkey | (account_id) REFERENCES accounts(id)
-#  account_default_project           | account_default_project_id_fkey                   | (id) REFERENCES accounts(id) ON DELETE CASCADE
-#  account_email_auth_keys           | account_email_auth_keys_id_fkey                   | (id) REFERENCES accounts(id)
-#  account_identities                | account_identities_account_id_fkey                | (account_id) REFERENCES accounts(id)
-#  account_jwt_refresh_keys          | account_jwt_refresh_keys_account_id_fkey          | (account_id) REFERENCES accounts(id)
-#  account_lockouts                  | account_lockouts_id_fkey                          | (id) REFERENCES accounts(id)
-#  account_login_change_keys         | account_login_change_keys_id_fkey                 | (id) REFERENCES accounts(id)
-#  account_login_failures            | account_login_failures_id_fkey                    | (id) REFERENCES accounts(id)
-#  account_otp_keys                  | account_otp_keys_id_fkey                          | (id) REFERENCES accounts(id)
-#  account_otp_unlocks               | account_otp_unlocks_id_fkey                       | (id) REFERENCES accounts(id)
-#  account_password_change_times     | account_password_change_times_id_fkey             | (id) REFERENCES accounts(id)
-#  account_password_hashes           | account_password_hashes_id_fkey                   | (id) REFERENCES accounts(id)
-#  account_password_reset_keys       | account_password_reset_keys_id_fkey               | (id) REFERENCES accounts(id)
-#  account_previous_password_hashes  | account_previous_password_hashes_account_id_fkey  | (account_id) REFERENCES accounts(id)
-#  account_recovery_codes            | account_recovery_codes_id_fkey                    | (id) REFERENCES accounts(id)
-#  account_remember_keys             | account_remember_keys_id_fkey                     | (id) REFERENCES accounts(id)
-#  account_session_keys              | account_session_keys_id_fkey                      | (id) REFERENCES accounts(id)
-#  account_sms_codes                 | account_sms_codes_id_fkey                         | (id) REFERENCES accounts(id)
-#  account_verification_keys         | account_verification_keys_id_fkey                 | (id) REFERENCES accounts(id)
-#  account_webauthn_keys             | account_webauthn_keys_account_id_fkey             | (account_id) REFERENCES accounts(id)
-#  account_webauthn_user_ids         | account_webauthn_user_ids_id_fkey                 | (id) REFERENCES accounts(id)
-#  usage_alert                       | usage_alert_user_id_fkey                          | (user_id) REFERENCES accounts(id)
+#  access_tag                       | access_tag_hyper_tag_id_fkey                     | (hyper_tag_id) REFERENCES accounts(id)
+#  account_active_session_keys      | account_active_session_keys_account_id_fkey      | (account_id) REFERENCES accounts(id)
+#  account_activity_times           | account_activity_times_id_fkey                   | (id) REFERENCES accounts(id)
+#  account_default_project          | account_default_project_id_fkey                  | (id) REFERENCES accounts(id) ON DELETE CASCADE
+#  account_email_auth_keys          | account_email_auth_keys_id_fkey                  | (id) REFERENCES accounts(id)
+#  account_identities               | account_identities_account_id_fkey               | (account_id) REFERENCES accounts(id)
+#  account_jwt_refresh_keys         | account_jwt_refresh_keys_account_id_fkey         | (account_id) REFERENCES accounts(id)
+#  account_lockouts                 | account_lockouts_id_fkey                         | (id) REFERENCES accounts(id)
+#  account_login_change_keys        | account_login_change_keys_id_fkey                | (id) REFERENCES accounts(id)
+#  account_login_failures           | account_login_failures_id_fkey                   | (id) REFERENCES accounts(id)
+#  account_otp_keys                 | account_otp_keys_id_fkey                         | (id) REFERENCES accounts(id)
+#  account_otp_unlocks              | account_otp_unlocks_id_fkey                      | (id) REFERENCES accounts(id)
+#  account_password_change_times    | account_password_change_times_id_fkey            | (id) REFERENCES accounts(id)
+#  account_password_hashes          | account_password_hashes_id_fkey                  | (id) REFERENCES accounts(id)
+#  account_password_reset_keys      | account_password_reset_keys_id_fkey              | (id) REFERENCES accounts(id)
+#  account_previous_password_hashes | account_previous_password_hashes_account_id_fkey | (account_id) REFERENCES accounts(id)
+#  account_recovery_codes           | account_recovery_codes_id_fkey                   | (id) REFERENCES accounts(id)
+#  account_remember_keys            | account_remember_keys_id_fkey                    | (id) REFERENCES accounts(id)
+#  account_session_keys             | account_session_keys_id_fkey                     | (id) REFERENCES accounts(id)
+#  account_sms_codes                | account_sms_codes_id_fkey                        | (id) REFERENCES accounts(id)
+#  account_verification_keys        | account_verification_keys_id_fkey                | (id) REFERENCES accounts(id)
+#  account_webauthn_keys            | account_webauthn_keys_account_id_fkey            | (account_id) REFERENCES accounts(id)
+#  account_webauthn_user_ids        | account_webauthn_user_ids_id_fkey                | (id) REFERENCES accounts(id)
+#  project_invitation               | project_invitation_inviter_id_fkey               | (inviter_id) REFERENCES accounts(id)
+#  usage_alert                      | usage_alert_user_id_fkey                         | (user_id) REFERENCES accounts(id)

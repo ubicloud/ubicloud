@@ -11,7 +11,7 @@ module Ubicloud
     set_associations do
       {
         firewalls: Firewall,
-        subnet: PrivateSubnet
+        subnet: PrivateSubnet,
       }
     end
 

@@ -13,7 +13,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -27,7 +27,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
     Strand.create(
       prog: "Postgres::ConvergePostgresResource", label: "start",
       parent_id: pg.strand.id,
-      stack: [{"subject_id" => pg.id}]
+      stack: [{"subject_id" => pg.id}],
     )
   }
 
@@ -56,7 +56,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         vm.update(vm_host_id: vm_host.id)
       end
       boot_image = BootImage.create(vm_host_id: vm.vm_host_id, name: "ubuntu-jammy", version: "20240801", size_gib: 10)
-      VmStorageVolume.create(vm_id: vm.id, size_gib: resource.target_storage_size_gib, boot: true, disk_index: 0, boot_image_id: boot_image.id)
+      vm.vm_storage_volumes_dataset.where(disk_index: 0).update(boot_image_id: boot_image.id)
     end
 
     server
@@ -77,7 +77,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       create_server(timeline: parent_timeline, is_representative: true, resource: parent)
       pg.update(parent_id: parent.id)
 
-      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 2 * 60 * 60)
+      expect(nx).to receive(:register_deadline).with("wait_for_maintenance_window", 10 * 60)
       expect { nx.start }.to hop("provision_servers")
     end
   end
@@ -113,23 +113,23 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
 
-    it "provisions a new server but excludes currently used az for aws" do
+    it "does not exclude AZs of recycling servers for aws" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
-      LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "az2")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
+      LocationAz.create(location_id: location.id, az: "b", zone_id: "az2")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server1 = create_server(is_representative: true, subnet_az: "a")
       server2 = create_server(subnet_az: "b")
       server1.incr_recycle
       server2.incr_recycle
       pg.incr_use_different_az
-      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: contain_exactly("a", "b"))).and_call_original
+      expect(Prog::Postgres::PostgresServerNexus).to receive(:assemble).with(hash_including(exclude_availability_zones: [])).and_call_original
       expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
     end
 
     it "provisions a new server in a used az for aws if use_different_az_set? is false" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "az1")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
@@ -159,7 +159,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
 
     it "provisions a new server on AWS even if a server is not assigned to a vm_host" do
       location.update(provider: HostProvider::AWS_PROVIDER_NAME)
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "fsn1-az1")
       PgAwsAmi.create(aws_location_name: location.name, pg_version: "17", arch: "x64", aws_ami_id: "ami-test")
       server = create_server(is_representative: true, subnet_az: "a")
       server.incr_recycle
@@ -184,10 +184,110 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect { nx.wait_servers_to_be_ready }.to hop("wait_for_maintenance_window")
     end
 
-    it "waits if there are not enough ready servers" do
-      server = create_server(is_representative: true)
-      server.strand.update(label: "configure")
+    it "waits and extends deadline if disk usage increased" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/0")
       expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+    end
+
+    it "waits and extends deadline if lsn advanced" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/1234567")
+      strand.stack.first["total_disk_usage"] = 2048000
+      strand.modified!(:stack)
+      strand.save_changes
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_lsn"]).to eq(standby.lsn2int("0/1234567"))
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(2048000)
+    end
+
+    it "waits without extending deadline if neither disk usage nor lsn increased" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      standby.update_last_known_lsn("0/1234567")
+      strand.stack.first["total_disk_usage"] = 2048000
+      strand.stack.first["total_lsn"] = standby.lsn2int("0/FFFFFFF")
+      strand.modified!(:stack)
+      strand.save_changes
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "treats last_known_lsn as zero when it is nil" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("0\n")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "handles failures gracefully when checking progress" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby = create_server
+      standby.strand.update(label: "wait_catch_up")
+      standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
+      expect(standby_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_raise(RuntimeError)
+      standby.update_last_known_lsn("0/0")
+      expect(nx).not_to receive(:register_deadline)
+      expect { nx.wait_servers_to_be_ready }.to nap
+    end
+
+    it "sums disk usage and lsn across multiple standbys" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      standby1 = create_server
+      standby1.strand.update(label: "wait_catch_up")
+      standby2 = create_server
+      standby2.strand.update(label: "wait_catch_up")
+
+      standby1.update_last_known_lsn("0/100")
+      standby2.update_last_known_lsn("0/200")
+
+      servers = nx.postgres_resource.servers
+      servers.reject { it.is_representative }.each do |s|
+        expect(s.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("512000\n")
+      end
+
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
+      expect(strand.reload.stack.first["total_lsn"]).to eq(standby1.lsn2int("0/100") + standby2.lsn2int("0/200"))
+    end
+
+    it "ignores recycling standbys when checking progress" do
+      pg.update(ha_type: "async")
+      create_server(is_representative: true)
+      recycling_standby = create_server
+      recycling_standby.incr_recycle
+      fresh_standby = create_server
+      fresh_standby.strand.update(label: "wait_catch_up")
+      servers = nx.postgres_resource.servers
+      recycling_from_assoc = servers.find { it.id == recycling_standby.id }
+      fresh_from_assoc = servers.find { it.id == fresh_standby.id }
+      expect(recycling_from_assoc.vm.sshable).not_to receive(:_cmd)
+      recycling_standby.update_last_known_lsn("0/FFFFFFF")
+      expect(fresh_from_assoc.vm.sshable).to receive(:_cmd).with("df --output=used /dat | tail -n 1").and_return("1024000\n")
+      fresh_standby.update_last_known_lsn("0/0")
+      expect { nx.wait_servers_to_be_ready }.to nap
+      expect(strand.reload.stack.first["total_disk_usage"]).to eq(1024000)
     end
   end
 
@@ -234,7 +334,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server = create_server(is_representative: true)
       server.incr_recycle
       standby = create_server(is_representative: false)
-      standby.update(physical_slot_ready: true)
+      standby.update(physical_slot_ready_id: server.id)
       standby_from_assoc = nx.postgres_resource.servers.find { !it.is_representative }
       expect(standby_from_assoc.vm.sshable).to receive(:_cmd).and_return("0/1234567")
       expect { nx.recycle_representative_server }.to nap(60)
@@ -343,7 +443,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       expect(candidate.reload).to have_attributes(
         version: "17",
         configure_set?: true,
-        restart_set?: true
+        restart_set?: true,
       )
     end
   end

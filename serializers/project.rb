@@ -6,7 +6,7 @@ class Serializers::Project < Serializers::Base
       id: p.ubid,
       name: p.name,
       credit: p.credit.to_f,
-      discount: p.discount
+      discount: p.discount,
     }
   end
 end

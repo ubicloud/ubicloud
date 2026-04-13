@@ -3,28 +3,33 @@
 require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::Base
-  def self.assemble
+  def self.assemble(provider: "metal")
     postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
+    Project[Config.postgres_service_project_id] ||
+      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
     Strand.create(
       prog: "Test::UpgradePostgresResource",
       label: "start",
-      stack: [{"postgres_test_project_id" => postgres_test_project.id}]
+      stack: [{"provider" => provider, "postgres_test_project_id" => postgres_test_project.id}],
     )
   end
 
   label def start
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id: Location::HETZNER_FSN1_ID,
+      location_id:,
       name: "postgres-test-upgrade",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 128,
+      target_vm_size:,
+      target_storage_size_gib:,
       ha_type: "async",
-      target_version: "17"
+      target_version: "17",
     )
 
     update_stack({"postgres_resource_id" => st.id})
+    update_stack({"pre_upgrade_postgres_timeline_id" => PostgresResource[st.id].timeline.id})
     hop_wait_postgres_resource
   end
 
@@ -47,16 +52,18 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   label def create_read_replica
     Clog.emit("Creating read replica for upgrade test")
 
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+
     # Create read replica using the PostgresResourceNexus with parent_id
     st = Prog::Postgres::PostgresResourceNexus.assemble(
       project_id: frame["postgres_test_project_id"],
-      location_id: Location::HETZNER_FSN1_ID,
+      location_id:,
       parent_id: postgres_resource.id,
       name: "postgres-test-upgrade-replica",
-      target_vm_size: "standard-2",
-      target_storage_size_gib: 128,
+      target_vm_size:,
+      target_storage_size_gib:,
       user_config: {},
-      pgbouncer_user_config: {}
+      pgbouncer_user_config: {},
     )
 
     update_stack({"read_replica_id" => st.id})
@@ -209,13 +216,15 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
   end
 
   label def destroy_postgres
+    pre_upgrade_timeline.incr_destroy
+    postgres_resource.timeline.incr_destroy
     read_replica.incr_destroy
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
 
   label def wait_resources_destroyed
-    nap 5 if read_replica || postgres_resource
+    nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
     hop_finish
   end
 
@@ -245,6 +254,10 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
 
   def representative_server
     @representative_server ||= postgres_resource.representative_server
+  end
+
+  def pre_upgrade_timeline
+    PostgresTimeline[frame["pre_upgrade_postgres_timeline_id"]]
   end
 
   def test_queries_sql

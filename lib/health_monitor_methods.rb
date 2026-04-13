@@ -5,7 +5,7 @@ module HealthMonitorMethods
     {
       reading:,
       reading_rpt: (previous_pulse[:reading] == reading) ? previous_pulse[:reading_rpt] + 1 : 1,
-      reading_chg: (previous_pulse[:reading] == reading) ? previous_pulse[:reading_chg] : Time.now
+      reading_chg: (previous_pulse[:reading] == reading) ? previous_pulse[:reading_chg] : Time.now,
     }.merge(data)
   end
 

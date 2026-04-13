@@ -39,7 +39,7 @@ RSpec.describe Clover, "firewall" do
     it "create firewall rule" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/0",
-        port_range: "100..101"
+        port_range: "100..101",
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -53,7 +53,7 @@ RSpec.describe Clover, "firewall" do
     it "can not create same firewall rule" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: firewall_rule.cidr,
-        port_range: "80..5432"
+        port_range: "80..5432",
       }.to_json
 
       expect(last_response).to have_api_error(400, "cidr and port_range and firewall_id and protocol is already taken")
@@ -61,7 +61,7 @@ RSpec.describe Clover, "firewall" do
 
     it "firewall rule no port range" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
-        cidr: "0.0.0.0/1"
+        cidr: "0.0.0.0/1",
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -75,7 +75,7 @@ RSpec.describe Clover, "firewall" do
     it "firewall rule single port" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/1",
-        port_range: "11111"
+        port_range: "11111",
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -90,7 +90,7 @@ RSpec.describe Clover, "firewall" do
       post "/project/#{project.ubid}/location/#{TEST_LOCATION}/firewall/#{firewall.ubid}/firewall-rule", {
         cidr: "0.0.0.0/1",
         port_range: "11111",
-        description: "fw rd"
+        description: "fw rd",
       }.to_json
 
       expect(last_response.status).to eq(200)
@@ -120,7 +120,7 @@ RSpec.describe Clover, "firewall" do
         "id" => firewall_rule.ubid,
         "cidr" => firewall_rule.cidr.to_s,
         "port_range" => "80..5432",
-        "description" => "fwrd"
+        "description" => "fwrd",
       )
     end
 

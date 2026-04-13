@@ -5,9 +5,9 @@
 # script.
 EXTENSION_UPGRADE_SCRIPTS = {
   17 => {
-    "postgis" => "SELECT postgis_extensions_upgrade();"
+    "postgis" => "SELECT postgis_extensions_upgrade();",
   },
   18 => {
-    "postgis" => "SELECT postgis_extensions_upgrade();"
-  }
+    "postgis" => "SELECT postgis_extensions_upgrade();",
+  },
 }

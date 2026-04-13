@@ -7,6 +7,19 @@ class BillingRecord < Sequel::Model
 
   dataset_module do
     where(:active, Sequel.function(:upper, :span) => nil)
+
+    def overlapping(start_time, end_time)
+      where(Sequel.pg_range(:span).overlaps(start_time...end_time))
+    end
+
+    def with_tag(key, value)
+      where(Sequel.pg_jsonb_op(:resource_tags).contains({key => value}))
+    end
+
+    def distinct_by_resource
+      distinct(:resource_id)
+        .order(:resource_id, Sequel.desc(Sequel.function(:lower, :span)))
+    end
   end
 
   plugin ResourceMethods
@@ -63,8 +76,10 @@ end
 #  span            | tstzrange | NOT NULL DEFAULT tstzrange(now(), NULL::timestamp with time zone, '[)'::text)
 #  amount          | numeric   | NOT NULL
 #  billing_rate_id | uuid      | NOT NULL
+#  resource_tags   | jsonb     | NOT NULL DEFAULT '[]'::jsonb
 # Indexes:
-#  billing_record_pkey              | PRIMARY KEY btree (id)
-#  billing_record_project_id_index  | btree (project_id)
-#  billing_record_resource_id_index | btree (resource_id)
-#  billing_record_span_index        | gist (span)
+#  billing_record_pkey                | PRIMARY KEY btree (id)
+#  billing_record_project_id_index    | btree (project_id)
+#  billing_record_resource_id_index   | btree (resource_id)
+#  billing_record_resource_tags_index | gin (resource_tags)
+#  billing_record_span_index          | gist (span)

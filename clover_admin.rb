@@ -10,6 +10,12 @@ require "openssl"
 class CloverAdmin < Roda
   include AuditLog
 
+  TableLink = Data.define(:value, :link)
+
+  def table_link(...)
+    TableLink.new(...)
+  end
+
   Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
 
   MIN_AUDIT_LOG_END_DATE = Date.new(2025, 6)
@@ -44,13 +50,15 @@ class CloverAdmin < Roda
     skip_compiled_encoding_detection: true,
     scope_class: self,
     default_fixed_locals:,
-    extract_fixed_locals: true
+    extract_fixed_locals: true,
   }
 
   # :nocov:
   if Config.test? && defined?(SimpleCov)
     plugin :render_coverage, dir: "coverage/views/admin"
   end
+
+  plugin :ip_from_header, Config.ip_from_header if Config.ip_from_header
   # :nocov:
 
   plugin :part
@@ -134,11 +142,7 @@ class CloverAdmin < Roda
     end
 
     password = SecureRandom.urlsafe_base64(16)
-    password_hash = rodauth.new(nil).password_hash(password)
-    DB.transaction do
-      id = DB[:admin_account].insert(login:)
-      DB[:admin_password_hash].insert(id:, password_hash:)
-    end
+    rodauth.create_account(login:, password:)
     Clog.emit("Created admin account", {admin_account_created: login})
     password
   end
@@ -151,6 +155,24 @@ class CloverAdmin < Roda
         it
       end
     end
+  end
+
+  def format_bytes(bytes)
+    if bytes < 1024
+      "#{bytes.round}B"
+    elsif bytes < 1024**2
+      "#{(bytes / 1024.0).round(1)}KiB"
+    elsif bytes < 1024**3
+      "#{(bytes / 1024.0**2).round(1)}MiB"
+    else
+      "#{(bytes / 1024.0**3).round(1)}GiB"
+    end
+  end
+
+  def format_seconds(s)
+    m, s = s.divmod(60)
+    h, m = m.divmod(60)
+    "%02d:%02d:%02d" % [h, m, s]
   end
 
   def available_classes
@@ -167,12 +189,24 @@ class CloverAdmin < Roda
   skip_webauthn_requirement = Config.development? && Config.clover_admin_development_no_webauthn?
 
   plugin :rodauth, route_csrf: true do
-    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account, :internal_request
+    enable :argon2, :login, :logout, :webauthn, :change_password, :close_account, :internal_request,
+      :audit_logging
+
+    internal_request_configuration do
+      enable :create_account
+      require_email_address_logins? false
+      password_meets_requirements? do |password|
+        # uses a randomly generated password
+        true
+      end
+    end
+
     accounts_table :admin_account
     password_hash_table :admin_password_hash
     webauthn_keys_table :admin_webauthn_key
     webauthn_user_ids_table :admin_webauthn_user_id
     login_column :login
+    audit_logging_table :admin_account_authentication_audit_log
 
     # :nocov:
     unless skip_webauthn_requirement
@@ -180,6 +214,41 @@ class CloverAdmin < Roda
       login_redirect do
         uses_two_factor_authentication? ? "/webauthn-auth" : "/webauthn-setup"
       end
+
+      remove_webauthn_key do |webauthn_id|
+        @_webauthn_credential_id = webauthn_id
+        super(webauthn_id)
+      end
+
+      add_webauthn_credential do |webauthn_credential|
+        @_webauthn_credential_id = webauthn_credential.id
+        super(webauthn_credential)
+      end
+    end
+
+    audit_log_metadata do |action|
+      hash = {}
+
+      if (ip = request.ip || session[:ip])
+        hash["ip"] = ip
+      end
+
+      case action
+      when :two_factor_authentication
+        webauthn_credential_id = authenticated_webauthn_id
+      when :webauthn_setup, :webauthn_remove
+        webauthn_credential_id = @_webauthn_credential_id
+      when :close_account
+        if (closer = session[:closer])
+          hash["closer"] = closer
+        end
+      end
+
+      if webauthn_credential_id
+        hash["token"] = webauthn_credential_id[0...8]
+      end
+
+      hash
     end
 
     check_csrf? false
@@ -190,7 +259,7 @@ class CloverAdmin < Roda
     hmac_secret OpenSSL::HMAC.digest("SHA512", Config.clover_session_secret, "admin-rodauth-hmac-secret")
     function_name(&{
       rodauth_get_salt: :rodauth_admin_get_salt,
-      rodauth_valid_password_hash: :rodauth_admin_valid_password_hash
+      rodauth_valid_password_hash: :rodauth_admin_valid_password_hash,
     }.to_proc)
 
     close_account_redirect "/login"
@@ -226,20 +295,29 @@ class CloverAdmin < Roda
   end
 
   OBJECT_ACTIONS = {
+    "BootImage" => {
+      "remove_boot_image" => object_action("Remove Boot Image", flash: "Boot image removal scheduled", &:remove_boot_image),
+      "activate_boot_image" => object_action("Activate Boot Image", flash: "Boot image activated") do |obj|
+        obj.update(activated_at: Time.now)
+      end,
+      "disable_boot_image" => object_action("Disable Boot Image", flash: "Boot image disabled") do |obj|
+        obj.update(activated_at: nil)
+      end,
+    },
     "Account" => {
       "suspend" => object_action("Suspend", flash: "Account suspended", &:suspend),
-      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend)
+      "unsuspend" => object_action("Unsuspend", flash: "Account unsuspended", &:unsuspend),
     },
     "Invoice" => {
       "download_pdf" => object_action("Download PDF", type: :direct) do |obj|
         obj.generate_download_link
-      end
+      end,
     },
     "GithubInstallation" => {
-      "github_page" => github_page_action
+      "github_page" => github_page_action,
     },
     "GithubRunner" => {
-      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner)
+      "provision" => object_action("Provision Spare Runner", flash: "Spare runner provisioned", type: :form, &:provision_spare_runner),
     },
     "GithubRepository" => {
       "github_page" => github_page_action,
@@ -248,13 +326,16 @@ class CloverAdmin < Roda
         "<a href=\"#{Erubi.h(url)}\">Download Job Log</a>"
       rescue Octokit::NotFound
         "Job not found"
-      end
+      end,
     },
     "Page" => {
-      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve)
+      "resolve" => object_action("Resolve", flash: "Resolve scheduled for Page", &:incr_resolve),
     },
     "PostgresResource" => {
-      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart)
+      "restart" => object_action("Restart", flash: "Restart scheduled for PostgresResource", &:incr_restart),
+    },
+    "PostgresServer" => {
+      "recycle" => object_action("Recycle", flash: "Recycle scheduled for PostgresServer", &:incr_recycle),
     },
     "Project" => {
       "add_credit" => object_action("Add credit", flash: "Added credit", params: {credit: {typecast: :float!, type: "number", attr: {min: -10**6, max: 10**6}}}) do |obj, credit|
@@ -265,13 +346,13 @@ class CloverAdmin < Roda
           typecast: :str!,
           type: "select",
           add_blank: true,
-          options: Project.instance_methods.filter_map { it.to_s.delete_prefix("set_ff_") if it.start_with?("set_ff_") }
+          options: Project.instance_methods.grep(/\Aset_ff_/).map! { it[7...] }.sort!,
         },
         value: {
           typecast: :nonempty_str,
           placeholder: "JSON",
-          required: nil
-        }
+          required: nil,
+        },
       }) do |obj, name, value|
         begin
           value = JSON.parse(value) if value
@@ -285,14 +366,14 @@ class CloverAdmin < Roda
           typecast: :str!,
           type: "select",
           add_blank: true,
-          options: ProjectQuota.default_quotas.keys
+          options: ProjectQuota.default_quotas.keys,
         },
         value: {
           typecast: :int,
           type: "number",
           placeholder: "blank to reset to default",
-          required: nil
-        }
+          required: nil,
+        },
       }) do |obj, resource_type, value|
         quota_id = ProjectQuota.default_quotas[resource_type]["id"]
         if (existing_quota = obj.quotas_dataset.first(quota_id:))
@@ -304,7 +385,7 @@ class CloverAdmin < Roda
         elsif value
           obj.add_quota(quota_id:, value:)
         end
-      end
+      end,
     },
     "Strand" => {
       "subject" => object_action("Subject", type: :direct) do |obj|
@@ -315,7 +396,28 @@ class CloverAdmin < Roda
       end,
       "extend" => object_action("Extend Schedule", flash: "Extended schedule", params: {minutes: {typecast: :pos_int!, type: "number", attr: {min: 1, max: 1440}}}) do |obj, minutes|
         obj.this.update(schedule: Sequel.date_add(:schedule, minutes:))
-      end
+      end,
+      "incr_semaphore" => object_action("Increment Semaphore", flash: "Incremented semaphore", params: ->(obj) {
+        subject_class = obj.subject.class
+        options = subject_class.respond_to?(:semaphore_names) ? subject_class.semaphore_names.map(&:name).sort! : [].freeze
+        {
+          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+        }
+      }) do |obj, name, name_confirmation|
+        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+        Semaphore.incr(obj.id, name)
+      end,
+      "decr_semaphore" => object_action("Decrement Semaphore", flash: "Decremented semaphore", params: ->(obj) {
+        options = obj.semaphores_dataset.distinct.select_order_map(:name)
+        {
+          name: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+          name_confirmation: {typecast: :nonempty_str!, type: "select", add_blank: true, required: true, options:},
+        }
+      }) do |obj, name, name_confirmation|
+        fail CloverError.new(400, "InvalidRequest", "Semaphore name confirmation does not match") unless name == name_confirmation
+        Semaphore.where(strand_id: obj.id, name:).destroy
+      end,
     },
     "Vm" => {
       "restart" => object_action("Restart", flash: "Restart scheduled for Vm", &:incr_restart),
@@ -324,7 +426,7 @@ class CloverAdmin < Roda
           obj.incr_admin_stop
           obj.incr_stop
         end
-      end
+      end,
     },
     "VmHost" => {
       "accept" => object_action("Move to Accepting", flash: "Host allocation state changed to accepting") do |obj|
@@ -334,8 +436,23 @@ class CloverAdmin < Roda
         obj.update(allocation_state: "draining")
       end,
       "reset" => object_action("Hardware Reset", flash: "Hardware reset scheduled for VmHost", &:incr_hardware_reset),
-      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot)
-    }
+      "reboot" => object_action("Reboot", flash: "Reboot scheduled for VmHost", &:incr_reboot),
+      "move_location" => object_action("Move to Location", flash: "Location updated and missing boot image downloads started", params: {
+        location: {
+          typecast: :ubid_uuid!,
+          type: "select",
+          add_blank: true,
+          required: true,
+          options: Location
+            .where(project_id: nil, provider: %w[hetzner leaseweb])
+            .or(id: Location::GITHUB_RUNNERS_ID)
+            .select_order_map([:display_name, :id])
+            .each { it[1] = UBID.to_ubid(it[1]) },
+        },
+      }) do |obj, target_location_id|
+        obj.move_to_location(target_location_id)
+      end,
+    },
   }.freeze
   OBJECT_ACTIONS.each_value(&:freeze)
 
@@ -347,14 +464,14 @@ class CloverAdmin < Roda
     "Invoice" => [:invoice_number],
     "KubernetesCluster" => [:name],
     "PostgresResource" => [:name],
-    "Vm" => [:name]
+    "Vm" => [:name],
   }.freeze
   SEARCH_QUERIES.each_value(&:freeze)
   SEARCH_PREFIXES = SEARCH_QUERIES.map { "#{Object.const_get(it[0]).ubid_type} (#{it[0]})" }.join(", ").freeze
 
   OBJECTS_WITH_UI = {
     "Vm" => lambda { |vm| "project/#{vm.project.ubid}/location/#{vm.location.display_name}/vm/#{vm.ubid}/overview" },
-    "PostgresResource" => lambda { |pg| "project/#{pg.project.ubid}/location/#{pg.location.display_name}/postgres/#{pg.name}/overview" }
+    "PostgresResource" => lambda { |pg| "project/#{pg.project.ubid}/location/#{pg.location.display_name}/postgres/#{pg.name}/overview" },
   }.freeze
 
   OBJECTS_WITH_EXTRAS = Dir["views/admin/extras/*.erb"]
@@ -369,7 +486,8 @@ class CloverAdmin < Roda
     ["Project", :vms] => "project",
     ["Project", :postgres_resources] => "project",
     ["Project", :invoices] => "project",
-    ["PostgresResource", :servers] => "resource"
+    ["PostgresResource", :servers] => "resource",
+    ["VmHost", :boot_images] => "vm_host",
   }.freeze
 
   plugin :autoforme do
@@ -680,6 +798,26 @@ class CloverAdmin < Roda
         project: ubid_input.call("Project")
     end
 
+    model BootImage do
+      order Sequel.desc(:created_at)
+      eager [:vm_host]
+      columns [:name, :version, :vm_host, :size_gib, :activated_at, :created_at]
+      column_options vm_host: ubid_input.call("VmHost"),
+        created_at: {type: "text"},
+        activated_at: {type: "text"}
+
+      column_search_filter do |ds, column, value|
+        case column
+        when :vm_host
+          ubid_uuid_grep.call(ds, :vm_host_id, value)
+        when :activated_at
+          column_grep.call(ds, :activated_at, value)
+        else
+          framework
+        end
+      end
+    end
+
     model VmHost do
       order Sequel[:vm_host][:id]
       eager [:location]
@@ -701,6 +839,16 @@ class CloverAdmin < Roda
           column_grep.call(ds, Sequel[:sshable][:host], value)
         end
       end
+    end
+  end
+
+  def audit_log_paginate
+    if @pagination_key
+      @next_page_params["pagination_key"] = @pagination_key
+      "Next Page"
+    elsif @next_end_date
+      @next_page_params["end"] = @next_end_date
+      "Older Results"
     end
   end
 
@@ -755,7 +903,7 @@ class CloverAdmin < Roda
             action = actions[key]
             action_type = action.type
             @label = action.label
-            @params = action.params
+            @params = action.params.is_a?(Proc) ? action.params.call(@obj) : action.params
 
             r.get(action_type != :form) do
               if action_type == :direct
@@ -767,7 +915,7 @@ class CloverAdmin < Roda
 
             r.post(action_type != :direct) do
               begin
-                params = action.params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
+                params = @params.map { |k, v| typecast_params.send(v[:typecast], k.to_s) }
               rescue Roda::RodaPlugins::TypecastParams::Error => e
                 flash.now["error"] = "Invalid parameter submitted: #{e.param_name}"
                 next view("object_action")
@@ -832,7 +980,7 @@ class CloverAdmin < Roda
             vm_id: it.ubid,
             vm_name: it.name,
             boot_image: it.boot_image,
-            project_id: it.project.ubid
+            project_id: it.project.ubid,
           }
         }
         archived_vms = ArchivedRecord.vms_by_ips(ips, days: @days).map {
@@ -843,7 +991,7 @@ class CloverAdmin < Roda
             vm_id: UBID.to_ubid(it[:vm_id]),
             vm_name: it[:vm_name],
             boot_image: it[:boot_image],
-            project_id: UBID.to_ubid(it[:project_id])
+            project_id: UBID.to_ubid(it[:project_id]),
           }
         }
         @vms = (active_vms + archived_vms).sort_by { [it[:ip], -it[:created_at].to_i] }
@@ -854,13 +1002,38 @@ class CloverAdmin < Roda
 
     r.get "audit-log" do
       ds = DB[:audit_log]
+      next_page_params = {}
 
       if (project_id = typecast_params.ubid_uuid("project"))
         ds = ds.where(project_id:)
+        next_page_params["project"] = UBID.to_ubid(project_id)
       end
 
-      audit_log_search(ds, resolve: nil, accounts_dataset: Account.dataset, month_limit: 6, min_end_date: MIN_AUDIT_LOG_END_DATE)
+      audit_log_search(ds, resolve: nil, accounts_dataset: Account.dataset, month_limit: 6, min_end_date: MIN_AUDIT_LOG_END_DATE, next_page_params:)
       view("audit_log")
+    end
+
+    r.get "authentication-audit-log", ["admin", true].freeze do |admin|
+      if admin
+        @page_title = "Admin Authentication Audit Log"
+        @account_name_map = DB[:admin_account].select_hash(:id, :login)
+        table = :admin_account_authentication_audit_log
+        accounts_dataset = DB[:admin_account]
+        args = {account_columns: [:login].freeze}
+      else
+        @page_title = "Authentication Audit Log"
+        table = :account_authentication_audit_log
+        accounts_dataset = Account.dataset
+      end
+
+      authentication_audit_log_search(
+        DB[table],
+        accounts_dataset:,
+        month_limit: 6,
+        min_end_date: MIN_AUDIT_LOG_END_DATE,
+        **args,
+      )
+      view("authentication_audit_log")
     end
 
     r.get "admin-list" do
@@ -873,7 +1046,7 @@ class CloverAdmin < Roda
 
       vcpus_expr = Sequel.case(
         [[{label: "ubicloud"}, 2], [{label: "ubicloud-arm"}, 2]],
-        Sequel.cast(Sequel.function(:regexp_replace, :label, '^.*(?:standard|premium)-(\d+).*$', '\1'), Integer)
+        Sequel.cast(Sequel.function(:regexp_replace, :label, '^.*(?:standard|premium)-(\d+).*$', '\1'), Integer),
       )
 
       runners = DB[:github_runner]
@@ -892,25 +1065,24 @@ class CloverAdmin < Roda
         .left_join(Sequel[:github_installation].as(:i), id: Sequel[:r][:installation_id])
         .left_join(Sequel[:vm].as(:v), id: Sequel[:r][:vm_id])
         .select(
+          Sequel[:i][:id],
           Sequel[:i][:name],
-          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium)
+          Sequel.pg_jsonb(Sequel[:i][:allocator_preferences]).get("family_filter").contains(["premium"]).as(:premium),
         )
         .select_append(
           *standard_sizes.map { count_f.call(r_vcpus => it).as(:"r#{it}") },
-          *{r: :runner, v: :vm}.map { |k, prefix|
-            Sequel.function(
-              :concat,
-              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]).filter(~Sequel.expr(Sequel[k][:allocated_at] => nil)), 0),
-              Sequel.lit("'/'"),
-              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0)
-            ).as(:"#{prefix}_vcpus")
+          *{r: :runner, v: :vm}.flat_map { |k, prefix|
+            [
+              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]).filter(~Sequel.expr(Sequel[k][:allocated_at] => nil)), 0).as(:"allocated_#{prefix}_vcpus"),
+              Sequel.function(:coalesce, Sequel.function(:sum, Sequel[k][:vcpus]), 0).as(:"#{prefix}_vcpus"),
+            ]
           },
           *standard_sizes.map { count_f.call(v_family => "standard", v_vcpus => it).as(:"s#{it}") },
           *premium_sizes.map { count_f.call(v_family => "premium", v_vcpus => it).as(:"p#{it}") },
-          *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") }
+          *alien_sizes.map { count_f.call(v_family.like("m%") & Sequel.expr(v_vcpus => it)).as(:"a#{it}") },
         )
-        .group(Sequel[:i][:name], :premium)
-        .order(Sequel.desc(Sequel.function(:sum, r_vcpus)), Sequel.desc(Sequel.function(:coalesce, Sequel.function(:sum, v_vcpus), 0)))
+        .group(Sequel[:i][:id], Sequel[:i][:name], :premium)
+        .reverse(:runner_vcpus, :vm_vcpus)
         .all
 
       view("github_runner_usage")
@@ -920,7 +1092,7 @@ class CloverAdmin < Roda
       login = typecast_params.nonempty_str!("login")
 
       begin
-        CloverAdmin.rodauth.close_account(account_login: login, session: {closer: rodauth.account_from_session[:login]})
+        CloverAdmin.rodauth.close_account(account_login: login, session: {closer: rodauth.account_from_session[:login], ip: request.ip})
       rescue Rodauth::InternalRequestError
         flash["error"] = "Unable to close admin account for #{login.inspect}."
       else

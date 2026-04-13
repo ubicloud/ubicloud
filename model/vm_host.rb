@@ -111,7 +111,7 @@ class VmHost < Sequel::Model
 
     # Combine it with the higher bits for the host.
     proposal = NetAddr::IPv6Net.new(
-      NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix)
+      NetAddr::IPv6.new(net6.network.addr | lower_bits), NetAddr::Mask128.new(prefix),
     )
 
     # :nocov:
@@ -225,7 +225,7 @@ class VmHost < Sequel::Model
   end
 
   # Introduced for downloading a new boot image via REPL.
-  def download_boot_image(image_name, version:, custom_url: nil, download_r2: true)
+  def download_boot_image(image_name, version: nil, custom_url: nil, download_r2: true)
     Strand.create(prog: "DownloadBootImage", label: "start", stack: [{subject_id: id, image_name:, custom_url:, version:, download_r2:}])
   end
 
@@ -370,13 +370,13 @@ class VmHost < Sequel::Model
 
   def init_health_monitor_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 
   def init_metrics_export_session
     {
-      ssh_session: sshable.start_fresh_session
+      ssh_session: sshable.start_fresh_session,
     }
   end
 
@@ -442,14 +442,31 @@ class VmHost < Sequel::Model
   def metrics_config
     {
       endpoints: [
-        "http://localhost:9100/metrics"
+        "http://localhost:9100/metrics",
       ],
       max_file_retention: 120,
       interval: "15s",
       additional_labels: {ubicloud_resource_id: ubid},
       metrics_dir: "/home/rhizome/host/metrics",
-      project_id: Config.monitoring_service_project_id
+      project_id: Config.monitoring_service_project_id,
     }
+  end
+
+  def move_to_location(target_location_id)
+    if location_id == target_location_id
+      Clog.emit("VmHost is already in this location")
+      return
+    end
+    target_location = Location.with_pk!(target_location_id)
+
+    target_image_names = %w[github-ubuntu-2404 github-ubuntu-2204]
+    target_image_names += %w[ubuntu-noble ubuntu-jammy almalinux-9 debian-12 postgres-ubuntu-2204] unless target_location.id == Location::GITHUB_RUNNERS_ID
+
+    DB.ignore_duplicate_queries do
+      target_image_names.each { |image_name| download_boot_image(image_name) }
+    end
+
+    update(location_id: target_location.id)
   end
 end
 

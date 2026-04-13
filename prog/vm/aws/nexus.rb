@@ -20,9 +20,9 @@ class Prog::Vm::Aws::Nexus < Prog::Base
         {
           Effect: "Allow",
           Principal: {Service: "ec2.amazonaws.com"},
-          Action: "sts:AssumeRole"
-        }
-      ]
+          Action: "sts:AssumeRole",
+        },
+      ],
     }.to_json
 
     ignore_invalid_entity do
@@ -41,22 +41,22 @@ class Prog::Vm::Aws::Nexus < Prog::Base
           Action: [
             "logs:CreateLogStream",
             "logs:PutLogEvents",
-            "logs:CreateLogGroup"
+            "logs:CreateLogGroup",
           ],
           Resource: [
             "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:log-stream:*",
-            "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:log-stream:*"
-          ]
+            "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:log-stream:*",
+          ],
         },
         {
           Effect: "Allow",
           Action: "logs:DescribeLogStreams",
           Resource: [
             "arn:aws:logs:*:*:log-group:/#{vm.name}/auth:*",
-            "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*"
-          ]
-        }
-      ]
+            "arn:aws:logs:*:*:log-group:/#{vm.name}/postgresql:*",
+          ],
+        },
+      ],
     }.to_json
 
     ignore_invalid_entity do
@@ -130,7 +130,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       instance_market_options = if Config.github_runner_aws_spot_instance_enabled
         spot_options = {
           spot_instance_type: "one-time",
-          instance_interruption_behavior: "terminate"
+          instance_interruption_behavior: "terminate",
         }
         if Config.github_runner_aws_spot_instance_max_price_per_vcpu > 0
           # Not setting max_price means you'll pay up to the on-demand price,
@@ -152,20 +152,20 @@ class Prog::Vm::Aws::Nexus < Prog::Base
             iops: 3000,
             volume_size: vm.vm_storage_volumes_dataset.where(:boot).get(:size_gib),
             volume_type: "gp3",
-            throughput: 125
-          }
-        }
+            throughput: 125,
+          },
+        },
       ],
       network_interfaces: [
         {
           network_interface_id: nic.nic_aws_resource.network_interface_id,
-          device_index: 0
-        }
+          device_index: 0,
+        },
       ],
       private_dns_name_options: {
         hostname_type: "ip-name",
         enable_resource_name_dns_a_record: false,
-        enable_resource_name_dns_aaaa_record: false
+        enable_resource_name_dns_aaaa_record: false,
       },
       metadata_options: {http_tokens: "required"},
       min_count: 1,
@@ -173,7 +173,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       user_data: Base64.encode64(user_data.gsub(/^(\s*# .*)?\n/, "")),
       tag_specifications: Util.aws_tag_specifications("instance", vm.name),
       client_token: vm.id,
-      instance_market_options:
+      instance_market_options:,
     }
     params[:iam_instance_profile] = {name: instance_profile_name} unless is_runner?
     begin
@@ -273,7 +273,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
       resource_id: vm.id,
       resource_name: vm.name,
       billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-      amount: vm.vcpus
+      amount: vm.vcpus,
     )
 
     hop_wait
@@ -382,11 +382,11 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   def client
-    @client ||= vm.location.location_credential.client
+    @client ||= vm.location.location_credential_aws.client
   end
 
   def iam_client
-    @iam_client ||= vm.location.location_credential.iam_client
+    @iam_client ||= vm.location.location_credential_aws.iam_client
   end
 
   def cloudwatch_policy

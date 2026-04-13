@@ -119,7 +119,7 @@ end
         arg
       else
         raise Strand::InternalError, "BUG: must pop with string or hash"
-      end
+      end,
     )
 
     if strand.stack.length > 0 && (link = frame["link"])
@@ -228,7 +228,7 @@ end
       id: Strand.generate_uuid,
       prog: Strand.prog_verify(prog),
       label:,
-      stack: Sequel.pg_jsonb_wrap([new_frame])
+      stack: Sequel.pg_jsonb_wrap([new_frame]),
     )
   end
 
@@ -248,9 +248,10 @@ end
   # * If fallthrough is given: returns nil
   # * If nap is given: naps for given time
   # * Otherwise, donates to run a child process
-  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand)
-    children = strand
-      .children_dataset
+  def reap(hop = nil, reaper: nil, nap: nil, fallthrough: false, strand: self.strand, prog: nil)
+    dataset = strand.children_dataset
+    dataset = dataset.where(prog:) if prog
+    children = dataset
       .order(:schedule)
       .select_append(Sequel.lit("lease < now() AND exitval IS NOT NULL").as(:reapable))
       .all
@@ -345,6 +346,12 @@ end
     strand.save_changes
   end
 
+  def delete_from_stack(*keys)
+    keys.flatten.each { |key| strand.stack.first.delete(key) }
+    strand.modified!(:stack)
+    strand.save_changes
+  end
+
   # A hop is a kind of jump, as in, like a jump instruction.
   private def dynamic_hop(label)
     raise Strand::InternalError, "BUG: #hop only accepts a symbol" unless label.is_a? Symbol
@@ -354,22 +361,49 @@ end
     fail Hop.new(@strand.prog, @strand.label, {label:, retval: nil})
   end
 
+  private def time_string(time)
+    strand.time_string(time)
+  end
+
   def register_deadline(deadline_target, deadline_in, allow_extension: false)
     current_frame = strand.stack.first
+    time = Time.now
+    new_deadline = time + deadline_in
+
     if (deadline_at = current_frame["deadline_at"]).nil? ||
         (old_deadline_target = current_frame["deadline_target"]) != deadline_target ||
         allow_extension ||
-        Time.parse(deadline_at.to_s) > Time.now + deadline_in
+        Time.parse(deadline_at) > new_deadline
 
       if old_deadline_target != deadline_target && (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, old_deadline_target))
         pg.incr_resolve
       end
 
       current_frame["deadline_target"] = deadline_target
-      current_frame["deadline_at"] = Time.now + deadline_in
+
+      if allow_extension.is_a?(Integer)
+        current_frame["deadline_start"] ||= time_string(time)
+        cap = Time.parse(current_frame["deadline_start"]) + allow_extension
+        current_frame["deadline_at"] = time_string([new_deadline, cap].min)
+      else
+        current_frame["deadline_at"] = time_string(new_deadline)
+      end
 
       strand.modified!(:stack)
     end
+  end
+
+  def unregister_deadline(deadline_target)
+    current_frame = strand.stack.first
+
+    if (pg = Page.from_tag_parts("Deadline", strand.id, strand.prog, deadline_target))
+      pg.incr_resolve
+    end
+
+    current_frame.delete("deadline_at")
+    current_frame.delete("deadline_target")
+    current_frame.delete("deadline_start")
+    strand.modified!(:stack)
   end
 
   # Copied from sequel/model/inflections.rb's camelize, to convert

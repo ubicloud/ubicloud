@@ -109,9 +109,12 @@ class UBID
   TYPE_VICTORIA_METRICS_SERVER = "vn"
   TYPE_SSH_PUBLIC_KEY = "sk"
   TYPE_GITHUB_CUSTOM_LABEL = "gc"
-  TYPE_LOCATION_AWS_AZ = "1a"
+  TYPE_LOCATION_AZ = "1a"
   TYPE_AWS_SUBNET = "as"
   # TYPE_AUDIT_LOG = "a1"
+  TYPE_MACHINE_IMAGE = "m1"
+  TYPE_MACHINE_IMAGE_VERSION = "mv"
+  TYPE_MACHINE_IMAGE_STORE = "m0"
 
   # Common entropy-based type for everything else
   TYPE_ETC = "et"
@@ -377,7 +380,7 @@ class UBID
     "2", "3", "4", "5", "6", "7", "8", "9",
     "A", "B", "C", "D", "E", "F", "G", "H",
     "J", "K", "M", "N", "P", "Q", "R", "S",
-    "T", "V", "W", "X", "Y", "Z"
+    "T", "V", "W", "X", "Y", "Z",
   ]
 
   def self.to_base32(c)

@@ -82,7 +82,7 @@ class SpdkSetup
     user = SpdkPath.user
     vhost_binary = SpdkPath.bin(@spdk_version, vhost_target)
     cpumask = (0..cpu_count - 1).to_a.join(",")
-    File.write("/lib/systemd/system/#{spdk_service}", <<SPDK_SERVICE
+    File.write("/lib/systemd/system/#{spdk_service}", <<SPDK_SERVICE,
 [Unit]
 Description=Block Storage Service #{@spdk_version}
 Requires=#{hugepages_mount_service}
@@ -121,7 +121,7 @@ SPDK_SERVICE
     user = SpdkPath.user
     r "sudo --user=#{user.shellescape} mkdir -p #{hugepages_dir.shellescape}"
 
-    File.write("/lib/systemd/system/#{hugepages_mount_service}", <<SPDK_HUGEPAGES_MOUNT
+    File.write("/lib/systemd/system/#{hugepages_mount_service}", <<SPDK_HUGEPAGES_MOUNT,
 [Unit]
 Description=SPDK hugepages mount #{@spdk_version}
 
@@ -154,8 +154,8 @@ SPDK_HUGEPAGES_MOUNT
         small_pool_count: small_pool_count,
         large_pool_count: large_pool_count,
         small_bufsize: 8192,
-        large_bufsize: 135168
-      }
+        large_bufsize: 135168,
+      },
     }]
 
     # Leave these same as defaults for now.
@@ -166,8 +166,8 @@ SPDK_HUGEPAGES_MOUNT
         large_cache_size: 16,
         task_count: 2048,
         sequence_count: 2048,
-        buf_count: 2048
-      }
+        buf_count: 2048,
+      },
     }]
 
     bdev_conf = [{
@@ -181,25 +181,25 @@ SPDK_HUGEPAGES_MOUNT
         # as it is.
         bdev_io_pool_size: 65536,
         bdev_io_cache_size: 256,
-        bdev_auto_examine: true
-      }
+        bdev_auto_examine: true,
+      },
     }]
 
     safe_write_to_file(conf_path, JSON.pretty_generate({
       subsystems: [
         {
           subsystem: "iobuf",
-          config: iobuf_conf
+          config: iobuf_conf,
         },
         {
           subsystem: "accel",
-          config: accel_conf
+          config: accel_conf,
         },
         {
           subsystem: "bdev",
-          config: bdev_conf
-        }
-      ]
+          config: bdev_conf,
+        },
+      ],
     }))
   end
 

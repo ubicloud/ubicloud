@@ -33,9 +33,9 @@ class Clover
             visible: true,
             provider: "aws",
             project_id: @project.id,
-            byoc: true
+            byoc: true,
           )
-          LocationCredential.create_with_id(loc, access_key:, secret_key:)
+          LocationCredentialAws.create_with_id(loc, access_key:, secret_key:)
           audit_log(loc, "create")
         end
 
@@ -75,7 +75,6 @@ class Clover
         end
 
         DB.transaction do
-          @location.location_credential.destroy
           @location.destroy
           audit_log(@location, "destroy")
         end

@@ -71,7 +71,7 @@ class GithubRepository < Sequel::Model
       begin
         admin_client.create_bucket({
           bucket: bucket_name,
-          create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region}
+          create_bucket_configuration: {location_constraint: Config.github_cache_blob_storage_region},
         })
       rescue Aws::S3::Errors::BucketAlreadyOwnedByYou
       end
@@ -80,8 +80,8 @@ class GithubRepository < Sequel::Model
         {
           "effect" => "allow",
           "permission_groups" => [{"id" => "2efd5506f9c8494dacb1fa10a3e7d5b6", "name" => "Workers R2 Storage Bucket Item Write"}],
-          "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"}
-        }
+          "resources" => {"com.cloudflare.edge.r2.bucket.#{Config.github_cache_blob_storage_account_id}_default_#{bucket_name}" => "*"},
+        },
       ]
 
       token_id, token = CloudflareClient.new(Config.github_cache_blob_storage_api_key).create_token("#{bucket_name}-token", policies)
@@ -97,7 +97,7 @@ class GithubRepository < Sequel::Model
       secret_access_key:,
       region: Config.github_cache_blob_storage_region,
       request_checksum_calculation: "when_required",
-      response_checksum_validation: "when_required"
+      response_checksum_validation: "when_required",
     )
   end
 end
@@ -113,6 +113,7 @@ end
 #  default_branch  | text                     |
 #  access_key      | text                     |
 #  secret_key      | text                     |
+#  no_cache_since  | timestamp with time zone |
 # Indexes:
 #  github_repository_pkey                       | PRIMARY KEY btree (id)
 #  github_repository_installation_id_name_index | UNIQUE btree (installation_id, name)

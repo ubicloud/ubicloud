@@ -569,11 +569,11 @@ DNSMASQ_CONF
         "name" => unix_user,
         "sudo" => "ALL=(ALL) NOPASSWD:ALL",
         "shell" => "/bin/bash",
-        "ssh_authorized_keys" => public_keys
+        "ssh_authorized_keys" => public_keys,
       }],
       "ssh_pwauth" => false,
       "runcmd" => runcmd,
-      "bootcmd" => nft_bootcmd
+      "bootcmd" => nft_bootcmd,
     }
 
     if swap_size_bytes
@@ -598,7 +598,7 @@ DNSMASQ_CONF
     [
       %w[nft add table ip6 filter],
       %w[nft add chain ip6 filter output { type filter hook output priority 0 ; }],
-      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset]
+      %w[nft add rule ip6 filter output ip6 daddr fd00:0b1c:100d:5AFE::/64 meta skuid != 0 tcp flags syn reject with tcp reset],
     ].map(&:shelljoin)
   end
 
@@ -656,12 +656,13 @@ ReadOnlyPaths=/
 DNSMASQ_SERVICE
 
     storage_volumes = storage_params.map { |params| StorageVolume.new(@vm_name, params) }
+    writable_volumes = storage_volumes.reject(&:read_only)
 
-    spdk_services = storage_volumes.filter_map { |volume| volume.spdk_service }.uniq
+    spdk_services = writable_volumes.filter_map { |volume| volume.spdk_service }.uniq
     spdk_after = spdk_services.map { |s| "After=#{s}" }.join("\n")
     spdk_requires = spdk_services.map { |s| "Requires=#{s}" }.join("\n")
 
-    vhost_user_block_services = storage_volumes.filter_map { |volume| volume.vhost_user_block_service }
+    vhost_user_block_services = writable_volumes.filter_map { |volume| volume.vhost_user_block_service }
     vhost_user_block_after = vhost_user_block_services.map { |s| "After=#{s}" }.join("\n")
     vhost_user_block_requires = vhost_user_block_services.map { |s| "Requires=#{s}" }.join("\n")
 
@@ -711,7 +712,7 @@ DNSMASQ_SERVICE
       storage_volumes: storage_volumes,
       storage_params: storage_params,
       nics: nics,
-      pci_devices: pci_devices
+      pci_devices: pci_devices,
     )
 
     vp.write_systemd_service(vm_service)
@@ -773,7 +774,7 @@ DNSMASQ_SERVICE
       "--cpus boot=#{max_vcpus},topology=#{cpu_topology}",
       "--memory size=#{mem_gib}G,#{@hugepages ? "hugepages=on,hugepage_size=1G" : "shared=on"}",
       net_params.join(" "),
-      pci_device_params
+      pci_device_params,
     ].compact.join(" \\\n")
 
     <<~SERVICE
@@ -794,18 +795,18 @@ DNSMASQ_SERVICE
       if vol.read_only
         [
           "-drive if=none,file=#{vol.image_path},format=raw,readonly=on,id=disk#{i}",
-          "-device virtio-blk-pci,drive=disk#{i},romfile="
+          "-device virtio-blk-pci,drive=disk#{i},romfile=",
         ]
       else
         [
           "-chardev socket,id=vhostblk#{i},path=#{vol.vhost_sock},server=off",
-          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile="
+          "-device vhost-user-blk-pci,chardev=vhostblk#{i},num-queues=#{vol.num_queues},queue-size=#{vol.queue_size},romfile=",
         ]
       end
     end
     disk_parts += [
       "-drive if=none,file=#{vp.cloudinit_img},format=raw,readonly=on,id=cidrive",
-      "-device virtio-blk-pci,drive=cidrive,romfile="
+      "-device virtio-blk-pci,drive=cidrive,romfile=",
     ]
 
     mem_parts =
@@ -814,7 +815,7 @@ DNSMASQ_SERVICE
         [
           "-object memory-backend-memfd,id=mem0,size=#{size},hugetlb=on,hugetlbsize=1G,prealloc=on,share=on",
           "-numa node,memdev=mem0",
-          "-m #{size}"
+          "-m #{size}",
         ]
       else
         ["-m #{mem_gib}G"]
@@ -824,31 +825,31 @@ DNSMASQ_SERVICE
       qemu_smp(cpu_topology, max_vcpus),
       qemu_cpu,
       "-enable-kvm",
-      "-machine accel=kvm,type=q35"
+      "-machine accel=kvm,type=q35",
     ]
 
     net_parts = nics.each_with_index.flat_map { |nic, i|
       [
         "-netdev tap,id=net#{i},ifname=#{nic.tap},script=no,downscript=no,queues=#{max_vcpus * 2 + 1},vhost=on",
-        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile="
+        "-device virtio-net-pci,mac=#{nic.mac},netdev=net#{i},mq=on,romfile=",
       ]
     }
 
     pci_parts = pci_devices.map.with_index(1) do |(bdf), i|
       [
         "-device pcie-root-port,id=rp#{i},slot=#{i},chassis=#{i},bus=pcie.0,hotplug=off",
-        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0"
+        "-device vfio-pci,host=0000:#{bdf},bus=rp#{i},addr=0x0",
       ]
     end.flatten
 
     serial_parts = [
       "-serial file:#{vp.serial_log}",
       "-display none",
-      "-vga none"
+      "-vga none",
     ]
 
     kernel_parts = [
-      "-bios /opt/fw/QEMU.fd"
+      "-bios /opt/fw/QEMU.fd",
     ]
 
     <<~SERVICE

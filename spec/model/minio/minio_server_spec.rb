@@ -12,7 +12,7 @@ RSpec.describe MinioServer do
       admin_password: "dummy-password",
       root_cert_1: "dummy-root-cert-1",
       root_cert_2: "dummy-root-cert-2",
-      project_id: vm.project_id
+      project_id: vm.project_id,
     )
     mp = MinioPool.create(
       cluster_id: mc.id,
@@ -20,14 +20,14 @@ RSpec.describe MinioServer do
       server_count: 1,
       drive_count: 1,
       storage_size_gib: 100,
-      vm_size: "standard-2"
+      vm_size: "standard-2",
     )
 
     described_class.create(
       minio_pool_id: mp.id,
       vm_id: vm.id,
       index: 0,
-      cert: "cert"
+      cert: "cert",
     )
   }
 
@@ -46,7 +46,7 @@ RSpec.describe MinioServer do
       net6: "fd10:9b0b:6b4b:8fbb::/64",
       net4: "10.0.0.0/26",
       state: "waiting",
-      project_id: ms.vm.project_id
+      project_id: ms.vm.project_id,
     )
     Nic.create(
       private_subnet_id: ps.id,
@@ -55,7 +55,7 @@ RSpec.describe MinioServer do
       mac: "00:00:00:00:00:01",
       name: "test-nic",
       vm_id: ms.vm.id,
-      state: "active"
+      state: "active",
     )
     expect(ms.private_ipv4_address).to eq("192.168.0.5")
   end
@@ -101,7 +101,7 @@ RSpec.describe MinioServer do
   it "checks pulse using endpoint for multiple servers" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data"),
     }
 
     expect(ms.vm).to receive(:ip4).and_return("1.2.3.4").at_least(:once)
@@ -113,7 +113,7 @@ RSpec.describe MinioServer do
 
     stub_request(:get, "https://1.2.3.4:9000/minio/admin/v3/info").to_return(status: 200, body: JSON.generate({servers: [
       {state: "online", endpoint: "1.2.3.5:9000", drives: [{state: "ok"}]},
-      {state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]}
+      {state: "online", endpoint: "1.2.3.4:9000", drives: [{state: "faulty"}]},
     ]}))
     ms.check_pulse(session:, previous_pulse: {})
 
@@ -124,7 +124,7 @@ RSpec.describe MinioServer do
   it "checks pulse without endpoint for single server" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data")
+      minio_client: Minio::Client.new(endpoint: "https://1.2.3.4:9000", access_key: "dummy-key", secret_key: "dummy-secret", ssl_ca_data: "data"),
     }
 
     expect(ms.vm).not_to receive(:ip4)
@@ -143,7 +143,7 @@ RSpec.describe MinioServer do
   it "increments checkup semaphore if pulse is down for a while" do
     session = {
       ssh_session: Net::SSH::Connection::Session.allocate,
-      minio_client: instance_double(Minio::Client)
+      minio_client: instance_double(Minio::Client),
     }
 
     expect(session[:minio_client]).to receive(:admin_info).and_raise(RuntimeError)
@@ -170,7 +170,7 @@ RSpec.describe MinioServer do
       minio_pool_id: ms.pool.id,
       vm_id: vm2.id,
       index: 1,
-      cert: "cert2"
+      cert: "cert2",
     )
 
     expect(ms.generate_etc_hosts_entry).to eq("127.0.0.1 minio-cluster-name0.minio.ubicloud.com\n1.1.1.2 minio-cluster-name1.minio.ubicloud.com")

@@ -186,7 +186,7 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8080",
           "Health Check Protocol", "HTTP",
-          "HTTP Health Check Endpoint", "/up"
+          "HTTP Health Check Endpoint", "/up",
         ]
         expect(page).to have_no_content "How to fetch the SSL certificate?"
       end
@@ -215,7 +215,7 @@ RSpec.describe Clover, "load balancer" do
           "Application Port", "8080",
           "Health Check Protocol", "HTTPS",
           "HTTPS Health Check Endpoint", "/up",
-          "SSL Certificate Status", "Creating"
+          "SSL Certificate Status", "Creating",
         ]
         expect(page).to have_content "How to fetch the SSL certificate?"
       end
@@ -255,7 +255,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id, enable_ip4: true).subject
 
         visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
@@ -278,7 +278,7 @@ RSpec.describe Clover, "load balancer" do
           "Application Port", "8000",
           "Health Check Protocol", "HTTPS",
           "HTTPS Health Check Endpoint", "/up",
-          "SSL Certificate Status", "Available"
+          "SSL Certificate Status", "Available",
         ]
 
         lb.update(health_check_protocol: "tcp", stack: "ipv4")
@@ -293,13 +293,13 @@ RSpec.describe Clover, "load balancer" do
           "Load Balancer Port", "80",
           "Application Port", "8000",
           "Health Check Protocol", "TCP",
-          "SSL Certificate Status", "Available"
+          "SSL Certificate Status", "Available",
         ]
 
         visit "#{project.path}#{lb.path}/vms"
         expect(page.all("#lb-vms td").map(&:text)).to eq [
           "dummy-vm-1", "down", "Detach",
-          "Select a VM", "", "Attach"
+          "Select a VM", "", "Attach",
         ]
 
         within("#load-balancer-submenu") { click_link "Overview" }
@@ -315,7 +315,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb1.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id, enable_ip4: true).subject
 
         visit "#{project.path}#{lb2.path}"
         within("#load-balancer-submenu") { click_link "Virtual Machines" }
@@ -331,7 +331,7 @@ RSpec.describe Clover, "load balancer" do
       it "can not attach vm when it does not exist" do
         ps = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
         lb = Prog::Vnet::LoadBalancerNexus.assemble(ps.id, name: "dummy-lb-3", src_port: 80, dst_port: 8000).subject
-        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id, enable_ip4: true).subject
 
         visit "#{project.path}#{lb.path}/vms"
         select vm.name, from: "vm_id"
@@ -374,7 +374,7 @@ RSpec.describe Clover, "load balancer" do
         cert = Prog::Vnet::CertNexus.assemble("test-host-name", dz.id).subject
         cert.update(cert: "cert", csr_key: Clec::Cert.ec_key.to_der)
         lb.add_cert(cert)
-        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id).subject
+        vm = Prog::Vm::Nexus.assemble("k y", project.id, name: "dummy-vm-1", private_subnet_id: ps.id, enable_ip4: true).subject
 
         visit "#{project.path}#{lb.path}/vms"
         select "dummy-vm-1", from: "vm_id"

@@ -14,7 +14,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
         used_cpu_percent: 0,
         total_memory_gib: memory_gib,
         used_memory_gib: 0,
-        vm_host_id: vm_host.id
+        vm_host_id: vm_host.id,
       )
 
       # This will update the CPU allocation as well as total_cpu_percent and cores values
@@ -82,7 +82,7 @@ class Prog::Vm::VmHostSliceNexus < Prog::Base
 
     VmHost.dataset.where(id: host.id).update(
       used_cores: Sequel[:used_cores] - vm_host_slice.cores,
-      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_gib
+      used_hugepages_1g: Sequel[:used_hugepages_1g] - vm_host_slice.total_memory_gib,
     )
 
     vm_host_slice.destroy

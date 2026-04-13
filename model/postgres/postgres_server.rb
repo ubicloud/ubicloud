@@ -14,7 +14,7 @@ class PostgresServer < Sequel::Model
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_certificates, :update_superuser_password, :checkup,
     :restart, :configure, :fence, :unfence, :planned_take_over, :unplanned_take_over, :configure_metrics,
-    :destroy, :recycle, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
+    :destroy, :recycle, :recycle_lagging_read_replica, :recycle_unavailable_server, :recycle_by_user_request, :promote_read_replica, :refresh_walg_credentials, :configure_s3_new_timeline, :lockout, :use_physical_slot
   include HealthMonitorMethods
   include MetricsTargetMethods
 
@@ -61,8 +61,9 @@ class PostgresServer < Sequel::Model
       "ssl_key_file" => "'/etc/ssl/certs/server.key'",
       "log_timezone" => "'UTC'",
       "log_directory" => "'pg_log'",
-      "log_filename" => "'postgresql.log'",
+      "log_filename" => "'postgresql-%a.log'",
       "log_truncate_on_rotation" => "true",
+      "log_rotation_age" => "1440",
       "logging_collector" => "on",
       "timezone" => "'UTC'",
       "lc_messages" => "'C.UTF-8'",
@@ -70,7 +71,7 @@ class PostgresServer < Sequel::Model
       "lc_numeric" => "'C.UTF-8'",
       "lc_time" => "'C.UTF-8'",
       "shared_preload_libraries" => "'pg_cron,pg_stat_statements'",
-      "cron.use_background_workers" => "on"
+      "cron.use_background_workers" => "on",
     }
 
     if resource.flavor == PostgresResource::Flavor::PARADEDB
@@ -111,7 +112,7 @@ class PostgresServer < Sequel::Model
 
       if standby?
         configs[:primary_conninfo] = "'#{resource.replication_connection_string(application_name: ubid)}'"
-        configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready
+        configs[:primary_slot_name] = "'#{ubid}'" if physical_slot_ready_id == resource.representative_server.id
       end
 
       if doing_pitr?
@@ -133,15 +134,20 @@ class PostgresServer < Sequel::Model
       private_subnets: vm.private_subnets.map {
         {
           net4: it.net4.to_s,
-          net6: it.net6.to_s
+          net6: it.net6.to_s,
         }
       },
       cert_auth_users: resource.cert_auth_users,
       identity: resource.identity,
       hosts: "#{resource.representative_server.vm.private_ipv4} #{resource.identity}",
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
-      metrics_config:
+      metrics_config:,
+      disk_throughput_baseline_mbps:,
     }
+  end
+
+  def disk_throughput_baseline_mbps
+    DISK_THROUGHPUT_BASELINE_MBPS.fetch(resource.location.provider, 100)
   end
 
   def trigger_failover(mode:)
@@ -157,6 +163,18 @@ class PostgresServer < Sequel::Model
 
     standby.send(:"incr_#{mode}_take_over")
     true
+  end
+
+  def display_state
+    label = strand.label
+    return "running" if label == "wait"
+    return "unavailable" if label == "unavailable"
+    return "restarting" if label == "restart"
+    return "failing_over" if FAILOVER_LABELS.include?(label)
+    return "synchronizing" if ["wait_catch_up", "wait_synchronization"].include?(label)
+    return "deleting" if ["destroy", "wait_children_destroy", "destroy_vm_and_pg"].include?(label)
+    return "creating" if initial_provisioning_set?
+    "updating"
   end
 
   def primary?
@@ -184,10 +202,16 @@ class PostgresServer < Sequel::Model
   end
 
   def needs_recycling?
-    recycle_set? || vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib || version != resource.target_version
+    recycle_requested = recycle_set? || recycle_lagging_read_replica_set? || recycle_unavailable_server_set? || recycle_by_user_request_set?
+    instance_size_mismatch = vm.display_size.gsub("burstable", "hobby") != resource.target_vm_size || storage_size_gib != resource.target_storage_size_gib
+    version_mismatch = version != resource.target_version
+
+    recycle_requested || instance_size_mismatch || version_mismatch
   end
 
   def lsn_caught_up
+    return true if primary?
+
     parent_server = if read_replica?
       resource.parent&.representative_server
     else
@@ -210,7 +234,7 @@ class PostgresServer < Sequel::Model
       .reject { it.is_representative }
       .select { it.strand.label == "wait" && !it.needs_recycling? }
       .map { {server: it, lsn: it.current_lsn} }
-      .max_by { [it[:server].physical_slot_ready ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
+      .max_by { [(it[:server].physical_slot_ready_id == resource.representative_server.id) ? 1 : 0, lsn2int(it[:lsn])] } # prefers physical slot ready servers
 
     return nil if target.nil?
 
@@ -225,7 +249,7 @@ class PostgresServer < Sequel::Model
   def lsn_function_name
     if primary?
       "pg_current_wal_lsn"
-    elsif standby?
+    elsif standby? && strand.label != "wait_catch_up"
       "pg_last_wal_receive_lsn"
     else
       "pg_last_wal_replay_lsn"
@@ -240,14 +264,14 @@ class PostgresServer < Sequel::Model
     ssh_session.forward.local_socket(File.join(health_monitor_socket_path, ".s.PGSQL.5432"), "/var/run/postgresql/.s.PGSQL.5432")
     {
       ssh_session:,
-      db_connection: nil
+      db_connection: nil,
     }
   end
 
   def init_metrics_export_session
     ssh_session = vm.sshable.start_fresh_session
     {
-      ssh_session:
+      ssh_session:,
     }
   end
 
@@ -325,6 +349,7 @@ class PostgresServer < Sequel::Model
     if session[:export_count] % 12 == 1
       observe_disk_usage(session)
       observe_archival_backlog(session)
+      observe_io_throttle(session)
       observe_metrics_backlog(session)
     end
 
@@ -335,11 +360,11 @@ class PostgresServer < Sequel::Model
   def metrics_config
     ignored_timeseries_patterns = [
       "pg_stat_user_tables_.*",
-      "pg_statio_user_tables_.*"
+      "pg_statio_user_tables_.*",
     ]
     exclude_pattern = ignored_timeseries_patterns.join("|")
     query_params = {
-      "match[]": "{__name__!~'#{exclude_pattern}'}"
+      "match[]": "{__name__!~'#{exclude_pattern}'}",
     }
     query_str = URI.encode_www_form(query_params)
     additional_labels = resource.tags.to_h { |tag| ["pg_tags_label_#{tag["key"]}", tag["value"]] }
@@ -347,18 +372,18 @@ class PostgresServer < Sequel::Model
       location_id: UBID.to_ubid(resource.location_id),
       location_name: resource.location.name,
       location_provider: resource.location.provider,
-      location_display_name: resource.location.display_name
+      location_display_name: resource.location.display_name,
     })
 
     {
       endpoints: [
-        "https://localhost:9090/federate?#{query_str}"
+        "https://localhost:9090/federate?#{query_str}",
       ],
       max_file_retention: 120,
       interval: "15s",
       additional_labels:,
       metrics_dir: "/home/ubi/postgres/metrics",
-      project_id: Config.postgres_service_project_id
+      project_id: Config.postgres_service_project_id,
     }
   end
 
@@ -373,7 +398,7 @@ class PostgresServer < Sequel::Model
     update(
       timeline_id: Prog::Postgres::PostgresTimelineNexus.assemble(location_id: resource.location_id, parent_id:).id,
       timeline_access: "push",
-      synchronization_status: "ready"
+      synchronization_status: "ready",
     )
 
     increment_s3_new_timeline
@@ -389,16 +414,20 @@ class PostgresServer < Sequel::Model
     vm.sshable.cmd("sudo systemctl restart wal-g") unless resource.use_old_walg_command_set?
   end
 
+  def install_rhizome(install_specs: false)
+    Strand.create(prog: "InstallRhizome", label: "start", stack: [{subject_id: vm.id, target_folder: "postgres", install_specs:}])
+  end
+
   def observe_archival_backlog(session)
     oldest_pending = session[:ssh_session].exec!(
       "sudo -u postgres find /dat/:version/data/pg_wal/archive_status -name '*.ready' -printf '%f\\n' | sort | head -1",
-      version:
+      version:,
     ).strip
     oldest_pending = nil if oldest_pending.empty?
 
     result = session[:ssh_session].exec!(
       "sudo find /dat/:version/data/pg_wal/archive_status -name '*.ready' | wc -l",
-      version:
+      version:,
     )
     archival_backlog = Integer(result.strip, 10)
 
@@ -459,7 +488,7 @@ class PostgresServer < Sequel::Model
     metrics_done_dir = "#{metrics_config[:metrics_dir]}/done"
     result = session[:ssh_session].exec!(
       "find :metrics_done_dir -name '*.txt' | wc -l",
-      metrics_done_dir:
+      metrics_done_dir:,
     )
     metrics_backlog = Integer(result.strip, 10)
     metrics_interval = metrics_config[:interval].to_i
@@ -473,6 +502,26 @@ class PostgresServer < Sequel::Model
     end
   rescue => ex
     Clog.emit("Failed to observe metrics backlog", Util.exception_to_hash(ex, into: {postgres_server_id: id}))
+  end
+
+  def observe_io_throttle(session)
+    # Make sure either the IO throttle file does not exist or if it exists, it
+    # has been updated in the last minute.
+    io_throttle_file = "/sys/fs/cgroup/system.slice/system-postgresql.slice/postgresql@#{version}-main.service/throttled/io.max"
+    result = session[:ssh_session].exec!("stat -c '%Y' :io_throttle_file 2>/dev/null || echo missing; date +%s", io_throttle_file:).strip.split("\n")
+    io_max_stat, vm_now_unix = result
+    if io_max_stat != "missing"
+      io_max_mtime = Time.at(Integer(io_max_stat, 10))
+      vm_now = Time.at(Integer(vm_now_unix, 10))
+      if vm_now - io_max_mtime > 120
+        Prog::PageNexus.assemble("#{ubid} I/O throttle stale",
+          ["PGIOThrottleStale", id], ubid,
+          severity: "warning", extra_data: {io_max_mtime:})
+      else
+        Page.from_tag_parts("PGIOThrottleStale", id)&.incr_resolve
+        Clog.emit("I/O throttle applied", {postgres_server_id: id, io_max_mtime:})
+      end
+    end
   end
 
   def observe_disk_usage(session)
@@ -494,6 +543,11 @@ class PostgresServer < Sequel::Model
   METRICS_BACKLOG_THRESHOLD_SECONDS = 300
   FAILOVER_LABELS = ["prepare_for_unplanned_take_over", "prepare_for_planned_take_over", "wait_fencing_of_old_primary", "taking_over", "lockout", "wait_lockout_attempt", "wait_representative_lockout"].freeze
   MIN_ARCHIVAL_RATE_BYTES_PER_SEC = 10 * 1024 * 1024
+  DISK_THROUGHPUT_BASELINE_MBPS = {
+    "hetzner" => 128,
+    "aws" => 448,
+    "leaseweb" => 100,
+  }.freeze
 end
 
 # Table: postgres_server
@@ -506,8 +560,8 @@ end
 #  timeline_access        | timeline_access          | NOT NULL DEFAULT 'push'::timeline_access
 #  synchronization_status | synchronization_status   | NOT NULL DEFAULT 'ready'::synchronization_status
 #  version                | text                     | NOT NULL
-#  physical_slot_ready    | boolean                  | NOT NULL DEFAULT false
 #  is_representative      | boolean                  | NOT NULL DEFAULT false
+#  physical_slot_ready_id | uuid                     |
 # Indexes:
 #  postgres_server_pkey1                             | PRIMARY KEY btree (id)
 #  postgres_server_resource_id_is_representative_idx | UNIQUE btree (resource_id) WHERE is_representative IS TRUE

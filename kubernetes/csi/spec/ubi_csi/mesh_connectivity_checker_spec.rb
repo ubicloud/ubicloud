@@ -57,10 +57,10 @@ RSpec.describe Csi::MeshConnectivityChecker do
   describe "#status_response" do
     it "returns node_id, pod_status, and mtr_results" do
       checker.instance_variable_set(:@pod_status, {
-        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"},
       })
       checker.instance_variable_set(:@mtr_results, {
-        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"}
+        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
       })
 
       response = checker.status_response
@@ -93,7 +93,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
     let(:pods) {
       [
         {"name" => "ubicsi-nodeplugin-abc", "ip" => "10.0.0.1", "node" => "worker-1"},
-        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"}
+        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"},
       ]
     }
 
@@ -109,7 +109,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "clears mtr result when pod connectivity check succeeds" do
       checker.instance_variable_set(:@mtr_results, {
-        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"}
+        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
       })
       expect(Csi::KubernetesClient).to receive(:new).and_return(client)
       expect(client).to receive(:get_nodeplugin_pods).and_return(pods)
@@ -134,7 +134,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
     it "skips pods without IP" do
       pods_with_nil_ip = [
         {"name" => "ubicsi-nodeplugin-abc", "ip" => nil, "node" => "worker-2"},
-        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"}
+        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"},
       ]
       expect(Csi::KubernetesClient).to receive(:new).and_return(client)
       expect(client).to receive(:get_nodeplugin_pods).and_return(pods_with_nil_ip)
@@ -146,16 +146,16 @@ RSpec.describe Csi::MeshConnectivityChecker do
     it "removes stale pods and mtr results that no longer exist in the cluster" do
       checker.instance_variable_set(:@pod_status, {
         "ubicsi-nodeplugin-old" => {ip: "10.0.0.99", reachable: true, last_check: "2026-01-01T00:00:00Z"},
-        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+        "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"},
       })
       checker.instance_variable_set(:@mtr_results, {
         "ubicsi-nodeplugin-old" => {ip: "10.0.0.99", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
-        "coredns:coredns-abc" => {ip: "10.96.0.5", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"}
+        "coredns:coredns-abc" => {ip: "10.96.0.5", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
       })
 
       current_pods = [
         {"name" => "ubicsi-nodeplugin-abc", "ip" => "10.0.0.1", "node" => "worker-1"},
-        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"}
+        {"name" => "ubicsi-nodeplugin-xyz", "ip" => "10.0.0.2", "node" => "worker-2"},
       ]
       expect(Csi::KubernetesClient).to receive(:new).and_return(client)
       expect(client).to receive(:get_nodeplugin_pods).and_return(current_pods)
@@ -182,7 +182,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields reachable when connection succeeds immediately" do
       expect(Socket).to receive(:getaddrinfo).with("10.0.0.1", 443, nil, :STREAM).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       expect(Socket).to receive(:new).with(2, :STREAM, 0).and_return(socket)
@@ -211,7 +211,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields reachable for pending connection that succeeds after IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       remote_addr = instance_double(Addrinfo)
@@ -232,7 +232,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields unreachable when connection fails after IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       remote_addr = instance_double(Addrinfo)
@@ -254,7 +254,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields unreachable when IO.select returns nil" do
       expect(Socket).to receive(:getaddrinfo).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       expect(Socket).to receive(:new).and_return(socket)
@@ -273,7 +273,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields unreachable when deadline exceeded before IO.select" do
       expect(Socket).to receive(:getaddrinfo).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       expect(Socket).to receive(:new).and_return(socket)
@@ -292,7 +292,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
     it "yields reachable for pending connection where connect_nonblock succeeds without EISCONN" do
       expect(Socket).to receive(:getaddrinfo).and_return([
-        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6]
+        ["AF_INET", 443, "10.0.0.1", "10.0.0.1", 2, 1, 6],
       ])
       socket = instance_double(Socket)
       remote_addr = instance_double(Addrinfo)
@@ -347,7 +347,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
         stub_const("Csi::MeshConnectivityChecker::STATUS_FILE_PATH", status_file_path)
 
         checker.instance_variable_set(:@pod_status, {
-          "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+          "ubicsi-nodeplugin-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"},
         })
 
         checker.write_status_file
@@ -394,7 +394,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       result = checker.parse_external_endpoints("10.0.0.1:443,api.example.com:8080")
       expect(result).to eq([
         {host: "10.0.0.1", port: 443},
-        {host: "api.example.com", port: 8080}
+        {host: "api.example.com", port: 8080},
       ])
     end
 
@@ -402,7 +402,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       result = checker.parse_external_endpoints("  10.0.0.1:443 , api.example.com:8080  ")
       expect(result).to eq([
         {host: "10.0.0.1", port: 443},
-        {host: "api.example.com", port: 8080}
+        {host: "api.example.com", port: 8080},
       ])
     end
 
@@ -410,7 +410,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       result = checker.parse_external_endpoints("10.0.0.1:443,,api.example.com:8080")
       expect(result).to eq([
         {host: "10.0.0.1", port: 443},
-        {host: "api.example.com", port: 8080}
+        {host: "api.example.com", port: 8080},
       ])
     end
 
@@ -426,13 +426,13 @@ RSpec.describe Csi::MeshConnectivityChecker do
   describe "#status_response with external endpoints" do
     it "includes external_endpoints and mtr_results in response" do
       checker.instance_variable_set(:@pod_status, {
-        "kube-proxy-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"}
+        "kube-proxy-xyz" => {ip: "10.0.0.2", reachable: true, last_check: "2026-01-01T00:00:00Z"},
       })
       checker.instance_variable_set(:@external_status, {
-        "10.0.0.1:443" => {reachable: true, last_check: "2026-01-01T00:00:00Z"}
+        "10.0.0.1:443" => {reachable: true, last_check: "2026-01-01T00:00:00Z"},
       })
       checker.instance_variable_set(:@mtr_results, {
-        "kube-proxy-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"}
+        "kube-proxy-xyz" => {ip: "10.0.0.2", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
       })
 
       response = checker.status_response
@@ -451,7 +451,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
 
       expect(checker).to receive(:check_endpoints).with([
         {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"},
-        {host: "api.example.com", port: 8080, name: "api.example.com:8080"}
+        {host: "api.example.com", port: 8080, name: "api.example.com:8080"},
       ]).and_yield({host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, true, nil)
 
       checker.check_all_external_endpoints
@@ -471,7 +471,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       checker.instance_variable_set(:@external_endpoints, endpoints)
 
       expect(checker).to receive(:check_endpoints).and_yield(
-        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, false, "Errno::ECONNREFUSED: Connection refused"
+        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, false, "Errno::ECONNREFUSED: Connection refused",
       )
 
       checker.check_all_external_endpoints
@@ -485,7 +485,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
       checker.instance_variable_set(:@external_endpoints, endpoints)
 
       expect(checker).to receive(:check_endpoints).and_yield(
-        {host: "api.example.com", port: 8080, name: "api.example.com:8080"}, false, "SocketError: getaddrinfo failed\nbacktrace..."
+        {host: "api.example.com", port: 8080, name: "api.example.com:8080"}, false, "SocketError: getaddrinfo failed\nbacktrace...",
       )
       expect(checker).to receive(:enqueue_mtr_for_coredns)
 
@@ -497,11 +497,11 @@ RSpec.describe Csi::MeshConnectivityChecker do
       checker.instance_variable_set(:@external_endpoints, endpoints)
       checker.instance_variable_set(:@mtr_results, {
         "10.0.0.1:443" => {ip: "10.0.0.1", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
-        "coredns:coredns-abc" => {ip: "10.96.0.5", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"}
+        "coredns:coredns-abc" => {ip: "10.96.0.5", output: "HOST: ...", exit_status: 0, last_check: "2026-01-01T00:00:00Z"},
       })
 
       expect(checker).to receive(:check_endpoints).and_yield(
-        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, true, nil
+        {host: "10.0.0.1", port: 443, name: "10.0.0.1:443"}, true, nil,
       )
 
       checker.check_all_external_endpoints
@@ -561,7 +561,7 @@ RSpec.describe Csi::MeshConnectivityChecker do
     it "enqueues mtr for each CoreDNS pod" do
       pods = [
         {"name" => "coredns-abc", "ip" => "10.96.0.5"},
-        {"name" => "coredns-xyz", "ip" => "10.96.0.6"}
+        {"name" => "coredns-xyz", "ip" => "10.96.0.6"},
       ]
       expect(Csi::KubernetesClient).to receive(:new).with(req_id: "mtr-coredns", logger:, log_level: :debug).and_return(client)
       expect(client).to receive(:get_coredns_pods).and_return(pods)
@@ -573,14 +573,14 @@ RSpec.describe Csi::MeshConnectivityChecker do
       targets << queue.pop(true) until queue.empty?
       expect(targets).to eq([
         {name: "coredns:coredns-abc", ip: "10.96.0.5"},
-        {name: "coredns:coredns-xyz", ip: "10.96.0.6"}
+        {name: "coredns:coredns-xyz", ip: "10.96.0.6"},
       ])
     end
 
     it "skips CoreDNS pods without IP" do
       pods = [
         {"name" => "coredns-abc", "ip" => nil},
-        {"name" => "coredns-xyz", "ip" => "10.96.0.6"}
+        {"name" => "coredns-xyz", "ip" => "10.96.0.6"},
       ]
       expect(Csi::KubernetesClient).to receive(:new).and_return(client)
       expect(client).to receive(:get_coredns_pods).and_return(pods)

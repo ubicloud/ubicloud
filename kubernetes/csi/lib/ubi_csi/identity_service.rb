@@ -17,7 +17,7 @@ module Csi
         log_request_response(req, "get_plugin_info") do |req_id|
           GetPluginInfoResponse.new(
             name: "csi.ubicloud.com",
-            vendor_version: Csi::VERSION
+            vendor_version: Csi::VERSION,
           )
         end
       end
@@ -28,15 +28,15 @@ module Csi
             capabilities: [
               PluginCapability.new(
                 service: PluginCapability::Service.new(
-                  type: PluginCapability::Service::Type::CONTROLLER_SERVICE
-                )
+                  type: PluginCapability::Service::Type::CONTROLLER_SERVICE,
+                ),
               ),
               PluginCapability.new(
                 service: PluginCapability::Service.new(
-                  type: PluginCapability::Service::Type::VOLUME_ACCESSIBILITY_CONSTRAINTS
-                )
-              )
-            ]
+                  type: PluginCapability::Service::Type::VOLUME_ACCESSIBILITY_CONSTRAINTS,
+                ),
+              ),
+            ],
           )
         end
       end
@@ -44,7 +44,7 @@ module Csi
       def probe(req, _call)
         log_request_response(req, "probe") do |req_id|
           ProbeResponse.new(
-            ready: Google::Protobuf::BoolValue.new(value: true)
+            ready: Google::Protobuf::BoolValue.new(value: true),
           )
         end
       end

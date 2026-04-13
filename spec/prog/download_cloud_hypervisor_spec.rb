@@ -12,7 +12,7 @@ RSpec.describe Prog::DownloadCloudHypervisor do
       vm_host,
       prog: "DownloadCloudHypervisor",
       label: "start",
-      stack: [{"version" => "35.1", "sha256_ch_bin" => "thesha", "sha256_ch_remote" => "anothersha"}]
+      stack: [{"version" => "35.1", "sha256_ch_bin" => "thesha", "sha256_ch_remote" => "anothersha"}],
     )
   }
 

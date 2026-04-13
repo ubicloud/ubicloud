@@ -103,32 +103,37 @@ RSpec.describe Clover, "github" do
       expect(page.title).to eq("Ubicloud - Active Runners")
     end
 
-    it "enables premium runners for installation" do
+    it "toggles premium runners for installation" do
       installation.update(allocator_preferences: {})
-      expect(installation.premium_runner_enabled?).to be false
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.premium_runner_enabled?).to be true
-    end
+      expect(DB[:audit_log].where(action: "enable_premium").count).to eq(1)
 
-    it "disables premium runners for installation" do
-      installation.update(allocator_preferences: {"family_filter" => ["standard", "premium"]})
-      expect(installation.premium_runner_enabled?).to be true
-
+      # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
       within("form#premium_runner_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {premium_runner_enabled: false, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: true, _csrf:}
       end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_premium").count).to eq(1)
 
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#premium_runner_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-premium", {premium_runner_enabled: false, _csrf:}
+      end
       expect(page.status_code).to eq(302)
       expect(installation.reload.premium_runner_enabled?).to be false
+      expect(DB[:audit_log].where(action: "disable_premium").count).to eq(1)
     end
 
     it "shows badge for free premium runner upgrade" do
@@ -139,19 +144,37 @@ RSpec.describe Clover, "github" do
       expect(page).to have_content "You’re eligible for an exclusive 50% off premium runners"
     end
 
-    it "enables cache for installation" do
+    it "toggles cache for installation" do
       installation.update(cache_enabled: false)
-      expect(installation.cache_enabled).to be false
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_enabled).to be true
+      expect(DB[:audit_log].where(action: "enable_cache").count).to eq(1)
+
+      # no change
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
+      end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_cache").count).to eq(1)
+
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_enabled_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: false, _csrf:}
+      end
+      expect(page.status_code).to eq(302)
+      expect(installation.reload.cache_enabled).to be false
+      expect(DB[:audit_log].where(action: "disable_cache").count).to eq(1)
     end
 
     it "handles case where installation does not exist" do
@@ -162,53 +185,43 @@ RSpec.describe Clover, "github" do
       within("form#cache_enabled_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
         installation.destroy
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache", {cache_enabled: true, _csrf:}
       end
 
       expect(page.status_code).to eq(404)
     end
 
-    it "disables cache for installation" do
-      installation.update(cache_enabled: true)
-      expect(installation.cache_enabled).to be true
-
-      visit "#{project.path}/github/#{installation.ubid}/setting"
-
-      within("form#cache_enabled_toggle") do
-        _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_enabled: false, _csrf:}
-      end
-
-      expect(page.status_code).to eq(302)
-      expect(installation.reload.cache_enabled).to be false
-    end
-
-    it "enables cache scope protection for installation" do
+    it "toggles cache scope protection for installation" do
       installation.update(cache_scope_protected: false)
 
+      # enable
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_scope_protected_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: true, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
-
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_scope_protected).to be true
-    end
+      expect(DB[:audit_log].where(action: "enable_cache_scope").count).to eq(1)
 
-    it "disables cache scope protection for installation" do
-      installation.update(cache_scope_protected: true)
-
+      # no change
       visit "#{project.path}/github/#{installation.ubid}/setting"
-
       within("form#cache_scope_protected_toggle") do
         _csrf = find("input[name='_csrf']", visible: false).value
-        page.driver.post "#{project.path}/github/#{installation.ubid}", {cache_scope_protected: false, _csrf:}
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: true, _csrf:}
       end
+      expect(page.status_code).to eq(302)
+      expect(DB[:audit_log].where(action: "enable_cache_scope").count).to eq(1)
 
+      # disable
+      visit "#{project.path}/github/#{installation.ubid}/setting"
+      within("form#cache_scope_protected_toggle") do
+        _csrf = find("input[name='_csrf']", visible: false).value
+        page.driver.post "#{project.path}/github/#{installation.ubid}/set-cache-scope", {cache_scope_protected: false, _csrf:}
+      end
       expect(page.status_code).to eq(302)
       expect(installation.reload.cache_scope_protected).to be false
+      expect(DB[:audit_log].where(action: "disable_cache_scope").count).to eq(1)
     end
 
     it "raises not found when installation doesn't exist" do
@@ -241,20 +254,20 @@ RSpec.describe Clover, "github" do
           "run_id" => 456,
           "workflow_name" => "test-workflow",
           "created_at" => (now - 60).iso8601,
-          "started_at" => (now - 40).iso8601
-        }
+          "started_at" => (now - 40).iso8601,
+        },
       )
       runner_waiting_job = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud", repository_name: "my-repo").subject.update(ready_at: now - 400, created_at: now)
       runner_not_created = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-arm", repository_name: "my-repo").subject.update(
         created_at: now - 38,
-        vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm-2", size: "standard-4", arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID).id
+        vm_id: Prog::Vm::Nexus.assemble("dummy-public key", project.id, name: "runner-vm-2", size: "standard-4", arch: "arm64", location_id: Location::GITHUB_RUNNERS_ID).id,
       )
       runner_concurrency_limit = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-2", repository_name: "my-repo").update(label: "wait_concurrency_limit").subject.update(created_at: now - 3.68 * 60 * 60)
       runner_custom_label_quota = Prog::Github::GithubRunnerNexus.assemble(installation, label: "ubicloud-standard-4", repository_name: "my-repo").update(label: "apply_custom_label_quota").subject.update(created_at: now - 120)
 
       [
         [now, "standard-2", 15],
-        [now - 3 * 24 * 60 * 60, "standard-16-arm", 200_000]
+        [now - 3 * 24 * 60 * 60, "standard-16-arm", 200_000],
       ].each do |time, family, amount|
         BillingRecord.create(
           project_id: project.id,
@@ -262,7 +275,7 @@ RSpec.describe Clover, "github" do
           resource_name: "Daily Usage #{time.strftime("%Y-%m-%d")}",
           span: Sequel::Postgres::PGRange.new(time, time),
           billing_rate_id: BillingRate.from_resource_properties("GitHubRunnerMinutes", family, "global")["id"],
-          amount:
+          amount:,
         )
       end
 
@@ -277,13 +290,13 @@ RSpec.describe Clover, "github" do
         ["my-repo", "#{runner_waiting_job.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Waiting for GitHub to assign a job\nReady for 6m 40s", "", ""],
         ["my-repo", "#{runner_not_created.ubid}\n2 vCPU\nstandard\narm64\nubuntu-24", "Provisioning an ephemeral virtual machine\nWaiting for 38s", "", ""],
         ["my-repo", "#{runner_custom_label_quota.ubid}\n4 vCPU\nstandard\nx64\nubuntu-24", "Checking concurrency quota for custom labels\nWaiting for 2m", "", ""],
-        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""]
+        ["my-repo", "#{runner_concurrency_limit.ubid}\n2 vCPU\nstandard\nx64\nubuntu-24", "Reached your concurrency limit\nWaiting for 3h 40m 48s", "", ""],
       ]
       expect(page.all("#current-usages div").map { it.text.split("\n") }).to eq [
         ["Allocated vCPU", "4 vCPU"],
         ["Requested vCPU", "14 vCPU"],
         ["Today", "$0.01"],
-        ["Last 30 Days", "$1280.01"]
+        ["Last 30 Days", "$1280.01"],
       ]
     end
 

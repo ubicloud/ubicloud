@@ -12,6 +12,7 @@ class Prog::InstallRhizome < Prog::Base
 
   label def start
     tar = StringIO.new
+    tar.binmode
     file_hash_map = {} # pun intended
     Gem::Package::TarWriter.new(tar) do |writer|
       base = Config.root + "/rhizome"
@@ -64,7 +65,7 @@ class Prog::InstallRhizome < Prog::Base
     digest = frame["rhizome_digest"]
     RhizomeInstallation.dataset.insert_conflict(
       target: :id,
-      update: {folder:, commit:, digest:, installed_at: Sequel::CURRENT_TIMESTAMP}
+      update: {folder:, commit:, digest:, installed_at: Sequel::CURRENT_TIMESTAMP},
     ).insert(id: sshable.id, folder:, commit:, digest:)
 
     pop "installed rhizome"

@@ -87,7 +87,7 @@ class CertServerSetup
 
   def create_service
     service = "#{service_name}.service"
-    File.write("/etc/systemd/system/#{service}", <<CERT_SERVICE
+    File.write("/etc/systemd/system/#{service}", <<CERT_SERVICE,
 [Unit]
 Description=Certificate Server
 After=network.target

@@ -76,7 +76,7 @@ class Clover
         name: firewall_name,
         description:,
         location_id: @location.id,
-        project_id: @project.id
+        project_id: @project.id,
       )
       audit_log(firewall, "create")
     end
@@ -102,7 +102,7 @@ class Clover
       {
         location_id: it.location_id,
         value: it.ubid,
-        display_name: it.name
+        display_name: it.name,
       }
     }
     options.add_option(name: "private_subnet_id", values: subnets, parent: "location") do |location, private_subnet|

@@ -18,4 +18,8 @@ end
 #  expires_at | timestamp without time zone | NOT NULL
 #  policy     | text                        |
 # Indexes:
-#  project_invitation_pkey | PRIMARY KEY btree (project_id, email)
+#  project_invitation_pkey           | PRIMARY KEY btree (project_id, email)
+#  project_invitation_inviter_id_idx | btree (inviter_id)
+# Foreign key constraints:
+#  project_invitation_inviter_id_fkey | (inviter_id) REFERENCES accounts(id)
+#  project_invitation_project_id_fkey | (project_id) REFERENCES project(id)

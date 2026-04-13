@@ -7,7 +7,7 @@ class Serializers::KubernetesNodepool < Serializers::Base
       kubernetes_cluster_id: kn.cluster.ubid,
       name: kn.name,
       node_count: kn.node_count,
-      node_size: kn.target_node_size
+      node_size: kn.target_node_size,
     }
     if options[:detailed]
       base[:vms] = Serializers::Vm.serialize(kn.vms_dataset.all)

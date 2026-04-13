@@ -19,4 +19,27 @@ RSpec.describe CloverAdmin, "PostgresTimeline" do
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - PostgresTimeline #{@instance.ubid}"
   end
+
+  it "displays the backups table" do
+    mc = create_minio_cluster
+    allow(Config).to receive(:postgres_service_project_id).and_return(mc.project_id)
+    client = instance_double(Minio::Client, list_objects: [Struct.new(:key, :last_modified).new("basebackups_005/backup_stop_sentinel.json", Time.new(2020, 2, 29))])
+    expect(Minio::Client).to receive(:new).and_return(client)
+
+    visit "/model/PostgresTimeline/#{@instance.ubid}"
+    expect(page.status_code).to eq 200
+    expect(page).to have_table(class: "timeline-backups-table")
+    expect(page).to have_content("2020-02-29")
+  end
+
+  it "displays no data available when there are no backups" do
+    mc = create_minio_cluster
+    allow(Config).to receive(:postgres_service_project_id).and_return(mc.project_id)
+    client = instance_double(Minio::Client, list_objects: [])
+    expect(Minio::Client).to receive(:new).and_return(client)
+
+    visit "/model/PostgresTimeline/#{@instance.ubid}"
+    expect(page.status_code).to eq 200
+    expect(page).to have_content("No data available for Backups table")
+  end
 end

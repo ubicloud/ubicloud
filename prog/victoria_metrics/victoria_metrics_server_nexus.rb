@@ -25,11 +25,11 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
         size: vr.target_vm_size,
         storage_volumes: [
           {encrypted: true, size_gib: 30},
-          {encrypted: true, size_gib: vr.target_storage_size_gib}
+          {encrypted: true, size_gib: vr.target_storage_size_gib},
         ],
         boot_image: "ubuntu-noble",
         private_subnet_id: vr.private_subnet_id,
-        enable_ip4: true
+        enable_ip4: true,
       )
 
       id = ubid.to_uuid
@@ -128,7 +128,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
         admin_password: resource.admin_password,
         cert: victoria_metrics_server.cert,
         cert_key: victoria_metrics_server.cert_key,
-        ca_bundle: resource.root_certs
+        ca_bundle: resource.root_certs,
       })
 
       vm.sshable.d_run("configure_victoria_metrics", "/home/ubi/victoria_metrics/bin/configure", stdin: config_json)
@@ -234,7 +234,7 @@ class Prog::VictoriaMetrics::VictoriaMetricsServerNexus < Prog::Base
       extensions: ["subjectAltName=DNS:#{resource.hostname},DNS:#{resource.hostname}#{ip_san}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
       duration: 60 * 60 * 24 * 30 * 6, # ~6 months
       issuer_cert: root_cert,
-      issuer_key: root_cert_key
+      issuer_key: root_cert_key,
     ).map(&:to_pem)
   end
 end

@@ -16,7 +16,7 @@ RSpec.describe Prog::Kubernetes::KubernetesNodepoolNexus do
       private_subnet_id: subnet.id,
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     )
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: project.id)

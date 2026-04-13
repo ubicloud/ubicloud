@@ -13,9 +13,9 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "avg(rate(node_cpu_seconds_total{mode=~\"(iowait|user|system|steal|softirq)\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) by (mode) * 100"
-        )
-      ]
+          query: "avg(rate(node_cpu_seconds_total{mode=~\"(iowait|user|system|steal|softirq)\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) by (mode) * 100",
+        ),
+      ],
     ),
     load_average:
     MetricDefinition.new(
@@ -25,17 +25,17 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "1 minute"},
-          query: "sum(node_load1{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})"
+          query: "sum(node_load1{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})",
         ),
         TimeSeries.new(
           labels: {name: "5 minutes"},
-          query: "sum(node_load5{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})"
+          query: "sum(node_load5{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})",
         ),
         TimeSeries.new(
           labels: {name: "15 minutes"},
-          query: "sum(node_load15{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})"
-        )
-      ]
+          query: "sum(node_load15{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})",
+        ),
+      ],
     ),
     memory_usage:
     MetricDefinition.new(
@@ -45,13 +45,13 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Used Memory"},
-          query: "sum((1 - (node_memory_MemAvailable_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})) * 100)"
+          query: "sum((1 - (node_memory_MemAvailable_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})) * 100)",
         ),
         TimeSeries.new(
           labels: {name: "Cache & Buffers"},
-          query: "sum((node_memory_Cached_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} + node_memory_Buffers_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100)"
-        )
-      ]
+          query: "sum((node_memory_Cached_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} + node_memory_Buffers_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) / node_memory_MemTotal_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} * 100)",
+        ),
+      ],
     ),
     disk_usage:
     MetricDefinition.new(
@@ -61,9 +61,9 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Used Space"},
-          query: "100 - (sum(node_filesystem_avail_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_filesystem_size_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) * 100)"
-        )
-      ]
+          query: "100 - (sum(node_filesystem_avail_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"} / node_filesystem_size_bytes{mountpoint=\"/dat\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}) * 100)",
+        ),
+      ],
     ),
     disk_io:
     MetricDefinition.new(
@@ -73,13 +73,13 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Reads"},
-          query: "sum(rate(node_disk_reads_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(node_disk_reads_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Writes"},
-          query: "sum(rate(node_disk_writes_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
-        )
-      ]
+          query: "sum(rate(node_disk_writes_completed_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
+        ),
+      ],
     ),
     network_traffic:
     MetricDefinition.new(
@@ -89,13 +89,13 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Received"},
-          query: "sum(rate(node_network_receive_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(node_network_receive_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Transmitted"},
-          query: "sum(rate(node_network_transmit_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
-        )
-      ]
+          query: "sum(rate(node_network_transmit_bytes_total{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
+        ),
+      ],
     ),
     connection_count:
     MetricDefinition.new(
@@ -105,13 +105,13 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Active"},
-          query: "sum(pg_stat_activity_count{state=\"active\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})"
+          query: "sum(pg_stat_activity_count{state=\"active\", ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})",
         ),
         TimeSeries.new(
           labels: {name: "Total"},
-          query: "sum(pg_stat_activity_count{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})"
-        )
-      ]
+          query: "sum(pg_stat_activity_count{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"})",
+        ),
+      ],
     ),
     cache_hit_ratio:
     MetricDefinition.new(
@@ -121,9 +121,9 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "sum(rate(pg_stat_database_blks_hit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) / (sum(rate(pg_stat_database_blks_hit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) + sum(rate(pg_stat_database_blks_read{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))) * 100"
-        )
-      ]
+          query: "sum(rate(pg_stat_database_blks_hit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) / (sum(rate(pg_stat_database_blks_hit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m])) + sum(rate(pg_stat_database_blks_read{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))) * 100",
+        ),
+      ],
     ),
     operation_throughput:
     MetricDefinition.new(
@@ -133,21 +133,21 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Fetch"},
-          query: "sum(rate(pg_stat_database_tup_fetched{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(pg_stat_database_tup_fetched{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Insert"},
-          query: "sum(rate(pg_stat_database_tup_inserted{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(pg_stat_database_tup_inserted{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Update"},
-          query: "sum(rate(pg_stat_database_tup_updated{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(pg_stat_database_tup_updated{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Delete"},
-          query: "sum(rate(pg_stat_database_tup_deleted{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
-        )
-      ]
+          query: "sum(rate(pg_stat_database_tup_deleted{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
+        ),
+      ],
     ),
     deadlocks:
     MetricDefinition.new(
@@ -157,9 +157,9 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "sum(rate(pg_stat_database_deadlocks{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
-        )
-      ]
+          query: "sum(rate(pg_stat_database_deadlocks{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
+        ),
+      ],
     ),
     database_size:
     MetricDefinition.new(
@@ -169,9 +169,9 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {},
-          query: "topk(5, sum(pg_database_size_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\", datname!~\"template0|template1\"}) by (datname))"
-        )
-      ]
+          query: "topk(5, sum(pg_database_size_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\", datname!~\"template0|template1\"}) by (datname))",
+        ),
+      ],
     ),
     transactions:
     MetricDefinition.new(
@@ -181,13 +181,52 @@ module Metrics
       series: [
         TimeSeries.new(
           labels: {name: "Commits"},
-          query: "sum(rate(pg_stat_database_xact_commit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
+          query: "sum(rate(pg_stat_database_xact_commit{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
         ),
         TimeSeries.new(
           labels: {name: "Rollbacks"},
-          query: "sum(rate(pg_stat_database_xact_rollback{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))"
-        )
-      ]
-    )
+          query: "sum(rate(pg_stat_database_xact_rollback{ubicloud_resource_id=\"$ubicloud_resource_id\", ubicloud_resource_role=\"primary\"}[1m]))",
+        ),
+      ],
+    ),
+  }
+
+  ADMIN_POSTGRES_METRICS = {
+    archival_backlog:
+    MetricDefinition.new(
+      name: "Archival Backlog",
+      description: "Number of WAL files pending archival",
+      unit: "count",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Pending WAL files"},
+          query: "ubicloud_pg_archival_backlog{ubicloud_resource_id=\"$ubicloud_resource_id\"}",
+        ),
+      ],
+    ),
+    wal_lag:
+    MetricDefinition.new(
+      name: "WAL Lag",
+      description: "WAL replication lag from primary",
+      unit: "bytes",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Lag"},
+          query: "max(ubicloud_pg_wal_lsn_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\"}) - ubicloud_pg_wal_lsn_bytes{ubicloud_resource_id=\"$ubicloud_resource_id\"}",
+        ),
+      ],
+    ),
+    replay_lag:
+    MetricDefinition.new(
+      name: "Replay Lag",
+      description: "Replication replay lag (standbys/replicas)",
+      unit: "seconds",
+      series: [
+        TimeSeries.new(
+          labels: {name: "Lag"},
+          query: "time() - ubicloud_pg_last_xact_replay_timestamp_seconds{ubicloud_resource_id=\"$ubicloud_resource_id\"}",
+        ),
+      ],
+    ),
   }
 end

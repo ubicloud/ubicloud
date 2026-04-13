@@ -57,8 +57,8 @@ module AdminModelSpecHelper
 
     def create_aws_subnet
       ps_aws_resource = create_private_subnet_aws_resource
-      location_aws_az = create_location_aws_az
-      AwsSubnet.create(private_subnet_aws_resource_id: ps_aws_resource.id, location_aws_az_id: location_aws_az.id, ipv4_cidr: "10.0.0.0/24")
+      location_az = create_location_az
+      AwsSubnet.create(private_subnet_aws_resource_id: ps_aws_resource.id, location_aws_az_id: location_az.id, ipv4_cidr: "10.0.0.0/24")
     end
 
     def create_billing_info
@@ -74,7 +74,7 @@ module AdminModelSpecHelper
         resource_name: vm.name,
         span: Sequel::Postgres::PGRange.new(Time.now - 3600, nil),
         billing_rate_id: BillingRate.from_resource_properties("VmVCpu", vm.family, vm.location.name)["id"],
-        amount: vm.vcpus
+        amount: vm.vcpus,
       )
     end
 
@@ -179,7 +179,7 @@ module AdminModelSpecHelper
         storage_volumes: [{size_gib: 100}].to_json,
         engine: "vllm",
         engine_params: "{}",
-        replica_count: 1
+        replica_count: 1,
       )
     end
 
@@ -200,7 +200,7 @@ module AdminModelSpecHelper
         private_subnet_id: ps.id,
         load_balancer_id: lb.id,
         vm_size: "standard-2",
-        replica_count: 1
+        replica_count: 1,
       )
     end
 
@@ -211,7 +211,7 @@ module AdminModelSpecHelper
         completion_billing_resource: "completion",
         project_inflight_limit: 10,
         project_prompt_tps_limit: 100,
-        project_completion_tps_limit: 100
+        project_completion_tps_limit: 100,
       )
     end
 
@@ -231,7 +231,7 @@ module AdminModelSpecHelper
         inflight_limit: 1,
         priority: 1,
         inference_router_id: router.id,
-        inference_router_model_id: router_model.id
+        inference_router_model_id: router_model.id,
       )
     end
 
@@ -242,7 +242,7 @@ module AdminModelSpecHelper
         invoice_number: "test-invoice-#{SecureRandom.hex(4)}",
         content: {billing_info: {country: "US"}, cost: 10, subtotal: 10},
         begin_time: Time.now - 86400,
-        end_time: Time.now
+        end_time: Time.now,
       )
     end
 
@@ -267,7 +267,7 @@ module AdminModelSpecHelper
         location_id: Location::HETZNER_FSN1_ID,
         cp_node_count: 3,
         version: Option.kubernetes_versions.first,
-        target_node_size: "standard-2"
+        target_node_size: "standard-2",
       )
     end
 
@@ -277,7 +277,7 @@ module AdminModelSpecHelper
         access_key: "a",
         secret_key: "b",
         location_id: Location::HETZNER_FSN1_ID,
-        kubernetes_cluster_id: cluster.id
+        kubernetes_cluster_id: cluster.id,
       )
     end
 
@@ -296,6 +296,46 @@ module AdminModelSpecHelper
       project = Project.create(name: "test-project")
       ps = PrivateSubnet.create(name: "test-ps", project_id: project.id, location_id: Location::HETZNER_FSN1_ID, net4: "10.0.0.0/26", net6: "fdfa::/64")
       LoadBalancer.create(name: "test-lb", project_id: project.id, private_subnet_id: ps.id, health_check_endpoint: "/health")
+    end
+
+    def create_machine_image
+      project = Project.create(name: "test-project")
+      MachineImage.create(name: "test-image", arch: "x64", project_id: project.id, location_id: Location::HETZNER_FSN1_ID)
+    end
+
+    def create_machine_image_version
+      mi = create_machine_image
+      v = MachineImageVersion.create(
+        machine_image_id: mi.id,
+        version: "20240101",
+        actual_size_mib: 1024,
+      )
+      store = create_machine_image_store(project: mi.project)
+      kek = StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "a" * 64, init_vector: "b" * 24, auth_data: "test")
+      MachineImageVersionMetal.create_with_id(v,
+        store_id: store.id,
+        store_prefix: "test-prefix",
+        archive_kek_id: kek.id)
+      v
+    end
+
+    def create_machine_image_version_metal
+      v = create_machine_image_version
+      MachineImageVersionMetal[v.id]
+    end
+
+    def create_machine_image_store(project: nil)
+      project ||= Project.create(name: "test-project")
+      MachineImageStore.create(
+        project_id: project.id,
+        location_id: Location::HETZNER_FSN1_ID,
+        provider: "minio",
+        region: "eu",
+        endpoint: "https://minio.example.com/",
+        bucket: "test-bucket",
+        access_key: "test-access-key",
+        secret_key: "test-secret-key",
+      )
     end
 
     def create_load_balancer_port
@@ -319,14 +359,14 @@ module AdminModelSpecHelper
       Location.create(name: "test-loc", display_name: "Test Location", ui_name: "Test", visible: true, provider: "hetzner")
     end
 
-    def create_location_aws_az
+    def create_location_az
       location = Location.create(name: "us-east-1", display_name: "AWS US East 1", ui_name: "AWS US East", visible: true, provider: "aws", project_id: nil)
-      LocationAwsAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
+      LocationAz.create(location_id: location.id, az: "us-east-1a", zone_id: "use1-az1")
     end
 
-    def create_location_credential
+    def create_location_credential_aws
       location = Location.create(name: "test-loc-cred", display_name: "Test Location", ui_name: "Test", visible: true, provider: "aws")
-      LocationCredential.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
+      LocationCredentialAws.create(access_key: "test-key", secret_key: "test-secret") { it.id = location.id }
     end
 
     def create_minio_cluster
@@ -338,7 +378,7 @@ module AdminModelSpecHelper
         location_id: Location::HETZNER_FSN1_ID,
         private_subnet_id: ps.id,
         admin_user: "admin",
-        admin_password: "test-password"
+        admin_password: "test-password",
       )
     end
 
@@ -379,7 +419,7 @@ module AdminModelSpecHelper
         authorization_endpoint: "/oauth/authorize",
         token_endpoint: "/oauth/token",
         userinfo_endpoint: "/oauth/userinfo",
-        jwks_uri: "https://test.example.com/.well-known/jwks.json"
+        jwks_uri: "https://test.example.com/.well-known/jwks.json",
       )
     end
 
@@ -413,7 +453,7 @@ module AdminModelSpecHelper
         admin_user: "admin",
         admin_password: "test-password",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 100
+        target_storage_size_gib: 100,
       )
       VictoriaMetricsServer.create(victoria_metrics_resource_id: vmr.id, vm_id: vm.id)
       pg = create_postgres_resource(project:, location_id: Location::HETZNER_FSN1_ID)
@@ -497,7 +537,7 @@ module AdminModelSpecHelper
 
     def create_vhost_block_backend
       host = Prog::Vm::HostNexus.assemble("1.2.3.4").subject
-      VhostBlockBackend.create(vm_host_id: host.id, version: "24.01", allocation_weight: 100)
+      VhostBlockBackend.create(vm_host_id: host.id, version_code: 401, allocation_weight: 100)
     end
 
     def create_victoria_metrics_resource
@@ -511,7 +551,7 @@ module AdminModelSpecHelper
         admin_user: "admin",
         admin_password: "test-password",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 100
+        target_storage_size_gib: 100,
       )
     end
 
@@ -540,7 +580,7 @@ module AdminModelSpecHelper
         used_memory_gib: 0,
         total_cpu_percent: 200,
         used_cpu_percent: 0,
-        family: "standard"
+        family: "standard",
       )
     end
 
@@ -555,7 +595,7 @@ module AdminModelSpecHelper
         vm_size: "standard-2",
         boot_image: "ubuntu-jammy",
         location_id: Location::HETZNER_FSN1_ID,
-        storage_size_gib: 86
+        storage_size_gib: 86,
       )
     end
 

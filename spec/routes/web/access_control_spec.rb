@@ -34,7 +34,7 @@ RSpec.describe Clover, "access control" do
       expect(page.title).to eq("Ubicloud - Default - Access Control")
 
       expect(displayed_access_control_entries).to eq [
-        "Tag: Admin", "All", "All"
+        "Tag: Admin", "All", "All",
       ]
 
       ace = AccessControlEntry.create(project_id:, subject_id: user.id)
@@ -42,7 +42,7 @@ RSpec.describe Clover, "access control" do
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Tname", "All Actions", "All Objects"
+        "Tname", "All Actions", "All Objects",
       ]
 
       st = SubjectTag.create(project_id:, name: "STest")
@@ -51,7 +51,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       at = ActionTag.create(project_id:, name: "ATest")
@@ -61,7 +61,7 @@ RSpec.describe Clover, "access control" do
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
         "Tname", "ATest", "All Objects",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       AccessControlEntry.create(project_id:, subject_id: user.id, action_id: ActionType::NAME_MAP["Project:view"])
@@ -71,7 +71,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "All Actions", "All Objects",
         "Tname", "Project:view", "All Objects",
         "Tname", "ATest", "All Objects",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       ot1 = ObjectTag.create(project_id:, name: "OTest1")
@@ -83,7 +83,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "Project:view", "All Objects",
         "Tname", "ATest", "All Objects",
         "Tname", "ATest", "OTest1",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       ot2 = ObjectTag.create(project_id:, name: "OTest2")
@@ -96,7 +96,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "All Objects",
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot2.id)
@@ -109,7 +109,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
         "Tname", "ATest", "OTest2",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       AccessControlEntry.create(project_id:, subject_id: user.id, action_id: ActionTag[project_id: nil, name: "Member"].id, object_id: ot2.id)
@@ -123,7 +123,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
         "Tname", "ATest", "OTest2",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       inference_api_key = ApiKey.create_inference_api_key(project)
@@ -139,7 +139,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
         "Tname", "ATest", "OTest2",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       AccessControlEntry.create(project_id:, subject_id: user.id, action_id: at.id, object_id: ot1.metatag_uuid)
@@ -155,7 +155,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "ATest", "OTest1",
         "Tname", "ATest", "OTest2",
         "Tname", "ATest", "OTest2",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
 
       project.subject_tags_dataset.where(name: "Admin").first.remove_members([user.id])
@@ -173,7 +173,7 @@ RSpec.describe Clover, "access control" do
         "Account: Tname", "Tag: ATest", "Tag: OTest1",
         "Account: Tname", "Tag: ATest", "Tag: OTest2",
         "Account: Tname", "Tag: ATest", "Tag: OTest2",
-        "Tag: STest", "All", "All"
+        "Tag: STest", "All", "All",
       ]
     end
 
@@ -188,7 +188,7 @@ RSpec.describe Clover, "access control" do
       page.refresh
       expect(page.title).to eq "Ubicloud - Default - Access Control"
       expect(displayed_access_control_entries).to eq [
-        "Account: foo", "Project:viewaccess", "All"
+        "Account: foo", "Project:viewaccess", "All",
       ]
       expect(page).to have_no_content("Save All")
       expect(page).to have_no_content("New Access Control Entry")
@@ -197,7 +197,7 @@ RSpec.describe Clover, "access control" do
       page.refresh
       expect(displayed_access_control_entries).to eq [
         "foo", "Project:editaccess", "All Objects",
-        "foo", "Project:viewaccess", "All Objects"
+        "foo", "Project:viewaccess", "All Objects",
       ]
       expect(page).to have_content("Save All")
       expect(page).to have_content("New Access Control Entry")
@@ -209,7 +209,7 @@ RSpec.describe Clover, "access control" do
       visit "#{project.path}/user/access-control"
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Member", "Member", "All Objects"
+        "Member", "Member", "All Objects",
       ]
     end
 
@@ -227,7 +227,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
-        "Member", "Member", "All Objects"
+        "Member", "Member", "All Objects",
       ]
 
       within("#ace-template .subject") { select "STest" }
@@ -239,7 +239,7 @@ RSpec.describe Clover, "access control" do
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "All Objects",
         "Member", "Member", "All Objects",
-        "STest", "ATest", "OTest"
+        "STest", "ATest", "OTest",
       ]
 
       within("#ace-template .subject") { select "STest" }
@@ -251,7 +251,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "All Actions", "All Objects",
         "Member", "Member", "All Objects",
         "STest", "Member", "All Objects",
-        "STest", "ATest", "OTest"
+        "STest", "ATest", "OTest",
       ]
 
       within("#ace-template .subject") { select "STest" }
@@ -264,7 +264,7 @@ RSpec.describe Clover, "access control" do
         "Tname", "All Actions", "All Objects",
         "Member", "Member", "All Objects",
         "STest", "Member", "All Objects",
-        "STest", "ATest", "OTest"
+        "STest", "ATest", "OTest",
       ]
     end
 
@@ -278,7 +278,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Member", "Member", "All Objects",
-        "STest", "All Actions", "All Objects"
+        "STest", "All Actions", "All Objects",
       ]
     end
 
@@ -292,7 +292,7 @@ RSpec.describe Clover, "access control" do
       expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
-        "Member", "Member", "All Objects"
+        "Member", "Member", "All Objects",
       ]
     end
 
@@ -303,7 +303,7 @@ RSpec.describe Clover, "access control" do
       click_button "Save All"
       expect(find_by_id("flash-notice").text).to include("Access control entries saved successfully")
       expect(displayed_access_control_entries).to eq [
-        "Tag: Admin", "All", "All"
+        "Tag: Admin", "All", "All",
       ]
     end
 
@@ -389,7 +389,7 @@ RSpec.describe Clover, "access control" do
         if type == "subject"
           expect(tds).to eq [
             "Admin", "Manage",
-            "Member", "Manage\nRemove"
+            "Member", "Manage\nRemove",
           ]
         else
           expect(tds).to eq []
@@ -403,7 +403,7 @@ RSpec.describe Clover, "access control" do
           expect(tds).to eq [
             "Admin", "Manage",
             "Member", "Manage\nRemove",
-            "test-subject", "Manage\nRemove"
+            "test-subject", "Manage\nRemove",
           ]
         else
           expect(tds).to eq ["test-#{type}", "Manage\nRemove"]
@@ -436,20 +436,20 @@ RSpec.describe Clover, "access control" do
         page.refresh
         expect(page).to have_no_content("Create #{cap_type} Tag")
         expect(page.all("table#tag-list td").map(&:text)).to eq [
-          "test-#{type}1", "Manage"
+          "test-#{type}1", "Manage",
         ]
         expect(page.all("table#tag-list td a").map(&:text)).to eq [
-          "Manage"
+          "Manage",
         ]
 
         AccessControlEntry.create(project_id: project.id, subject_id: user.id, action_id: ActionType::NAME_MAP[perm_type])
         page.refresh
         expect(page).to have_content("Create #{cap_type} Tag")
         expect(page.all("table#tag-list td").map(&:text)).to eq [
-          "test-#{type}1", "Manage\nRemove"
+          "test-#{type}1", "Manage\nRemove",
         ]
         expect(page.all("table#tag-list td a").map(&:text)).to eq [
-          "Manage"
+          "Manage",
         ]
 
         click_link "Manage"
@@ -822,7 +822,7 @@ RSpec.describe Clover, "access control" do
       click_button "Add Members"
       expect(page).to have_flash_notice "1 members added to object tag"
       expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
-        "InferenceApiKey: #{inference_api_key.ubid}", ""
+        "InferenceApiKey: #{inference_api_key.ubid}", "",
       ]
     end
 
@@ -838,7 +838,7 @@ RSpec.describe Clover, "access control" do
       expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
         "ObjectTag: other-obj", "",
         "ObjectTag: test-obj", "",
-        "Tag: other-obj", ""
+        "Tag: other-obj", "",
       ]
     end
 
@@ -853,7 +853,7 @@ RSpec.describe Clover, "access control" do
       expect(page).to have_flash_notice "2 members added to object tag"
       expect(page.all("table#tag-membership-remove td").map(&:text)).to eq [
         "ActionTag: at", "",
-        "SubjectTag: st", ""
+        "SubjectTag: st", "",
       ]
     end
 
@@ -865,7 +865,7 @@ RSpec.describe Clover, "access control" do
       expect(displayed_access_control_entries).to eq [
         "Tag: Admin", "All", "All",
         "Tname", "All Actions", "test-obj",
-        "Member", "Member", "All Objects"
+        "Member", "Member", "All Objects",
       ]
     end
 

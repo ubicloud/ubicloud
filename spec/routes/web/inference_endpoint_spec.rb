@@ -30,7 +30,7 @@ RSpec.describe Clover, "inference-endpoint" do
         ["ie4", "mistral-small-3", project, false, true, {capability: "Text Generation"}],
         ["ie5", "llama-3-3-70b-turbo", project, false, true, {capability: "Text Generation"}],
         ["ie6", "test-model", project_wo_permissions, false, true, {capability: "Text Generation"}],
-        ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}]
+        ["ie7", "unknown-capability", project_wo_permissions, true, true, {capability: "wrong capability"}],
       ].each do |name, model_name, project, is_public, visible, tags|
         InferenceEndpoint.create(name:, model_name:, project_id: project.id, is_public:, visible:, load_balancer_id: lb.id, location_id: Location::HETZNER_FSN1_ID, vm_size: "size", replica_count: 1, boot_image: "image", storage_volumes: [], engine_params: "", engine: "vllm", private_subnet_id: ps.id, tags:)
       end
@@ -50,32 +50,32 @@ RSpec.describe Clover, "inference-endpoint" do
     it "shows the right inference router models" do
       private_subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "dummy-ps-1", location_id: Location::HETZNER_FSN1_ID).subject
       load_balancer = LoadBalancer.create(
-        private_subnet_id: private_subnet.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id
+        private_subnet_id: private_subnet.id, name: "dummy-lb-1", health_check_endpoint: "/up", project_id: project.id,
       )
       LoadBalancerPort.create(load_balancer_id: load_balancer.id, src_port: 80, dst_port: 8000)
       inference_router = InferenceRouter.create(
         name: "ir-name", location_id: Location::HETZNER_FSN1_ID, vm_size: "standard-2", replica_count: 1,
-        project_id: project.id, load_balancer_id: load_balancer.id, private_subnet_id: private_subnet.id
+        project_id: project.id, load_balancer_id: load_balancer.id, private_subnet_id: private_subnet.id,
       )
       [
         ["meta-llama/Llama-3.2-1B-Instruct", "llama-3-2-1b-it-input", "llama-3-2-1b-it-output", true, {capability: "Text Generation", hf_model: "foo/bar"}],
         ["Invisible Model", "test-model-input", "test-model-output", false, {capability: "Text Generation"}],
-        ["Unknown Capability", "test-model2-input", "test-model2-output", true, {capability: "Unknown"}]
+        ["Unknown Capability", "test-model2-input", "test-model2-output", true, {capability: "Unknown"}],
       ].each do |model_name, prompt_billing, completion_billing, visible, tags|
         model = InferenceRouterModel.create(
           model_name:, prompt_billing_resource: prompt_billing, completion_billing_resource: completion_billing,
           project_inflight_limit: 100, project_prompt_tps_limit: 10_000, project_completion_tps_limit: 10_000,
-          visible:, tags:
+          visible:, tags:,
         )
         InferenceRouterTarget.create(
           name: "test-target", host: "test-host", api_key: "test-key", inflight_limit: 10, priority: 1,
-          inference_router_model_id: model.id, inference_router_id: inference_router.id, enabled: true
+          inference_router_model_id: model.id, inference_router_id: inference_router.id, enabled: true,
         )
       end
       InferenceRouterModel.create(
         model_name: "Model without Target", prompt_billing_resource: "test-model2-input", completion_billing_resource: "test-model2-output",
         project_inflight_limit: 100, project_prompt_tps_limit: 10_000, project_completion_tps_limit: 10_000,
-        visible: true, tags: {capability: "Text Generation"}
+        visible: true, tags: {capability: "Text Generation"},
       )
 
       visit "#{project.path}/inference-endpoint"
@@ -109,7 +109,7 @@ RSpec.describe Clover, "inference-endpoint" do
         engine_params: "",
         engine: "vllm",
         private_subnet_id: private_subnet.id,
-        tags: {capability: "Text Generation"}
+        tags: {capability: "Text Generation"},
       )
       inference_router = InferenceRouter.create(
         name: "ir-name",
@@ -118,7 +118,7 @@ RSpec.describe Clover, "inference-endpoint" do
         replica_count: 1,
         project_id: project.id,
         load_balancer_id: load_balancer.id,
-        private_subnet_id: private_subnet.id
+        private_subnet_id: private_subnet.id,
       )
       inference_router_model = InferenceRouterModel.create(
         model_name: "meta-llama/Llama-3.2-1B-Instruct",
@@ -128,7 +128,7 @@ RSpec.describe Clover, "inference-endpoint" do
         project_prompt_tps_limit: 1000,
         project_completion_tps_limit: 1000,
         visible: true,
-        tags: {capability: "Text Generation"}
+        tags: {capability: "Text Generation"},
       )
       InferenceRouterTarget.create(
         name: "test-target",
@@ -138,7 +138,7 @@ RSpec.describe Clover, "inference-endpoint" do
         priority: 1,
         inference_router_model_id: inference_router_model.id,
         inference_router_id: inference_router.id,
-        enabled: true
+        enabled: true,
       )
       visit "#{project.path}/inference-endpoint"
       expect(page.title).to eq("Ubicloud - Inference Endpoints")
@@ -171,7 +171,7 @@ RSpec.describe Clover, "inference-endpoint" do
         resource_name: ie.name,
         span: Sequel::Postgres::PGRange.new(Sequel::CURRENT_TIMESTAMP, nil),
         billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
-        amount: 100000
+        amount: 100000,
       )
       visit "#{project.path}/inference-api-key"
       expect(page.text).to include("You have 400000 free inference tokens available (few-minute delay). Free quota refreshes next month.")
@@ -182,7 +182,7 @@ RSpec.describe Clover, "inference-endpoint" do
         resource_name: ie.name,
         span: Sequel::Postgres::PGRange.new(Sequel::CURRENT_TIMESTAMP, nil),
         billing_rate_id: BillingRate.from_resource_type("InferenceTokens").first["id"],
-        amount: 99999999
+        amount: 99999999,
       )
       visit "#{project.path}/inference-api-key"
       expect(page.text).to include("You have 0 free inference tokens available (few-minute delay). Free quota refreshes next month.")

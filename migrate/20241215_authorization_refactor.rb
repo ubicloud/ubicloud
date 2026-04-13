@@ -114,7 +114,7 @@ Sequel.migration do
             .where(project_id: nil)
             .where(Sequel.like(:name, "%:all"))
             .exclude(name: "Project:all")
-            .select(member_id, :id)
+            .select(member_id, :id),
         ))
 
     create_table(:access_control_entry) do

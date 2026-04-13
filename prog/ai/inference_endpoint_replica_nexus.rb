@@ -27,14 +27,14 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         boot_image: inference_endpoint.boot_image,
         private_subnet_id: inference_endpoint.load_balancer.private_subnet.id,
         enable_ip4: true,
-        gpu_count: inference_endpoint.gpu_count
+        gpu_count: inference_endpoint.gpu_count,
       )
 
       inference_endpoint.load_balancer.add_vm(vm_st.subject)
 
       replica = InferenceEndpointReplica.create(
         inference_endpoint_id:,
-        vm_id: vm_st.id
+        vm_id: vm_st.id,
       ) { it.id = ubid.to_uuid }
 
       Strand.create_with_id(replica, prog: "Ai::InferenceEndpointReplicaNexus", label: "start")
@@ -92,7 +92,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
         ssl_crt_path: "/ie/workdir/ssl/ubi_cert.pem",
         ssl_key_path: "/ie/workdir/ssl/ubi_key.pem",
         gateway_port: inference_endpoint.load_balancer.ports.first.dst_port,
-        max_requests: inference_endpoint.max_requests
+        max_requests: inference_endpoint.max_requests,
       }
       params_json = JSON.generate(params)
       vm.sshable.cmd("common/bin/daemonizer 'sudo inference_endpoint/bin/setup-replica' setup", stdin: params_json)
@@ -162,7 +162,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
       vm_ubid: vm.ubid,
       vm_ip: vm.sshable.host,
       vm_host_ubid: vm.vm_host.ubid,
-      vm_host_ip: vm.vm_host.sshable.host
+      vm_host_ip: vm.vm_host.sshable.host,
     }
     Prog::PageNexus.assemble("Replica #{inference_endpoint_replica.ubid.to_s[0..7]} of inference endpoint #{inference_endpoint.name} is unavailable",
       ["InferenceEndpointReplicaUnavailable", inference_endpoint_replica.ubid],
@@ -200,14 +200,14 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
           ubid: it.ubid,
           api_keys: it.api_keys.select { |k| k.used_for == "inference_endpoint" && k.is_valid }.map { |k| Digest::SHA2.hexdigest(k.key) },
           quota_rps: inference_endpoint.max_project_rps,
-          quota_tps: inference_endpoint.max_project_tps
+          quota_tps: inference_endpoint.max_project_tps,
         }
     end
 
     body = {
       replica_ubid: inference_endpoint_replica.ubid,
       public_endpoint: inference_endpoint.is_public,
-      projects: eligible_projects
+      projects: eligible_projects,
     }
 
     project_usage = vm.sshable.cmd_json("sudo curl -m 10 --no-progress-meter -H \"Content-Type: application/json\" -X POST --data-binary @- --unix-socket /ie/workdir/inference-gateway.clover.sock http://localhost/control", stdin: body.to_json)["projects"]
@@ -247,7 +247,7 @@ class Prog::Ai::InferenceEndpointReplicaNexus < Prog::Base
             resource_name: "#{resource_family} #{begin_time.strftime("%Y-%m-%d")}",
             billing_rate_id: rate_id,
             span: Sequel.pg_range(begin_time...end_time),
-            amount: tokens
+            amount: tokens,
           )
         end
       rescue Sequel::Error => ex
@@ -350,7 +350,7 @@ sudo cat /ie/workdir/.ssh/runpod.pub
     {
       pod_id: pod["id"],
       ip: port&.fetch("ip"),
-      port: port&.fetch("publicPort")
+      port: port&.fetch("publicPort"),
     }
   end
 

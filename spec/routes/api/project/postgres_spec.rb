@@ -2,7 +2,7 @@
 
 require_relative "../spec_helper"
 
-RSpec.describe Clover, "vm" do
+RSpec.describe Clover, "postgres" do
   let(:user) { create_account }
 
   let(:project) { project_with_default_policy(user) }
@@ -28,7 +28,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-foo-1",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       )
 
       Prog::Postgres::PostgresResourceNexus.assemble(
@@ -36,7 +36,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-foo-2",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       )
 
       get "/project/#{project.ubid}/postgres"
@@ -51,7 +51,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-production",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg.update(tags: [{key: "environment", value: "production"}])
 
@@ -69,7 +69,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-production",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg.update(tags: [{key: "environment", value: "production"}])
 
@@ -87,7 +87,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-prod-backend",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg1.update(tags: [{key: "environment", value: "production"}, {key: "team", value: "backend"}])
 
@@ -96,7 +96,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-prod-frontend",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg2.update(tags: [{key: "environment", value: "production"}, {key: "team", value: "frontend"}])
 
@@ -105,7 +105,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-staging-backend",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg3.update(tags: [{key: "environment", value: "staging"}, {key: "team", value: "backend"}])
 
@@ -123,7 +123,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-test",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg.update(tags: [{key: "environment", value: "development"}])
 
@@ -139,7 +139,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-test",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg.update(tags: [{key: "environment", value: "production"}, {key: "team", value: "frontend"}])
 
@@ -156,7 +156,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-prod-backend",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg1.update(tags: [{key: "environment", value: "production"}, {key: "team", value: "backend"}])
 
@@ -165,7 +165,7 @@ RSpec.describe Clover, "vm" do
         location_id: Location::HETZNER_FSN1_ID,
         name: "pg-staging-backend",
         target_vm_size: "standard-2",
-        target_storage_size_gib: 128
+        target_storage_size_gib: 128,
       ).subject
       pg2.update(tags: [{key: "environment", value: "staging"}, {key: "team", value: "backend"}])
 

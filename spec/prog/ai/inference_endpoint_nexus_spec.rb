@@ -36,7 +36,7 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
         max_requests: 500,
         max_project_rps: 100,
         max_project_tps: 10000,
-        tags: {}
+        tags: {},
       )
 
       described_class.assemble_with_model(project_id: 1, location_id: Location::HETZNER_FSN1_ID, name: "test-endpoint", model_id: "model_id")
@@ -118,6 +118,12 @@ RSpec.describe Prog::Ai::InferenceEndpointNexus do
       Vm.dataset.destroy
       expect {
         ie_project.destroy
+      }.to raise_error(Sequel::ForeignKeyConstraintViolation)
+
+      DnsZone.dataset.destroy
+      ie_project.destroy
+
+      expect {
         described_class.assemble(project_id: customer_project.id, location_id: Location::HETZNER_FSN1_ID, boot_image: "ai-ubuntu-2404-nvidia", name: "test-endpoint", vm_size: "standard-gpu-6", storage_volumes: [{encrypted: true, size_gib: 80}], model_name: "llama-3-1-8b-it", engine: "vllm", engine_params: "", replica_count: 1, is_public: false, gpu_count: 1, tags: {}, max_requests: 500, max_project_rps: 100, max_project_tps: 10000)
       }.to raise_error("No project configured for inference endpoints")
     end

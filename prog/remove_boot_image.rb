@@ -21,7 +21,7 @@ class Prog::RemoveBootImage < Prog::Base
 
   label def update_database
     StorageDevice.where(vm_host_id: boot_image.vm_host.id, name: "DEFAULT").update(
-      available_storage_gib: Sequel[:available_storage_gib] + boot_image.size_gib
+      available_storage_gib: Sequel[:available_storage_gib] + boot_image.size_gib,
     )
     boot_image.destroy
     pop "Boot image was removed."

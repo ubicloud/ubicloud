@@ -1,0 +1,49 @@
+#!/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+if ARGV.count != 1
+  fail "Wrong number of arguments. Expected 1 (pg version), given #{ARGV.count}"
+end
+
+version = Integer(ARGV[0], 10)
+output_path = "/var/lib/node_exporter/pg_metrics.prom"
+
+lines = []
+
+# Archival backlog: count of WAL files pending archival
+backlog = r("sudo", "find", "/dat/#{version}/data/pg_wal/archive_status", "-name", "*.ready").count("\n")
+lines << "# HELP ubicloud_pg_archival_backlog Number of WAL files pending archival\n"
+lines << "# TYPE ubicloud_pg_archival_backlog gauge\n"
+lines << "ubicloud_pg_archival_backlog #{backlog}\n"
+
+# Current WAL LSN as integer bytes
+is_recovery = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT pg_is_in_recovery()").strip
+lsn_func = if is_recovery == "t"
+  lsn = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT pg_last_wal_receive_lsn()").strip
+  lsn.empty? ? "pg_last_wal_replay_lsn" : "pg_last_wal_receive_lsn"
+else
+  "pg_current_wal_lsn"
+end
+
+lsn = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT #{lsn_func}()").strip
+unless lsn.empty?
+  high, low = lsn.split("/")
+  lsn_bytes = high.to_i(16) << 32 | low.to_i(16)
+  lines << "# HELP ubicloud_pg_wal_lsn_bytes Current WAL LSN position in bytes\n"
+  lines << "# TYPE ubicloud_pg_wal_lsn_bytes gauge\n"
+  lines << "ubicloud_pg_wal_lsn_bytes #{lsn_bytes}\n"
+end
+
+# Last replay timestamp (standbys/replicas only)
+if is_recovery == "t"
+  ts = r("sudo", "-u", "postgres", "psql", "-t", "-A", "-c", "SELECT extract(epoch FROM pg_last_xact_replay_timestamp())").strip
+  unless ts.empty?
+    lines << "# HELP ubicloud_pg_last_xact_replay_timestamp_seconds Last transaction replay timestamp as Unix epoch\n"
+    lines << "# TYPE ubicloud_pg_last_xact_replay_timestamp_seconds gauge\n"
+    lines << "ubicloud_pg_last_xact_replay_timestamp_seconds #{ts}\n"
+  end
+end
+
+safe_write_to_file(output_path, lines.join)

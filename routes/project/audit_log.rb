@@ -20,7 +20,7 @@ class Clover
             at: row[:at].getutc.iso8601,
             action: "#{row[:ubid_type]}/#{row[:action]}",
             subject_id: UBID.to_ubid(subject_id),
-            object_ids: row[:object_ids].map { UBID.to_ubid(it) }
+            object_ids: row[:object_ids].map { UBID.to_ubid(it) },
           }
 
           if (subject_name = ubids[subject_id]&.name)
@@ -36,19 +36,30 @@ class Clover
           subject_id = log[:subject_id]
           subject_ubid = UBID.to_ubid(subject_id)
           subject_name = ubids[subject_id]&.name || subject_ubid
-          log[:subject] = "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;subject=#{h subject_ubid}\">#{h subject_name}</a>"
+          log[:subject] = [subject_name, {link: "?#{to_query_string("end" => end_date, "subject" => subject_ubid)}"}]
 
           log[:objects] = log[:object_ids].filter_map do |object_id|
             object_ubid = UBID.to_ubid(object_id)
+            l_params = to_query_string("end" => end_date, "object" => object_ubid)
             if (obj = ubids[object_id]) && obj.respond_to?(:name) && obj.respond_to?(:path)
-              "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;object=#{h object_ubid}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
+              "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h obj.name}</a> (<a class=\"text-orange-600\" href=\"#{@project.path}#{obj.path}\">View</a>)"
             else
-              "<a class=\"text-orange-600\" href=\"?end=#{end_date}&amp;object=#{h object_ubid}\">#{h object_ubid}</a>"
+              "<a class=\"text-orange-600\" href=\"?#{h l_params}\">#{h object_ubid}</a>"
             end
           end
         end
         view "project/audit_log"
       end
+    end
+
+    r.get web?, @project.get_ff_authentication_audit_log, "authentication" do
+      accounts_dataset = @project.accounts_dataset
+      authentication_audit_log_search(
+        DB[:account_authentication_audit_log].join(accounts_dataset.select(Sequel[:id].as(:account_id), Sequel[:name].as(:account_name)).as(:accounts), [:account_id]),
+        accounts_dataset:,
+        month_limit: 3,
+      )
+      view "project/authentication_audit_log"
     end
   end
 end

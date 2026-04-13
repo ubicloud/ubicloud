@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |spec|
   spec.name = "ubi-csi"
-  spec.version = "0.8.0"
+  spec.version = "0.10.0"
   spec.authors = ["Ubicloud"]
   spec.email = ["support@ubicloud.com"]
 
@@ -10,7 +10,7 @@ Gem::Specification.new do |spec|
   spec.description = "Container Storage Interface driver for Ubicloud"
   spec.homepage = "https://github.com/ubicloud/ubicloud"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 3.2.0"
+  spec.required_ruby_version = "~> 4.0"
 
   spec.files = Dir["lib/**/*", "bin/**/*"]
   spec.bindir = "bin"
@@ -18,8 +18,9 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   spec.add_dependency "base64"
-  spec.add_dependency "grpc", "~> 1.76"
-  spec.add_dependency "grpc-tools", "~> 1.76"
+  spec.add_dependency "logger"
+  spec.add_dependency "grpc", "1.78.1"
+  spec.add_dependency "grpc-tools", "1.78.1"
 
   spec.add_development_dependency "rspec", "~> 3.12"
   spec.add_development_dependency "simplecov", "~> 0.22"

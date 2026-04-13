@@ -79,7 +79,7 @@ RSpec.describe Vm do
   end
 
   describe "#load_balancer_state" do
-    it "returns nil if there is related object" do
+    it "returns nil if there is no related object" do
       expect(vm.load_balancer_state).to be_nil
     end
 
@@ -279,7 +279,7 @@ RSpec.describe Vm do
       end
 
       it "checks volume services if present" do
-        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vbb = create_vhost_block_backend(vm_host_id: vmh.id)
         vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
         expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
@@ -297,7 +297,7 @@ RSpec.describe Vm do
 
     context "when vm is sshable" do
       it "checks only volume services if present" do
-        vbb = VhostBlockBackend.create(version: "v1", allocation_weight: 100, vm_host_id: vmh.id)
+        vbb = create_vhost_block_backend(vm_host_id: vmh.id)
         vol = VmStorageVolume.create(vm_id: pulse_vm.id, disk_index: 0, size_gib: 10, boot: true, vhost_block_backend_id: vbb.id, vring_workers: 1)
 
         expected_cmd = "systemctl is-active #{pulse_vm.inhost_name} #{pulse_vm.inhost_name}-dnsmasq #{vol.vhost_backend_systemd_unit_name}"
@@ -336,6 +336,7 @@ RSpec.describe Vm do
     vmh = create_vm_host(total_cpus: 12, total_cores: 12, total_dies: 1, total_sockets: 1, accepts_slices: true)
     vm = Prog::Vm::Nexus.assemble("a a", project_id).subject
     vm.update(vm_host_id: vmh.id)
+    vm.vm_storage_volumes_dataset.destroy
 
     expect(JSON.parse(vm.params_json)["init_script"]).to eq ""
     VmInitScript.create_with_id(vm, init_script: "c")
@@ -348,8 +349,8 @@ RSpec.describe Vm do
     let(:spdk_installation) { SpdkInstallation.create_with_id(vm_host.id, vm_host_id: vm_host.id, version: "spdk1", allocation_weight: 100, cpu_count: 2) }
     let(:storage_device) { StorageDevice.create(vm_host_id: vm_host.id, name: "default", available_storage_gib: 200, total_storage_gib: 200) }
     let(:boot_image) { BootImage.create(name: "boot_image", version: "1", vm_host_id: vm_host.id, activated_at: Time.now, size_gib: 1) }
-    let(:kek) { StorageKeyEncryptionKey.create(algorithm: "aes-256-gcm", key: "testkey", init_vector: "iv", auth_data: "auth") }
-    let(:vbb) { VhostBlockBackend.create(version: "v0.1-5", allocation_weight: 100, vm_host_id: vm_host.id) }
+    let(:kek) { StorageKeyEncryptionKey.create_random(auth_data: "auth_data") }
+    let(:vbb) { create_vhost_block_backend(vm_host_id: vm_host.id) }
     let(:vm) { create_vm(vm_host_id: vm_host.id) }
 
     before do
@@ -361,20 +362,20 @@ RSpec.describe Vm do
         vm_id: vm.id, disk_index: 0, size_gib: 1, boot: true,
         boot_image_id: boot_image.id, key_encryption_key_1_id: kek.id,
         spdk_installation_id: spdk_installation.id, use_bdev_ubi: false,
-        storage_device_id: storage_device.id
+        storage_device_id: storage_device.id,
       )
       VmStorageVolume.create(
         vm_id: vm.id, disk_index: 1, size_gib: 100, boot: false,
         spdk_installation_id: spdk_installation.id, use_bdev_ubi: true,
         storage_device_id: storage_device.id, max_read_mbytes_per_sec: 200,
-        max_write_mbytes_per_sec: 300, vhost_block_backend_id: vbb.id, vring_workers: 4
+        max_write_mbytes_per_sec: 300, vhost_block_backend_id: vbb.id, vring_workers: 4,
       )
 
       (0..total_cpus - 1).each do |cpu|
         VmHostCpu.create(
           vm_host_id: vm_host.id,
           cpu_number: cpu,
-          spdk: cpu < vm_host.spdk_cpu_count
+          spdk: cpu < vm_host.spdk_cpu_count,
         )
       end
     end
@@ -390,16 +391,23 @@ RSpec.describe Vm do
          "max_read_mbytes_per_sec" => nil,
          "max_write_mbytes_per_sec" => nil,
          "vhost_block_backend_version" => nil, "num_queues" => 1, "queue_size" => 256,
-         "copy_on_read" => false, "slice_name" => "system.slice"},
+         "copy_on_read" => false, "slice_name" => "system.slice", "track_written" => false},
         {"boot" => false, "image" => nil, "image_version" => nil, "size_gib" => 100,
          "device_id" => expected_device_id_1, "disk_index" => 1, "encrypted" => false,
          "spdk_version" => "spdk1", "use_bdev_ubi" => true,
          "storage_device" => "default", "read_only" => false,
          "max_read_mbytes_per_sec" => 200,
          "max_write_mbytes_per_sec" => 300,
-         "vhost_block_backend_version" => "v0.1-5", "num_queues" => 4, "queue_size" => 64,
-         "copy_on_read" => false, "slice_name" => "system.slice"}
+         "vhost_block_backend_version" => vbb.version, "num_queues" => 4, "queue_size" => 64,
+         "copy_on_read" => false, "slice_name" => "system.slice", "track_written" => false},
       ])
+    end
+
+    it "includes track_written true when set on a volume" do
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 1).update(track_written: true)
+      volumes = vm.storage_volumes
+      expect(volumes[0]["track_written"]).to be(false)
+      expect(volumes[1]["track_written"]).to be(true)
     end
 
     it "adds the cpus field to the params json when needed" do
@@ -409,6 +417,31 @@ RSpec.describe Vm do
       storage_volumes = vm.storage_volumes
       expect(storage_volumes[0]["cpus"].count).to eq(1)
       expect(storage_volumes[1]["cpus"].sort).to eq([0, 1])
+    end
+
+    it "adds archive_source when volume has machine_image_version_id" do
+      project_id = Project.create(name: "test").id
+      store = MachineImageStore.create(
+        project_id:, location_id: Location::HETZNER_FSN1_ID,
+        provider: "r2", region: "auto", endpoint: "https://r2.cloudflare.com/",
+        bucket: "test-bucket", access_key: "ak", secret_key: "sk",
+      )
+      miv = create_machine_image_version_metal(project_id:, machine_image_store_id: store.id, store_prefix: "prefix/path")
+      VmStorageVolume.where(vm_id: vm.id, disk_index: 0).update(machine_image_version_id: miv.id, boot_image_id: nil)
+
+      volumes = vm.storage_volumes
+
+      expect(volumes[0]).to have_key("archive_source")
+      src = volumes[0]["archive_source"]
+      expect(src["bucket"]).to eq("test-bucket")
+      expect(src["prefix"]).to eq("prefix/path")
+      expect(src["region"]).to eq("auto")
+      expect(src["endpoint"]).to eq("https://r2.cloudflare.com/")
+      expect(src).to have_key("encrypted_access_key_id")
+      expect(src).to have_key("encrypted_secret_access_key")
+      expect(src).to have_key("encrypted_archive_kek")
+
+      expect(volumes[1]).not_to have_key("archive_source")
     end
   end
 
@@ -442,6 +475,7 @@ RSpec.describe Vm do
       vm.ephemeral_net6 = vm_host.ip6_random_vm_network.to_s
       expect(vm_host).not_to receive(:ip6_random_vm_network)
       DB[:nic].where(vm_id: vm.id).delete
+      DB[:vm_storage_volume].where(vm_id: vm.id).delete
       DB[:vm].where(id: vm.id).delete
       expect { vm.save_with_ephemeral_net6_error_retrying(vm_host) }.to raise_error(Sequel::NoExistingObject)
     end
@@ -513,6 +547,59 @@ RSpec.describe Vm do
     it "includes the private IPv6 address as a string" do
       vm.define_singleton_method(:private_ipv6) { NetAddr.parse_ip("::2") }
       expect(vm.private_ipv6_string).to eq "::2"
+    end
+  end
+
+  describe "#create_storage_volumes" do
+    it "creates storage volumes" do
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0},
+        {boot: false, size_gib: 20, disk_index: 1},
+      ]
+      vm.create_storage_volumes(params)
+      expect(vm.vm_storage_volumes_dataset.count).to eq(2)
+      vol1 = vm.vm_storage_volumes_dataset.first(disk_index: 0)
+      expect(vol1.boot).to be true
+      expect(vol1.size_gib).to eq(10)
+      vol2 = vm.vm_storage_volumes_dataset.first(disk_index: 1)
+      expect(vol2.boot).to be false
+      expect(vol2.size_gib).to eq(20)
+    end
+
+    it "creates storage volumes with machine image if specified" do
+      miv = create_machine_image_version_metal
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
+      ]
+      vm.create_storage_volumes(params)
+      expect(vm.vm_storage_volumes_dataset.count).to eq(1)
+      vol = vm.vm_storage_volumes_dataset.first
+      expect(vol.boot).to be true
+      expect(vol.size_gib).to eq(10)
+      expect(vol.machine_image_version_id).to eq(miv.id)
+    end
+
+    it "fails if machine image version is specified but not found" do
+      miv = create_machine_image_version_metal
+      miv_id = miv.id
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv_id},
+      ]
+      miv.destroy
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv_id} is not available")
+    end
+
+    it "fails if machine image version is specified but not enabled" do
+      miv = create_machine_image_version_metal
+      vm = create_vm
+      params = [
+        {boot: true, size_gib: 10, disk_index: 0, machine_image_version_id: miv.id},
+      ]
+      miv.update(enabled: false)
+      expect { vm.create_storage_volumes(params) }.to raise_error(RuntimeError, "machine image version #{miv.id} is not available")
     end
   end
 end

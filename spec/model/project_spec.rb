@@ -131,7 +131,7 @@ RSpec.describe Project do
         {allocation_state: "accepting", location_id: Location::HETZNER_FSN1_ID, total_cores: 10, used_cores: 1},
         {allocation_state: "accepting", location_id: Location::LEASEWEB_WDC02_ID, total_cores: 100, used_cores: 99},
         {allocation_state: "draining", location_id: Location::HETZNER_HEL1_ID, total_cores: 100, used_cores: 0},
-        {allocation_state: "accepting", location_id: Location::GITHUB_RUNNERS_ID, total_cores: 100, used_cores: 0}
+        {allocation_state: "accepting", location_id: Location::GITHUB_RUNNERS_ID, total_cores: 100, used_cores: 0},
       ].each { create_vm_host(**it) }
 
       expect(project.default_location).to eq("github-runners")

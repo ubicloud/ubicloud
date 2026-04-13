@@ -173,6 +173,40 @@ RSpec.describe Validation::PostgresConfigValidator do
         expect { validator.validate(config) }.to raise_error(Validation::ValidationFailed)
       end
     end
+
+    context "with PG 18 string configurations" do
+      let(:pg18_validator) { described_class.new("18") }
+
+      it "validates idle_replication_slot_timeout accepts valid string value" do
+        config = {"idle_replication_slot_timeout" => "5min"}
+        expect { pg18_validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns a validation error for invalid idle_replication_slot_timeout without crashing" do
+        config = {"idle_replication_slot_timeout" => "notanumber"}
+        expect { pg18_validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "validates io_combine_limit accepts valid string value" do
+        config = {"io_combine_limit" => "5MB"}
+        expect { pg18_validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns a validation error for invalid io_combine_limit without crashing" do
+        config = {"io_combine_limit" => "notanumber"}
+        expect { pg18_validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+
+      it "validates log_rotation_size accepts valid string value" do
+        config = {"log_rotation_size" => "10MB"}
+        expect { pg18_validator.validate(config) }.not_to raise_error
+      end
+
+      it "returns a validation error for invalid log_rotation_size without crashing" do
+        config = {"log_rotation_size" => "notanumber"}
+        expect { pg18_validator.validate(config) }.to raise_error(Validation::ValidationFailed)
+      end
+    end
   end
 
   describe "#restart_required_params" do

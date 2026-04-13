@@ -15,7 +15,7 @@ RSpec.describe Serializers::Nic do
         private_ipv4: "192.168.1.0/24",
         private_ipv6: "fd91:4ef3:a586:943d:c2ae::/79",
         mac: "00:00:00:00:00:01",
-        state: "active"
+        state: "active",
       )
 
       expected_result = {
@@ -23,7 +23,7 @@ RSpec.describe Serializers::Nic do
         name: "nic-name",
         private_ipv4: "192.168.1.1",
         private_ipv6: "fd91:4ef3:a586:943d:c2ae::2",
-        vm_name: "test-vm"
+        vm_name: "test-vm",
       }
 
       expect(described_class.serialize_internal(nic)).to eq(expected_result)
@@ -37,7 +37,7 @@ RSpec.describe Serializers::Nic do
         private_ipv4: "10.23.34.53/32",
         private_ipv6: "fd91:4ef3:a586:943d:c2ae::/79",
         mac: "00:00:00:00:00:02",
-        state: "active"
+        state: "active",
       )
 
       expected_result = {
@@ -45,7 +45,7 @@ RSpec.describe Serializers::Nic do
         name: "nic-name",
         private_ipv4: "10.23.34.53",
         private_ipv6: "fd91:4ef3:a586:943d:c2ae::2",
-        vm_name: "test-vm"
+        vm_name: "test-vm",
       }
 
       expect(described_class.serialize_internal(nic)).to eq(expected_result)

@@ -19,7 +19,7 @@ class PostgresUpgrade
   end
 
   def disable_archiving(version, reload: false)
-    r "echo 'archive_command = false' | sudo tee /etc/postgresql/#{version}/main/conf.d/100-upgrade.conf"
+    r "echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/#{version}/main/conf.d/100-upgrade.conf"
     r "sudo pg_ctlcluster #{version} main reload" if reload
   end
 
@@ -34,7 +34,7 @@ class PostgresUpgrade
       return
     end
 
-    r "sudo pg_ctlcluster promote #{version} main", expect: [0, 1]
+    r "sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\""
   end
 
   def disable_previous_version
@@ -47,10 +47,6 @@ class PostgresUpgrade
     disable_previous_version
     pg_setup.setup_data_directory
     pg_setup.create_cluster
-  end
-
-  def stop_new_version
-    r "sudo systemctl stop postgresql@#{@version}-main"
   end
 
   def run_check
@@ -112,8 +108,6 @@ class PostgresUpgrade
     promote @prev_version
     @logger.info("Initializing new version")
     initialize_new_version
-    @logger.info("Stop new version")
-    stop_new_version
     @logger.info("Running check")
     run_check
     @logger.info("Running pg upgrade")

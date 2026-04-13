@@ -5,7 +5,7 @@ Sequel.migration do
     create_table(:dns_zone) do
       column :id, :uuid, primary_key: true, default: nil
       column :created_at, :timestamptz, null: false, default: Sequel.lit("now()")
-      column :project_id, :project, type: :uuid, null: false
+      column :project_id, :uuid, null: false
       column :name, :text, collate: '"C"', null: false
     end
 

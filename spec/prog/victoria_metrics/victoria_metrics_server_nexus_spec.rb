@@ -32,7 +32,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       root_cert_key_2: "root_cert_key_2",
       admin_user: "vm-admin",
       admin_password: "dummy-password",
-      project_id: project.id
+      project_id: project.id,
     )
   }
 
@@ -44,7 +44,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       resource: victoria_metrics_resource,
       cert: "cert",
       cert_key: "cert_key",
-      certificate_last_checked_at: Time.now
+      certificate_last_checked_at: Time.now,
     )
   }
 
@@ -128,7 +128,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect { nx.install }.to nap(5)
     end
 
-    it "hops to configure if install is complete" do
+    it "hops to mount_data_disk if install is complete" do
       expect(vm.sshable).to receive(:d_check).with("install_victoria_metrics").and_return("Succeeded")
       expect(vm.sshable).to receive(:d_clean).with("install_victoria_metrics")
       expect { nx.install }.to hop("mount_data_disk")
@@ -180,7 +180,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
         admin_password: "dummy-password",
         cert: "cert",
         cert_key: "cert_key",
-        ca_bundle: "root_cert_1\nroot_cert_2"
+        ca_bundle: "root_cert_1\nroot_cert_2",
       }.to_json
       expect(vm.sshable).to receive(:d_check).with("configure_victoria_metrics").and_return("NotStarted")
       expect(vm.sshable).to receive(:d_run).with("configure_victoria_metrics", "/home/ubi/victoria_metrics/bin/configure", stdin: expected_config)
@@ -356,7 +356,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
         extensions: ["subjectAltName=DNS:#{victoria_metrics_server.resource.hostname},DNS:#{victoria_metrics_server.resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
         duration: 60 * 60 * 24 * 30 * 6,
         issuer_cert: root_cert_1,
-        issuer_key: root_cert_key_1
+        issuer_key: root_cert_key_1,
       ).and_return([cert, key])
       expect(nx.create_certificate).to eq(["cert", "key"])
     end
@@ -368,7 +368,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
         extensions: ["subjectAltName=DNS:#{victoria_metrics_server.resource.hostname},DNS:#{victoria_metrics_server.resource.hostname}", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
         duration: 60 * 60 * 24 * 30 * 6,
         issuer_cert: root_cert_2,
-        issuer_key: root_cert_key_2
+        issuer_key: root_cert_key_2,
       ).and_return([cert, key])
       expect(nx.create_certificate).to eq(["cert", "key"])
     end
@@ -383,7 +383,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
         extensions: ["subjectAltName=DNS:#{victoria_metrics_server.resource.hostname},DNS:#{victoria_metrics_server.resource.hostname},IP:1.1.1.1,IP:2a01:4f8:10a:128b:814c::2", "keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=serverAuth"],
         duration: 60 * 60 * 24 * 30 * 6,
         issuer_cert: root_cert_1,
-        issuer_key: root_cert_key_1
+        issuer_key: root_cert_key_1,
       ).and_return([cert, key])
 
       expect(nx.create_certificate).to eq(["cert", "key"])
@@ -395,7 +395,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsServerNexus do
       expect(nx).to receive(:register_deadline).with("wait", 10 * 60)
       expect(nx).to receive(:reap)
       expect(nx.strand).to receive(:children).and_return([
-        instance_double(Strand, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "restart")
+        instance_double(Strand, prog: "VictoriaMetrics::VictoriaMetricsServerNexus", label: "restart"),
       ])
       expect { nx.unavailable }.to nap(5)
     end

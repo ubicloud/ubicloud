@@ -36,7 +36,7 @@ class Clover
         dst_port: Validation.validate_port(:dst_port, dst_port),
         health_check_endpoint:,
         health_check_protocol:,
-        cert_enabled:
+        cert_enabled:,
       ).subject
       audit_log(lb, "create")
     end

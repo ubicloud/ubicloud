@@ -117,6 +117,12 @@ RSpec.describe VictoriaMetrics::Client do
           .to_return(status: 500, body: "Internal Server Error")
         expect { client.send(:send_request, "GET", "/test") }.to raise_error(VictoriaMetrics::ClientError, "VictoriaMetrics Client error, method: GET, path: /test, status code: 500")
       end
+
+      it "raises error for Excon error status code" do
+        stub_request(:get, "#{endpoint}/test")
+          .to_raise(Excon::Error::Timeout.new("bad"))
+        expect { client.send(:send_request, "GET", "/test") }.to raise_error(VictoriaMetrics::ClientError, "VictoriaMetrics Client error (Excon::Error::Timeout: bad), method: GET, path: /test")
+      end
     end
   end
 
@@ -137,8 +143,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: "gzipped_data",
             headers: {
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -157,8 +163,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: "gzipped_data",
             headers: {
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -190,8 +196,8 @@ RSpec.describe VictoriaMetrics::Client do
             headers: {
               "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
           .to_return(status: 204)
       end
@@ -203,8 +209,8 @@ RSpec.describe VictoriaMetrics::Client do
             headers: {
               "Authorization" => "Basic #{Base64.strict_encode64("#{username}:#{password}")}",
               "Content-Encoding" => "gzip",
-              "Content-Type" => "application/octet-stream"
-            }
+              "Content-Type" => "application/octet-stream",
+            },
           )
       end
     end
@@ -229,19 +235,19 @@ RSpec.describe VictoriaMetrics::Client do
                     "metric" => {"job" => "api", "instance" => "server1"},
                     "values" => [
                       [1600000000, "10.5"],
-                      [1600000015, "12.3"]
-                    ]
+                      [1600000015, "12.3"],
+                    ],
                   },
                   {
                     "metric" => {"job" => "api", "instance" => "server2"},
                     "values" => [
                       [1600000000, "5.2"],
-                      [1600000015, "6.1"]
-                    ]
-                  }
-                ]
-              }
-            }.to_json
+                      [1600000015, "6.1"],
+                    ],
+                  },
+                ],
+              },
+            }.to_json,
           )
       end
 
@@ -263,7 +269,7 @@ RSpec.describe VictoriaMetrics::Client do
           ["query", query],
           ["start", start_ts.to_s],
           ["end", end_ts.to_s],
-          ["step", expected_step.to_s]
+          ["step", expected_step.to_s],
         ]
         encoded_params = URI.encode_www_form(query_params)
 
@@ -280,9 +286,9 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "matrix",
-                "result" => []
-              }
-            }.to_json
+                "result" => [],
+              },
+            }.to_json,
           )
       end
 
@@ -300,8 +306,8 @@ RSpec.describe VictoriaMetrics::Client do
             body: {
               "status" => "error",
               "errorType" => "execution",
-              "error" => "parse error: unexpected end of input"
-            }.to_json
+              "error" => "parse error: unexpected end of input",
+            }.to_json,
           )
       end
 
@@ -320,14 +326,123 @@ RSpec.describe VictoriaMetrics::Client do
               "status" => "success",
               "data" => {
                 "resultType" => "scalar",
-                "result" => 42
-              }
-            }.to_json
+                "result" => 42,
+              },
+            }.to_json,
           )
       end
 
       it "returns an empty array" do
         result = client.query_range(query:, start_ts:, end_ts:)
+        expect(result).to eq([])
+      end
+    end
+  end
+
+  describe "#query" do
+    let(:query) { 'sum(rate(http_requests_total{job="api"}[5m]))' }
+
+    context "when the query is successful" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "vector",
+                "result" => [
+                  {
+                    "metric" => {"job" => "api", "instance" => "server1"},
+                    "value" => [1600000000, "10.5"],
+                  },
+                  {
+                    "metric" => {"job" => "api", "instance" => "server2"},
+                    "value" => [1600000000, "5.2"],
+                  },
+                ],
+              },
+            }.to_json,
+          )
+      end
+
+      it "returns formatted instant data" do
+        result = client.query(query:)
+
+        expect(result.length).to eq(2)
+        expect(result[0]["labels"]).to eq({"job" => "api", "instance" => "server1"})
+        expect(result[0]["value"]).to eq([1600000000, "10.5"])
+        expect(result[1]["labels"]).to eq({"job" => "api", "instance" => "server2"})
+        expect(result[1]["value"]).to eq([1600000000, "5.2"])
+      end
+
+      it "constructs the correct query parameters" do
+        client.query(query:)
+
+        query_params = [["query", query]]
+        encoded_params = URI.encode_www_form(query_params)
+
+        expect(WebMock).to have_requested(:get, "#{endpoint}/api/v1/query?#{encoded_params}")
+      end
+    end
+
+    context "when the query returns no results" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "vector",
+                "result" => [],
+              },
+            }.to_json,
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns an error" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "error",
+              "errorType" => "execution",
+              "error" => "parse error: unexpected end of input",
+            }.to_json,
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
+        expect(result).to eq([])
+      end
+    end
+
+    context "when the query returns a different result type" do
+      before do
+        stub_request(:get, /#{endpoint}\/api\/v1\/query\?.*/)
+          .to_return(
+            status: 200,
+            body: {
+              "status" => "success",
+              "data" => {
+                "resultType" => "scalar",
+                "result" => [1600000000, "42"],
+              },
+            }.to_json,
+          )
+      end
+
+      it "returns an empty array" do
+        result = client.query(query:)
         expect(result).to eq([])
       end
     end

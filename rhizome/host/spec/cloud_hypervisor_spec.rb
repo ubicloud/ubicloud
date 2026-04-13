@@ -50,7 +50,7 @@ RSpec.describe CloudHypervisor do
         remote: "/opt/cloud-hypervisor/v35.1/ch-remote",
         remote_tmp: "/opt/cloud-hypervisor/v35.1/ch-remote.tmp",
         ch: "/opt/cloud-hypervisor/v35.1/cloud-hypervisor",
-        ch_tmp: "/opt/cloud-hypervisor/v35.1/cloud-hypervisor.tmp"
+        ch_tmp: "/opt/cloud-hypervisor/v35.1/cloud-hypervisor.tmp",
       }
     end
 

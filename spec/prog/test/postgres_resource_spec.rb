@@ -12,7 +12,7 @@ RSpec.describe Prog::Test::PostgresResource do
   let(:private_subnet) {
     PrivateSubnet.create(
       name: "pg-subnet", project_id: test_project.id, location_id:,
-      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64"
+      net4: "172.0.0.0/26", net6: "fdfa:b5aa:14a3:4a3d::/64",
     )
   }
 
@@ -50,9 +50,9 @@ RSpec.describe Prog::Test::PostgresResource do
       aws_strand = described_class.assemble(provider: "aws")
       aws_pgr_test = described_class.new(aws_strand)
       location = Location[provider: "aws", project_id: nil, name: "us-west-2"]
-      LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1")
       expect { aws_pgr_test.start }.to hop("wait_postgres_resource")
-      expect(LocationCredential[location.id].access_key).to eq("access_key")
+      expect(LocationCredentialAws[location.id].access_key).to eq("access_key")
     end
   end
 
@@ -89,11 +89,12 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#destroy_postgres" do
-    before { setup_postgres_resource(with_server: false) }
+    before { setup_postgres_resource(with_server: true) }
 
     it "increments the destroy count and hops to wait_resources_destroyed" do
       expect { pgr_test.destroy_postgres }.to hop("wait_resources_destroyed")
       expect(Semaphore.where(strand_id: postgres_resource.id, name: "destroy").count).to eq(1)
+      expect(Semaphore.where(strand_id: timeline.strand.id, name: "destroy").count).to eq(1)
     end
   end
 

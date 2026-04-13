@@ -127,7 +127,7 @@ module Csi
         {
           "name" => pod.dig("metadata", "name"),
           "ip" => pod.dig("status", "podIP"),
-          "node" => pod.dig("spec", "nodeName")
+          "node" => pod.dig("spec", "nodeName"),
         }
       end
     end
@@ -138,7 +138,7 @@ module Csi
         next unless pod.dig("status", "phase") == "Running"
         {
           "name" => pod.dig("metadata", "name"),
-          "ip" => pod.dig("status", "podIP")
+          "ip" => pod.dig("status", "podIP"),
         }
       end
     end

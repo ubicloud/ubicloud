@@ -11,7 +11,7 @@ RSpec.describe KubernetesCluster do
       cp_node_count: 3,
       project_id: project.id,
       private_subnet_id: private_subnet.id,
-      target_node_size: "standard-2"
+      target_node_size: "standard-2",
     ).subject
   }
 
@@ -93,7 +93,7 @@ RSpec.describe KubernetesCluster do
       pv_json = JSON.generate({"items" => [
         {"metadata" => {"name" => "pv-healthy", "annotations" => {"csi.ubicloud.com/migration-retry-count" => "1"}}},
         {"metadata" => {"name" => "pv-stuck", "annotations" => {"csi.ubicloud.com/migration-retry-count" => "3"}}},
-        {"metadata" => {"name" => "pv-no-annotation", "annotations" => {}}}
+        {"metadata" => {"name" => "pv-no-annotation", "annotations" => {}}},
       ]})
 
       lb_response = Net::SSH::Connection::Session::StringWithExitstatus.new(JSON.generate({"items" => []}), 0)

@@ -87,6 +87,8 @@ module Prog::Github; end
 
 module Prog::Kubernetes; end
 
+module Prog::MachineImage; end
+
 module Prog::Minio; end
 
 module Prog::Postgres; end
@@ -176,7 +178,7 @@ when :smtp
       user_name: Config.smtp_user,
       password: Config.smtp_password,
       authentication: :plain,
-      enable_starttls: Config.smtp_tls
+      enable_starttls: Config.smtp_tls,
     }
   end
 when :logger
@@ -240,6 +242,7 @@ def clover_freeze
     Prog::DnsZone,
     Prog::Github,
     Prog::Kubernetes,
+    Prog::MachineImage,
     Prog::Minio,
     Prog::Postgres,
     Prog::Storage,
@@ -255,7 +258,7 @@ def clover_freeze
     ResourceMethods::ClassMethods,
     ResourceMethods::DatasetMethods,
     ResourceMethods::InstanceMethods,
-    ResourceMethods::UbidTypeEtcMethods,
+    ResourceMethods::NoSetUuid,
     Scheduling,
     Scheduling::Allocator,
     Scheduling::Allocator::Allocation,
@@ -275,7 +278,7 @@ def clover_freeze
     Serializers::Base,
     Sshable::SshError,
     Validation,
-    Validation::ValidationFailed
+    Validation::ValidationFailed,
   ].each(&:freeze)
 
   RubyVM::YJIT.enable if defined?(RubyVM::YJIT)

@@ -6,12 +6,12 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
   let(:project) { Project.create(name: "test-prj") }
   let(:location) {
     loc = Location.create(name: "us-west-2", provider: "aws", project_id: project.id, display_name: "aws-us-west-2", ui_name: "AWS US West 2", visible: true)
-    LocationCredential.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
+    LocationCredentialAws.create_with_id(loc.id, access_key: "stubbed-akid", secret_key: "stubbed-secret")
     loc
   }
-  let(:az_a) { LocationAwsAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1") }
-  let(:az_b) { LocationAwsAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
-  let(:az_c) { LocationAwsAz.create(location_id: location.id, az: "c", zone_id: "usw2-az3") }
+  let(:az_a) { LocationAz.create(location_id: location.id, az: "a", zone_id: "usw2-az1") }
+  let(:az_b) { LocationAz.create(location_id: location.id, az: "b", zone_id: "usw2-az2") }
+  let(:az_c) { LocationAz.create(location_id: location.id, az: "c", zone_id: "usw2-az3") }
 
   let(:client) { Aws::EC2::Client.new(stub_responses: true) }
 
@@ -83,7 +83,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         vpc_id: "vpc-old",
         route_table_id: "rtb-old",
         security_group_id: "sg-old",
-        internet_gateway_id: "igw-old"
+        internet_gateway_id: "igw-old",
       )
       # Remove AwsSubnet records created by assemble to simulate pre-migration state
       ps.private_subnet_aws_resource.aws_subnets.each(&:destroy)
@@ -117,7 +117,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           subnet_id: "subnet-old",
           cidr_block: "10.0.0.0/26",
           availability_zone: "us-west-2a",
-          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14::/64"}]
+          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14::/64"}],
         }])
 
         expect { nx.backfill_old_subnet }.to hop("link_nics")
@@ -133,39 +133,39 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         expect { nx.backfill_old_subnet }.to raise_error("No subnets found in VPC vpc-old")
       end
 
-      it "fetches AZs from AWS if LocationAwsAz not cached" do
+      it "fetches AZs from AWS if LocationAz not cached" do
         # Remove the existing AZ record
-        LocationAwsAz.where(id: az_a.id).destroy
+        LocationAz.where(id: az_a.id).destroy
 
         client.stub_responses(:describe_subnets, subnets: [{
           subnet_id: "subnet-old",
           cidr_block: "10.0.0.0/26",
           availability_zone: "us-west-2a",
-          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14::/64"}]
+          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14::/64"}],
         }])
         client.stub_responses(:describe_availability_zones, availability_zones: [
           {zone_name: "us-west-2a", zone_id: "usw2-az1"},
-          {zone_name: "us-west-2b", zone_id: "usw2-az2"}
+          {zone_name: "us-west-2b", zone_id: "usw2-az2"},
         ])
 
         expect { nx.backfill_old_subnet }.to hop("link_nics")
-        expect(LocationAwsAz.where(location_id: location.id).count).to eq(2)
+        expect(LocationAz.where(location_id: location.id).count).to eq(2)
       end
 
       it "fails if AZ not found even after fetching from AWS" do
-        LocationAwsAz.where(id: az_a.id).destroy
+        LocationAz.where(id: az_a.id).destroy
 
         client.stub_responses(:describe_subnets, subnets: [{
           subnet_id: "subnet-old",
           cidr_block: "10.0.0.0/26",
           availability_zone: "us-west-2x",
-          ipv_6_cidr_block_association_set: []
+          ipv_6_cidr_block_association_set: [],
         }])
         client.stub_responses(:describe_availability_zones, availability_zones: [
-          {zone_name: "us-west-2b", zone_id: "usw2-az2"}
+          {zone_name: "us-west-2b", zone_id: "usw2-az2"},
         ])
 
-        expect { nx.backfill_old_subnet }.to raise_error("Could not find LocationAwsAz for AZ x")
+        expect { nx.backfill_old_subnet }.to raise_error("Could not find LocationAz for AZ x")
       end
     end
 
@@ -177,7 +177,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_a.id,
           ipv4_cidr: "10.0.0.0/26",
-          subnet_id: "subnet-old"
+          subnet_id: "subnet-old",
         )
         nic  # ensure NIC is created
       end
@@ -207,7 +207,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         vpc_id: "vpc-new",
         route_table_id: "rtb-new",
         security_group_id: "sg-new",
-        internet_gateway_id: "igw-new"
+        internet_gateway_id: "igw-new",
       )
       # Remove AwsSubnet records to simulate pre-migration state
       ps.private_subnet_aws_resource.aws_subnets.each(&:destroy)
@@ -251,7 +251,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           {subnet_id: "subnet-a2", cidr_block: "#{ps.net4.network}/24", availability_zone: "us-west-2a",
            ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000:100::/64"}]},
           {subnet_id: "subnet-b", cidr_block: "#{ps.net4.nth_subnet(24, 1).network}/24", availability_zone: "us-west-2b",
-           ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000:200::/64"}]}
+           ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000:200::/64"}]},
         ])
 
         expect { nx.fetch_existing_subnets }.to hop("create_records")
@@ -278,7 +278,7 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
 
       it "creates AwsSubnet records for each AZ with existing and calculated CIDRs" do
         st.stack.first["az_subnet_map"] = {
-          "a" => {"subnet_id" => "subnet-a", "cidr_block" => "#{ps.net4.network}/24", "ipv6_cidr" => "2600:1f14:1000::/64"}
+          "a" => {"subnet_id" => "subnet-a", "cidr_block" => "#{ps.net4.network}/24", "ipv6_cidr" => "2600:1f14:1000::/64"},
         }
         st.modified!(:stack)
         st.save_changes
@@ -309,12 +309,12 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_a.id,
           ipv4_cidr: "#{ps.net4.network}/24",
-          subnet_id: "subnet-a"
+          subnet_id: "subnet-a",
         )
         AwsSubnet.create(
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_b.id,
-          ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s
+          ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s,
         )
         nic_a
         nic_b
@@ -352,17 +352,17 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           location_aws_az_id: az_a.id,
           ipv4_cidr: "#{ps.net4.network}/24",
           subnet_id: "subnet-existing-a",
-          ipv6_cidr: "2600:1f14:1000::/64"
+          ipv6_cidr: "2600:1f14:1000::/64",
         )
         AwsSubnet.create(
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_b.id,
-          ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s
+          ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s,
         )
 
         client.stub_responses(:describe_vpcs, vpcs: [{
           vpc_id: "vpc-new",
-          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}]
+          ipv_6_cidr_block_association_set: [{ipv_6_cidr_block: "2600:1f14:1000::/56"}],
         }])
         client.stub_responses(:create_subnet, ->(context) {
           az = context.params[:availability_zone]
@@ -401,13 +401,13 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_a.id,
           ipv4_cidr: "#{ps.net4.network}/24",
-          subnet_id: "subnet-a"
+          subnet_id: "subnet-a",
         )
         AwsSubnet.create(
           private_subnet_aws_resource_id: ps.private_subnet_aws_resource.id,
           location_aws_az_id: az_b.id,
           ipv4_cidr: ps.net4.nth_subnet(24, 1).to_s,
-          subnet_id: "subnet-b"
+          subnet_id: "subnet-b",
         )
       end
 
@@ -415,11 +415,11 @@ RSpec.describe Prog::Vnet::Aws::BackfillAwsSubnets do
         client.stub_responses(:associate_route_table)
         expect(client).to receive(:associate_route_table).with({
           route_table_id: "rtb-new",
-          subnet_id: "subnet-a"
+          subnet_id: "subnet-a",
         }).and_call_original
         expect(client).to receive(:associate_route_table).with({
           route_table_id: "rtb-new",
-          subnet_id: "subnet-b"
+          subnet_id: "subnet-b",
         }).and_call_original
         expect { nx.associate_route_tables }.to hop("finish")
       end

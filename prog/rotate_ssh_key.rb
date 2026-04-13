@@ -35,7 +35,7 @@ SH
 
   label def retire_old_key_in_database
     changed_records = sshable.this.where(
-      Sequel.~(raw_private_key_2: nil)
+      Sequel.~(raw_private_key_2: nil),
     ).update(raw_private_key_1: Sequel[:raw_private_key_2], raw_private_key_2: nil)
 
     fail "Unexpected number of changed records: #{changed_records}" unless changed_records == 1

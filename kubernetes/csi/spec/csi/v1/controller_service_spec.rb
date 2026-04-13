@@ -54,8 +54,8 @@ RSpec.describe Csi::V1::ControllerService do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
           preferred: [worker1, kc],
-          requisite: [kc]
-        }
+          requisite: [kc],
+        },
       )
       expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-1")
     end
@@ -64,8 +64,8 @@ RSpec.describe Csi::V1::ControllerService do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
           preferred: [kc],
-          requisite: [worker2, kc]
-        }
+          requisite: [worker2, kc],
+        },
       )
       expect(service.select_worker_topology(request).segments["kubernetes.io/hostname"]).to eq("worker-2")
     end
@@ -74,8 +74,8 @@ RSpec.describe Csi::V1::ControllerService do
       request = Csi::V1::CreateVolumeRequest.new(
         accessibility_requirements: {
           preferred: [kc],
-          requisite: [kc]
-        }
+          requisite: [kc],
+        },
       )
       expect { service.select_worker_topology(request) }.to raise_error(GRPC::FailedPrecondition, /No suitable worker node topology found/)
     end
@@ -86,7 +86,7 @@ RSpec.describe Csi::V1::ControllerService do
     let(:volume_capability) do
       {
         mount: {fs_type: "ext4", mount_flags: []},
-        access_mode: {mode: :SINGLE_NODE_WRITER}
+        access_mode: {mode: :SINGLE_NODE_WRITER},
       }
     end
     let(:topology) do
@@ -99,9 +99,9 @@ RSpec.describe Csi::V1::ControllerService do
         volume_capabilities: [volume_capability],
         accessibility_requirements: {
           requisite: [topology],
-          preferred: [topology]
+          preferred: [topology],
         },
-        parameters: {"type" => "ssd"}
+        parameters: {"type" => "ssd"},
       }
     end
     let(:valid_request) { Csi::V1::CreateVolumeRequest.new(base_request_args) }
@@ -125,7 +125,7 @@ RSpec.describe Csi::V1::ControllerService do
         expect(volume_store["test-volume"]).to include(
           volume_id: "vol-vol-test-uuid",
           name: "test-volume",
-          capacity_bytes: 1024 * 1024 * 1024
+          capacity_bytes: 1024 * 1024 * 1024,
         )
 
         # Verify idempotent behavior - calling again returns same volume
@@ -182,7 +182,7 @@ RSpec.describe Csi::V1::ControllerService do
       it "raises InvalidArgument when required_bytes is zero" do
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
-          capacity_range: {required_bytes: 0}
+          capacity_range: {required_bytes: 0},
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Required bytes must be positive")
       end
@@ -193,7 +193,7 @@ RSpec.describe Csi::V1::ControllerService do
 
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
-          capacity_range: {required_bytes: 11 * 1024 * 1024 * 1024} # 11GB > 10GB max
+          capacity_range: {required_bytes: 11 * 1024 * 1024 * 1024}, # 11GB > 10GB max
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 11GB exceeds maximum allowed size of 10GB")
       end
@@ -204,7 +204,7 @@ RSpec.describe Csi::V1::ControllerService do
 
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
-          capacity_range: {required_bytes: 45 * 1024 * 1024 * 1024}
+          capacity_range: {required_bytes: 45 * 1024 * 1024 * 1024},
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 45GB exceeds maximum allowed size of 40GB")
       ensure
@@ -217,7 +217,7 @@ RSpec.describe Csi::V1::ControllerService do
 
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
-          capacity_range: {required_bytes: 5 * 1024 * 1024 * 1024}
+          capacity_range: {required_bytes: 5 * 1024 * 1024 * 1024},
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::OutOfRange, "11:Requested volume size 5GB exceeds maximum allowed size of 4.5GB")
       ensure
@@ -228,7 +228,7 @@ RSpec.describe Csi::V1::ControllerService do
         request = Csi::V1::CreateVolumeRequest.new(
           name: "test",
           capacity_range: {required_bytes: 1024},
-          volume_capabilities: nil
+          volume_capabilities: nil,
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Volume capabilities are required")
       end
@@ -238,7 +238,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: {required_bytes: 1024},
           volume_capabilities: [volume_capability],
-          accessibility_requirements: nil
+          accessibility_requirements: nil,
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
@@ -248,7 +248,7 @@ RSpec.describe Csi::V1::ControllerService do
           name: "test",
           capacity_range: {required_bytes: 1024},
           volume_capabilities: [volume_capability],
-          accessibility_requirements: {requisite: []}
+          accessibility_requirements: {requisite: []},
         )
         expect { service.create_volume(request, call) }.to raise_error(GRPC::InvalidArgument, "3:Topology requirement is required")
       end
@@ -273,7 +273,7 @@ RSpec.describe Csi::V1::ControllerService do
         # Add volume to store
         service.instance_variable_get(:@volume_store)["test-volume"] = {
           volume_id: "vol-123",
-          name: "test-volume"
+          name: "test-volume",
         }
 
         expect(kubernetes_client).to receive(:get_pv).with("test-volume").and_return({
@@ -282,12 +282,12 @@ RSpec.describe Csi::V1::ControllerService do
               "required" => {
                 "nodeSelectorTerms" => [{
                   "matchExpressions" => [{
-                    "values" => ["worker-1"]
-                  }]
-                }]
-              }
-            }
-          }
+                    "values" => ["worker-1"],
+                  }],
+                }],
+              },
+            },
+          },
         }).at_least(:once)
         expect(kubernetes_client).to receive(:extract_node_from_pv).and_return("worker-1").at_least(:once)
         expect(kubernetes_client).to receive(:get_node_ip).with("worker-1").and_return("10.0.0.1").at_least(:once)
@@ -297,9 +297,35 @@ RSpec.describe Csi::V1::ControllerService do
         expect(service).to receive(:run_cmd).with(
           "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
           "-i", "/ssh/id_ed25519", "ubi@10.0.0.1", "sudo", "rm", "-f", "/var/lib/ubicsi/vol-123.img",
-          req_id: "test-uuid"
+          req_id: "test-uuid",
         ).and_return(["", success_status])
         service.delete_volume(request, call)
+      end
+    end
+
+    context "when migration is in progress" do
+      let(:request) { Csi::V1::DeleteVolumeRequest.new(volume_id: "vol-123") }
+
+      before do
+        expect(SecureRandom).to receive(:uuid).and_return("test-uuid")
+        expect(Csi::KubernetesClient).to receive(:new).and_return(kubernetes_client)
+        service.instance_variable_get(:@volume_store)["test-volume"] = {
+          volume_id: "vol-123",
+          name: "test-volume",
+        }
+
+        expect(kubernetes_client).to receive(:get_pv).with("test-volume").and_return({
+          "metadata" => {
+            "annotations" => {
+              "csi.ubicloud.com/old-pvc-object" => "eyJtZXRhZGF0YSI6e319",
+            },
+          },
+        })
+      end
+
+      it "fails so the sidecar retries after migration completes" do
+        expect(service).not_to receive(:run_cmd)
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::FailedPrecondition, /migration in progress/)
       end
     end
 
@@ -310,7 +336,7 @@ RSpec.describe Csi::V1::ControllerService do
         expect(Csi::KubernetesClient).to receive(:new).and_return(kubernetes_client).at_least(:once)
         service.instance_variable_get(:@volume_store)["test-volume"] = {
           volume_id: "vol-789",
-          name: "test-volume"
+          name: "test-volume",
         }
 
         expect(kubernetes_client).to receive(:get_pv).and_return({}).at_least(:once)
@@ -321,7 +347,7 @@ RSpec.describe Csi::V1::ControllerService do
 
       it "raises Internal error" do
         expect(service).to receive(:log_with_id).at_least(:once)
-        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:DeleteVolume error: 13:Could not delete the PV's backing file")
+        expect { service.delete_volume(request, call) }.to raise_error(GRPC::Internal, "13:Could not delete the PV's backing file")
       end
     end
 

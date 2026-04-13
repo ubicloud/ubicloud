@@ -11,6 +11,8 @@ RSpec.describe CloverAdmin, "PostgresResource" do
   end
 
   it "displays the PostgresResource instance page correctly" do
+    @instance.update(cert_auth_users: Sequel.pg_jsonb_wrap(["user1", "user2"]))
+
     click_link "PostgresResource"
     expect(page.status_code).to eq 200
     expect(page.title).to eq "Ubicloud Admin - PostgresResource - Browse"

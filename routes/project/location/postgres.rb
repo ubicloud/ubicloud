@@ -69,17 +69,23 @@ class Clover
           "size" => size,
           "storage_size" => target_storage_size_gib,
           "ha_type" => ha_type,
-          "version" => pg.version
+          "version" => pg.version,
         }
 
         validate_postgres_input(pg.name, postgres_params)
 
-        if target_storage_size_gib < pg.representative_server.storage_size_gib
-          begin
-            current_disk_usage = pg.representative_server.vm.sshable.cmd("df --output=used /dev/vdb | tail -n 1").strip.to_i / (1024 * 1024)
+        if target_storage_size_gib < pg.representative_server.storage_size_gib && (tsdb_client = PostgresServer.victoria_metrics_client)
+          disk_usage = begin
+            query = Metrics::POSTGRES_METRICS[:disk_usage].series[0].query.gsub("$ubicloud_resource_id", pg.ubid)
+            tsdb_client.query(query:).last
           rescue
-            fail CloverError.new(400, "InvalidRequest", "Database is not ready for update", {})
+            nil
           end
+
+          fail CloverError.new(400, "InvalidRequest", "Metrics unavailable right now to verify scale down safety", {}) unless disk_usage
+
+          disk_usage_percentage = disk_usage["value"][1].to_f
+          current_disk_usage = disk_usage_percentage * pg.representative_server.storage_size_gib / 100
 
           if target_storage_size_gib * 0.8 < current_disk_usage
             fail Validation::ValidationFailed.new({storage_size: "Insufficient storage size is requested. It is only possible to reduce the storage size if the current usage is less than 80% of the requested size."})
@@ -181,7 +187,7 @@ class Clover
 
             {
               items: Serializers::PostgresFirewallRule.serialize(rules),
-              count: rules.count
+              count: rules.count,
             }
           end
 
@@ -219,7 +225,7 @@ class Clover
             DB.transaction do
               fwr.update(
                 cidr: new_cidr,
-                description:
+                description:,
               )
               firewall.update_private_subnet_firewall_rules if current_cidr != new_cidr
               audit_log(fwr, "update")
@@ -291,8 +297,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "read-replica" }
 
         name = typecast_params.nonempty_str!("name")
-        user_config = typecast_params.Hash("pg_config", {})
-        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
         tags = typecast_params.array(:Hash, "tags", [])
 
         Validation.validate_name(name)
@@ -321,7 +327,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target: nil,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "create_replica", replica)
         end
@@ -347,8 +353,7 @@ class Clover
         DB.transaction do
           pg.update(restore_target: Time.now)
           pg.representative_server.switch_to_new_timeline
-          pg.servers.each(&:incr_configure)
-          pg.servers.each(&:incr_configure_metrics)
+          pg.representative_server.incr_promote_read_replica
 
           audit_log(pg, "promote_read_replica")
         end
@@ -367,8 +372,8 @@ class Clover
         handle_validation_failure("postgres/show") { @page = "backup_restore" }
 
         name, restore_target = typecast_params.nonempty_str!(["name", "restore_target"])
-        user_config = typecast_params.Hash("pg_config", {})
-        pgbouncer_user_config = typecast_params.Hash("pgbouncer_config", {})
+        user_config = pg.user_config.merge(typecast_params.Hash("pg_config", {}))
+        pgbouncer_user_config = pg.pgbouncer_user_config.merge(typecast_params.Hash("pgbouncer_config", {}))
         tags = typecast_params.array(:Hash, "tags", pg.tags)
 
         Validation.validate_name(name)
@@ -392,7 +397,7 @@ class Clover
             pgbouncer_user_config:,
             tags:,
             restore_target:,
-            init_script: pg.init_script&.init_script
+            init_script: pg.init_script&.init_script,
           ).subject
           audit_log(pg, "restore", restored)
         end
@@ -410,7 +415,7 @@ class Clover
         authorize("Postgres:edit", pg)
 
         DB.transaction do
-          pg.representative_server.incr_recycle
+          pg.representative_server.incr_recycle_by_user_request
           audit_log(pg, "recycle")
         end
 
@@ -510,7 +515,7 @@ class Clover
             extensions: ["keyUsage=digitalSignature,keyEncipherment", "subjectKeyIdentifier=hash", "extendedKeyUsage=clientAuth"],
             duration:,
             issuer_cert:,
-            issuer_key:
+            issuer_key:,
           ).map(&:to_pem)
 
           audit_log(pg, "create_cert")
@@ -557,19 +562,28 @@ class Clover
         end
       end
 
+      r.get api?, "servers" do
+        authorize("Postgres:view", pg)
+
+        {
+          items: Serializers::PostgresServer.serialize(pg.servers(eager: [:strand, :semaphores])),
+          count: pg.servers.count,
+        }
+      end
+
       r.get api?, "backup" do
         authorize("Postgres:view", pg)
 
         backups = pg.timeline.backups.map do |backup|
           {
             key: backup.key,
-            last_modified: backup.last_modified.utc.iso8601
+            last_modified: backup.last_modified.utc.iso8601,
           }
         end
 
         {
           items: backups,
-          count: backups.count
+          count: backups.count,
         }
       end
 
@@ -620,7 +634,7 @@ class Clover
               series_query_result = tsdb_client.query_range(
                 query:,
                 start_ts:,
-                end_ts:
+                end_ts:,
               )
 
               # This can be a two cases:
@@ -648,12 +662,12 @@ class Clover
             name: metric_definition.name,
             unit: metric_definition.unit,
             description: metric_definition.description,
-            series: series_results.flatten
+            series: series_results.flatten,
           }
         end
 
         {
-          metrics: results
+          metrics: results,
         }
       end
 
@@ -664,7 +678,7 @@ class Clover
           {
             pg_config: pg.user_config,
             pgbouncer_config: pg.pgbouncer_user_config,
-            default_pg_config: pg.representative_server.configure_hash[:configs]
+            default_pg_config: pg.representative_server.configure_hash[:configs],
           }
         end
 
@@ -707,7 +721,7 @@ class Clover
           if api?
             response = {
               pg_config: pg.user_config,
-              pgbouncer_config: pg.pgbouncer_user_config
+              pgbouncer_config: pg.pgbouncer_user_config,
             }
             response[:message] = "The changes in the following parameters require a database restart to take effect: #{restart_requiring_changed_params.join(", ")}. You can restart the database by using the restart endpoint." unless restart_requiring_changed_params.empty?
             response

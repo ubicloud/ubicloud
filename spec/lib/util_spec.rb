@@ -9,7 +9,7 @@ RSpec.describe Util do
       expect(Net::SSH).to receive(:start).with("hostname", "user", expected_options) do |&blk|
         sess = Net::SSH::Connection::Session.allocate
         expect(sess).to receive(:_exec!).with("test command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0)
+          Net::SSH::Connection::Session::StringWithExitstatus.new("it worked", 0),
         )
         blk.call sess
       end
@@ -21,12 +21,20 @@ RSpec.describe Util do
       expect(Net::SSH).to receive(:start) do |&blk|
         sess = Net::SSH::Connection::Session.allocate
         expect(sess).to receive(:_exec!).with("failing command").and_return(
-          Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1)
+          Net::SSH::Connection::Session::StringWithExitstatus.new("it didn't work", 1),
         )
         blk.call sess
       end
 
       expect { described_class.rootish_ssh("hostname", "user", [], "failing command") }.to raise_error RuntimeError, "Ssh command failed: it didn't work"
+    end
+  end
+
+  describe "#aws_tag_specifications" do
+    it "uses configured tag value" do
+      expect(Config).to receive(:provider_resource_tag_value).and_return("my-controlplane")
+      result = described_class.aws_tag_specifications("instance", "test-vm")
+      expect(result).to eq([{resource_type: "instance", tags: [{key: "Ubicloud", value: "my-controlplane"}, {key: "Name", value: "test-vm"}]}])
     end
   end
 

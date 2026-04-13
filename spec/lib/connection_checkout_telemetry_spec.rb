@@ -56,7 +56,7 @@ RSpec.describe ConnectionCheckoutTelemetry do
         "immediate" => 50.0,
         "over_3_s" => 0.0,
         "requests" => 2,
-        "pool_size" => 1
+        "pool_size" => 1,
       })
     end
     cct.queue.push(:immediately_available)

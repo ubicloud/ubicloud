@@ -18,7 +18,7 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
       private_subnet: instance_double(
         PrivateSubnet,
         firewalls: [instance_double(Firewall)],
-        incr_destroy: nil
+        incr_destroy: nil,
       ),
       servers: [instance_double(
         VictoriaMetricsServer,
@@ -28,9 +28,9 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
           vcpus: 2,
           vm_host: instance_double(VmHost, id: "dd9ef3e7-6d55-8371-947f-a8478b42a17d"),
           private_subnets: [instance_double(PrivateSubnet, id: "627a23ee-c1fb-86d9-a261-21cc48415916")],
-          display_state: "running"
-        )
-      )]
+          display_state: "running",
+        ),
+      )],
     ).as_null_object
   }
 
@@ -50,13 +50,13 @@ RSpec.describe Prog::VictoriaMetrics::VictoriaMetricsResourceNexus do
         ui_name: "aws-us-west-2",
         visible: true,
         provider: "aws",
-        project_id: victoria_metrics_project.id
+        project_id: victoria_metrics_project.id,
       )
-      LocationCredential.create(
+      LocationCredentialAws.create(
         access_key: "access-key-id",
-        secret_key: "secret-access-key"
+        secret_key: "secret-access-key",
       ) { it.id = loc.id }
-      LocationAwsAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
+      LocationAz.create(location_id: loc.id, az: "a", zone_id: "usw2-az1")
       loc
     }
 

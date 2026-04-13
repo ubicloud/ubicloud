@@ -6,7 +6,7 @@ class Serializers::FirewallRule < Serializers::Base
       id: firewall_rule.ubid,
       cidr: firewall_rule.cidr,
       port_range: firewall_rule.display_port_range,
-      description: firewall_rule.description || ""
+      description: firewall_rule.description || "",
     }
   end
 end

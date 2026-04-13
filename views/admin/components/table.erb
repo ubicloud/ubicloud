@@ -25,6 +25,8 @@
                 <a href="/model/<%= column_class %>/<%= v %>" title="<%= v %>"><%= obj.admin_label %></a>
               <% elsif v&.is_a?(Sequel::Postgres::JSONBHash) %>
                 <pre><%== linkify_ubids(JSON.pretty_generate(v)) %></pre>
+              <% elsif v.is_a?(CloverAdmin::TableLink) %>
+                <a href="<%= v.link %>"><%= v.value %></a>
               <% else %>
                 <%== linkify_ubids(v.to_s) %>
               <% end %>

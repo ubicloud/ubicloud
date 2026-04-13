@@ -28,7 +28,7 @@ class BillingInfo < Sequel::Model
           "postal_code" => address["postal_code"],
           "tax_id" => metadata["tax_id"],
           "company_name" => metadata["company_name"],
-          "note" => metadata["note"]
+          "note" => metadata["note"],
         }
       end
     end
@@ -49,8 +49,11 @@ class BillingInfo < Sequel::Model
     super
   end
 
+  VAT_COUNTRY_CODES = {"GR" => "EL"}.freeze
+
   def validate_vat
-    response = Excon.get("https://ec.europa.eu/taxation_customs/vies/rest-api/ms/#{stripe_data["country"]}/vat/#{stripe_data["tax_id"]}", expects: 200)
+    country_code = VAT_COUNTRY_CODES.fetch(stripe_data["country"], stripe_data["country"])
+    response = Excon.get("https://ec.europa.eu/taxation_customs/vies/rest-api/ms/#{country_code}/vat/#{stripe_data["tax_id"]}", expects: 200)
     case (status = JSON.parse(response.body)["userError"])
     when "VALID"
       true

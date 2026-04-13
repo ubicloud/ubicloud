@@ -19,7 +19,7 @@ class Prog::RotateStorageKek < Prog::Base
   label def install
     storage_key_tool("reencrypt", {
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
-      new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
+      new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash,
     })
 
     hop_test_keys_on_server
@@ -28,7 +28,7 @@ class Prog::RotateStorageKek < Prog::Base
   label def test_keys_on_server
     storage_key_tool("test-keys", {
       old_key: vm_storage_volume.key_encryption_key_1.secret_key_material_hash,
-      new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash
+      new_key: vm_storage_volume.key_encryption_key_2.secret_key_material_hash,
     })
 
     hop_retire_old_key_on_server
@@ -43,7 +43,7 @@ class Prog::RotateStorageKek < Prog::Base
   label def retire_old_key_in_database
     vm_storage_volume.update({
       key_encryption_key_1_id: vm_storage_volume.key_encryption_key_2_id,
-      key_encryption_key_2_id: nil
+      key_encryption_key_2_id: nil,
     })
 
     pop "key rotated successfully"

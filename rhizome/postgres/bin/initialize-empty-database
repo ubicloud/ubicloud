@@ -4,64 +4,15 @@
 require_relative "../../common/lib/util"
 require_relative "../lib/postgres_setup"
 
-if ARGV.count != 1
-  fail "Wrong number of arguments. Expected 1, Given #{ARGV.count}"
+if ARGV.count != 2
+  fail "Wrong number of arguments. Expected 2, Given #{ARGV.count}"
 end
 
 v = ARGV[0]
+strict_overcommit = ARGV[1] == "true"
 
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
-pg_setup.configure_memory_overcommit
+pg_setup.configure_memory_overcommit(strict: strict_overcommit)
 pg_setup.setup_data_directory
 pg_setup.create_cluster
-
-role_creation_queries = <<~ROLE_CREATION
-  /**
-    * Create system roles.
-    */
-  CREATE ROLE ubi_replication WITH REPLICATION LOGIN;
-  CREATE ROLE ubi_monitoring WITH LOGIN IN ROLE pg_monitor;
-  CREATE ROLE pgbouncer LOGIN;
-ROLE_CREATION
-
-database_init_queries = <<~DATABASE_INIT
-  /**
-    * Lock down the privileges of the pgbouncer role.
-    */
-  REVOKE ALL PRIVILEGES ON SCHEMA public FROM pgbouncer;
-
-  /**
-    * Create the pgbouncer schema if it does not exist. All of the
-    * administrative functions for pgbouncer will live in its own schema.
-    */
-  CREATE SCHEMA IF NOT EXISTS pgbouncer;
-
-  /**
-    * Lock down the privileges of the pgbouncer schema.
-    */
-  REVOKE ALL PRIVILEGES ON SCHEMA pgbouncer FROM pgbouncer;
-  GRANT USAGE ON SCHEMA pgbouncer TO pgbouncer;
-
-  /**
-    * The "get_auth" function is used by pgbouncer to authenticate users.
-    * See: https://www.pgbouncer.org/config.html#auth_query
-    */
-  CREATE OR REPLACE FUNCTION pgbouncer.get_auth (
-    INOUT p_user     name,
-    OUT   p_password text
-  ) RETURNS record
-    LANGUAGE sql SECURITY DEFINER SET search_path = pg_catalog AS
-  $$SELECT usename, passwd FROM pg_shadow WHERE usename = p_user$$;
-
-  REVOKE ALL ON FUNCTION pgbouncer.get_auth(name) FROM PUBLIC, pgbouncer;
-  GRANT EXECUTE ON FUNCTION pgbouncer.get_auth(name) TO pgbouncer;
-DATABASE_INIT
-
-r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: role_creation_queries
-r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: database_init_queries
-r "sudo -u postgres psql -d template1 -v 'ON_ERROR_STOP=1'", stdin: database_init_queries
-
-Dir.glob("/var/cache/postgresql-init/*.sql").sort.each do |sql_file|
-  r "sudo -u postgres psql -v 'ON_ERROR_STOP=1'", stdin: File.read(sql_file)
-end

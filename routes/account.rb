@@ -8,6 +8,15 @@ class Clover
         r.redirect "/account/multifactor-manage"
       end
 
+      r.get "authentication-audit-log" do
+        no_authorization_needed
+        authentication_audit_log_search(
+          DB[:account_authentication_audit_log].where(account_id: current_account_id),
+          month_limit: 3,
+        )
+        view "project/authentication_audit_log"
+      end
+
       r.on "login-method" do
         r.get true do
           no_authorization_needed
@@ -31,17 +40,23 @@ class Clover
           provider, uid = typecast_params.nonempty_str(["provider", "uid"])
           identities = current_account.identities
           unless identities.length > (rodauth.has_password? ? 0 : 1)
+            rodauth.add_audit_log(current_account_id, ((provider == "password") ? :remove_password_failure : :disconnect_provider_failure), {"reason" => "only remaining authentication method"})
             raise_web_error("You must have at least one login method")
           end
-          if provider == "password"
-            DB[:account_password_hashes].where(id: current_account.id).delete
-            DB[:account_previous_password_hashes].where(account_id: current_account.id).delete
-            flash[:notice] = "Your password has been deleted"
-          elsif (identity = identities.find { it.provider == provider && it.uid == uid })
-            identity.destroy
-            flash[:notice] = "Your account has been disconnected from #{omniauth_provider_name(provider)}"
-          else
-            raise_web_error("Your account already has been disconnected from #{omniauth_provider_name(provider)}")
+
+          DB.transaction do
+            if provider == "password"
+              DB[:account_password_hashes].where(id: current_account.id).delete
+              DB[:account_previous_password_hashes].where(account_id: current_account.id).delete
+              rodauth.add_audit_log(current_account_id, :remove_password)
+              flash[:notice] = "Your password has been deleted"
+            elsif (identity = identities.find { it.provider == provider && it.uid == uid })
+              identity.destroy
+              rodauth.add_audit_log(current_account_id, :disconnect_provider, {"provider" => omniauth_provider_name(provider)})
+              flash[:notice] = "Your account has been disconnected from #{omniauth_provider_name(provider)}"
+            else
+              raise_web_error("Your account already has been disconnected from #{omniauth_provider_name(provider)}")
+            end
           end
 
           r.redirect "/account/login-method"

@@ -20,7 +20,7 @@ RSpec.describe Prog::RemoveBootImage do
   end
 
   describe "#wait_volumes" do
-    it "hops to remove_volumes if all volumes are removed" do
+    it "hops to remove if all volumes are removed" do
       expect { rbi.wait_volumes }.to hop("remove")
     end
 

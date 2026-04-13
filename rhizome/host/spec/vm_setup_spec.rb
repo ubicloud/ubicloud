@@ -37,7 +37,7 @@ RSpec.describe VmSetup do
       "key" => Base64.encode64(cipher.random_key),
       "init_vector" => Base64.encode64(cipher.random_iv),
       "algorithm" => key_wrapping_algorithm,
-      "auth_data" => "Ubicloud-Test-Auth"
+      "auth_data" => "Ubicloud-Test-Auth",
     }
   end
 
@@ -254,7 +254,7 @@ RSpec.describe VmSetup do
     it "generates network-config with multiple NICs" do
       multi_nics = [
         VmSetup::Nic.new("fd48:666c:a296:ce4b:2cc6::/79", "192.168.5.50/32", "nctest1", "3e:bd:a5:96:f7:b9", "10.0.0.254/32"),
-        VmSetup::Nic.new("fddf:53d2:4c89:2305:46a0::/79", "10.10.10.10/32", "nctest2", "fb:55:dd:ba:21:0a", "10.0.0.253/32")
+        VmSetup::Nic.new("fddf:53d2:4c89:2305:46a0::/79", "10.10.10.10/32", "nctest2", "fb:55:dd:ba:21:0a", "10.0.0.253/32"),
       ]
       vs.cloudinit("user", ["key"], "fddf:53d2:4c89:2305:46a0::/79", multi_nics, nil, "ubuntu-noble", "10.0.0.2", ipv6_disabled: false)
       config = YAML.safe_load(vps.writes["network-config"])
@@ -269,7 +269,7 @@ RSpec.describe VmSetup do
         "device_id" => "test_0",
         "disk_index" => 0,
         "encrypted" => false,
-        "spdk_version" => "some-version"
+        "spdk_version" => "some-version",
       }
     }
     let(:vol_2_params) {
@@ -278,7 +278,7 @@ RSpec.describe VmSetup do
         "device_id" => "test_1",
         "disk_index" => 1,
         "encrypted" => true,
-        "spdk_version" => "some-version"
+        "spdk_version" => "some-version",
       }
     }
     let(:vol_3_params) {
@@ -287,7 +287,7 @@ RSpec.describe VmSetup do
         "device_id" => "test_2",
         "disk_index" => 2,
         "encrypted" => false,
-        "read_only" => true
+        "read_only" => true,
       }
     }
     let(:params) {
@@ -364,7 +364,7 @@ RSpec.describe VmSetup do
 
       vs.recreate_unpersisted(
         "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
-        "10.0.0.2", [], "some_slice.slice", 200, nil, multiqueue: true
+        "10.0.0.2", [], "some_slice.slice", 200, nil, multiqueue: true,
       )
     end
 
@@ -378,13 +378,20 @@ RSpec.describe VmSetup do
 
       vs.recreate_unpersisted(
         "gua", "ip4", "local_ip4", "nics", 4, false, "storage_params", "storage_secrets",
-        "10.0.0.2", ["dev"], "system.slice", 0, 1, multiqueue: true
+        "10.0.0.2", ["dev"], "system.slice", 0, 1, multiqueue: true,
       )
     end
   end
 
   describe "#install_systemd_unit" do
-    let(:args) { [2, "1:1:1:2", 2, [], [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
+    let(:storage_params) {
+      [
+        {"disk_index" => 0, "device_id" => "vol_0", "encrypted" => true, "vhost_block_backend_version" => "v0.4.0"},
+        {"disk_index" => 1, "device_id" => "vol_1", "encrypted" => false, "read_only" => true, "image" => "some-ai-model", "vhost_block_backend_version" => "v0.4.0"},
+        {"disk_index" => 2, "device_id" => "vol_2", "encrypted" => true, "read_only" => false, "vhost_block_backend_version" => "v0.4.0"},
+      ]
+    }
+    let(:args) { [2, "1:1:1:2", 2, storage_params, [VmSetup::Nic.new("fd00::/64", "10.0.0.1/32", "tap0", "02:aa:bb:cc:dd:01", "10.0.0.254/32")], [], "system.slice", 0] }
 
     it "uses cloud-hypervisor by default" do
       vps = instance_spy(VmPath)
@@ -446,6 +453,12 @@ RSpec.describe VmSetup do
         expect(content).to include("User=test")
         expect(content).to include("Group=test")
         expect(content).to include("LimitNOFILE=500000")
+        expect(content).to include("After=test-0-storage.service")
+        expect(content).to include("Requires=test-0-storage.service")
+        expect(content).not_to include("After=test-1-storage.service")
+        expect(content).not_to include("Requires=test-1-storage.service")
+        expect(content).to include("After=test-2-storage.service")
+        expect(content).to include("Requires=test-2-storage.service")
       }
     end
 
@@ -534,12 +547,12 @@ RSpec.describe VmSetup do
       [
         {"boot" => true, "size_gib" => 20, "device_id" => "test_0", "disk_index" => 0, "encrypted" => false},
         {"boot" => false, "size_gib" => 20, "device_id" => "test_1", "disk_index" => 1, "encrypted" => true},
-        {"boot" => false, "size_gib" => 0, "device_id" => "test_2", "disk_index" => 0, "encrypted" => false, "read_only" => true}
+        {"boot" => false, "size_gib" => 0, "device_id" => "test_2", "disk_index" => 0, "encrypted" => false, "read_only" => true},
       ]
     }
     let(:storage_secrets) {
       {
-        "test_1" => "storage_secrets"
+        "test_1" => "storage_secrets",
       }
     }
     let(:storage_volumes) {
@@ -621,7 +634,7 @@ RSpec.describe VmSetup do
       ip4 = "123.123.123.123"
       nics = [
         %w[fd48:666c:a296:ce4b:2cc6::/79 192.168.5.50/32 ncaka58xyg 3e:bd:a5:96:f7:b9],
-        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a]
+        %w[fddf:53d2:4c89:2305:46a0::/79 10.10.10.10/32 ncbbbbbbbb fb:55:dd:ba:21:0a],
       ].map { VmSetup::Nic.new(*_1) }
 
       expect(vps).to receive(:write_nftables_conf).with(<<NFTABLES_CONF)

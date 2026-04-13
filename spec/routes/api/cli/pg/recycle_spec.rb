@@ -11,6 +11,6 @@ RSpec.describe Clover, "cli pg recycle" do
 
   it "recycles primary of postgres database" do
     expect { expect(cli(%w[pg eu-central-h1/test-pg recycle])).to eq("Recycle requested for PostgreSQL database with id #{@pg.ubid}\n") }
-      .to change { Semaphore.where(strand_id: @pg.servers.first.id, name: "recycle").count }.from(0).to(1)
+      .to change { Semaphore.where(strand_id: @pg.servers.first.id, name: "recycle_by_user_request").count }.from(0).to(1)
   end
 end

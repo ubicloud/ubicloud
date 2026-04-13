@@ -37,7 +37,7 @@ RSpec.describe SshKey do
       stdout, stderr, status = Open3.capture3("ssh-keygen -Y sign -f #{d}/key -n test@ubicloud.com #{d}/data")
       expect(status).to(
         be_success,
-        "Expected ssh-keygen sign to succeed, but it failed.\nStatus: #{status}\nSTDOUT: #{stdout}\nSTDERR: #{stderr}"
+        "Expected ssh-keygen sign to succeed, but it failed.\nStatus: #{status}\nSTDOUT: #{stdout}\nSTDERR: #{stderr}",
       )
 
       File.write("#{d}/signers", "test #{ssh_key.public_key}")
@@ -45,7 +45,7 @@ RSpec.describe SshKey do
       # Verify the signature
       stdout, stderr, status = Open3.capture3(
         "ssh-keygen -Y verify -f #{d}/signers -I test -n test@ubicloud.com -s #{d}/data.sig",
-        stdin_data: test_data
+        stdin_data: test_data,
       )
       expect(stderr).to be_empty
       expect(stdout).to match(/\AGood "test@ubicloud.com" signature for test with ED25519 key .*\n\z/)
@@ -68,7 +68,7 @@ zwE4g32X+TfVTofQt95jI5q6qBefY1ig6AfH7rhlVg==
 TEST_KEY
 
       expect(described_class.public_key(pair)).to eq(
-        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAQQDpM6mp0CRXWllW6Ipzo73jgb3xtLUZuoP2lxCQ9qqtPgweVLVePEv5uny8SZ/D9zp8+RMyM/tfmt1cglzr/mUD"
+        "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAAAQQDpM6mp0CRXWllW6Ipzo73jgb3xtLUZuoP2lxCQ9qqtPgweVLVePEv5uny8SZ/D9zp8+RMyM/tfmt1cglzr/mUD",
       )
     end
 

@@ -12,7 +12,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
   let(:inference_router) do
     Prog::Ai::InferenceRouterNexus.assemble(
       project_id: project.id,
-      location_id:
+      location_id:,
     )
   end
 
@@ -25,7 +25,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       project_prompt_tps_limit: 10_000,
       project_completion_tps_limit: 10_000,
       visible: true,
-      tags: {capability: "Text Generation"}
+      tags: {capability: "Text Generation"},
     )
   end
 
@@ -34,7 +34,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       gpuCount: 1,
       gpuTypeIds: ["NVIDIA RTX 4000 Ada"],
       dataCenterIds: ["EU-RO-1"],
-      env: {VLLM_PARAMS: "--tensor-parallel-size 1 --gpu-memory-utilization 0.95"}
+      env: {VLLM_PARAMS: "--tensor-parallel-size 1 --gpu-memory-utilization 0.95"},
     }
   end
 
@@ -46,7 +46,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       priority: 1,
       type: "runpod",
       config:,
-      inflight_limit: 10
+      inflight_limit: 10,
     )
   end
 
@@ -55,7 +55,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
       name: "inference-router-firewall",
       project_id: project.id,
       location_id:,
-      description: "inference-router-firewall"
+      description: "inference-router-firewall",
     )
 
     allow(Config).to receive(:inference_endpoint_service_project_id)
@@ -69,7 +69,7 @@ RSpec.describe Prog::Ai::InferenceRouterTargetNexus do
         inference_router_model_id: inference_router_model.id,
         name: "target",
         priority: 1,
-        inflight_limit: 10
+        inflight_limit: 10,
       )
 
       target = strand.subject

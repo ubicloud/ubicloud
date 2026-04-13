@@ -18,7 +18,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
       total_cpu_percent: 200,
       used_cpu_percent: 0,
       total_memory_gib: 4,
-      used_memory_gib: 0
+      used_memory_gib: 0,
     )
     Strand.create_with_id(slice, prog: "Prog::Vm::VmHostSliceNexus", label: "create")
     slice
@@ -39,7 +39,7 @@ RSpec.describe Prog::Vm::VmHostSliceNexus do
     (0..15).each { |i|
       VmHostCpu.create(
         spdk: i < 2,
-        vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil
+        vm_host_slice_id: (i == 2 || i == 3) ? vm_host_slice.id : nil,
       ) {
         it.vm_host_id = vm_host.id
         it.cpu_number = i

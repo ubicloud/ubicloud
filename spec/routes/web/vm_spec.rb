@@ -137,28 +137,29 @@ RSpec.describe Clover, "vm" do
         click_button "Create"
         address = Address.create(
           cidr: "1.2.3.0/24",
-          routed_to_host_id: create_vm_host.id
+          routed_to_host_id: create_vm_host.id,
         )
         vm.assigned_vm_address = AssignedVmAddress.new_with_id(
           ip: "1.2.3.4",
-          address_id: address.id
+          address_id: address.id,
         )
         spdk_installation = SpdkInstallation.create(
           version: "1",
-          allocation_weight: 1
+          allocation_weight: 1,
         ) { |obj| obj.id = SpdkInstallation.generate_uuid }
         storage_device = StorageDevice.create(
           name: "t",
           total_storage_gib: 147,
-          available_storage_gib: 24
+          available_storage_gib: 24,
         )
         storage_volume = VmStorageVolume.new(
           boot: true,
           size_gib: 123,
           disk_index: 1,
           spdk_installation_id: spdk_installation.id,
-          storage_device_id: storage_device.id
+          storage_device_id: storage_device.id,
         )
+        vm.vm_storage_volumes_dataset.destroy
         vm.add_vm_storage_volume(storage_volume)
 
         visit "#{project.path}/vm"
@@ -303,7 +304,7 @@ RSpec.describe Clover, "vm" do
           vendor: "10de",
           device: "20b5",
           numa_node: nil,
-          iommu_group: 0
+          iommu_group: 0,
         )
         vmh.save_changes
         pci.save_changes
@@ -371,7 +372,7 @@ RSpec.describe Clover, "vm" do
           vendor: "10de",
           device: "20b5",
           numa_node: nil,
-          iommu_group: 0
+          iommu_group: 0,
         )
         vmh.save_changes
         pci.save_changes
@@ -424,7 +425,7 @@ RSpec.describe Clover, "vm" do
           vendor: "10de",
           device: "20b5",
           numa_node: nil,
-          iommu_group: 0
+          iommu_group: 0,
         )
         vmh.save_changes
         pci.save_changes
@@ -464,7 +465,7 @@ RSpec.describe Clover, "vm" do
           vendor: "10de",
           device: "20b5",
           numa_node: nil,
-          iommu_group: 0
+          iommu_group: 0,
         )
         vmh.save_changes
         pci.save_changes
@@ -487,7 +488,7 @@ RSpec.describe Clover, "vm" do
           vendor: "10de",
           device: "20b5",
           numa_node: nil,
-          iommu_group: 0
+          iommu_group: 0,
         )
         vmh.save_changes
         pci.save_changes
@@ -745,7 +746,7 @@ RSpec.describe Clover, "vm" do
         within("#vm-submenu") { click_link "Networking" }
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
           "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535"
+          "default-eu-central-h1-default", "::/0", "0..65535",
         ]
         page.all("#vm-firewall-rules td a").first.click
         expect(page.title).to eq "Ubicloud - default-eu-central-h1-default"
@@ -756,7 +757,7 @@ RSpec.describe Clover, "vm" do
         visit "#{project_wo_permissions.path}#{vm_wo_permission.path}/networking"
         expect(page.all("#vm-firewall-rules td").map(&:text)).to eq [
           "default-eu-central-h1-default", "0.0.0.0/0", "0..65535",
-          "default-eu-central-h1-default", "::/0", "0..65535"
+          "default-eu-central-h1-default", "::/0", "0..65535",
         ]
         expect(page.all("#vm-firewall-rules td a").to_a).to eq []
       end

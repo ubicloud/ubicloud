@@ -23,7 +23,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       location_id: Location::HETZNER_FSN1_ID,
       project_id: project.id,
       target_node_size: "standard-4",
-      target_node_storage_size_gib: 37
+      target_node_storage_size_gib: 37,
     ).subject
 
     lb = LoadBalancer.create(private_subnet_id: subnet.id, name: "somelb", health_check_endpoint: "/foo", project_id: Config.kubernetes_service_project_id)
@@ -38,7 +38,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       boot_image: Option.kubernetes_versions.first,
       private_subnet_id: subnet.id,
       enable_ip4: true,
-      kubernetes_cluster_id: kc.id
+      kubernetes_cluster_id: kc.id,
     )
     kc.update(api_server_lb_id: lb.id)
   }
@@ -164,7 +164,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
           s.include?("ip6 saddr 2001:db8:85a3:73f2:1c4a::/79 ct state established,related,new counter accept") &&
           s.include?("ip6 saddr fd40:1a0a:8d48:182a::/64 ct state established,related,new counter accept") &&
           s.include?("ip6 daddr fd40:1a0a:8d48:182a::/64 ct state established,related,new counter accept")
-        }
+        },
       ).ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now nftables").ordered
       expect(sshable).to receive(:_cmd).with("sudo systemctl enable --now kubelet").ordered
@@ -211,7 +211,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_check).with("init_kubernetes_cluster").and_return("NotStarted")
       expect(prog.vm.sshable).to receive(:d_run).with(
         "init_kubernetes_cluster", "/home/ubi/kubernetes/bin/init-cluster",
-        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"/, log: false
+        stdin: /{"node_name":"test-vm","cluster_name":"k8scluster","lb_hostname":"somelb\..*","port":"443","private_subnet_cidr4":"172.19.0.0\/16","private_subnet_cidr6":"fd40:1a0a:8d48:182a::\/64","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"/, log: false,
       )
 
       expect { prog.init_cluster }.to nap(30)
@@ -252,7 +252,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_control_plane", "kubernetes/bin/join-node",
         stdin: /{"is_control_plane":true,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","certificate_key":"ck","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
-        log: false
+        log: false,
       )
 
       expect { prog.join_control_plane }.to nap(15)
@@ -295,7 +295,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm.sshable).to receive(:d_run).with(
         "join_worker", "kubernetes/bin/join-node",
         stdin: /{"is_control_plane":false,"node_name":"test-vm","endpoint":"somelb\..*:443","join_token":"jt","discovery_token_ca_cert_hash":"dtcch","node_ipv4":"172.19.145.65","node_ipv6":"2001:db8:85a3:73f2:1c4a::2"}/,
-        log: false
+        log: false,
       )
 
       expect { prog.join_worker }.to nap(15)
@@ -328,7 +328,7 @@ RSpec.describe Prog::Kubernetes::ProvisionKubernetesNode do
       expect(prog.vm).to receive(:sshable).and_return(sshable)
       expect(prog.node.vm).to receive_messages(
         nics: [instance_double(Nic, private_ipv4: "10.0.0.37", private_ipv6: "0::1")],
-        ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64))
+        ephemeral_net6: NetAddr::IPv6Net.new(NetAddr::IPv6.parse("2001:db8::"), NetAddr::Mask128.new(64)),
       )
 
       expect(sshable).to receive(:_cmd).with("sudo tee /etc/cni/net.d/ubicni-config.json", stdin: /"type": "ubicni"/)

@@ -56,7 +56,7 @@ class MinioServer < Sequel::Model
     ssh_session.forward.local(UNIXServer.new(File.join(socket_path, "health_monitor_socket")), private_ipv4_address, 9000)
     {
       ssh_session:,
-      minio_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket"))
+      minio_client: client(socket: File.join("unix://", socket_path, "health_monitor_socket")),
     }
   end
 
@@ -99,7 +99,7 @@ class MinioServer < Sequel::Model
       access_key: cluster.admin_user,
       secret_key: cluster.admin_password,
       ssl_ca_data: cluster.root_certs,
-      socket:
+      socket:,
     )
   end
 end

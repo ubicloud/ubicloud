@@ -8,8 +8,7 @@ RSpec.describe Prog::Vm::VmPool do
   let(:st) {
     pool = VmPool.create(
       size: 0, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
-      storage_size_gib: 86, storage_encrypted: true,
-      arch: "x64"
+      storage_size_gib: 86, arch: "x64",
     )
     Strand.create_with_id(pool, prog: "Vm::VmPool", label: "start")
   }
@@ -22,8 +21,7 @@ RSpec.describe Prog::Vm::VmPool do
     it "creates the entity and strand properly" do
       st = described_class.assemble(
         size: 3, vm_size: "standard-2", boot_image: "img", location_id: Location::HETZNER_FSN1_ID,
-        storage_size_gib: 86, storage_encrypted: true,
-        arch: "x64"
+        storage_size_gib: 86, arch: "x64",
       )
       pool = st.subject
       expect(pool).not_to be_nil
@@ -32,7 +30,6 @@ RSpec.describe Prog::Vm::VmPool do
       expect(pool.boot_image).to eq("img")
       expect(pool.location_id).to eq(Location::HETZNER_FSN1_ID)
       expect(pool.storage_size_gib).to eq(86)
-      expect(pool.storage_encrypted).to be(true)
       expect(st.label).to eq("create_new_vm")
     end
   end

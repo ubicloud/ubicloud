@@ -2,12 +2,12 @@
 
 require_relative "../model"
 
-class LocationAwsAz < Sequel::Model
+class LocationAz < Sequel::Model
   many_to_one :location, read_only: true, is_used: true
   plugin ResourceMethods
 end
 
-# Table: location_aws_az
+# Table: location_az
 # Columns:
 #  id          | uuid | PRIMARY KEY
 #  location_id | uuid | NOT NULL
@@ -19,4 +19,4 @@ end
 # Foreign key constraints:
 #  location_aws_az_location_id_fkey | (location_id) REFERENCES location(id) ON DELETE CASCADE
 # Referenced By:
-#  aws_subnet | aws_subnet_location_aws_az_id_fkey | (location_aws_az_id) REFERENCES location_aws_az(id)
+#  aws_subnet | aws_subnet_location_aws_az_id_fkey | (location_aws_az_id) REFERENCES location_az(id)

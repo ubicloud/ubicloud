@@ -1,10 +1,28 @@
 # frozen_string_literal: true
 
 module ResourceMethods
-  def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil)
+  def self.configure(model, etc_type: false, redacted_columns: nil, encrypted_columns: nil, referencing: nil)
     model.instance_exec do
-      extend UbidTypeEtcMethods if etc_type
-      @ubid_format = /\A#{ubid_type}[a-z0-9]{24}\z/
+      @ubid_type = if referencing
+        include NoSetUuid
+
+        singleton_class.instance_exec do
+          undef_method :generate_ubid
+          undef_method :generate_uuid
+          undef_method :new_with_id
+        end
+
+        referencing
+      elsif etc_type
+        UBID::TYPE_ETC
+      else
+        # Adapted from sequel/model/inflections.rb's underscore, to convert
+        # class names into symbols
+        lookup_name = name.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').gsub(/([a-z\d])([A-Z])/, '\1_\2').tr("-", "_").upcase
+        UBID.const_get(:"TYPE_#{lookup_name}")
+      end
+
+      @ubid_format = /\A#{ubid_type}[a-tv-z0-9]{24}\z/
       @encrypted_columns = Array(encrypted_columns).freeze
       @redacted_columns = (Array(redacted_columns) + @encrypted_columns).freeze
 
@@ -18,9 +36,9 @@ module ResourceMethods
     end
   end
 
-  module UbidTypeEtcMethods
-    def ubid_type
-      UBID::TYPE_ETC
+  module NoSetUuid
+    def set_uuid
+      self
     end
   end
 
@@ -69,7 +87,7 @@ module ResourceMethods
       "cidr" => :to_s.to_proc,
       "inet" => :to_s.to_proc,
       "numeric" => :to_f.to_proc,
-      "timestamp with time zone" => lambda { |v| v.strftime("%F %T") }
+      "timestamp with time zone" => lambda { |v| v.strftime("%F %T") },
     }.freeze
     def inspect_values_hash
       inspect_values = {}
@@ -121,36 +139,24 @@ module ResourceMethods
   end
 
   module ClassMethods
+    attr_reader :ubid_type
+
     attr_reader :ubid_format
 
     attr_reader :encrypted_columns
 
     attr_reader :redacted_columns
 
-    # Adapted from sequel/model/inflections.rb's underscore, to convert
-    # class names into symbols
-    def self.uppercase_underscore(s)
-      s.gsub(/([A-Z]+)([A-Z][a-z])/, '\1_\2').gsub(/([a-z\d])([A-Z])/, '\1_\2').tr("-", "_").upcase
-    end
-
     def [](arg)
       if arg.is_a?(UBID)
         super(arg.to_uuid)
       elsif arg.is_a?(String) && arg.bytesize == 26
-        begin
-          ubid = UBID.parse(arg)
-        rescue UBIDParseError
-          nil
-        else
-          super(ubid.to_uuid)
+        if (uuid = UBID.to_uuid(arg))
+          super(uuid)
         end
       else
         super
       end
-    end
-
-    def ubid_type
-      UBID.const_get("TYPE_#{ClassMethods.uppercase_underscore(name)}")
     end
 
     def generate_ubid

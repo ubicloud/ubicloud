@@ -5,7 +5,7 @@ class Serializers::GithubRepository < Serializers::Base
     {
       id: repository.ubid,
       installation_name: options[:installation].name,
-      name: repository.repository_name
+      name: repository.repository_name,
     }
   end
 end

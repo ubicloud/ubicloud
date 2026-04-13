@@ -11,8 +11,8 @@ RSpec.describe PostgresUpgrade do
     allow(postgres_upgrade).to receive(:r)
     stub_const("EXTENSION_UPGRADE_SCRIPTS", {
       17 => {
-        "postgis" => "SELECT postgis_extensions_upgrade();"
-      }
+        "postgis" => "SELECT postgis_extensions_upgrade();",
+      },
     })
   end
 
@@ -40,28 +40,28 @@ RSpec.describe PostgresUpgrade do
 
   describe "#disable_archiving" do
     it "disables archiving without reload by default" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/17/main/conf.d/100-upgrade.conf")
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/17/main/conf.d/100-upgrade.conf")
       expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster 17 main reload")
       postgres_upgrade.disable_archiving(17)
     end
 
     it "disables archiving and reloads when reload: true" do
-      expect(postgres_upgrade).to receive(:r).with("echo 'archive_command = false' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
+      expect(postgres_upgrade).to receive(:r).with("echo 'archive_mode = on\narchive_command = false' | sudo tee /etc/postgresql/16/main/conf.d/100-upgrade.conf")
       expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster 16 main reload")
       postgres_upgrade.disable_archiving(16, reload: true)
     end
   end
 
   describe "#promote" do
-    it "promotes server if in recovery mode" do
+    it "promotes server using pg_promote" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("t\n")
-      expect(postgres_upgrade).to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
+      expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\"")
       postgres_upgrade.promote(16)
     end
 
     it "skips promotion if server is already promoted" do
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT pg_catalog.pg_is_in_recovery();' 2>/dev/null || echo 't'").and_return("f\n")
-      expect(postgres_upgrade).not_to receive(:r).with("sudo pg_ctlcluster promote 16 main", expect: [0, 1])
+      expect(postgres_upgrade).not_to receive(:r).with("sudo -u postgres psql -c \"SELECT pg_promote(true, 300)\"")
       expect(logger).to receive(:info).with("Server is already promoted (not in recovery mode)")
       postgres_upgrade.promote(16)
     end
@@ -90,13 +90,6 @@ RSpec.describe PostgresUpgrade do
       expect(pg_setup).to receive(:setup_data_directory)
       expect(pg_setup).to receive(:create_cluster)
       postgres_upgrade.initialize_new_version
-    end
-  end
-
-  describe "#stop_new_version" do
-    it "stops new version service" do
-      expect(postgres_upgrade).to receive(:r).with("sudo systemctl stop postgresql@17-main")
-      postgres_upgrade.stop_new_version
     end
   end
 
@@ -164,8 +157,8 @@ RSpec.describe PostgresUpgrade do
     it "escapes dangerous database and extension names correctly" do
       stub_const("EXTENSION_UPGRADE_SCRIPTS", {
         17 => {
-          "ext'sname" => "ALTER EXTENSION \"ext'sname\" UPDATE;"
-        }
+          "ext'sname" => "ALTER EXTENSION \"ext'sname\" UPDATE;",
+        },
       })
       expect(postgres_upgrade).to receive(:r).with("sudo -u postgres psql -t -c 'SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;'").and_return("mydb$(pwd)\n")
       expect(logger).to receive(:info).with("Running post upgrade extension update for ext'sname")
@@ -202,7 +195,6 @@ RSpec.describe PostgresUpgrade do
       expect(postgres_upgrade).to receive(:wait_for_postgres_to_start).ordered
       expect(postgres_upgrade).to receive(:promote).with(16).ordered
       expect(postgres_upgrade).to receive(:initialize_new_version).ordered
-      expect(postgres_upgrade).to receive(:stop_new_version).ordered
       expect(postgres_upgrade).to receive(:run_check).ordered
       expect(postgres_upgrade).to receive(:run_pg_upgrade).ordered
       expect(postgres_upgrade).to receive(:disable_archiving).with(17).ordered
