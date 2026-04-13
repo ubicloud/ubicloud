@@ -61,7 +61,7 @@ jobs:
       uses: actions/checkout@v6
 
     - name: Setup SSH access
-      uses: ubicloud/ssh-runner@v1
+      uses: ubicloud/ssh-runner@v2
       with:
         public-ssh-key: |
           ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
