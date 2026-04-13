@@ -7,9 +7,9 @@
 # (per-subnet allow rules).
 #
 # The including class must provide:
-#   credential          — a LocationCredentialGcp (for network_firewall_policies_client)
-#   gcp_project_id      — the GCP project ID string
-#   firewall_policy_name — the policy to operate on
+#   credential: a LocationCredentialGcp (for network_firewall_policies_client).
+#   gcp_project_id: the GCP project ID string.
+#   firewall_policy_name: the policy to operate on.
 module GcpFirewallPolicy
   private
 
@@ -57,7 +57,7 @@ module GcpFirewallPolicy
           firewall_policy_rule_resource: rule,
         )
       rescue ::Google::Cloud::AlreadyExistsError
-        # Concurrent strand added this rule -- proceed.
+        # Concurrent strand added this rule. Proceed.
         nil
       end
     else

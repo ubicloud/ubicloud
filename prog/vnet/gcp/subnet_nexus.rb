@@ -70,7 +70,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     save_gcp_op(op.name, "region", gcp_region, name: "create_subnet")
     hop_wait_create_subnet
   rescue Google::Cloud::AlreadyExistsError
-    # Retry after partial crash -- subnet already exists, proceed.
+    # Retry after partial crash. Subnet already exists, proceed.
     hop_create_tag_resources
   end
 
@@ -126,7 +126,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
 
   label def wait
     when_refresh_keys_set? do
-      # GCP has no IPsec tunnels -- nothing to rekey, just clear the semaphore
+      # GCP has no IPsec tunnels. Nothing to rekey, just clear the semaphore.
       decr_refresh_keys
     end
 
@@ -242,12 +242,12 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
     subnet_tv = resp.tag_values&.find { |v| v.short_name == subnet_tag_short_name }
     credential.crm_client.delete_tag_value(subnet_tv.name) if subnet_tv
 
-    # Per-subnet tag key -- always delete it when the subnet is destroyed
+    # Per-subnet tag key. Always delete it when the subnet is destroyed.
     credential.crm_client.delete_tag_key(tag_key.name)
   rescue Google::Apis::ClientError => e
     case e.status_code
     when 404
-      # Tag key / value already deleted -- swallow.
+      # Tag key / value already deleted. Swallow.
       nil
     when 400
       # CRM returns HTTP 400 with a v2 error body whose `status` field is

@@ -698,13 +698,13 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse.new(tag_keys: []),
       )
 
-      # get succeeds — policy exists at this point
+      # get succeeds: policy exists at this point.
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(associations: [])
       expect(nfp_client).to receive(:get).with(
         project: "test-gcp-project", firewall_policy: vpc_name,
       ).and_return(policy)
 
-      # delete raises NotFoundError — policy was deleted between get and delete
+      # delete raises NotFoundError: policy was deleted between get and delete.
       expect(nfp_client).to receive(:delete).with(
         project: "test-gcp-project", firewall_policy: vpc_name,
       ).and_raise(Google::Cloud::NotFoundError.new("not found"))

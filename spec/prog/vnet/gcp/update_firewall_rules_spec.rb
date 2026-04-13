@@ -128,7 +128,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       st.save_changes
       nx.instance_variable_set(:@frame, nil)
 
-      # Should NOT call create_tag_key or create_tag_value — already cached
+      # Should NOT call create_tag_key or create_tag_value (already cached).
       expect(crm_client).not_to receive(:create_tag_key)
       expect(crm_client).not_to receive(:create_tag_value)
 
@@ -285,7 +285,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      # Subnet tag create fails with 400 — no stale bindings to free, so re-raise
+      # Subnet tag create fails with 400: no stale bindings to free, so re-raise.
       allow(regional_crm_client).to receive(:create_tag_binding)
         .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
 
@@ -1214,7 +1214,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "skips active firewalls (attached to this VM)" do
-      # Only active firewall tag key present — should be skipped entirely
+      # Only active firewall tag key present. Should be skipped entirely.
       active_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-fwubid1", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 

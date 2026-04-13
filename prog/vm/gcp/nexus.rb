@@ -15,7 +15,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     nap 5 unless nic.private_subnet.strand.label == "wait"
     nap 1 unless nic.strand.label == "wait"
 
-    # Zone selection is a VM concern -- pick a zone on first entry,
+    # Zone selection is a VM concern. Pick a zone on first entry,
     # then honour the value already set by retry_zone_capacity.
     unless strand.stack.first.key?("gcp_zone_suffix")
       excluded = frame["exclude_zones"] || frame["exclude_availability_zones"] || []
@@ -330,7 +330,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     return vm.boot_image if vm.boot_image.start_with?("projects/")
 
     entry = GCE_BOOT_IMAGE_FAMILIES[vm.boot_image]
-    raise "Unknown boot image '#{vm.boot_image}' -- expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
+    raise "Unknown boot image '#{vm.boot_image}'. Expected a projects/* path or one of: #{GCE_BOOT_IMAGE_FAMILIES.keys.join(", ")}" unless entry
 
     gce_arch = (vm.arch == "arm64") ? "arm64" : "amd64"
     family = entry[:family].sub("ARCH", gce_arch)
@@ -364,8 +364,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       "gcp_zone_suffix" => new_suffix,
       "exclude_zones" => excluded,
     })
-    # 5 minutes: all zones exhausted, exclusions reset -- wait for capacity to free up
-    # 5 seconds: still have untried zones -- move on to the next one quickly
+    # 5 minutes: all zones exhausted, exclusions reset. Wait for capacity to free up.
+    # 5 seconds: still have untried zones. Move on to the next one quickly.
     (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
   end
 
@@ -407,7 +407,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         priority: rule.priority,
       )
     rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
-      # Already deleted or rule rejected as invalid -- skip and continue
+      # Already deleted or rule rejected as invalid. Skip and continue.
       nil
     end
 

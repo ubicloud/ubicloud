@@ -97,7 +97,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       save_gcp_op(op.name, "global", name: "create_fw_policy")
       hop_wait_firewall_policy_created
     rescue Google::Cloud::AlreadyExistsError
-      # Policy already exists -- either a concurrent strand just created
+      # Policy already exists: either a concurrent strand just created
       # it, or we are on the second pass after wait_firewall_policy_created
       # hopped back here. Fetch it so we can continue with association.
       credential.network_firewall_policies_client.get(

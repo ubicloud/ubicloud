@@ -462,11 +462,11 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
     end
 
     it "fires delete op and hops to wait_delete_subnet" do
-      # delete_subnet_policy_rules — rules already deleted
+      # delete_subnet_policy_rules: rules already deleted.
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      # delete_gcp_subnet — fires op
+      # delete_gcp_subnet: fires op.
       delete_op = instance_double(Gapic::GenericLRO::Operation, name: "op-delete-subnet")
       expect(subnetworks_client).to receive(:delete).with(
         project: "test-gcp-project",
@@ -483,7 +483,7 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       expect(nfp_client).to receive(:get_rule).twice
         .and_raise(Google::Cloud::NotFoundError.new("not found"))
 
-      # delete_subnet_tag_resources — per-subnet tag key
+      # delete_subnet_tag_resources: per-subnet tag key.
       tag_key = Google::Apis::CloudresourcemanagerV3::TagKey.new(
         name: "tagKeys/111", short_name: "ubicloud-subnet-#{ps.ubid}",
       )

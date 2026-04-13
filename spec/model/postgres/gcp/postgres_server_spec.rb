@@ -203,7 +203,7 @@ RSpec.describe PostgresServer do
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
-        # SA already exists — get succeeds
+        # SA already exists: get succeeds.
         expect(iam_client).to receive(:get_project_service_account).and_return(sa)
         expect(iam_client).not_to receive(:create_service_account)
 

@@ -5,7 +5,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
 
   # Per-VM INGRESS rules start at priority 10000 in the VPC's network firewall policy.
   # These rules target per-firewall secure tags (ubicloud-fw-{firewall.ubid}/active),
-  # so rules for different firewalls can share the same priority number -- GCP only
+  # so rules for different firewalls can share the same priority number. GCP only
   # evaluates a rule for VMs bound to its target tag. Priorities are not stored in the
   # DB; they're allocated on-the-fly by reading the current policy and finding free slots.
   # See doc/gcp_firewall_architecture.md for the full priority band layout.
@@ -306,7 +306,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       failed_creates << tv
     end
 
-    # Unbind stale tags (fire-and-forget -- the delete completes asynchronously)
+    # Unbind stale tags (fire-and-forget; the delete completes asynchronously).
     stale_bindings.each do |binding|
       regional_crm_client.delete_tag_binding(binding.name)
     rescue Google::Apis::ClientError => e
@@ -323,7 +323,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       tag_value: tag_value_name,
     )
 
-    # Fire-and-forget -- the binding completes asynchronously.
+    # Fire-and-forget. The binding completes asynchronously.
     regional_crm_client.create_tag_binding(tag_binding_obj)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409 || e.status_code == 400
@@ -389,7 +389,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
           delete_policy_rule(rule.priority)
         end
 
-        # Fire-and-forget: don't wait for CRM LRO -- ghost bindings can
+        # Fire-and-forget: don't wait for CRM LRO. Ghost bindings can
         # cause 30-second waits that block the respirate thread.
         credential.crm_client.delete_tag_value(tag_value_name)
       end
@@ -415,7 +415,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     rules_by_cidr.each do |cidr, cidr_rules|
       layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
         config = {ip_protocol: proto}
-        # nil port_range means all ports — omit :ports entirely when any
+        # nil port_range means all ports. Omit :ports entirely when any
         # rule in the group covers all ports so GCP treats it as "all".
         unless proto_rules.any? { |r| r.port_range.nil? }
           config[:ports] = proto_rules.map { |r| format_port_range(r.port_range) }

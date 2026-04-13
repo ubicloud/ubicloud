@@ -76,7 +76,7 @@ PGDATA=/dat/#{version}/data
     end
 
     def gcp_setup_blob_storage
-      # GCS setup is automatic via SA credentials — no-op
+      # GCS setup is automatic via SA credentials (no-op).
     end
 
     def gcp_generate_blob_storage_credentials?

@@ -82,7 +82,7 @@ class PostgresServer < Sequel::Model
 
       timeline.update(access_key: sa.email, secret_key: key_json)
 
-      # Clean up old timeline's SA if it exists — best-effort, runs after
+      # Clean up old timeline's SA if it exists. Best-effort, runs after
       # timeline.update so retries won't re-enter (access_key guard above).
       cleanup_old_timeline_sa(credential)
     end
