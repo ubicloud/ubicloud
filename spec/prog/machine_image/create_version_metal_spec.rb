@@ -171,16 +171,19 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
   describe "#archive" do
     let(:sshable) { source_vm.vm_host.sshable }
     let(:daemon_name) { "archive_#{mi_version.ubid}" }
+    let(:stats_path) { "/tmp/archive_stats_#{mi_version.ubid}.json" }
 
     before do
       allow(prog).to receive_messages(archive_params_json: "{\"field\":\"value\"}", source_vm:)
     end
 
-    it "cleans daemon and hops to finish when daemon succeeded" do
+    it "reads stats, cleans daemon and hops to finish when daemon succeeded" do
       expect(sshable).to receive(:d_check).with(daemon_name).and_return("Succeeded")
+      expect(sshable).to receive(:_cmd).with("cat #{stats_path}").and_return('{"physical_size_bytes": 10485760, "logical_size_bytes": 1073741824}')
       expect(sshable).to receive(:d_clean).with(daemon_name)
 
       expect { prog.archive }.to hop("finish")
+      expect(strand.stack.first["archive_size_bytes"]).to eq(10485760)
     end
 
     it "restarts daemon when it failed" do
@@ -192,7 +195,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     it "starts daemon when status is NotStarted" do
       expect(sshable).to receive(:d_check).with(daemon_name).and_return("NotStarted")
       expect(sshable).to receive(:d_run).with(daemon_name,
-        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, "vda", 0, vhost_block_backend.version,
+        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, "vda", 0, vhost_block_backend.version, stats_path,
         stdin: "{\"field\":\"value\"}", log: false)
 
       expect { prog.archive }.to nap(30)
@@ -213,7 +216,11 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
   end
 
   describe "#finish" do
-    before { allow(prog).to receive(:archive_size_bytes).and_return(10 * 1024 * 1024) }
+    before {
+      refresh_frame(prog, new_values: {"archive_size_bytes" => 10 * 1024 * 1024})
+      allow(prog).to receive(:source_vm).and_return(source_vm)
+      expect(source_vm.vm_host.sshable).to receive(:_cmd).with("sudo rm -f /tmp/archive_stats_#{mi_version.ubid}.json")
+    }
 
     it "enables machine image version metal and sets archive size" do
       expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
@@ -226,7 +233,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     end
 
     it "destroys source vm when configured" do
-      refresh_frame(prog, new_values: {"destroy_source_after" => true})
+      refresh_frame(prog, new_values: {"archive_size_bytes" => 10 * 1024 * 1024, "destroy_source_after" => true})
 
       expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
 
@@ -234,7 +241,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     end
 
     it "sets machine image latest version when configured" do
-      refresh_frame(prog, new_values: {"set_as_latest" => true})
+      refresh_frame(prog, new_values: {"archive_size_bytes" => 10 * 1024 * 1024, "set_as_latest" => true})
 
       expect { prog.finish }.to exit({"msg" => "Metal machine image version is created and enabled"})
 
@@ -266,23 +273,9 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
     end
   end
 
-  describe "#archive_size_bytes" do
-    it "sums object sizes across pages" do
-      s3 = Aws::S3::Client.new(stub_responses: true)
-      s3.stub_responses(
-        :list_objects_v2,
-        {contents: [{size: 10}, {size: 20}], is_truncated: true, next_continuation_token: "token"},
-        {contents: [{size: 5}], is_truncated: false},
-      )
-
-      allow(Aws::S3::Client).to receive(:new).with(
-        region: store.region,
-        endpoint: store.endpoint,
-        access_key_id: store.access_key,
-        secret_access_key: store.secret_key,
-      ).and_return(s3)
-
-      expect(prog.archive_size_bytes).to eq(35)
+  describe "#stats_file_path" do
+    it "returns the expected path" do
+      expect(prog.stats_file_path).to eq("/tmp/archive_stats_#{mi_version.ubid}.json")
     end
   end
 end
