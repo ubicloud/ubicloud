@@ -34,6 +34,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         ],
         boot_image:,
         enable_ip4: true,
+        exclude_host_ids: dns_server.vms.filter_map(&:vm_host_id),
       )
 
       Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id:}])
