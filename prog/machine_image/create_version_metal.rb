@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "aws-sdk-s3"
 require "json"
 
 class Prog::MachineImage::CreateVersionMetal < Prog::Base
@@ -51,6 +50,9 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     status = sshable.d_check(unit_name)
     case status
     when "Succeeded"
+      stats_json = sshable.cmd("cat :stats_path", stats_path: stats_file_path)
+      stats = JSON.parse(stats_json)
+      update_stack("archive_size_bytes" => stats["physical_size_bytes"])
       sshable.d_clean(unit_name)
       hop_finish
     when "Failed"
@@ -58,7 +60,7 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
       nap 60
     when "NotStarted"
       sshable.d_run(unit_name,
-        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, sv.storage_device.name, sv.disk_index, sv.vhost_block_backend.version,
+        "sudo", "host/bin/archive-storage-volume", source_vm.inhost_name, sv.storage_device.name, sv.disk_index, sv.vhost_block_backend.version, stats_file_path,
         stdin: archive_params_json, log: false)
       nap 30
     when "InProgress"
@@ -71,9 +73,11 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
   end
 
   label def finish
+    source_vm.vm_host.sshable.cmd("sudo rm -f :stats_path", stats_path: stats_file_path)
+
     machine_image_version_metal.update(
       enabled: true,
-      archive_size_mib: (archive_size_bytes/1048576r).ceil,
+      archive_size_mib: (frame["archive_size_bytes"]/1048576r).ceil,
     )
     if frame["destroy_source_after"]
       source_vm.incr_destroy
@@ -103,21 +107,9 @@ class Prog::MachineImage::CreateVersionMetal < Prog::Base
     }.to_json
   end
 
-  def archive_size_bytes
-    store = machine_image_version_metal.store
-
-    s3 = Aws::S3::Client.new(
-      region: store.region,
-      endpoint: store.endpoint,
-      access_key_id: store.access_key,
-      secret_access_key: store.secret_key,
-    )
-
-    total = 0
-    s3.list_objects_v2(bucket: store.bucket, prefix: machine_image_version_metal.store_prefix).each_page do |page|
-      total += page.contents.sum(&:size)
-    end
-    total
+  def stats_file_path
+    mi_version = machine_image_version_metal.machine_image_version
+    "/tmp/archive_stats_#{mi_version.ubid}.json"
   end
 
   def source_vm
