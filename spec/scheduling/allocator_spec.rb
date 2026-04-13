@@ -46,6 +46,10 @@ RSpec.describe Al do
     )
   end
 
+  def create_storage_volumes(vm, storage_volume_params)
+    vm.create_storage_volumes(storage_volume_params.map { it.transform_keys(&:to_sym) })
+  end
+
   describe "allocation_request" do
     let(:storage_volumes) {
       [{
@@ -61,13 +65,15 @@ RSpec.describe Al do
 
     let(:project) { Project.create(name: "test-project") }
     let(:vm) {
-      Vm.create(
+      vm = Vm.create(
         project_id: project.id, family: "standard", cores: 0, vcpus: 2, cpu_percent_limit: 200,
         cpu_burst_percent_limit: 0, memory_gib: 8, name: "dummy-vm", arch: "x64",
         location_id: Location::HETZNER_FSN1_ID, ip4_enabled: true, created_at: Time.now,
         unix_user: "ubi", public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINYf51IA6bHApuggkz/VksM1cZ0elj2gNQQfPBFdlpRW",
         boot_image: "ubuntu-jammy",
       )
+      create_storage_volumes(vm, storage_volumes)
+      vm
     }
 
     it "fails if no valid allocation is found" do
@@ -714,8 +720,10 @@ RSpec.describe Al do
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
+      storage_volumes = [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes)
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -734,8 +742,10 @@ RSpec.describe Al do
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
       available_storage = vmh.storage_devices.sum { it.available_storage_gib }
-      described_class.allocate(vm, [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
-        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}], gpu_count: 1)
+      storage_volumes = [{"size_gib" => 85, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false},
+        {"size_gib" => 95, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}]
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes, gpu_count: 1)
       vmh.reload
       expect(vm.vm_storage_volumes.detect { it.disk_index == 0 }.size_gib).to eq(85)
       expect(vm.vm_storage_volumes.detect { it.disk_index == 1 }.size_gib).to eq(95)
@@ -925,53 +935,13 @@ RSpec.describe Al do
       expect { al.update(vm1) }.to raise_error(RuntimeError, "concurrent GPU partition allocation")
     end
 
-    it "creates volume without encryption key if storage is not encrypted" do
-      vm = create_vm
-      described_class.allocate(vm, vol)
-      expect(StorageKeyEncryptionKey.count).to eq(0)
-      expect(vm.reload.vm_storage_volumes.first.key_encryption_key_1_id).to be_nil
-      expect(vm.storage_secrets.count).to eq(0)
-    end
-
-    it "creates volume with rate limits" do
-      vm = create_vm
-      vol = [{
-        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false, "max_read_mbytes_per_sec" => 200,
-        "max_write_mbytes_per_sec" => 300, "rate_limit_bytes_write" => 400,
-      }]
-      described_class.allocate(vm, vol)
-      expect(vm.vm_storage_volumes.first.max_read_mbytes_per_sec).to eq(200)
-      expect(vm.vm_storage_volumes.first.max_write_mbytes_per_sec).to eq(300)
-    end
-
-    it "creates volume with track_written set to true" do
-      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.4.0", allocation_weight: 100)
-      vm = create_vm
-      vol = [{
-        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false, "track_written" => true, "vring_workers" => 1,
-      }]
-      described_class.allocate(vm, vol)
-      expect(vm.vm_storage_volumes.first.track_written).to be(true)
-    end
-
-    it "creates volume with track_written defaulting to false" do
-      vm = create_vm
-      vol = [{
-        "size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false,
-        "boot" => false,
-      }]
-      described_class.allocate(vm, vol)
-      expect(vm.vm_storage_volumes.first.track_written).to be(false)
-    end
-
     it "succeeds allocation when track_written is set and host has vhost block backend v0.4.0+" do
       vmh = VmHost.first
       create_vhost_block_backend(vm_host_id: vmh.id, version: "v0.4.0", allocation_weight: 100)
 
       vm = create_vm
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true, "vring_workers" => 1}]
+      create_storage_volumes(vm, vol)
       described_class.allocate(vm, vol)
       expect(vm.reload.vm_host_id).to eq(vmh.id)
       expect(vm.vm_storage_volumes.first.track_written).to be(true)
@@ -992,6 +962,7 @@ RSpec.describe Al do
         "boot" => true, "machine_image_version_id" => miv.id,
         "vring_workers" => 1,
       }]
+      create_storage_volumes(vm, vol)
       BootImage.dataset.destroy
       described_class.allocate(vm, vol)
       expect(vm.vm_storage_volumes.first.boot_image_id).to be_nil
@@ -1002,14 +973,8 @@ RSpec.describe Al do
       vm = create_vm
       miv = create_machine_image_version_metal
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "machine_image_version_id" => miv.id}]
+      create_storage_volumes(vm, vol)
       expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
-    end
-
-    it "creates volume with no rate limits" do
-      vm = create_vm
-      described_class.allocate(vm, vol)
-      expect(vm.vm_storage_volumes.first.max_read_mbytes_per_sec).to be_nil
-      expect(vm.vm_storage_volumes.first.max_write_mbytes_per_sec).to be_nil
     end
 
     it "can have empty allocation state filter" do
@@ -1026,19 +991,13 @@ RSpec.describe Al do
       expect(al).to be_truthy
     end
 
-    it "creates volume with encryption key if storage is encrypted" do
-      vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false}])
-      expect(StorageKeyEncryptionKey.count).to eq(1)
-      expect(vm.vm_storage_volumes.first.key_encryption_key_1_id).not_to be_nil
-      expect(vm.storage_secrets.count).to eq(1)
-    end
-
     it "uses vhost block backend if available" do
       vmh = VmHost.first
       vhost_backend = create_vhost_block_backend(vm_host_id: vmh.id)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
+      storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}]
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes)
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to eq(vhost_backend.id)
       expect(volume.spdk_installation_id).to be_nil
@@ -1054,6 +1013,7 @@ RSpec.describe Al do
         {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 3},
         {"size_gib" => 14, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 1},
       ]
+      create_storage_volumes(vm, volumes)
       described_class.allocate(vm, volumes)
       vol1 = vm.vm_storage_volumes.find { |v| v.disk_index == 0 }
       vol2 = vm.vm_storage_volumes.find { |v| v.disk_index == 1 }
@@ -1069,36 +1029,13 @@ RSpec.describe Al do
       expect(vol3.vring_workers).to eq(1)
     end
 
-    it "assigns correct params to each volume when volumes have different sizes & have been prepoulled" do
-      vmh = VmHost.first
-      vhost_backend = create_vhost_block_backend(vm_host_id: vmh.id)
-      vm = create_vm
-      volumes = [
-        {"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "vring_workers" => 2},
-        {"size_gib" => 20, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 3},
-        {"size_gib" => 14, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "vring_workers" => 1},
-      ]
-      vm.create_storage_volumes(volumes.map { it.transform_keys(&:to_sym) })
-      described_class.allocate(vm, volumes)
-      vol1 = vm.vm_storage_volumes_dataset.first(disk_index: 0)
-      vol2 = vm.vm_storage_volumes_dataset.first(disk_index: 1)
-      vol3 = vm.vm_storage_volumes_dataset.first(disk_index: 2)
-      expect(vol1.size_gib).to eq(5)
-      expect(vol1.vhost_block_backend_id).to eq(vhost_backend.id)
-      expect(vol1.vring_workers).to eq(2)
-      expect(vol2.size_gib).to eq(20)
-      expect(vol2.vhost_block_backend_id).to eq(vhost_backend.id)
-      expect(vol2.vring_workers).to eq(3)
-      expect(vol3.size_gib).to eq(14)
-      expect(vol3.vhost_block_backend_id).to eq(vhost_backend.id)
-      expect(vol3.vring_workers).to eq(1)
-    end
-
     it "uses SPDK if vhost block backend has allocation_weight 0" do
       vmh = VmHost.first
       create_vhost_block_backend(vm_host_id: vmh.id, allocation_weight: 0)
+      storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}]
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => false, "vring_workers" => 3}])
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes)
       volume = vm.vm_storage_volumes.first
       expect(volume.vhost_block_backend_id).to be_nil
       expect(volume.spdk_installation_id).to eq(vmh.spdk_installations.first.id)
@@ -1112,7 +1049,9 @@ RSpec.describe Al do
       BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: nil, activated_at: Time.now, size_gib: 3)
       BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20240404", activated_at: nil, size_gib: 3)
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}])
+      storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}]
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes)
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
     end
 
@@ -1131,8 +1070,10 @@ RSpec.describe Al do
       bi = BootImage.create(vm_host_id: vmh.id, name: "ubuntu-jammy", version: "20230303", activated_at: Time.now, size_gib: 3)
       mi = BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240406", activated_at: Time.now, size_gib: 3)
       BootImage.create(vm_host_id: vmh.id, name: "ai-model-test-model", version: "20240404", activated_at: Time.now, size_gib: 3)
+      storage_volumes = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}, {"size_gib" => 0, "read_only" => true, "image" => "ai-model-test-model", "boot" => false, "encrypted" => false, "use_bdev_ubi" => false}]
       vm = create_vm
-      described_class.allocate(vm, [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => true, "boot" => true}, {"size_gib" => 0, "read_only" => true, "image" => "ai-model-test-model", "boot" => false, "encrypted" => false, "use_bdev_ubi" => false}])
+      create_storage_volumes(vm, storage_volumes)
+      described_class.allocate(vm, storage_volumes)
       expect(vm.vm_storage_volumes.first.boot_image_id).to eq(bi.id)
       expect(vm.vm_storage_volumes.last.boot_image_id).to eq(mi.id)
     end
@@ -1226,7 +1167,7 @@ RSpec.describe Al do
       }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
-    it "skips volume creation and only updates associations when storage volumes already exist" do
+    it "updates associations on pre-existing storage volumes" do
       vm = create_vm
       vm.create_storage_volumes([
         {boot: true, size_gib: 5, encrypted: false, track_written: false},
@@ -1341,6 +1282,7 @@ RSpec.describe Al do
 
     it "creates a vm with a slice" do
       vm = create_vm
+      create_storage_volumes(vm, vol)
       vmh = VmHost.first
       used_cores = vmh.used_cores
       used_hugepages_1g = vmh.used_hugepages_1g
