@@ -238,18 +238,18 @@ zone-flush zone2.domain.io
       dummy_sshable = prog.ds.vms.first.sshable
 
       expect(prog.vm.sshable).to receive(:_cmd).twice
-        .with("sudo -u knot knotc", stdin: "zone-read --")
+        .with("sudo -u knot knotc", log: false, stdin: "zone-read --")
         .and_return("line1\nline2")
 
       expect(dummy_sshable).to receive(:_cmd)
-        .with("sudo -u knot knotc", stdin: "zone-read --")
+        .with("sudo -u knot knotc", log: false, stdin: "zone-read --")
         .and_return("line1\nline3")
 
       # Different outputs
       expect { prog.validate }.to hop("sync_zones")
 
       expect(dummy_sshable).to receive(:_cmd)
-        .with("sudo -u knot knotc", stdin: "zone-read --")
+        .with("sudo -u knot knotc", log: false, stdin: "zone-read --")
         .and_return("line2\nline1")
 
       # Same output but different order, doesn't matter
