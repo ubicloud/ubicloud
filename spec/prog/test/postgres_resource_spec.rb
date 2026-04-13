@@ -33,9 +33,18 @@ RSpec.describe Prog::Test::PostgresResource do
 
   describe ".assemble" do
     it "creates a strand and service projects" do
-      st = described_class.assemble
+      st = nil
+      expect { st = described_class.assemble }.to change { Project.select_order_map(:name) }.from(["service-project"]).to(["Postgres-Test-Project", "service-project"])
       expect(st).to be_a Strand
       expect(st.label).to eq("start")
+    end
+
+    it "uses existing project if Config.local_e2e_postgres_test_project_id" do
+      st = nil
+      project = Project.create(name: "foo")
+      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(project.id).at_least(:once)
+      expect { st = described_class.assemble }.not_to change { Project.select_order_map(:name) }
+      expect(st).to be_a Strand
     end
   end
 
@@ -116,8 +125,18 @@ RSpec.describe Prog::Test::PostgresResource do
   end
 
   describe "#finish" do
-    it "exits successfully if no failure happened" do
+    it "delete project and exits successfully if no failure happened" do
+      pgr_test
       expect { pgr_test.finish }.to exit({"msg" => "Postgres tests are finished!"})
+        .and change { Project.select_order_map(:name) }.from(["Postgres-Test-Project", "service-project"]).to(["service-project"])
+    end
+
+    it "not delete project if Config.local_e2e_postgres_test_project_id" do
+      pgr_test
+      project = Project.create(name: "foo")
+      expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(project.id).at_least(:once)
+      expect { pgr_test.finish }.to exit({"msg" => "Postgres tests are finished!"})
+        .and not_change { Project.select_order_map(:name) }
     end
 
     it "hops to failed if a failure happened" do
