@@ -121,7 +121,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       )
       save_gcp_op(op.name, "zone", gcp_zone, name: "create_vm")
     rescue Google::Cloud::AlreadyExistsError
-      # Instance already exists from a prior attempt -- proceed to wait
+      # Instance already exists from a prior attempt, proceed to wait
+      nil
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::InvalidArgumentError => e
