@@ -54,16 +54,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsVmNexus do
   end
 
   describe "#start" do
-    it "creates vm_ports and hops to wait, leaving them registering when no TG ARN is set" do
+    it "creates vm_ports in registering state and hops to wait" do
       expect { nx.start }.to hop("wait")
         .and change { pl_vm.vm_ports_dataset.where(state: "registering").count }.from(0).to(1)
-    end
-
-    it "registers targets immediately if TG ARN is already set" do
-      pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
-      elb_client.stub_responses(:register_targets)
-      expect { nx.start }.to hop("wait")
-        .and change { pl_vm.vm_ports_dataset.where(state: "registered").count }.from(0).to(1)
     end
   end
 
@@ -95,21 +88,21 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsVmNexus do
         .and change { pl_vm.vm_ports_dataset.where(state: "registered").count }.from(0).to(1)
     end
 
-    it "skips registration if target group not found" do
+    it "naps to retry if target group not found in AWS" do
       elb_client.stub_responses(:register_targets, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
-      expect { nx.add_port }.to hop("wait")
+      expect { nx.add_port }.to nap(5)
     end
 
-    it "skips registration if port has no target_group_arn" do
+    it "naps to retry if port has no target_group_arn" do
       pl.ports.first.update(target_group_arn: nil)
       expect(elb_client).not_to receive(:register_targets)
-      expect { nx.add_port }.to hop("wait")
+      expect { nx.add_port }.to nap(5)
     end
 
-    it "skips if vm has no NIC in subnet" do
+    it "naps to retry if vm has no NIC in subnet" do
       vm.nics.find { it.private_subnet_id == ps.id }.update(private_subnet_id: Prog::Vnet::SubnetNexus.assemble(ps.project.id, name: "other-ps", location_id: ps.location.id).subject.id)
       expect(elb_client).not_to receive(:register_targets)
-      expect { nx.add_port }.to hop("wait")
+      expect { nx.add_port }.to nap(5)
     end
   end
 

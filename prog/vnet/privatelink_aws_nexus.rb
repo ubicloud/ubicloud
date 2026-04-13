@@ -78,10 +78,6 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
     end
 
     nlb_arn = begin
-      elb_client.describe_load_balancers(
-        names: ["pl-#{privatelink_aws_resource.ubid}"]
-      ).load_balancers.first.load_balancer_arn
-    rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
       elb_client.create_load_balancer(
         name: "pl-#{privatelink_aws_resource.ubid}",
         type: "network",
@@ -92,6 +88,10 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
           {key: "ubid", value: privatelink_aws_resource.ubid.to_s},
           {key: "subnet_ubid", value: private_subnet.ubid.to_s}
         ]
+      ).load_balancers.first.load_balancer_arn
+    rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateLoadBalancerName
+      elb_client.describe_load_balancers(
+        names: ["pl-#{privatelink_aws_resource.ubid}"]
       ).load_balancers.first.load_balancer_arn
     end
 
@@ -305,15 +305,13 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
 
   label def destroy_nlb
     unless privatelink_aws_resource.nlb_arn
-      privatelink_aws_resource.destroy
-      pop "PrivateLink deleted"
+      finish_destroy
     end
 
     begin
       elb_client.delete_load_balancer(load_balancer_arn: privatelink_aws_resource.nlb_arn)
     rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
-      privatelink_aws_resource.destroy
-      pop "PrivateLink deleted"
+      finish_destroy
     rescue Aws::ElasticLoadBalancingV2::Errors::ResourceInUse
       nap 10
     end
@@ -324,9 +322,13 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
       )
       nap 10
     rescue Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound
-      privatelink_aws_resource.destroy
-      pop "PrivateLink deleted"
+      finish_destroy
     end
+  end
+
+  def finish_destroy
+    privatelink_aws_resource.destroy
+    pop "PrivateLink deleted"
   end
 
   def ensure_target_group(port, vpc_id)
@@ -334,8 +336,6 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
 
     tg_name = "pl-tg-#{port.src_port}-#{privatelink_aws_resource.ubid}"[..31]
     target_group_arn = begin
-      elb_client.describe_target_groups(names: [tg_name]).target_groups.first.target_group_arn
-    rescue Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound
       elb_client.create_target_group(
         name: tg_name,
         protocol: "TCP",
@@ -352,6 +352,8 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
           {key: "port_ubid", value: port.ubid.to_s}
         ]
       ).target_groups.first.target_group_arn
+    rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateTargetGroupName
+      elb_client.describe_target_groups(names: [tg_name]).target_groups.first.target_group_arn
     end
 
     port.update(target_group_arn:)
@@ -360,16 +362,18 @@ class Prog::Vnet::PrivatelinkAwsNexus < Prog::Base
   def ensure_listener(port)
     return if port.listener_arn
 
-    listener_arn = elb_client.describe_listeners(
-      load_balancer_arn: privatelink_aws_resource.nlb_arn
-    ).listeners.find { |l| l.port == port.src_port }&.listener_arn
-
-    listener_arn ||= elb_client.create_listener(
-      load_balancer_arn: privatelink_aws_resource.nlb_arn,
-      protocol: "TCP",
-      port: port.src_port,
-      default_actions: [{type: "forward", target_group_arn: port.target_group_arn}]
-    ).listeners.first.listener_arn
+    listener_arn = begin
+      elb_client.create_listener(
+        load_balancer_arn: privatelink_aws_resource.nlb_arn,
+        protocol: "TCP",
+        port: port.src_port,
+        default_actions: [{type: "forward", target_group_arn: port.target_group_arn}]
+      ).listeners.first.listener_arn
+    rescue Aws::ElasticLoadBalancingV2::Errors::DuplicateListener
+      elb_client.describe_listeners(
+        load_balancer_arn: privatelink_aws_resource.nlb_arn
+      ).listeners.find { |l| l.port == port.src_port }&.listener_arn
+    end
 
     port.update(listener_arn:)
   end

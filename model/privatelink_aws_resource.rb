@@ -40,6 +40,7 @@ class PrivatelinkAwsResource < Sequel::Model
     DB.transaction do
       pl_vm = add_privatelink_aws_vm(vm_id: vm.id)
       Strand.create_with_id(pl_vm, prog: "Vnet::PrivatelinkAwsVmNexus", label: "start")
+      pl_vm.incr_add_port
     end
   end
 

@@ -167,6 +167,7 @@ class Prog::Vnet::Aws::VpcNexus < Prog::Base
       nap 5
     end
     if (pl = private_subnet.privatelink_aws_resource)
+      register_deadline(nil, 10 * 60, allow_extension: true)
       pl.incr_destroy
       nap 5
     end

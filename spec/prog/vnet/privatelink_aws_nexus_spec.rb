@@ -80,16 +80,15 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
   describe "#start" do
     let(:nlb_arn) { "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/net/pl-test/abc123" }
 
-    it "creates an NLB when none exists and hops to wait_nlb_active" do
-      elb_client.stub_responses(:describe_load_balancers, Aws::ElasticLoadBalancingV2::Errors::LoadBalancerNotFound.new(nil, nil))
+    it "creates an NLB and hops to wait_nlb_active" do
       elb_client.stub_responses(:create_load_balancer, load_balancers: [{load_balancer_arn: nlb_arn}])
       expect { nx.start }.to hop("wait_nlb_active")
         .and change { pl.reload.nlb_arn }.from(nil).to(nlb_arn)
     end
 
-    it "uses an existing NLB if already created in AWS and hops to wait_nlb_active" do
+    it "recovers an existing NLB if creation raises DuplicateLoadBalancerName" do
+      elb_client.stub_responses(:create_load_balancer, Aws::ElasticLoadBalancingV2::Errors::DuplicateLoadBalancerName.new(nil, nil))
       elb_client.stub_responses(:describe_load_balancers, load_balancers: [{load_balancer_arn: nlb_arn}])
-      expect(elb_client).not_to receive(:create_load_balancer)
       expect { nx.start }.to hop("wait_nlb_active")
         .and change { pl.reload.nlb_arn }.from(nil).to(nlb_arn)
     end
@@ -118,7 +117,6 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
   describe "#create_target_groups" do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
-      elb_client.stub_responses(:describe_target_groups, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
       elb_client.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc"}])
     }
 
@@ -127,9 +125,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
     end
 
-    it "recovers an existing target group created in AWS but not yet saved to DB" do
+    it "recovers an existing target group if creation raises DuplicateTargetGroupName" do
+      elb_client.stub_responses(:create_target_group, Aws::ElasticLoadBalancingV2::Errors::DuplicateTargetGroupName.new(nil, nil))
       elb_client.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered"}])
-      expect(elb_client).not_to receive(:create_target_group)
       expect { nx.create_target_groups }.to hop("create_listeners")
       expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered")
     end
@@ -146,7 +144,6 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
-      elb_client.stub_responses(:describe_listeners, listeners: [])
       elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
@@ -155,9 +152,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
 
-    it "recovers an existing listener created in AWS but not yet saved to DB" do
+    it "recovers an existing listener if creation raises DuplicateListener" do
+      elb_client.stub_responses(:create_listener, Aws::ElasticLoadBalancingV2::Errors::DuplicateListener.new(nil, nil))
       elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered", port: 5432}])
-      expect(elb_client).not_to receive(:create_listener)
       expect { nx.create_listeners }.to hop("create_endpoint_service")
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered")
     end
@@ -223,7 +220,6 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       nx.incr_add_port
-      elb_client.stub_responses(:describe_target_groups, Aws::ElasticLoadBalancingV2::Errors::TargetGroupNotFound.new(nil, nil))
       elb_client.stub_responses(:create_target_group, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/new"}])
     }
 
@@ -233,9 +229,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.listener_arn).to be_nil
     end
 
-    it "recovers an existing target group created in AWS but not yet saved to DB" do
+    it "recovers an existing target group if creation raises DuplicateTargetGroupName" do
+      elb_client.stub_responses(:create_target_group, Aws::ElasticLoadBalancingV2::Errors::DuplicateTargetGroupName.new(nil, nil))
       elb_client.stub_responses(:describe_target_groups, target_groups: [{target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered"}])
-      expect(elb_client).not_to receive(:create_target_group)
       expect { nx.add_port }.to hop("add_listener")
       expect(pl.ports.first.reload.target_group_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/recovered")
     end
@@ -252,7 +248,6 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
     before {
       pl.update(nlb_arn: "arn:aws:elasticloadbalancing:us-east-1:123:loadbalancer/net/pl-test/abc")
       pl.ports.first.update(target_group_arn: "arn:aws:elasticloadbalancing:us-east-1:123:targetgroup/pl-tg/abc")
-      elb_client.stub_responses(:describe_listeners, listeners: [])
       elb_client.stub_responses(:create_listener, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def"}])
     }
 
@@ -261,9 +256,9 @@ RSpec.describe Prog::Vnet::PrivatelinkAwsNexus do
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/def")
     end
 
-    it "recovers an existing listener created in AWS but not yet saved to DB" do
+    it "recovers an existing listener if creation raises DuplicateListener" do
+      elb_client.stub_responses(:create_listener, Aws::ElasticLoadBalancingV2::Errors::DuplicateListener.new(nil, nil))
       elb_client.stub_responses(:describe_listeners, listeners: [{listener_arn: "arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered", port: 5432}])
-      expect(elb_client).not_to receive(:create_listener)
       expect { nx.add_listener }.to hop("wait")
       expect(pl.ports.first.reload.listener_arn).to eq("arn:aws:elasticloadbalancing:us-east-1:123:listener/net/pl-test/abc/recovered")
     end

@@ -28,8 +28,6 @@ class Prog::Vnet::PrivatelinkAwsVmNexus < Prog::Base
       privatelink_aws_vm.add_vm_port(privatelink_aws_port_id: port.id, state: "registering")
     end
 
-    register_registering_vm_ports
-
     hop_wait
   end
 
@@ -46,7 +44,11 @@ class Prog::Vnet::PrivatelinkAwsVmNexus < Prog::Base
 
     register_registering_vm_ports
 
-    hop_wait
+    if privatelink_aws_vm.vm_ports_dataset.where(state: "registering").any?
+      nap 5
+    else
+      hop_wait
+    end
   end
 
   label def destroy
