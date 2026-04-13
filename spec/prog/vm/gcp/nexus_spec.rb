@@ -383,7 +383,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "shell-escapes SSH keys via NetSsh.command in the startup script" do
+    it "renders the startup script via NetSsh.command with base64-encoded SSH keys" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
@@ -397,9 +397,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.start }.to hop("wait_create_op")
 
-      expected_key = vm.sshable.keys.map(&:public_key).join("\n")
-      expect(captured_startup).to include(expected_key.shellescape)
-      expect(captured_startup).to include("> /home/$custom_user/.ssh/authorized_keys")
+      expected_b64 = Base64.strict_encode64(vm.sshable.keys.map(&:public_key).join("\n"))
+      expect(captured_startup).to include(expected_b64.shellescape)
+      expect(captured_startup).to include("> /home/#{vm.unix_user.shellescape}/.ssh/authorized_keys")
+      expect(captured_startup).to include("| base64 -d")
+      expect(captured_startup).not_to include("$custom_user")
+      expect(captured_startup).not_to include('#{')
     end
   end
 
