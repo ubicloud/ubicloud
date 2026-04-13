@@ -50,7 +50,22 @@ class Firewall < Sequel::Model
     super
   end
 
+  # GCP NICs have a hard limit of 10 secure tag bindings (see
+  # Prog::Vnet::Gcp::UpdateFirewallRules::GCP_MAX_TAGS_PER_NIC). One slot
+  # is always consumed by the subnet "member" tag, which leaves 9 for
+  # per-firewall tags.
+  GCP_MAX_FIREWALLS_PER_VM = 9
+
   def associate_with_private_subnet(private_subnet, apply_firewalls: true)
+    if private_subnet.location.gcp?
+      private_subnet.vms_dataset.all.each do |vm|
+        firewall_ids = vm.firewalls.map(&:id).to_set
+        firewall_ids << id
+        if firewall_ids.size > GCP_MAX_FIREWALLS_PER_VM
+          fail Validation::ValidationFailed.new(firewall: "GCP VMs cannot be attached to more than #{GCP_MAX_FIREWALLS_PER_VM} firewalls")
+        end
+      end
+    end
     add_private_subnet(private_subnet)
     private_subnet.incr_update_firewall_rules if apply_firewalls
   end

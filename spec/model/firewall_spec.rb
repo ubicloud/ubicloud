@@ -81,6 +81,71 @@ RSpec.describe Firewall do
     expect(described_class[fw.id]).to be_nil
   end
 
+  describe "GCP firewall-per-VM limit" do
+    let(:gcp_location) {
+      Location.create(name: "gcp-us-central1", provider: "gcp",
+        display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true,
+        project_id:)
+    }
+
+    let(:gcp_ps) {
+      PrivateSubnet.create(name: "gcp-ps", location_id: gcp_location.id, project_id:,
+        net6: "fd10:9b0b:6b4b:8fbb::/64", net4: "10.0.0.0/26", state: "active")
+    }
+
+    def make_fw(name)
+      described_class.create(name:, description: "desc", location_id: gcp_location.id, project_id:)
+    end
+
+    def attach_vm(name, idx)
+      vm = create_vm(project_id:, location_id: gcp_location.id, name:)
+      Nic.create(private_subnet_id: gcp_ps.id, vm_id: vm.id, name: "nic-#{idx}",
+        private_ipv4: gcp_ps.net4.nth(idx + 2).to_s,
+        private_ipv6: gcp_ps.net6.nth(idx + 2).to_s,
+        mac: "00:00:00:00:00:%02x" % idx, state: "active")
+      vm
+    end
+
+    it "allows associating up to 9 firewalls on a GCP subnet with a VM" do
+      attach_vm("gcp-vm", 1)
+      9.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+      expect(gcp_ps.reload.firewalls.count).to eq(9)
+    end
+
+    it "raises when associating a 10th firewall on a GCP subnet with a VM" do
+      attach_vm("gcp-vm", 1)
+      9.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+      tenth = make_fw("fw-10")
+      expect {
+        tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+      }.to raise_error(Validation::ValidationFailed) { |e|
+        expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+      }
+      expect(gcp_ps.reload.firewalls.count).to eq(9)
+    end
+
+    it "allows associating a 10th firewall on a GCP subnet with no VMs" do
+      10.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+      expect(gcp_ps.reload.firewalls.count).to eq(10)
+    end
+
+    it "allows associating a 10th firewall when the subnet is non-GCP" do
+      hetzner_ps = PrivateSubnet.create(name: "hz-ps", location_id: Location::HETZNER_FSN1_ID, project_id:,
+        net6: "fd10:9b0b:6b4b:1000::/64", net4: "10.1.0.0/26", state: "active")
+      vm = create_vm(project_id:, location_id: Location::HETZNER_FSN1_ID, name: "hz-vm")
+      Nic.create(private_subnet_id: hetzner_ps.id, vm_id: vm.id, name: "nic-1",
+        private_ipv4: hetzner_ps.net4.nth(3).to_s,
+        private_ipv6: hetzner_ps.net6.nth(3).to_s,
+        mac: "00:00:00:00:01:01", state: "active")
+      10.times do |i|
+        described_class.create(name: "hz-fw-#{i}", description: "d",
+          location_id: Location::HETZNER_FSN1_ID, project_id:)
+          .associate_with_private_subnet(hetzner_ps, apply_firewalls: false)
+      end
+      expect(hetzner_ps.reload.firewalls.count).to eq(10)
+    end
+  end
+
   it "removes referencing access control entries and object tag memberships" do
     account = Account.create(email: "test@example.com")
     project = account.create_project_with_default_policy("project-1", default_policy: false)
