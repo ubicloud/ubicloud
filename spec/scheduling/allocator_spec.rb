@@ -419,6 +419,17 @@ RSpec.describe Al do
       expect(cand.size).to eq(2)
     end
 
+    it "retrieves candidates with no ipv4 addresses at all if not ip4_enabled" do
+      req.ip4_enabled = false
+      vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
+      StorageDevice.create(vm_host_id: vmh1.id, name: "stor1", available_storage_gib: 100, total_storage_gib: 100)
+      BootImage.create(name: "ubuntu-jammy", version: "20220202", vm_host_id: vmh1.id, activated_at: Time.now, size_gib: 3)
+
+      cand = Al::Allocation.candidate_hosts(req)
+      expect(cand.size).to eq(1)
+      expect(cand.first[:vm_host_id]).to eq(vmh1.id)
+    end
+
     it "retrieves candidates with gpu if gpu_count > 0" do
       vmh1 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
       vmh2 = create_vm_host(total_cpus: 14, total_cores: 7, used_cores: 4, total_hugepages_1g: 10, used_hugepages_1g: 2)
