@@ -67,9 +67,10 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
       NicGcpResource.create_with_id(nic.id, vpc_name: "ubicloud-test-net", subnet_name: "ubicloud-test-sub")
     end
 
-    it "fails if address name exceeds 63 characters" do
+    it "logs and naps if address name exceeds 63 characters" do
       allow(nx.nic).to receive(:name).and_return("a" * 60)
-      expect { nx.allocate_static_ip }.to raise_error(RuntimeError, /GCP address name too long/)
+      expect(Clog).to receive(:emit).with("GCP address name too long", hash_including(:address_name, :length)).and_call_original
+      expect { nx.allocate_static_ip }.to nap(30)
     end
 
     it "reserves a new static IP and hops to wait_allocate_ip" do

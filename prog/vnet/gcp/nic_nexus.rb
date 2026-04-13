@@ -25,7 +25,10 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
     # GCP resource names must be 1-63 chars, lowercase alphanumeric + hyphens.
     # NIC names are "{vm_ubid}-nic" (30 chars) so this is always safe (39 chars).
     address_name = "ubicloud-#{nic.name}"
-    fail "GCP address name too long: #{address_name.length} chars" if address_name.length > 63
+    if address_name.length > 63
+      Clog.emit("GCP address name too long", {address_name:, length: address_name.length})
+      nap 30
+    end
 
     address_resource = Google::Cloud::Compute::V1::Address.new(
       name: address_name,
