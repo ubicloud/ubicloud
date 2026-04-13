@@ -249,7 +249,13 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm.update(display_state: "deleting")
 
     # Clean up per-VM firewall policy rules
-    cleanup_vm_policy_rules
+    begin
+      cleanup_vm_policy_rules
+    rescue Google::Apis::ClientError, Google::Cloud::Error => e
+      Clog.emit("Failed to clean up GCE firewall resources",
+        {vm_cleanup_error: Util.exception_to_hash(e, into: {vm_name: vm.name})})
+      nap 30
+    end
 
     begin
       op = compute_client.delete(
@@ -424,9 +430,5 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     vm_tag_short = "vm-#{vm.ubid}"
     resp = credential.crm_client.list_tag_values(parent: vpc_tag_key.name)
     resp.tag_values&.find { |v| v.short_name == vm_tag_short }&.name
-  rescue Google::Apis::ClientError => e
-    Clog.emit("Failed to look up old VM tag value",
-      {tag_lookup_error: Util.exception_to_hash(e, into: {vm_name: vm.name})})
-    nil
   end
 end
