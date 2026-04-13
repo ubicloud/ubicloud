@@ -43,7 +43,11 @@ class Prog::Vm::Nexus < Prog::Base
       volume[:max_write_mbytes_per_sec] ||= vm_size.io_limits.max_write_mbytes_per_sec
       volume[:vring_workers] ||= vm_size.vring_workers
       volume[:encrypted] = true if !volume.has_key? :encrypted
-      volume[:track_written] = false if !volume.has_key? :track_written
+      if !volume.has_key? :track_written
+        volume[:track_written] = !!project.get_ff_machine_image &&
+          storage_volumes.length == 1 &&
+          volume[:size_gib] <= Config.machine_image_max_size_gib
+      end
       volume[:boot] = disk_index == boot_disk_index
       volume[:machine_image_version_id] = machine_image_version_id if volume[:boot] && machine_image_version_id
 
