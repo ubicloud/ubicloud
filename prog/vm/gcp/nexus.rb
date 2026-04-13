@@ -112,41 +112,28 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
         instance_resource:,
       )
       save_gcp_op(op.name, "zone", gcp_zone, name: "create_vm")
+      hop_wait_create_op
     rescue Google::Cloud::AlreadyExistsError
-      # Instance already exists from a prior attempt, proceed to wait
-      nil
+      # Instance already exists from a prior attempt, skip the LRO wait
+      hop_wait_instance_created
     rescue Google::Cloud::ResourceExhaustedError, Google::Cloud::UnavailableError => e
       retry_zone_capacity(e.message)
     rescue Google::Cloud::InvalidArgumentError => e
       raise unless e.message.include?("does not exist in zone")
       retry_zone_capacity(e.message)
     end
-
-    hop_wait_create_op
   end
 
   label def wait_create_op
-    unless frame["create_vm_name"]
-      # No pending LRO. If we got here via retry_zone_capacity (which sets
-      # exclude_zones), hop back to start to attempt the next zone. Otherwise
-      # the instance was created via AlreadyExistsError -- go straight to wait.
-      hop_start if frame.key?("exclude_zones")
-      hop_wait_instance_created
-    end
-
-    op = poll_gcp_op(name: "create_vm")
-    unless op.status == :DONE
-      nap 5
-    end
-    if op_error?(op)
+    poll_and_clear_gcp_op(name: "create_vm") do |op|
       error_code = op_error_code(op)
       if RETRIABLE_ZONE_ERRORS.include?(error_code)
         clear_gcp_op(name: "create_vm")
-        retry_zone_capacity("GCE operation error: #{error_code}")
+        bump_excluded_zone("GCE operation error: #{error_code}")
+        hop_start
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
     end
-    clear_gcp_op(name: "create_vm")
     hop_wait_instance_created
   end
 
@@ -357,6 +344,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   def retry_zone_capacity(error_message)
+    nap bump_excluded_zone(error_message)
+  end
+
+  def bump_excluded_zone(error_message)
     excluded = (frame["exclude_zones"] || []) + [gcp_zone_suffix]
     available = gcp_az_suffixes - excluded
 
@@ -381,7 +372,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     })
     # 5 minutes: all zones exhausted, exclusions reset -- wait for capacity to free up
     # 5 seconds: still have untried zones -- move on to the next one quickly
-    nap((available.length == gcp_az_suffixes.length) ? 5 * 60 : 5)
+    (available.length == gcp_az_suffixes.length) ? 5 * 60 : 5
   end
 
   def gcp_az_suffixes

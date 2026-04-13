@@ -375,12 +375,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "hops to wait_create_op even when instance already exists" do
+    it "hops to wait_instance_created when instance already exists" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
       ensure_nic_gcp_resource(nic)
       expect(compute_client).to receive(:insert).and_raise(Google::Cloud::AlreadyExistsError.new("exists"))
-      expect { nx.start }.to hop("wait_create_op")
+      expect { nx.start }.to hop("wait_instance_created")
     end
 
     it "renders the startup script via NetSsh.command with base64-encoded SSH keys" do
@@ -407,15 +407,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
   end
 
   describe "#wait_create_op" do
-    it "hops to wait_instance_created when no operation is pending" do
-      expect { nx.wait_create_op }.to hop("wait_instance_created")
-    end
-
-    it "hops to start when no operation is pending but exclude_zones is set" do
-      refresh_frame(nx, new_values: {"exclude_zones" => ["a"]})
-      expect { nx.wait_create_op }.to hop("start")
-    end
-
     it "naps when operation is still running" do
       refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a"})
 
@@ -458,10 +449,11 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-      expect { nx.wait_create_op }.to nap(5)
+      expect { nx.wait_create_op }.to hop("start")
       stack = st.reload.stack.first
       expect(stack["exclude_zones"]).to include("a")
       expect(stack["gcp_zone_suffix"]).not_to eq("a")
+      expect(stack["create_vm_name"]).to be_nil
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do
@@ -475,7 +467,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-      expect { nx.wait_create_op }.to nap(5)
+      expect { nx.wait_create_op }.to hop("start")
       stack = st.reload.stack.first
       expect(stack["exclude_zones"]).to include("a")
       expect(stack["gcp_zone_suffix"]).not_to eq("a")
@@ -492,7 +484,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(zone_ops_client).to receive(:get).and_return(op)
       expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-      expect { nx.wait_create_op }.to nap(5)
+      expect { nx.wait_create_op }.to hop("start")
       stack = st.reload.stack.first
       expect(stack["exclude_zones"]).to include("a")
     end
