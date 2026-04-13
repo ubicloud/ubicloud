@@ -23,8 +23,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       update_stack({"gcp_zone_suffix" => available.sample || gcp_az_suffixes.sample})
     end
 
-    public_keys = vm.sshable.keys.map(&:public_key).join("\n")
-    public_keys_b64 = Base64.strict_encode64(public_keys)
+    public_keys_b64 = Base64.strict_encode64(vm.sshable.keys.map(&:public_key).join("\n"))
     user_data = NetSsh.command(<<~STARTUP, custom_user: vm.unix_user, public_keys_b64:)
       #!/bin/bash
       if [ ! -d /home/:custom_user ]; then
@@ -96,15 +95,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
           ],
         ),
       ],
-      # Both ssh-keys metadata and the startup script provision SSH keys.
-      # Metadata lets the GCE guest agent manage keys on supported images;
-      # the startup script ensures our custom user/sudo/permissions setup.
       metadata: Google::Cloud::Compute::V1::Metadata.new(
         items: [
-          Google::Cloud::Compute::V1::Items.new(
-            key: "ssh-keys",
-            value: "#{vm.unix_user}:#{public_keys}",
-          ),
           Google::Cloud::Compute::V1::Items.new(
             key: "startup-script",
             value: user_data,
