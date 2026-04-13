@@ -69,12 +69,12 @@ RSpec.describe Location do
         allow(location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
         allow(location_credential_gcp).to receive(:zones_client).and_return(zones_client)
 
-        zone_a = double(name: "us-central1-a")
-        zone_b = double(name: "us-central1-b")
-        zone_c = double(name: "us-central1-c")
-        zone_f = double(name: "us-central1-f")
-        zone_other = double(name: "us-east1-a")
-        zone_down = double(name: "us-central1-d")
+        zone_a = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-a")
+        zone_b = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-b")
+        zone_c = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-c")
+        zone_f = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-f")
+        zone_other = Google::Cloud::Compute::V1::Zone.new(name: "us-east1-a")
+        zone_down = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-d")
 
         allow(zones_client).to receive(:list)
           .with(project: "test-project")
