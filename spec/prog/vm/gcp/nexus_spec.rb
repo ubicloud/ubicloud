@@ -604,24 +604,40 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_instance_created }.to nap(5)
     end
 
-    it "raises if the instance enters TERMINATED state" do
+    it "pages and naps if the instance enters TERMINATED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "TERMINATED",
         network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
-      expect { nx.wait_instance_created }.to raise_error(RuntimeError, /GCE instance entered terminal state: TERMINATED/)
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        /entered terminal state TERMINATED during provisioning/,
+        ["GceProvisionTerminal", vm.ubid, "TERMINATED"],
+        vm.ubid,
+      )
+      st.stack.first["deadline_at"] = "2020-01-01T00:00:00Z"
+      st.stack.first["deadline_target"] = "wait"
+      st.modified!(:stack)
+      expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
+      frame = st.reload.stack.first
+      expect(frame).not_to have_key("deadline_at")
+      expect(frame).not_to have_key("deadline_target")
     end
 
-    it "raises if the instance enters SUSPENDED state" do
+    it "pages and naps if the instance enters SUSPENDED state" do
       instance = Google::Cloud::Compute::V1::Instance.new(
         status: "SUSPENDED",
         network_interfaces: [],
       )
 
       expect(compute_client).to receive(:get).and_return(instance)
-      expect { nx.wait_instance_created }.to raise_error(RuntimeError, /GCE instance entered terminal state: SUSPENDED/)
+      expect(Prog::PageNexus).to receive(:assemble).with(
+        /entered terminal state SUSPENDED during provisioning/,
+        ["GceProvisionTerminal", vm.ubid, "SUSPENDED"],
+        vm.ubid,
+      )
+      expect { nx.wait_instance_created }.to nap(6 * 60 * 60)
     end
   end
 

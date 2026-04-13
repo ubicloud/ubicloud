@@ -169,10 +169,19 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     when "RUNNING"
       # proceed
     when "TERMINATED", "SUSPENDED"
-      # Neither state is expected during provisioning. Treat as provisioning
-      # failure — fail immediately so the deadline page fires with a specific
-      # reason rather than napping until timeout.
-      fail "GCE instance entered terminal state: #{instance.status}"
+      # Unrecoverable: GCE reports the instance as stopped mid-provisioning.
+      # Page with a specific tag, clear the provisioning deadline so a generic
+      # "expired deadline" page does not also fire, and nap long enough for a
+      # human to investigate before re-paging.
+      Prog::PageNexus.assemble(
+        "GCE VM #{vm.ubid} entered terminal state #{instance.status} during provisioning",
+        ["GceProvisionTerminal", vm.ubid, instance.status],
+        vm.ubid,
+      )
+      strand.stack.first.delete("deadline_at")
+      strand.stack.first.delete("deadline_target")
+      strand.modified!(:stack)
+      nap 6 * 60 * 60
     else
       nap 5
     end
