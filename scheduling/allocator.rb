@@ -632,17 +632,6 @@ module Scheduling::Allocator
 
     def update(vm, vm_host)
       @storage_device_allocations.each { it.update }
-
-      # Backwards compatibility: We now pre-populate storage volumes in
-      # Vm::Nexus.assemble; However, some VMs might have been assembled before
-      # this change but not yet allocated. For those VMs, we need to create the
-      # storage volumes here during allocation. This can be removed after the
-      # initial rollout is done.
-      if vm.vm_storage_volumes_dataset.empty?
-        params = @request.storage_volumes.sort_by(&:first).map! { |_, v| v.transform_keys(&:to_sym) }
-        vm.create_storage_volumes(params)
-      end
-
       allocate_storage_volume_associations(vm, vm_host)
     end
 
