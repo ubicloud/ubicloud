@@ -160,6 +160,9 @@ module Config
   # Boot Images
   override :default_boot_image_name, "ubuntu-jammy", string
 
+  # Machine Images
+  override :machine_image_max_size_gib, 40, int
+
   # Pagerduty
   optional :pagerduty_key, string, clear: true
   optional :pagerduty_log_link, string

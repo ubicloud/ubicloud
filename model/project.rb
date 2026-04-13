@@ -225,6 +225,7 @@ class Project < Sequel::Model
     :free_runner_upgrade_until,
     :gpu_vm,
     :ipv6_disabled,
+    :machine_image,
     :postgres_hostname_override,
     :postgres_init_script,
     :postgres_lantern,
