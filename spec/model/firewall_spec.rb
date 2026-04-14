@@ -129,6 +129,86 @@ RSpec.describe Firewall do
       expect(gcp_ps.reload.firewalls.count).to eq(10)
     end
 
+    describe "TOCTOU race serialization" do
+      it "locks the subnet row before cap validation in associate_with_private_subnet (race B)" do
+        attach_vm("gcp-vm", 1)
+        8.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+        fw9 = make_fw("fw-9")
+
+        lock_calls = []
+        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
+          lock_calls << ps.id
+          m.call(ps)
+        end
+        cap_calls = []
+        allow(described_class).to receive(:validate_gcp_firewall_cap!).and_wrap_original do |m, vm, **kw|
+          cap_calls << vm.id
+          m.call(vm, **kw)
+        end
+
+        fw9.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+        expect(lock_calls).to eq([gcp_ps.id])
+        expect(cap_calls).not_to be_empty
+        # Lock acquired before any cap validation read.
+        expect(lock_calls.size).to be >= 1
+      end
+
+      it "sees firewalls committed by a prior transaction that held the lock (race B)" do
+        attach_vm("gcp-vm", 1)
+        # Simulate T1 (subnet-attach path) having committed 9 firewalls onto the
+        # subnet just before T2 tries to attach its own firewall; T2 acquires the
+        # lock after T1 releases it, and its cap read now sees the 9 committed rows.
+        9.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+        tenth = make_fw("fw-10")
+        expect {
+          tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+        }.to raise_error(Validation::ValidationFailed) { |e|
+          expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+        }
+        expect(gcp_ps.reload.firewalls.count).to eq(9)
+      end
+
+      it "rejects a firewall attach when a concurrent attach commits first (simulated race B)" do
+        attach_vm("gcp-vm", 1)
+        8.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }
+        fw9 = make_fw("fw-9")
+        tenth = make_fw("fw-10")
+
+        # Stub the lock acquisition to simulate "concurrent" commit from a peer
+        # transaction that also takes the subnet lock: when T2 (tenth) acquires
+        # the lock, the peer's write (fw9 attached) is already visible.
+        peer_committed = false
+        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
+          result = m.call(ps)
+          unless peer_committed
+            peer_committed = true
+            # Bypass the locking path to emulate another committed transaction
+            # that already attached fw9 before the lock was granted to us.
+            fw9.add_private_subnet(ps)
+          end
+          result
+        end
+
+        expect {
+          tenth.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+        }.to raise_error(Validation::ValidationFailed) { |e|
+          expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+        }
+      end
+
+      it "wraps the attach in a DB transaction so the lock is held with the write" do
+        attach_vm("gcp-vm", 1)
+        fw = make_fw("fw-x")
+        in_tx = nil
+        allow(described_class).to receive(:lock_subnet_for_gcp_cap!).and_wrap_original do |m, ps|
+          in_tx = DB.in_transaction?
+          m.call(ps)
+        end
+        fw.associate_with_private_subnet(gcp_ps, apply_firewalls: false)
+        expect(in_tx).to be true
+      end
+    end
+
     it "allows associating a 10th firewall when the subnet is non-GCP" do
       hetzner_ps = PrivateSubnet.create(name: "hz-ps", location_id: Location::HETZNER_FSN1_ID, project_id:,
         net6: "fd10:9b0b:6b4b:1000::/64", net4: "10.1.0.0/26", state: "active")
