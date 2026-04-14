@@ -221,7 +221,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   end
 
   label def finish
-    finish_test("Postgres upgrade tests are finished!")
+    finish_test
   end
 
   label def failed

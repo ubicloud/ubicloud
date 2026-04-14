@@ -384,7 +384,7 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
   describe "#finish" do
     it "exits if no failure happened" do
       project = Project[pgr_test.frame["postgres_test_project_id"]]
-      expect { pgr_test.finish }.to exit({"msg" => "Postgres upgrade tests are finished!"})
+      expect { pgr_test.finish }.to exit({"msg" => "Postgres tests are finished!"})
       expect(Project[project.id]).to be_nil
     end
 

@@ -56,7 +56,7 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   end
 
   label def finish
-    finish_test("Postgres tests are finished!")
+    finish_test
   end
 
   label def failed
