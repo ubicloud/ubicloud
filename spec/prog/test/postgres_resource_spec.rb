@@ -74,6 +74,7 @@ RSpec.describe Prog::Test::PostgresResource do
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
         arch: "arm64",
+        pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
@@ -88,6 +89,7 @@ RSpec.describe Prog::Test::PostgresResource do
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
         arch: "arm64",
+        pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp")
       gcp_pgr_test = described_class.new(gcp_strand)
@@ -103,6 +105,7 @@ RSpec.describe Prog::Test::PostgresResource do
       PgGceImage.create(
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
         arch: "arm64",
+        pg_versions: ["16", "17", "18"],
       )
       gcp_strand = described_class.assemble(provider: "gcp", family: "c4a-standard")
       gcp_pgr_test = described_class.new(gcp_strand)

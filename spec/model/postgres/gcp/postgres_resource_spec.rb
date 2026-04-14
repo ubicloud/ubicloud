@@ -61,19 +61,29 @@ RSpec.describe PostgresResource do
 
   context "with GCP provider" do
     describe "#upgrade_candidate_server" do
-      it "returns the most recent non-representative server" do
+      before { PgGceImage.dataset.destroy }
+
+      let(:gce_image_name) { "postgres-ubuntu-2204-x64-20260223" }
+      let(:gce_image_path) { "projects/test-pg-project/global/images/#{gce_image_name}" }
+
+      def create_gcp_pg_server(boot_image: gce_image_path, server_version: "17")
         timeline = PostgresTimeline.create(location_id: location.id)
         vm = create_vm(
           project_id: project.id,
           location_id: location.id,
-          name: "gcp-pg-vm",
+          name: "gcp-pg-vm-#{SecureRandom.hex(3)}",
           memory_gib: 8,
+          boot_image:,
         )
-
-        server = PostgresServer.create(
+        PostgresServer.create(
           timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
+          synchronization_status: "ready", timeline_access: "push", version: server_version,
         )
+      end
+
+      it "returns the most recent non-representative server whose image has the target version" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        server = create_gcp_pg_server
 
         expect(postgres_resource.reload.upgrade_candidate_server).to eq(server)
       end
@@ -83,21 +93,34 @@ RSpec.describe PostgresResource do
       end
 
       it "excludes representative servers" do
-        timeline = PostgresTimeline.create(location_id: location.id)
-        vm = create_vm(
-          project_id: project.id,
-          location_id: location.id,
-          name: "gcp-pg-vm",
-          memory_gib: 8,
-        )
-
-        server = PostgresServer.create(
-          timeline:, resource: postgres_resource, vm_id: vm.id,
-          synchronization_status: "ready", timeline_access: "push", version: "17",
-        )
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        server = create_gcp_pg_server
         server.update(is_representative: true)
 
         expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "skips candidates whose boot image pg_versions lacks the target version" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16"])
+        create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "skips candidates whose boot image is not a known pg_gce_image" do
+        PgGceImage.create(gce_image_name: "other-image", arch: "x64", pg_versions: ["16", "17", "18"])
+        create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
+      end
+
+      it "prefers the newest eligible server over an older eligible one" do
+        PgGceImage.create(gce_image_name:, arch: "x64", pg_versions: ["16", "17", "18"])
+        old_server = create_gcp_pg_server
+        old_server.update(created_at: Time.now - 3600)
+        new_server = create_gcp_pg_server
+
+        expect(postgres_resource.reload.upgrade_candidate_server).to eq(new_server)
       end
     end
 

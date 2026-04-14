@@ -23,6 +23,7 @@ RSpec.describe Location do
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2404-x64-20260218",
           arch: "x64",
+          pg_versions: ["16", "17", "18"],
         )
 
         expect(location.pg_gce_image("x64")).to eq(
@@ -43,6 +44,7 @@ RSpec.describe Location do
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
           arch: "arm64",
+          pg_versions: ["16", "17", "18"],
         )
 
         expect(location.send(:gcp_pg_boot_image, "99", "arm64", "standard")).to eq(

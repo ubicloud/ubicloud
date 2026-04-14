@@ -18,6 +18,8 @@ Sequel.migration do
     # seed them via migration rather than a runtime registration process.
     # The hosting project id lives in Config (postgres_gce_image_gcp_project_id),
     # not in the table, because it is configuration rather than data.
+    # The pg_versions column is added in a later migration; this seed predates
+    # it and is backfilled from the column default defined there.
     run <<~SQL
       INSERT INTO pg_gce_image (id, gce_image_name, arch) VALUES
         /* ubid 0ktm6pew48zs6nt96fv453k0gz */

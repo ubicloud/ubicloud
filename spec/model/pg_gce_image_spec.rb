@@ -9,6 +9,7 @@ RSpec.describe PgGceImage do
     image = described_class.create(
       gce_image_name: "postgres-ubuntu-2404-x64-20260218",
       arch: "x64",
+      pg_versions: ["16", "17", "18"],
     )
 
     expect(image.gce_image_name).to eq("postgres-ubuntu-2404-x64-20260218")
@@ -19,12 +20,14 @@ RSpec.describe PgGceImage do
     described_class.create(
       gce_image_name: "image1",
       arch: "x64",
+      pg_versions: ["16", "17", "18"],
     )
 
     expect {
       described_class.create(
         gce_image_name: "image1",
         arch: "x64",
+        pg_versions: ["16", "17", "18"],
       )
     }.to raise_error(Sequel::Error)
   end
@@ -33,12 +36,14 @@ RSpec.describe PgGceImage do
     described_class.create(
       gce_image_name: "image1",
       arch: "x64",
+      pg_versions: ["16", "17", "18"],
     )
 
     expect {
       described_class.create(
         gce_image_name: "image2",
         arch: "x64",
+        pg_versions: ["16", "17", "18"],
       )
     }.not_to raise_error
   end
@@ -47,6 +52,7 @@ RSpec.describe PgGceImage do
     described_class.create(
       gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
       arch: "arm64",
+      pg_versions: ["16", "17", "18"],
     )
 
     found = described_class.find(arch: "arm64")

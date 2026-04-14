@@ -174,7 +174,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
         service_account_email: "test@test.iam.gserviceaccount.com",
         credentials_json: "{}")
       PgGceImage.where(arch: "x64").each(&:destroy)
-      PgGceImage.create(arch: "x64", gce_image_name: "postgres-x64-test")
+      PgGceImage.create(arch: "x64", gce_image_name: "postgres-x64-test", pg_versions: ["16", "17", "18"])
       server = create_server(is_representative: true)
       server.incr_recycle
       server.vm.update(vm_host_id: nil)

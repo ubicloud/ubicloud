@@ -100,7 +100,7 @@ RSpec.describe Location do
     PgGceImage.dataset.destroy
     allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
     gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
-    PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+    PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64", pg_versions: ["16", "17", "18"])
     expect(gcp_loc.pg_gce_image("x64")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
   end
 
