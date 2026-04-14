@@ -133,6 +133,25 @@ jobs:
       run: |
         echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
         gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
+
+        # Preflight ownership check: refuse to touch anything unless the target
+        # project carries a project-level label e2e_marker=true. This is the
+        # safety net against a misconfigured E2E_GCP_PROJECT_ID accidentally
+        # pointing at a shared or production project — the deletes below are
+        # irreversible and match broad name patterns. One-time setup on the
+        # dedicated E2E project:
+        #   gcloud projects update $PROJECT_ID --update-labels=e2e_marker=true
+        e2e_marker=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(labels.e2e_marker)' 2>/dev/null || true)
+        if [ "$e2e_marker" != "true" ]; then
+          echo "ERROR: project $GCP_PROJECT_ID is missing project-level label e2e_marker=true."
+          echo "  Refusing to run destructive cleanup on a project not identifiably owned by E2E."
+          echo "  If this IS the dedicated E2E project, run once:"
+          echo "    gcloud projects update $GCP_PROJECT_ID --update-labels=e2e_marker=true"
+          rm -f /tmp/gcp-credentials.json
+          exit 1
+        fi
+        echo "Preflight OK: project $GCP_PROJECT_ID carries e2e_marker=true"
+
         GCP_PROJECT_NUMBER=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)' 2>/dev/null || true)
         if [ -z "$GCP_PROJECT_NUMBER" ]; then
           echo "WARNING: Could not resolve project number, skipping"
@@ -427,6 +446,26 @@ jobs:
       run: |
         echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
         gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
+
+        # Preflight ownership check: refuse to touch anything unless the target
+        # project carries a project-level label e2e_marker=true. This is the
+        # safety net against a misconfigured E2E_GCP_PROJECT_ID accidentally
+        # pointing at a shared or production project — the deletes below match
+        # broad name patterns (vm*, pv*, ubicloud-*, pt*, pg-tl-*) and are
+        # irreversible. The preflight hard-fails; only individual delete calls
+        # may tolerate transient errors via "|| true". One-time setup on the
+        # dedicated E2E project:
+        #   gcloud projects update $PROJECT_ID --update-labels=e2e_marker=true
+        e2e_marker=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(labels.e2e_marker)' 2>/dev/null || true)
+        if [ "$e2e_marker" != "true" ]; then
+          echo "ERROR: project $GCP_PROJECT_ID is missing project-level label e2e_marker=true."
+          echo "  Refusing to run destructive cleanup on a project not identifiably owned by E2E."
+          echo "  If this IS the dedicated E2E project, run once:"
+          echo "    gcloud projects update $GCP_PROJECT_ID --update-labels=e2e_marker=true"
+          rm -f /tmp/gcp-credentials.json
+          exit 1
+        fi
+        echo "Preflight OK: project $GCP_PROJECT_ID carries e2e_marker=true"
 
         echo "=== Cleaning up ALL GCP E2E resources ==="
 
