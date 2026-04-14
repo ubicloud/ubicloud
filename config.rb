@@ -99,7 +99,9 @@ module Config
   override :recursive_tag_limit, 32, int
   override :root, File.expand_path(__dir__), string
   override :aws_role_session_name, "ubi", string
-  override :provider_resource_tag_value, "true", string
+  # :nocov:
+  override :provider_resource_tag_value, (development? ? ENV.fetch("USER", "true") : "true"), string
+  # :nocov:
   override :clover_database_rds_iam_auth_enabled, false, bool
   optional :hetzner_user, string, clear: true
   optional :hetzner_password, string, clear: true
