@@ -239,7 +239,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       project: gcp_project_id,
       firewall_policy: firewall_policy_name,
     )
-    if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+    if policy.associations.any? { |a| a.attachment_target == vpc_target }
       hop_create_vpc_deny_rules
     end
 
@@ -248,7 +248,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         policy: firewall_policy_name,
         vpc: gcp_vpc.name,
         vpc_target:,
-        current_associations: policy.associations&.map { |a| {name: a.name, attachment_target: a.attachment_target} } || [],
+        current_associations: policy.associations.map { |a| {name: a.name, attachment_target: a.attachment_target} },
       },
     })
     nap 5
