@@ -110,6 +110,7 @@ class Prog::Vm::Nexus < Prog::Base
         arch:,
         project_id:,
       ) { it.id = ubid.to_uuid }
+      Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: subnet.firewalls_dataset.select_map(:id))
       nic.update(vm_id: vm.id)
 
       if init_script && !init_script.empty?

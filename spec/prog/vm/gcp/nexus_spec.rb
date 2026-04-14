@@ -91,6 +91,28 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(v.vm_storage_volumes.count).to eq(1)
       expect(v.vm_storage_volumes.first.boot).to be true
     end
+
+    it "rejects attaching a VM to a grandfathered GCP subnet with more than 9 firewalls" do
+      location_credential
+      gcp_vpc
+      subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "grandfathered",
+        location_id: location.id).subject
+      9.times do |i|
+        Firewall.create(name: "over-cap-fw-#{i}", description: "d",
+          location_id: location.id, project_id: project.id)
+          .associate_with_private_subnet(subnet, apply_firewalls: false)
+      end
+      expect(subnet.reload.firewalls.count).to be > 9
+      expect {
+        Prog::Vm::Nexus.assemble_with_sshable(project.id,
+          location_id: location.id, unix_user: "test-user",
+          boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+          name: "testvm-overcap", size: "c3d-standard-8", arch: "x64",
+          private_subnet_id: subnet.id).subject
+      }.to raise_error(Validation::ValidationFailed) { |e|
+        expect(e.details[:firewall]).to match(/more than 9 firewalls/)
+      }
+    end
   end
 
   describe "#before_destroy" do

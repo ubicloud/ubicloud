@@ -56,13 +56,20 @@ class Firewall < Sequel::Model
   # per-firewall tags.
   GCP_MAX_FIREWALLS_PER_VM = 9
 
+  def self.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [])
+    return unless vm.location.gcp?
+    firewall_ids = vm.firewalls.map(&:id).to_set
+    additional_firewall_ids.each { firewall_ids << it }
+    if firewall_ids.size > GCP_MAX_FIREWALLS_PER_VM
+      fail Validation::ValidationFailed.new(firewall: "GCP VMs cannot be attached to more than #{GCP_MAX_FIREWALLS_PER_VM} firewalls")
+    end
+  end
+
   def associate_with_private_subnet(private_subnet, apply_firewalls: true)
     if private_subnet.location.gcp?
-      private_subnet.vms_dataset.all.each do |vm|
-        firewall_ids = vm.firewalls.map(&:id).to_set
-        firewall_ids << id
-        if firewall_ids.size > GCP_MAX_FIREWALLS_PER_VM
-          fail Validation::ValidationFailed.new(firewall: "GCP VMs cannot be attached to more than #{GCP_MAX_FIREWALLS_PER_VM} firewalls")
+      DB.ignore_duplicate_queries do
+        private_subnet.vms_dataset.all.each do |vm|
+          Firewall.validate_gcp_firewall_cap!(vm, additional_firewall_ids: [id])
         end
       end
     end
