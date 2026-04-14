@@ -4,25 +4,7 @@ require_relative "../../lib/util"
 
 class Prog::Test::PostgresResource < Prog::Test::PostgresBase
   def self.assemble(provider: "metal")
-    postgres_test_project = if Config.local_e2e_postgres_test_project_id
-      Project.with_pk!(Config.local_e2e_postgres_test_project_id)
-    else
-      Project.create(name: "Postgres-Test-Project")
-    end
-    postgres_service_project = Project[Config.postgres_service_project_id] ||
-      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
-
-    frame = {
-      "provider" => provider,
-      "postgres_service_project_id" => postgres_service_project.id,
-      "postgres_test_project_id" => postgres_test_project.id,
-    }
-
-    Strand.create(
-      prog: "Test::PostgresResource",
-      label: "start",
-      stack: [frame],
-    )
+    super(provider:, project_name: "Postgres-Test-Project")
   end
 
   label def start
