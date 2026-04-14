@@ -1089,14 +1089,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
   end
 
-  describe "find_firewall" do
-    it "delegates to Firewall[]" do
-      expect(nx.send(:find_firewall, Firewall.generate_ubid.to_s)).to be_nil
-    end
-  end
-
   describe "cleanup_orphaned_firewall_rules" do
-    let(:orphan_fw_ubid) { "orphanfwubid1" }
+    let(:orphan_fw) { Firewall.create(name: "orphan-fw", location_id: location.id, project_id: project.id) }
+    let(:orphan_fw_ubid) { orphan_fw.ubid }
     let(:orphan_tag_key_name) { "tagKeys/orphan-123" }
     let(:orphan_tag_value_name) { "tagValues/orphan-tv-1" }
     let(:vpc_purpose_data) { {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890"} }
@@ -1109,9 +1104,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk, active_tk]))
-
-      orphan_fw = Firewall.create(name: "orphan-fw", location_id: location.id, project_id: project.id)
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(orphan_fw)
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
       allow(crm_client).to receive(:list_tag_values)
@@ -1134,13 +1126,12 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "deletes policy rules, tag value, and tag key for deleted firewalls (not found in DB)" do
+      deleted_fw_ubid = Firewall.generate_ubid.to_s
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+        short_name: "ubicloud-fw-#{deleted_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
-
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(nil)
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
       allow(crm_client).to receive(:list_tag_values)
@@ -1163,14 +1154,19 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "skips firewalls still attached to subnets" do
+      # Real firewall attached to a different private subnet so it is not in
+      # vm.firewalls (would be caught by the early active-set filter) but is
+      # still discovered as associated via the UNION query.
+      attached_fw = Firewall.create(name: "attached-fw", location_id: location.id, project_id: project.id)
+      other_ps = PrivateSubnet.create(name: "other-ps", location_id: location.id,
+        net6: "fd91:4ef3:a586:943d::/64", net4: "192.168.9.0/24", project_id: project.id)
+      DB[:firewalls_private_subnets].insert(firewall_id: attached_fw.id, private_subnet_id: other_ps.id)
+
       attached_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+        short_name: "ubicloud-fw-#{attached_fw.ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [attached_tk]))
-
-      # Use the real firewall (attached to ps) under a different ubid label.
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(firewall)
 
       expect(nfp_client).not_to receive(:get)
       expect(nfp_client).not_to receive(:remove_rule)
@@ -1179,15 +1175,20 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "skips firewalls attached directly to VMs (not through subnets)" do
+      # Firewall attached to some other vm via firewalls_vms. It won't show up
+      # in this vm's firewalls list but must still be detected by the UNION.
+      vm_fw = Firewall.create(name: "vm-attached-fw", location_id: location.id, project_id: project.id)
+      other_vm_id = DB[:vm].insert(id: Sequel.function(:gen_random_uuid),
+        unix_user: "x", public_key: "x", name: "other-vm", boot_image: "img",
+        family: "standard", cores: 1, vcpus: 1, memory_gib: 1,
+        project_id: project.id, location_id: location.id)
+      DB[:firewalls_vms].insert(firewall_id: vm_fw.id, vm_id: other_vm_id)
+
       vm_fw_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+        short_name: "ubicloud-fw-#{vm_fw.ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vm_fw_tk]))
-
-      vm_fw = Firewall.create(name: "vm-attached-fw", location_id: location.id, project_id: project.id)
-      DB[:firewalls_vms].insert(firewall_id: vm_fw.id, vm_id: vm.id)
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(vm_fw)
 
       expect(nfp_client).not_to receive(:get)
       expect(nfp_client).not_to receive(:remove_rule)
@@ -1275,7 +1276,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(nil)
 
       allow(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
@@ -1295,7 +1295,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(nil)
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
       allow(crm_client).to receive(:list_tag_values)
@@ -1323,7 +1322,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk]))
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(nil)
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
       allow(crm_client).to receive(:list_tag_values)
@@ -1351,7 +1349,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
-      allow(nx).to receive(:find_firewall).and_return(nil)
 
       allow(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)
@@ -1380,7 +1377,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk1]))
-      allow(nx).to receive(:find_firewall).and_return(nil)
 
       allow(crm_client).to receive(:list_tag_values)
         .with(parent: orphan_tag_key_name)

@@ -350,12 +350,24 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         tk.purpose_data&.dig("network") == vpc_network_link
     } || []
 
-    orphaned_tag_keys = fw_tag_keys.reject { |tk|
+    # Pair each non-active candidate tag key with its parsed firewall UUID.
+    # Malformed ubids yield nil and are always treated as orphaned.
+    candidates = fw_tag_keys.filter_map { |tk|
       fw_ubid = tk.short_name.delete_prefix("ubicloud-fw-")
-      next true if active_fw_ubids.include?(fw_ubid)
-      fw = find_firewall(fw_ubid)
-      fw&.private_subnets&.any? || DB[:firewalls_vms].where(firewall_id: fw&.id).any?
+      next if active_fw_ubids.include?(fw_ubid)
+      [tk, UBID.to_uuid(fw_ubid)]
     }
+    return if candidates.empty?
+
+    # Single UNION query: which candidate firewalls still have a
+    # private_subnet or VM association? Those are not orphans.
+    candidate_uuids = candidates.filter_map(&:last)
+    active_ids = DB[
+      DB[:firewalls_private_subnets].where(firewall_id: candidate_uuids).select(:firewall_id)
+        .union(DB[:firewalls_vms].where(firewall_id: candidate_uuids).select(:firewall_id)),
+    ].select_map(:firewall_id).to_set
+
+    orphaned_tag_keys = candidates.reject { |_tk, uuid| uuid && active_ids.include?(uuid) }.map(&:first)
     return if orphaned_tag_keys.empty?
 
     all_rules = nil
@@ -477,10 +489,6 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       project = credential.crm_client.get_project("projects/#{gcp_project_id}")
       project.name.delete_prefix("projects/")
     end
-  end
-
-  def find_firewall(fw_ubid)
-    Firewall[fw_ubid]
   end
 
   def tag_key_parent
