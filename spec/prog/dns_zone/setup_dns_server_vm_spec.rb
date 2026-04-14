@@ -61,7 +61,6 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
 
       {false => [existing_vm.vm_host_id], true => []}.each do |allow_unspread, expected_ids|
         expect(Config).to receive(:allow_unspread_servers).and_return(allow_unspread)
-        expect(described_class).to receive(:vms_in_sync?).and_return(true)
 
         st = described_class.assemble(ds)
         vm_strand = Strand[st.stack.first["subject_id"]]
@@ -82,7 +81,13 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     end
 
     it "errors out if the DNS Server VMs are not in sync" do
-      expect(described_class).to receive(:vms_in_sync?).and_return(false)
+      ds.add_vm(create_vm_with_sshable)
+      ds.add_vm(create_vm_with_sshable)
+      ds.reload
+
+      expect(ds.vms[0].sshable).to receive(:_cmd).and_return "foo"
+      expect(ds.vms[1].sshable).to receive(:_cmd).and_return "bar"
+
       expect {
         described_class.assemble(ds)
       }.to raise_error RuntimeError, "Existing DNS Server VMs are not in sync, try again later"
@@ -92,15 +97,9 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   describe ".vms_in_sync?" do
     let(:vms) { [create_vm_with_sshable, create_vm_with_sshable] }
 
-    it "returns true if no VMs are given" do
-      expect(described_class.vms_in_sync?(nil)).to be true
+    it "returns true if the vm count is < 2" do
       expect(described_class.vms_in_sync?([])).to be true
-    end
-
-    it "returns false if the command outputs are do not match" do
-      expect(vms[0].sshable).to receive(:_cmd).and_return "foo"
-      expect(vms[1].sshable).to receive(:_cmd).and_return "bar"
-      expect(described_class.vms_in_sync?(vms)).to be false
+      expect(described_class.vms_in_sync?([vms.first])).to be true
     end
 
     it "returns true if the dns records match, irrespective of order" do

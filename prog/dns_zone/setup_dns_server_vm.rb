@@ -34,7 +34,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   end
 
   def self.vms_in_sync?(vms)
-    return true if vms.nil? || vms.empty?
+    return true if vms.size <= 1
 
     outputs = vms.map do |vm|
       lines = vm.sshable.cmd("sudo -u knot knotc", stdin: "zone-read --", log: false).split("\n")
