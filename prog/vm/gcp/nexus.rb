@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+
 class Prog::Vm::Gcp::Nexus < Prog::Base
   include GcpLro
 
