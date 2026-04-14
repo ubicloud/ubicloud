@@ -13,7 +13,7 @@ class Prog::Vm::Nexus < Prog::Base
     hugepages: true, hypervisor: nil, ch_version: nil, firmware_version: nil, new_private_subnet_name: nil,
     exclude_availability_zones: [], availability_zone: nil, alternative_families: [],
     allow_private_subnet_in_other_project: false, init_script: nil, exclude_data_centers: [],
-    machine_image_version_id: nil)
+    machine_image_version_id: nil, use_secondary_nic: false)
 
     unless (project = Project[project_id])
       fail "No existing project"
@@ -180,6 +180,7 @@ class Prog::Vm::Nexus < Prog::Base
           "firmware_version" => firmware_version,
           "alternative_families" => alternative_families,
           "private_subnet_id" => subnet.id,
+          "use_secondary_nic" => use_secondary_nic,
         }],
       ) { it.id = vm.id }
     end
