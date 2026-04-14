@@ -55,11 +55,6 @@ class Prog::Test::PostgresResource < Prog::Test::PostgresBase
     hop_finish
   end
 
-  label def finish
-    finish_test
-  end
-
-  label def failed
-    nap 15
-  end
+  label :finish
+  label :failed
 end

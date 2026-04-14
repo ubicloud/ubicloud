@@ -51,9 +51,13 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     File.read("./prog/test/testdata/order_analytics_read_queries.sql").freeze
   end
 
-  def finish_test
+  def finish
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
     fail_test(frame["fail_message"]) if frame["fail_message"]
     pop "Postgres tests are finished!"
+  end
+
+  def failed
+    nap 15
   end
 end
