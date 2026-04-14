@@ -177,15 +177,10 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
   end
 
   label def wait_delete_subnet
-    op = poll_gcp_op(name: "delete_subnet")
-    nap 5 unless op.status == :DONE
-
-    if op_error?(op)
+    poll_and_clear_gcp_op(name: "delete_subnet") do |op|
       Clog.emit("GCP subnet deletion LRO error, proceeding with cleanup",
         {gcp_subnet_delete_error: {error: op_error_message(op)}})
     end
-
-    clear_gcp_op(name: "delete_subnet")
     hop_finish_destroy
   end
 
