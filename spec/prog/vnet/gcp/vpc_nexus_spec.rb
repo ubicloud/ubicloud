@@ -115,11 +115,25 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
         nr = args[:network_resource]
         expect(nr.name).to eq(vpc_name)
         expect(nr.auto_create_subnetworks).to be(false)
+        expect(nr.description).not_to include("e2e_run_id=")
         op
       end
 
       expect { nx.create_vpc }.to hop("wait_create_vpc")
       expect(st.stack.first["create_vpc_name"]).to eq("op-vpc-123")
+    end
+
+    it "stamps the VPC description with e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "17"))
+      expect(networks_client).to receive(:get).and_raise(Google::Cloud::NotFoundError.new("not found"))
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-vpc-e2e")
+      expect(networks_client).to receive(:insert) do |args|
+        expect(args[:network_resource].description).to include("[e2e_run_id=17]")
+        op
+      end
+
+      expect { nx.create_vpc }.to hop("wait_create_vpc")
     end
 
     it "handles AlreadyExistsError on INSERT and caches network_self_link" do
@@ -189,11 +203,23 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nfp_client).to receive(:insert) do |args|
         expect(args[:project]).to eq("test-gcp-project")
         expect(args[:firewall_policy_resource].name).to eq(vpc_name)
+        expect(args[:firewall_policy_resource].description).not_to include("e2e_run_id=")
         op
       end
 
       expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_created")
       expect(st.stack.first["create_fw_policy_name"]).to eq("op-policy")
+    end
+
+    it "stamps the firewall policy description with e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "91"))
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-policy-e2e")
+      expect(nfp_client).to receive(:insert) do |args|
+        expect(args[:firewall_policy_resource].description).to include("[e2e_run_id=91]")
+        op
+      end
+
+      expect { nx.create_firewall_policy }.to hop("wait_firewall_policy_created")
     end
 
     it "skips creation but ensures association when firewall policy already exists and is associated" do

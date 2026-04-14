@@ -77,6 +77,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     instance_resource = Google::Cloud::Compute::V1::Instance.new(
       name: vm.name,
       machine_type: "zones/#{gcp_zone}/machineTypes/#{gce_machine_type}",
+      labels: GcpE2eLabels.labels_hash,
       disks:,
       network_interfaces: [
         Google::Cloud::Compute::V1::NetworkInterface.new(

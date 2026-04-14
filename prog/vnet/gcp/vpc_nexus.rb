@@ -50,6 +50,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
           project: gcp_project_id,
           network_resource: Google::Cloud::Compute::V1::Network.new(
             name: gcp_vpc.name,
+            description: "Ubicloud VPC network for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
             auto_create_subnetworks: false,
             routing_config: Google::Cloud::Compute::V1::NetworkRoutingConfig.new(
               routing_mode: "REGIONAL",
@@ -92,7 +93,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         project: gcp_project_id,
         firewall_policy_resource: Google::Cloud::Compute::V1::FirewallPolicy.new(
           name: firewall_policy_name,
-          description: "Ubicloud network firewall policy for #{gcp_vpc.name}",
+          description: "Ubicloud network firewall policy for #{gcp_vpc.name}#{GcpE2eLabels.description_suffix}",
         ),
       )
       save_gcp_op(op.name, "global", name: "create_fw_policy")

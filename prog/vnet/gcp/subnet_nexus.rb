@@ -60,6 +60,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       region: gcp_region,
       subnetwork_resource: Google::Cloud::Compute::V1::Subnetwork.new(
         name: subnet_name,
+        description: "Ubicloud subnet for #{private_subnet.ubid}#{GcpE2eLabels.description_suffix}",
         ip_cidr_range: private_subnet.net4.to_s,
         network: "projects/#{gcp_project_id}/global/networks/#{private_subnet.gcp_vpc.name}",
         private_ip_google_access: true,

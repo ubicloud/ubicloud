@@ -237,6 +237,8 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
         # No classic tags should be set
         expect(args[:instance_resource].tags).to be_nil
+        # Outside E2E (E2E_RUN_ID unset) no run-id label is applied.
+        expect(args[:instance_resource].labels.to_h).to eq({})
 
         ni = args[:instance_resource].network_interfaces.first
         expect(ni.network).to eq("projects/test-gcp-project/global/networks/ubicloud-#{project.ubid}-#{location.ubid}")
@@ -250,6 +252,22 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.start }.to hop("wait_create_op")
       expect(st.reload.stack.first["create_vm_name"]).to eq("op-12345")
+    end
+
+    it "tags the GCE instance with labels.e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "555666777"))
+      nic = vm.nics.first
+      nic.strand.update(label: "wait")
+      ensure_nic_gcp_resource(nic)
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "a"})
+
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-e2e")
+      expect(compute_client).to receive(:insert) do |args|
+        expect(args[:instance_resource].labels.to_h).to eq("e2e_run_id" => "555666777")
+        op
+      end
+
+      expect { nx.start }.to hop("wait_create_op")
     end
 
     it "selects a zone suffix and persists it in VM strand frame" do

@@ -81,12 +81,24 @@ RSpec.describe Prog::Vnet::Gcp::NicNexus do
         expect(args[:address_resource].name).to eq("ubicloud-#{nic.name}")
         expect(args[:address_resource].address_type).to eq("EXTERNAL")
         expect(args[:address_resource].network_tier).to eq("STANDARD")
+        expect(args[:address_resource].labels.to_h).to eq({})
         op
       end
 
       expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
       expect(st.reload.stack.first["allocate_ip_name"]).to eq("op-addr-123")
       expect(st.stack.first["gcp_address_name"]).to eq("ubicloud-#{nic.name}")
+    end
+
+    it "tags the reserved address with labels.e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "314159"))
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-addr-e2e")
+      expect(addresses_client).to receive(:insert) do |args|
+        expect(args[:address_resource].labels.to_h).to eq("e2e_run_id" => "314159")
+        op
+      end
+
+      expect { nx.allocate_static_ip }.to hop("wait_allocate_ip")
     end
 
     it "handles AlreadyExistsError on insert by falling back to get" do

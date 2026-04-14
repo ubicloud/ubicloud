@@ -100,11 +100,23 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
         expect(sr.private_ip_google_access).to be(true)
         expect(sr.stack_type).to eq("IPV4_IPV6")
         expect(sr.ipv6_access_type).to eq("EXTERNAL")
+        expect(sr.description).not_to include("e2e_run_id=")
         op
       end
 
       expect { nx.create_subnet }.to hop("wait_create_subnet")
       expect(st.stack.first["create_subnet_name"]).to eq("op-subnet-123")
+    end
+
+    it "stamps the subnet description with e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "2024"))
+      op = instance_double(Gapic::GenericLRO::Operation, name: "op-subnet-e2e")
+      expect(subnetworks_client).to receive(:insert) do |args|
+        expect(args[:subnetwork_resource].description).to include("[e2e_run_id=2024]")
+        op
+      end
+
+      expect { nx.create_subnet }.to hop("wait_create_subnet")
     end
   end
 

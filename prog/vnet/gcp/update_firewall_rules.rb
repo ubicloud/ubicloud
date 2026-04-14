@@ -104,6 +104,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       parent: tag_key_parent,
       purpose: "GCE_FIREWALL",
       purpose_data: {"network" => gcp_network_self_link_with_id},
+      description: "Ubicloud firewall tag key#{GcpE2eLabels.description_suffix}",
     )
 
     op = credential.crm_client.create_tag_key(tag_key_obj)
@@ -144,6 +145,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
       short_name:,
       parent: tag_key_name,
+      description: "Ubicloud firewall tag value#{GcpE2eLabels.description_suffix}",
     )
 
     op = credential.crm_client.create_tag_value(tag_value_obj)

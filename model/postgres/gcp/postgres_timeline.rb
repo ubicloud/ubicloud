@@ -44,8 +44,10 @@ PGDATA=/dat/#{version}/data
     end
 
     def gcp_create_bucket
+      e2e_labels = GcpE2eLabels.labels_hash
       blob_storage_client.create_bucket(ubid, location: location.name.delete_prefix("gcp-")) do |b|
         b.uniform_bucket_level_access = true
+        b.labels = e2e_labels unless e2e_labels.empty?
       end
     rescue Google::Cloud::AlreadyExistsError
       # Ignore if bucket already exists

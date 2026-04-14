@@ -38,6 +38,7 @@ class PostgresServer < Sequel::Model
             account_id: sa_name,
             service_account: Google::Apis::IamV1::ServiceAccount.new(
               display_name: "Postgres timeline #{timeline.ubid}",
+              description: "Ubicloud postgres timeline SA#{GcpE2eLabels.description_suffix}",
             ),
           ),
         )

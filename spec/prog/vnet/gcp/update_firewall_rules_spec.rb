@@ -137,6 +137,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         expect(tag_key.short_name).to eq("ubicloud-fw-#{firewall.ubid}")
         expect(tag_key.purpose).to eq("GCE_FIREWALL")
         expect(tag_key.purpose_data["network"]).to include("networks/1234567890")
+        expect(tag_key.description).not_to include("e2e_run_id=")
         crm_done_op
       end
 
@@ -150,6 +151,23 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       end
 
       expect(regional_crm_client).to receive(:create_tag_binding).twice
+
+      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+    end
+
+    it "stamps tag key and tag value descriptions with e2e_run_id when E2E_RUN_ID is set" do
+      stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "8080"))
+      tv_op_local = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: true, name: "crm-op-tv", response: {"name" => fw_tag_value_name}, error: nil)
+
+      expect(crm_client).to receive(:create_tag_key) do |tag_key|
+        expect(tag_key.description).to include("[e2e_run_id=8080]")
+        crm_done_op
+      end
+      expect(crm_client).to receive(:create_tag_value) do |tag_value|
+        expect(tag_value.description).to include("[e2e_run_id=8080]")
+        tv_op_local
+      end
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end

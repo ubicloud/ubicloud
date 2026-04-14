@@ -145,6 +145,22 @@ PGDATA=/dat/17/data
         expect(storage_client).to receive(:create_bucket).with(postgres_timeline.ubid, location: "us-central1").and_yield(
           instance_double(Google::Cloud::Storage::Bucket::Updater).tap do |b|
             expect(b).to receive(:uniform_bucket_level_access=).with(true)
+            expect(b).not_to receive(:labels=)
+          end,
+        )
+
+        postgres_timeline.create_bucket
+      end
+
+      it "tags the bucket with labels.e2e_run_id when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "12321"))
+        storage_client = instance_double(Google::Cloud::Storage::Project)
+        expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
+
+        expect(storage_client).to receive(:create_bucket).with(postgres_timeline.ubid, location: "us-central1").and_yield(
+          instance_double(Google::Cloud::Storage::Bucket::Updater).tap do |b|
+            expect(b).to receive(:uniform_bucket_level_access=).with(true)
+            expect(b).to receive(:labels=).with({"e2e_run_id" => "12321"})
           end,
         )
 

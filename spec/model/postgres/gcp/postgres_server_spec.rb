@@ -149,7 +149,10 @@ RSpec.describe PostgresServer do
         expect(iam_client).to receive(:create_service_account).with(
           "projects/test-project",
           an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
-        ).and_return(sa)
+        ) do |_, req|
+          expect(req.service_account.description).not_to include("e2e_run_id=")
+          sa
+        end
 
         empty_policy = Google::Apis::IamV1::Policy.new(bindings: [])
         expect(iam_client).to receive(:get_project_service_account_iam_policy).with(sa_resource_name).and_return(empty_policy)
@@ -186,6 +189,25 @@ RSpec.describe PostgresServer do
         timeline.reload
         expect(timeline.access_key).to eq("pg-tl-abcd1234@test-project.iam.gserviceaccount.com")
         expect(timeline.secret_key).to eq('{"type":"service_account","private_key":"pk"}')
+      end
+
+      it "stamps the new SA description with e2e_run_id when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "4242"))
+        timeline.update(access_key: nil, secret_key: nil)
+
+        allow(location_credential_gcp).to receive_messages(iam_client:)
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
+        )
+        expect(iam_client).to receive(:create_service_account).with(
+          "projects/test-project",
+          an_instance_of(Google::Apis::IamV1::CreateServiceAccountRequest),
+        ) do |_, req|
+          expect(req.service_account.description).to include("[e2e_run_id=4242]")
+          raise "stop after assertion"
+        end
+
+        expect { postgres_server.attach_s3_policy_if_needed }.to raise_error("stop after assertion")
       end
 
       it "re-raises non-404 errors from get_project_service_account" do

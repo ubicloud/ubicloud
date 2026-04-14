@@ -34,6 +34,7 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
       name: address_name,
       address_type: "EXTERNAL",
       network_tier: "STANDARD",
+      labels: GcpE2eLabels.labels_hash,
     )
 
     begin
