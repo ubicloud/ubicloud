@@ -108,5 +108,36 @@ RSpec.describe Clover, "postgres/capabilities" do
       families = body.dig("option_tree", "flavor", "standard", "location", "hetzner-fsn1", "family")
       expect(families.keys).to include("standard", "hobby")
     end
+
+    it "excludes feature-flagged aws families by default" do
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+      tree = body["option_tree"]
+
+      aws_location = tree.dig("flavor", "standard", "location").keys.find { |l|
+        Location[name: l]&.provider == "aws"
+      }
+      next unless aws_location
+
+      families = tree.dig("flavor", "standard", "location", aws_location, "family")
+      expect(families.keys).to include("m8gd")
+      expect(families.keys).not_to include("i8ge")
+    end
+
+    it "includes feature-flagged aws family when enabled" do
+      project.set_ff_enable_i8ge(true)
+
+      get "/project/#{project.ubid}/postgres/capabilities"
+      body = JSON.parse(last_response.body)
+      tree = body["option_tree"]
+
+      aws_location = tree.dig("flavor", "standard", "location").keys.find { |l|
+        Location[name: l]&.provider == "aws"
+      }
+      next unless aws_location
+
+      families = tree.dig("flavor", "standard", "location", aws_location, "family")
+      expect(families.keys).to include("i8ge")
+    end
   end
 end

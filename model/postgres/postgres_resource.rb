@@ -490,22 +490,19 @@ class PostgresResource < Sequel::Model
 
     options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
 
+    available_families_and_sizes_by_location = {}
     options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
+      available_families_and_sizes_by_location[location.name] ||= available_families_and_sizes(location, project)
       flavor == PostgresResource.default_flavor || location.provider != "aws"
     end
 
-    availability_cache = {}
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
-      available = (availability_cache[location.name] ||= available_families_and_sizes(location))
-      next false if available&.none? { |f, _| f == family }
-      family_allowed?(location, project, family)
+      available_families_and_sizes_by_location[location.name].any? { |f, _| f == family }
     end
 
     options.add_option(name: "size", values: Option::POSTGRES_SIZE_OPTIONS.keys, parent: "family") do |flavor, location, family, size|
       next false unless Option::POSTGRES_SIZE_OPTIONS[size].family == family
-      available = availability_cache[location.name]
-      next true unless available
-      available.include?([family, size])
+      available_families_and_sizes_by_location[location.name].include?([family, size])
     end
 
     storage_size_options = Option::POSTGRES_STORAGE_SIZE_OPTIONS + Option::AWS_STORAGE_SIZE_OPTIONS.values.flat_map { |h| h.values.flatten }.uniq

@@ -2,12 +2,10 @@
 
 class PostgresResource < Sequel::Model
   module Metal
-    def self.available_families_and_sizes(_location)
-      nil
-    end
-
-    def self.family_allowed?(_location, _project, family)
-      family == "standard" || family == "hobby"
+    def self.available_families_and_sizes(_location, _project)
+      Set.new(
+        Option::POSTGRES_SIZE_OPTIONS.filter_map { |name, opt| [opt.family, name] if opt.family == "standard" || opt.family == "hobby" },
+      )
     end
 
     def self.storage_sizes(_location, family, vcpu_count)

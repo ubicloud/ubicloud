@@ -116,14 +116,27 @@ class Clover
     end
   end
 
-  def postgres_option_metadata(locations)
+  def postgres_option_metadata(option_tree)
+    valid = collect_valid_option_keys(option_tree)
     {
-      flavor: Option::POSTGRES_FLAVOR_OPTIONS.transform_values { |v| {display_name: v.title} },
-      location: locations.to_h { |l| [l.name, {display_name: l.display_name, ui_name: l.ui_name, provider: l.provider}] },
-      family: Option::POSTGRES_FAMILY_OPTIONS.transform_values { |v| {display_name: v.description, category: v.category} },
-      size: Option::POSTGRES_SIZE_OPTIONS.transform_values { |v| {vcpu: v.vcpu_count, memory_gib: v.memory_gib} },
-      ha_type: Option::POSTGRES_HA_OPTIONS.transform_values { |v| {display_name: v.description, standby_count: v.standby_count} },
+      flavor: Option::POSTGRES_FLAVOR_OPTIONS.slice(*valid["flavor"]).transform_values { |v| {display_name: v.title} },
+      location: (valid["location"] || []).to_h { |l| [l.name, {display_name: l.display_name, ui_name: l.ui_name, provider: l.provider}] },
+      family: Option::POSTGRES_FAMILY_OPTIONS.slice(*valid["family"]).transform_values { |v| {display_name: v.description, category: v.category} },
+      size: Option::POSTGRES_SIZE_OPTIONS.slice(*valid["size"]).transform_values { |v| {vcpu: v.vcpu_count, memory_gib: v.memory_gib} },
+      ha_type: Option::POSTGRES_HA_OPTIONS.slice(*valid["ha_type"]).transform_values { |v| {display_name: v.description, standby_count: v.standby_count} },
     }
+  end
+
+  def collect_valid_option_keys(tree)
+    result = Hash.new { |h, k| h[k] = Set.new }
+    tree.each do |name, subtree|
+      next unless subtree
+      subtree.each do |value, children|
+        result[name] << value
+        collect_valid_option_keys(children).each { |k, vs| result[k].merge(vs) }
+      end
+    end
+    result
   end
 
   def postgres_require_customer_firewall!
