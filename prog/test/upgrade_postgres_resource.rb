@@ -4,15 +4,7 @@ require_relative "../../lib/util"
 
 class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   def self.assemble(provider: "metal")
-    postgres_test_project = Project.create(name: "Postgres-Upgrade-Test-Project")
-    Project[Config.postgres_service_project_id] ||
-      Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
-
-    Strand.create(
-      prog: "Test::UpgradePostgresResource",
-      label: "start",
-      stack: [{"provider" => provider, "postgres_test_project_id" => postgres_test_project.id}],
-    )
+    super(provider:, project_name: "Postgres-Upgrade-Test-Project")
   end
 
   label def start
