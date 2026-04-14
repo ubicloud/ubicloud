@@ -984,6 +984,56 @@ RSpec.describe Prog::Vnet::Gcp::SubnetNexus do
       end
     end
 
+    describe "tag resource e2e_run_id scoping" do
+      let(:done_op) {
+        Google::Apis::CloudresourcemanagerV3::Operation.new(
+          done: true, name: "operations/tag-op", response: {"name" => "tagKeys/abc"},
+        )
+      }
+
+      it "omits e2e_run_id token from tag key description when E2E_RUN_ID is unset" do
+        expect(crm_client).to receive(:create_tag_key) do |tag_key|
+          expect(tag_key.description).to eq("Ubicloud subnet tag key")
+          expect(tag_key.description).not_to include("e2e_run_id=")
+          done_op
+        end
+        nx.send(:ensure_tag_key)
+      end
+
+      it "stamps tag key description with [e2e_run_id=<id>] when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "9090"))
+        expect(crm_client).to receive(:create_tag_key) do |tag_key|
+          expect(tag_key.description).to eq("Ubicloud subnet tag key [e2e_run_id=9090]")
+          done_op
+        end
+        nx.send(:ensure_tag_key)
+      end
+
+      it "omits e2e_run_id token from tag value description when E2E_RUN_ID is unset" do
+        value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+          done: true, name: "operations/tag-op", response: {"name" => "tagValues/xyz"},
+        )
+        expect(crm_client).to receive(:create_tag_value) do |tag_value|
+          expect(tag_value.description).to eq("Ubicloud subnet tag value")
+          expect(tag_value.description).not_to include("e2e_run_id=")
+          value_op
+        end
+        nx.send(:ensure_tag_value, "tagKeys/123", "member")
+      end
+
+      it "stamps tag value description with [e2e_run_id=<id>] when E2E_RUN_ID is set" do
+        stub_const("ENV", ENV.to_h.merge("E2E_RUN_ID" => "9090"))
+        value_op = Google::Apis::CloudresourcemanagerV3::Operation.new(
+          done: true, name: "operations/tag-op", response: {"name" => "tagValues/xyz"},
+        )
+        expect(crm_client).to receive(:create_tag_value) do |tag_value|
+          expect(tag_value.description).to eq("Ubicloud subnet tag value [e2e_run_id=9090]")
+          value_op
+        end
+        nx.send(:ensure_tag_value, "tagKeys/123", "member")
+      end
+    end
+
     describe "#ensure_tag_key" do
       it "falls back to lookup when operation response has no name" do
         op = Google::Apis::CloudresourcemanagerV3::Operation.new(done: true, response: nil)

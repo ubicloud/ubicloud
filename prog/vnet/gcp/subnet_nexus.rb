@@ -330,6 +330,7 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
           parent: tag_key_parent,
           purpose: "GCE_FIREWALL",
           purpose_data: {"network" => private_subnet.gcp_vpc.network_self_link},
+          description: "Ubicloud subnet tag key#{GcpE2eLabels.description_suffix}",
         ),
       )
     end
@@ -348,7 +349,11 @@ class Prog::Vnet::Gcp::SubnetNexus < Prog::Base
       lookup: -> { lookup_tag_value_name(parent_tag_key_name, short_name) },
     ) do
       credential.crm_client.create_tag_value(
-        Google::Apis::CloudresourcemanagerV3::TagValue.new(short_name:, parent: parent_tag_key_name),
+        Google::Apis::CloudresourcemanagerV3::TagValue.new(
+          short_name:,
+          parent: parent_tag_key_name,
+          description: "Ubicloud subnet tag value#{GcpE2eLabels.description_suffix}",
+        ),
       )
     end
   end

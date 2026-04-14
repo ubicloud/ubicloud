@@ -135,6 +135,8 @@ jobs:
       env:
         GCP_PROJECT_ID: ${{ secrets.E2E_GCP_PROJECT_ID }}
         GOOGLE_APPLICATION_CREDENTIALS: /tmp/gcp-credentials.json
+        E2E_RUN_ID: ${{ github.run_id }}
+        GCP_BROAD_CLEANUP: ${{ inputs.gcp_broad_cleanup }}
       run: |
         echo '${{ secrets.E2E_GCP_CREDENTIALS_JSON }}' > /tmp/gcp-credentials.json
         gcloud auth activate-service-account --key-file=/tmp/gcp-credentials.json --project=$GCP_PROJECT_ID
@@ -157,18 +159,36 @@ jobs:
         fi
         echo "Preflight OK: project $GCP_PROJECT_ID carries e2e_marker=true"
 
+        # Scope the sweep. Broad mode is an explicit operator janitor toggle
+        # (workflow_dispatch input). Otherwise match only tag resources whose
+        # description contains the current run's [e2e_run_id=<id>] token, so
+        # concurrent runs cannot delete each other's live resources. If neither
+        # applies, skip — safer than deleting an unrelated run's state.
+        if [ "$GCP_BROAD_CLEANUP" = "true" ]; then
+          echo "Broad cleanup mode: matching all ubicloud- tag keys"
+          filter='ubicloud-'
+        elif [ -n "${E2E_RUN_ID:-}" ]; then
+          echo "Run-scoped cleanup: matching [e2e_run_id=${E2E_RUN_ID}]"
+          filter="[e2e_run_id=${E2E_RUN_ID}]"
+        else
+          echo "No E2E_RUN_ID and not in broad mode — skipping pre-cleanup"
+          rm -f /tmp/gcp-credentials.json
+          exit 0
+        fi
+
         GCP_PROJECT_NUMBER=$(gcloud projects describe "$GCP_PROJECT_ID" --format='value(projectNumber)' 2>/dev/null || true)
         if [ -z "$GCP_PROJECT_NUMBER" ]; then
           echo "WARNING: Could not resolve project number, skipping"
           exit 0
         fi
         all_tag_keys=$(gcloud resource-manager tags keys list --parent="projects/$GCP_PROJECT_NUMBER" \
-          --format="csv[no-heading](name,shortName)" 2>/dev/null || true)
-        ubicloud_tags=$(echo "$all_tag_keys" | grep "ubicloud-" || true)
+          --format="csv[no-heading](name,shortName,description)" 2>/dev/null || true)
+        # grep -F: literal match, so brackets in the run-id token are not regex.
+        ubicloud_tags=$(echo "$all_tag_keys" | grep -F "$filter" || true)
         if [ -n "$ubicloud_tags" ]; then
           echo "Cleaning up orphaned tag keys before test run:"
           echo "$ubicloud_tags"
-          echo "$ubicloud_tags" | while IFS="," read -r tag_name short_name; do
+          echo "$ubicloud_tags" | while IFS="," read -r tag_name short_name description; do
             tag_values=$(gcloud resource-manager tags values list --parent="$tag_name" \
               --format="value(name)" 2>/dev/null || true)
             for tv in $tag_values; do
