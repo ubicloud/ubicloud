@@ -77,8 +77,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
   describe "#start" do
     it "registers deadline and hops to create_vpc" do
-      expect(nx).to receive(:register_deadline).with("wait", 5 * 60)
       expect { nx.start }.to hop("create_vpc")
+      frame = nx.strand.stack.first
+      expect(frame["deadline_target"]).to eq("wait")
+      expect(Time.new(frame["deadline_at"])).to be_within(5).of(Time.now + 5 * 60)
     end
   end
 

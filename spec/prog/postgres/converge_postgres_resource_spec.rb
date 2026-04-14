@@ -178,7 +178,7 @@ RSpec.describe Prog::Postgres::ConvergePostgresResource do
       server = create_server(is_representative: true)
       server.incr_recycle
       server.vm.update(vm_host_id: nil)
-      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).by(1)
+      expect { nx.provision_servers }.to nap.and change(PostgresServer, :count).from(1).to(2)
     end
   end
 

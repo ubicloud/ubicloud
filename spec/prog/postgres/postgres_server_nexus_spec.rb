@@ -1264,10 +1264,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     it "skips host_routing lockout on cloud providers" do
       expect(server).to receive(:lockout_mechanisms).and_return(["pg_stop", "hba"])
 
-      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
-      expect(nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
-      expect(nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
       expect { nx.lockout }.to hop("wait_lockout_attempt")
+      child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
+      expect(child_mechanisms).to contain_exactly("pg_stop", "hba")
     end
   end
 

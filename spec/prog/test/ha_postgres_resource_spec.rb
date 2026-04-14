@@ -283,7 +283,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     end
 
     it "verifies timelines are retained and explicitly destroys them" do
-      timeline_id = SecureRandom.uuid
+      timeline_id = PostgresTimeline.generate_uuid
       timeline = instance_double(PostgresTimeline)
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "timeline_ids" => [timeline_id]})
       expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(nil)

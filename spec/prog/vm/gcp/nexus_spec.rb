@@ -230,45 +230,24 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to hop("wait_create_op")
     end
 
-    it "retries in a different zone on ResourceExhaustedError" do
-      nic = vm.nics.first
-      nic.strand.update(label: "wait")
-      ensure_nic_gcp_resource(nic)
-      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::ResourceExhaustedError.new("zone capacity"))
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
+    {
+      "ResourceExhaustedError" => Google::Cloud::ResourceExhaustedError.new("zone capacity"),
+      "UnavailableError" => Google::Cloud::UnavailableError.new("service unavailable"),
+      "InvalidArgumentError for missing machine type" => Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'."),
+    }.each do |label, error|
+      it "retries in a different zone on #{label}" do
+        nic = vm.nics.first
+        nic.strand.update(label: "wait")
+        ensure_nic_gcp_resource(nic)
+        expect(compute_client).to receive(:insert).and_raise(error)
+        expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-      expect { nx.start }.to nap(5)
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"]).to be_a(Array)
-      expect(stack["exclude_zones"].length).to eq(1)
-      expect(stack["gcp_zone_suffix"]).not_to eq(stack["exclude_zones"].first)
-    end
-
-    it "retries in a different zone on UnavailableError" do
-      nic = vm.nics.first
-      nic.strand.update(label: "wait")
-      ensure_nic_gcp_resource(nic)
-      expect(compute_client).to receive(:insert).and_raise(Google::Cloud::UnavailableError.new("service unavailable"))
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-
-      expect { nx.start }.to nap(5)
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"]).to be_a(Array)
-      expect(stack["exclude_zones"].length).to eq(1)
-    end
-
-    it "retries in a different zone on InvalidArgumentError for missing machine type" do
-      nic = vm.nics.first
-      nic.strand.update(label: "wait")
-      ensure_nic_gcp_resource(nic)
-      expect(compute_client).to receive(:insert).and_raise(
-        Google::Cloud::InvalidArgumentError.new("Machine type with name 'c3d-highmem-8-lssd' does not exist in zone 'us-central1-b'."),
-      )
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-
-      expect { nx.start }.to nap(5)
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"].length).to eq(1)
+        expect { nx.start }.to nap(5)
+        stack = st.reload.stack.first
+        expect(stack["exclude_zones"]).to be_a(Array)
+        expect(stack["exclude_zones"].length).to eq(1)
+        expect(stack["gcp_zone_suffix"]).not_to eq(stack["exclude_zones"].first)
+      end
     end
 
     it "re-raises InvalidArgumentError when not about missing machine type" do
@@ -708,11 +687,9 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
   describe "#prevent_destroy" do
     it "registers a deadline and naps while preventing" do
-      now = Time.now
-      expect(Time).to receive(:now).at_least(:once).and_return(now)
       expect { nx.prevent_destroy }.to nap(30)
       expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
-      expect(Time.new(nx.strand.stack.first["deadline_at"]).to_i).to eq((now + 24 * 60 * 60).to_i)
+      expect(Time.new(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 24 * 60 * 60)
     end
   end
 
@@ -753,7 +730,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
         n.strand.destroy
         n.destroy
       end
-      nx.instance_variable_set(:@nic, nil)
 
       expect(nx).to receive(:cleanup_vm_policy_rules)
 
@@ -792,7 +768,10 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     end
 
     it "returns when nic is nil" do
-      allow(nx).to receive(:nic).and_return(nil)
+      vm.nics.each do |n|
+        n.strand.destroy
+        n.destroy
+      end
       expect(nfp_client).not_to receive(:get)
       nx.send(:cleanup_vm_policy_rules)
     end
