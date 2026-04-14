@@ -12,10 +12,6 @@ class Location < Sequel::Model
 
     private
 
-    def aws_pg_boot_image(pg_version, arch, flavor)
-      pg_aws_ami(pg_version, arch)
-    end
-
     def aws_azs
       v = location_azs_dataset.all
       return v unless v.empty?

@@ -38,21 +38,6 @@ RSpec.describe Location do
       end
     end
 
-    describe "#pg_boot_image" do
-      it "delegates to pg_gce_image" do
-        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
-        PgGceImage.create(
-          gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
-          arch: "arm64",
-          pg_versions: ["16", "17", "18"],
-        )
-
-        expect(location.send(:gcp_pg_boot_image, "99", "arm64", "standard")).to eq(
-          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
-        )
-      end
-    end
-
     describe "#azs" do
       let(:zones_client) { instance_double(Google::Cloud::Compute::V1::Zones::Rest::Client) }
 

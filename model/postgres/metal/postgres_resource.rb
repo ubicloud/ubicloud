@@ -4,6 +4,16 @@ class PostgresResource < Sequel::Model
   module Metal
     private
 
+    def metal_boot_image(pg_version, arch)
+      flavor_suffix = case flavor
+      when PostgresResource::Flavor::STANDARD, PostgresResource::Flavor::PARADEDB then ""
+      when PostgresResource::Flavor::LANTERN then "#{pg_version}-lantern"
+      else raise "Unknown PostgreSQL flavor: #{flavor}"
+      end
+
+      "postgres#{flavor_suffix}-ubuntu-2204"
+    end
+
     def metal_upgrade_candidate_server
       servers
         .reject(&:is_representative)

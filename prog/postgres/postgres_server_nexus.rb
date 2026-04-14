@@ -26,7 +26,7 @@ class Prog::Postgres::PostgresServerNexus < Prog::Base
       end
 
       arch = Option::VmSizes.find { it.name == postgres_resource.target_vm_size.gsub("hobby", "burstable") }.arch
-      boot_image = postgres_resource.location.pg_boot_image(server_version, arch, postgres_resource.flavor)
+      boot_image = postgres_resource.boot_image(server_version, arch)
 
       vm_st = Prog::Vm::Nexus.assemble_with_sshable(
         Config.postgres_service_project_id,

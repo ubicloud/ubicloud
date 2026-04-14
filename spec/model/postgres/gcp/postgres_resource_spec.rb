@@ -124,6 +124,22 @@ RSpec.describe PostgresResource do
       end
     end
 
+    describe "#boot_image" do
+      it "delegates to the location's pg_gce_image" do
+        PgGceImage.dataset.destroy
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16", "17", "18"],
+        )
+
+        expect(postgres_resource.boot_image("99", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
+        )
+      end
+    end
+
     describe "#new_server_exclusion_filters" do
       let(:timeline) { PostgresTimeline.create(location_id: location.id) }
 

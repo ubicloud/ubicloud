@@ -4,6 +4,10 @@ class PostgresResource < Sequel::Model
   module Gcp
     private
 
+    def gcp_boot_image(pg_version, arch)
+      location.pg_gce_image(arch)
+    end
+
     def gcp_upgrade_candidate_server
       eligible_image_names = PgGceImage
         .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([target_version], :text)))
