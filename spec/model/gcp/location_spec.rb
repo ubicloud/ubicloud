@@ -18,9 +18,9 @@ RSpec.describe Location do
     describe "#pg_gce_image" do
       before { PgGceImage.dataset.destroy }
 
-      it "returns a GCE image path using the image's hosting project" do
+      it "returns a GCE image path using the configured hosting project" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(
-          gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-x64-20260218",
           arch: "x64",
         )
@@ -41,8 +41,8 @@ RSpec.describe Location do
       before { PgGceImage.dataset.destroy }
 
       it "delegates to pg_gce_image" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(
-          gcp_project_id: "image-hosting-project",
           gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
           arch: "arm64",
         )

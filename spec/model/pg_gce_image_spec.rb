@@ -7,26 +7,22 @@ RSpec.describe PgGceImage do
 
   it "creates a PgGceImage with required fields" do
     image = described_class.create(
-      gcp_project_id: "test-project",
       gce_image_name: "postgres-ubuntu-2404-x64-20260218",
       arch: "x64",
     )
 
-    expect(image.gcp_project_id).to eq("test-project")
     expect(image.gce_image_name).to eq("postgres-ubuntu-2404-x64-20260218")
     expect(image.arch).to eq("x64")
   end
 
   it "enforces uniqueness on (arch, gce_image_name)" do
     described_class.create(
-      gcp_project_id: "project-a",
       gce_image_name: "image1",
       arch: "x64",
     )
 
     expect {
       described_class.create(
-        gcp_project_id: "project-b",
         gce_image_name: "image1",
         arch: "x64",
       )
@@ -35,14 +31,12 @@ RSpec.describe PgGceImage do
 
   it "allows multiple images per arch" do
     described_class.create(
-      gcp_project_id: "project-a",
       gce_image_name: "image1",
       arch: "x64",
     )
 
     expect {
       described_class.create(
-        gcp_project_id: "project-b",
         gce_image_name: "image2",
         arch: "x64",
       )
@@ -51,7 +45,6 @@ RSpec.describe PgGceImage do
 
   it "can be looked up by find" do
     described_class.create(
-      gcp_project_id: "test-project",
       gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
       arch: "arm64",
     )

@@ -5,9 +5,14 @@ class PostgresResource < Sequel::Model
     private
 
     def gcp_upgrade_candidate_server
-      # GCP VMs don't track boot_image on storage volumes. GCE Postgres
-      # images always include all supported PG versions (16/17/18), so
-      # any non-representative server is a valid upgrade candidate.
+      # GCP VMs do not track boot_image on storage volumes, so we cannot
+      # check directly whether the candidate VM has binaries for the target
+      # PG version. Current invariant (April 2026): every pg_gce_image row
+      # we ship is built from postgres-vm-images, which installs PG 16, 17,
+      # and 18, so any non-representative server is a valid upgrade target.
+      # TODO: this invariant breaks the first time we ship an image that
+      # adds PG 19 or drops PG 16. Tighten the candidate filter then. See
+      # walk issue 42-verify-gcp-upgrade-candidate-pg-version for options.
       servers
         .reject(&:is_representative)
         .max_by(&:created_at)

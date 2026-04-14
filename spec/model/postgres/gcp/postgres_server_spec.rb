@@ -146,7 +146,7 @@ RSpec.describe PostgresServer do
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
         expect(iam_client).to receive(:get_project_service_account).and_raise(
-          Google::Apis::ClientError.new("Not Found"),
+          Google::Apis::ClientError.new("Not Found", status_code: 404),
         )
 
         expect(iam_client).to receive(:create_service_account).with(
@@ -189,6 +189,19 @@ RSpec.describe PostgresServer do
         timeline.reload
         expect(timeline.access_key).to eq("pg-tl-abcd1234@test-project.iam.gserviceaccount.com")
         expect(timeline.secret_key).to eq('{"type":"service_account","private_key":"pk"}')
+      end
+
+      it "re-raises non-404 errors from get_project_service_account" do
+        timeline.update(access_key: nil, secret_key: nil)
+
+        allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
+
+        expect(iam_client).to receive(:get_project_service_account).and_raise(
+          Google::Apis::ClientError.new("Forbidden", status_code: 403),
+        )
+        expect(iam_client).not_to receive(:create_service_account)
+
+        expect { postgres_server.attach_s3_policy_if_needed }.to raise_error(Google::Apis::ClientError, /Forbidden/)
       end
 
       it "uses existing SA when get_project_service_account succeeds" do
@@ -358,7 +371,7 @@ RSpec.describe PostgresServer do
 
           allow(iam_client).to receive(:get_project_service_account_iam_policy).and_return(Google::Apis::IamV1::Policy.new(bindings: []))
           allow(iam_client).to receive(:set_service_account_iam_policy)
-          allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found"))
+          allow(iam_client).to receive(:get_project_service_account).and_raise(Google::Apis::ClientError.new("Not Found", status_code: 404))
           allow(iam_client).to receive_messages(create_service_account: new_sa, create_service_account_key: new_key)
         end
 
@@ -399,10 +412,25 @@ RSpec.describe PostgresServer do
           timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
 
           expect(iam_client).to receive(:delete_project_service_account).and_raise(
-            Google::Apis::ClientError.new("Not Found"),
+            Google::Apis::ClientError.new("Not Found", status_code: 404),
           )
 
           expect { postgres_server.attach_s3_policy_if_needed }.not_to raise_error
+        end
+
+        it "re-raises non-404 errors when deleting old SA" do
+          parent_timeline = PostgresTimeline.create(
+            location_id: location.id,
+            access_key: "broken-sa@test-project.iam.gserviceaccount.com",
+            secret_key: '{"type":"service_account","key":"old"}',
+          )
+          timeline.update(access_key: nil, secret_key: nil, parent_id: parent_timeline.id)
+
+          expect(iam_client).to receive(:delete_project_service_account).and_raise(
+            Google::Apis::ClientError.new("Forbidden", status_code: 403),
+          )
+
+          expect { postgres_server.attach_s3_policy_if_needed }.to raise_error(Google::Apis::ClientError, /Forbidden/)
         end
 
         it "does not attempt to delete when there is no parent timeline" do

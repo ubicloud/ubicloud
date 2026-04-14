@@ -76,7 +76,6 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gcp_project_id: "test-gcp-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
         arch: "arm64",
       )
@@ -96,7 +95,6 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
         credentials_json: "{}")
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gcp_project_id: "test-gcp-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
         arch: "arm64",
       )

@@ -5,7 +5,7 @@ class Location < Sequel::Model
     def pg_gce_image(arch)
       image = PgGceImage.find(arch:)
       raise "No GCE image found for arch #{arch}" unless image
-      "projects/#{image.gcp_project_id}/global/images/#{image.gce_image_name}"
+      "projects/#{Config.postgres_gce_image_gcp_project_id}/global/images/#{image.gce_image_name}"
     end
 
     private

@@ -92,14 +92,15 @@ RSpec.describe Location do
 
   it "raises descriptive error when AMI not found" do
     expect {
-      p2_loc.pg_ami("16", "x64")
+      p2_loc.pg_aws_ami("16", "x64")
     }.to raise_error("No AMI found for PostgreSQL 16 (x64) in l2")
   end
 
-  it "#pg_gce_image returns image path using image's hosting project" do
+  it "#pg_gce_image returns image path using configured hosting project" do
     PgGceImage.dataset.destroy
+    allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
     gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
-    PgGceImage.create(gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+    PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
     expect(gcp_loc.pg_gce_image("x64")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
   end
 

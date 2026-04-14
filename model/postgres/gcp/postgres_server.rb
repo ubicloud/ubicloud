@@ -29,7 +29,8 @@ class PostgresServer < Sequel::Model
       sa_email = "#{sa_name}@#{credential.project_id}.iam.gserviceaccount.com"
       begin
         sa = credential.iam_client.get_project_service_account("projects/#{credential.project_id}/serviceAccounts/#{sa_email}")
-      rescue Google::Apis::ClientError
+      rescue Google::Apis::ClientError => e
+        raise unless e.status_code == 404
         sa = credential.iam_client.create_service_account(
           "projects/#{credential.project_id}",
           Google::Apis::IamV1::CreateServiceAccountRequest.new(
@@ -93,8 +94,8 @@ class PostgresServer < Sequel::Model
           credential.iam_client.delete_project_service_account(
             "projects/-/serviceAccounts/#{old_timeline.access_key}",
           )
-        rescue Google::Apis::ClientError
-          # SA may already be deleted
+        rescue Google::Apis::ClientError => e
+          raise unless e.status_code == 404
         end
       end
     end

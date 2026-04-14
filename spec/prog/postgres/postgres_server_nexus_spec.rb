@@ -140,8 +140,9 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
         project_id: "test-gcp-project",
         service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
         credentials_json: "{}")
+      allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
       PgGceImage.where(arch: "x64").destroy
-      PgGceImage.create(gcp_project_id: "image-hosting-project", gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
+      PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64")
       gcp_resource = PostgresResource.create(
         project: user_project,
         location_id: gcp_location.id,

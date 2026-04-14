@@ -72,7 +72,6 @@ RSpec.describe Prog::Test::PostgresResource do
       gcp_location = Location[provider: "gcp", project_id: nil]
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gcp_project_id: "test-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
         arch: "arm64",
       )
@@ -87,7 +86,6 @@ RSpec.describe Prog::Test::PostgresResource do
       LocationCredentialGcp.create_with_id(location, credentials_json: "{}", project_id: "existing-project", service_account_email: "existing@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gcp_project_id: "existing-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
         arch: "arm64",
       )
@@ -103,7 +101,6 @@ RSpec.describe Prog::Test::PostgresResource do
       expect(Config).to receive(:e2e_gcp_service_account_email).and_return("test@test.iam.gserviceaccount.com")
       PgGceImage.dataset.destroy
       PgGceImage.create(
-        gcp_project_id: "test-project",
         gce_image_name: "postgres-ubuntu-2204-arm64-20260225",
         arch: "arm64",
       )
