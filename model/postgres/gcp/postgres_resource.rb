@@ -18,12 +18,14 @@ class PostgresResource < Sequel::Model
         .max_by(&:created_at)
     end
 
+    GCP_ZONE_SUFFIX_EXPR = Sequel.lit("stack->0->>'gcp_zone_suffix'")
+
     def gcp_new_server_exclusion_filters
       exclude_availability_zones = Strand
         .where(id: servers_dataset.select(:vm_id))
-        .select_map(Sequel.lit("stack->0->>'gcp_zone_suffix'"))
-        .compact
-        .uniq
+        .distinct
+        .exclude(GCP_ZONE_SUFFIX_EXPR => nil)
+        .select_map(GCP_ZONE_SUFFIX_EXPR)
 
       ServerExclusionFilters.new(exclude_host_ids: [], exclude_data_centers: [], exclude_availability_zones:, availability_zone: nil)
     end

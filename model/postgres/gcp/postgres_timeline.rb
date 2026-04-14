@@ -1,7 +1,8 @@
 # frozen_string_literal: true
 
 class PostgresTimeline < Sequel::Model
-  GcsBlobStorage = Struct.new(:url)
+  GcsBlobStorage = Data.define(:url)
+  GcsFileWrapper = Data.define(:key, :last_modified)
 
   module Gcp
     private
@@ -31,14 +32,15 @@ PGDATA=/dat/#{version}/data
       bucket = blob_storage_client.bucket(ubid)
       return [] unless bucket
 
-      files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter)
+      delimiter = nil if delimiter.empty?
+      files = bucket.files(prefix:, delimiter:)
       all_files = files.to_a
       while (token = files.token)
-        files = bucket.files(prefix:, delimiter: delimiter.empty? ? nil : delimiter, token:)
+        files = bucket.files(prefix:, delimiter:, token:)
         all_files.concat(files.to_a)
       end
 
-      all_files.map { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
+      all_files.map! { |f| GcsFileWrapper.new(f.name, f.updated_at.to_time) }
     end
 
     def gcp_create_bucket
@@ -83,8 +85,6 @@ PGDATA=/dat/#{version}/data
       false
     end
   end
-
-  GcsFileWrapper = Struct.new(:key, :last_modified)
 end
 
 # Table: postgres_timeline
