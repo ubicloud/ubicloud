@@ -443,17 +443,21 @@ RSpec.describe Prog::Test::UpgradePostgresResource do
     end
 
     it "naps if private subnet still exists" do
+      project_id = pgr_test.frame["postgres_test_project_id"]
       refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil})
-      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(instance_double(PrivateSubnet))
+      PrivateSubnet.create(
+        name: "upgrade-test-subnet", project_id:, location_id: Location::HETZNER_FSN1_ID,
+        net4: "10.0.0.0/26", net6: "fd00::/64",
+      )
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
     it "verifies timelines are retained and explicitly destroys them" do
-      timeline_id = SecureRandom.uuid
-      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => [timeline_id]})
-      expect(PrivateSubnet).to receive(:[]).with(project_id: pgr_test.frame["postgres_test_project_id"]).and_return(nil)
-      expect(PostgresTimeline).to receive(:destroy_remaining).with([timeline_id]).and_return(1)
+      tl = PostgresTimeline.create(location_id: Location::HETZNER_FSN1_ID)
+      Strand.create_with_id(tl, prog: "Postgres::PostgresTimelineNexus", label: "wait")
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => nil, "read_replica_id" => nil, "timeline_ids" => [tl.id]})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
+      expect(Semaphore.where(strand_id: tl.id, name: "destroy").count).to eq(1)
     end
 
     it "hops to destroy if all resources and timelines are destroyed" do

@@ -187,13 +187,9 @@ RSpec.describe Prog::Test::PostgresFirewall do
     let(:sshable) { pg_fw_test.representative_server.vm.sshable }
 
     it "naps if firewall rules are still being applied" do
+      Strand.create_with_id(private_subnet, prog: "Vnet::SubnetNexus", label: "wait")
+      private_subnet.incr_update_firewall_rules
       refresh_frame(pg_fw_test, new_values: {"runner_ip" => "100.100.100.100"})
-      expect(private_subnet).to receive(:update_firewall_rules_set?).and_return(true)
-      allow(pg_fw_test).to receive_messages(postgres_resource: instance_double(
-        PostgresResource,
-        private_subnet:,
-        pg_firewall_rules: [],
-      ))
       expect { pg_fw_test.wait_restricted_rules_applied }.to nap(5)
     end
 
@@ -244,10 +240,8 @@ RSpec.describe Prog::Test::PostgresFirewall do
     let(:sshable) { pg_fw_test.representative_server.vm.sshable }
 
     it "naps if firewall rules are still being applied" do
-      allow(pg_fw_test).to receive_messages(postgres_resource: instance_double(
-        PostgresResource,
-        private_subnet: instance_double(PrivateSubnet, update_firewall_rules_set?: true, vms: []),
-      ))
+      Strand.create_with_id(private_subnet, prog: "Vnet::SubnetNexus", label: "wait")
+      private_subnet.incr_update_firewall_rules
       expect { pg_fw_test.wait_open_rules_applied }.to nap(5)
     end
 
