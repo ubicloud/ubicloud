@@ -17,7 +17,7 @@ class Prog::Test::Base < Prog::Base
       unless LocationCredentialAws[location.id]
         LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
       end
-      family ||= "m8gd"
+      family = "m8gd"
       vcpus = 2
       [location.id, Option.aws_instance_type_name(family, vcpus), Option::AWS_STORAGE_SIZE_OPTIONS[family][vcpus].first.to_i]
     when "gcp"
