@@ -151,6 +151,12 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.start }.to nap(1)
     end
 
+    it "naps for the stashed retry_zone_delay and clears it" do
+      refresh_frame(nx, new_values: {"retry_zone_delay" => 5 * 60})
+      expect { nx.start }.to nap(5 * 60)
+      expect(st.reload.stack.first["retry_zone_delay"]).to be_nil
+    end
+
     it "creates a GCE instance without tags and hops to wait_create_op" do
       nic = vm.nics.first
       nic.strand.update(label: "wait")
@@ -454,6 +460,24 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(stack["exclude_zones"]).to include("a")
       expect(stack["gcp_zone_suffix"]).not_to eq("a")
       expect(stack["create_vm_name"]).to be_nil
+      expect(stack["retry_zone_delay"]).to eq(5)
+    end
+
+    it "stashes a 5-minute backoff when all zones are exhausted on LRO error" do
+      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-c", "gcp_zone_suffix" => "c", "exclude_zones" => ["a", "b"]})
+
+      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED", message: "exhausted")
+      op = Google::Cloud::Compute::V1::Operation.new(
+        status: :DONE,
+        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+      )
+      expect(zone_ops_client).to receive(:get).and_return(op)
+      expect(Clog).to receive(:emit).with("GCE zone retry exhausted, resetting exclusions", anything).and_call_original
+
+      expect { nx.wait_create_op }.to hop("start")
+      stack = st.reload.stack.first
+      expect(stack["exclude_zones"]).to eq([])
+      expect(stack["retry_zone_delay"]).to eq(5 * 60)
     end
 
     it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do

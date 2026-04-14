@@ -11,6 +11,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def start
+    if (delay = frame["retry_zone_delay"])
+      update_stack({"retry_zone_delay" => nil})
+      nap delay
+    end
     register_deadline("wait", 10 * 60)
     nap 5 unless nic.private_subnet.strand.label == "wait"
     nap 1 unless nic.strand.label == "wait"
@@ -129,7 +133,8 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
       error_code = op_error_code(op)
       if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze.include?(error_code)
         clear_gcp_op(name: "create_vm")
-        bump_excluded_zone("GCE operation error: #{error_code}")
+        # Stash the backoff delay; #start naps it off before retrying (nap here would re-enter wait_create_op).
+        update_stack({"retry_zone_delay" => bump_excluded_zone("GCE operation error: #{error_code}")})
         hop_start
       end
       raise "GCE instance creation failed: #{op_error_message(op)}"
