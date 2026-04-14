@@ -532,23 +532,25 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect { nx.wait_create_op }.to raise_error(RuntimeError, /GCE instance creation failed.*operation failed/)
     end
 
-    it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED operation error" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
+    %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].each do |code|
+      it "retries in a different zone on #{code} operation error" do
+        refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
 
-      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED", message: "exhausted")
-      op = Google::Cloud::Compute::V1::Operation.new(
-        status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
-      )
-      expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
+        error_entry = Google::Cloud::Compute::V1::Errors.new(code:, message: code)
+        op = Google::Cloud::Compute::V1::Operation.new(
+          status: :DONE,
+          error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
+        )
+        expect(zone_ops_client).to receive(:get).and_return(op)
+        expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
 
-      expect { nx.wait_create_op }.to hop("start")
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"]).to include("a")
-      expect(stack["gcp_zone_suffix"]).not_to eq("a")
-      expect(stack["create_vm_name"]).to be_nil
-      expect(stack["retry_zone_delay"]).to eq(5)
+        expect { nx.wait_create_op }.to hop("start")
+        stack = st.reload.stack.first
+        expect(stack["exclude_zones"]).to include("a")
+        expect(stack["gcp_zone_suffix"]).not_to eq("a")
+        expect(stack["create_vm_name"]).to be_nil
+        expect(stack["retry_zone_delay"]).to eq(5)
+      end
     end
 
     it "stashes a 5-minute backoff when all zones are exhausted on LRO error" do
@@ -566,39 +568,6 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       stack = st.reload.stack.first
       expect(stack["exclude_zones"]).to eq([])
       expect(stack["retry_zone_delay"]).to eq(5 * 60)
-    end
-
-    it "retries in a different zone on ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS operation error" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
-
-      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS", message: "exhausted with details")
-      op = Google::Cloud::Compute::V1::Operation.new(
-        status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
-      )
-      expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-
-      expect { nx.wait_create_op }.to hop("start")
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"]).to include("a")
-      expect(stack["gcp_zone_suffix"]).not_to eq("a")
-    end
-
-    it "retries in a different zone on QUOTA_EXCEEDED operation error" do
-      refresh_frame(nx, new_values: {"create_vm_name" => "op-123", "create_vm_scope" => "zone", "create_vm_scope_value" => "us-central1-a", "gcp_zone_suffix" => "a"})
-
-      error_entry = Google::Cloud::Compute::V1::Errors.new(code: "QUOTA_EXCEEDED", message: "quota exceeded")
-      op = Google::Cloud::Compute::V1::Operation.new(
-        status: :DONE,
-        error: Google::Cloud::Compute::V1::Error.new(errors: [error_entry]),
-      )
-      expect(zone_ops_client).to receive(:get).and_return(op)
-      expect(Clog).to receive(:emit).with("GCE zone retry", anything).and_call_original
-
-      expect { nx.wait_create_op }.to hop("start")
-      stack = st.reload.stack.first
-      expect(stack["exclude_zones"]).to include("a")
     end
   end
 
@@ -944,14 +913,14 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
     it "returns when no old per-VM tag value exists" do
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(policy)
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(nil)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(nil)
       expect(nfp_client).not_to receive(:remove_rule)
       nx.send(:cleanup_vm_policy_rules)
     end
 
     it "removes per-VM tag rules and deletes the tag value" do
       vm_tag_value_name = "tagValues/vm-456"
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
       tag_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 22222,
@@ -979,7 +948,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "skips non-INGRESS and non-allow rules" do
       vm_tag_value_name = "tagValues/vm-456"
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
       egress_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 11111,
@@ -1006,7 +975,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "continues cleaning up remaining rules when one raises InvalidArgumentError" do
       vm_tag_value_name = "tagValues/vm-456"
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
       rule1 = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 11111,
@@ -1035,7 +1004,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "handles nil policy rules gracefully" do
       vm_tag_value_name = "tagValues/vm-456"
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new
       expect(nfp_client).to receive(:get).and_return(policy)
@@ -1056,7 +1025,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
     it "propagates ClientError from tag value deletion" do
       vm_tag_value_name = "tagValues/vm-456"
-      allow(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
+      expect(nx).to receive(:lookup_old_vm_tag_value_name).and_return(vm_tag_value_name)
 
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(policy)
