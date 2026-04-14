@@ -91,12 +91,9 @@ class Prog::Vnet::Gcp::NicNexus < Prog::Base
   end
 
   label def wait_release_ip
-    op = poll_gcp_op(name: "release_ip")
-    nap 5 unless op.status == :DONE
-
-    raise "GCP static IP deletion failed: #{op_error_message(op)}" if op_error?(op)
-
-    clear_gcp_op(name: "release_ip")
+    poll_and_clear_gcp_op(name: "release_ip") do |op|
+      raise "GCP static IP deletion failed: #{op_error_message(op)}"
+    end
     hop_finalize_destroy
   end
 
