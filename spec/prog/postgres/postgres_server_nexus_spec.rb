@@ -1318,7 +1318,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
       expect(Semaphore.where(strand_id: server.id, name: "lockout").count).to eq(0)
     end
 
-    it "skips host_routing lockout on AWS" do
+    it "dispatches detach_nic instead of host_routing on AWS" do
       aws_location = Location.create(
         name: "us-west-2",
         display_name: "aws-us-west-2",
@@ -1334,6 +1334,7 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
 
       expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"})
       expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "hba"})
+      expect(aws_nx).to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "detach_nic"})
       expect(aws_nx).not_to receive(:bud).with(Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"})
       expect { aws_nx.lockout }.to hop("wait_lockout_attempt")
     end

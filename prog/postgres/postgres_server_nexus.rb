@@ -767,7 +767,9 @@ SQL
 
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "pg_stop"}
     bud Prog::Postgres::PostgresLockout, {"mechanism" => "hba"}
-    unless resource.location.aws?
+    if resource.location.aws?
+      bud Prog::Postgres::PostgresLockout, {"mechanism" => "detach_nic"}
+    else
       bud Prog::Postgres::PostgresLockout, {"mechanism" => "host_routing"}
     end
 
