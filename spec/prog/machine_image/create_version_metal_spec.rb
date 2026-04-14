@@ -58,7 +58,6 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       prog: "MachineImage::CreateVersionMetal",
       label: "archive",
       stack: [{
-        "subject_id" => mi_version_metal.id,
         "source_vm_id" => source_vm.id,
         "destroy_source_after" => false,
       }],
@@ -70,7 +69,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       vm_without_host = create_vm(project_id: project.id, name: "vm-without-host")
 
       expect {
-        described_class.assemble(mi_version, vm_without_host, store)
+        described_class.assemble(machine_image, "1.0", vm_without_host, store)
       }.to raise_error("source vm must be a metal vm")
     end
 
@@ -83,7 +82,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       )
 
       expect {
-        described_class.assemble(mi_version, source_vm.reload, store)
+        described_class.assemble(machine_image, "1.0", source_vm.reload, store)
       }.to raise_error("source vm must have only one storage volume")
     end
 
@@ -97,7 +96,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       )
 
       expect {
-        described_class.assemble(mi_version, running_vm, store)
+        described_class.assemble(machine_image, "1.0", running_vm, store)
       }.to raise_error("source vm must be stopped")
     end
 
@@ -113,7 +112,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       )
 
       expect {
-        described_class.assemble(mi_version, old_vm, store)
+        described_class.assemble(machine_image, "1.0", old_vm, store)
       }.to raise_error("source vm's vhost block backend must support archive")
     end
 
@@ -127,7 +126,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       )
 
       expect {
-        described_class.assemble(mi_version, unencrypted_vm, store)
+        described_class.assemble(machine_image, "1.0", unencrypted_vm, store)
       }.to raise_error("source vm's storage volume must be encrypted")
     end
 
@@ -141,20 +140,19 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       )
 
       expect {
-        described_class.assemble(mi_version, no_backend_vm, store)
+        described_class.assemble(machine_image, "1.0", no_backend_vm, store)
       }.to raise_error("source vm's vhost block backend must support archive")
     end
 
-    it "creates a machine image version metal and strand" do
-      new_mi_version = MachineImageVersion.create(
-        machine_image_id: machine_image.id,
-        version: "2.0",
-        actual_size_mib: 5120,
-      )
+    it "creates a machine image version, its metal instance & archive_kek, and strand" do
+      strand = described_class.assemble(machine_image, "2.0", source_vm, store, destroy_source_after: true)
 
-      strand = described_class.assemble(new_mi_version, source_vm, store, destroy_source_after: true)
+      mi_version = MachineImageVersion[strand.id]
+      expect(mi_version).not_to be_nil
+      expect(mi_version.version).to eq("2.0")
+      expect(mi_version.actual_size_mib).to eq(source_vm.storage_size_gib * 1024)
 
-      mi_version_metal = MachineImageVersionMetal[strand.id]
+      mi_version_metal = mi_version.metal
       expect(mi_version_metal).not_to be_nil
       expect(mi_version_metal.enabled).to be false
       expect(mi_version_metal.store_id).to eq(store.id)
@@ -165,6 +163,7 @@ RSpec.describe Prog::MachineImage::CreateVersionMetal do
       expect(strand.label).to eq("archive")
       expect(strand.stack.first["source_vm_id"]).to eq(source_vm.id)
       expect(strand.stack.first["destroy_source_after"]).to be true
+      expect(strand.stack.first["set_as_latest"]).to be true
     end
   end
 
