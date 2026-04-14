@@ -670,6 +670,8 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
 
       expect { nx.destroy }.to exit({"msg" => "vpc destroyed"})
       expect(GcpVpc[gcp_vpc.id]).to be_nil
+      expect(Time.parse(nx.strand.stack.first["deadline_at"])).to be_within(5).of(Time.now + 5 * 60)
+      expect(nx.strand.stack.first["deadline_target"]).to eq("destroy")
     end
 
     it "naps when subnets still exist" do
