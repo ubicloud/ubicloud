@@ -349,6 +349,59 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
     end
   end
 
+  describe "#verify_firewall_policy_associated_with_vpc!" do
+    let(:vpc_target) { "projects/test-gcp-project/global/networks/#{vpc_name}" }
+
+    it "hops to create_vpc_deny_rules and clears retry counter when association appears on retry" do
+      policy_missing = Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name)
+      policy_present = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        name: vpc_name,
+        associations: [
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+            name: vpc_name, attachment_target: vpc_target,
+          ),
+        ],
+      )
+      expect(nfp_client).to receive(:get).and_return(policy_missing, policy_present)
+      expect(Clog).to receive(:emit).with(/association missing/, anything)
+
+      expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
+      expect(frame_value(nx, "verify_assoc_try")).to eq(1)
+
+      refresh_frame(nx)
+      expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to hop("create_vpc_deny_rules")
+      expect(frame_value(nx, "verify_assoc_try")).to eq(0)
+    end
+
+    it "raises a terminal error after VERIFY_ASSOC_MAX_TRIES unsuccessful attempts" do
+      policy_missing = Google::Cloud::Compute::V1::FirewallPolicy.new(
+        name: vpc_name,
+        associations: [
+          Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+            name: vpc_name,
+            attachment_target: "projects/test-gcp-project/global/networks/some-other-vpc",
+          ),
+        ],
+      )
+      expect(nfp_client).to receive(:get)
+        .and_return(policy_missing)
+        .exactly(described_class::VERIFY_ASSOC_MAX_TRIES).times
+      allow(Clog).to receive(:emit)
+
+      (described_class::VERIFY_ASSOC_MAX_TRIES - 1).times do
+        expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
+        refresh_frame(nx)
+      end
+
+      expect {
+        nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target)
+      }.to raise_error(
+        RuntimeError,
+        /not present after #{described_class::VERIFY_ASSOC_MAX_TRIES} attempts.*some-other-vpc/o,
+      )
+    end
+  end
+
   describe "#wait_firewall_policy_created" do
     before do
       refresh_frame(nx, new_values: {"create_fw_policy_name" => "op-policy-123", "create_fw_policy_scope" => "global"})

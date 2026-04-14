@@ -9,6 +9,7 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
   RFC1918_RANGES = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"].freeze
   GCE_INTERNAL_IPV6_RANGES = ["fd20::/20"].freeze
   DENY_RULE_BASE_PRIORITY = 65534
+  VERIFY_ASSOC_MAX_TRIES = 5
 
   def self.assemble(project_id, location_id)
     unless (project = Project[project_id])
@@ -240,7 +241,14 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       firewall_policy: firewall_policy_name,
     )
     if policy.associations.any? { |a| a.attachment_target == vpc_target }
+      update_stack({"verify_assoc_try" => 0})
       hop_create_vpc_deny_rules
+    end
+
+    current_associations = policy.associations.map { |a| {name: a.name, attachment_target: a.attachment_target} }
+    try = (frame["verify_assoc_try"] || 0) + 1
+    if try >= VERIFY_ASSOC_MAX_TRIES
+      raise "GCP firewall policy #{firewall_policy_name} association with VPC #{gcp_vpc.name} (#{vpc_target}) not present after #{try} attempts; current associations: #{current_associations.inspect}"
     end
 
     Clog.emit("GCP firewall policy association missing after already-exists rescue", {
@@ -248,9 +256,11 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
         policy: firewall_policy_name,
         vpc: gcp_vpc.name,
         vpc_target:,
-        current_associations: policy.associations.map { |a| {name: a.name, attachment_target: a.attachment_target} },
+        try:,
+        current_associations:,
       },
     })
+    update_stack({"verify_assoc_try" => try})
     nap 5
   end
 
