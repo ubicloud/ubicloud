@@ -935,9 +935,9 @@ RSpec.describe Al do
       expect { al.update(vm1) }.to raise_error(RuntimeError, "concurrent GPU partition allocation")
     end
 
-    it "succeeds allocation when track_written is set and host has vhost block backend v0.4.0+" do
+    it "succeeds allocation when track_written is set and host has vhost block backend v0.4.1+" do
       vmh = VmHost.first
-      create_vhost_block_backend(vm_host_id: vmh.id, version: "v0.4.0", allocation_weight: 100)
+      create_vhost_block_backend(vm_host_id: vmh.id, version: "v0.4.1", allocation_weight: 100)
 
       vm = create_vm
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true, "vring_workers" => 1}]
@@ -947,14 +947,14 @@ RSpec.describe Al do
       expect(vm.vm_storage_volumes.first.track_written).to be(true)
     end
 
-    it "fails allocation when track_written is set but no host has vhost block backend v0.4.0+" do
+    it "fails allocation when track_written is set but no host has vhost block backend v0.4.1+" do
       vm = create_vm
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => false, "track_written" => true}]
       expect { described_class.allocate(vm, vol) }.to raise_error(RuntimeError, /no space left on any eligible host/)
     end
 
     it "allocates without boot image filter when using machine_image_version_id" do
-      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.4.0", allocation_weight: 100)
+      create_vhost_block_backend(vm_host_id: VmHost.first.id, version: "v0.4.1", allocation_weight: 100)
       vm = create_vm
       miv = create_machine_image_version_metal
       vol = [{
@@ -969,7 +969,7 @@ RSpec.describe Al do
       expect(vm.vm_storage_volumes.first.machine_image_version_id).to eq(miv.id)
     end
 
-    it "fails allocation when machine_image_version_id is set but no host has vhost block backend v0.4.0+" do
+    it "fails allocation when machine_image_version_id is set but no host has vhost block backend v0.4.1+" do
       vm = create_vm
       miv = create_machine_image_version_metal
       vol = [{"size_gib" => 5, "use_bdev_ubi" => false, "encrypted" => false, "boot" => true, "machine_image_version_id" => miv.id}]

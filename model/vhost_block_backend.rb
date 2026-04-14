@@ -3,7 +3,7 @@
 require_relative "../model"
 
 class VhostBlockBackend < Sequel::Model
-  MIN_ARCHIVE_SUPPORT_VERSION = 400
+  MIN_ARCHIVE_SUPPORT_VERSION = 401
 
   plugin ResourceMethods, etc_type: true
 
