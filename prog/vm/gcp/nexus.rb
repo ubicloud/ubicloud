@@ -127,7 +127,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   label def wait_create_op
     poll_and_clear_gcp_op(name: "create_vm") do |op|
       error_code = op_error_code(op)
-      if RETRIABLE_ZONE_ERRORS.include?(error_code)
+      if %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze.include?(error_code)
         clear_gcp_op(name: "create_vm")
         bump_excluded_zone("GCE operation error: #{error_code}")
         hop_start
@@ -196,10 +196,10 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   end
 
   label def create_billing_record
-    now = Time.now
-    vm.update(display_state: "running", provisioned_at: now)
+    time = Time.now
+    vm.update(display_state: "running", provisioned_at: time)
 
-    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (now - vm.allocated_at).round(3)}}])
+    Clog.emit("vm provisioned", [vm, {provision: {vm_ubid: vm.ubid, duration: (time - vm.allocated_at).round(3)}}])
 
     project = vm.project
     hop_wait unless project.billable
@@ -324,8 +324,6 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
   def gce_machine_type
     @gce_machine_type ||= Option.gcp_machine_type_name(vm.family, vm.vcpus)
   end
-
-  RETRIABLE_ZONE_ERRORS = %w[ZONE_RESOURCE_POOL_EXHAUSTED ZONE_RESOURCE_POOL_EXHAUSTED_WITH_DETAILS QUOTA_EXCEEDED].freeze
 
   GCE_BOOT_IMAGE_FAMILIES = {
     "ubuntu-noble" => {project: "ubuntu-os-cloud", family: "ubuntu-2404-lts-ARCH"},
