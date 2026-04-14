@@ -12,6 +12,20 @@ RSpec.describe Prog::DownloadBootImage do
   let(:sshable) { dbi.sshable }
   let(:vm_host) { dbi.vm_host }
 
+  describe ".sha256sum" do
+    it "fails if image is unknown in production" do
+      allow(Config).to receive(:production?).and_return(true)
+      refresh_frame(dbi, new_values: {"version" => "20260101"})
+      expect { dbi.sha256sum }.to raise_error RuntimeError, "Cannot download images without a SHA256 checksum in production"
+    end
+
+    it "allows to download unknown images in development" do
+      allow(Config).to receive(:production?).and_return(false)
+      refresh_frame(dbi, new_values: {"version" => "20260101"})
+      expect(dbi.sha256sum).to be_nil
+    end
+  end
+
   describe "#start" do
     it "creates database record and hops" do
       expect { dbi.start }.to hop("download")
