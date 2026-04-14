@@ -69,7 +69,27 @@ RSpec.describe Location do
         )
       end
 
-      it "falls back to a current-only image when no dual-version image exists" do
+      it "raises when no dual-version image exists for an upgrade (fail fast)" do
+        PgGceImage.create(
+          gce_image_name: "pg-17-x86-a",
+          arch: "x86_64",
+          pg_versions: ["17"],
+        )
+        PgGceImage.create(
+          gce_image_name: "pg-18-x86-b",
+          arch: "x86_64",
+          pg_versions: ["18"],
+        )
+
+        expect {
+          location.pg_gce_image("x86_64", "17", target_version: "18")
+        }.to raise_error(
+          RuntimeError,
+          /No dual-version GCE image found for arch x86_64 covering pg_version=17 \+ target_version=18/,
+        )
+      end
+
+      it "still falls back to a current-only image when target_version is nil" do
         allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2204-x64-20260223",
@@ -77,7 +97,7 @@ RSpec.describe Location do
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(location.pg_gce_image("x64", "18", target_version: "19")).to eq(
+        expect(location.pg_gce_image("x64", "18")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
         )
       end
@@ -100,7 +120,7 @@ RSpec.describe Location do
         )
       end
 
-      it "raises with target_version when no image supports the current pg_version" do
+      it "raises the dual-version fail-fast error when an upgrade call cannot find any overlapping image" do
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2204-x64-20260223",
           arch: "x64",
@@ -109,7 +129,10 @@ RSpec.describe Location do
 
         expect {
           location.pg_gce_image("x64", "99", target_version: "19")
-        }.to raise_error(RuntimeError, /No GCE image found for arch x64 and pg_version 99/)
+        }.to raise_error(
+          RuntimeError,
+          /No dual-version GCE image found for arch x64 covering pg_version=99 \+ target_version=19/,
+        )
       end
 
       it "selects the image whose pg_versions contains the requested version when multiple rows share an arch" do

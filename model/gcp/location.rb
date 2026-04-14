@@ -11,7 +11,8 @@ class Location < Sequel::Model
           .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([target_version], :text)))
           .order(:gce_image_name)
           .first
-        return "projects/#{Config.postgres_gce_image_gcp_project_id}/global/images/#{dual.gce_image_name}" if dual
+        raise "No dual-version GCE image found for arch #{arch} covering pg_version=#{pg_version} + target_version=#{target_version}; cannot provision upgrade standby" unless dual
+        return "projects/#{Config.postgres_gce_image_gcp_project_id}/global/images/#{dual.gce_image_name}"
       end
       image = rel.order(:gce_image_name).first
       raise "No GCE image found for arch #{arch} and pg_version #{pg_version}" unless image
