@@ -4,16 +4,26 @@ require "google/cloud/compute/v1"
 require_relative "../spec_helper"
 
 RSpec.describe GcpLro do
-  let(:strand) { Strand.create(prog: "Vnet::Gcp::SubnetNexus", label: "start") }
-  let(:credential) {
-    instance_double(LocationCredentialGcp,
-      project_id: "test-gcp-project",
-      zone_operations_client: zone_ops_client,
-      region_operations_client: region_ops_client,
-      global_operations_client: global_ops_client)
+  let(:project) { Project.create(name: "test-gcp-lro") }
+  let(:location) {
+    Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
+      display_name: "GCP US Central 1", ui_name: "GCP US Central 1", visible: true)
   }
+  let(:credential) {
+    LocationCredentialGcp.create_with_id(location,
+      project_id: "test-gcp-project",
+      service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+      credentials_json: "{}")
+  }
+  let(:private_subnet) {
+    credential
+    PrivateSubnet.create(name: "ps", location_id: location.id, net6: "fd10:9b0b:6b4b:8fbb::/64",
+      net4: "10.0.0.0/26", state: "waiting", project_id: project.id, firewall_priority: 1000)
+  }
+  let(:strand) { Strand.create_with_id(private_subnet, prog: "Vnet::Gcp::SubnetNexus", label: "start") }
   # google-cloud-compute-v1 does not expose a test fixture stub equivalent to
-  # AWS SDK's stub_responses, so operations clients are stubbed individually.
+  # AWS SDK's stub_responses, so operations clients are stubbed individually
+  # on the real LocationCredentialGcp row.
   let(:zone_ops_client) { instance_double(Google::Cloud::Compute::V1::ZoneOperations::Rest::Client) }
   let(:region_ops_client) { instance_double(Google::Cloud::Compute::V1::RegionOperations::Rest::Client) }
   let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }
@@ -21,7 +31,11 @@ RSpec.describe GcpLro do
   let(:nx) { Prog::Vnet::Gcp::SubnetNexus.new(strand) }
 
   before do
-    allow(nx).to receive_messages(credential:, gcp_project_id: "test-gcp-project")
+    allow(nx.send(:credential)).to receive_messages(
+      zone_operations_client: zone_ops_client,
+      region_operations_client: region_ops_client,
+      global_operations_client: global_ops_client,
+    )
   end
 
   describe "#poll_gcp_op" do
