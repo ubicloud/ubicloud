@@ -568,6 +568,7 @@ SQL
 
     if !is_in_recovery
       postgres_server.switch_to_new_timeline
+      decr_initial_provisioning
       hop_configure
     end
 
