@@ -48,6 +48,70 @@ RSpec.describe Location do
         )
       end
 
+      it "prefers a dual-version image when target_version is supplied for an upgrade" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260501",
+          arch: "x64",
+          pg_versions: ["18", "19"],
+        )
+
+        expect(location.pg_gce_image("x64", "18")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
+        )
+        expect(location.pg_gce_image("x64", "18", target_version: "19")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260501",
+        )
+      end
+
+      it "falls back to a current-only image when no dual-version image exists" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+
+        expect(location.pg_gce_image("x64", "18", target_version: "19")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
+        )
+      end
+
+      it "ignores target_version when it equals pg_version (no upgrade in progress)" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260501",
+          arch: "x64",
+          pg_versions: ["18", "19"],
+        )
+
+        expect(location.pg_gce_image("x64", "18", target_version: "18")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
+        )
+      end
+
+      it "raises with target_version when no image supports the current pg_version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+
+        expect {
+          location.pg_gce_image("x64", "99", target_version: "19")
+        }.to raise_error(RuntimeError, /No GCE image found for arch x64 and pg_version 99/)
+      end
+
       it "selects the image whose pg_versions contains the requested version when multiple rows share an arch" do
         allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(

@@ -5,7 +5,7 @@ class PostgresResource < Sequel::Model
     private
 
     def gcp_boot_image(pg_version, arch)
-      location.pg_gce_image(arch, pg_version)
+      location.pg_gce_image(arch, pg_version, target_version:)
     end
 
     def gcp_upgrade_candidate_server

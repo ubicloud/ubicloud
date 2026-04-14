@@ -154,6 +154,41 @@ RSpec.describe PostgresResource do
         }.to raise_error(RuntimeError, /No GCE image found for arch arm64 and pg_version 99/)
       end
 
+      it "threads the resource target_version so upgrade standbys pick a dual-version image" do
+        postgres_resource.update(target_version: "18")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260501",
+          arch: "x64",
+          pg_versions: ["17", "18"],
+        )
+
+        # Standbys are provisioned at the current version (17) while an
+        # upgrade to 18 is in progress. Selecting the dual-version image
+        # ensures gcp_upgrade_candidate_server's `pg_versions @> [18]`
+        # filter still accepts the new standby, avoiding an upgrade wedge.
+        expect(postgres_resource.reload.boot_image("17", "x64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260501",
+        )
+      end
+
+      it "falls back to a current-only image when no dual-version image exists for the upgrade" do
+        postgres_resource.update(target_version: "18")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260223",
+          arch: "x64",
+          pg_versions: ["16", "17"],
+        )
+
+        expect(postgres_resource.reload.boot_image("17", "x64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260223",
+        )
+      end
+
       it "picks the image whose pg_versions array contains the requested version" do
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2204-arm64-20260218",

@@ -2,12 +2,18 @@
 
 class Location < Sequel::Model
   module Gcp
-    def pg_gce_image(arch, pg_version)
-      image = PgGceImage
+    def pg_gce_image(arch, pg_version, target_version: nil)
+      rel = PgGceImage
         .where(arch:)
         .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([pg_version], :text)))
-        .order(:gce_image_name)
-        .first
+      if target_version && target_version != pg_version
+        dual = rel
+          .where(Sequel.pg_array_op(:pg_versions).contains(Sequel.pg_array([target_version], :text)))
+          .order(:gce_image_name)
+          .first
+        return "projects/#{Config.postgres_gce_image_gcp_project_id}/global/images/#{dual.gce_image_name}" if dual
+      end
+      image = rel.order(:gce_image_name).first
       raise "No GCE image found for arch #{arch} and pg_version #{pg_version}" unless image
       "projects/#{Config.postgres_gce_image_gcp_project_id}/global/images/#{image.gce_image_name}"
     end
