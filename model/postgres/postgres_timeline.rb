@@ -15,6 +15,12 @@ class PostgresTimeline < Sequel::Model
 
   BACKUP_BUCKET_EXPIRATION_DAYS = 8
 
+  def self.destroy_remaining(timeline_ids)
+    remaining = where(id: timeline_ids).all
+    Semaphore.incr(remaining.map(&:id), "destroy")
+    remaining.count
+  end
+
   def bucket_name
     ubid
   end

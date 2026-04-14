@@ -3,8 +3,6 @@
 require "net/http"
 require "uri"
 
-require_relative "../../lib/util"
-
 class Prog::Test::PostgresFirewall < Prog::Test::Base
   semaphore :destroy
 
@@ -152,7 +150,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
   end
 
   label def destroy_postgres
-    update_stack({"timeline_ids" => postgres_resource.servers.map(&:timeline_id).uniq})
+    update_stack({"timeline_ids" => postgres_resource.servers_dataset.distinct.select_map(:timeline_id)})
     postgres_resource.incr_destroy
     hop_wait_resources_destroyed
   end
@@ -163,10 +161,9 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       Clog.emit("Waiting for private subnet to be destroyed")
       nap 5
     end
-    remaining_timelines = frame["timeline_ids"]&.filter_map { PostgresTimeline[it] } || []
-    if remaining_timelines.any?
-      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
-      remaining_timelines.each(&:incr_destroy)
+    remaining_count = PostgresTimeline.destroy_remaining(frame["timeline_ids"] || [])
+    if remaining_count > 0
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_count})")
       nap 5
     end
 
@@ -199,16 +196,19 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
 
   def test_pg_connection(vm, should_succeed:)
     ip = vm.ip4_string
-    vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
-    unless should_succeed
-      update_stack({"fail_message" => "Connection to #{ip}:5432 should have been blocked"})
-    end
-  rescue Sshable::SshError
-    if should_succeed
-      retries = (frame["pg_connect_retries"] || 0) + 1
-      update_stack({"pg_connect_retries" => retries})
-      nap 15 if retries < 10
-      update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+    begin
+      vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
+    rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
+      if should_succeed
+        retries = (frame["pg_connect_retries"] || 0) + 1
+        update_stack({"pg_connect_retries" => retries})
+        nap 15 if retries < 10
+        update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
+      end
+    else
+      unless should_succeed
+        update_stack({"fail_message" => "Connection to #{ip}:5432 should have been blocked"})
+      end
     end
   end
 end

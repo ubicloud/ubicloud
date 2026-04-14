@@ -256,10 +256,9 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::Base
     # Timelines are retained for 10 days after resource destruction for
     # customer recovery. Verify they still exist, then explicitly destroy
     # them to test timeline cleanup.
-    remaining_timelines = (frame["timeline_ids"] || []).filter_map { PostgresTimeline[it] }
-    if remaining_timelines.any?
-      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_timelines.count})")
-      remaining_timelines.each(&:incr_destroy)
+    remaining_count = PostgresTimeline.destroy_remaining(frame["timeline_ids"] || [])
+    if remaining_count > 0
+      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_count})")
       nap 5
     end
 

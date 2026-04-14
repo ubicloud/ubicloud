@@ -61,6 +61,10 @@ class Location < Sequel::Model
     provider == "gcp"
   end
 
+  def metal?
+    !aws? && !gcp?
+  end
+
   def provider_dispatcher_group_name
     case provider
     when "aws", "gcp"
