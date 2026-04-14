@@ -201,8 +201,10 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
     rescue *Sshable::SSH_CONNECTION_ERRORS, Sshable::SshError
       if should_succeed
         retries = (frame["pg_connect_retries"] || 0) + 1
-        update_stack({"pg_connect_retries" => retries})
-        nap 15 if retries < 10
+        if retries < 10
+          update_stack({"pg_connect_retries" => retries})
+          nap 15
+        end
         update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
       end
     else
