@@ -15,6 +15,10 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   subject_is :vm
 
   def before_run
+    # If the VM is being torn down, exit successfully even if rules were never
+    # synced: the per-VM tag bindings are deleted with the instance, and any
+    # leftover policy rules will be cleaned up by cleanup_orphaned_firewall_rules
+    # the next time another VM in this VPC runs UpdateFirewallRules.
     pop "firewall rule is added" if vm.destroy_set?
   end
 
@@ -92,10 +96,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       end
       update_stack({"pending_tag_key_crm_op" => nil, "pending_tag_key_fw_ubid" => nil})
       raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
-      name = op.response&.dig("name")
-      return name if name
-      return lookup_tag_key_name(short_name) ||
-          raise("Tag key #{short_name} created but name not found")
+      return op.response&.dig("name") || lookup_tag_key_name!(short_name)
     end
 
     tag_key_obj = Google::Apis::CloudresourcemanagerV3::TagKey.new(
@@ -111,24 +112,22 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       nap 5
     end
     raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
-    name = op.response&.dig("name")
-    return name if name
-
-    lookup_tag_key_name(short_name) ||
-      raise("Tag key #{short_name} created but name not found")
+    op.response&.dig("name") || lookup_tag_key_name!(short_name)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
-    lookup_tag_key_name(short_name) ||
-      raise("Tag key #{short_name} conflict but not found on lookup")
+    lookup_tag_key_name!(short_name, "conflict but not found on lookup")
   rescue RuntimeError => e
     raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_key_name(short_name) ||
-      raise("Tag key #{short_name} conflict but not found on lookup")
+    lookup_tag_key_name!(short_name, "conflict but not found on lookup")
   end
 
   def lookup_tag_key_name(short_name)
     resp = credential.crm_client.list_tag_keys(parent: tag_key_parent)
     resp.tag_keys&.find { |tk| tk.short_name == short_name }&.name
+  end
+
+  def lookup_tag_key_name!(short_name, label = "created but name not found")
+    lookup_tag_key_name(short_name) || raise("Tag key #{short_name} #{label}")
   end
 
   def ensure_tag_value(tag_key_name, short_name)
@@ -139,10 +138,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       end
       update_stack({"pending_tag_value_crm_op" => nil, "pending_tag_value_parent" => nil})
       raise "CRM operation #{pending} failed: #{op.error.message}" if op.error
-      name = op.response&.dig("name")
-      return name if name
-      return lookup_tag_value_name(tag_key_name, short_name) ||
-          raise("Tag value #{short_name} created but name not found")
+      return op.response&.dig("name") || lookup_tag_value_name!(tag_key_name, short_name)
     end
 
     tag_value_obj = Google::Apis::CloudresourcemanagerV3::TagValue.new(
@@ -156,24 +152,22 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
       nap 5
     end
     raise "CRM operation #{op.name} failed: #{op.error.message}" if op.error
-    name = op.response&.dig("name")
-    return name if name
-
-    lookup_tag_value_name(tag_key_name, short_name) ||
-      raise("Tag value #{short_name} created but name not found")
+    op.response&.dig("name") || lookup_tag_value_name!(tag_key_name, short_name)
   rescue Google::Apis::ClientError => e
     raise unless e.status_code == 409
-    lookup_tag_value_name(tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
+    lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
   rescue RuntimeError => e
     raise unless e.message.include?("ALREADY_EXISTS")
-    lookup_tag_value_name(tag_key_name, short_name) ||
-      raise("Tag value #{short_name} conflict but not found on lookup")
+    lookup_tag_value_name!(tag_key_name, short_name, "conflict but not found on lookup")
   end
 
   def lookup_tag_value_name(tag_key_name, short_name)
     resp = credential.crm_client.list_tag_values(parent: tag_key_name)
     resp.tag_values&.find { |v| v.short_name == short_name }&.name
+  end
+
+  def lookup_tag_value_name!(tag_key_name, short_name, label = "created but name not found")
+    lookup_tag_value_name(tag_key_name, short_name) || raise("Tag value #{short_name} #{label}")
   end
 
   def lookup_subnet_tag_value
@@ -189,11 +183,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   # targeting the same tag value, ignoring priority. Stale rules are deleted,
   # missing rules are created with free priorities starting from TAG_RULE_BASE_PRIORITY.
   def sync_firewall_rules(fw_rules, tag_value_name)
-    ip4_rules, ip6_rules = fw_rules.partition { |r| !r.ip6? }
-    desired = build_tag_based_policy_rules(ip4_rules, tag_value_name:)
-    desired += build_tag_based_policy_rules(ip6_rules, tag_value_name:)
-
-    sync_tag_policy_rules(desired, tag_value_name)
+    sync_tag_policy_rules(build_tag_based_policy_rules(fw_rules, tag_value_name:), tag_value_name)
   end
 
   def sync_tag_policy_rules(desired_rules, tag_value_name)
@@ -203,13 +193,12 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     )
 
     all_rules = policy.rules || []
-    existing_for_tag = all_rules.select { |r|
+
+    # Match desired to existing by content (ignoring priority)
+    remaining_existing = all_rules.select { |r|
       r.action == "allow" &&
         r.target_secure_tags.any? { |t| t.name == tag_value_name }
     }
-
-    # Match desired to existing by content (ignoring priority)
-    remaining_existing = existing_for_tag.dup
     unmatched_desired = []
 
     desired_rules.each do |d|
@@ -225,14 +214,13 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     remaining_existing.each { |e| delete_policy_rule(e.priority) }
 
     # Create unmatched desired rules with free priorities
-    used = Set.new(all_rules.map(&:priority))
+    used = Set.new(all_rules, &:priority)
     remaining_existing.each { |e| used.delete(e.priority) }
 
     next_p = TAG_RULE_BASE_PRIORITY
     unmatched_desired.each do |d|
       next_p += 1 while used.include?(next_p)
       d[:priority] = next_p
-      used << next_p
       create_tag_policy_rule(d)
       next_p += 1
     end
@@ -258,7 +246,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         project: gcp_project_id,
         firewall_policy: firewall_policy_name,
       )
-      used = Set.new((policy.rules || []).map(&:priority))
+      used = Set.new(policy.rules, &:priority)
       next_p = TAG_RULE_BASE_PRIORITY
       next_p += 1 while used.include?(next_p)
       desired[:priority] = next_p
@@ -275,6 +263,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     )
   rescue Google::Cloud::NotFoundError, Google::Cloud::InvalidArgumentError
     # Already deleted
+    nil
   end
 
   # --- Tag binding ---
@@ -285,7 +274,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     resp = regional_crm_client.list_tag_bindings(parent: resource)
     existing = resp.tag_bindings || []
 
-    already_bound = existing.map(&:tag_value).to_set
+    already_bound = existing.to_set(&:tag_value)
     desired_set = desired_tag_values.to_set
     stale_bindings = existing.reject { |b| desired_set.include?(b.tag_value) }
     new_tag_values = desired_tag_values.reject { |tv| already_bound.include?(tv) }
@@ -350,7 +339,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   # associations and deletes the corresponding policy rules.
 
   def cleanup_orphaned_firewall_rules
-    active_fw_ubids = vm.firewalls.map(&:ubid).to_set
+    active_fw_ubids = vm.firewalls.to_set(&:ubid)
 
     vpc_network_link = gcp_network_self_link_with_id
 
@@ -407,12 +396,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def build_tag_based_policy_rules(rules, tag_value_name:)
-    return [] if rules.empty?
-
-    rules_by_cidr = rules.group_by { |r| r.cidr.to_s }
-    desired = []
-
-    rules_by_cidr.each do |cidr, cidr_rules|
+    rules.group_by { |r| r.cidr.to_s }.map do |cidr, cidr_rules|
       layer4_configs = cidr_rules.group_by(&:protocol).map do |proto, proto_rules|
         config = {ip_protocol: proto}
         # nil port_range means all ports. Omit :ports entirely when any
@@ -423,15 +407,13 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
         config
       end
 
-      desired << {
+      {
         direction: "INGRESS",
         source_ranges: [cidr],
         target_secure_tags: [tag_value_name],
         layer4_configs:,
       }
     end
-
-    desired
   end
 
   def build_tag_policy_rule(desired)
@@ -462,7 +444,7 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
     return false unless existing.direction == "INGRESS" && existing.action == "allow"
     return false unless matcher.src_ip_ranges.to_a.sort == desired[:source_ranges].sort
 
-    existing_tags = existing.target_secure_tags.map(&:name).sort
+    existing_tags = existing.target_secure_tags.map(&:name).sort!
     desired_tags = desired[:target_secure_tags].sort
 
     existing_tags == desired_tags &&
@@ -518,10 +500,11 @@ class Prog::Vnet::Gcp::UpdateFirewallRules < Prog::Base
   end
 
   def gcp_zone
-    @gcp_zone ||= begin
-      suffix = strand.stack.find { |f| f.key?("gcp_zone_suffix") }&.dig("gcp_zone_suffix") || "a"
-      "#{gcp_region}-#{suffix}"
-    end
+    # gcp_zone_suffix lives in the bottom (root) frame of the strand stack,
+    # set once by Vm::Gcp::Nexus when the VM is provisioned. UpdateFirewallRules
+    # is always pushed as a child of that nexus, so reading from [-1] gives us
+    # the parent frame's value.
+    @gcp_zone ||= "#{gcp_region}-#{strand.stack[-1]["gcp_zone_suffix"] || "a"}"
   end
 
   def gcp_region
