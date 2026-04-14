@@ -100,15 +100,37 @@ RSpec.describe Prog::Test::HaPostgresResource do
   end
 
   describe "#wait_failover" do
-    it "naps for 3 minutes for the 1st time" do
-      expect { pgr_test.wait_failover }.to nap(180)
-      refresh_frame(pgr_test)
-      expect(frame_value(pgr_test, "failover_wait_started")).to be true
+    before do
+      pg_strand = Prog::Postgres::PostgresResourceNexus.assemble(project_id: pgr_test.frame["postgres_test_project_id"], location_id: Location::HETZNER_FSN1_ID, name: "test-pg", target_vm_size: "standard-2", target_storage_size_gib: 128, ha_type: "async")
+      primary = pg_strand.subject.servers.first
+      refresh_frame(pgr_test, new_values: {"postgres_resource_id" => pg_strand.id, "primary_ubid" => primary.ubid})
     end
 
-    it "hops to test_postgres_after_failover 2nd time" do
-      refresh_frame(pgr_test, new_values: {"failover_wait_started" => true})
+    it "sets a deadline and naps on first entry" do
+      expect { pgr_test.wait_failover }.to nap(10)
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "failover_deadline")).to be > Time.now.to_i
+    end
+
+    it "naps while no new primary is ready" do
+      refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i + 300})
+      expect { pgr_test.wait_failover }.to nap(10)
+    end
+
+    it "hops to test_postgres_after_failover once a new primary reaches wait" do
+      refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i + 300})
+      pg = pgr_test.postgres_resource
+      Prog::Postgres::PostgresServerNexus.assemble(resource_id: pg.id, timeline_id: pg.timeline.id, timeline_access: "push")
+      new_primary = pg.reload.servers.find { |s| s.ubid != pgr_test.frame["primary_ubid"] }
+      new_primary.strand.update(label: "wait")
       expect { pgr_test.wait_failover }.to hop("test_postgres_after_failover")
+    end
+
+    it "fails when the deadline passes without a new primary" do
+      refresh_frame(pgr_test, new_values: {"failover_deadline" => Time.now.to_i - 1})
+      expect { pgr_test.wait_failover }.to hop("destroy_postgres")
+      refresh_frame(pgr_test)
+      expect(frame_value(pgr_test, "fail_message")).to match(/Failover did not complete/)
     end
   end
 
@@ -131,18 +153,6 @@ RSpec.describe Prog::Test::HaPostgresResource do
       allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
       expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
       expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
-    end
-
-    it "logs that no primary was found after failover" do
-      refresh_frame(pgr_test, new_values: {"primary_ubid" => pgr_test.postgres_resource.representative_server.ubid})
-      allow(pgr_test.representative_server).to receive(:_run_query).and_return("")
-      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
-      expect(frame_value(pgr_test, "fail_message")).to eq("Failed to run read queries after failover")
-      expect(Clog).to receive(:emit).with(/Postgres servers after failover: .*/).once.ordered
-      expect(Clog).to receive(:emit).with("No new primary found after failover").once.ordered
-      expect(Clog).to receive(:emit).with("Running read queries after failover").once.ordered
-
-      expect { pgr_test.test_postgres_after_failover }.to hop("destroy_postgres")
     end
 
     it "hops to destroy_postgres if the standby does not exit read-only mode" do
