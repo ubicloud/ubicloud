@@ -8,16 +8,10 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
     Project[Config.postgres_service_project_id] ||
       Project.create_with_id(Config.postgres_service_project_id || Project.generate_uuid, name: "Postgres-Service-Project")
 
-    frame = {
-      "provider" => provider,
-      "postgres_test_project_id" => postgres_test_project.id,
-      "failover_wait_started" => false,
-    }
-
     Strand.create(
       prog: "Test::HaPostgresResource",
       label: "start",
-      stack: [frame],
+      stack: [{"postgres_test_project_id" => postgres_test_project.id, "provider" => provider}],
     )
   end
 
@@ -67,26 +61,30 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   end
 
   label def wait_failover
-    # Wait 3 minutes for the failover to finish.
-    failover_wait_started = frame["failover_wait_started"]
-    update_stack({"failover_wait_started" => true})
+    deadline = frame["failover_deadline"]
+    unless deadline
+      deadline = Time.now.to_i + 600
+      update_stack({"failover_deadline" => deadline})
+    end
 
-    nap 180 unless failover_wait_started
+    new_primary = postgres_resource.servers(eager: :strand).find { |s| s.ubid != frame["primary_ubid"] && s.timeline_access == "push" && s.strand.label == "wait" }
+    hop_test_postgres_after_failover if new_primary
 
-    hop_test_postgres_after_failover
+    if Time.now.to_i >= deadline
+      update_stack({"fail_message" => "Failover did not complete within 600 seconds"})
+      hop_destroy_postgres
+    end
+
+    nap 10
   end
 
   label def test_postgres_after_failover
     Clog.emit("Postgres servers after failover: #{postgres_resource.servers.map { |s| "[#{s.ubid}, #{s.timeline_access}, #{s.strand.label}]" }.join(", ")}")
 
     new_candidate = postgres_resource.servers.filter { |s| s.ubid != frame["primary_ubid"] }.min_by(&:created_at)
-    if new_candidate
-      # Get last few log lines from the new candidate for debugging.
-      log_lines = new_candidate.vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -exec tail -n 20 {} \\;", version: new_candidate.version)
-      Clog.emit("Last log lines from new candidate (#{new_candidate.ubid}):\n#{log_lines}")
-    else
-      Clog.emit("No new primary found after failover")
-    end
+    # Get last few log lines from the new candidate for debugging.
+    log_lines = new_candidate.vm.sshable.cmd("sudo find /dat/:version/data/pg_log/ -name 'postgresql-*.log' -exec tail -n 20 {} \\;", version: new_candidate.version)
+    Clog.emit("Last log lines from new candidate (#{new_candidate.ubid}):\n#{log_lines}")
 
     Clog.emit("Running read queries after failover")
     unless representative_server.run_query(read_queries_sql) == "4159.90\n415.99\n4.1"
