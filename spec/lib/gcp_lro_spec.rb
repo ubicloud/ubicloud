@@ -12,6 +12,8 @@ RSpec.describe GcpLro do
       region_operations_client: region_ops_client,
       global_operations_client: global_ops_client)
   }
+  # google-cloud-compute-v1 does not expose a test fixture stub equivalent to
+  # AWS SDK's stub_responses, so operations clients are stubbed individually.
   let(:zone_ops_client) { instance_double(Google::Cloud::Compute::V1::ZoneOperations::Rest::Client) }
   let(:region_ops_client) { instance_double(Google::Cloud::Compute::V1::RegionOperations::Rest::Client) }
   let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }

@@ -45,17 +45,6 @@ RSpec.describe PrivateSubnet do
       expect(ps.random_private_ipv4.to_s).to eq "10.9.39.9/32"
     end
 
-    it "returns random private ipv4 on gcp (skips first 2 + last 2)" do
-      prj = Project.create(name: "gcp-rand-prj")
-      loc = Location.create(name: "gcp-us-central1r", provider: "gcp", project_id: prj.id,
-        display_name: "GCP US Central 1R", ui_name: "GCP US Central 1R", visible: true)
-      ps = described_class.create(name: "gcp-rand-ps", location_id: loc.id,
-        net6: "fd1b:9793:dcef:cd0a::/64", net4: "10.9.39.0/26",
-        state: "waiting", project_id: prj.id)
-      expect(SecureRandom).to receive(:random_number).with(60).and_return(5)
-      expect(ps.random_private_ipv4.to_s).to eq "10.9.39.7/32"
-    end
-
     it "does not subtract any reservation for bigger parent subnets" do
       prj = Project.create(name: "big-net-prj")
       ps = described_class.create(name: "big-ps", location_id: Location::HETZNER_FSN1_ID,

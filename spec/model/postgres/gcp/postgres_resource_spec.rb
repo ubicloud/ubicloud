@@ -75,9 +75,7 @@ RSpec.describe PostgresResource do
           synchronization_status: "ready", timeline_access: "push", version: "17",
         )
 
-        expect(postgres_resource.reload).to receive(:servers).and_return([server])
-
-        expect(postgres_resource.upgrade_candidate_server).to eq(server)
+        expect(postgres_resource.reload.upgrade_candidate_server).to eq(server)
       end
 
       it "returns nil when no eligible servers exist" do
@@ -97,12 +95,9 @@ RSpec.describe PostgresResource do
           timeline:, resource: postgres_resource, vm_id: vm.id,
           synchronization_status: "ready", timeline_access: "push", version: "17",
         )
-        DB[:postgres_server].where(id: server.id).update(is_representative: true)
-        server.reload
+        server.update(is_representative: true)
 
-        expect(postgres_resource.reload).to receive(:servers).and_return([server])
-
-        expect(postgres_resource.upgrade_candidate_server).to be_nil
+        expect(postgres_resource.reload.upgrade_candidate_server).to be_nil
       end
     end
 

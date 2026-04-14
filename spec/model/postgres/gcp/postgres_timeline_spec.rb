@@ -75,7 +75,7 @@ PGDATA=/dat/17/data
         storage_client = instance_double(Google::Cloud::Storage::Project)
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
 
-        updated_datetime = DateTime.now
+        updated_datetime = Time.now
         file1 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0001_backup_stop_sentinel.json", updated_at: updated_datetime)
         file2 = instance_double(Google::Cloud::Storage::File, name: "basebackups_005/0002_data.tar", updated_at: updated_datetime)
         file_list = instance_double(Google::Cloud::Storage::File::List, to_a: [file1, file2], token: nil)
@@ -156,7 +156,7 @@ PGDATA=/dat/17/data
         expect(postgres_timeline).to receive(:blob_storage_client).and_return(storage_client)
         expect(storage_client).to receive(:create_bucket).and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
 
-        expect { postgres_timeline.create_bucket }.not_to raise_error
+        postgres_timeline.create_bucket
       end
     end
 

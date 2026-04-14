@@ -15,9 +15,9 @@ RSpec.describe Location do
   }
 
   context "with GCP provider" do
-    describe "#pg_gce_image" do
-      before { PgGceImage.dataset.destroy }
+    before { PgGceImage.dataset.destroy }
 
+    describe "#pg_gce_image" do
       it "returns a GCE image path using the configured hosting project" do
         allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(
@@ -38,8 +38,6 @@ RSpec.describe Location do
     end
 
     describe "#pg_boot_image" do
-      before { PgGceImage.dataset.destroy }
-
       it "delegates to pg_gce_image" do
         allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
         PgGceImage.create(
@@ -66,8 +64,7 @@ RSpec.describe Location do
 
       it "fetches zones from GCP API when cache is empty" do
         location_credential_gcp
-        allow(location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        allow(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
 
         zone_a = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-a")
         zone_b = Google::Cloud::Compute::V1::Zone.new(name: "us-central1-b")
@@ -90,8 +87,7 @@ RSpec.describe Location do
 
       it "handles empty zone list from GCP API" do
         location_credential_gcp
-        allow(location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
-        allow(location_credential_gcp).to receive(:zones_client).and_return(zones_client)
+        allow(location.location_credential_gcp).to receive(:zones_client).and_return(zones_client)
         allow(zones_client).to receive(:list)
           .with(project: "test-project")
           .and_return([])

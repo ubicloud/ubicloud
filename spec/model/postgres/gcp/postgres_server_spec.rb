@@ -27,6 +27,7 @@ RSpec.describe PostgresServer do
       project_id: "test-project",
       service_account_email: "test@test-project.iam.gserviceaccount.com",
       credentials_json: '{"type":"service_account","project_id":"test-project"}')
+    resource.location.location_credential_gcp
   }
 
   let(:timeline) {
@@ -65,10 +66,8 @@ RSpec.describe PostgresServer do
   let(:storage_client) { instance_double(Google::Cloud::Storage::Project) }
 
   before do
-    location_credential_gcp
     allow(Config).to receive(:postgres_service_project_id).and_return(project.id)
-    resource # force creation
-    allow(resource.location).to receive(:location_credential_gcp).and_return(location_credential_gcp)
+    location_credential_gcp
   end
 
   context "with GCP provider" do
@@ -101,18 +100,16 @@ RSpec.describe PostgresServer do
 
     describe "#storage_device_paths" do
       it "returns data disk device path from vm_storage_volumes" do
-        boot_vol = instance_double(VmStorageVolume, boot: true)
-        data_vol = instance_double(VmStorageVolume, boot: false, disk_index: 1, device_path: "/dev/vdb")
-        expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([boot_vol, data_vol])
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
 
-        expect(postgres_server.storage_device_paths).to eq(["/dev/vdb"])
+        expect(postgres_server.storage_device_paths).to eq(["/dev/disk/by-id/google-local-nvme-ssd-0"])
       end
 
       it "returns all non-boot device paths sorted by disk_index" do
-        boot_vol = instance_double(VmStorageVolume, boot: true)
-        data_vol1 = instance_double(VmStorageVolume, boot: false, disk_index: 1, device_path: "/dev/disk/by-id/google-local-nvme-ssd-0")
-        data_vol2 = instance_double(VmStorageVolume, boot: false, disk_index: 2, device_path: "/dev/disk/by-id/google-local-nvme-ssd-1")
-        expect(postgres_server.vm).to receive(:vm_storage_volumes).and_return([data_vol2, boot_vol, data_vol1])
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 0, size_gib: 10, boot: true)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 2, size_gib: 10, boot: false)
+        VmStorageVolume.create(vm_id: vm.id, disk_index: 1, size_gib: 10, boot: false)
 
         expect(postgres_server.storage_device_paths).to eq([
           "/dev/disk/by-id/google-local-nvme-ssd-0",
@@ -141,7 +138,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -212,7 +209,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -250,7 +247,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -303,7 +300,7 @@ RSpec.describe PostgresServer do
           email: "pg-tl-abcd1234@test-project.iam.gserviceaccount.com",
           name: sa_resource_name)
         key = instance_double(Google::Apis::IamV1::ServiceAccountKey,
-          private_key_data: '{"type":"service_account","private_key":"pk"}'.dup.force_encoding("ASCII-8BIT"))
+          private_key_data: '{"type":"service_account","private_key":"pk"}'.b)
 
         allow(location_credential_gcp).to receive_messages(iam_client:, storage_client:)
 
@@ -353,7 +350,7 @@ RSpec.describe PostgresServer do
 
         let(:new_key) {
           instance_double(Google::Apis::IamV1::ServiceAccountKey,
-            private_key_data: '{"type":"service_account","private_key":"new"}'.dup.force_encoding("ASCII-8BIT"))
+            private_key_data: '{"type":"service_account","private_key":"new"}'.b)
         }
 
         before do
