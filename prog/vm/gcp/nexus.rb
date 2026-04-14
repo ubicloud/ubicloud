@@ -251,7 +251,7 @@ class Prog::Vm::Gcp::Nexus < Prog::Base
     # Clean up per-VM firewall policy rules
     begin
       cleanup_vm_policy_rules
-    rescue Google::Apis::ClientError, Google::Cloud::Error => e
+    rescue Google::Apis::Error, Google::Cloud::Error => e
       Clog.emit("Failed to clean up GCE firewall resources",
         {vm_cleanup_error: Util.exception_to_hash(e, into: {vm_name: vm.name})})
       nap 30

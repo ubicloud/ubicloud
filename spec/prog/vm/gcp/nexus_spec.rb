@@ -782,6 +782,24 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
 
       expect { nx.destroy }.to nap(30)
     end
+
+    it "naps and logs when firewall cleanup raises a Google::Apis::RateLimitError" do
+      expect(nx).to receive(:cleanup_vm_policy_rules)
+        .and_raise(Google::Apis::RateLimitError.new("rate limited", status_code: 429))
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", hash_including(:vm_cleanup_error)).and_call_original
+      expect(compute_client).not_to receive(:delete)
+
+      expect { nx.destroy }.to nap(30)
+    end
+
+    it "naps and logs when firewall cleanup raises a Google::Apis::ServerError" do
+      expect(nx).to receive(:cleanup_vm_policy_rules)
+        .and_raise(Google::Apis::ServerError.new("internal error", status_code: 500))
+      expect(Clog).to receive(:emit).with("Failed to clean up GCE firewall resources", hash_including(:vm_cleanup_error)).and_call_original
+      expect(compute_client).not_to receive(:delete)
+
+      expect { nx.destroy }.to nap(30)
+    end
   end
 
   describe "#cleanup_vm_policy_rules" do
