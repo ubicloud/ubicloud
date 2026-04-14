@@ -227,11 +227,18 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(st.stack.first["associate_fw_policy_name"]).to eq("op-assoc")
     end
 
-    it "proceeds when association raises AlreadyExistsError from concurrent strand" do
+    it "verifies association and proceeds when add_association raises AlreadyExistsError and our VPC is associated" do
+      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name, attachment_target: vpc_target,
+            ),
+          ]),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
@@ -239,16 +246,57 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
     end
 
-    it "proceeds when association raises InvalidArgumentError with 'already exists'" do
+    it "naps when add_association raises AlreadyExistsError but our VPC is not associated" do
+      other_target = "projects/test-gcp-project/global/networks/some-other-vpc"
       expect(nfp_client).to receive(:insert)
         .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
       expect(nfp_client).to receive(:get).and_return(
         Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name, attachment_target: other_target,
+            ),
+          ]),
+      )
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("association exists"))
+      expect(Clog).to receive(:emit).with(/association missing/, anything)
+
+      expect { nx.create_firewall_policy }.to nap(5)
+    end
+
+    it "verifies association and proceeds when add_association raises InvalidArgumentError 'already exists' and our VPC is associated" do
+      vpc_target = "projects/test-gcp-project/global/networks/#{vpc_name}"
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name,
+          associations: [
+            Google::Cloud::Compute::V1::FirewallPolicyAssociation.new(
+              name: vpc_name, attachment_target: vpc_target,
+            ),
+          ]),
       )
       expect(nfp_client).to receive(:add_association)
         .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
 
       expect { nx.create_firewall_policy }.to hop("create_vpc_deny_rules")
+    end
+
+    it "naps when add_association raises InvalidArgumentError 'already exists' but re-fetched policy has nil associations" do
+      expect(nfp_client).to receive(:insert)
+        .and_raise(Google::Cloud::AlreadyExistsError.new("already exists"))
+      expect(nfp_client).to receive(:get).and_return(
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
+        Google::Cloud::Compute::V1::FirewallPolicy.new(name: vpc_name),
+      )
+      expect(nfp_client).to receive(:add_association)
+        .and_raise(Google::Cloud::InvalidArgumentError.new("An association with that name already exists."))
+      expect(Clog).to receive(:emit).with(/association missing/, anything)
+
+      expect { nx.create_firewall_policy }.to nap(5)
     end
 
     it "naps when VPC resource is not ready for association" do

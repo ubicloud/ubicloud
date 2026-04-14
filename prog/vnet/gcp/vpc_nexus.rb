@@ -123,11 +123,11 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
       save_gcp_op(assoc_op.name, "global", name: "associate_fw_policy")
       hop_wait_firewall_policy_associated
     rescue Google::Cloud::AlreadyExistsError
-      hop_create_vpc_deny_rules
+      verify_firewall_policy_associated_with_vpc!(vpc_target)
     rescue Google::Cloud::InvalidArgumentError => e
       case e.message
       when /already exists/
-        hop_create_vpc_deny_rules
+        verify_firewall_policy_associated_with_vpc!(vpc_target)
       when /is not ready/
         Clog.emit("GCP resource not ready for association, will retry",
           {gcp_resource_not_ready: Util.exception_to_hash(e, into: {policy: firewall_policy_name, vpc: gcp_vpc.name})})
@@ -232,6 +232,26 @@ class Prog::Vnet::Gcp::VpcNexus < Prog::Base
 
   def firewall_policy_name
     gcp_vpc.name
+  end
+
+  def verify_firewall_policy_associated_with_vpc!(vpc_target)
+    policy = credential.network_firewall_policies_client.get(
+      project: gcp_project_id,
+      firewall_policy: firewall_policy_name,
+    )
+    if policy.associations&.any? { |a| a.attachment_target == vpc_target }
+      hop_create_vpc_deny_rules
+    end
+
+    Clog.emit("GCP firewall policy association missing after already-exists rescue", {
+      gcp_assoc_missing: {
+        policy: firewall_policy_name,
+        vpc: gcp_vpc.name,
+        vpc_target:,
+        current_associations: policy.associations&.map { |a| {name: a.name, attachment_target: a.attachment_target} } || [],
+      },
+    })
+    nap 5
   end
 
   def delete_all_firewall_tag_keys
