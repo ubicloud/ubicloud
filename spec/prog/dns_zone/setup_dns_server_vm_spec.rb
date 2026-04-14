@@ -59,11 +59,14 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
       existing_vm.update(vm_host_id: vm_host.id)
       ds.add_vm(existing_vm)
 
-      expect(described_class).to receive(:vms_in_sync?).and_return(true)
+      {false => [existing_vm.vm_host_id], true => []}.each do |allow_unspread, expected_ids|
+        expect(Config).to receive(:allow_unspread_servers).and_return(allow_unspread)
+        expect(described_class).to receive(:vms_in_sync?).and_return(true)
 
-      st = described_class.assemble(ds.id)
-      vm_strand = Strand[st.stack.first["subject_id"]]
-      expect(vm_strand.stack.first["exclude_host_ids"]).to eq [existing_vm.vm_host_id]
+        st = described_class.assemble(ds.id)
+        vm_strand = Strand[st.stack.first["subject_id"]]
+        expect(vm_strand.stack.first["exclude_host_ids"]).to eq expected_ids
+      end
     end
 
     it "propagates parameters to the created vm" do
