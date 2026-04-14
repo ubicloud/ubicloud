@@ -1262,7 +1262,15 @@ RSpec.describe Prog::Postgres::PostgresServerNexus do
     end
 
     it "skips host_routing lockout on cloud providers" do
-      expect(server).to receive(:lockout_mechanisms).and_return(["pg_stop", "hba"])
+      gcp_location = Location.create(
+        name: "us-central1", display_name: "gcp-us-central1", ui_name: "gcp-us-central1",
+        visible: true, provider: "gcp", project:,
+      )
+      LocationCredentialGcp.create_with_id(gcp_location,
+        project_id: "test-project",
+        service_account_email: "test@test-project.iam.gserviceaccount.com",
+        credentials_json: "{}")
+      server.resource.update(location_id: gcp_location.id)
 
       expect { nx.lockout }.to hop("wait_lockout_attempt")
       child_mechanisms = Strand.where(parent_id: st.id, prog: "Postgres::PostgresLockout").map { it.stack.first["mechanism"] }
