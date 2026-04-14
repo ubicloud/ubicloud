@@ -129,7 +129,12 @@ RSpec.describe Firewall do
       expect(gcp_ps.reload.firewalls.count).to eq(10)
     end
 
-    describe "TOCTOU race serialization" do
+    # Wiring smoke tests, not a real race. These stub Firewall.lock_subnet_for_gcp_cap!
+    # and inject "peer" writes from inside the same RSpec transaction, so they verify
+    # ordering and basic wiring but cannot catch a regression that silently drops the
+    # FOR UPDATE row lock. See spec/model/firewall_concurrency_spec.rb for the real
+    # two-connection concurrency specs that exercise the lock.
+    describe "TOCTOU race serialization (wiring smoke test, not a real race)" do
       it "locks the subnet row before cap validation in associate_with_private_subnet (race B)" do
         attach_vm("gcp-vm", 1)
         8.times { |i| make_fw("fw-#{i}").associate_with_private_subnet(gcp_ps, apply_firewalls: false) }

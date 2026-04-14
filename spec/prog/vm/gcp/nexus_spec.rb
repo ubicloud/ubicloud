@@ -114,7 +114,13 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       }
     end
 
-    it "locks the subnet row before the GCP firewall cap validation (race A)" do
+    # The next two specs are wiring smoke tests, not real races. They stub
+    # Firewall.lock_subnet_for_gcp_cap! and inject the "peer" write inside
+    # the same RSpec transaction, so they verify ordering but cannot catch
+    # a regression that silently drops the FOR UPDATE row lock. See
+    # spec/model/firewall_concurrency_spec.rb for the real two-connection
+    # concurrency coverage of the subnet row lock.
+    it "locks the subnet row before the GCP firewall cap validation (race A wiring smoke test)" do
       location_credential
       gcp_vpc
       subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "locktest",
@@ -144,7 +150,7 @@ RSpec.describe Prog::Vm::Gcp::Nexus do
       expect(call_order[lock_idx][1]).to eq(subnet.id)
     end
 
-    it "rejects assemble when a concurrent firewall-attach commits first (simulated race A)" do
+    it "rejects assemble when a concurrent firewall-attach commits first (simulated race A wiring smoke test)" do
       location_credential
       gcp_vpc
       subnet = Prog::Vnet::SubnetNexus.assemble(project.id, name: "race-a",

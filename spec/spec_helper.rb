@@ -55,8 +55,16 @@ RSpec.configure do |config|
   leaked_threads[Thread.current] = true
 
   config.around do |example|
-    DB.transaction(rollback: :always, auto_savepoint: true) do
+    if example.metadata[:no_db_transaction]
+      # Real concurrency specs check out multiple connections and commit
+      # on their own. They must opt out of the wrapping rollback-only
+      # transaction so writes are visible across connections, and are
+      # responsible for their own cleanup.
       example.run
+    else
+      DB.transaction(rollback: :always, auto_savepoint: true) do
+        example.run
+      end
     end
     Thread.current[:clover_ssh_cache] = nil
     Mail::TestMailer.deliveries.clear if defined?(Mail)
