@@ -349,6 +349,7 @@ class Prog::DownloadBootImage < Prog::Base
 
   label def update_available_storage_space
     image_size_bytes = sshable.cmd("stat -c %s :image_path", image_path: image.path).to_i
+    fail "Downloaded boot image has zero size" unless image_size_bytes > 0
     image_size_gib = (image_size_bytes / 1024.0**3).ceil
     StorageDevice.where(vm_host_id: vm_host.id, name: "DEFAULT").update(
       available_storage_gib: Sequel[:available_storage_gib] - image_size_gib,
