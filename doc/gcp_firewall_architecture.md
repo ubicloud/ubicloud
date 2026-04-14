@@ -148,6 +148,10 @@ GCP allows **max 10 tag bindings per NIC**. A VM needs 1 binding for its subnet 
 plus 1 per firewall, so a VM can belong to at most **9 firewalls**. If exceeded,
 `UpdateFirewallRules` truncates (keeping the subnet tag) and logs a warning.
 
+A model-level validation that refuses to attach a 10th firewall to a GCP VM is
+tracked as a follow-up so the truncation path becomes a defensive backstop
+rather than the primary guardrail.
+
 ## Priority Allocation Mechanics
 
 ### Subnet priorities (DB-backed)

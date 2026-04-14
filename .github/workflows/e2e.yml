@@ -59,9 +59,7 @@ jobs:
       id: ssh
       uses: ubicloud/ssh-runner@v1
       with:
-        public-ssh-key: |
-          ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
-          ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIO2YqaaJlZ2+N1oa1Y8QIxW1ZCMHAfZv+HaMh1dqXnBe claude@ubicloud-e2e
+        public-ssh-key: ${{ secrets.OPERATOR_SSH_PUBLIC_KEYS }}
         wait-minutes: 0
 
     - name: Post runner IP
