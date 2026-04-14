@@ -6,59 +6,89 @@ require "google/apis/cloudresourcemanager_v3"
 RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   subject(:nx) { described_class.new(st) }
 
-  let(:st) { Strand.create(prog: "Vnet::Gcp::UpdateFirewallRules", label: "update_firewall_rules") }
-  let(:vm) { instance_double(Vm, name: "testvm", ubid: "vmubid1") }
-  let(:location) { instance_double(Location, name: "gcp-us-central1", ubid: "locationubid1", location_credential_gcp: credential) }
-  let(:project) { instance_double(Project, ubid: "myprojectubid") }
+  let(:project) { Project.create(name: "test-prj") }
+
+  let(:location) {
+    Location.create(name: "gcp-us-central1", provider: "gcp", project_id: project.id,
+      display_name: "gcp-us-central1", ui_name: "GCP US Central 1", visible: true)
+  }
+
+  let(:location_credential) {
+    LocationCredentialGcp.create_with_id(location,
+      project_id: "test-gcp-project",
+      service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
+      credentials_json: "{}")
+  }
+
   let(:vpc_name) { "ubicloud-#{project.ubid}-#{location.ubid}" }
+
+  let(:gcp_vpc) {
+    vpc = GcpVpc.create(
+      project_id: project.id,
+      location_id: location.id,
+      name: vpc_name,
+      firewall_policy_name: vpc_name,
+      network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890",
+    )
+    Strand.create_with_id(vpc, prog: "Vnet::Gcp::VpcNexus", label: "wait")
+    vpc
+  }
+
+  let(:vm) {
+    location_credential
+    gcp_vpc
+    v = Prog::Vm::Nexus.assemble_with_sshable(project.id,
+      location_id: location.id, unix_user: "test-user",
+      boot_image: "projects/ubuntu-os-cloud/global/images/family/ubuntu-2404-lts-amd64",
+      name: "testvm", size: "c3d-standard-8", arch: "x64").subject
+    DB[:private_subnet_gcp_vpc].insert(private_subnet_id: v.nics.first.private_subnet.id, gcp_vpc_id: gcp_vpc.id)
+    v
+  }
+
+  let(:ps) { vm.nics.first.private_subnet }
+  let(:nic) { vm.nics.first }
+  let(:firewall) { ps.firewalls.first }
+
+  # UpdateFirewallRules runs as a child of Vm::Gcp::Nexus, so its strand shares
+  # the vm's id (subject_is :vm resolves @subject_id from strand.id).
+  let(:st) {
+    vm.strand.update(prog: "Vnet::Gcp::UpdateFirewallRules", label: "update_firewall_rules")
+    vm.strand
+  }
+
   let(:nfp_client) { instance_double(Google::Cloud::Compute::V1::NetworkFirewallPolicies::Rest::Client) }
-  let(:global_ops_client) { instance_double(Google::Cloud::Compute::V1::GlobalOperations::Rest::Client) }
   let(:compute_client) { instance_double(Google::Cloud::Compute::V1::Instances::Rest::Client) }
-  let(:networks_client) { instance_double(Google::Cloud::Compute::V1::Networks::Rest::Client) }
   let(:crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
   let(:regional_crm_client) { instance_double(Google::Apis::CloudresourcemanagerV3::CloudResourceManagerService) }
-  let(:credential) {
-    instance_double(LocationCredentialGcp,
-      network_firewall_policies_client: nfp_client,
-      global_operations_client: global_ops_client,
-      compute_client:,
-      networks_client:,
-      crm_client:,
-      project_id: "test-gcp-project")
-  }
-  let(:lro_op) { instance_double(Gapic::GenericLRO::Operation, name: "op-12345") }
-  let(:done_op) { Google::Cloud::Compute::V1::Operation.new(status: :DONE) }
 
-  let(:firewall) { instance_double(Firewall, id: "fw-id-1", ubid: "fwubid1") }
+  let(:lro_op) { instance_double(Gapic::GenericLRO::Operation, name: "op-12345") }
+
   let(:fw_tag_key_name) { "tagKeys/fw-123" }
   let(:fw_tag_value_name) { "tagValues/fw-tv-1" }
   let(:subnet_tag_key_name) { "tagKeys/subnet-123" }
   let(:subnet_tag_value_name) { "tagValues/subnet-tv-1" }
 
-  let(:gcp_vpc) { instance_double(GcpVpc, name: vpc_name, firewall_policy_name: vpc_name, network_self_link: "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890") }
-  let(:ps) { instance_double(PrivateSubnet, ubid: "subnetubid1", net4: NetAddr::IPv4Net.parse("10.0.0.0/26"), net6: NetAddr::IPv6Net.parse("fd10:9b0b:6b4b:8fbb::/64"), project:, location:, gcp_vpc:) }
-  let(:nic) { instance_double(Nic, private_subnet: ps, private_ipv4: NetAddr::IPv4Net.parse("10.0.0.5/32")) }
-
-  let(:crm_done_op) { instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-1", response: {"name" => "tagKeys/created-1"}, error: nil) }
-  let(:crm_tv_done_op) { instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-2", response: {"name" => "tagValues/created-1"}, error: nil) }
-
-  let(:network) { Google::Cloud::Compute::V1::Network.new(name: vpc_name, id: 1234567890) }
-  let(:instance_obj) { Google::Cloud::Compute::V1::Instance.new(name: "testvm", id: 9876543210) }
-  let(:project_obj) { instance_double(Google::Apis::CloudresourcemanagerV3::Project, name: "projects/73189733048") }
+  let(:crm_done_op) {
+    instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+      done?: true, name: "crm-op-1", response: {"name" => "tagKeys/created-1"}, error: nil)
+  }
+  let(:instance_obj) { Google::Cloud::Compute::V1::Instance.new(name: vm.name, id: 9876543210) }
+  let(:project_obj) { Google::Apis::CloudresourcemanagerV3::Project.new(name: "projects/73189733048") }
 
   before do
-    nx.instance_variable_set(:@vm, vm)
-    allow(vm).to receive_messages(location:, nics: [nic], nic:, ephemeral_net6: nil, destroy_set?: false)
-    allow(credential).to receive(:regional_crm_client).and_return(regional_crm_client)
-    allow(global_ops_client).to receive(:get).and_return(done_op)
-    allow(networks_client).to receive(:get).and_return(network)
+    allow(nx.send(:credential)).to receive_messages(
+      network_firewall_policies_client: nfp_client,
+      compute_client:,
+      crm_client:,
+    )
+    allow(nx.send(:credential)).to receive(:regional_crm_client).and_return(regional_crm_client)
     allow(crm_client).to receive(:get_project).and_return(project_obj)
     allow(compute_client).to receive(:get).and_return(instance_obj)
   end
 
   describe "#before_run" do
     it "pops if vm is being destroyed" do
-      allow(vm).to receive(:destroy_set?).and_return(true)
+      vm.incr_destroy
       expect { nx.before_run }.to exit({"msg" => "firewall rule is added"})
     end
 
@@ -68,33 +98,35 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   end
 
   describe "#update_firewall_rules" do
-    let(:fw_rule) {
-      instance_double(FirewallRule,
-        firewall_id: "fw-id-1", port_range: (22...23), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-        ip6?: false, protocol: "tcp")
+    let!(:fw_rule) {
+      # SubnetNexus.assemble seeds the default firewall with permit-all rules
+      # for 0.0.0.0/0 and ::/0. Clear them so each test controls its own rule set.
+      firewall.firewall_rules.each(&:destroy)
+      FirewallRule.create(firewall_id: firewall.id,
+        cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23))
     }
 
     before do
-      allow(vm).to receive(:firewalls).and_return([firewall])
-      allow(firewall).to receive(:firewall_rules).and_return([fw_rule])
+      tv_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+        done?: true, name: "crm-op-tv", response: {"name" => fw_tag_value_name}, error: nil)
 
-      # Tag key creation
-
-      # Tag value creation
-      tv_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-tv", response: {"name" => fw_tag_value_name}, error: nil)
-
-      # Firewall policy rules sync
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
-      # Subnet tag lookup
-      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-subnet-subnetubid1", name: subnet_tag_key_name)
-      subnet_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "member", name: subnet_tag_value_name)
+      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
+        short_name: "ubicloud-subnet-#{ps.ubid}", name: subnet_tag_key_name)
+      subnet_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue,
+        short_name: "member", name: subnet_tag_value_name)
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [subnet_tk])
       tv_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagValuesResponse, tag_values: [subnet_tv])
-      allow(crm_client).to receive_messages(create_tag_key: crm_done_op, get_operation: crm_done_op, create_tag_value: tv_op, list_tag_keys: tk_list, list_tag_values: tv_list)
+      allow(crm_client).to receive_messages(
+        create_tag_key: crm_done_op,
+        get_operation: crm_done_op,
+        create_tag_value: tv_op,
+        list_tag_keys: tk_list,
+        list_tag_values: tv_list,
+      )
 
-      # Tag bindings
       empty_bindings = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagBindingsResponse, tag_bindings: [])
       binding_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "bind-op", error: nil)
       allow(regional_crm_client).to receive_messages(list_tag_bindings: empty_bindings, create_tag_binding: binding_op)
@@ -102,7 +134,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "creates per-firewall tag key, tag value, syncs rules, binds tags, and pops" do
       expect(crm_client).to receive(:create_tag_key) do |tag_key|
-        expect(tag_key.short_name).to eq("ubicloud-fw-fwubid1")
+        expect(tag_key.short_name).to eq("ubicloud-fw-#{firewall.ubid}")
         expect(tag_key.purpose).to eq("GCE_FIREWALL")
         expect(tag_key.purpose_data["network"]).to include("networks/1234567890")
         crm_done_op
@@ -123,27 +155,21 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "uses fw_tag_data cache on re-entry after nap and skips tag creation" do
-      st.stack.first["fw_tag_data"] = {"fwubid1" => "tagValues/cached-tv"}
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {"fw_tag_data" => {firewall.ubid => "tagValues/cached-tv"}})
 
-      # Should NOT call create_tag_key or create_tag_value (already cached).
       expect(crm_client).not_to receive(:create_tag_key)
       expect(crm_client).not_to receive(:create_tag_value)
 
-      # Should still bind tags
       expect(regional_crm_client).to receive(:create_tag_binding).twice
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
 
     it "syncs empty rules for firewall with no rules and does not bind its tag" do
-      allow(firewall).to receive(:firewall_rules).and_return([])
+      fw_rule.destroy
 
       expect(crm_client).to receive(:create_tag_key)
       expect(crm_client).to receive(:create_tag_value)
-      # sync_firewall_rules is called with empty list (cleans up stale rules)
       expect(nfp_client).to receive(:get).and_return(Google::Cloud::Compute::V1::FirewallPolicy.new(rules: []))
       expect(nfp_client).not_to receive(:add_rule)
 
@@ -154,34 +180,28 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "handles multiple firewalls with separate tag keys" do
-      firewall2 = instance_double(Firewall, id: "fw-id-2", ubid: "fwubid2")
-      fw_rule2 = instance_double(FirewallRule,
-        firewall_id: "fw-id-2", port_range: (443...444), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-        ip6?: false, protocol: "tcp")
+      firewall2 = Firewall.create(name: "fw2", location_id: location.id, project_id: project.id)
+      firewall2.associate_with_private_subnet(ps, apply_firewalls: false)
+      FirewallRule.create(firewall_id: firewall2.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443...444))
 
-      allow(vm).to receive(:firewalls).and_return([firewall, firewall2])
-      allow(firewall).to receive(:firewall_rules).and_return([fw_rule])
-      allow(firewall2).to receive(:firewall_rules).and_return([fw_rule2])
-
-      # Each firewall gets its own tag key
       created_keys = []
       allow(crm_client).to receive(:create_tag_key) do |tag_key|
         created_keys << tag_key.short_name
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
 
-      # Each firewall gets its own tag value
       allow(crm_client).to receive(:create_tag_value) do |tag_value|
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}"}, error: nil)
       end
 
-      # Both firewalls get rules synced
       expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
       # 2 firewall tags + 1 subnet tag
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(3).times
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
-      expect(created_keys).to contain_exactly("ubicloud-fw-fwubid1", "ubicloud-fw-fwubid2")
+      expect(created_keys).to contain_exactly("ubicloud-fw-#{firewall.ubid}", "ubicloud-fw-#{firewall2.ubid}")
     end
 
     it "unbinds stale tags from firewalls no longer attached" do
@@ -216,7 +236,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      # Verify all creates happen before any deletes
       call_order = []
       allow(regional_crm_client).to receive(:create_tag_binding) do |binding|
         call_order << :create
@@ -229,7 +248,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
 
-      # All creates must precede all deletes
       last_create = call_order.rindex(:create)
       first_delete = call_order.index(:delete)
       expect(last_create).not_to be_nil
@@ -247,9 +265,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       unbind_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "unbind-op", error: nil)
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      # Track per-tag-value create attempts and ordering with deletes.
-      # NIC limit 400 persists until stale bindings are freed, so all
-      # internal retries (up to 3) in create_tag_binding also fail.
       call_log = []
       stale_deleted = false
       allow(regional_crm_client).to receive(:create_tag_binding) do |binding|
@@ -267,7 +282,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
 
-      # The successful fw create must come after stale delete
       fw_creates = call_log.each_with_index.select { |entry, _| entry == [:create, fw_tag_value_name] }.map(&:last)
       deletes = call_log.each_with_index.select { |entry, _| entry[0] == :delete }.map(&:last)
       expect(fw_creates.length).to be >= 2
@@ -276,7 +290,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "re-raises 400 errors when there are no stale bindings to free" do
-      # No stale bindings - all existing are desired
       active_binding = instance_double(Google::Apis::CloudresourcemanagerV3::TagBinding,
         name: "tagBindings/active-1", tag_value: fw_tag_value_name)
 
@@ -285,11 +298,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       allow(regional_crm_client).to receive(:list_tag_bindings).and_return(existing_bindings)
 
-      # Subnet tag create fails with 400: no stale bindings to free, so re-raise.
       allow(regional_crm_client).to receive(:create_tag_binding)
         .and_raise(Google::Apis::ClientError.new("bad request", status_code: 400))
 
-      # Must not attempt to delete any bindings
       expect(regional_crm_client).not_to receive(:delete_tag_binding)
 
       expect { nx.update_firewall_rules }.to raise_error(Google::Apis::ClientError)
@@ -299,37 +310,35 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       no_subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [])
       allow(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
 
-      # Only firewall tag should be bound
       expect(regional_crm_client).to receive(:create_tag_binding).once
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
     end
 
     it "truncates desired tags and logs when exceeding GCP 10-tag NIC limit" do
-      # Create 11 firewalls (each with rules) to exceed the 10-tag limit
-      firewalls = (1..11).map { |i| instance_double(Firewall, id: "fw-id-#{i}", ubid: "fwubid#{i}") }
-      firewalls.each do |fw|
-        rule = instance_double(FirewallRule,
-          firewall_id: fw.id, port_range: (22...23), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-          ip6?: false, protocol: "tcp")
-        allow(fw).to receive(:firewall_rules).and_return([rule])
-      end
+      # Need 11 firewalls total. The first is already attached. Bypass the
+      # GCP_MAX_FIREWALLS_PER_VM=9 validation by inserting join rows directly.
+      extra_firewalls = (2..11).map { |i|
+        fw = Firewall.create(name: "fw#{i}", location_id: location.id, project_id: project.id)
+        FirewallRule.create(firewall_id: fw.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23))
+        DB[:firewalls_private_subnets].insert(private_subnet_id: ps.id, firewall_id: fw.id)
+        fw
+      }
+      all_firewalls = [firewall] + extra_firewalls
 
-      allow(vm).to receive(:firewalls).and_return(firewalls)
-
-      # Each firewall gets its own tag key and value
       allow(crm_client).to receive(:create_tag_key) do |tag_key|
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
       allow(crm_client).to receive(:create_tag_value) do |tag_value|
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
       end
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
       # 12 desired (11 fw + 1 subnet) → truncated to 10 (9 fw + 1 subnet)
-      # Verify subnet tag is preserved by checking it's among the bound tags
       bound_tags = []
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(10).times do |binding|
         bound_tags << binding.tag_value
@@ -341,34 +350,31 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
       expect(bound_tags).to include(subnet_tag_value_name)
       expect(bound_tags.size).to eq(10)
+      expect(all_firewalls.size).to eq(11)
     end
 
     it "truncates to 10 without subnet tag when subnet tag is not found" do
-      firewalls = (1..11).map { |i| instance_double(Firewall, id: "fw-id-#{i}", ubid: "fwubid#{i}") }
-      firewalls.each do |fw|
-        rule = instance_double(FirewallRule,
-          firewall_id: fw.id, port_range: (22...23), cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"),
-          ip6?: false, protocol: "tcp")
-        allow(fw).to receive(:firewall_rules).and_return([rule])
+      (2..11).each do |i|
+        fw = Firewall.create(name: "fw#{i}", location_id: location.id, project_id: project.id)
+        FirewallRule.create(firewall_id: fw.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23))
+        DB[:firewalls_private_subnets].insert(private_subnet_id: ps.id, firewall_id: fw.id)
       end
-
-      allow(vm).to receive(:firewalls).and_return(firewalls)
 
       allow(crm_client).to receive(:create_tag_key) do |tag_key|
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op", response: {"name" => "tagKeys/#{tag_key.short_name}"}, error: nil)
       end
       allow(crm_client).to receive(:create_tag_value) do |tag_value|
-        instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
+        instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
+          done?: true, name: "crm-op-tv", response: {"name" => "tagValues/#{tag_value.parent}-active"}, error: nil)
       end
 
-      # No subnet tag found
       no_subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [])
       allow(crm_client).to receive(:list_tag_keys).and_return(no_subnet_tk)
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       allow(nfp_client).to receive_messages(get: empty_policy, add_rule: lro_op)
 
-      # 11 fw tags, no subnet → truncated to 10
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(10).times
 
       expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything)
@@ -403,7 +409,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(regional_crm_client).to receive(:delete_tag_binding)
         .and_raise(Google::Apis::ClientError.new("not found", status_code: 404))
 
-      # fw + subnet bindings
       expect(regional_crm_client).to receive(:create_tag_binding).twice
 
       expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
@@ -437,7 +442,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", response: nil, error: nil)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-fwubid1", name: "tagKeys/lookup-1")
+      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{firewall.ubid}", name: "tagKeys/lookup-1")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -459,7 +464,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(crm_client).to receive(:create_tag_key)
         .and_raise(Google::Apis::ClientError.new("conflict", status_code: 409))
 
-      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-fwubid1", name: "tagKeys/existing-1")
+      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{firewall.ubid}", name: "tagKeys/existing-1")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -490,15 +495,14 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect { nx.send(:ensure_firewall_tag_key, firewall) }.to nap(5)
       expect(st.stack.first["pending_tag_key_crm_op"]).to eq("op-pending")
-      expect(st.stack.first["pending_tag_key_fw_ubid"]).to eq("fwubid1")
+      expect(st.stack.first["pending_tag_key_fw_ubid"]).to eq(firewall.ubid)
     end
 
     it "polls pending operation on re-entry and returns name" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/pending-tk"
-      st.stack.first["pending_tag_key_fw_ubid"] = "fwubid1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_key_crm_op" => "operations/pending-tk",
+        "pending_tag_key_fw_ubid" => firewall.ubid,
+      })
 
       done_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/pending-tk", response: {"name" => "tagKeys/polled-1"}, error: nil)
@@ -510,11 +514,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "naps again when polling pending operation that is still not done" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/still-pending"
-      st.stack.first["pending_tag_key_fw_ubid"] = "fwubid1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_key_crm_op" => "operations/still-pending",
+        "pending_tag_key_fw_ubid" => firewall.ubid,
+      })
 
       still_pending = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false)
       expect(crm_client).to receive(:get_operation).with("operations/still-pending").and_return(still_pending)
@@ -523,17 +526,16 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "falls back to lookup when polled op has no name in response" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/no-name"
-      st.stack.first["pending_tag_key_fw_ubid"] = "fwubid1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_key_crm_op" => "operations/no-name",
+        "pending_tag_key_fw_ubid" => firewall.ubid,
+      })
 
       no_name_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/no-name", response: nil, error: nil)
       expect(crm_client).to receive(:get_operation).with("operations/no-name").and_return(no_name_op)
 
-      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-fwubid1", name: "tagKeys/fallback-poll")
+      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{firewall.ubid}", name: "tagKeys/fallback-poll")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -542,11 +544,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "raises when polled pending op has error" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/tk-error"
-      st.stack.first["pending_tag_key_fw_ubid"] = "fwubid1"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_key_crm_op" => "operations/tk-error",
+        "pending_tag_key_fw_ubid" => firewall.ubid,
+      })
 
       error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "INTERNAL: server error")
       error_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
@@ -561,7 +562,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", error:)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
 
-      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-fwubid1", name: "tagKeys/existing-lro-1")
+      tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-fw-#{firewall.ubid}", name: "tagKeys/existing-lro-1")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -589,11 +590,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "ignores pending op from a different firewall and creates fresh" do
-      st.stack.first["pending_tag_key_crm_op"] = "operations/other-fw"
-      st.stack.first["pending_tag_key_fw_ubid"] = "fwubid-other"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_key_crm_op" => "operations/other-fw",
+        "pending_tag_key_fw_ubid" => "fwubid-other",
+      })
 
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", response: {"name" => "tagKeys/fresh-1"}, error: nil)
       expect(crm_client).to receive(:create_tag_key).and_return(op)
@@ -694,11 +694,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "polls pending operation on re-entry and returns name" do
-      st.stack.first["pending_tag_value_crm_op"] = "operations/pending-tv"
-      st.stack.first["pending_tag_value_parent"] = "tagKeys/123"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_crm_op" => "operations/pending-tv",
+        "pending_tag_value_parent" => "tagKeys/123",
+      })
 
       done_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/pending-tv", response: {"name" => "tagValues/polled-1"}, error: nil)
@@ -710,11 +709,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "naps again when polling pending tag value op that is still not done" do
-      st.stack.first["pending_tag_value_crm_op"] = "operations/tv-still-pending"
-      st.stack.first["pending_tag_value_parent"] = "tagKeys/123"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_crm_op" => "operations/tv-still-pending",
+        "pending_tag_value_parent" => "tagKeys/123",
+      })
 
       still_pending = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false)
       expect(crm_client).to receive(:get_operation).with("operations/tv-still-pending").and_return(still_pending)
@@ -723,11 +721,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "falls back to lookup when polled tag value op has no name in response" do
-      st.stack.first["pending_tag_value_crm_op"] = "operations/tv-no-name"
-      st.stack.first["pending_tag_value_parent"] = "tagKeys/123"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_crm_op" => "operations/tv-no-name",
+        "pending_tag_value_parent" => "tagKeys/123",
+      })
 
       no_name_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
         done?: true, name: "operations/tv-no-name", response: nil, error: nil)
@@ -742,11 +739,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "raises when polled pending tag value op has error" do
-      st.stack.first["pending_tag_value_crm_op"] = "operations/tv-error"
-      st.stack.first["pending_tag_value_parent"] = "tagKeys/123"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_crm_op" => "operations/tv-error",
+        "pending_tag_value_parent" => "tagKeys/123",
+      })
 
       error = instance_double(Google::Apis::CloudresourcemanagerV3::Status, message: "INTERNAL: server error")
       error_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation,
@@ -757,11 +753,10 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "ignores pending op from a different parent and creates fresh" do
-      st.stack.first["pending_tag_value_crm_op"] = "operations/other-parent"
-      st.stack.first["pending_tag_value_parent"] = "tagKeys/999"
-      st.modified!(:stack)
-      st.save_changes
-      nx.instance_variable_set(:@frame, nil)
+      refresh_frame(nx, new_values: {
+        "pending_tag_value_crm_op" => "operations/other-parent",
+        "pending_tag_value_parent" => "tagKeys/999",
+      })
 
       op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: true, name: "op-1", response: {"name" => "tagValues/fresh-1"}, error: nil)
       expect(crm_client).to receive(:create_tag_value).and_return(op)
@@ -881,7 +876,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "does not count rules being deleted as used priorities" do
-      # An existing rule for our tag at priority 10000 that doesn't match desired
       stale_rule = Google::Cloud::Compute::V1::FirewallPolicyRule.new(
         priority: 10000,
         direction: "INGRESS",
@@ -908,7 +902,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(nfp_client).to receive(:remove_rule).with(hash_including(priority: 10000)).and_return(lro_op)
       expect(nfp_client).to receive(:add_rule) do |args|
-        # Should reuse priority 10000 since the stale rule is being deleted
         expect(args[:firewall_policy_rule_resource].priority).to eq(10000)
         lro_op
       end
@@ -934,7 +927,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [other_tag_rule])
       expect(nfp_client).to receive(:get).and_return(policy)
 
-      # Should not delete the other tag's rule
       expect(nfp_client).not_to receive(:remove_rule)
 
       nx.send(:sync_tag_policy_rules, [], tag_value)
@@ -1109,26 +1101,16 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     let(:orphan_tag_value_name) { "tagValues/orphan-tv-1" }
     let(:vpc_purpose_data) { {"network" => "https://www.googleapis.com/compute/v1/projects/test-gcp-project/global/networks/1234567890"} }
 
-    let(:vm_firewall_dataset) { instance_double(Sequel::Dataset) }
-
-    before do
-      allow(vm).to receive(:firewalls).and_return([firewall])
-      # Default: orphaned firewalls have no VM associations either
-      allow(DB).to receive(:[]).and_call_original
-      allow(DB).to receive(:[]).with(:firewalls_vms).and_return(vm_firewall_dataset)
-      allow(vm_firewall_dataset).to receive(:where).and_return(instance_double(Sequel::Dataset, any?: false))
-    end
-
     it "deletes policy rules, tag value, and tag key for firewalls with no subnets" do
       orphan_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
         short_name: "ubicloud-fw-#{orphan_fw_ubid}", name: orphan_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
       active_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-fwubid1", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+        short_name: "ubicloud-fw-#{firewall.ubid}", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [orphan_tk, active_tk]))
 
-      orphan_fw = instance_double(Firewall, ubid: orphan_fw_ubid, private_subnets: [], id: "orphan-fw-id")
+      orphan_fw = Firewall.create(name: "orphan-fw", location_id: location.id, project_id: project.id)
       allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(orphan_fw)
 
       orphan_tv = instance_double(Google::Apis::CloudresourcemanagerV3::TagValue, short_name: "active", name: orphan_tag_value_name)
@@ -1187,8 +1169,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [attached_tk]))
 
-      attached_fw = instance_double(Firewall, ubid: orphan_fw_ubid, private_subnets: [ps])
-      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(attached_fw)
+      # Use the real firewall (attached to ps) under a different ubid label.
+      allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(firewall)
 
       expect(nfp_client).not_to receive(:get)
       expect(nfp_client).not_to receive(:remove_rule)
@@ -1203,9 +1185,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [vm_fw_tk]))
 
-      vm_fw = instance_double(Firewall, ubid: orphan_fw_ubid, private_subnets: [], id: "vm-fw-id")
+      vm_fw = Firewall.create(name: "vm-attached-fw", location_id: location.id, project_id: project.id)
+      DB[:firewalls_vms].insert(firewall_id: vm_fw.id, vm_id: vm.id)
       allow(nx).to receive(:find_firewall).with(orphan_fw_ubid).and_return(vm_fw)
-      allow(vm_firewall_dataset).to receive(:where).with(firewall_id: "vm-fw-id").and_return(instance_double(Sequel::Dataset, any?: true))
 
       expect(nfp_client).not_to receive(:get)
       expect(nfp_client).not_to receive(:remove_rule)
@@ -1214,9 +1196,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "skips active firewalls (attached to this VM)" do
-      # Only active firewall tag key present. Should be skipped entirely.
       active_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-fw-fwubid1", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
+        short_name: "ubicloud-fw-#{firewall.ubid}", name: fw_tag_key_name, purpose: "GCE_FIREWALL", purpose_data: vpc_purpose_data)
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [active_tk]))
@@ -1241,7 +1222,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "skips tag keys without matching short_name prefix" do
       subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey,
-        short_name: "ubicloud-subnet-subnetubid1", name: "tagKeys/subnet-1", purpose: "GCE_FIREWALL")
+        short_name: "ubicloud-subnet-#{ps.ubid}", name: "tagKeys/subnet-1", purpose: "GCE_FIREWALL")
 
       allow(crm_client).to receive(:list_tag_keys)
         .and_return(instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [subnet_tk]))
@@ -1380,7 +1361,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "propagates Google::Cloud::Error from list_tag_keys" do
-      allow(vm).to receive(:firewalls).and_return([firewall])
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(Google::Cloud::Error.new("error"))
 
@@ -1388,7 +1368,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "propagates RuntimeError from list_tag_keys during orphan cleanup" do
-      allow(vm).to receive(:firewalls).and_return([firewall])
       allow(crm_client).to receive(:list_tag_keys)
         .and_raise(RuntimeError.new("CRM operation op-1 failed: PERMISSION_DENIED"))
 
@@ -1550,7 +1529,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
   describe "lookup_subnet_tag_value" do
     it "returns tag value name when subnet tag exists" do
-      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-subnet-subnetubid1", name: "tagKeys/subnet-1")
+      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-subnet-#{ps.ubid}", name: "tagKeys/subnet-1")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [subnet_tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -1571,7 +1550,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "returns nil when subnet tag value not found" do
-      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-subnet-subnetubid1", name: "tagKeys/subnet-1")
+      subnet_tk = instance_double(Google::Apis::CloudresourcemanagerV3::TagKey, short_name: "ubicloud-subnet-#{ps.ubid}", name: "tagKeys/subnet-1")
       tk_list = instance_double(Google::Apis::CloudresourcemanagerV3::ListTagKeysResponse, tag_keys: [subnet_tk])
       expect(crm_client).to receive(:list_tag_keys).and_return(tk_list)
 
@@ -1585,7 +1564,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
   describe "helper methods" do
     it "reads zone suffix from strand stack" do
-      st.stack.first["gcp_zone_suffix"] = "c"
+      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
       expect(nx.send(:gcp_zone)).to eq("us-central1-c")
     end
 
@@ -1596,6 +1575,9 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     it "finds zone suffix in parent frame" do
       st.stack.unshift({})
       st.stack.last["gcp_zone_suffix"] = "b"
+      st.modified!(:stack)
+      st.save_changes
+      nx.instance_variable_set(:@frame, nil)
       expect(nx.send(:gcp_zone)).to eq("us-central1-b")
     end
 
@@ -1628,7 +1610,6 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
 
-      # Should create two rules: one for IPv4, one for IPv6
       expect(nfp_client).to receive(:add_rule).twice.and_return(lro_op)
 
       nx.send(:sync_firewall_rules, [ipv4_rule, ipv6_rule], "tagValues/tv-1")
