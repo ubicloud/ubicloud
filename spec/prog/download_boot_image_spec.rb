@@ -235,6 +235,12 @@ RSpec.describe Prog::DownloadBootImage do
   end
 
   describe "#update_available_storage_space" do
+    it "fails if image size is zero" do
+      BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
+      expect(sshable).to receive(:_cmd).with("stat -c %s /var/storage/images/my-image-20230303.raw").and_return("0")
+      expect { dbi.update_available_storage_space }.to raise_error RuntimeError, "Downloaded boot image has zero size"
+    end
+
     it "updates available storage space" do
       bi = BootImage.create(vm_host_id: vm_host.id, name: "my-image", version: "20230303", size_gib: 0)
       sd = StorageDevice.create(
