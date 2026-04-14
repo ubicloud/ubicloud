@@ -160,11 +160,15 @@ class Prog::Vm::Nexus < Prog::Base
           # multiple VmStorageVolume records so each maps to one physical disk.
           boot = volume[:boot]
           disk_count = boot ? 1 : (volume[:size_gib] / 375.0).ceil
-          next if disk_count.zero?
-          size_gib = volume[:size_gib] / disk_count
 
           disk_count.times do
-            VmStorageVolume.create(vm_id: vm.id, size_gib:, boot:, use_bdev_ubi: false, disk_index:)
+            VmStorageVolume.create(
+              vm_id: vm.id,
+              size_gib: volume[:size_gib] / disk_count,
+              boot:,
+              use_bdev_ubi: false,
+              disk_index:,
+            )
             disk_index += 1
           end
         end
