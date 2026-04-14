@@ -220,13 +220,8 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
     hop_finish
   end
 
-  label def finish
-    finish_test
-  end
-
-  label def failed
-    nap 15
-  end
+  label :finish
+  label :failed
 
   def read_replica
     @read_replica ||= PostgresResource[frame["read_replica_id"]]
