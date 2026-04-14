@@ -297,9 +297,9 @@ class Prog::DownloadBootImage < Prog::Base
   end.freeze
 
   def sha256sum
-    # YYY: In future all images should be checked for sha256 sum, so the nil
-    # default will be removed.
-    BOOT_IMAGE_SHA256.dig(image_name, vm_host.arch, version)
+    sum = BOOT_IMAGE_SHA256.dig(image_name, vm_host.arch, version)
+    fail "Cannot download images without a SHA256 checksum in production" if !sum && Config.production?
+    sum
   end
 
   def r2_signed_url(key)
