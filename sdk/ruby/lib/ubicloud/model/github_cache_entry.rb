@@ -4,7 +4,7 @@ module Ubicloud
   class GithubCacheEntry < Model
     set_prefix "ge"
 
-    set_columns :key, :size, :created_at, :last_accessed_at
+    set_columns :key, :scope, :size, :created_at, :last_accessed_at
 
     singleton_class.undef_method(:create)
     singleton_class.undef_method(:list)

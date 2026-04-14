@@ -34,6 +34,7 @@ RSpec.describe Clover, "github" do
     expect(last_response.status).to eq(200)
     body = JSON.parse(last_response.body)
     expect(body["key"]).to eq(cache_entry.key)
+    expect(body["scope"]).to eq("main")
     expect(body).to have_key("created_at")
     expect(body).to have_key("last_accessed_at")
   end

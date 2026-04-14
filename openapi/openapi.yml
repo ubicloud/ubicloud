@@ -2779,6 +2779,9 @@ components:
         key:
           description: GitHub cache entry key
           type: string
+        scope:
+          description: Branch scope of the GitHub cache entry
+          type: string
         size:
           description: Size of the GitHub cache entry in bytes
           type: integer
@@ -2797,6 +2800,7 @@ components:
         - installation_name
         - repository_name
         - key
+        - scope
         - size
         - created_at
         - last_accessed_at
