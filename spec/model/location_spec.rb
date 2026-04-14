@@ -101,14 +101,14 @@ RSpec.describe Location do
     allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
     gcp_loc = described_class.create(name: "gcp-image-test", display_name: "gcp-image-test", ui_name: "gcp-image-test", visible: false, provider: "gcp")
     PgGceImage.create(gce_image_name: "postgres-ubuntu-2204-x64-20260218", arch: "x64", pg_versions: ["16", "17", "18"])
-    expect(gcp_loc.pg_gce_image("x64")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
+    expect(gcp_loc.pg_gce_image("x64", "17")).to eq("projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218")
   end
 
   it "#pg_gce_image raises when no image found" do
     PgGceImage.dataset.destroy
     gcp_loc = described_class.create(name: "gcp-image-err", display_name: "gcp-image-err", ui_name: "gcp-image-err", visible: false, provider: "gcp")
     expect {
-      gcp_loc.pg_gce_image("x64")
-    }.to raise_error("No GCE image found for arch x64")
+      gcp_loc.pg_gce_image("x64", "17")
+    }.to raise_error("No GCE image found for arch x64 and pg_version 17")
   end
 end

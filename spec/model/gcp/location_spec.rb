@@ -26,14 +26,46 @@ RSpec.describe Location do
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(location.pg_gce_image("x64")).to eq(
+        expect(location.pg_gce_image("x64", "17")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20260218",
         )
       end
 
-      it "raises when no matching PgGceImage is found" do
-        expect { location.pg_gce_image("x64") }.to raise_error(
-          RuntimeError, /No GCE image found for arch x64/,
+      it "raises when no matching PgGceImage is found for arch" do
+        expect { location.pg_gce_image("x64", "17") }.to raise_error(
+          RuntimeError, /No GCE image found for arch x64 and pg_version 17/,
+        )
+      end
+
+      it "raises when no image supports the requested pg_version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-x64-20260218",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+        expect { location.pg_gce_image("x64", "99") }.to raise_error(
+          RuntimeError, /No GCE image found for arch x64 and pg_version 99/,
+        )
+      end
+
+      it "selects the image whose pg_versions contains the requested version when multiple rows share an arch" do
+        allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-x64-20260218",
+          arch: "x64",
+          pg_versions: ["16", "17", "18"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-x64-20270101",
+          arch: "x64",
+          pg_versions: ["19"],
+        )
+
+        expect(location.pg_gce_image("x64", "17")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-x64-20260218",
+        )
+        expect(location.pg_gce_image("x64", "19")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-x64-20270101",
         )
       end
     end

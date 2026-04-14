@@ -125,17 +125,52 @@ RSpec.describe PostgresResource do
     end
 
     describe "#boot_image" do
-      it "delegates to the location's pg_gce_image" do
+      before do
         PgGceImage.dataset.destroy
         allow(Config).to receive(:postgres_gce_image_gcp_project_id).and_return("image-hosting-project")
+      end
+
+      it "delegates to the location's pg_gce_image for a supported pg_version" do
         PgGceImage.create(
           gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
           arch: "arm64",
           pg_versions: ["16", "17", "18"],
         )
 
-        expect(postgres_resource.boot_image("99", "arm64")).to eq(
+        expect(postgres_resource.boot_image("17", "arm64")).to eq(
           "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20260218",
+        )
+      end
+
+      it "raises when no image supports the requested pg_version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16", "17", "18"],
+        )
+
+        expect {
+          postgres_resource.boot_image("99", "arm64")
+        }.to raise_error(RuntimeError, /No GCE image found for arch arm64 and pg_version 99/)
+      end
+
+      it "picks the image whose pg_versions array contains the requested version" do
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2204-arm64-20260218",
+          arch: "arm64",
+          pg_versions: ["16", "17", "18"],
+        )
+        PgGceImage.create(
+          gce_image_name: "postgres-ubuntu-2404-arm64-20270101",
+          arch: "arm64",
+          pg_versions: ["19"],
+        )
+
+        expect(postgres_resource.boot_image("17", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2204-arm64-20260218",
+        )
+        expect(postgres_resource.boot_image("19", "arm64")).to eq(
+          "projects/image-hosting-project/global/images/postgres-ubuntu-2404-arm64-20270101",
         )
       end
     end
