@@ -491,7 +491,7 @@ class PostgresResource < Sequel::Model
     options.add_option(name: "flavor", values: flavor || postgres_flavors(project).keys)
 
     options.add_option(name: "location", values: location || postgres_locations(project), parent: "flavor") do |flavor, location|
-      flavor == PostgresResource.default_flavor || (!location.aws? && !location.gcp?)
+      flavor == PostgresResource.default_flavor || location.metal?
     end
 
     options.add_option(name: "family", values: Option::POSTGRES_FAMILY_OPTIONS.keys, parent: "location") do |flavor, location, family|
