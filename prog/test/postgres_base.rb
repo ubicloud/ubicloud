@@ -31,6 +31,23 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     end
   end
 
+  def start(**)
+    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
+
+    st = Prog::Postgres::PostgresResourceNexus.assemble(
+      project_id: frame["postgres_test_project_id"],
+      location_id:,
+      target_vm_size:,
+      target_storage_size_gib:,
+      **,
+    )
+
+    frame = {"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id}
+    yield st.subject, frame if block_given?
+    update_stack(frame)
+    hop_wait_postgres_resource
+  end
+
   def postgres_test_project
     @postgres_test_project ||= Project[frame["postgres_test_project_id"]]
   end

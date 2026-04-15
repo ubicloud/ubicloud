@@ -8,21 +8,9 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
-
-    st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: frame["postgres_test_project_id"],
-      location_id:,
-      name: "postgres-test-upgrade",
-      target_vm_size:,
-      target_storage_size_gib:,
-      ha_type: "async",
-      target_version: "17",
-    )
-
-    update_stack({"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id})
-    update_stack({"pre_upgrade_postgres_timeline_id" => PostgresResource[st.id].timeline.id})
-    hop_wait_postgres_resource
+    super(name: "postgres-test-upgrade", ha_type: "async", target_version: "17") do |resource, frame|
+      frame["pre_upgrade_postgres_timeline_id"] = resource.timeline.id
+    end
   end
 
   label def wait_postgres_resource
