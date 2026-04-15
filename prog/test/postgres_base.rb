@@ -51,6 +51,13 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     File.read("./prog/test/testdata/order_analytics_read_queries.sql").freeze
   end
 
+  def nap_if_private_subnet
+    if PrivateSubnet[frame["private_subnet_id"]]
+      Clog.emit("Waiting for private subnet to be destroyed")
+      nap 5
+    end
+  end
+
   def finish
     postgres_test_project.destroy unless Config.local_e2e_postgres_test_project_id
     fail_test(frame["fail_message"]) if frame["fail_message"]

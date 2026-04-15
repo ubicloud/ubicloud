@@ -115,7 +115,8 @@ RSpec.describe Prog::Test::PostgresResource do
 
     it "naps if the private subnet isn't deleted yet" do
       project_id = pgr_test.strand.stack.first["postgres_test_project_id"]
-      PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      ps = PrivateSubnet.create(name: "subnet", project_id:, location_id:, net4: "10.0.0.0/26", net6: "fd00::/64")
+      refresh_frame(pgr_test, new_values: {"private_subnet_id" => ps.id})
       expect { pgr_test.wait_resources_destroyed }.to nap(5)
     end
 
