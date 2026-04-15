@@ -2307,12 +2307,32 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
     post:
       operationId: createMachineImage
-      summary: Create a machine image
-      parameters:
-        - $ref: '#/components/parameters/location'
-        - $ref: '#/components/parameters/project_id'
+      summary: Create a machine image from a stopped VM
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vm
+              properties:
+                vm:
+                  description: UBID of the source VM
+                  type: string
+                version:
+                  description: Version label (default is a timestamp)
+                  type: string
+                destroy_source:
+                  description: Destroy the source VM after capture
+                  type: string
       responses:
         '200':
           $ref: '#/components/responses/MachineImageDetailed'
@@ -2320,11 +2340,6 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - Machine Image
-  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
-    parameters:
-      - $ref: '#/components/parameters/project_id'
-      - $ref: '#/components/parameters/location'
-      - $ref: '#/components/parameters/machine_image_reference'
     delete:
       operationId: deleteMachineImage
       summary: Delete a machine image
