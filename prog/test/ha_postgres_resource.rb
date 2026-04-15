@@ -8,19 +8,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
   end
 
   label def start
-    location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
-
-    st = Prog::Postgres::PostgresResourceNexus.assemble(
-      project_id: frame["postgres_test_project_id"],
-      location_id:,
-      name: "postgres-test-ha",
-      target_vm_size:,
-      target_storage_size_gib:,
-      ha_type: "async",
-    )
-
-    update_stack({"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id})
-    hop_wait_postgres_resource
+    super(name: "postgres-test-ha", ha_type: "async")
   end
 
   label def wait_postgres_resource
