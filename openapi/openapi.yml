@@ -2274,6 +2274,77 @@ paths:
           $ref: '#/components/responses/Error'
       tags:
         - SSH Public Key
+  '/project/{project_id}/machine-image':
+    get:
+      operationId: listProjectMachineImages
+      summary: List all machine images
+      parameters:
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image':
+    get:
+      operationId: listLocationMachineImages
+      summary: List machine images in a location
+      parameters:
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/project_id'
+        - $ref: '#/components/parameters/start_after'
+        - $ref: '#/components/parameters/page_size'
+        - $ref: '#/components/parameters/order_column'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImages'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    post:
+      operationId: createMachineImage
+      summary: Create a machine image
+      parameters:
+        - $ref: '#/components/parameters/location'
+        - $ref: '#/components/parameters/project_id'
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+  '/project/{project_id}/location/{location}/machine-image/{machine_image_reference}':
+    parameters:
+      - $ref: '#/components/parameters/project_id'
+      - $ref: '#/components/parameters/location'
+      - $ref: '#/components/parameters/machine_image_reference'
+    delete:
+      operationId: deleteMachineImage
+      summary: Delete a machine image
+      responses:
+        '204':
+          $ref: '#/components/responses/Delete'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
+    get:
+      operationId: getMachineImage
+      summary: Get details of a machine image
+      responses:
+        '200':
+          $ref: '#/components/responses/MachineImageDetailed'
+        default:
+          $ref: '#/components/responses/Error'
+      tags:
+        - Machine Image
   '/project/{project_id}/vm':
     get:
       operationId: listProjectVMs
@@ -2292,6 +2363,18 @@ paths:
         - Virtual Machine
 components:
   parameters:
+    machine_image_reference:
+      description: Machine Image ID or name
+      examples:
+        id:
+          value: m1n30gjk1d1e2jj34v9x0dq4rp
+        name:
+          value: my-image
+      in: path
+      name: machine_image_reference
+      required: true
+      schema:
+        $ref: '#/components/schemas/Reference'
     firewall_reference:
       description: Firewall ID or name
       examples:
@@ -3018,6 +3101,43 @@ components:
         - id
         - name
         - src_port
+    MachineImage:
+      type: object
+      properties:
+        id:
+          description: ID of the machine image
+          type: string
+          example: m1n30gjk1d1e2jj34v9x0dq4rp
+          pattern: '^m1[0-9a-hj-km-np-tv-z]{24}$'
+        name:
+          description: Name of the machine image
+          type: string
+          example: my-image
+        location:
+          description: Location of the machine image
+          type: string
+          example: eu-central-h1
+        arch:
+          description: Architecture
+          type: string
+          enum:
+            - x64
+            - arm64
+        latest_version:
+          description: Latest version label
+          type: string
+          nullable: true
+        created_at:
+          description: Creation timestamp
+          type: string
+          format: date-time
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - location
+        - arch
+        - created_at
     Nic:
       type: object
       properties:
@@ -4047,6 +4167,48 @@ components:
                 type: array
                 items:
                   $ref: '#/components/schemas/Vm'
+            additionalProperties: false
+            required:
+              - count
+              - items
+    MachineImageDetailed:
+      description: A machine image with version details
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            allOf:
+              - $ref: '#/components/schemas/MachineImage'
+              - additionalProperties: false
+                properties:
+                  versions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        version:
+                          type: string
+                        state:
+                          type: string
+                        created_at:
+                          type: string
+                          format: date-time
+    MachineImages:
+      description: A list of machine images
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              count:
+                type: integer
+              items:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MachineImage'
             additionalProperties: false
             required:
               - count

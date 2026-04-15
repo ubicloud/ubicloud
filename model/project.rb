@@ -22,6 +22,7 @@ class Project < Sequel::Model
   one_to_many :load_balancers, read_only: true
   one_to_many :inference_endpoints, read_only: true
   one_to_many :kubernetes_clusters, read_only: true
+  one_to_many :machine_images, read_only: true
   one_to_many :ssh_public_keys, order: :name, remover: nil, clearer: nil
 
   RESOURCE_ASSOCIATIONS = %i[vms minio_clusters private_subnets postgres_resources firewalls load_balancers kubernetes_clusters github_runners]
