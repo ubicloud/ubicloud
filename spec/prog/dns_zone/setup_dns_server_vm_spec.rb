@@ -4,7 +4,7 @@ require_relative "../../model/spec_helper"
 
 RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   subject(:prog) {
-    st = described_class.assemble(ds.id)
+    st = described_class.assemble(ds)
     described_class.new(st)
   }
 
@@ -29,18 +29,18 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
   describe ".assemble" do
     it "validates input" do
       expect {
-        described_class.assemble(SecureRandom.uuid)
+        described_class.assemble(nil, name: nil)
       }.to raise_error RuntimeError, "No existing Dns Server"
 
       expect {
-        described_class.assemble(ds.id, name: "InVaLidNAME")
+        described_class.assemble(ds, name: "InVaLidNAME")
       }.to raise_error Validation::ValidationFailed, "Validation failed for following fields: name"
 
       expect {
-        described_class.assemble(ds.id, location_id: nil)
+        described_class.assemble(ds, location_id: nil)
       }.to raise_error RuntimeError, "No existing Location"
 
-      expect(described_class.assemble(ds.id)).to be_a Strand
+      expect(described_class.assemble(ds)).to be_a Strand
 
       expect(Vm.count).to eq 1
       expect(Vm.first.unix_user).to eq "ubi"
@@ -49,7 +49,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "errors out if the dns service project id is not put into config properly" do
       expect(Config).to receive(:dns_service_project_id).and_return(nil)
       expect {
-        described_class.assemble(ds.id)
+        described_class.assemble(ds)
       }.to raise_error RuntimeError, "No existing Project"
     end
 
@@ -63,14 +63,14 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
         expect(Config).to receive(:allow_unspread_servers).and_return(allow_unspread)
         expect(described_class).to receive(:vms_in_sync?).and_return(true)
 
-        st = described_class.assemble(ds.id)
+        st = described_class.assemble(ds)
         vm_strand = Strand[st.stack.first["subject_id"]]
         expect(vm_strand.stack.first["exclude_host_ids"]).to eq expected_ids
       end
     end
 
     it "propagates parameters to the created vm" do
-      described_class.assemble(ds.id, name: "custom-dns", vm_size: "standard-4", storage_size_gib: 37, boot_image: "almalinux-9", location_id: Location::LEASEWEB_WDC02_ID)
+      described_class.assemble(ds, name: "custom-dns", vm_size: "standard-4", storage_size_gib: 37, boot_image: "almalinux-9", location_id: Location::LEASEWEB_WDC02_ID)
 
       vm = Vm.first
       expect(vm.name).to eq "custom-dns"
@@ -84,7 +84,7 @@ RSpec.describe Prog::DnsZone::SetupDnsServerVm do
     it "errors out if the DNS Server VMs are not in sync" do
       expect(described_class).to receive(:vms_in_sync?).and_return(false)
       expect {
-        described_class.assemble(ds.id)
+        described_class.assemble(ds)
       }.to raise_error RuntimeError, "Existing DNS Server VMs are not in sync, try again later"
     end
   end

@@ -3,18 +3,10 @@
 class Prog::DnsZone::SetupDnsServerVm < Prog::Base
   subject_is :vm, :sshable
 
-  def self.assemble(dns_server_id, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy")
-    unless (dns_server = DnsServer[dns_server_id])
-      fail "No existing Dns Server"
-    end
-
-    unless Project[Config.dns_service_project_id]
-      fail "No existing Project"
-    end
-
-    unless Location[location_id]
-      fail "No existing Location"
-    end
+  def self.assemble(dns_server, name: nil, vm_size: "standard-2", storage_size_gib: 30, location_id: Location::HETZNER_FSN1_ID, boot_image: "ubuntu-jammy")
+    fail "No existing Dns Server" unless dns_server
+    fail "No existing Project" unless Project[Config.dns_service_project_id]
+    fail "No existing Location" unless Location[location_id]
 
     # The .assemble function is meant to be run by an operator manually. If/when we want to make this more programmatic
     # we should move this check to a pre-validation label of the prog.
@@ -37,7 +29,7 @@ class Prog::DnsZone::SetupDnsServerVm < Prog::Base
         exclude_host_ids: Config.allow_unspread_servers ? [] : dns_server.vms_dataset.where(location_id:).select_map(:vm_host_id),
       )
 
-      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id:}])
+      Strand.create(prog: "DnsZone::SetupDnsServerVm", label: "start", stack: [{subject_id: vm_st.id, dns_server_id: dns_server.id}])
     end
   end
 
