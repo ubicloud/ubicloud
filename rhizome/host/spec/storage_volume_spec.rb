@@ -647,6 +647,16 @@ RSpec.describe StorageVolume do
       expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
     end
 
+    it "returns the persistent device id for a path with LVM device-mapper device" do
+      paths = ["/dev/disk/by-id/dm-name-vg0-root", "/dev/disk/by-id/dm-uuid-LVM-abc123def456ghi789jkl012mno345pqr678stu901vwx234yz5678abcdef0123"]
+      expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return(paths)
+      expect(File).to receive(:realpath).with(paths[0]).and_return("/dev/dm-1")
+      expect(File).to receive(:realpath).with(paths[1]).and_return("/dev/dm-1")
+      expect(File).to receive(:stat).with("/dev/dm-1").and_return(instance_double(File::Stat, rdev_major: 252, rdev_minor: 1)).twice
+      expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 252, dev_minor: 1))
+      expect(encrypted_sv.persistent_device_id("storage_path")).to eq(paths.last)
+    end
+
     it "raises an error if no matching device is found" do
       expect(Dir).to receive(:[]).with("/dev/disk/by-id/*").and_return([])
       expect(File).to receive(:stat).with("storage_path").and_return(instance_double(File::Stat, dev_major: 8, dev_minor: 0))
