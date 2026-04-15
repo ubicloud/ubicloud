@@ -273,10 +273,12 @@ class StorageVolume
       #  - SSDs: Use identifiers starting with 'wwn' (World Wide Name), globally unique.
       #  - NVMe: Use identifiers starting with 'nvme-eui', also globally unique.
       #  - MD devices: Use uuid identifiers.
+      #  - LVM/device-mapper: Use LVM uuid identifiers.
       dev = File.basename(dev_path)
       return id if (dev.start_with?("nvme") && id.include?("nvme-eui.")) ||
         (dev.start_with?("sd") && id.include?("wwn-")) ||
-        (dev.start_with?("md") && id.include?("md-uuid-"))
+        (dev.start_with?("md") && id.include?("md-uuid-")) ||
+        (dev.start_with?("dm") && id.include?("dm-uuid-"))
     rescue SystemCallError
       next
     end
