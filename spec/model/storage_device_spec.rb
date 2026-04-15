@@ -33,4 +33,14 @@ RSpec.describe StorageDevice do
       end
     end
   end
+
+  describe "#path" do
+    it "returns /var/storage/ for DEFAULT device" do
+      expect(described_class.new(name: "DEFAULT").path).to eq("/var/storage/")
+    end
+
+    it "returns /var/storage/devices/<name> for non-DEFAULT device" do
+      expect(described_class.new(name: "disk1").path).to eq("/var/storage/devices/disk1")
+    end
+  end
 end
