@@ -20,7 +20,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
       target_version: "17",
     )
 
-    update_stack({"postgres_resource_id" => st.id})
+    update_stack({"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id})
     update_stack({"pre_upgrade_postgres_timeline_id" => PostgresResource[st.id].timeline.id})
     hop_wait_postgres_resource
   end
@@ -217,6 +217,7 @@ class Prog::Test::UpgradePostgresResource < Prog::Test::PostgresBase
 
   label def wait_resources_destroyed
     nap 5 if read_replica || postgres_resource || pre_upgrade_timeline
+    nap_if_private_subnet
     hop_finish
   end
 

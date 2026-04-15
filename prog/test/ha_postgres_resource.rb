@@ -19,7 +19,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
       ha_type: "async",
     )
 
-    update_stack({"postgres_resource_id" => st.id})
+    update_stack({"postgres_resource_id" => st.id, "private_subnet_id" => st.subject.private_subnet_id})
     hop_wait_postgres_resource
   end
 
@@ -103,6 +103,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::PostgresBase
 
   label def wait_resources_destroyed
     nap 5 if postgres_resource
+    nap_if_private_subnet
     hop_finish
   end
 
