@@ -507,14 +507,14 @@ dhcp-option=6,8.8.8.8
     else
       <<~IP4_CONFIG
 dhcp-range=#{guest_network.nth(2)},#{guest_network.nth(2)},#{guest_network.netmask.prefix_len}
-server=2606:4700:4700::1111
 server=2001:4860:4860::8888
+server=2606:4700:4700::1111
 dhcp-option=6,#{dns_ipv4}
 listen-address=#{dns_ipv4}
 dhcp-option=54,#{dns_ipv4}
 dhcp-option=option6:dns-server,#{dnsmasq_address_ip6}
 listen-address=#{dnsmasq_address_ip6}
-all-servers
+strict-order
       IP4_CONFIG
     end
     vp.write_dnsmasq_conf(<<DNSMASQ_CONF)
