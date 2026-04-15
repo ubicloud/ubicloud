@@ -268,6 +268,10 @@ class Clover < Roda
         message = "Validation failed for following fields: body"
         details = {"body" => "Request body must include required parameters: #{keys.join(", ")}"}
       end
+    when Rodish::CommandFailure
+      code = 400
+      type = "InvalidRequest"
+      message = e.message
     when Sequel::SerializationFailure
       code = 500
       type = "InternalServerError"
