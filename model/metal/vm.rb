@@ -170,6 +170,7 @@ class Vm < Sequel::Model
         "encrypted_access_key_id" => kek.encrypt(store.access_key, "archive-access-key"),
         "encrypted_secret_access_key" => kek.encrypt(store.secret_key, "archive-secret-key"),
         "encrypted_archive_kek" => kek.encrypt(Base64.decode64(metal.archive_kek.key), "archive-kek"),
+        "autofetch" => true,
       }
     end
 

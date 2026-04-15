@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../model"
+require "json"
 
 class VmStorageVolume < Sequel::Model
   many_to_one :vm
@@ -53,6 +54,27 @@ class VmStorageVolume < Sequel::Model
       # SPDK volumes
       256
     end
+  end
+
+  def path
+    @path ||= File.join(storage_device.path, vm.inhost_name, disk_index.to_s)
+  end
+
+  def rpc(payload)
+    # The rpc server sends each response in a separate line. The pipe through
+    # `head -n 1` is to close the connection after receiving the first response,
+    # otherwise the rpc server will keep the connection open waiting for the 2nd
+    # request.
+    #
+    # `-q 2`: after stdin EOF, wait up to 2s for the response before exiting
+    # `-w 2`: connection timeout
+    rpc_socket = File.join(path, "rpc.sock")
+    vm.vm_host.sshable.cmd_json("sudo nc -U :rpc_socket -q 2 -w 2 | head -n 1", stdin: payload.to_json, rpc_socket:)
+  end
+
+  def caught_up?
+    stripes = rpc(command: "status").dig("status", "stripes")
+    stripes.fetch("fetched") == stripes.fetch("source")
   end
 end
 

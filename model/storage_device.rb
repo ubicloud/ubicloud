@@ -30,6 +30,14 @@ class StorageDevice < Sequel::Model
       device_name
     end
   end
+
+  def path
+    @path ||= if name == "DEFAULT"
+      "/var/storage/"
+    else
+      "/var/storage/devices/#{name}"
+    end
+  end
 end
 
 # Table: storage_device

@@ -757,6 +757,43 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       allow(vm).to receive(:allocated_at).and_return(now - 100)
       expect { nx.wait_sshable }.to hop("wait")
     end
+
+    it "hops to wait_storage_catchup when a volume has machine_image_version_id" do
+      miv = create_machine_image_version_metal
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, machine_image_version_id: miv.id)
+      vm.incr_update_firewall_rules
+      allow(vm).to receive(:allocated_at).and_return(Time.now - 100)
+      expect { nx.wait_sshable }.to hop("wait_storage_catchup")
+    end
+  end
+
+  describe "#wait_storage_catchup" do
+    before do
+      sd = StorageDevice.create(vm_host_id: vm_host.id, name: "DEFAULT", total_storage_gib: 100, available_storage_gib: 100)
+      VmStorageVolume.create(vm_id: vm.id, boot: true, size_gib: 20, disk_index: 0, use_bdev_ubi: false, storage_device_id: sd.id)
+      VmStorageVolume.create(vm_id: vm.id, boot: false, size_gib: 15, disk_index: 1, use_bdev_ubi: false, storage_device_id: sd.id)
+    end
+
+    it "hops to wait when no volume has machine_image_version_id" do
+      expect { nx.wait_storage_catchup }.to hop("wait")
+    end
+
+    it "naps if a volume is not caught up" do
+      miv = create_machine_image_version_metal
+      vm.vm_storage_volumes_dataset.where(boot: true).update(machine_image_version_id: miv.id)
+      payload = {command: "status"}
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/0/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 50, "source": 100}}}')
+      expect { nx.wait_storage_catchup }.to nap(30)
+    end
+
+    it "clears machine_image_version_id and hops to wait when volume is caught up" do
+      miv = create_machine_image_version_metal
+      vm.vm_storage_volumes_dataset.where(boot: false).update(machine_image_version_id: miv.id)
+      payload = {command: "status"}
+      expect(vm.vm_host.sshable).to receive(:_cmd).with("sudo nc -U /var/storage/#{vm.inhost_name}/1/rpc.sock -q 2 -w 2 | head -n 1", stdin: payload.to_json).and_return('{"status": {"stripes": {"fetched": 100, "source": 100}}}')
+      expect { nx.wait_storage_catchup }.to hop("wait")
+      expect(vm.vm_storage_volumes.first.reload.machine_image_version_id).to be_nil
+    end
   end
 
   describe "#create_billing_record" do

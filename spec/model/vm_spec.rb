@@ -440,6 +440,7 @@ RSpec.describe Vm do
       expect(src).to have_key("encrypted_access_key_id")
       expect(src).to have_key("encrypted_secret_access_key")
       expect(src).to have_key("encrypted_archive_kek")
+      expect(src["autofetch"]).to be(true)
 
       expect(volumes[1]).not_to have_key("archive_source")
     end
