@@ -424,6 +424,7 @@ class StorageVolume
         "prefix" => @archive_source["prefix"],
         "region" => @archive_source["region"],
         "endpoint" => @archive_source["endpoint"],
+        "autofetch" => @archive_source.fetch("autofetch", false),
         "access_key_id.ref" => "archive-access-key",
         "secret_access_key.ref" => "archive-secret-key",
         "archive_kek.ref" => "archive-kek",
