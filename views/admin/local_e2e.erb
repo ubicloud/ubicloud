@@ -11,3 +11,10 @@
 end %>
 
 <%== part("components/table", title: "Active Local E2E Strands", table_class: "local-e2e-table", data:) %>
+
+<h2>Start Local E2E Strand</h2>
+
+<% form({method: "post"}, button: "Start Local E2E Strand") do |f| %>
+  <%== f.input(:select, key: :prog, label: "E2E Prog", options: LOCAL_E2E_PROGS, add_blank: true, required: true) %>
+  <%== f.input(:select, key: :provider, label: "Provider", options: LOCAL_E2E_PROVIDERS, add_blank: true, required: true) %>
+<% end %>

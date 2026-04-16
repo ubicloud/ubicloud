@@ -496,6 +496,16 @@ class CloverAdmin < Roda
     ["VmHost", :boot_images] => "vm_host",
   }.freeze
 
+  LOCAL_E2E_PROGS = %w[
+    PostgresResource
+    HaPostgresResource
+    UpgradePostgresResource
+  ].freeze
+  LOCAL_E2E_PROVIDERS = %w[
+    aws
+    metal
+  ].freeze
+
   plugin :autoforme do
     # :nocov:
     register_by_name if Config.development?
@@ -1042,9 +1052,19 @@ class CloverAdmin < Roda
       view("authentication_audit_log")
     end
 
-    r.get "local-e2e" do
-      @strands = Strand.where(Sequel.like(:prog, "Test::%")).order(:prog, :id).all
-      view("local_e2e")
+    r.is "local-e2e" do
+      r.get do
+        @strands = Strand.where(Sequel.like(:prog, "Test::%")).order(:prog, :id).all
+        view("local_e2e")
+      end
+
+      r.post do
+        prog, provider = typecast_params.nonempty_str(%w[prog provider])
+        raise "invalid local E2E prog or provider" unless LOCAL_E2E_PROGS.include?(prog) && LOCAL_E2E_PROVIDERS.include?(provider)
+        st = Prog::Test.const_get(prog).assemble(provider:)
+        flash["notice"] = "Started local E2E strand: #{st.ubid}"
+        r.redirect
+      end
     end
 
     r.get "admin-list" do
