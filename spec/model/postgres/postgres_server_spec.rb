@@ -150,6 +150,15 @@ RSpec.describe PostgresServer do
       postgres_server.update(version: "17")
       expect(postgres_server.configure_hash[:configs]).to include("allow_alter_system" => "off")
     end
+
+    it "sets strict_overcommit to true by default" do
+      expect(postgres_server.configure_hash[:strict_overcommit]).to be true
+    end
+
+    it "sets strict_overcommit to false when skip_strict_memory_overcommit semaphore is set" do
+      resource.incr_skip_strict_memory_overcommit
+      expect(postgres_server.configure_hash[:strict_overcommit]).to be false
+    end
   end
 
   describe "#trigger_failover" do
