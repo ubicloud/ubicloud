@@ -49,10 +49,18 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   let(:nic) { vm.nics.first }
   let(:firewall) { ps.firewalls.first }
 
-  # UpdateFirewallRules runs as a child of Vm::Gcp::Nexus, so its strand shares
-  # the vm's id (subject_is :vm resolves @subject_id from strand.id).
+  # UpdateFirewallRules runs as a child of Vm::Gcp::Nexus (pushed from
+  # prog/vm/gcp/nexus.rb), so production has a two-frame stack:
+  #   stack[0] = UpdateFirewallRules child frame (subject_id + link)
+  #   stack[-1] = Vm::Gcp::Nexus parent frame (holds gcp_zone_suffix, etc.)
+  # subject_is :vm resolves @subject_id from strand.id, so we reuse vm.strand.
   let(:st) {
-    vm.strand.update(prog: "Vnet::Gcp::UpdateFirewallRules", label: "update_firewall_rules")
+    child_frame = {"subject_id" => vm.id, "link" => ["Vm::Gcp::Nexus", "wait_sshable"]}
+    vm.strand.update(
+      prog: "Vnet::Gcp::UpdateFirewallRules",
+      label: "update_firewall_rules",
+      stack: Sequel.pg_jsonb_wrap([child_frame] + vm.strand.stack),
+    )
     vm.strand
   }
 
@@ -89,7 +97,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   describe "#before_run" do
     it "pops if vm is being destroyed" do
       vm.incr_destroy
-      expect { nx.before_run }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.before_run }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "does nothing if vm is not being destroyed" do
@@ -152,7 +160,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(regional_crm_client).to receive(:create_tag_binding).twice
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "stamps tag key and tag value descriptions with e2e_run_id when E2E_RUN_ID is set" do
@@ -169,7 +177,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         tv_op_local
       end
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "uses fw_tag_data cache on re-entry after nap and skips tag creation" do
@@ -180,7 +188,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(regional_crm_client).to receive(:create_tag_binding).twice
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "syncs empty rules for firewall with no rules and does not bind its tag" do
@@ -194,7 +202,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       # Only subnet tag should be bound (firewall has no rules → not bound)
       expect(regional_crm_client).to receive(:create_tag_binding).once
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "handles multiple firewalls with separate tag keys" do
@@ -218,7 +226,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       # 2 firewall tags + 1 subnet tag
       expect(regional_crm_client).to receive(:create_tag_binding).exactly(3).times
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
       expect(created_keys).to contain_exactly("ubicloud-fw-#{firewall.ubid}", "ubicloud-fw-#{firewall2.ubid}")
     end
 
@@ -241,7 +249,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       # Subnet tag still needs to be bound
       expect(regional_crm_client).to receive(:create_tag_binding).once
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "creates new tag bindings before deleting stale ones" do
@@ -264,7 +272,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         unbind_op
       end
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
 
       last_create = call_order.rindex(:create)
       first_delete = call_order.index(:delete)
@@ -298,7 +306,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
         unbind_op
       end
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
 
       fw_creates = call_log.each_with_index.select { |entry, _| entry == [:create, fw_tag_value_name] }.map(&:last)
       deletes = call_log.each_with_index.select { |entry, _| entry[0] == :delete }.map(&:last)
@@ -330,7 +338,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(regional_crm_client).to receive(:create_tag_binding).once
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "truncates desired tags and logs when exceeding GCP 10-tag NIC limit" do
@@ -365,7 +373,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything).and_call_original
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
       expect(bound_tags).to include(subnet_tag_value_name)
       expect(bound_tags.size).to eq(10)
       expect(all_firewalls.size).to eq(11)
@@ -397,7 +405,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(Clog).to receive(:emit).with("GCP NIC tag limit exceeded, truncating to 10", anything).and_call_original
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "skips already-bound tags" do
@@ -413,7 +421,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
       expect(regional_crm_client).not_to receive(:create_tag_binding)
       expect(regional_crm_client).not_to receive(:delete_tag_binding)
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "handles unbind 404 gracefully" do
@@ -429,7 +437,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
       expect(regional_crm_client).to receive(:create_tag_binding).twice
 
-      expect { nx.update_firewall_rules }.to exit({"msg" => "firewall rule is added"})
+      expect { nx.update_firewall_rules }.to hop("wait_sshable", "Vm::Gcp::Nexus")
     end
 
     it "re-raises non-404 errors during stale binding unbind" do
@@ -1409,8 +1417,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   describe "build_tag_based_policy_rules" do
     it "groups rules by CIDR" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (443...444), protocol: "tcp", ip6?: false),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(443...444), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1421,8 +1429,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "creates separate rules for different CIDRs" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("10.0.0.0/8"), port_range: (5432...5433), protocol: "tcp", ip6?: false),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "10.0.0.0/8", port_range: Sequel.pg_range(5432...5433), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1436,8 +1444,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "groups by protocol within a CIDR" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (53...54), protocol: "udp", ip6?: false),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(53...54), protocol: "udp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1449,7 +1457,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "formats port ranges correctly" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (80...9999), protocol: "tcp", ip6?: false),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(80...9999), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1458,7 +1466,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "formats single-port ranges as single number" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (5432...5433), protocol: "tcp", ip6?: false),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(5432...5433), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1467,8 +1475,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "groups IPv6-only rules into a single policy rule" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true),
-        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (443...444), protocol: "tcp", ip6?: true),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "fd10::/64", port_range: Sequel.pg_range(80...81), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "fd10::/64", port_range: Sequel.pg_range(443...444), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1481,8 +1489,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "produces separate policy rules for mixed IPv4 and IPv6 rules" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv4Net.parse("10.0.0.0/24"), port_range: (22...23), protocol: "tcp", ip6?: false),
-        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "10.0.0.0/24", port_range: Sequel.pg_range(22...23), protocol: "tcp"),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "fd10::/64", port_range: Sequel.pg_range(80...81), protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1497,7 +1505,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
 
     it "omits :ports in layer4 config for an IPv6 rule with nil port_range" do
       rules = [
-        instance_double(FirewallRule, cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: nil, protocol: "tcp", ip6?: true),
+        FirewallRule.create(firewall_id: firewall.id, cidr: "fd10::/64", port_range: nil, protocol: "tcp"),
       ]
 
       result = nx.send(:build_tag_based_policy_rules, rules, tag_value_name: "tagValues/tv-1")
@@ -1632,17 +1640,11 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
   end
 
   describe "helper methods" do
-    it "reads zone suffix from strand stack" do
-      refresh_frame(nx, new_values: {"gcp_zone_suffix" => "c"})
-      expect(nx.send(:gcp_zone)).to eq("us-central1-c")
-    end
-
     it "defaults zone suffix to 'a'" do
       expect(nx.send(:gcp_zone)).to eq("us-central1-a")
     end
 
     it "finds zone suffix in parent frame" do
-      st.stack.unshift({})
       st.stack.last["gcp_zone_suffix"] = "b"
       st.modified!(:stack)
       st.save_changes
@@ -1669,12 +1671,37 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
   end
 
+  describe "strand frame shape" do
+    it "writes pending-op state to child frame and reads zone suffix from parent frame" do
+      st.stack.last["gcp_zone_suffix"] = "d"
+      st.modified!(:stack)
+      st.save_changes
+      nx.instance_variable_set(:@frame, nil)
+
+      pending_op = instance_double(Google::Apis::CloudresourcemanagerV3::Operation, done?: false, name: "op-frame-shape")
+      expect(crm_client).to receive(:create_tag_key).and_return(pending_op)
+
+      expect { nx.send(:ensure_firewall_tag_key, firewall) }.to nap(5)
+
+      st.reload
+      expect(st.stack.length).to eq(2)
+      expect(st.stack.first).not_to eq(st.stack.last)
+
+      expect(st.stack.first["pending_tag_key_crm_op"]).to eq("op-frame-shape")
+      expect(st.stack.first["pending_tag_key_fw_ubid"]).to eq(firewall.ubid)
+      expect(st.stack.last).not_to have_key("pending_tag_key_crm_op")
+      expect(st.stack.last).not_to have_key("pending_tag_key_fw_ubid")
+
+      expect(st.stack.last["gcp_zone_suffix"]).to eq("d")
+      expect(st.stack.first).not_to have_key("gcp_zone_suffix")
+      expect(nx.send(:gcp_zone)).to eq("us-central1-d")
+    end
+  end
+
   describe "sync_firewall_rules" do
     it "partitions IPv4 and IPv6 rules and syncs" do
-      ipv4_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: (22...23), protocol: "tcp", ip6?: false)
-      ipv6_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv6Net.parse("::/0"), port_range: (22...23), protocol: "tcp", ip6?: true)
+      ipv4_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
+      ipv6_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "::/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
@@ -1685,10 +1712,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "emits per-family src_ip_ranges on add_rule for mixed IPv4 and IPv6 rules" do
-      ipv4_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv4Net.parse("10.0.0.0/24"), port_range: (22...23), protocol: "tcp", ip6?: false)
-      ipv6_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv6Net.parse("fd10::/64"), port_range: (80...81), protocol: "tcp", ip6?: true)
+      ipv4_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "10.0.0.0/24", port_range: Sequel.pg_range(22...23), protocol: "tcp")
+      ipv6_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "fd10::/64", port_range: Sequel.pg_range(80...81), protocol: "tcp")
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
@@ -1713,8 +1738,7 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "treats nil port_range as all ports (no ports field in layer4 config)" do
-      rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil, protocol: "tcp", ip6?: false)
+      rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: nil, protocol: "tcp")
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
@@ -1730,10 +1754,8 @@ RSpec.describe Prog::Vnet::Gcp::UpdateFirewallRules do
     end
 
     it "nil port_range dominates when mixed with specific ports in the same protocol group" do
-      all_ports_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: nil, protocol: "tcp", ip6?: false)
-      specific_rule = instance_double(FirewallRule,
-        cidr: NetAddr::IPv4Net.parse("0.0.0.0/0"), port_range: 22..23, protocol: "tcp", ip6?: false)
+      all_ports_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: nil, protocol: "tcp")
+      specific_rule = FirewallRule.create(firewall_id: firewall.id, cidr: "0.0.0.0/0", port_range: Sequel.pg_range(22...23), protocol: "tcp")
 
       empty_policy = Google::Cloud::Compute::V1::FirewallPolicy.new(rules: [])
       expect(nfp_client).to receive(:get).and_return(empty_policy)
