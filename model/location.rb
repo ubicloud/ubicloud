@@ -90,6 +90,7 @@ end
 #  machine_image             | machine_image_location_id_fkey             | (location_id) REFERENCES location(id)
 #  machine_image_store       | machine_image_store_location_id_fkey       | (location_id) REFERENCES location(id)
 #  minio_cluster             | minio_cluster_location_id_fkey             | (location_id) REFERENCES location(id)
+#  parseable_resource        | parseable_resource_location_id_fkey        | (location_id) REFERENCES location(id)
 #  postgres_resource         | postgres_resource_location_id_fkey         | (location_id) REFERENCES location(id)
 #  postgres_timeline         | postgres_timeline_location_id_fkey         | (location_id) REFERENCES location(id)
 #  private_subnet            | private_subnet_location_id_fkey            | (location_id) REFERENCES location(id)

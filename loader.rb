@@ -91,6 +91,8 @@ module Prog::MachineImage; end
 
 module Prog::Minio; end
 
+module Prog::Parseable; end
+
 module Prog::Postgres; end
 
 module Prog::Storage; end
@@ -112,6 +114,8 @@ module Prog::Vnet::Metal; end
 module Scheduling; end
 
 module Serializers; end
+
+module Parseable; end
 
 module VictoriaMetrics; end
 
