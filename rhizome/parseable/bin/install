@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require_relative "../../common/lib/util"
+
+unless (ver = ARGV.shift)
+  fail "No version provided"
+end
+
+r "wget", "https://github.com/parseablehq/parseable/releases/download/#{ver}/Parseable_OSS_x86_64-unknown-linux-gnu", "-O", "/usr/local/bin/parseable"
+r "chmod", "+x", "/usr/local/bin/parseable"
