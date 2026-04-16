@@ -477,7 +477,7 @@ class Prog::Github::GithubRunnerNexus < Prog::Base
     rescue *Sshable::SSH_CONNECTION_ERRORS
       if vm.location.aws? && vm.aws_instance
         instance_id = vm.aws_instance.instance_id
-        instance_response = vm.location.location_credential_aws.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first&.instances&.first
+        instance_response = vm.location.location_credential_aws.client.describe_instances({filters: [{name: "instance-id", values: [instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first&.instances&.first
         if instance_response && instance_response.dig(:state, :name) == "terminated" && instance_response.dig(:state_reason, :code) == "Server.SpotInstanceTermination"
           Clog.emit("Spot instance interrupted", [github_runner, {interrupted_runner: {instance_id:}}])
           github_runner.incr_destroy

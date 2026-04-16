@@ -166,7 +166,7 @@ class Prog::Vnet::Aws::NicNexus < Prog::Base
   end
 
   def get_network_interface
-    client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).network_interfaces[0]
+    client.describe_network_interfaces({filters: [{name: "network-interface-id", values: [nic.nic_aws_resource.network_interface_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).network_interfaces[0]
   end
 
   private
