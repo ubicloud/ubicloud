@@ -21,7 +21,7 @@ class PostgresResource < Sequel::Model
   dataset_module Pagination
 
   plugin ResourceMethods, redacted_columns: [:root_cert_1, :root_cert_2, :server_cert, :trusted_ca_certs, :client_root_cert_1, :client_root_cert_2, :client_cert],
-    encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key, :client_root_cert_key_1, :client_root_cert_key_2, :client_cert_key]
+    encrypted_columns: [:superuser_password, :root_cert_key_1, :root_cert_key_2, :server_cert_key, :client_root_cert_key_1, :client_root_cert_key_2, :client_cert_key, :parseable_password]
   plugin ProviderDispatcher, __FILE__
   plugin SemaphoreMethods, :initial_provisioning, :refresh_dns_record, :update_billing_records,
     :destroy, :refresh_certificates, :use_different_az, :use_old_walg_command, :check_disk_usage,
