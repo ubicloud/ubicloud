@@ -143,6 +143,7 @@ class PostgresServer < Sequel::Model
       pgbouncer_instances: (vm.vcpus / 2.0).ceil.clamp(1, 8),
       metrics_config:,
       disk_throughput_baseline_mbps:,
+      strict_overcommit: !resource.skip_strict_memory_overcommit_set?,
     }
   end
 
