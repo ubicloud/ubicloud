@@ -132,15 +132,47 @@ RSpec.describe IoThrottle do
     end
   end
 
+  describe "#calculate_disk_usage_throttle" do
+    it "returns nil when disk usage is below 95%" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  94%\n")
+      expect(throttle.send(:calculate_disk_usage_throttle)).to be_nil
+    end
+
+    it "returns baseline at 95% disk" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  95%\n")
+      # ratio = 1.0 - 0.15 * 0 = 1.0 -> 100
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(100)
+    end
+
+    it "returns 70 MB/s at 97% disk" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
+      # ratio = 1.0 - 0.15 * 2 = 0.70 -> 70
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(70)
+    end
+
+    it "descends to 25% of baseline at 100% disk" do
+      expect(throttle).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return(" 100%\n")
+      # ratio = 1.0 - 0.15 * 5 = 0.25 -> 25
+      expect(throttle.send(:calculate_disk_usage_throttle)).to eq(25)
+    end
+
+    it "scales with disk throughput baseline" do
+      throttle_aws = described_class.new("17-main", logger, 448)
+      expect(throttle_aws).to receive(:r).with("df --output=pcent /dat | tail -n 1").and_return("  97%\n")
+      # ratio = 0.70 -> 448 * 0.70 = 313.6 -> 314
+      expect(throttle_aws.send(:calculate_disk_usage_throttle)).to eq(314)
+    end
+  end
+
   describe "#run" do
     let(:data_dir) { "/dat/17/data" }
 
     before do
       allow(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      allow(throttle).to receive(:find_device_id).and_return("8:0")
+      allow(throttle).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
     end
 
-    it "applies no throttle when backlog is below threshold" do
+    it "applies no throttle when backlog is below threshold and no disk usage throttle" do
       allow(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=max")
 
@@ -162,7 +194,7 @@ RSpec.describe IoThrottle do
     it "scales throttle values with the disk throughput baseline" do
       throttle_leaseweb = described_class.new("17-main", logger, 35)
       allow(File).to receive(:directory?).with(service_cgroup).and_return(true)
-      allow(throttle_leaseweb).to receive(:find_device_id).and_return("8:0")
+      allow(throttle_leaseweb).to receive_messages(find_device_id: "8:0", calculate_disk_usage_throttle: nil)
 
       ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
       allow(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
@@ -173,6 +205,32 @@ RSpec.describe IoThrottle do
       expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{28 * 1024 * 1024}")
 
       throttle_leaseweb.run
+    end
+
+    it "applies disk usage throttle when disk is high and no archival backlog" do
+      expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return([])
+      expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(throttle).to receive(:find_immune_pids).and_return([])
+      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
+
+      throttle.run
+    end
+
+    it "uses more restrictive throttle when both apply" do
+      ready_files = Array.new(150) { |i| "#{data_dir}/pg_wal/archive_status/#{i.to_s.rjust(8, "0")}.ready" }
+      expect(Dir).to receive(:glob).with("#{data_dir}/pg_wal/archive_status/*.ready").and_return(ready_files)
+      # Archival: 80 MB/s, disk usage: 55 MB/s -> pick 55
+      expect(throttle).to receive(:calculate_disk_usage_throttle).and_return(55)
+      expect(File).to receive(:read).with("#{service_cgroup}/cgroup.subtree_control").and_return("io")
+      expect(throttle).to receive(:find_immune_pids).and_return([])
+      expect(throttle).to receive(:get_cgroup_pids).and_return([]).at_least(:once)
+
+      expect(File).to receive(:write).with("#{throttled_cgroup}/io.max", "8:0 wbps=#{55 * 1024 * 1024}")
+
+      throttle.run
     end
   end
 end
