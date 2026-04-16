@@ -14,5 +14,6 @@ strict_overcommit = ARGV[1] == "true"
 pg_setup = PostgresSetup.new(v)
 pg_setup.install_packages
 pg_setup.configure_memory_overcommit(strict: strict_overcommit)
+pg_setup.configure_tcp_keepalive
 pg_setup.setup_data_directory
 pg_setup.create_cluster
