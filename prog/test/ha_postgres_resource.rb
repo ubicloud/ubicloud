@@ -151,11 +151,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     # Timelines are retained for 10 days after resource destruction for
     # customer recovery. Verify they still exist, then explicitly destroy
     # them to test timeline cleanup.
-    remaining_count = destroy_remaining_timelines(frame["timeline_ids"] || [])
-    if remaining_count > 0
-      Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining_count})")
-      nap 5
-    end
+    verify_timelines_destroyed(frame["timeline_ids"] || [])
     hop_finish
   end
 

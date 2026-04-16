@@ -37,13 +37,16 @@ class Prog::Test::Base < Prog::Base
   end
 
   # Used by postgres e2e test progs during teardown verification. Bumps
-  # the destroy semaphore on any timelines still present after the
-  # parent resource has been destroyed, and returns the count so the
-  # caller can nap until all are gone. Lives here (not on the model)
-  # because it is e2e-teardown plumbing, not production behavior.
-  def destroy_remaining_timelines(timeline_ids)
+  # the destroy semaphore on any timelines still present after the parent
+  # resource has been destroyed; logs progress and naps if any remain so
+  # the caller re-enters the same label until the set drains. Lives here
+  # (not on the model) because this is e2e teardown plumbing, not
+  # production behavior.
+  def verify_timelines_destroyed(timeline_ids)
     remaining = PostgresTimeline.where(id: timeline_ids).all
+    return if remaining.empty?
     Semaphore.incr(remaining.map(&:id), "destroy")
-    remaining.count
+    Clog.emit("Verifying timelines are retained after resource destroy (found #{remaining.count})")
+    nap 5
   end
 end
