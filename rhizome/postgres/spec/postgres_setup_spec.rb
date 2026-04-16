@@ -31,4 +31,16 @@ RSpec.describe PostgresSetup do
       pg_setup.configure_memory_overcommit
     end
   end
+
+  describe "#configure_tcp_keepalive" do
+    it "writes sysctl drop-in for 3 probes at 20s interval" do
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-tcp-keepalive.conf", <<~SYSCTL)
+        net.ipv4.tcp_keepalive_time=30
+        net.ipv4.tcp_keepalive_probes=3
+        net.ipv4.tcp_keepalive_intvl=10
+      SYSCTL
+      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
+      pg_setup.configure_tcp_keepalive
+    end
+  end
 end

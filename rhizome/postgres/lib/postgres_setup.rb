@@ -30,6 +30,15 @@ class PostgresSetup
     r "sudo sysctl --system"
   end
 
+  def configure_tcp_keepalive
+    safe_write_to_file("/etc/sysctl.d/99-tcp-keepalive.conf", <<~SYSCTL)
+      net.ipv4.tcp_keepalive_time=30
+      net.ipv4.tcp_keepalive_probes=3
+      net.ipv4.tcp_keepalive_intvl=10
+    SYSCTL
+    r "sudo sysctl --system"
+  end
+
   def setup_data_directory
     r "chown postgres /dat"
 
