@@ -56,6 +56,7 @@ else
     LoadBalancerVmPort,
     KubernetesCluster,
     VictoriaMetricsServer,
+    ParseableServer,
     KubernetesNode.eager(:vm, :kubernetes_cluster),
   ]
   host_attached_types = [
