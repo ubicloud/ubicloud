@@ -99,6 +99,29 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
       update_stack({"fail_message" => "Expected firewall CIDRs #{expected_cidrs} but got #{actual_cidrs}"})
     end
 
+    hop_test_block_all_rules
+  end
+
+  label def test_block_all_rules
+    # Set a block-all posture by clearing the rule set. With no allow
+    # rules, no ingress is permitted, so we do not need to enumerate
+    # and exclude the runner IP.
+    firewall = postgres_resource.customer_firewall
+    firewall.replace_firewall_rules([])
+
+    hop_wait_block_all_applied
+  end
+
+  label def wait_block_all_applied
+    if postgres_resource.private_subnet.update_firewall_rules_set? ||
+        postgres_resource.private_subnet.vms.any?(&:update_firewall_rules_set?)
+      nap 5
+    end
+
+    # With no allow rules, the runner cannot reach the VM on 5432.
+    vm = representative_server.vm
+    test_pg_connection(vm, should_succeed: false)
+
     hop_test_restore_open_rules
   end
 
