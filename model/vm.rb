@@ -284,6 +284,7 @@ end
 #  load_balancers_vms         | load_balancers_vms_vm_id_fkey         | (vm_id) REFERENCES vm(id)
 #  minio_server               | minio_server_vm_id_fkey               | (vm_id) REFERENCES vm(id)
 #  nic                        | nic_vm_id_fkey                        | (vm_id) REFERENCES vm(id)
+#  parseable_server           | parseable_server_vm_id_fkey           | (vm_id) REFERENCES vm(id)
 #  pci_device                 | pci_device_vm_id_fkey                 | (vm_id) REFERENCES vm(id)
 #  postgres_server            | postgres_server_vm_id_fkey            | (vm_id) REFERENCES vm(id)
 #  victoria_metrics_server    | victoria_metrics_server_vm_id_fkey    | (vm_id) REFERENCES vm(id)
