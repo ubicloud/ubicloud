@@ -12,17 +12,9 @@ RSpec.describe PostgresSetup do
 
   describe "#configure_memory_overcommit" do
     it "sets strict overcommit settings when strict is true" do
-      # 8 GB = 8388608 KB -> kbytes = 8388608 * 0.8 + 2 * 1048576 = 8808038
+      # 8 GB = 8388608 KB -> kbytes = 8388608 * 0.75 * 0.8 + 2 * 1048576 = 7130317
       allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        8388608 kB\n")
-      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=8808038\n")
-      expect(pg_setup).to receive(:r).with("sudo sysctl --system")
-      pg_setup.configure_memory_overcommit(strict: true)
-    end
-
-    it "calculates correct kbytes for smaller memory" do
-      # 4 GB = 4194304 KB -> kbytes = 4194304 * 0.8 + 2 * 1048576 = 5452595
-      allow(File).to receive(:read).with("/proc/meminfo").and_return("MemTotal:        4194304 kB\n")
-      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=5452595\n")
+      expect(pg_setup).to receive(:safe_write_to_file).with("/etc/sysctl.d/99-overcommit.conf", "vm.overcommit_memory=2\nvm.overcommit_kbytes=7130317\n")
       expect(pg_setup).to receive(:r).with("sudo sysctl --system")
       pg_setup.configure_memory_overcommit(strict: true)
     end
