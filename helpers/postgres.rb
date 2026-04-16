@@ -108,16 +108,8 @@ class Clover
     end
   end
 
-  def serialize_option_tree(node)
-    node.each_with_object({}) do |(key, value), result|
-      next if value.nil?
-      serialized_key = key.is_a?(Location) ? key.name : key.to_s
-      result[serialized_key] = serialize_option_tree(value)
-    end
-  end
-
   def postgres_option_metadata(option_tree)
-    valid = collect_valid_option_keys(option_tree)
+    valid = OptionTreeGenerator.collect_valid_values(option_tree)
     {
       flavor: Option::POSTGRES_FLAVOR_OPTIONS.slice(*valid["flavor"]).transform_values { |v| {display_name: v.title} },
       location: (valid["location"] || []).to_h { |l| [l.name, {display_name: l.display_name, ui_name: l.ui_name, provider: l.provider}] },
@@ -125,18 +117,6 @@ class Clover
       size: Option::POSTGRES_SIZE_OPTIONS.slice(*valid["size"]).transform_values { |v| {vcpu: v.vcpu_count, memory_gib: v.memory_gib} },
       ha_type: Option::POSTGRES_HA_OPTIONS.slice(*valid["ha_type"]).transform_values { |v| {display_name: v.description, standby_count: v.standby_count} },
     }
-  end
-
-  def collect_valid_option_keys(tree)
-    result = Hash.new { |h, k| h[k] = Set.new }
-    tree.each do |name, subtree|
-      next unless subtree
-      subtree.each do |value, children|
-        result[name] << value
-        collect_valid_option_keys(children).each { |k, vs| result[k].merge(vs) }
-      end
-    end
-    result
   end
 
   def postgres_require_customer_firewall!

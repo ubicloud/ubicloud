@@ -7,7 +7,7 @@ class Clover
         authorize("Postgres:view", @project)
         option_tree, = PostgresResource.generate_postgres_options(@project)
         {
-          option_tree: serialize_option_tree(option_tree),
+          option_tree: OptionTreeGenerator.stringify_tree(option_tree),
           metadata: postgres_option_metadata(option_tree),
         }
       end
