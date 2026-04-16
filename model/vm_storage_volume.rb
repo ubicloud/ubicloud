@@ -64,7 +64,7 @@ class VmStorageVolume < Sequel::Model
     # The rpc server sends each response in a separate line. The pipe through
     # `head -n 1` is to close the connection after receiving the first response,
     # otherwise the rpc server will keep the connection open waiting for the 2nd
-    # request.
+    # request, until the timeout is reached.
     #
     # `-q 2`: after stdin EOF, wait up to 2s for the response before exiting
     # `-w 2`: connection timeout

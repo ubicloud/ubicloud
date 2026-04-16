@@ -28,7 +28,12 @@ class Prog::Vm::Nexus < Prog::Base
 
     if machine_image_version_id
       fail "Machine images are only supported for metal locations" unless location.provider_dispatcher_group_name == "metal"
-      fail "No existing machine image version metal" unless MachineImageVersionMetal[machine_image_version_id]
+      miv_metal = MachineImageVersionMetal[machine_image_version_id]
+      fail "No existing machine image version metal" unless miv_metal
+      fail "Boot image cannot be specified when using machine image version" if boot_image
+      miv = miv_metal.machine_image_version
+      mi = miv.machine_image
+      boot_image = "#{mi.name}@#{miv.version}"
     end
 
     vm_size = Validation.validate_vm_size(size, arch)
