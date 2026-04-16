@@ -226,7 +226,7 @@ class Prog::Vm::Aws::Nexus < Prog::Base
   end
 
   label def wait_instance_created
-    unless (reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: ["true"]}]}).reservations.first) &&
+    unless (reservation = client.describe_instances({filters: [{name: "instance-id", values: [aws_instance.instance_id]}, {name: "tag:Ubicloud", values: [Config.provider_resource_tag_value]}]}).reservations.first) &&
         (instance_response = reservation.instances.first) &&
         instance_response.dig(:state, :name) == "running"
       nap 1
