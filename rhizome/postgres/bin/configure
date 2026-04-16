@@ -179,5 +179,6 @@ if configure_hash["physical_slots"]
   end
 end
 
-pgbouncer_setup = PgBouncerSetup.new(v, configure_hash["configs"]["max_connections"], configure_hash["pgbouncer_instances"], configure_hash["pgbouncer_user_config"])
+max_connections = configure_hash["user_config"]["max_connections"] || configure_hash["configs"]["max_connections"]
+pgbouncer_setup = PgBouncerSetup.new(v, max_connections, configure_hash["pgbouncer_instances"], configure_hash["pgbouncer_user_config"])
 pgbouncer_setup.setup
