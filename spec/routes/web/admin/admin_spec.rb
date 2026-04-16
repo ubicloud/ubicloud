@@ -1485,6 +1485,25 @@ RSpec.describe CloverAdmin do
     expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
   end
 
+  it "allows creation of local E2E strands" do
+    project = Project.create(name: "Postgres-Service-Project")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+
+    click_link "Manage Local E2E"
+    local_e2e_path = page.current_path
+    expect { click_button "Start Local E2E Strand" }.to raise_error(RuntimeError)
+
+    visit local_e2e_path
+    select "PostgresResource"
+    select "metal"
+    click_button "Start Local E2E Strand"
+
+    st = Strand.first(prog: "Test::PostgresResource")
+    expect(page).to have_flash_notice("Started local E2E strand: #{st.ubid}")
+    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}']
+  end
+
   it "shows admin list" do
     click_link "View Admin List"
     expect(page.title).to eq "Ubicloud Admin - Admin List"
