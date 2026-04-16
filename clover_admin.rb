@@ -1042,6 +1042,11 @@ class CloverAdmin < Roda
       view("authentication_audit_log")
     end
 
+    r.get "local-e2e" do
+      @strands = Strand.where(Sequel.like(:prog, "Test::%")).order(:prog, :id).all
+      view("local_e2e")
+    end
+
     r.get "admin-list" do
       @admins = DB[:admin_account].select_order_map(:login)
       view("admin_list")

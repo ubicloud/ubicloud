@@ -1461,6 +1461,30 @@ RSpec.describe CloverAdmin do
     expect(created_at_cell).to have_content(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
   end
 
+  it "shows local E2E strand status" do
+    click_link "Manage Local E2E"
+    expect(page.title).to eq "Ubicloud Admin - Manage Local E2E"
+    expect(page).to have_content("No data available for Active Local E2E Strands")
+
+    local_e2e_path = page.current_path
+    project = Project.create(name: "Postgres-Service-Project")
+    expect(Config).to receive(:postgres_service_project_id).and_return(project.id).at_least(:once)
+    expect(Config).to receive(:local_e2e_postgres_test_project_id).and_return(nil).at_least(:once)
+
+    strand = Prog::Test::PostgresResource.assemble(provider: "metal")
+    page.refresh
+    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}']
+    click_link strand.ubid
+    expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
+
+    strand.run
+    pg_ubid = UBID.to_ubid(strand.stack[0]["postgres_resource_id"])
+    visit local_e2e_path
+    expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}"]
+    click_link pg_ubid
+    expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
+  end
+
   it "shows admin list" do
     click_link "View Admin List"
     expect(page.title).to eq "Ubicloud Admin - Admin List"
