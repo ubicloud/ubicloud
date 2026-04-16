@@ -30,12 +30,16 @@ class IoThrottle
     @data_dir = "/dat/#{instance.split("-").first}/data"
   end
 
-  # Main entry point for the systemd timer: reads the archival backlog,
-  # calculates the appropriate throttle tier, and applies it.
+  # Main entry point for the systemd timer: reads the archival backlog
+  # and disk usage, calculates appropriate throttle, and applies it.
   def run
     backlog = Dir.glob("#{@data_dir}/pg_wal/archive_status/*.ready").length
-    throttle_mbps = calculate_throttle(backlog)
-    @logger.info("Archival backlog: #{backlog} files, throttle: #{throttle_mbps ? "#{throttle_mbps} MB/s" : "none"}")
+    archival_throttle_mbps = calculate_archival_throttle(backlog)
+    disk_usage_throttle_mbps = calculate_disk_usage_throttle
+    throttle_mbps = [archival_throttle_mbps, disk_usage_throttle_mbps].compact.min
+    @logger.info("Archival backlog: #{backlog} files (#{archival_throttle_mbps || "none"}), " \
+      "disk usage throttle: #{disk_usage_throttle_mbps || "none"}, " \
+      "effective: #{throttle_mbps ? "#{throttle_mbps} MB/s" : "none"}")
     apply(throttle_mbps)
   end
 
@@ -101,11 +105,19 @@ class IoThrottle
 
   private
 
-  def calculate_throttle(backlog_count)
+  def calculate_archival_throttle(backlog_count)
     IO_THROTTLE_RATIOS.each do |threshold, ratio|
       return (@disk_throughput_baseline_mbps * ratio).round if backlog_count >= threshold
     end
     nil
+  end
+
+  # descend to 25% of baseline, starting at 95% disk usage
+  def calculate_disk_usage_throttle
+    disk_usage_percent = Integer(r("df --output=pcent /dat | tail -n 1").strip.delete_suffix("%"), 10)
+    return nil if disk_usage_percent < 95
+    ratio = 1.0 - 0.15 * (disk_usage_percent - 95)
+    (@disk_throughput_baseline_mbps * ratio).round
   end
 
   def find_device_id(mount_path)
