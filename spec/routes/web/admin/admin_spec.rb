@@ -1476,14 +1476,14 @@ RSpec.describe CloverAdmin do
       local_e2e_path = page.current_path
       strand = Prog::Test::PostgresResource.assemble(provider: "metal")
       page.refresh
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}']
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", strand.ubid, '{"provider" => "metal"}', ""]
       click_link strand.ubid
       expect(page.title).to eq "Ubicloud Admin - Strand #{strand.ubid}"
 
       strand.run
       pg_ubid = UBID.to_ubid(strand.stack[0]["postgres_resource_id"])
       visit local_e2e_path
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}"]
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "wait_postgres_resource", "0", strand.ubid, "{\"provider\" => \"metal\", \"postgres_resource\" => \"#{pg_ubid}\"}", ""]
       click_link pg_ubid
       expect(page.title).to eq "Ubicloud Admin - PostgresResource #{pg_ubid}"
     end
@@ -1505,7 +1505,33 @@ RSpec.describe CloverAdmin do
 
       st = Strand.first(prog: "Test::PostgresResource")
       expect(page).to have_flash_notice("Started local E2E strand: #{st.ubid}")
-      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}']
+      expect(page.all(".local-e2e-table td").map(&:text)).to eq ["Test::PostgresResource", "start", "0", st.ubid, '{"provider" => "metal"}', ""]
+    end
+
+    it "allows pausing and unpausing strands" do
+      local_e2e_path = page.current_path
+      select "PostgresResource"
+      select "metal"
+      click_button "Start Local E2E Strand"
+
+      click_button "Pause"
+      st = Strand.first(prog: "Test::PostgresResource")
+      expect(page).to have_flash_notice("Strand #{st.ubid} paused")
+      expect(st.semaphores.map(&:name)).to eq ["pause"]
+
+      st.this.update(schedule: "2100-01-01")
+      click_button "Unpause"
+      expect(page).to have_flash_notice("Strand #{st.ubid} unpaused")
+      expect(st.semaphores(reload: true)).to eq []
+      expect(st.this.get(:schedule)).to be_within(10).of(Time.now)
+
+      st.this.update(prog: "Test::Base")
+      expect { click_button "Pause" }.to raise_error(RuntimeError)
+
+      visit local_e2e_path
+      st.destroy
+      click_button "Pause"
+      expect(page).to have_flash_error("Strand not found, it was probably already deleted")
     end
   end
 
