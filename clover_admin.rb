@@ -16,6 +16,12 @@ class CloverAdmin < Roda
     TableLink.new(...)
   end
 
+  TableFormButton = Data.define(:text, :attributes)
+
+  def table_form_button(text, **attributes)
+    TableFormButton.new(text, attributes)
+  end
+
   Unreloader.record_dependency("lib/audit_log.rb", __FILE__)
 
   MIN_AUDIT_LOG_END_DATE = Date.new(2025, 6)
@@ -102,6 +108,7 @@ class CloverAdmin < Roda
 
   plugin :symbol_matchers
   symbol_matcher(:ubid, /([a-tv-z0-9]{26})/)
+  symbol_matcher(:ubid_uuid, :ubid) { UBID.to_uuid(it) }
 
   plugin :not_found do
     raise "admin route not handled: #{request.path}" if Config.test? && !ENV["DONT_RAISE_ADMIN_ERRORS"]
@@ -1052,18 +1059,41 @@ class CloverAdmin < Roda
       view("authentication_audit_log")
     end
 
-    r.is "local-e2e" do
-      r.get do
-        @strands = Strand.where(Sequel.like(:prog, "Test::%")).order(:prog, :id).all
-        view("local_e2e")
+    r.on "local-e2e" do
+      strand_ds = Strand.where(Sequel.like(:prog, "Test::%"))
+
+      r.is do
+        r.get do
+          @strands = strand_ds.order(:prog, :id).all
+          view("local_e2e")
+        end
+
+        r.post do
+          prog, provider = typecast_params.nonempty_str(%w[prog provider])
+          raise "invalid local E2E prog or provider" unless LOCAL_E2E_PROGS.include?(prog) && LOCAL_E2E_PROVIDERS.include?(provider)
+          st = Prog::Test.const_get(prog).assemble(provider:)
+          flash["notice"] = "Started local E2E strand: #{st.ubid}"
+          r.redirect
+        end
       end
 
-      r.post do
-        prog, provider = typecast_params.nonempty_str(%w[prog provider])
-        raise "invalid local E2E prog or provider" unless LOCAL_E2E_PROGS.include?(prog) && LOCAL_E2E_PROVIDERS.include?(provider)
-        st = Prog::Test.const_get(prog).assemble(provider:)
-        flash["notice"] = "Started local E2E strand: #{st.ubid}"
-        r.redirect
+      r.post %w[pause unpause].freeze, :ubid_uuid do |action, strand_id|
+        unless (strand = strand_ds.with_pk(strand_id))
+          flash["error"] = "Strand not found, it was probably already deleted"
+          r.redirect "/local-e2e"
+        end
+
+        raise "invalid strand" unless LOCAL_E2E_PROGS.include?(strand.prog.split("::").last)
+
+        if action == "pause"
+          Semaphore.incr(strand.id, "pause")
+        else
+          Semaphore.where(strand_id: strand.id, name: "pause").destroy
+          strand.this.update(schedule: Sequel::CURRENT_TIMESTAMP)
+        end
+
+        flash["notice"] = "Strand #{strand.ubid} #{action}d"
+        r.redirect "/local-e2e"
       end
     end
 
