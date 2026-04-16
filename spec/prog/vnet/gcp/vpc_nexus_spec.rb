@@ -412,7 +412,10 @@ RSpec.describe Prog::Vnet::Gcp::VpcNexus do
       expect(nfp_client).to receive(:get)
         .and_return(policy_missing)
         .exactly(described_class::VERIFY_ASSOC_MAX_TRIES).times
-      allow(Clog).to receive(:emit)
+      expect(Clog).to receive(:emit)
+        .with("GCP firewall policy association missing after already-exists rescue", anything)
+        .exactly(described_class::VERIFY_ASSOC_MAX_TRIES - 1).times
+        .and_call_original
 
       (described_class::VERIFY_ASSOC_MAX_TRIES - 1).times do
         expect { nx.send(:verify_firewall_policy_associated_with_vpc!, vpc_target) }.to nap(5)
