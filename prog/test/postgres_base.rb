@@ -31,6 +31,14 @@ class Prog::Test::PostgresBase < Prog::Test::Base
     end
   end
 
+  def before_run
+    super
+
+    if pause_set?
+      nap(60 * 60)
+    end
+  end
+
   def start(**)
     location_id, target_vm_size, target_storage_size_gib = self.class.postgres_test_location_options(frame["provider"])
 

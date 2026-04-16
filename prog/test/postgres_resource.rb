@@ -3,6 +3,8 @@
 require_relative "../../lib/util"
 
 class Prog::Test::PostgresResource < Prog::Test::PostgresBase
+  semaphore :pause
+
   def self.assemble(provider: "metal")
     super(provider:, project_name: "Postgres-Test-Project")
   end
