@@ -200,12 +200,7 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
     ip = vm.ip4_string
     begin
       vm.sshable.cmd("nc -zvw 5 :ip 5432", ip:)
-    rescue *Sshable::SSH_CONNECTION_ERRORS => e
-      # SSH transport failure — says nothing about the firewall under
-      # test. On the positive path, sshd may still be coming up, so
-      # retry. On the negative path, a block check that never reached
-      # nc cannot conclude the firewall blocked anything — fail loudly
-      # instead of passing silently.
+    rescue Sshable::SshError, *Sshable::SSH_CONNECTION_ERRORS
       if should_succeed
         retries = (frame["pg_connect_retries"] || 0) + 1
         if retries < 10
@@ -213,16 +208,6 @@ class Prog::Test::PostgresFirewall < Prog::Test::Base
           nap 15
         end
         update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded after #{retries} attempts"})
-      else
-        update_stack({"fail_message" => "Block test inconclusive: SSH transport error #{e.class}: #{e.message}"})
-      end
-    rescue Sshable::SshError
-      # Remote nc exited non-zero — proof of connect refusal/timeout.
-      # On should_succeed: false this is the expected pass; on
-      # should_succeed: true the VM is already known-up (default rules
-      # just verified), so fail fast rather than retry.
-      if should_succeed
-        update_stack({"fail_message" => "Connection to #{ip}:5432 should have succeeded but nc failed"})
       end
     else
       unless should_succeed

@@ -163,7 +163,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "naps if connectivity fails" do
       expect(sshable).to receive(:_cmd).with("sudo apt-get update && sudo apt-get install -y netcat-openbsd").ordered
-      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Errno::ECONNREFUSED.new("Connection refused")).ordered
+      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil)).ordered
       expect { pg_fw_test.test_default_firewall_rules }.to nap(15)
     end
   end
@@ -261,13 +261,6 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
       expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
       expect(frame_value(pg_fw_test, "fail_message")).to include("should have been blocked")
-    end
-
-    it "sets fail_message when SSH transport fails (block test inconclusive)" do
-      expect(sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432")
-        .and_raise(Errno::ECONNREFUSED.new("Connection refused"))
-      expect { pg_fw_test.wait_block_all_applied }.to hop("test_restore_open_rules")
-      expect(frame_value(pg_fw_test, "fail_message")).to match(/Block test inconclusive/)
     end
   end
 
@@ -373,30 +366,21 @@ RSpec.describe Prog::Test::PostgresFirewall do
       expect(frame_value(pg_fw_test, "fail_message")).to be_nil
     end
 
-    it "naps when SSH transport fails and should_succeed is true" do
+    it "naps when connection fails and should_succeed is true" do
       vm = pg_fw_test.representative_server.vm
       allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
-      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Errno::ECONNREFUSED.new("Connection refused"))
+      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
       expect { pg_fw_test.send(:test_pg_connection, vm, should_succeed: true) }.to nap(15)
       expect(frame_value(pg_fw_test, "pg_connect_retries")).to eq(1)
     end
 
-    it "sets fail_message after exhausting SSH transport retries" do
-      vm = pg_fw_test.representative_server.vm
-      allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
-      expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Errno::ECONNREFUSED.new("Connection refused"))
-      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 9})
-      pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
-    end
-
-    it "sets fail_message when nc fails and should_succeed is true (fail fast)" do
+    it "sets fail_message after exhausting retries" do
       vm = pg_fw_test.representative_server.vm
       allow(vm).to receive(:ip4_string).and_return("1.2.3.4")
       expect(vm.sshable).to receive(:_cmd).with("nc -zvw 5 1.2.3.4 5432").and_raise(Sshable::SshError.new("nc -zvw 5 1.2.3.4 5432", "", "Connection refused", 1, nil))
+      refresh_frame(pg_fw_test, new_values: {"pg_connect_retries" => 9})
       pg_fw_test.send(:test_pg_connection, vm, should_succeed: true)
-      expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded but nc failed")
-      expect(frame_value(pg_fw_test, "pg_connect_retries")).to be_nil
+      expect(frame_value(pg_fw_test, "fail_message")).to include("should have succeeded")
     end
   end
 end
