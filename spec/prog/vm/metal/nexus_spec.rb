@@ -119,10 +119,11 @@ RSpec.describe Prog::Vm::Metal::Nexus do
 
     it "sets machine_image_version_id if provided" do
       miv = create_machine_image_version_metal
-      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true, image: "model"}], machine_image_version_id: miv.id)
+      st = Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: nil, storage_volumes: [{size_gib: 20}, {size_gib: 10, read_only: true, image: "model"}], machine_image_version_id: miv.id)
       vols = st.stack.first["storage_volumes"]
       expect(vols[0]["machine_image_version_id"]).to eq(miv.id)
       expect(vols[1]).not_to have_key("machine_image_version_id")
+      expect(st.subject.boot_image).to eq("test-mi@v1")
     end
 
     it "fails if MachineImageVersionMetal with given machine_image_version_id does not exist" do
@@ -133,11 +134,18 @@ RSpec.describe Prog::Vm::Metal::Nexus do
       }.to raise_error RuntimeError, "No existing machine image version metal"
     end
 
+    it "fails if boot_image is specified when using machine_image_version_id" do
+      miv = create_machine_image_version_metal
+      expect {
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: "ubuntu-jammy", machine_image_version_id: miv.id)
+      }.to raise_error RuntimeError, "Boot image cannot be specified when using machine image version"
+    end
+
     it "fails if MachineImageVersionMetal with given machine_image_version_id is not enabled" do
       miv = create_machine_image_version_metal
       miv.update(enabled: false)
       expect {
-        Prog::Vm::Nexus.assemble("some_ssh key", project.id, machine_image_version_id: miv.id)
+        Prog::Vm::Nexus.assemble("some_ssh key", project.id, boot_image: nil, machine_image_version_id: miv.id)
       }.to raise_error RuntimeError, "machine image version #{miv.id} is not available"
     end
 
