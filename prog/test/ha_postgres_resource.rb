@@ -24,7 +24,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     location_id, target_vm_size, target_storage_size_gib = if frame["provider"] == "aws"
       location = Location[provider: "aws", project_id: nil, name: "us-east-1"]
       unless LocationCredentialAws[location.id]
-        LocationCredentialAws.create_with_id(location.id, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
+        LocationCredentialAws.create_with_id(location, access_key: Config.e2e_aws_access_key, secret_key: Config.e2e_aws_secret_key)
       end
       family = "m8gd"
       vcpus = 2
@@ -32,7 +32,7 @@ class Prog::Test::HaPostgresResource < Prog::Test::Base
     elsif frame["provider"] == "gcp"
       location = Location[provider: "gcp", project_id: nil]
       unless LocationCredentialGcp[location.id]
-        LocationCredentialGcp.create_with_id(location.id,
+        LocationCredentialGcp.create_with_id(location,
           credentials_json: Config.e2e_gcp_credentials_json,
           project_id: Config.e2e_gcp_project_id,
           service_account_email: Config.e2e_gcp_service_account_email)

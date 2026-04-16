@@ -80,7 +80,7 @@ RSpec.describe PostgresServer do
     end
 
     describe "#refresh_walg_blob_storage_credentials" do
-      before { Sshable.create_with_id(vm.id) }
+      before { Sshable.create_with_id(vm) }
 
       it "writes SA key JSON to the server" do
         expect(postgres_server.vm.sshable).to receive(:_cmd).with(

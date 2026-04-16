@@ -67,7 +67,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "creates a postgres resource on gcp and hops to wait_postgres_resource" do
       gcp_location = Location[provider: "gcp", project_id: nil]
       unless LocationCredentialGcp[gcp_location.id]
-        LocationCredentialGcp.create_with_id(gcp_location.id,
+        LocationCredentialGcp.create_with_id(gcp_location,
           project_id: "test-gcp-project",
           service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
           credentials_json: "{}")
@@ -105,7 +105,7 @@ RSpec.describe Prog::Test::HaPostgresResource do
     it "creates a postgres resource on gcp with c4a-standard family and hops to wait_postgres_resource" do
       gcp_location = Location[provider: "gcp", project_id: nil]
       unless LocationCredentialGcp[gcp_location.id]
-        LocationCredentialGcp.create_with_id(gcp_location.id,
+        LocationCredentialGcp.create_with_id(gcp_location,
           project_id: "test-gcp-project",
           service_account_email: "test@test-gcp-project.iam.gserviceaccount.com",
           credentials_json: "{}")

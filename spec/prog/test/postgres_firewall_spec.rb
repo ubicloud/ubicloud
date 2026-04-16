@@ -114,7 +114,7 @@ RSpec.describe Prog::Test::PostgresFirewall do
 
     it "skips creating gcp credential if one already exists" do
       gcp_location = Location[provider: "gcp", project_id: nil]
-      LocationCredentialGcp.create_with_id(gcp_location.id,
+      LocationCredentialGcp.create_with_id(gcp_location,
         project_id: "existing-project",
         service_account_email: "existing@test.iam.gserviceaccount.com",
         credentials_json: "{}")

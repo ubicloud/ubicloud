@@ -13,7 +13,7 @@ RSpec.describe PostgresTimeline do
       visible: true,
       provider: "aws",
     )
-    LocationCredentialAws.create_with_id(loc.id, access_key: "aws-access-key", secret_key: "aws-secret-key")
+    LocationCredentialAws.create_with_id(loc, access_key: "aws-access-key", secret_key: "aws-secret-key")
     loc
   end
 
